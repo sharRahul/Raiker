@@ -52,7 +52,13 @@ from typing import Any, Literal, cast
 
 from raiker.contracts.views import View
 from raiker.models.readiness import ModelReadiness, ModelReadinessService
-from raiker.models.wire import DecisionProblem, ModelDecisionView
+from raiker.models.wire import (
+    DecisionProblem,
+    ModelDecisionView,
+    NextAction,
+    ReadinessStep,
+    ReadinessStepState,
+)
 
 SelectionSource = Literal["surface_default", "global_default", "native_default"]
 EffectiveReason = Literal["selected", "fallback", "no_ready_candidate"]
@@ -99,6 +105,8 @@ class ModelDecision:
     running: bool | None
     problem: dict[str, str] | None
     revision: str
+    steps: tuple[ReadinessStep, ...] = ()
+    next_action: NextAction | None = None
 
     def to_dict(self) -> ModelDecisionView:
         return {
@@ -120,6 +128,8 @@ class ModelDecision:
             "running": self.running,
             "problem": cast("DecisionProblem | None", self.problem),
             "revision": self.revision,
+            "steps": list(self.steps),
+            "next_action": self.next_action,
         }
 
 
@@ -261,6 +271,12 @@ class ModelDecisionService:
             )
             problem = _problem(head)
 
+        steps, next_action = readiness_steps(
+            selected=selected,
+            head=head,
+            has_connection=self._has_connection(owner_principal_id, selected.profile_id),
+            catalogue_lists_model=self._catalogue_lists(owner_principal_id, selected),
+        )
         return ModelDecision(
             surface=surface,
             project_id=project_id or None,
@@ -270,7 +286,52 @@ class ModelDecisionService:
             running=self._running(effective.profile_id),
             problem=problem,
             revision=self._revision(owner_principal_id, selected, effective),
+            steps=steps,
+            next_action=next_action,
         )
+
+    # ── readiness steps ──────────────────────────────────────────────────────
+
+    def _has_connection(self, owner_principal_id: str, profile_id: str) -> bool | None:
+        """Whether the owner can reach this profile's provider at all.
+
+        With a profile: a local runtime needs no saved connection, and a hosted
+        one needs the owner's own. Without one: whether *any* provider is
+        connected, because the first step of "nothing chosen yet" is still
+        "is there anything to choose from". ``None`` when the store cannot say.
+        """
+        from raiker.models.connections import list_model_connections
+
+        try:
+            connected = set(list_model_connections(self.store, owner_principal_id))
+        except Exception:  # noqa: BLE001 — unknown, not "not connected"
+            return None
+        if not profile_id:
+            return bool(connected)
+        if profile_id in connected:
+            return True
+        try:
+            from raiker.models.registry import ModelProfileRegistry
+
+            profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001
+            return None
+        # A local runtime and a hosted profile whose key lives in the
+        # environment are both reachable without a saved connection; whether
+        # they really answer is the readiness check's question, not this one.
+        return True if profile.local_only else None
+
+    def _catalogue_lists(self, owner_principal_id: str, selected: ModelChoice) -> bool | None:
+        """Whether the provider's last catalogue named the selected model."""
+        if not selected.profile_id or not selected.model:
+            return None
+        try:
+            listed = self.store.list_provider_catalogue(owner_principal_id, selected.profile_id)
+        except Exception:  # noqa: BLE001
+            return None
+        if not listed:
+            return None
+        return selected.model in listed
 
     # ── runtime ──────────────────────────────────────────────────────────────
 
@@ -320,6 +381,117 @@ class ModelDecisionService:
             sort_keys=True,
         )
         return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
+
+#: The four steps, in the order an owner meets them (UX-MODEL-02).
+_STEP_LABELS: tuple[tuple[str, str], ...] = (
+    ("connect", "Provider connected"),
+    ("discover", "Model found"),
+    ("choose", "Model chosen"),
+    ("run", "Runs"),
+)
+
+#: Which step a readiness verdict stops at, and the one action that moves it.
+#: Keyed by reason code first, because one state can mean two different steps:
+#: ``unsupported`` is a catalogue the provider will not list *or* an execution
+#: check it will not run, and they are fixed in different places.
+_REASON_STEP: dict[str, tuple[str, NextAction]] = {
+    "provider_not_configured": ("connect", {"label": "Connect the provider", "target": "add"}),
+    "local_runtime_missing": ("connect", {"label": "Install the runtime", "target": "runtime"}),
+    "provider_authentication_failed": ("connect", {"label": "Update the credential", "target": "add"}),
+    "provider_workspace_required": ("connect", {"label": "Add the workspace ID", "target": "add"}),
+    "provider_workspace_invalid": ("connect", {"label": "Check the workspace ID", "target": "add"}),
+    "provider_model_missing": ("discover", {"label": "Choose an available model", "target": "models"}),
+    "local_model_missing": ("discover", {"label": "Download the model", "target": "models"}),
+    "model_catalogue_unsupported": ("discover", {"label": "Choose a supported provider", "target": "add"}),
+    "local_runtime_unreachable": ("run", {"label": "Start the runtime", "target": "runtime"}),
+    "provider_policy_blocked": ("run", {"label": "Review model policy", "target": "permissions"}),
+    "provider_quota_exhausted": ("run", {"label": "Check again after adding credit", "target": "check"}),
+}
+_STATE_STEP: dict[str, tuple[str, NextAction]] = {
+    "not_configured": ("connect", {"label": "Connect the provider", "target": "add"}),
+    "authentication_failed": ("connect", {"label": "Update the credential", "target": "add"}),
+    "runtime_missing": ("connect", {"label": "Install the runtime", "target": "runtime"}),
+    "model_missing": ("discover", {"label": "Choose an available model", "target": "models"}),
+    "configuration_unreadable": ("choose", {"label": "Choose the model again", "target": "models"}),
+    "runtime_stopped": ("run", {"label": "Start the runtime", "target": "runtime"}),
+}
+
+
+def readiness_steps(
+    *,
+    selected: ModelChoice,
+    head: ModelReadiness | None,
+    has_connection: bool | None,
+    catalogue_lists_model: bool | None,
+) -> tuple[tuple[ReadinessStep, ...], NextAction | None]:
+    """Say the decision as four steps and one next action (UX-MODEL-02).
+
+    "Provider connected", "models discovered", "model selected" and "runtime
+    available" were four facts the owner had to read off four places and put in
+    order themselves. This puts them in order: every step before the one that
+    stops the work is done, that one is ``blocked`` and carries the action, and
+    every step after it is ``waiting`` — not failed, because nothing has been
+    asked of it yet. A pair that has never been checked is ``unchecked`` at
+    ``run``; it is not reported as broken, and the action is to check it.
+
+    Pure, so the table can be tested one verdict at a time; nothing here reads a
+    store or invents a verdict readiness did not give.
+    """
+    blocked_at: str | None = None
+    unchecked_run = False
+    action: NextAction | None = None
+
+    if not selected.profile_id or not selected.model:
+        if has_connection is False:
+            blocked_at = "connect"
+            action = {"label": "Connect a provider", "target": "add"}
+        else:
+            blocked_at = "choose"
+            action = {"label": "Choose a model", "target": "models"}
+    elif head is None or head.ready:
+        blocked_at = None
+    elif head.reason_code == "model_not_checked" or head.state.value in ("stale", "checking"):
+        unchecked_run = True
+        action = {"label": "Check it now", "target": "check"}
+    else:
+        step, action = _REASON_STEP.get(head.reason_code) or _STATE_STEP.get(
+            head.state.value, ("run", {"label": "Check again", "target": "check"})
+        )
+        blocked_at = step
+
+    steps: list[ReadinessStep] = []
+    reached_block = False
+    for step_id, label in _STEP_LABELS:
+        state: ReadinessStepState
+        if reached_block:
+            state = "waiting"
+        elif step_id == blocked_at:
+            state = "blocked"
+            reached_block = True
+        elif unchecked_run and step_id == "run":
+            state = "unchecked"
+        elif (
+            unchecked_run
+            and step_id == "connect"
+            and has_connection is not True
+        ) or (unchecked_run and step_id == "discover" and catalogue_lists_model is not True):
+            # Never checked, and nothing else on record says this step passed:
+            # say so rather than tick it.
+            state = "unchecked"
+        else:
+            state = "done"
+        steps.append(
+            cast(ReadinessStep, {"id": step_id, "label": label, "state": state})
+        )
+    if selected.profile_id and selected.model and head is None:
+        # `resolve_chain` could not be read: the decision already carries the
+        # problem, and no step claims to have passed a check it never saw.
+        steps = [
+            cast(ReadinessStep, {**step, "state": "unchecked"}) for step in steps
+        ]
+        action = {"label": "Check it now", "target": "check"}
+    return tuple(steps), action
 
 
 def _problem(entry: ModelReadiness | None) -> dict[str, str] | None:

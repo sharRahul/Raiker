@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatContextUsage, formatCost, sourceNote } from "../contextPresentation";
+  import { providerName } from "../format";
   import type { ContextUsage } from "../apiTypes";
 
   /**
@@ -93,7 +94,7 @@
       ["Cache read", usage?.price_cache_read_per_mtok],
     ].filter((row): row is [string, string] => typeof row[1] === "string" && row[1] !== ""),
   );
-  const providerLabel = $derived(usage?.provider ? `${usage.provider}, all time` : "All time");
+  const providerLabel = $derived(usage?.provider ? `${providerName(usage.provider)}, all time` : "All time");
   // Backlog #16 — how much of the tool catalogue a turn carries. Absent on an
   // older server, which renders nothing rather than "0 deferred".
   const toolsProjected = $derived(usage?.tools_projected ?? 0);

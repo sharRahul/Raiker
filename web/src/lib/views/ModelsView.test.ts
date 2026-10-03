@@ -1557,6 +1557,41 @@ describe("ModelsView action-category tabs", () => {
     expect(screen.queryByText("Off-machine provider posture")).toBeNull();
   });
 
+  it("shows My models as a comparison on request, with Unknown for unstated facts", async () => {
+    // UX-MODEL-04 — cost, context, privacy and tool support were spread over
+    // tabs and cards; Compare puts them in one row per model.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "qwen3:8b",
+            configured: true,
+          }),
+          // Never connected, so not a model this owner has set up.
+          profile({ profile_id: "anthropic-hosted", provider: "anthropic", off_machine: true }),
+        ],
+      }),
+    });
+    render(ModelsView, { props: { tab: "models" } });
+    const compare = await screen.findByRole("button", { name: "Compare" });
+    expect(compare).toHaveAttribute("aria-pressed", "false");
+    await fireEvent.click(compare);
+    expect(compare).toHaveAttribute("aria-pressed", "true");
+    const table = await screen.findByRole("table");
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent?.trim()),
+    ).toEqual(["Model", "Runs", "Context", "Tools", "Vision", "Estimated cost", "Availability"]);
+    // The fixture declares no capabilities, so nothing reads Yes or No.
+    expect(within(table).queryAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    await fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
   it("folds fallback order and the advisor into advanced routing", async () => {
     // REM-MODEL-02 / UX-MODEL-05 — "Runtime & routing" opened on four things at
     // once: what is serving, what is on disk, what each surface starts on, and

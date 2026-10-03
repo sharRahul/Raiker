@@ -243,6 +243,43 @@ def _fake_image_provider(monkeypatch: Any) -> None:
 
 
 
+def _stored_image(deleted: bool, suffix: str = "") -> Seed:
+    """UX-DESIGN-01 — one picture already in the owner's gallery (or in
+    Recently deleted), so the lifecycle routes answer about a real row."""
+
+    def seed(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+        store = SQLiteStore(ws)
+        store.save_attachment(
+            attachment_id="att_contract",
+            kind="generated_image",
+            filename="img_contract.png",
+            media_type="image/png",
+            sha256="x",
+            data=_PNG,
+            owner_principal_id=OWNER,
+        )
+        store.record_image_generation(
+            generation_id="img_contract",
+            owner_principal_id=OWNER,
+            profile_id="openai-hosted",
+            provider="openai",
+            model="gpt-image-1",
+            prompt="a cat",
+            size="1024x1024",
+            status="ok",
+            attachment_id="att_contract",
+            media_type="image/png",
+            byte_size=len(_PNG),
+        )
+        if deleted:
+            store.set_image_generation_deleted(
+                "img_contract", owner_principal_id=OWNER, deleted=True
+            )
+        return f"/api/images/img_contract{suffix}"
+
+    return seed
+
+
 CASES: Cases = {
     ("GET", "/api/model-readiness"): plain("/api/model-readiness"),
     ("POST", "/api/model-readiness/check"): plain(
@@ -346,5 +383,8 @@ CASES: Cases = {
     ),
     ("GET", "/api/images"): plain("/api/images"),
     ("POST", "/api/images"): patched(_image, _fake_image_provider),
+    ("DELETE", "/api/images/{generation_id}"): _stored_image(deleted=False),
+    ("POST", "/api/images/{generation_id}/restore"): _stored_image(deleted=True, suffix="/restore"),
+    ("DELETE", "/api/images/{generation_id}/purge"): _stored_image(deleted=True, suffix="/purge"),
     ("POST", "/api/language/check"): plain("/api/language/check", {"text": "This are wrong.", "language": "en-US"}),
 }

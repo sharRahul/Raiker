@@ -26,7 +26,7 @@
   import PageState from "./PageState.svelte";
   import { api } from "../api";
   import type { ImageGeneration } from "../apiTypes";
-  import { relativeTime } from "../format";
+  import { providerName, relativeTime } from "../format";
   import {
     designAssets,
     KIND_LABEL,
@@ -42,6 +42,11 @@
     readable,
     sizedProviders = undefined,
     selectedId = $bindable(null),
+    deleted = [],
+    filedIn = undefined,
+    ondelete = undefined,
+    onrestore = undefined,
+    onpurge = undefined,
   }: {
     turns: ImageGeneration[];
     loading?: boolean;
@@ -60,7 +65,42 @@
      * selection the button cannot see would be a selection that means nothing.
      */
     selectedId?: string | null;
+    /** UX-DESIGN-01 — Recently deleted, newest deletion first. */
+    deleted?: ImageGeneration[];
+    /**
+     * UX-DESIGN-02 — where a picture is filed, in words: a project's name, or
+     * "Unfiled". Absent, the inspector makes no claim about filing.
+     */
+    filedIn?: (projectId: string | null) => string;
+    /** UX-DESIGN-01 — the lifecycle actions. Absent, the control is not drawn. */
+    ondelete?: (generationId: string) => Promise<void>;
+    onrestore?: (generationId: string) => Promise<void>;
+    onpurge?: (generationId: string) => Promise<void>;
   } = $props();
+
+  /** The picture whose lifecycle request is in flight, so only its controls wait. */
+  let lifecycleBusy = $state<string | null>(null);
+  async function lifecycle(
+    action: ((generationId: string) => Promise<void>) | undefined,
+    generationId: string,
+  ) {
+    if (action === undefined || lifecycleBusy !== null) return;
+    lifecycleBusy = generationId;
+    try {
+      await action(generationId);
+    } finally {
+      lifecycleBusy = null;
+    }
+  }
+
+  /** The irreversible step says what it removes, and is never the first one. */
+  function purge(item: ImageGeneration) {
+    const ok = window.confirm(
+      `Remove "${item.prompt}" for good? The picture and its bytes are deleted from ` +
+        "this workspace and cannot be restored.",
+    );
+    if (ok) void lifecycle(onpurge, item.generation_id);
+  }
 
   const assets = $derived(designAssets(turns));
 
@@ -87,6 +127,48 @@
   const shot = (generation: ImageGeneration) => api.imageBytesUrl(generation.generation_id);
 </script>
 
+{#snippet recentlyDeleted()}
+  {#if deleted.length > 0 && (onrestore !== undefined || onpurge !== undefined)}
+    <!-- UX-DESIGN-01 — put away, not gone. Closed by default: it is a way
+         back, not part of the work. -->
+    <details class="deleted" data-testid="design-recently-deleted">
+      <summary>Recently deleted <span>{deleted.length}</span></summary>
+      <p class="sub">
+        Kept until you remove them for good. Restoring puts a picture back with
+        its versions.
+      </p>
+      <ul>
+        {#each deleted as item (item.generation_id)}
+          <li>
+            {#if item.has_image}
+              <img src={shot(item)} alt={item.prompt} loading="lazy" />
+            {/if}
+            <span class="deleted-prompt">{item.prompt}</span>
+            <span class="deleted-actions">
+              {#if onrestore}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={lifecycleBusy !== null}
+                  onclick={() => void lifecycle(onrestore, item.generation_id)}
+                >Restore</button>
+              {/if}
+              {#if onpurge}
+                <button
+                  type="button"
+                  class="btn btn-sm btn-ghost danger"
+                  disabled={lifecycleBusy !== null}
+                  onclick={() => purge(item)}
+                >Remove for good</button>
+              {/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </details>
+  {/if}
+{/snippet}
+
 {#if loadError}
   <PageState state="error" title="Couldn't read your generations" detail={loadError} />
 {:else if loading}
@@ -97,6 +179,7 @@
     title="Nothing generated yet"
     detail="Describe an image below. What you generate is stored in this workspace."
   />
+  {@render recentlyDeleted()}
 {:else if selected === null}
   <!-- No object, so no three-pane frame: the history *is* the page. Selecting
        an asset is what turns this surface into a canvas. -->
@@ -125,6 +208,7 @@
       </li>
     {/each}
   </ol>
+  {@render recentlyDeleted()}
 {:else}
   <div class="workspace">
     <!-- Assets. Every picture this owner has, newest first, so the one being
@@ -245,16 +329,59 @@
               {#if sizeWasSent(selected.generation)}
                 {selected.generation.size}
               {:else}
-                <span class="muted">chosen by {selected.generation.provider}</span>
+                <span class="muted">chosen by {providerName(selected.generation.provider)}</span>
               {/if}
             </dd>
           </div>
           <div><dt>When</dt><dd>{relativeTime(selected.generation.created_at)}</dd></div>
+          {#if filedIn !== undefined}
+            <!-- UX-DESIGN-02 — where it was filed when it was made. Captured on
+                 the row at submission; changing the project selector later
+                 does not move it. -->
+            <div><dt>Filed in</dt><dd>{filedIn(selected.generation.project_id)}</dd></div>
+          {/if}
         </dl>
-        <a class="download" href={shot(selected.generation)} target="_blank" rel="noopener">
-          Open full size
-        </a>
+        <div class="asset-actions">
+          <a class="download" href={shot(selected.generation)} target="_blank" rel="noopener">
+            Open full size
+          </a>
+          <!-- UX-DESIGN-01 — export: the same owner-scoped bytes, named for
+               the picture and with the extension of what was returned. -->
+          <a class="download" href={api.imageDownloadUrl(selected.generation.generation_id)} download>
+            <Icon name="download" size="sm" />Download
+          </a>
+          {#if ondelete}
+            <button
+              type="button"
+              class="link danger"
+              disabled={lifecycleBusy !== null}
+              onclick={() => void lifecycle(ondelete, selected!.generation.generation_id)}
+            >Delete</button>
+          {/if}
+        </div>
       </section>
+
+      {#if (selected.generation.references ?? []).length > 0}
+        <!-- UX-DESIGN-03 — the research this picture was sent with, as the
+             provider received it, with the pages it came from. -->
+        <section class="panel" aria-label="References">
+          <h3>Sent with</h3>
+          <ul class="references">
+            {#each selected.generation.references as reference, index (index)}
+              <li>
+                <p class="reference-name">{reference.name}</p>
+                <details>
+                  <summary>Passage sent to {providerName(selected.generation.provider)}</summary>
+                  <p class="reference-text">{reference.text}</p>
+                </details>
+                {#each reference.sources as url (url)}
+                  <a class="reference-source" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+                {/each}
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
 
       {#if refusals.length > 0}
         <!-- Why the executor records lineage on refusals too: an edit that was
@@ -273,6 +400,99 @@
 {/if}
 
 <style>
+  .references {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .reference-name {
+    margin: 0;
+    color: var(--text-1);
+    font-weight: 600;
+  }
+  .references summary {
+    cursor: pointer;
+    color: var(--text-2);
+  }
+  .reference-text {
+    margin: var(--space-1) 0 0;
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+  .reference-source {
+    display: block;
+    color: var(--accent);
+    overflow-wrap: anywhere;
+  }
+  .asset-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-2);
+  }
+  .asset-actions .download {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .danger {
+    color: var(--danger, var(--warn));
+  }
+  .deleted {
+    margin-top: var(--space-5);
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-3);
+  }
+  .deleted summary {
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--text-2);
+  }
+  .deleted summary span {
+    color: var(--text-3);
+    margin-left: 0.25rem;
+  }
+  .deleted ul {
+    list-style: none;
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .deleted li {
+    display: grid;
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .deleted img {
+    width: 3rem;
+    height: 3rem;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    opacity: 0.7;
+  }
+  .deleted-prompt {
+    font-size: var(--text-sm);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+  .deleted-actions {
+    display: inline-flex;
+    gap: var(--space-2);
+  }
+  @media (max-width: 47.9rem) {
+    .deleted li {
+      grid-template-columns: 3rem minmax(0, 1fr);
+    }
+    .deleted-actions {
+      grid-column: 1 / -1;
+    }
+  }
   .turns {
     list-style: none;
     margin: 0;

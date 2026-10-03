@@ -166,6 +166,17 @@ questions in order:
    they are two different facts and the page states both.
 4. **Other models you can use** — what else is set up and not already in use.
 
+**A row that is not ready says which step stops it.** Under the model, four
+steps in the order you meet them — **Provider connected → Model found → Model
+chosen → Runs** — with a tick for each one passed, a warning on the one that
+needs you, and the ones after it simply waiting. Beside them is one button: the
+single thing that moves the stopped step forward — **Connect a provider**,
+**Choose a model**, **Start the runtime**, **Update the credential**. **Check it
+now** runs the exact-model check on the spot, for a model you have chosen and
+never run: *not checked yet* is a different fact from *broken*, and the line
+never ticks a step nothing has checked. A ready row says **Ready** and nothing
+else.
+
 Tasks and Schedule are not on that list because they do not hold a live default.
 They capture the model chosen when the work is created, so a run that fires next
 week uses the model it was scheduled with rather than whatever you have selected
@@ -185,6 +196,29 @@ where you have set no default, the picker says **Not selected** and means it.
 Raiker ships with profiles it can offer, and none of them is a choice you made.
 
 ---
+
+## Comparing models
+
+**My models → Compare** puts every model you have set up in one table:
+**Runs** (on this device, a private server, or a hosted service — and so whether
+your prompts leave this device), **Context**, **Tools**, **Vision**, **Estimated
+cost** and **Availability**. Choosing still happens in the list; the table is
+for deciding.
+
+**Unknown means no source states it.** A profile that declares nothing about
+vision reads *Unknown*, not *No*; a hosted model with no published rate reads
+*Unknown*, not *$0*. A model that runs on this machine has no API bill and says
+so. Rates are list prices per million tokens in and out — what you have actually
+spent is on **Usage**.
+
+A model you have not set up — a hosted provider you never connected, a local
+slot with nothing deployed — is not in the table, because it is not something
+you could pick. One that is set up and currently failing stays in, with the
+reason in **Availability**.
+
+Provider and profile identifiers are not labels. Where a stable id is useful —
+correlating a usage card with a log or an export — it is under **Details** at
+the foot of the card.
 
 ## Connect a hosted provider
 

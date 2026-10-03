@@ -106,7 +106,8 @@ describe("Settings → Memory engine", () => {
     await fireEvent.click(screen.getByRole("button", { name: /embed 6/i }));
 
     expect(asked[0]).toContain("Send 4 approved memories");
-    expect(asked[0]).toContain("to openai");
+    // UX-MODEL-05 — the destination by its display name, not the provider key.
+    expect(asked[0]).toContain("to OpenAI");
     // Refused, so nothing ran.
     expect(screen.queryByText(/Embedded 4 memories/)).not.toBeInTheDocument();
   });

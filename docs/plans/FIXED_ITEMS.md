@@ -746,6 +746,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-722](#fixed-722--creating-an-mcp-sample-named-a-server-that-did-not-exist) | Low | MCP | Fixed 2026-10-03 — found by the live round |
 | [FIXED-723](#fixed-723--a-model-chosen-by-search-was-shown-as-the-default) | Medium | Models / composers | Fixed 2026-10-03 — found by the live round |
 | [FIXED-724](#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | Low | Chat | Fixed 2026-10-03 (closes UX-CHAT-02 with FIXED-581) |
+| [FIXED-725](#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) | Medium | Models | Fixed 2026-10-03 (closes UX-MODEL-02) |
+| [FIXED-726](#fixed-726--choosing-between-models-meant-opening-each-one-and-remembering-the-last) | Medium | Models | Fixed 2026-10-03 (closes UX-MODEL-04) |
+| [FIXED-727](#fixed-727--internal-identifiers-were-still-primary-labels-in-four-places) | Low | Models / Design / Memory | Fixed 2026-10-03 (closes UX-MODEL-05 with FIXED-530) |
+| [FIXED-728](#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it) | Low | Build | Fixed 2026-10-03 (closes UX-BUILD-02 with FIXED-521) |
+| [FIXED-729](#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for) | Medium | Build | Fixed 2026-10-03 (closes UX-BUILD-03 with FIXED-582) |
+| [FIXED-730](#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) | Medium | Build | Fixed 2026-10-03 (closes UX-BUILD-04) |
+| [FIXED-731](#fixed-731--a-generated-picture-could-not-be-exported-deleted-or-brought-back) | Medium | Design | Fixed 2026-10-03 (closes UX-DESIGN-01 with FIXED-491, FIXED-492) |
+| [FIXED-732](#fixed-732--no-project-read-as-nothing-rather-than-as-a-place-a-picture-would-go) | Low | Design | Fixed 2026-10-03 (closes UX-DESIGN-02 with FIXED-492) |
+| [FIXED-733](#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt) | Medium | Design | Fixed 2026-10-03 (closes UX-DESIGN-03) |
+| [FIXED-734](#fixed-734--an-approved-command-that-failed-left-its-turn-waiting-forever) | High | Approvals / Build / Chat | Fixed 2026-10-03 — found by the live round |
+| [FIXED-735](#fixed-735--every-composers-primary-action-had-no-name-at-phone-width) | Medium | Composer / accessibility | Fixed 2026-10-03 — found by the live round |
+| [FIXED-736](#fixed-736--builds-evidence-line-counted-calls-and-not-what-the-turn-read) | Low | Build | Fixed 2026-10-03 — found by the live round |
 
 ---
 
@@ -29362,3 +29374,345 @@ still what fetches the record.
 
 **Evidence.** `TurnEvidence.test.ts` — *summarises calls, sources and approvals
 while closed*. Not exercised by the live round, whose turns used no tool.
+
+---
+
+## FIXED-725 — Readiness was four facts in four places, and nothing said which one stopped the work
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-10-03.
+Closes [UX-MODEL-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+
+**Observed.** "Provider connected", "models discovered", "model selected" and
+"runtime available" were each true or false somewhere — the provider card, the
+catalogue, the global picker, the readiness check — and the Overview reduced
+them to **Ready** or **Not ready** with a generic **Fix**. An owner had to read
+four places and order the facts themselves to learn what to do next.
+
+**Fixed.** The model decision (`/api/model-decisions`) carries `steps` and
+`next_action`, authored on the server by `readiness_steps` in
+`raiker/models/decision.py`: **Provider connected → Model found → Model chosen →
+Runs**, every step before the one that stops the work `done`, that one
+`blocked` with the single action that moves it, every step after it `waiting`.
+A pair that has never been checked is `unchecked` at **Runs** — not broken — and
+its action is **Check it now**, which the Overview runs in place against the
+exact pair and then re-reads the decision. Nothing claims a step it never saw:
+an unreadable chain marks every step `unchecked`. The Overview draws the line
+only while a step is not done, and **Needs attention** uses the same action word,
+so the two never offer different fixes for one problem.
+
+**Evidence.** `tests/test_model_readiness_steps.py` (16 cases: each verdict
+stops at its own step, unchecked is not blocked, no selection, no provider, the
+route); `ModelsOverview.test.ts` (4 cases). Live, on a fresh workspace: the line
+stopped at *Provider connected* with **Connect a provider**; after Anthropic was
+connected it moved to *Model chosen* with **Choose a model**; after **Use** it
+read *Runs — not checked yet* with **Check it now**; pressing it made the row
+**Ready** and the line stepped aside (captures 01–03b).
+
+---
+
+## FIXED-726 — Choosing between models meant opening each one and remembering the last
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-10-03.
+Closes [UX-MODEL-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+
+**Observed.** Cost, context, privacy and tool support were spread across the
+Overview, model details, Usage and provider cards. DEC-08 step 4 asks for one
+comparable projection in which an unknown fact renders Unknown.
+
+**Fixed.** **My models → Compare** draws one row per model the owner has set up:
+**Runs** (and whether prompts leave the device), **Context**, **Tools**,
+**Vision**, **Estimated cost** and **Availability**. The profile view gained
+`supports_tool_calls`, `supports_vision` (each `null` when the profile says
+nothing, never collapsed to `false`) and this model's list rate
+(`rate_input_per_mtok`, `rate_output_per_mtok`, `rate_currency`, `null` when no
+source names one). `modelComparison.ts` holds the rules: Unknown is never No and
+never $0, a model running here has *No API cost*, and the table scrolls inside
+its own focusable region so the page never scrolls sideways.
+
+**Found by the live round, fixed before closing.** The first capture listed four
+empty local GGUF slots and a shipped Ollama profile beside the one model the
+owner had connected — the registry, not the owner's models. The table now takes
+`isComparable`: a model that exists here and, if hosted, is connected. It is
+deliberately not `isChoosableModel`, which also hides a model whose check
+answered badly: Availability exists to show that beside the alternatives.
+
+**Evidence.** `modelComparison.test.ts` (5), `ModelsView.test.ts` — *shows My
+models as a comparison*, `tests/test_api_dashboard.py` — *carry the comparison
+facts and keep unknown unknown*; live captures 04 and 05 (390 px, no horizontal
+overflow).
+
+---
+
+## FIXED-727 — Internal identifiers were still primary labels in four places
+
+**Severity: Low. Area: Models / Design / Memory. Status: Fixed 2026-10-03.
+Closes [UX-MODEL-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models) together with
+[FIXED-530](#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants).**
+
+**Observed.** FIXED-530 moved fallback routing and raw profile ids into Advanced.
+An audit of every rendered `provider` and `profile_id` found four places left:
+the Usage card printed `anthropic-hosted` as the second line under the
+provider's name (its comment said the id was also "in the connection detail
+below", which did not exist); the price registry's sync list, Design's *chosen
+by gemini*, the context meter's *anthropic, all time* and Memory engine's
+*Send … to openai* printed provider keys.
+
+**Fixed.** The Usage card's id moved into a closed **Details** disclosure at the
+card's foot; the other four print `providerName(...)`. Model-setup's
+*Technical details* already kept ids in a disclosure and stays.
+
+**Evidence.** `ProviderUsagePanel.test.ts` — *leads with the provider's name and
+keeps the profile id in Details*; the Design and Memory engine assertions now
+expect *Gemini* and *OpenAI*. Live capture 10.
+
+---
+
+## FIXED-728 — Build's boundary named where a turn ran and not what answered it
+
+**Severity: Low. Area: Build. Status: Fixed 2026-10-03.
+Closes [UX-BUILD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build) together with
+[FIXED-521](#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run).**
+
+**Observed.** FIXED-521 (REM-BUILD-02) put *Runs on* beside Project and
+Repository. UX-BUILD-02 and DEC-06 step 2 name the order Project → repository →
+environment → **model**, and the model — the fact that decides whether a prompt
+leaves the machine — was only on the picker.
+
+**Fixed.** The context inspector ends with **Model**: the model and provider,
+whether it is *your default* or *chosen for this work*, and a fallback that
+would answer instead. It has no `short` form, because the picker beside the line
+already prints the name.
+
+**Evidence.** `BuildView.test.ts` — *orders the boundary Project → repository →
+environment → model*; live capture 06.
+
+---
+
+## FIXED-729 — On a narrow window, a drawer could sit over the approval a turn was waiting for
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-10-03.
+Closes [UX-BUILD-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build) together with
+[FIXED-582](#fixed-582--builds-workbench-closed-itself-on-every-reload).**
+
+**Observed.** FIXED-582 (REM-BUILD-01) gave Build one workbench pane with four
+views and remembered state. DEC-06 step 4 also says *approval review overrides
+the normal inspector*. Below 1024 px the workbench and the file explorer are
+modal drawers over the transcript, which is where an approval is reviewed, so a
+drawer opened to read a file hid — and made inert — the one decision the turn was
+waiting on.
+
+**Fixed.** When a **new** approval id appears, a narrow window closes the open
+drawers without changing the workbench tab or recording the explorer as closed
+(`newlyRaisedApproval` in `buildArtifacts.ts`). A drawer the owner reopens while
+the approval is still pending stays open.
+
+**Evidence.** `buildArtifacts.test.ts` (the trigger), `BuildView.test.ts` —
+*puts a narrow window's workbench drawer away when an approval is raised*, which
+fails with the effect disabled. Live capture 09.
+
+---
+
+## FIXED-730 — Build's closed loop was claimed from its parts, not proven end to end
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-10-03.
+Closes [UX-BUILD-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+
+**Observed.** UX-BUILD-04 and DEC-06 steps 5–6 ask that release acceptance
+cover edit → test → diagnose → retry → green → summary, including failure and an
+approval interruption, because a working diff view and a working terminal do not
+prove that a red test returns to the model. No acceptance run did. The first
+attempt at one found that it could not: the failed test command dead-ended the
+turn ([FIXED-734](#fixed-734--an-approved-command-that-failed-left-its-turn-waiting-forever)).
+
+**Fixed and proved.** `web/e2e/round-2026-10-03-models-build-design-live.spec.ts`
+— *Build closes the loop* — is now the acceptance run, against a real model
+(Anthropic Haiku 4.5) with **File writes**, **Shell commands** and the
+**Approval execution relay** turned on through Permissions and every action
+going through a real approval. A workspace folder holds `pricing.py`, whose
+`total()` subtracts a discount as a flat amount, and `test_pricing.py`, which
+expects a percentage. Asked to run the test, fix the module and not the test,
+and keep going until it passes, the turn:
+
+1. proposed `python <folder>/test_pricing.py` and stopped for the owner's
+   approval;
+2. ran it once on approval — it failed with an assertion — and the turn resumed
+   with that failure (FIXED-734);
+3. read both files, explained the bug (*60 − 10 = 50, expected 54*), proposed
+   the edit to `pricing.py`, and stopped for approval;
+4. re-ran the test on the third approval, which printed *all tests passed*;
+5. ended with **What was wrong / What I changed / Final test result**, with the
+   two files as sources.
+
+The spec then runs the test itself, outside Raiker, and asserts it passes and
+that the test file is unchanged.
+
+**Evidence.** Live captures 06–08: the boundary before the turn, the first
+approval interrupting it, and the green summary.
+
+---
+
+## FIXED-731 — A generated picture could not be exported, deleted or brought back
+
+**Severity: Medium. Area: Design. Status: Fixed 2026-10-03.
+Closes [UX-DESIGN-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design) together with
+[FIXED-491](#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) and
+[FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in).**
+
+**Observed.** FIXED-491 and FIXED-492 built the asset model UX-DESIGN-01 asks
+for — project ownership, immutable versions as a chain of single parents, source
+prompt, model and options, a durable owner-scoped file. DEC-07 step 1 also names
+*export and delete/recover*, and neither existed: the only way out of the
+gallery was never to have made the picture. The one download path,
+`Content-Disposition: inline; filename="<id>.png"`, named every picture `.png`
+whatever the provider returned.
+
+**Fixed.** `image_generations.deleted_at` (migration
+`RAIKER-2084-image-lifecycle-and-references`). `DELETE /api/images/{id}` puts a
+picture in **Recently deleted** with its bytes and lineage;
+`POST …/restore` brings it back; `DELETE …/purge` removes it for good — only
+from Recently deleted, and the row and its attachment in one transaction, so no
+row points at missing bytes and no bytes are orphaned. Every one is
+owner-scoped, and another owner's id answers exactly as one never issued. A
+deleted picture cannot be an edit's subject. `?download=1` returns the picture
+as `raiker-<words from the prompt>-<id tail>.<ext>`, with the extension of the
+returned media type and characters any filesystem accepts. The inspector offers
+**Download** and **Delete**; Recently deleted is a closed disclosure under the
+history with **Restore** and a confirmed **Remove for good**.
+
+**Evidence.** `tests/test_image_lifecycle.py` (7), `DesignView.test.ts`
+(*a picture's lifecycle*, 2). Live, on pictures seeded into the workspace's own
+store by `scripts/seed_design_assets.py` (no image provider is reachable from
+this host): the download's `Content-Disposition` read
+`attachment; filename="raiker-the-same-lighthouse-with-a-red-….png"`, a
+deleted edit waited in Recently deleted and came back, and an unfiled picture
+removed for good was gone from both lists (captures 12–14).
+
+---
+
+## FIXED-732 — "No project" read as nothing, rather than as a place a picture would go
+
+**Severity: Low. Area: Design. Status: Fixed 2026-10-03.
+Closes [UX-DESIGN-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design) together with
+[FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in).**
+
+**Observed.** FIXED-492 files a picture against the project the composer names
+and captures it at submission. With no project chosen the context line said
+nothing at all, so "no project" read the same as "the project I had open last",
+and the inspector never said where a picture was filed.
+
+**Fixed.** With no project the line reads **Unfiled** (*this picture belongs to
+no project. Choose one under +*), and the inspector says **Filed in** — the
+project's name, **Unfiled**, or *a project not in your list*.
+
+**Evidence.** `DesignView.test.ts` — *where a generation will be filed* (2);
+live captures 11 and 12.
+
+---
+
+## FIXED-733 — Research could only reach a picture by being pasted into the prompt
+
+**Severity: Medium. Area: Design. Status: Fixed 2026-10-03.
+Closes [UX-DESIGN-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design).**
+
+**Observed.** FIXED-538 put the pages a research turn read beside its findings.
+Using the findings for a picture meant copying prose into the prompt: no record
+of where it came from, and no moment at which the owner agreed to send it to the
+image provider. DEC-07 step 5 asks for both.
+
+**Fixed.** **Use as a reference** turns a research result into a named
+reference — the question, the findings as plain text without Raiker's citation
+markers, and the http(s) pages read, cited first. Each reference has its own
+**Send with the prompt to *provider*** box, unticked; only ticked references are
+sent, as an audited `references` argument rather than spliced into the prompt.
+The executor validates them again (`parse_references`: at most three, a name, a
+passage of at most 1,000 characters, at most five http(s) pages), refuses the
+request on anything malformed rather than dropping it, composes them after the
+owner's prompt as labelled reference material, holds the whole to
+`MAX_PROMPT_CHARS`, and records them in `references_json` on every row the
+request writes — refusals included. The inspector lists what a picture was
+**Sent with**.
+
+**Evidence.** `tests/test_image_references.py` (12), `designReferences.test.ts`
+(5), `DesignView.test.ts` — *builds a reference from research and sends it only
+after consent*, `tests/test_image_lifecycle.py` (references in the gallery and
+the request body). **Not driven live:** this host has no route to a search
+provider or an image provider, so neither a research turn nor a generation could
+complete here; the route-level case shows the request reaching the governed
+path.
+
+---
+
+## FIXED-734 — An approved command that failed left its turn waiting forever
+
+**Severity: High. Area: Approvals / Build / Chat. Status: Fixed 2026-10-03 —
+found by the live round.**
+
+**Observed.** Driving UX-BUILD-04's loop live, the model proposed
+`python test_pricing.py`, the owner approved it, the relay ran it, and it exited
+non-zero — which is what a red test does. Build went on showing *Waiting for
+approval* and the decision card with **Accept**; every further press answered
+`approval_already_resolved`, and the turn never continued. The approval was
+`execution_failed`; the parked turn was still `suspended` with no outcome.
+
+**Root cause.** `POST /api/approvals/{id}/resolve` raised its 409 for a failed
+execution *before* `_record_resume_outcome`. Every other ending — executed,
+rejected, recorded-not-executed — records an outcome on the parked turn, which
+is what makes it resumable; this one recorded nothing, so the turn could never
+be claimed, and the model was never handed the failure it had been asked to
+diagnose. `ApprovalExecutionBridge` also dropped the failed command's output on
+the way.
+
+**Fixed.** When the relay leaves the approval `execution_failed` — the action
+ran once and did not succeed — the route records an outcome first:
+`approval_outcome(failed=True)` is `status: "failed"`, `executed: true`, the
+reason code and what the executor returned (exit code, stdout, stderr), with a
+note that approving it once did not approve a retry. The 409 response is
+unchanged. A refusal where nothing ran still records nothing, because that
+approval went back to pending and the turn is still waiting for a decision.
+Build reads the pending decisions again after such a 409: when the card is no
+longer pending it says *Approved and run once — it did not succeed (exit code
+N). The turn continues with the output* and lets the resume watcher continue
+the turn, instead of offering **Accept** on a decision already spent.
+
+**Evidence.** `tests/test_approval_execution_wiring.py` — *the parked turn hears
+the failure and becomes resumable* (409 kept, outcome `failed` with the reason,
+listed by `/api/approvals/resumable`); the approval and resume suites unchanged.
+Live: the closed-loop round below.
+
+---
+
+## FIXED-735 — Every composer's primary action had no name at phone width
+
+**Severity: Medium. Area: Composer / accessibility. Status: Fixed 2026-10-03 —
+found by the live round.**
+
+**Observed.** At 390 px the narrow-window Build scenario could not find **Run**
+by its name: the button was in the composer, enabled, and nameless. Below
+48 rem the shared `Composer` collapsed the button to an icon with
+`.send-label { display: none }`, and `display: none` removes text from the
+accessibility tree — so Chat's **Send**, Build's **Run**, Design's **Generate**
+and the Tasks composer's primary action were all unlabelled buttons on a phone.
+
+**Fixed.** The label is visually hidden (`clip`, one pixel, `overflow: hidden`)
+rather than removed, so it stays the button's accessible name at every width.
+
+**Evidence.** `appCss.test.ts` — *hides the label visually without removing
+it*; the live narrow-window scenario now finds **Run** by name at 390 px.
+
+---
+
+## FIXED-736 — Build's evidence line counted calls and not what the turn read
+
+**Severity: Low. Area: Build. Status: Fixed 2026-10-03 — found by the live
+round. Completes [FIXED-724](#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) for Build.**
+
+**Observed.** The closed-loop turn read two files, cited them as sources, and
+paused three times for approval; its closed evidence line said *5 calls*.
+FIXED-724 taught `TurnEvidence` to count sources and approvals, and only Chat
+passed it the counts.
+
+**Fixed.** Build passes the turn's source count and its parked approval, as
+Chat does.
+
+**Evidence.** `BuildView.test.ts` — *counts the sources a turn read beside its
+calls*, which fails without the change.

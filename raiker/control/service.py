@@ -1322,6 +1322,7 @@ class RuntimeControlService:
         source_generation_id: str = "",
         variations: int = 1,
         project_id: str = "",
+        references: list[dict[str, Any]] | None = None,
     ) -> ControlResult:
         """One governed image generation, edit or variation, for Design.
 
@@ -1360,6 +1361,10 @@ class RuntimeControlService:
                 **({"source_generation_id": source_generation_id} if source_generation_id else {}),
                 **({"variations": variations} if variations != 1 else {}),
                 **({"project_id": project_id} if project_id else {}),
+                # UX-DESIGN-03 — in the audited arguments, so the approval
+                # preview and the audit event show exactly what research was
+                # sent with the prompt. Absent when none was chosen.
+                **({"references": references} if references else {}),
             },
             risk_level=RiskLevelValue.MEDIUM,
         )

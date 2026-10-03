@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**353 operations: 342 verified, 0 eligible, 0 deferred, 11 special.**
+**356 operations: 345 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -148,7 +148,10 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/hugging-face/{owner}/{repository}/variants` |  | HuggingFaceVariants | verified | declared HuggingFaceVariants |
 | GET | `/api/images` |  | ImageGallery | verified | declared ImageGallery |
 | POST | `/api/images` | GenerateImageRequest | ImagesGenerated | verified | declared by cast |
+| DELETE | `/api/images/{generation_id}` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
 | GET | `/api/images/{generation_id}/bytes` |  |  | special | special |
+| DELETE | `/api/images/{generation_id}/purge` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
+| POST | `/api/images/{generation_id}/restore` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
 | POST | `/api/instances` | InstanceCreateRequest | InstanceCreated | verified | declared InstanceCreated |
 | POST | `/api/interrupts` | InterruptRequest | InterruptResult | verified | declared InterruptResult |
 | DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |

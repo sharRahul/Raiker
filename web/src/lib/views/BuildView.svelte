@@ -89,7 +89,8 @@
     turnCapabilityModes,
     type BuildMode,
   } from "../buildModes";
-  import { humanize, relativeTime } from "../format";
+  import { humanize, providerName, relativeTime } from "../format";
+  import { modelName } from "../modelPresentation";
   import {
     attachmentChipsByTurn,
     mergeRestoredChips,
@@ -119,6 +120,7 @@
     readWorkbenchTab,
     rememberWorkbenchOpen,
     rememberWorkbenchTab,
+    newlyRaisedApproval,
     type ArtifactTab,
   } from "../buildArtifacts";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
@@ -619,6 +621,33 @@
     if (!visible && railOpen) closeRail(false);
   });
 
+  /*
+   * UX-BUILD-03 — approval review overrides the normal inspector.
+   *
+   * Narrow, the workbench and the explorer are modal drawers over the
+   * transcript, which is where an approval is reviewed. When a new one is
+   * raised they step aside; the tab and the explorer's place are kept, so the
+   * owner returns to exactly what they had open. Wide, nothing covers the
+   * transcript and nothing moves.
+   */
+  let approvalIdsSeen: string[] = [];
+  $effect(() => {
+    const ids = approvals.map((approval) => approval.approval_id);
+    const raised = newlyRaisedApproval(approvalIdsSeen, ids);
+    approvalIdsSeen = ids;
+    if (!raised || !compactRail) return;
+    untrack(() => {
+      if (railOpen) closeRail(false);
+      if (filesOpen) {
+        // Not `closeFiles`: that records the explorer as closed, and stepping
+        // aside for an approval is not the owner choosing to close it.
+        deactivateFiles?.(false);
+        deactivateFiles = null;
+        filesOpen = false;
+      }
+    });
+  });
+
   $effect(() => {
     if (!compactRail || !railOpen || railElement === undefined) return;
     const shellBackground = Array.from(document.querySelectorAll<HTMLElement>(".topbar, .sidebar"));
@@ -824,7 +853,9 @@
     }
   }
 
-  const contextFacts = $derived([
+  // UX-BUILD-02 — `$derived.by`, because the model fact reads the composer's
+  // model state, which is declared further down this script.
+  const contextFacts = $derived.by(() => [
     ...(selectedProject !== null
       ? [
           /*
@@ -859,6 +890,30 @@
             short: runtimeEnvironment.name,
             href: "#/settings?tab=runtime",
             action: "Change",
+          },
+        ]
+      : []),
+    /*
+     * UX-BUILD-02 — the last link of the boundary: Project → repository →
+     * environment → model. The line named where a turn runs and not what
+     * answers it, so the one fact that decides whether a prompt leaves this
+     * machine was only on the picker. No `short`: the picker beside the line
+     * already prints the name, and saying it twice on one bar is noise. The
+     * inspector says whether it is the default or this work's own choice, and
+     * names a fallback rather than letting it stand in silently.
+     */
+    ...(activeProfile !== null && activeProfile.model !== ""
+      ? [
+          {
+            label: "Model",
+            value:
+              `${modelName(activeProfile.model)} · ${providerName(activeProfile.provider)}` +
+              (modelProfile !== "" ? " — chosen for this work" : " — your default") +
+              (decision?.effective.reason === "fallback"
+                ? ` — using ${modelName(decision.effective.model)} for now`
+                : ""),
+            href: "#/models",
+            action: "Models",
           },
         ]
       : []),
@@ -1930,10 +1985,35 @@
         await resumeTurn(approval.approval_id, approve ? "success" : "rejected");
       }
     } catch (error) {
-      approvalNotice =
-        error instanceof ApiError
-          ? `The decision was not accepted (${error.reasonCode ?? error.status}).`
-          : "The decision could not be recorded.";
+      /*
+       * UX-BUILD-04 — `target_not_executed` is two different outcomes. If
+       * governance stopped the action before it ran, the approval went back to
+       * pending and the card stays. If it ran once and failed — a red test is
+       * the ordinary case — the decision is spent, the server has handed the
+       * failure to the parked turn, and the card must not go on offering
+       * Accept. Re-reading the pending decisions is what tells them apart.
+       */
+      let spent = false;
+      if (
+        approve &&
+        error instanceof ApiError &&
+        (error.reasonCode ?? "").startsWith("target_not_executed")
+      ) {
+        await loadApprovals();
+        spent = !approvals.some((item) => item.approval_id === approval.approval_id);
+      }
+      if (spent && error instanceof ApiError) {
+        const detail = (error.reasonCode ?? "")
+          .replace(/^target_not_executed:/, "")
+          .replace(/^exit_code:(\d+)$/, "exit code $1");
+        approvalNotice = `Approved and run once — it did not succeed (${detail}). The turn continues with the output.`;
+        resumeWatcher?.checkNow();
+      } else {
+        approvalNotice =
+          error instanceof ApiError
+            ? `The decision was not accepted (${error.reasonCode ?? error.status}).`
+            : "The decision could not be recorded.";
+      }
     } finally {
       approvalBusy = null;
     }
@@ -2370,10 +2450,15 @@
                  the turn's coordinate, each call's action id and the governed
                  events the runtime actually wrote down. -->
             {#if turn.response?.turn_id || turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
+              <!-- UX-CHAT-02's closed line, with the same counts Chat gives it:
+                   Build passed none, so a turn that read two files and paused
+                   for three decisions read only "5 calls". -->
               <TurnEvidence
                 sessionId={sessionId}
                 turnId={turn.response?.turn_id ?? null}
                 rows={toolRows}
+                sources={turnSourceList.length}
+                approvals={turn.response?.approval ? 1 : 0}
                 phases={groupPhases(turn.events).map((row) => ({
                   phase: row.phase,
                   label: row.label,

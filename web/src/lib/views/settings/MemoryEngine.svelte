@@ -14,6 +14,7 @@
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
+  import { providerName } from "../../format";
   import type { MemorySettingsView } from "../../apiTypes";
   import PageState from "../../components/PageState.svelte";
   import Icon from "../../components/Icon.svelte";
@@ -64,7 +65,7 @@
     if (!indexTarget || busy) return;
     const waiting = indexTarget.unindexed_memories ?? 0;
     const waitingFiles = indexTarget.unindexed_file_chunks ?? 0;
-    const where = indexTarget.local_only ? "on this machine" : `to ${indexTarget.provider}`;
+    const where = indexTarget.local_only ? "on this machine" : `to ${providerName(indexTarget.provider)}`;
     const question =
       `${indexTarget.local_only ? "Process" : "Send"} ${waiting} approved ` +
       `${waiting === 1 ? "memory" : "memories"} and ${waitingFiles} managed document ` +
@@ -150,7 +151,7 @@
               <option value="">Choose an embedding model…</option>
               {#each providers as provider (provider.space)}
                 <option value={provider.space}
-                  >{provider.model} · {provider.local_only ? "on this machine" : provider.provider}</option
+                  >{provider.model} · {provider.local_only ? "on this machine" : providerName(provider.provider)}</option
                 >
               {/each}
             </select>

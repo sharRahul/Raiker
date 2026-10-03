@@ -277,6 +277,11 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     reasoning_modes: [],
     supports_reasoning_summary: false,
     image_models: [],
+    supports_tool_calls: null,
+    supports_vision: null,
+    rate_input_per_mtok: null,
+    rate_output_per_mtok: null,
+    rate_currency: null,
     ...over,
   };
 }

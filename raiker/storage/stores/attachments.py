@@ -108,6 +108,7 @@ class AttachmentStore:
         source_generation_id: str | None = None,
         kind: str = "create",
         project_id: str | None = None,
+        references_json: str | None = None,
     ) -> None:
         """Record one attempt, whether or not it produced an image.
 
@@ -127,8 +128,8 @@ class AttachmentStore:
             INSERT OR REPLACE INTO image_generations
             (generation_id, owner_principal_id, profile_id, provider, model, prompt,
              size, status, reason_code, attachment_id, media_type, byte_size, created_at,
-             source_generation_id, kind, project_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             source_generation_id, kind, project_id, references_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 generation_id,
@@ -147,22 +148,85 @@ class AttachmentStore:
                 source_generation_id,
                 kind,
                 project_id,
+                references_json,
             ),
         )
 
     def list_image_generations(
-        self: SQLiteStore, *, owner_principal_id: str | None = None, limit: int = 60
+        self: SQLiteStore,
+        *,
+        owner_principal_id: str | None = None,
+        limit: int = 60,
+        deleted: bool = False,
     ) -> list[dict[str, Any]]:
         """Newest first. ``None`` disables owner scoping; an empty string fails
-        closed rather than dropping the predicate (see ``load_attachment``)."""
+        closed rather than dropping the predicate (see ``load_attachment``).
+
+        UX-DESIGN-01 — ``deleted`` chooses which of the two lists: the gallery
+        (``False``) or Recently deleted (``True``), newest deletion first. The
+        two never mix, so a picture put away cannot reappear as a version or a
+        sibling in the gallery it was taken out of.
+        """
         scoped = owner_principal_id is not None
+        clauses = (["owner_principal_id = ?"] if scoped else []) + [
+            "deleted_at IS NOT NULL" if deleted else "deleted_at IS NULL"
+        ]
+        order = "deleted_at DESC, generation_id DESC" if deleted else "created_at DESC, generation_id DESC"
         rows = self._rows(
-            "SELECT * FROM image_generations"
-            + (" WHERE owner_principal_id = ?" if scoped else "")
-            + " ORDER BY created_at DESC, generation_id DESC LIMIT ?",
+            "SELECT * FROM image_generations WHERE "
+            + " AND ".join(clauses)
+            + f" ORDER BY {order} LIMIT ?",
             (*([owner_principal_id] if scoped else []), int(limit)),
         )
         return [dict(row) for row in rows]
+
+    def set_image_generation_deleted(
+        self: SQLiteStore, generation_id: str, *, owner_principal_id: str, deleted: bool
+    ) -> bool:
+        """Put one picture away, or bring it back. Owner-scoped; False when the
+        id is not this owner's or is already in the state asked for."""
+        if not owner_principal_id:
+            return False
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE image_generations SET deleted_at = ? "
+                "WHERE generation_id = ? AND owner_principal_id = ? AND deleted_at IS "
+                + ("NULL" if deleted else "NOT NULL"),
+                (utc_now() if deleted else None, generation_id, owner_principal_id),
+            )
+            return cursor.rowcount == 1
+
+    def purge_image_generation(
+        self: SQLiteStore, generation_id: str, *, owner_principal_id: str
+    ) -> bool:
+        """Remove a picture that is already in Recently deleted, with its bytes.
+
+        Only from Recently deleted: removing for good is the second of two
+        deliberate steps, never the first. The row and its attachment go in one
+        transaction, so a failure leaves both or neither — never a row pointing
+        at bytes that are gone, or bytes nothing points at.
+        """
+        if not owner_principal_id:
+            return False
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT attachment_id FROM image_generations WHERE generation_id = ? "
+                "AND owner_principal_id = ? AND deleted_at IS NOT NULL",
+                (generation_id, owner_principal_id),
+            ).fetchone()
+            if row is None:
+                return False
+            attachment_id = row[0]
+            connection.execute(
+                "DELETE FROM image_generations WHERE generation_id = ? AND owner_principal_id = ?",
+                (generation_id, owner_principal_id),
+            )
+            if attachment_id:
+                connection.execute(
+                    "DELETE FROM attachments WHERE attachment_id = ? AND owner_principal_id = ?",
+                    (attachment_id, owner_principal_id),
+                )
+            return True
 
     def get_image_generation(
         self: SQLiteStore, generation_id: str, *, owner_principal_id: str | None = None

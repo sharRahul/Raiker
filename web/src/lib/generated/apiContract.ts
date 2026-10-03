@@ -1779,6 +1779,7 @@ export type GenerateImageRequest = {
   source_generation_id?: string;
   variations?: number;
   project_id?: string;
+  references?: ImageReferenceRequest[];
 };
 
 export type GistDiscarded = {
@@ -2094,6 +2095,7 @@ export type ImageGallery = {
   sizes: string[];
   sized_providers: string[];
   generations: ImageGeneration[];
+  deleted: ImageGeneration[];
 };
 
 /** One generation as the page sees it — metadata only, never the bytes. */
@@ -2113,6 +2115,29 @@ export type ImageGeneration = {
   source_generation_id: string | null;
   kind: "create" | "edit" | "variation";
   project_id: string | null;
+  deleted_at: string | null;
+  references: ImageReference[];
+};
+
+/** A picture put away, brought back, or removed for good. */
+export type ImageLifecycleChanged = {
+  ok: boolean;
+  generation_id: string;
+  state: "deleted" | "restored" | "removed";
+};
+
+/** A research passage sent with a prompt, with the pages it came from. */
+export type ImageReference = {
+  name: string;
+  text: string;
+  sources: string[];
+};
+
+/** One research passage the owner consented to send with an image prompt. */
+export type ImageReferenceRequest = {
+  name: string;
+  text: string;
+  sources?: string[];
 };
 
 /** One governed generation request; ``generation_ids`` holds every variation made. */
@@ -2898,6 +2923,8 @@ export type ModelDecisionView = {
   running: boolean | null;
   problem: DecisionProblem | null;
   revision: string;
+  steps: ReadinessStep[];
+  next_action: NextAction | null;
 };
 
 export type ModelDecisions = {
@@ -3036,6 +3063,11 @@ export type ModelProfileView = {
   reasoning_modes: string[];
   supports_reasoning_summary: boolean;
   image_models: string[];
+  supports_tool_calls: boolean | null;
+  supports_vision: boolean | null;
+  rate_input_per_mtok: string | null;
+  rate_output_per_mtok: string | null;
+  rate_currency: string | null;
 };
 
 export type ModelReadinessCheckRequest = {
@@ -3140,6 +3172,12 @@ export type NativeUsageView = {
   checked_at: string | null;
   expires_at: string | null;
   metrics: NativeUsageMetricView[];
+};
+
+/** The one thing that moves the first unfinished step forward. */
+export type NextAction = {
+  label: string;
+  target: "add" | "models" | "runtime" | "check" | "permissions";
 };
 
 /**
@@ -3693,6 +3731,13 @@ export type ReadCapabilities = {
   surfaces: Record<string, string[]>;
   administrative_surfaces: string[];
   readiness: ToolReadinessView[];
+};
+
+/** One of the four steps between "nothing set up" and "this work can run". */
+export type ReadinessStep = {
+  id: "connect" | "discover" | "choose" | "run";
+  label: string;
+  state: "done" | "blocked" | "waiting" | "unchecked";
 };
 
 /** An approved memory a turn of this conversation was given, as Raiker knows it now. */
@@ -5086,6 +5131,12 @@ export const contract = {
     request<ImageGallery>("/api/images"),
   generateImage: (body: GenerateImageRequest) =>
     call<ImagesGenerated>("POST", "/api/images", { body }),
+  deleteImage: (generationId: string) =>
+    call<ImageLifecycleChanged>("DELETE", `/api/images/${encodeURIComponent(generationId)}`),
+  purgeImage: (generationId: string) =>
+    call<ImageLifecycleChanged>("DELETE", `/api/images/${encodeURIComponent(generationId)}/purge`),
+  restoreImage: (generationId: string) =>
+    call<ImageLifecycleChanged>("POST", `/api/images/${encodeURIComponent(generationId)}/restore`),
   createInstance: (body: InstanceCreateRequest) =>
     call<InstanceCreated>("POST", "/api/instances", { body }),
   interrupts: (body: InterruptRequest) =>

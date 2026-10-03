@@ -126,6 +126,8 @@ import type {
   ModelCapacityEntry,
   ModelConversionRequestBody,
   ModelDecisionView,
+  NextAction,
+  ReadinessStep,
   ModelLibraryView,
   ModelOperationView,
   ModelPricingEntryView,
@@ -883,3 +885,5 @@ export type ImageGenerationsView = ImageGallery;
 export type TelemetryDestination = TelemetryDestinationView;
 
 export type ModelDecision = ModelDecisionView;
+
+export type { NextAction as ModelNextAction, ReadinessStep as ModelReadinessStep };

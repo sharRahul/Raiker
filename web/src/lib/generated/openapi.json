@@ -8788,6 +8788,13 @@
             "title": "Prompt",
             "type": "string"
           },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/ImageReferenceRequest"
+            },
+            "title": "References",
+            "type": "array"
+          },
           "size": {
             "default": "1024x1024",
             "title": "Size",
@@ -10444,6 +10451,13 @@
       },
       "ImageGallery": {
         "properties": {
+          "deleted": {
+            "items": {
+              "$ref": "#/components/schemas/ImageGeneration"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
           "generations": {
             "items": {
               "$ref": "#/components/schemas/ImageGeneration"
@@ -10469,7 +10483,8 @@
         "required": [
           "sizes",
           "sized_providers",
-          "generations"
+          "generations",
+          "deleted"
         ],
         "title": "ImageGallery",
         "type": "object"
@@ -10491,6 +10506,17 @@
           "created_at": {
             "title": "Created At",
             "type": "string"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
           },
           "generation_id": {
             "title": "Generation Id",
@@ -10558,6 +10584,13 @@
             ],
             "title": "Reason Code"
           },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/ImageReference"
+            },
+            "title": "References",
+            "type": "array"
+          },
           "size": {
             "title": "Size",
             "type": "string"
@@ -10593,9 +10626,93 @@
           "created_at",
           "source_generation_id",
           "kind",
-          "project_id"
+          "project_id",
+          "deleted_at",
+          "references"
         ],
         "title": "ImageGeneration",
+        "type": "object"
+      },
+      "ImageLifecycleChanged": {
+        "description": "A picture put away, brought back, or removed for good.",
+        "properties": {
+          "generation_id": {
+            "title": "Generation Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "deleted",
+              "restored",
+              "removed"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "generation_id",
+          "state"
+        ],
+        "title": "ImageLifecycleChanged",
+        "type": "object"
+      },
+      "ImageReference": {
+        "description": "A research passage sent with a prompt, with the pages it came from.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "text",
+          "sources"
+        ],
+        "title": "ImageReference",
+        "type": "object"
+      },
+      "ImageReferenceRequest": {
+        "description": "One research passage the owner consented to send with an image prompt.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ],
+        "title": "ImageReferenceRequest",
         "type": "object"
       },
       "ImagesGenerated": {
@@ -14510,6 +14627,16 @@
           "effective": {
             "$ref": "#/components/schemas/EffectiveChoice"
           },
+          "next_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "problem": {
             "anyOf": [
               {
@@ -14544,6 +14671,13 @@
           },
           "selected": {
             "$ref": "#/components/schemas/SelectedChoice"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessStep"
+            },
+            "title": "Steps",
+            "type": "array"
           }
         },
         "required": [
@@ -14553,7 +14687,9 @@
           "ready",
           "running",
           "problem",
-          "revision"
+          "revision",
+          "steps",
+          "next_action"
         ],
         "title": "ModelDecisionView",
         "type": "object"
@@ -15332,6 +15468,42 @@
             "default": null,
             "title": "Provider Detected"
           },
+          "rate_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rate Currency"
+          },
+          "rate_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rate Input Per Mtok"
+          },
+          "rate_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Rate Output Per Mtok"
+          },
           "readiness_checked_at": {
             "anyOf": [
               {
@@ -15453,6 +15625,30 @@
             "default": false,
             "title": "Supports Reasoning Summary",
             "type": "boolean"
+          },
+          "supports_tool_calls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Supports Tool Calls"
+          },
+          "supports_vision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Supports Vision"
           },
           "total_cost": {
             "anyOf": [
@@ -16209,6 +16405,32 @@
           "metrics"
         ],
         "title": "NativeUsageView",
+        "type": "object"
+      },
+      "NextAction": {
+        "description": "The one thing that moves the first unfinished step forward.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "target": {
+            "enum": [
+              "add",
+              "models",
+              "runtime",
+              "check",
+              "permissions"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "target"
+        ],
+        "title": "NextAction",
         "type": "object"
       },
       "NotificationView": {
@@ -18921,6 +19143,42 @@
           "readiness"
         ],
         "title": "ReadCapabilities",
+        "type": "object"
+      },
+      "ReadinessStep": {
+        "description": "One of the four steps between \"nothing set up\" and \"this work can run\".",
+        "properties": {
+          "id": {
+            "enum": [
+              "connect",
+              "discover",
+              "choose",
+              "run"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "done",
+              "blocked",
+              "waiting",
+              "unchecked"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "state"
+        ],
+        "title": "ReadinessStep",
         "type": "object"
       },
       "RecalledMemory": {
@@ -29603,9 +29861,49 @@
         "summary": "Generate Image"
       }
     },
+    "/api/images/{generation_id}": {
+      "delete": {
+        "description": "Put a picture in Recently deleted (UX-DESIGN-01). Recoverable: the row\nand its bytes stay until the owner removes it for good.",
+        "operationId": "delete_image_api_images__generation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "generation_id",
+            "required": true,
+            "schema": {
+              "title": "Generation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageLifecycleChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Image"
+      }
+    },
     "/api/images/{generation_id}/bytes": {
       "get": {
-        "description": "The image itself, to the principal who generated it and nobody else.",
+        "description": "The image itself, to the principal who generated it and nobody else.\n\n``?download=1`` asks for it as a file (UX-DESIGN-01 export): the same\nowner-scoped bytes, named for what they are, with the extension of the\nmedia type actually returned rather than always ``.png``.",
         "operationId": "get_image_bytes_api_images__generation_id__bytes_get",
         "parameters": [
           {
@@ -29615,6 +29913,16 @@
             "schema": {
               "title": "Generation Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Download",
+              "type": "boolean"
             }
           }
         ],
@@ -29639,6 +29947,86 @@
           }
         },
         "summary": "Get Image Bytes"
+      }
+    },
+    "/api/images/{generation_id}/purge": {
+      "delete": {
+        "description": "Remove a picture from Recently deleted for good, with its bytes.\n\nOnly a picture already put away can be removed: the irreversible step is\nalways the second one. An id that is not this owner's, or is not in\nRecently deleted, answers the same 404 as one that was never issued.",
+        "operationId": "purge_image_api_images__generation_id__purge_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "generation_id",
+            "required": true,
+            "schema": {
+              "title": "Generation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageLifecycleChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Image"
+      }
+    },
+    "/api/images/{generation_id}/restore": {
+      "post": {
+        "description": "Bring a picture back from Recently deleted, lineage intact.",
+        "operationId": "restore_image_api_images__generation_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "generation_id",
+            "required": true,
+            "schema": {
+              "title": "Generation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageLifecycleChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Image"
       }
     },
     "/api/instances": {

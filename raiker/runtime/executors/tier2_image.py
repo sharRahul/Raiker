@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextvars
 import hashlib
 import json
 from pathlib import Path
@@ -92,6 +93,82 @@ MAX_PROMPT_CHARS = 4_000
 #: table as user attachments and a generation is not a licence to fill it.
 MAX_IMAGE_BYTES = 8_000_000
 
+#: UX-DESIGN-03 — research the owner chose to send with a prompt. Bounded the
+#: way the prompt is: a reference is text the owner has read and approved, and
+#: the whole composed prompt still has to fit ``MAX_PROMPT_CHARS``.
+MAX_REFERENCES = 3
+MAX_REFERENCE_NAME_CHARS = 80
+MAX_REFERENCE_TEXT_CHARS = 1_000
+MAX_REFERENCE_SOURCES = 5
+MAX_REFERENCE_SOURCE_CHARS = 500
+
+#: The references of the request being executed, so every row it writes —
+#: refusals included — records what it was asked to carry. A context variable
+#: rather than an attribute because one executor serves concurrent requests.
+_REFERENCES: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "image_references", default=None
+)
+
+
+class _InvalidReferences(ValueError):
+    pass
+
+
+def parse_references(raw: Any) -> list[dict[str, Any]]:
+    """Validate the ``references`` argument into named, sourced, bounded text.
+
+    UX-DESIGN-03 — an action argument is a thing a model can propose, so
+    nothing here is taken on trust: a reference is a name, a passage, and the
+    http(s) pages it came from, each bounded. A malformed one refuses the whole
+    request rather than being dropped, because a reference the owner consented
+    to send and then did not see sent would be the silent change DEC-07 rules
+    out in the other direction.
+    """
+    if raw is None or raw == []:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_REFERENCES:
+        raise _InvalidReferences("invalid_references:count")
+    parsed: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise _InvalidReferences("invalid_references:shape")
+        name = str(item.get("name") or "").strip()
+        text = str(item.get("text") or "").strip()
+        sources = item.get("sources") or []
+        if not name or len(name) > MAX_REFERENCE_NAME_CHARS:
+            raise _InvalidReferences("invalid_references:name")
+        if not text or len(text) > MAX_REFERENCE_TEXT_CHARS:
+            raise _InvalidReferences("invalid_references:text")
+        if not isinstance(sources, list) or len(sources) > MAX_REFERENCE_SOURCES:
+            raise _InvalidReferences("invalid_references:sources")
+        urls: list[str] = []
+        for source in sources:
+            url = str(source or "").strip()
+            if (
+                not url.startswith(("https://", "http://"))
+                or len(url) > MAX_REFERENCE_SOURCE_CHARS
+                or any(ch.isspace() for ch in url)
+            ):
+                raise _InvalidReferences("invalid_references:sources")
+            urls.append(url)
+        parsed.append({"name": name, "text": text, "sources": urls})
+    return parsed
+
+
+def compose_prompt(prompt: str, references: list[dict[str, Any]]) -> str:
+    """What the provider receives: the owner's prompt, then each reference by name.
+
+    The references follow the prompt rather than precede it, and are labelled as
+    reference material, so the provider reads them as context for the request
+    and not as the request.
+    """
+    if not references:
+        return prompt
+    lines = [prompt, "", "Reference material the owner chose to include:"]
+    for reference in references:
+        lines.append(f"- {reference['name']}: {reference['text']}")
+    return "\n".join(lines)
+
 
 class ImageGenerationExecutor:
     """Real executor for ``image_generation``."""
@@ -108,7 +185,7 @@ class ImageGenerationExecutor:
         return getattr(principal, "principal_id", None)
 
     def _record(self, **kwargs: Any) -> None:
-        self._store.record_image_generation(**kwargs)
+        self._store.record_image_generation(references_json=_REFERENCES.get(), **kwargs)
 
     def _fail(
         self,
@@ -178,7 +255,9 @@ class ImageGenerationExecutor:
         row = self._store.get_image_generation(
             source_generation_id, owner_principal_id=owner
         )
-        if row is None:
+        if row is None or row.get("deleted_at"):
+            # UX-DESIGN-01 — a picture in Recently deleted is not a subject. It
+            # answers as an unknown id: restoring it is the owner's way back.
             return None, None, "image_source_not_found"
         if str(row.get("status")) != "ok" or not row.get("attachment_id"):
             # A refused generation has no picture, so there is nothing to edit.
@@ -194,6 +273,13 @@ class ImageGenerationExecutor:
     # ── execute ──
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        token = _REFERENCES.set(None)
+        try:
+            return self._execute(action, principal)
+        finally:
+            _REFERENCES.reset(token)
+
+    def _execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         prompt = str(action.arguments.get("prompt", "")).strip()
         profile_id = str(action.arguments.get("profile_id", "")).strip()
         size = str(action.arguments.get("size", "") or SUPPORTED_SIZES[0]).strip()
@@ -221,6 +307,21 @@ class ImageGenerationExecutor:
                 profile_id=profile_id, prompt=prompt, size=size,
                 source_generation_id=source_id or None, kind=kind, project_id=project_id,
             )
+        # UX-DESIGN-03 — the references, validated before anything else reads
+        # them, and recorded on every row this request writes from here on.
+        try:
+            references = parse_references(action.arguments.get("references"))
+        except _InvalidReferences as exc:
+            return self._fail(
+                action, principal, str(exc),
+                "Image generation denied: a reference was not a named, sourced passage "
+                "within the limits.",
+                profile_id=profile_id, prompt=prompt, size=size,
+                source_generation_id=source_id or None, kind=kind, project_id=project_id,
+            )
+        if references:
+            _REFERENCES.set(json.dumps(references, sort_keys=True))
+        provider_prompt = compose_prompt(prompt, references)
         if not prompt:
             return self._fail(
                 action, principal, "missing_argument:prompt",
@@ -228,7 +329,7 @@ class ImageGenerationExecutor:
                 profile_id=profile_id, size=size,
                 source_generation_id=source_id or None, kind=kind, project_id=project_id,
             )
-        if len(prompt) > MAX_PROMPT_CHARS:
+        if len(provider_prompt) > MAX_PROMPT_CHARS:
             return self._fail(
                 action, principal, "prompt_too_long",
                 f"Image generation denied: the prompt is over {MAX_PROMPT_CHARS} characters.",
@@ -331,7 +432,7 @@ class ImageGenerationExecutor:
             response = _call_provider(
                 provider,
                 model,
-                prompt,
+                provider_prompt,
                 size,
                 api_key,
                 allowlist,

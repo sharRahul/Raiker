@@ -91,6 +91,17 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-03 (third round).** §3.4 Design is closed —
+> UX-DESIGN-01 to -03 as FIXED-731 to FIXED-733 and UX-DESIGN-04 recorded
+> against FIXED-517. In §3.3, UX-BUILD-02 to -04 closed as FIXED-728 to
+> FIXED-730, leaving UX-BUILD-01; in §3.5, UX-MODEL-02, -04 and -05 closed as
+> FIXED-725 to FIXED-727, leaving UX-MODEL-01. What remains of §3 is the three
+> large-view refactors — UX-CHAT-01, UX-BUILD-01 and UX-MODEL-01 — which change
+> no behaviour. The live round found three defects, fixed as FIXED-734 to
+> FIXED-736: a failed approved command dead-ended its turn, every composer's
+> primary action was nameless at phone width, and Build's evidence line did
+> not count sources.
+>
 > **Implementation status, 2026-10-03 (second round).** §3.10 Messaging and
 > §3.11 MCP are closed — UX-MSG-03 to -06 as FIXED-709 to FIXED-712, UX-MCP-02
 > and -03 as FIXED-713 and FIXED-714, with UX-MSG-01/-02, SEC-MCP-01 to -03 and
@@ -499,6 +510,19 @@ never need to visit Settings to understand why Send is disabled.
 
 ## 3.3 Build
 
+> **Implementation status, 2026-10-03 (third round).** UX-BUILD-02 to -04 are
+> closed. UX-BUILD-02 completes [FIXED-521](FIXED_ITEMS.md#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run) with [FIXED-728](FIXED_ITEMS.md#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it): the boundary reads
+> Project → Repository → Runs on → **Model**. UX-BUILD-03 completes [FIXED-582](FIXED_ITEMS.md#fixed-582--builds-workbench-closed-itself-on-every-reload)
+> with [FIXED-729](FIXED_ITEMS.md#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for): a new approval puts a narrow window's drawers away, keeping
+> their state. UX-BUILD-04 closed as [FIXED-730](FIXED_ITEMS.md#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) — a live acceptance run in which a
+> real model ran a failing test, read the failure, fixed the module, re-ran it
+> green and summarised, through three owner approvals. Getting there found
+> [FIXED-734](FIXED_ITEMS.md#fixed-734--an-approved-command-that-failed-left-its-turn-waiting-forever): an approved command that failed left its turn waiting forever, so
+> before this round no red test could ever have returned to the model.
+> **UX-BUILD-01 — splitting `BuildView.svelte` — is the one row left.** Of the
+> runtime expectation below, the server-issued `ExecutionBoundaryView`
+> (DEC-06 step 1) remains open: the line is still assembled from three reads.
+
 ### Current strengths
 
 - Build is a real code-work surface: project/repository boundary, file explorer,
@@ -513,9 +537,9 @@ never need to visit Settings to understand why Send is disabled.
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
 | UX-BUILD-01 | P1 | `BuildView.svelte` is about 3,311 lines, the largest requested surface. | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. |
-| UX-BUILD-02 | P1 | Repository, project, runtime and model are separate concepts but can read as competing “where work happens” selectors. | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. |
-| UX-BUILD-03 | P1 | The page can expose file tree, transcript, artifact panel, terminal output and approval review simultaneously. | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. |
-| UX-BUILD-04 | P1 | Autonomous completion is not proven by UI sophistication alone. | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. |
+| ~~UX-BUILD-02~~ **closed** — [FIXED-728](FIXED_ITEMS.md#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it) | P1 | Repository, project, runtime and model are separate concepts but can read as competing “where work happens” selectors. | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. |
+| ~~UX-BUILD-03~~ **closed** — [FIXED-729](FIXED_ITEMS.md#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for) | P1 | The page can expose file tree, transcript, artifact panel, terminal output and approval review simultaneously. | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. |
+| ~~UX-BUILD-04~~ **closed** — [FIXED-730](FIXED_ITEMS.md#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) | P1 | Autonomous completion is not proven by UI sophistication alone. | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. |
 | ~~UX-BUILD-05~~ **closed** — [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | P2 | “Start in Build” is clear, but later navigation back to the originating Project is weak. | Add a persistent Project breadcrumb and “Open project work” backlink. |
 
 ### Runtime expectation
@@ -528,6 +552,23 @@ client state.
 
 ## 3.4 Design
 
+> **Implementation status, 2026-10-03 (third round). Every row in this table is
+> closed.** UX-DESIGN-01's asset model had shipped as FIXED-491 (lineage,
+> versions, variations) and FIXED-492 (project ownership); what it still lacked
+> was step 1's export and delete/recover, which closed as [FIXED-731](FIXED_ITEMS.md#fixed-731--a-generated-picture-could-not-be-exported-deleted-or-brought-back) —
+> **Download** with an honest filename, **Delete** into Recently deleted,
+> **Restore**, and a confirmed **Remove for good** that takes the row and its
+> bytes in one transaction. UX-DESIGN-02 closed as [FIXED-732](FIXED_ITEMS.md#fixed-732--no-project-read-as-nothing-rather-than-as-a-place-a-picture-would-go): the line says
+> **Unfiled** when no project is chosen and the inspector says **Filed in**.
+> UX-DESIGN-03 closed as [FIXED-733](FIXED_ITEMS.md#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt): research becomes a named, sourced
+> reference sent only once its own box is ticked, as an audited argument, and
+> recorded on the picture. UX-DESIGN-04 is recorded against [FIXED-517](FIXED_ITEMS.md#fixed-517--design-recorded-a-size-it-never-sent),
+> re-verified in source: size is offered only where `sized_providers` says it is
+> sent, count is a real governed field, and aspect, seed and quality — which
+> have no governed path — are absent. Of the staged model below, stage 1 is
+> complete; reference *images*, compare-and-revert as a new version, masks and
+> the canvas document remain DEC-07 steps 5–8 beyond these rows.
+
 ### Current strengths
 
 - Real governed image generation and governed research exist.
@@ -539,10 +580,10 @@ client state.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-DESIGN-01 | P1 | The surface is a prompt plus generation history, not a persistent design workspace. | Add an asset model before adding canvas chrome: Project ownership, versions, source prompt/model/options and durable file reference. |
-| UX-DESIGN-02 | P1 | Selecting a Project does not yet guarantee generated assets are filed into it. | Bind every generation to an explicit project or “Unfiled” collection and show the destination before Generate. |
-| UX-DESIGN-03 | P1 | Research and generation are adjacent but not a reusable reference workflow. | Let approved research images/text become named references with provenance and explicit consent to send them to the image provider. |
-| UX-DESIGN-04 | P2 | Size is visible, while aspect/count/seed/quality are absent because the backend lacks them. | Preserve this honesty; introduce an Options drawer only as governed endpoint fields become real. |
+| ~~UX-DESIGN-01~~ **closed** — [FIXED-731](FIXED_ITEMS.md#fixed-731--a-generated-picture-could-not-be-exported-deleted-or-brought-back) | P1 | The surface is a prompt plus generation history, not a persistent design workspace. | Add an asset model before adding canvas chrome: Project ownership, versions, source prompt/model/options and durable file reference. |
+| ~~UX-DESIGN-02~~ **closed** — [FIXED-732](FIXED_ITEMS.md#fixed-732--no-project-read-as-nothing-rather-than-as-a-place-a-picture-would-go) | P1 | Selecting a Project does not yet guarantee generated assets are filed into it. | Bind every generation to an explicit project or “Unfiled” collection and show the destination before Generate. |
+| ~~UX-DESIGN-03~~ **closed** — [FIXED-733](FIXED_ITEMS.md#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt) | P1 | Research and generation are adjacent but not a reusable reference workflow. | Let approved research images/text become named references with provenance and explicit consent to send them to the image provider. |
+| ~~UX-DESIGN-04~~ **closed** — [FIXED-517](FIXED_ITEMS.md#fixed-517--design-recorded-a-size-it-never-sent) | P2 | Size is visible, while aspect/count/seed/quality are absent because the backend lacks them. | Preserve this honesty; introduce an Options drawer only as governed endpoint fields become real. |
 
 ### Required staged design model
 
@@ -557,6 +598,14 @@ client state.
 
 ## 3.5 Models
 
+> **Implementation status, 2026-10-03 (third round).** UX-MODEL-02, -04 and
+> -05 closed as [FIXED-725](FIXED_ITEMS.md#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) to [FIXED-727](FIXED_ITEMS.md#fixed-727--internal-identifiers-were-still-primary-labels-in-four-places): a server-authored four-step readiness
+> line with one next action on every Overview row that is not ready, **My
+> models → Compare** with Unknown kept Unknown, and the last four places a
+> provider key or profile id was a primary label. **UX-MODEL-01 — splitting
+> `ModelsView.svelte` — is the one row left**; like UX-CHAT-01 it is a refactor
+> with no owner-visible change.
+>
 > **Implementation status, 2026-10-03.** UX-MODEL-03 closed as
 > [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold): every composer's model menu says **Default model** and, when
 > the work is on something else, **This work uses … · Reset to default**, and the
@@ -580,10 +629,10 @@ client state.
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
 | UX-MODEL-01 | P1 | `ModelsView.svelte` is about 3,235 lines and owns discovery, credentials, catalogue, selection, pricing/usage, runtime setup and modal state. | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. |
-| UX-MODEL-02 | P1 | “Provider connected”, “models discovered”, “model selected” and “runtime available” still demand expert interpretation. | Use a four-step readiness line and give one primary next action. |
+| ~~UX-MODEL-02~~ **closed** — [FIXED-725](FIXED_ITEMS.md#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) | P1 | “Provider connected”, “models discovered”, “model selected” and “runtime available” still demand expert interpretation. | Use a four-step readiness line and give one primary next action. |
 | ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | P1 | Users can choose globally and again inside composers without a clear override hierarchy. | State: “Default model” and “This work uses …”; offer Reset to default. |
-| UX-MODEL-04 | P1 | Cost, context, privacy and tool support are spread across tabs/cards. | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. |
-| UX-MODEL-05 | P2 | Raw profile/provider identifiers may leak into troubleshooting. | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. |
+| ~~UX-MODEL-04~~ **closed** — [FIXED-726](FIXED_ITEMS.md#fixed-726--choosing-between-models-meant-opening-each-one-and-remembering-the-last) | P1 | Cost, context, privacy and tool support are spread across tabs/cards. | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. |
+| ~~UX-MODEL-05~~ **closed** — [FIXED-727](FIXED_ITEMS.md#fixed-727--internal-identifiers-were-still-primary-labels-in-four-places) | P2 | Raw profile/provider identifiers may leak into troubleshooting. | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. |
 
 ### Recommended selection journey
 
@@ -2454,29 +2503,29 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 | Finding | Decision | Explanation |
 | --- | --- | --- |
 | UX-BUILD-01 | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. | Extract ownership of state and effects before presentation; preserve session and approval contracts. |
-| UX-BUILD-02 | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. | A single summary makes the execution destination reviewable before a write. |
-| UX-BUILD-03 | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. | Exclusive inspectors reduce simultaneous cognitive load without losing user state. |
-| UX-BUILD-04 | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. | A passing tool call is insufficient evidence of a working change; require the entire recovery loop. |
+| ~~UX-BUILD-02~~ **closed** — [FIXED-728](FIXED_ITEMS.md#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it) | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. | A single summary makes the execution destination reviewable before a write. |
+| ~~UX-BUILD-03~~ **closed** — [FIXED-729](FIXED_ITEMS.md#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for) | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. | Exclusive inspectors reduce simultaneous cognitive load without losing user state. |
+| ~~UX-BUILD-04~~ **closed** — [FIXED-730](FIXED_ITEMS.md#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. | A passing tool call is insufficient evidence of a working change; require the entire recovery loop. |
 | ~~UX-BUILD-05~~ **closed** — [FIXED-600](FIXED_ITEMS.md#fixed-600--build-named-the-project-and-sent-you-to-the-list-of-them) | Add a persistent Project breadcrumb and “Open project work” backlink. | Explicit navigation preserves continuity across work modes. |
 
 ## 14.4 DESIGN decisions
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-DESIGN-01 | Add an asset model before adding canvas chrome: Project ownership, versions, source prompt/model/options and durable file reference. | Durable assets must precede a canvas so edits and lineage survive reloads. |
-| UX-DESIGN-02 | Bind every generation to an explicit project or “Unfiled” collection and show the destination before Generate. | Capture the destination at submission; changing the selector must not refile an in-flight result. |
-| UX-DESIGN-03 | Let approved research images/text become named references with provenance and explicit consent to send them to the image provider. | Reference import is an independent data disclosure requiring provenance and permission. |
-| UX-DESIGN-04 | Preserve this honesty; introduce an Options drawer only as governed endpoint fields become real. | Capability-driven controls avoid promising unsupported provider operations. |
+| ~~UX-DESIGN-01~~ **closed** — [FIXED-731](FIXED_ITEMS.md#fixed-731--a-generated-picture-could-not-be-exported-deleted-or-brought-back) | Add an asset model before adding canvas chrome: Project ownership, versions, source prompt/model/options and durable file reference. | Durable assets must precede a canvas so edits and lineage survive reloads. |
+| ~~UX-DESIGN-02~~ **closed** — [FIXED-732](FIXED_ITEMS.md#fixed-732--no-project-read-as-nothing-rather-than-as-a-place-a-picture-would-go) | Bind every generation to an explicit project or “Unfiled” collection and show the destination before Generate. | Capture the destination at submission; changing the selector must not refile an in-flight result. |
+| ~~UX-DESIGN-03~~ **closed** — [FIXED-733](FIXED_ITEMS.md#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt) | Let approved research images/text become named references with provenance and explicit consent to send them to the image provider. | Reference import is an independent data disclosure requiring provenance and permission. |
+| ~~UX-DESIGN-04~~ **closed** — [FIXED-517](FIXED_ITEMS.md#fixed-517--design-recorded-a-size-it-never-sent) | Preserve this honesty; introduce an Options drawer only as governed endpoint fields become real. | Capability-driven controls avoid promising unsupported provider operations. |
 
 ## 14.5 MODEL decisions
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
 | UX-MODEL-01 | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. | Shared connection lifecycle prevents tabs from disagreeing about readiness. |
-| UX-MODEL-02 | Use a four-step readiness line and give one primary next action. | One next action makes missing credentials distinguishable from unavailable execution. |
+| ~~UX-MODEL-02~~ **closed** — [FIXED-725](FIXED_ITEMS.md#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) | Use a four-step readiness line and give one primary next action. | One next action makes missing credentials distinguishable from unavailable execution. |
 | ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | State: “Default model” and “This work uses …”; offer Reset to default. | Explicit inheritance avoids unexpected model and privacy changes. |
-| UX-MODEL-04 | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. | Comparable verified fields support informed choice; unknown pricing must remain unknown. |
-| UX-MODEL-05 | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. | Friendly labels improve comprehension without replacing stable internal keys. |
+| ~~UX-MODEL-04~~ **closed** — [FIXED-726](FIXED_ITEMS.md#fixed-726--choosing-between-models-meant-opening-each-one-and-remembering-the-last) | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. | Comparable verified fields support informed choice; unknown pricing must remain unknown. |
+| ~~UX-MODEL-05~~ **closed** — [FIXED-727](FIXED_ITEMS.md#fixed-727--internal-identifiers-were-still-primary-labels-in-four-places) | Keep stable IDs in Advanced diagnostics and exports, never as primary labels. | Friendly labels improve comprehension without replacing stable internal keys. |
 
 ## 14.6 SETPOP decisions
 

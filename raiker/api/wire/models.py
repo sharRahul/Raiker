@@ -299,6 +299,14 @@ class Transcript(TypedDict):
     text: str
 
 
+class ImageReference(TypedDict):
+    """A research passage sent with a prompt, with the pages it came from."""
+
+    name: str
+    text: str
+    sources: list[str]
+
+
 class ImageGeneration(TypedDict):
     """One generation as the page sees it — metadata only, never the bytes."""
 
@@ -317,12 +325,28 @@ class ImageGeneration(TypedDict):
     source_generation_id: str | None
     kind: Literal["create", "edit", "variation"]
     project_id: str | None
+    #: UX-DESIGN-01 — when this was put in Recently deleted; ``None`` in the
+    #: gallery.
+    deleted_at: str | None
+    #: UX-DESIGN-03 — the research this was sent with, as the provider got it.
+    references: list[ImageReference]
 
 
 class ImageGallery(TypedDict):
     sizes: list[str]
     sized_providers: list[str]
     generations: list[ImageGeneration]
+    #: UX-DESIGN-01 — Recently deleted, newest deletion first. Never mixed into
+    #: ``generations``, so nothing put away is drawn as a version or sibling.
+    deleted: list[ImageGeneration]
+
+
+class ImageLifecycleChanged(TypedDict):
+    """A picture put away, brought back, or removed for good."""
+
+    ok: bool
+    generation_id: str
+    state: Literal["deleted", "restored", "removed"]
 
 
 class ImagesGenerated(TypedDict):

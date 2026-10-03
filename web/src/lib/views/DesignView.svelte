@@ -31,6 +31,12 @@
   import SourceChips from "../components/SourceChips.svelte";
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { citedSourceIds, sentenceAround, sourcesForTurn } from "../citations";
+  import {
+    MAX_REFERENCES,
+    referenceFromResearch,
+    referencesToSend,
+    type DesignReference,
+  } from "../designReferences";
   import { designPrimaryAction, MAX_DESIGN_VARIATIONS } from "../designAssets";
   import { routeStateFromHash } from "../routeState";
   import { densityGap, workSurface } from "../workSurface";
@@ -114,6 +120,29 @@
    * own claim about which sentence rests on which page.
    */
   let researchSources = $state<TurnSourceView[]>([]);
+
+  /*
+   * UX-DESIGN-03 — research the owner has turned into references. Building one
+   * sends nothing: each is sent with a prompt only once its own box is ticked,
+   * and then as its own audited argument rather than pasted into the prompt.
+   */
+  let references = $state<DesignReference[]>([]);
+  const referenceLimitReached = $derived(references.length >= MAX_REFERENCES);
+  const researchAlreadyReferenced = $derived(
+    research !== null && references.some((reference) => reference.key === research!.turnId),
+  );
+
+  function useResearchAsReference() {
+    if (research === null || referenceLimitReached || researchAlreadyReferenced) return;
+    const reference = referenceFromResearch(
+      research.question,
+      research.answer,
+      researchSources,
+      citedSourceIds(research.answer, researchSources),
+      research.turnId,
+    );
+    if (reference !== null) references = [...references, reference];
+  }
   let openSourceId = $state<string | null>(null);
   let openSource = $state<TurnSourceExcerptView | null>(null);
   let openSourceLoading = $state(false);
@@ -273,7 +302,19 @@
             action: "Open project work",
           },
         ]
-      : []),
+      : [
+          /*
+           * UX-DESIGN-02 — the destination is stated before Generate even when
+           * there is no project. Saying nothing let "no project" read as "the
+           * project I had open last", and a picture filed nowhere is a real,
+           * visible place: Unfiled. Choosing one is under `+`.
+           */
+          {
+            label: "Filed in",
+            value: "Unfiled — this picture belongs to no project. Choose one under +.",
+            short: "Unfiled",
+          },
+        ]),
     // Size is deliberately *not* a fact here: it has its own control two
     // elements to the left, and repeating it is the duplication COMPOSER-18
     // prevents. The context line answers only what the bar does not show.
@@ -491,6 +532,9 @@
         ...(selectedId ? { source_generation_id: selectedId } : {}),
         ...(variations > 1 ? { variations } : {}),
         ...(project ? { project_id: project.project_id } : {}),
+        ...(referencesToSend(references).length > 0
+          ? { references: referencesToSend(references) }
+          : {}),
       });
       made = created.generation_id;
       if (sentDraft.text === sentText) sentDraft.text = "";
@@ -523,6 +567,57 @@
         if (generation?.has_image) selectedId = generation.generation_id;
       }
     }
+  }
+
+  /**
+   * UX-DESIGN-02 — where a picture was filed, by the project's name, or
+   * Unfiled. A project this owner can no longer see is named as such rather
+   * than as Unfiled, because the row does say where it was filed.
+   */
+  function filedIn(projectId: string | null): string {
+    if (!projectId) return "Unfiled";
+    return (
+      (projects?.projects ?? []).find((entry) => entry.project_id === projectId)?.name ??
+      "A project not in your list"
+    );
+  }
+
+  /** The last lifecycle failure, said once above the canvas. */
+  let lifecycleNotice = $state<string | null>(null);
+
+  /**
+   * UX-DESIGN-01 — put a picture away. It leaves the canvas and the gallery
+   * and waits in Recently deleted; nothing is removed for good here.
+   */
+  async function deleteAsset(generationId: string) {
+    lifecycleNotice = null;
+    try {
+      await api.deleteImage(generationId);
+      if (selectedId === generationId) selectedId = null;
+    } catch {
+      lifecycleNotice = "That picture could not be deleted. Nothing was changed.";
+    }
+    await load();
+  }
+
+  async function restoreAsset(generationId: string) {
+    lifecycleNotice = null;
+    try {
+      await api.restoreImage(generationId);
+    } catch {
+      lifecycleNotice = "That picture could not be restored. It is still in Recently deleted.";
+    }
+    await load();
+  }
+
+  async function purgeAsset(generationId: string) {
+    lifecycleNotice = null;
+    try {
+      await api.purgeImage(generationId);
+    } catch {
+      lifecycleNotice = "That picture could not be removed. It is still in Recently deleted.";
+    }
+    await load();
   }
 
   function onKeydown(event: KeyboardEvent) {
@@ -573,6 +668,9 @@
       <GuideLink route="design" label="How image generation is governed" />
     </p>
 
+    {#if lifecycleNotice !== null}
+      <p class="notice" role="alert">{lifecycleNotice}</p>
+    {/if}
     {#if block.kind !== "none"}
       <p class="notice" role="status">
         {block.reason}
@@ -604,6 +702,11 @@
       {readable}
       sizedProviders={view?.sized_providers}
       bind:selectedId
+      deleted={view?.deleted ?? []}
+      {filedIn}
+      ondelete={deleteAsset}
+      onrestore={restoreAsset}
+      onpurge={purgeAsset}
     />
   </div>
 
@@ -656,6 +759,17 @@
             />
           {/if}
         {/if}
+        <p class="research-use">
+          <button
+            type="button"
+            class="btn btn-sm"
+            disabled={referenceLimitReached || researchAlreadyReferenced}
+            onclick={useResearchAsReference}
+          >{researchAlreadyReferenced ? "Added as a reference" : "Use as a reference"}</button>
+          {#if referenceLimitReached && !researchAlreadyReferenced}
+            <span class="research-use-note">Up to {MAX_REFERENCES} references at a time.</span>
+          {/if}
+        </p>
         <p class="research-note">
           Gathered by a governed research turn. It read pages; it did not draw
           anything, and image generation gained no network access from it.
@@ -744,6 +858,39 @@
     {/snippet}
 
     {#snippet above()}
+      {#if references.length > 0}
+        <!-- UX-DESIGN-03 — what may go with the prompt, and to whom. Unticked by
+             default: a reference is sent only after the owner says so here,
+             beside the name of the provider that would receive it. -->
+        <ul class="references" aria-label="References">
+          {#each references as reference (reference.key)}
+            <li>
+              <div class="reference-copy">
+                <p class="reference-name">{reference.name}</p>
+                <p class="reference-meta">
+                  {reference.sources.length === 0
+                    ? "No pages recorded"
+                    : reference.sources.length === 1
+                      ? "1 source page"
+                      : `${reference.sources.length} source pages`}
+                  · {reference.text.length} characters
+                </p>
+              </div>
+              <label class="reference-consent">
+                <input type="checkbox" bind:checked={reference.consented} disabled={busy} />
+                Send with the prompt to {choice !== null ? providerName(choice.provider) : "the image provider"}
+              </label>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                disabled={busy}
+                aria-label={`Remove reference ${reference.name}`}
+                onclick={() => (references = references.filter((item) => item.key !== reference.key))}
+              >Remove</button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
       {#if projectPickerOpen}
         <div class="project-choice" role="group" aria-label="Choose a project">
           <label for="design-project-choice">Project for this work</label>
@@ -875,6 +1022,64 @@
   .research-note { margin: 0.4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
   /* The same shape Chat's chooser uses, for the same reason: it opens in flow
      between the prompt and the bar rather than as a popover over the text. */
+  .research-use {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+  }
+  .research-use-note {
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .references {
+    list-style: none;
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .references li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .reference-copy {
+    min-width: 0;
+  }
+  .reference-name {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-1);
+    overflow-wrap: anywhere;
+  }
+  .reference-meta {
+    margin: 0;
+    font-size: var(--text-2xs);
+    color: var(--text-3);
+  }
+  .reference-consent {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--text-xs);
+    color: var(--text-2);
+  }
+  @media (max-width: 47.9rem) {
+    .references li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .reference-consent {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
   .project-choice {
     display: flex;
     align-items: center;

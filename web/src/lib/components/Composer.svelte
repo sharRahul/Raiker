@@ -265,7 +265,21 @@
       padding: 0;
       border-radius: 50%;
     }
-    :global(.composer-card .send-label) { display: none; }
+    /* Visually hidden, never `display: none`: the label is the button's
+       accessible name, and hiding it that way left every composer's primary
+       action nameless at phone width — found by the 2026-10-03 live round,
+       where Build's Run could not be found by its name at 390 px. */
+    :global(.composer-card .send-label) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
     :global(.composer-card .model-trigger) {
       min-width: 2.75rem;
       width: 2.75rem;

@@ -149,6 +149,17 @@ class ModelProfileView(View):
     # empty on every real install, and only looked correct in a fixture that had
     # no image provider either.
     image_models: tuple[str, ...] = ()
+    # UX-MODEL-04 — the comparison's declared facts. ``None`` is "this profile
+    # does not say", which the table renders Unknown; ``False`` is a declared
+    # absence. A profile config that omits the key never reads as "no tools".
+    supports_tool_calls: bool | None = None
+    supports_vision: bool | None = None
+    # This exact model's list rate per million tokens, as decimal strings so no
+    # float rounding reaches a price. ``None`` when no source names one — an
+    # unknown price is never shown as free.
+    rate_input_per_mtok: str | None = None
+    rate_output_per_mtok: str | None = None
+    rate_currency: str | None = None
 
 
 class ContextCompaction(TypedDict):

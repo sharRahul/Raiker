@@ -119,6 +119,8 @@ names.
 | [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about) | Medium | Memory / recall | Open — a question carrying an instruction ("Answer in one sentence") recalls nothing, because the lexical leg needs every content word in the record |
 | [BUG-314](#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window) | Low | Composers / models | Open — Chat, Build and Tasks look the chosen pair up among the quick list, so a model reached by search is judged by the default's readiness and context window until the server checks it |
 | [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) | Medium | Messaging / Telegram | Open — a routed Telegram message runs its turn and the answer stays in Raiker; the page now says so (FIXED-711, FIXED-712), but nothing delivers it |
+| [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in) | Medium | Build / Projects | Open — Build says *Working in <project>*, while its reads, writes and commands are relative to the workspace and the project's own folder is protected |
+| [BUG-317](#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build) | Low | Build / notifications | Open — on Build the *Approval needed* toast sits over the right end of the same decision's card |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -1521,6 +1523,14 @@ selected.
 
 ## BUG-287 — The image provider round trip is unverified against a real provider
 
+> **2026-10-03 — and now references.** [FIXED-733](FIXED_ITEMS.md#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt)
+> lets a consented research reference travel with a prompt as its own audited
+> argument, composed after the prompt by the executor. It is proven to the
+> provider's request body with a stubbed transport, not against a real
+> provider, and the research turn that makes a reference needs a search
+> provider this host cannot reach either. The live round that closes this entry
+> should send one reference and read it back in the inspector's **Sent with**.
+
 > **2026-09-15 — what the round trip now has to prove changed.**
 > [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all)
 > found that `image_generation` had no key in `CAPABILITY_GATE_MAP`, so the
@@ -2250,3 +2260,46 @@ owner's approval mode.
 
 **Required user-interface outcome.** A routed Telegram message's receipt reaches
 *delivered*, and *What this route does* says replies go back to the chat.
+
+---
+
+## BUG-316 — Build's "Working in" names a project whose folder Build does not work in
+
+**Severity: Medium. Area: Build / Projects. Status: Open — raised 2026-10-03 by
+the live round.**
+
+**Observed.** The first closed-loop attempt (UX-BUILD-04) put its module and
+test in the new project's own folder and told the model to run them "in this
+project". The command ran at the workspace root and could not find the file. A
+managed project's root is `.raiker/projects/<slug>`, which is a protected
+workspace path, and a managed project's path authority is the workspace itself
+(`authority_for_project`): Build reads, writes and runs commands relative to the
+workspace whichever project is chosen. Meanwhile the composer says **Working in
+*project***, and the boundary inspector names the project first.
+
+**Why it is not fixed in passing.** Either the wording changes — the project is
+where the conversation is *filed*, and the repository (or the workspace) is
+where the work happens — or a managed project gains a working folder commands
+start in, with the authority and checkpoint rules that implies. That is DEC-04
+and DEC-06 step 1's server-issued boundary, and it is the owner's choice which.
+
+**Required user-interface outcome.** What the composer and the boundary say a
+turn works in is the folder its reads, writes and commands are relative to.
+
+---
+
+## BUG-317 — The global approval toast covers the decision it duplicates in Build
+
+**Severity: Low. Area: Build / notifications. Status: Open — raised 2026-10-03
+by the live round.**
+
+**Observed.** When a Build turn raises an approval, Build shows the decision in
+its own **Waiting on you** card, and the shell's global **Approval needed**
+toast appears at the same time, anchored bottom-right, over the right-hand end
+of that card (capture `07-build-approval-interrupts.png` in
+`docs/screenshots/2026-10-03-models-build-design-round/`). Both offer the same
+decision.
+
+**Required user-interface outcome.** On the surface already showing a decision,
+the toast is not shown, or does not cover it.
+

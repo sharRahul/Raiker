@@ -72,6 +72,16 @@ if TYPE_CHECKING:
 LOCAL_RUNTIME_PROVIDERS: frozenset[str] = frozenset({"ollama", "llama.cpp", "mlx", "vllm"})
 
 
+def _declared(raw: Any, key: str) -> bool | None:
+    """A capability the profile states, or ``None`` when it says nothing.
+
+    UX-MODEL-04 — the comparison renders ``None`` as Unknown. Collapsing an
+    absent key to ``False`` would print "No" for a fact nobody established.
+    """
+    value = (raw or {}).get(key)
+    return value if isinstance(value, bool) else None
+
+
 class ModelService:
 
     def get_models(self: DashboardService, acting_principal_id: str | None = None) -> ModelsView:
@@ -296,6 +306,15 @@ class ModelService:
                     profile.raw.get("supports_reasoning_summary", False)
                 ),
                 image_models=declared_image_models(profile.raw),
+                supports_tool_calls=_declared(profile.raw, "supports_tool_calls"),
+                supports_vision=_declared(profile.raw, "supports_vision"),
+                rate_input_per_mtok=(
+                    str(facts.price.input_per_mtok) if facts.price is not None else None
+                ),
+                rate_output_per_mtok=(
+                    str(facts.price.output_per_mtok) if facts.price is not None else None
+                ),
+                rate_currency=(facts.price.currency if facts.price is not None else None),
                 **_usage_fields(profile),
             )
 

@@ -615,6 +615,25 @@ async def resolve_approval(
             )
         )
         if not execution.ok:
+            if execution.status == "execution_failed":
+                # UX-BUILD-04 — the action ran once and failed, so the decision
+                # is final and the parked turn must hear how it ended. Raising
+                # without this left the turn suspended with no outcome: never
+                # resumable, the model never shown the failure it was asked to
+                # fix, and the edit → test → fix loop dead at its first red test.
+                _record_resume_outcome(
+                    request,
+                    store,
+                    approval_id,
+                    approval_outcome(
+                        approved=True,
+                        executed=True,
+                        failed=True,
+                        capability=execution.capability,
+                        artifacts=dict(execution.artifacts),
+                        reason_code=execution.reason_code,
+                    ),
+                )
             raise refusal(_EXECUTION_ERRORS.get(
                     execution.reason_code or "", status.HTTP_409_CONFLICT
                 ), execution.reason_code)

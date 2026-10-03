@@ -183,7 +183,7 @@ describe("the size control says what it decides", () => {
     arriveAt("#/design?asset=img_g");
     render(DesignView);
 
-    await waitFor(() => expect(screen.getByText("chosen by gemini")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("chosen by Gemini")).toBeInTheDocument());
     expect(screen.queryByText("1024x1536")).toBeNull();
   });
 
@@ -427,5 +427,255 @@ describe("what happens to a picture once it is made", () => {
     await waitFor(() => expect(screen.getAllByRole("img").length).toBeGreaterThan(0));
     // A refusal has nothing to put on a canvas, so no canvas is opened.
     expect(screen.queryByRole("button", { name: "Back to everything" })).not.toBeInTheDocument();
+  });
+});
+
+// UX-DESIGN-01 — export, delete and restore, with removal for good only as the
+// second step.
+describe("a picture's lifecycle", () => {
+  const PROJECTS = {
+    projects: [
+      {
+        project_id: "proj_1",
+        name: "Quarterly note",
+        root_subpath: "projects/quarterly-note",
+        created_at: "2026-09-01T00:00:00Z",
+        session_count: 1,
+        selected: true,
+        parent_id: null,
+        path: "/",
+        is_archived: false,
+        archived_at: null,
+      },
+    ],
+    active_project_id: "proj_1",
+  };
+
+  it("offers a named download, says where it is filed, and deletes into Recently deleted", async () => {
+    const fetchMock = stubFetch(
+      routes({
+        "GET /api/images": { sizes: ["1024x1024"], generations: GENERATIONS, deleted: [] },
+        "DELETE /api/images/img_1": { ok: true, generation_id: "img_1", state: "deleted" },
+      }),
+    );
+    render(DesignView, { props: { projects: PROJECTS as never } });
+    await fireEvent.click(await screen.findByRole("button", { name: "Open a maple leaf on the canvas" }));
+
+    const inspector = await screen.findByRole("complementary", { name: "Inspector" });
+    expect(inspector).toHaveTextContent("Filed in");
+    expect(inspector).toHaveTextContent("Quarterly note");
+    const download = screen.getByRole("link", { name: "Download" });
+    expect(download).toHaveAttribute("href", "/api/images/img_1/bytes?download=1");
+    expect(download).toHaveAttribute("download");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/api/images/img_1") &&
+            (init as RequestInit | undefined)?.method === "DELETE",
+        ),
+      ).toBe(true),
+    );
+    // Off the canvas: back to the history.
+    await waitFor(() =>
+      expect(screen.queryByRole("complementary", { name: "Inspector" })).toBeNull(),
+    );
+  });
+
+  it("restores from Recently deleted, and removes for good only after confirming", async () => {
+    const gone = generation({ generation_id: "img_gone", prompt: "a fallen leaf", deleted_at: "2026-09-14T10:00:00Z" });
+    const fetchMock = stubFetch(
+      routes({
+        "GET /api/images": { sizes: ["1024x1024"], generations: GENERATIONS, deleted: [gone] },
+        "POST /api/images/img_gone/restore": { ok: true, generation_id: "img_gone", state: "restored" },
+        "DELETE /api/images/img_gone/purge": { ok: true, generation_id: "img_gone", state: "removed" },
+      }),
+    );
+    render(DesignView);
+    const section = await screen.findByTestId("design-recently-deleted");
+    expect(section).not.toHaveAttribute("open");
+    expect(section).toHaveTextContent("Recently deleted 1");
+    // Not in the gallery it was taken out of.
+    expect(screen.queryByRole("button", { name: "Open a fallen leaf on the canvas" })).toBeNull();
+
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    await fireEvent.click(screen.getByRole("button", { name: "Remove for good" }));
+    expect(confirm).toHaveBeenCalled();
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes("/purge")),
+    ).toBe(false);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/api/images/img_gone/restore") &&
+            (init as RequestInit | undefined)?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+
+    // One lifecycle request at a time: the controls wait while one is in flight.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Restore" })).toBeEnabled());
+    confirm.mockReturnValue(true);
+    await fireEvent.click(screen.getByRole("button", { name: "Remove for good" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) =>
+            String(url).endsWith("/purge") && (init as RequestInit | undefined)?.method === "DELETE",
+        ),
+      ).toBe(true),
+    );
+  });
+});
+
+// UX-DESIGN-02 — the destination is said before Generate, Unfiled included.
+describe("where a generation will be filed", () => {
+  it("says Unfiled when no project is chosen", async () => {
+    stubFetch(routes({ "GET /api/images": { sizes: ["1024x1024"], generations: [], deleted: [] } }));
+    render(DesignView);
+    const line = await screen.findByRole("button", { name: /^Context for this turn/ });
+    expect(line).toHaveTextContent("Unfiled");
+  });
+
+  it("names an unfiled picture as Unfiled in the inspector", async () => {
+    stubFetch(
+      routes({
+        "GET /api/images": {
+          sizes: ["1024x1024"],
+          generations: [generation({ generation_id: "img_free", prompt: "a loose leaf", project_id: null })],
+          deleted: [],
+        },
+      }),
+    );
+    render(DesignView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open a loose leaf on the canvas" }));
+    const inspector = await screen.findByRole("complementary", { name: "Inspector" });
+    expect(inspector).toHaveTextContent(/Filed in\s*Unfiled/);
+  });
+});
+
+// UX-DESIGN-03 — research as a named reference, sent only once ticked.
+describe("research as a reference", () => {
+  const MODELS = {
+    profiles: [
+      {
+        profile_id: "prof_1",
+        provider: "openai",
+        model: "gpt-4",
+        selected: true,
+        configured: true,
+        ready: true,
+        readiness_state: "ready",
+        image_models: ["gpt-image-1"],
+      },
+    ],
+    selected_profile_id: "prof_1",
+  };
+
+  it("builds a reference from research and sends it only after consent", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetchMock = stubFetch(
+      routes({
+        "GET /api/models": MODELS,
+        "GET /api/projects": { projects: [], active_project_id: null },
+        "GET /api/surface-models": { surfaces: {} },
+        "GET /api/read-capabilities": {
+          capabilities: ["web_search"],
+          external: ["web_search"],
+          interactive: [],
+          surfaces: { design: ["web_search"] },
+          administrative_surfaces: [],
+          readiness: [],
+        },
+        "POST /api/prompts": {
+          request_id: "req_1",
+          session_id: "sess_research",
+          turn_id: "turn_r1",
+          status: "completed",
+          message: "Maple leaves are **palmate** [s1].",
+        },
+        "GET /api/sessions/sess_research/sources": {
+          sources: [
+            {
+              source_id: "s1",
+              turn_id: "turn_r1",
+              ordinal: 1,
+              kind: "web",
+              title: "Maple plate",
+              locator: "https://example.test/maple",
+              detail: "",
+              attachment_id: "",
+              openable: true,
+            },
+          ],
+        },
+        "POST /api/images": { ok: true, generation_id: "img_new" },
+      }),
+    );
+    render(DesignView);
+    const prompt = await screen.findByLabelText("Describe the image");
+    await fireEvent.input(prompt, { target: { value: "a maple leaf" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /Tools/ }));
+    await fireEvent.click(await screen.findByRole("menuitem", { name: /Search the web/i }));
+    const panel = await screen.findByTestId("design-research");
+    await waitFor(() => expect(panel).toHaveTextContent("palmate"));
+
+    await fireEvent.click(screen.getByRole("button", { name: "Use as a reference" }));
+    expect(screen.getByRole("button", { name: "Added as a reference" })).toBeDisabled();
+    const list = screen.getByRole("list", { name: "References" });
+    expect(list).toHaveTextContent("1 source page");
+    const consent = screen.getByRole("checkbox", { name: /Send with the prompt to OpenAI/ });
+    expect(consent).not.toBeChecked();
+
+    const capture = () => {
+      bodies.length = 0;
+      for (const [url, init] of fetchMock.mock.calls) {
+        if (String(url).endsWith("/api/images") && (init as RequestInit | undefined)?.method === "POST") {
+          bodies.push(JSON.parse(String((init as RequestInit).body)));
+        }
+      }
+    };
+
+    // Not ticked: nothing about the research leaves with the prompt.
+    await fireEvent.input(screen.getByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    const button = screen.getByRole("button", { name: "Generate" });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    await fireEvent.click(button);
+    await waitFor(() => {
+      capture();
+      expect(bodies.length).toBe(1);
+    });
+    expect(bodies[0]).not.toHaveProperty("references");
+
+    // Ticked: sent as its own argument, with its provenance.
+    fetchMock.mockClear();
+    await fireEvent.click(screen.getByRole("checkbox", { name: /Send with the prompt to OpenAI/ }));
+    await fireEvent.input(screen.getByLabelText("Describe the image"), {
+      target: { value: "a maple leaf" },
+    });
+    const again = screen.getByRole("button", { name: "Generate" });
+    await waitFor(() => expect(again).not.toBeDisabled());
+    await fireEvent.click(again);
+    await waitFor(() => {
+      capture();
+      expect(bodies.length).toBe(1);
+    });
+    expect(bodies[0].prompt).toBe("a maple leaf");
+    expect(bodies[0].references).toEqual([
+      {
+        name: "a maple leaf",
+        // Plain text, and without Raiker's own citation markers.
+        text: "Maple leaves are palmate.",
+        sources: ["https://example.test/maple"],
+      },
+    ]);
   });
 });

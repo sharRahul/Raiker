@@ -241,8 +241,14 @@ def approval_outcome(
     artifacts: dict[str, Any] | None = None,
     reason_code: str | None = None,
     replaced: bool = False,
+    failed: bool = False,
 ) -> dict[str, Any]:
     """The tool result the model is handed when the turn resumes.
+
+    UX-BUILD-04 — ``failed`` is the fifth: the owner approved it and it ran once,
+    and it did not succeed. A failing test command is the ordinary case, and it
+    is exactly what the model has to read in order to diagnose and retry, so the
+    output travels with it.
 
     Four genuinely different things can have happened, and the model has to be
     able to tell them apart — a rejection it must not retry, a rejection where
@@ -266,6 +272,19 @@ def approval_outcome(
                 else "The owner rejected this action, so it did not run. Do not propose "
                 "the same action again; explain the situation or take a different "
                 "approach."
+            ),
+        }
+    if executed and failed:
+        return {
+            "status": "failed",
+            "executed": True,
+            "capability": capability,
+            **({"reason_code": reason_code} if reason_code else {}),
+            **(artifacts or {}),
+            "note": (
+                "The owner approved this action and it ran once, but it did not "
+                "succeed. Read its output, fix the cause, and propose it again if "
+                "it should be retried — approving it once did not approve a retry."
             ),
         }
     if executed:

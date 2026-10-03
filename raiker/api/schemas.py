@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -94,6 +94,15 @@ class CreateTelemetryDestinationRequest:
 
 
 @dataclass
+class ImageReferenceRequest:
+    """One research passage the owner consented to send with an image prompt."""
+
+    name: str
+    text: str
+    sources: list[str] = field(default_factory=list)
+
+
+@dataclass
 class GenerateImageRequest:
     # What an owner chooses. Everything else — the endpoint, the credential —
     # comes from the profile they already configured, because a request is a
@@ -116,6 +125,11 @@ class GenerateImageRequest:
     source_generation_id: str = ""
     variations: int = 1
     project_id: str = ""
+    # UX-DESIGN-03 — research the owner chose to send with the prompt, each a
+    # named passage with the pages it came from. Validated and bounded again in
+    # the executor: this is an action argument, so it is checked where it is
+    # used rather than trusted because the page built it.
+    references: list[ImageReferenceRequest] = field(default_factory=list)
 
 
 @dataclass

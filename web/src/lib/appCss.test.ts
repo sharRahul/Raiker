@@ -241,3 +241,20 @@ describe("data-visual language", () => {
     expect(stylesheet).toMatch(/min-width: 2px/);
   });
 });
+
+describe("the composer's primary action keeps its name at phone width", () => {
+  // Found by the 2026-10-03 live round: `.send-label { display: none }` took the
+  // label out of the accessibility tree, so Chat's Send, Build's Run, Design's
+  // Generate and Tasks' primary action were all nameless buttons at 390 px.
+  const composer = readFileSync(
+    resolve(process.cwd(), "src", "lib", "components", "Composer.svelte"),
+    "utf8",
+  );
+
+  it("hides the label visually without removing it", () => {
+    const rule = composer.match(/\.composer-card \.send-label\)\s*\{([^}]*)\}/);
+    expect(rule).not.toBeNull();
+    expect(rule![1]).not.toMatch(/display:\s*none/);
+    expect(rule![1]).toMatch(/clip: rect\(0 0 0 0\)/);
+  });
+});

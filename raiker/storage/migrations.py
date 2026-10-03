@@ -4030,6 +4030,25 @@ CREATE INDEX IF NOT EXISTS idx_channel_receipts_connector
 """
 
 
+# UX-DESIGN-01 and UX-DESIGN-03 — a generated picture can be put away and
+# brought back, and says what research it was sent with.
+#
+# DEC-07 step 4 asks for delete and restore as an asset lifecycle, and the row
+# had no state to hold either: the only way out of the gallery was never to
+# have made the picture. `deleted_at` is the recoverable half — the row and its
+# bytes stay, and Design lists it under Recently deleted. Removing it for good
+# deletes the row and its attachment together, so nothing is left orphaned.
+#
+# `references_json` is the provenance of research the owner chose to send with
+# the prompt: each reference's name, passage and source pages, exactly as the
+# provider received them.
+IMAGE_DELETION_MIGRATION_ID = "RAIKER-2084-image-lifecycle-and-references"
+
+IMAGE_DELETION_SQL = """
+ALTER TABLE image_generations ADD COLUMN deleted_at TEXT;
+ALTER TABLE image_generations ADD COLUMN references_json TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4259,6 +4278,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(
         CHANNEL_DESTINATION_AND_RECEIPTS_MIGRATION_ID, CHANNEL_DESTINATION_AND_RECEIPTS_SQL
     ),
+    Migration(IMAGE_DELETION_MIGRATION_ID, IMAGE_DELETION_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

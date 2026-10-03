@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-03 (third) | Targeted | `2026-10-03-models-build-design-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real Build turn through three owner approvals, the key entered through the Connect dialog; Design's pictures seeded into the workspace's own store | Ten items from the release-readiness review: UX-MODEL-02, -04, -05, UX-BUILD-02 to -04 and UX-DESIGN-01 to -04. Proved live: a readiness line walking connect → choose → check → Ready on one page, a comparison with Unknown kept Unknown, Build's boundary ending at the model, **a real model running a failing test, reading the failure, fixing the module and re-running it green**, a narrow window's drawer stepping aside for an approval, and Design's Unfiled destination, download, delete, restore and removal. **Three defects found and fixed** — an approved command that failed left its turn waiting forever, every composer's primary action was nameless at phone width, and Build's evidence line did not count sources; BUG-316 and BUG-317 filed |
 | 2026-10-03 (second) | Targeted | `2026-10-03-messaging-mcp-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a turn routed in from a webhook channel and a Chat turn, the key entered through the Connect dialog; a local receiver standing in for a webhook destination | Ten items from the release-readiness review: §3.10 Messaging (UX-MSG-03 to -06), §3.11 MCP (UX-MCP-02, -03), UX-CHAT-03 to -05 and UX-MODEL-03, with UX-CHAT-02 completed and UX-MSG-01/-02, SEC-MCP-01 to -03 and UX-MCP-01 recorded against earlier closures. Proved live: a channel set up step by step, its test refused at the gate and then **delivered while the channel was still off**, a real Anthropic answer to a routed message with each receipt stage separate, Telegram group scope and a bot's update ignored, an MCP sample stating its reach before Test and its trust after, Chat's filing line, labelled background work and grouped actions, and a model reset that holds across a reload, with no horizontal overflow at 390 wide. **Five defects found and fixed** — a refused channel action left the page stale, a failed routed turn read *Failed: failed*, every routed Telegram message failed validation, the MCP notice named a server that did not exist, and a searched model was shown as the default; BUG-314 and BUG-315 filed |
 | 2026-10-03 | Targeted | `2026-10-03-tasks-more-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real delegated task, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.8 Tasks (UX-TASK-02, -03, -05, -06), §3.6 the More window (UX-SETPOP-02 to -04) and UX-PERM-01, with UX-TASK-01 and UX-SETPOP-01 re-verified against FIXED-584 and FIXED-528. Proved live: a weekday routine with an end and a skip policy composed in two groups and stating its terms on its card, Cancel rather than Stop on work that has not run, delegated work folded and counted under its parent, a real run settling and **Run again** filing new work, Permissions by task group, More by purpose with Recent and the palette, More as a full-height sheet at 390 wide, and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — Show on a parent revealed none of its settled work, a finished task said *Now: Starting scheduled run*, and filing a task forgot its model |
 | 2026-10-02 (second) | Targeted | `2026-10-02-memory-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that recalled an imported memory, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.9 Memory (UX-MEM-01 to UX-MEM-08) and UX-PERM-02 to UX-PERM-05. Proved live: an import reviewed record by record with one left out and a receipt, a real turn given the imported memory and its record linking back to that turn, archive / retention / restore as one lifecycle, an undo that keeps the record the owner changed, Permissions by goal, and 390 wide with no horizontal overflow, with **no 4xx, no 5xx and no console error** in the Memory and Permissions steps. **Four defects found** — three fixed (the Expired filter could never show a record, *last included* ignored a turn's own recall, an imported record said *agent*) and one filed (BUG-313: an instruction in the prompt stops recall) |
@@ -84,6 +85,84 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-03 (third) — A readiness line in order, a red test that returns to the model, and pictures that can be put away
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` on a
+workspace reset with `scripts/reset_live_workspace.py`, in a Linux container
+whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: the pre-installed Chromium, through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-03-models-build-design-live.spec.ts` (7 of 7 on the
+final, fresh workspace; capture 13 was retaken against its element by a
+Design-only run on a second fresh workspace, because the full-page capture
+left the list below the scrolled history). Captures:
+[`docs/screenshots/2026-10-03-models-build-design-round/`](../screenshots/2026-10-03-models-build-design-round).**
+
+§3.3, §3.4 and §3.5 of the release-readiness review: FIXED-725 to FIXED-736.
+
+**What it proved.**
+
+1. **The readiness line walks the journey in order.** On a fresh workspace every
+   work row stopped at *Provider connected* with **Connect a provider**; once
+   Anthropic was connected it moved to *Model chosen* with **Choose a model**;
+   after **Use** it read *Runs — not checked yet* with **Check it now**; pressing
+   that ran the exact-pair check and the row became **Ready**, the line stepping
+   aside (FIXED-725,
+   [01](../screenshots/2026-10-03-models-build-design-round/01-readiness-nothing-connected.png), [02](../screenshots/2026-10-03-models-build-design-round/02-readiness-connected-choose-next.png), [03](../screenshots/2026-10-03-models-build-design-round/03-readiness-chosen-not-checked.png)).
+2. **Compare** listed the connected model as *Hosted service · Prompts leave
+   this device · 200k tokens · Yes · Yes · $1.00 in · $5.00 out per 1M tokens ·
+   Ready*, Unknown where nothing is stated, and scrolled inside itself at 390
+   wide (FIXED-726, [04](../screenshots/2026-10-03-models-build-design-round/04-models-compare.png), [05](../screenshots/2026-10-03-models-build-design-round/05-models-compare-390.png)).
+3. **Build's boundary** read *Project → Runs on Local strict → Model Haiku 4.5 ·
+   Anthropic — your default* (FIXED-728, [06](../screenshots/2026-10-03-models-build-design-round/06-build-boundary.png)).
+4. **The closed loop.** A real model ran a failing test on approval, was handed
+   the failure, read both files, fixed the module, re-ran the test green on a
+   third approval and summarised what was wrong, what changed and the result;
+   the spec then ran the test itself and it passed (FIXED-730, FIXED-734,
+   [07](../screenshots/2026-10-03-models-build-design-round/07-build-approval-interrupts.png), [08](../screenshots/2026-10-03-models-build-design-round/08-build-green-summary.png)).
+5. **At 390 wide**, an approval raised while the workbench drawer was open put
+   the drawer away, and **Run** was found by its name (FIXED-729, FIXED-735,
+   [09](../screenshots/2026-10-03-models-build-design-round/09-build-approval-over-drawer-390.png)).
+6. **Usage** led with *Anthropic* and kept `anthropic-hosted` under a closed
+   **Details** (FIXED-727, [10](../screenshots/2026-10-03-models-build-design-round/10-usage-id-in-details.png)).
+7. **Design**, on pictures seeded into the workspace's own store: the line said
+   **Unfiled** with no project chosen; the inspector said **Filed in** the
+   project and **Unfiled**; **Download** answered
+   `attachment; filename="raiker-the-same-lighthouse-with-a-red-….png"`;
+   a deleted edit waited in **Recently deleted** and **Restore** brought it back;
+   an unfiled picture removed for good was gone from both lists; no horizontal
+   overflow at 390 and no console error (FIXED-731, FIXED-732,
+   [11](../screenshots/2026-10-03-models-build-design-round/11-design-unfiled-destination.png)–[14](../screenshots/2026-10-03-models-build-design-round/14-design-390.png)).
+
+**What it found**, all fixed in this change:
+
+* **An approved command that failed left its turn waiting forever**
+  (FIXED-734). The first closed-loop attempt's test command exited non-zero; the
+  route raised its 409 before recording an outcome, so the turn stayed parked,
+  Build kept offering **Accept** on a spent decision, and the model never saw
+  the failure. Before this, no red test could have returned to the model.
+* **Every composer's primary action was nameless at phone width** (FIXED-735) —
+  `display: none` on the label removed it from the accessibility tree.
+* **Build's evidence line counted calls and not sources** (FIXED-736).
+* **Compare first listed the registry rather than the owner's models** — empty
+  local slots and an unconnected profile — and now lists what is set up
+  (FIXED-726).
+
+**Filed:** [BUG-316](TO_BE_FIXED.md#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in)
+(Build says *Working in* a project whose folder it does not work in) and
+[BUG-317](TO_BE_FIXED.md#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build)
+(the approval toast covers Build's own decision card).
+
+**What it could not prove.** Research references (FIXED-733) and image export of
+a *generated* picture: this host reaches neither a search provider nor an image
+provider, so the pictures were seeded and the reference path is proven to the
+request body only ([BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider)).
 
 ---
 

@@ -43,6 +43,18 @@ read, and a chip marked as cited is the *model* saying a sentence rests on it �
 a claim, not something Raiker can verify. The research turn reads pages; it
 draws nothing, and image generation gains no network access from it.
 
+**Research can travel with a prompt — only when you say so.** Under a research
+result, **Use as a reference** turns it into a named reference above the
+composer: the question you asked, the findings as plain text, and the pages they
+came from. Making a reference sends nothing. Each one has its own box — **Send
+with the prompt to *provider*** — and it starts unticked; only ticked references
+go with the next request, as their own entry in the request's audited arguments
+rather than pasted into your prompt, so the approval preview and the audit log
+show exactly what went. Up to three at a time, each up to a thousand characters,
+and the prompt and its references together stay within the prompt limit. The
+picture's inspector then lists what it was **Sent with**, with the passage and
+the pages.
+
 What is *not* there is still not there: no crop, no mask, no outpaint. Those need
 provider capabilities behind the governed endpoint that this build does not have,
 and a control that named them anyway would be a promise the runtime cannot keep.
@@ -73,12 +85,28 @@ is the set of pictures one request produced, side by side.
 something you asked of *this* picture, so it is recorded against it and shown
 there, with the reason, rather than disappearing.
 
+The inspector says where the picture is **Filed in** — a project's name, or
+**Unfiled** — and offers **Open full size**, **Download** and **Delete**.
+**Download** saves the picture under a name made from its prompt, with the
+extension of the image the provider actually returned.
+
 **Back to everything**, above the picture, returns you to the history.
 
 A picture you have just generated goes straight onto the canvas, so the thing
 you asked for stays in front of you rather than becoming the first row of a
 history that grows all day. A refused request does not: there is nothing to put
 on a canvas, and it is read in the history with its reason.
+
+## Deleting and restoring
+
+**Delete** is not permanent. The picture leaves the canvas and the history and
+waits under **Recently deleted**, at the foot of the history, with its bytes and
+its versions intact; **Restore** puts it back exactly where it was in its
+lineage. A picture in Recently deleted cannot be the subject of an edit.
+
+**Remove for good** is only offered there — always the second step, never the
+first — and asks you to confirm. It deletes the record and the image together,
+so nothing is left behind pointing at bytes that are gone.
 
 ## What it needs before it can generate anything
 
@@ -128,10 +156,13 @@ it — generated from a prompt, edited from a named picture, or one of a set. Th
 is what the version strip and the variation grid are built from; neither guesses
 from the order things were made in.
 
-**A picture belongs to the project you made it in.** When Design's context line
-names a project, the pictures you generate are filed against it and appear on
-that project's page beside its files and sessions. Pictures made with no project
-chosen stand alone, and stay that way.
+**A picture belongs to the project you made it in.** Design's context line
+always says where the next picture will be filed before you press Generate: the
+project's name, or **Unfiled** when none is chosen (choose one under `+`). The
+destination is captured with the request, so changing the project afterwards
+does not move a picture already made. Pictures filed in a project appear on that
+project's page beside its files and sessions; unfiled ones stand alone, and stay
+that way.
 
 ## What leaves the machine
 

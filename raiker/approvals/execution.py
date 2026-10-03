@@ -208,11 +208,21 @@ class ApprovalExecutionBridge:
         current = self._store.load_approval(approval_id)
         status = str((current or approval).get("status", "pending"))
         if not executed:
+            # UX-BUILD-04 — when the target executor ran and failed (the relay
+            # left the approval `execution_failed`), what it produced — exit
+            # code, output — is kept, because it is the thing the turn that
+            # proposed the action has to read next.
+            failed_result = (result.artifacts or {}).get("result")
             return ApprovalExecution(
                 ok=False,
                 status=status,
                 capability=capability,
                 reason_code=result.error or result.message or result.decision,
+                artifacts=(
+                    {k: v for k, v in failed_result.items() if v is not None}
+                    if status == "execution_failed" and isinstance(failed_result, dict)
+                    else {}
+                ),
             )
         # The relay records `approval_executed`; this records the *decision* that
         # authorised it, in the same shape the metadata-only inbox emits, so the

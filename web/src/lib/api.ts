@@ -460,6 +460,12 @@ export const api = {
   generateImage: (body: GenerateImageRequest) => contract.generateImage(body),
   imageBytesUrl: (generationId: string) =>
     `/api/images/${encodeURIComponent(generationId)}/bytes`,
+  // UX-DESIGN-01 — the same owner-scoped bytes, as a named file to save.
+  imageDownloadUrl: (generationId: string) =>
+    `/api/images/${encodeURIComponent(generationId)}/bytes?download=1`,
+  deleteImage: (generationId: string) => contract.deleteImage(generationId),
+  restoreImage: (generationId: string) => contract.restoreImage(generationId),
+  purgeImage: (generationId: string) => contract.purgeImage(generationId),
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => contract.getModelPricing(),
   refreshModelPricing: () => contract.refreshModelPricing(),

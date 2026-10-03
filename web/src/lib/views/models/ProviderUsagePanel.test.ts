@@ -51,6 +51,19 @@ const weekly = {
 };
 
 describe("ProviderUsagePanel", () => {
+  it("leads with the provider's name and keeps the profile id in Details", async () => {
+    // UX-MODEL-05 — stable ids stay available for correlating with logs and
+    // exports, but are never a primary label.
+    stubFetch({ "GET /api/models/weekly-usage": weekly });
+    render(ProviderUsagePanel);
+    const heading = await screen.findByRole("heading", { name: "OpenRouter" });
+    const header = heading.closest("header") as HTMLElement;
+    expect(header.textContent).not.toContain("openrouter-policy-gated");
+    const id = screen.getByText("openrouter-policy-gated");
+    expect(id.closest("details")).not.toBeNull();
+    expect(id.closest("details")).not.toHaveAttribute("open");
+  });
+
   it("keeps Raiker-observed usage separate from genuine provider data", async () => {
     stubFetch({ "GET /api/models/weekly-usage": weekly });
     render(ProviderUsagePanel);

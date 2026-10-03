@@ -218,6 +218,29 @@ class TestReads:
         assert profiles["anthropic-hosted"]["model"] == "claude-haiku-4-5-20251001"
         assert profiles["openai-hosted"]["model"] == "gpt-4o-mini"
 
+    def test_models_carry_the_comparison_facts_and_keep_unknown_unknown(
+        self, client: TestClient, app: FastAPI
+    ) -> None:
+        # UX-MODEL-04 — the comparison table's tools, vision and rate come from
+        # the profile's own declarations and the price resolution. A profile
+        # that says nothing about vision reports null (Unknown), not false.
+        store = SQLiteStore(app.state.workspace_root)
+        store.save_configured_model(
+            "principal_owner", "anthropic-hosted", "claude-haiku-4-5-20251001"
+        )
+        response = client.get("/api/models", headers=_auth_headers(_token(client)))
+        profiles = {row["profile_id"]: row for row in response.json()["profiles"]}
+        anthropic = profiles["anthropic-hosted"]
+        assert anthropic["supports_tool_calls"] is True
+        assert anthropic["supports_vision"] is True
+        assert anthropic["rate_input_per_mtok"] == "1.0"
+        assert anthropic["rate_output_per_mtok"] == "5.0"
+        assert anthropic["rate_currency"] == "USD"
+        ollama = profiles["ollama-local-openai-compatible"]
+        assert ollama["supports_tool_calls"] is True
+        assert ollama["supports_vision"] is None
+        assert ollama["rate_input_per_mtok"] is None
+
     def test_diagnostics_reports_disabled_capabilities_and_scope(self, client: TestClient) -> None:
         resp = client.get("/api/diagnostics", headers=_auth_headers(_token(client)))
         assert resp.status_code == 200

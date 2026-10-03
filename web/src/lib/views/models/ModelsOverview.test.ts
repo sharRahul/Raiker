@@ -74,3 +74,99 @@ describe("BUG-311 — Design is ready to draw only when a model returns images",
     expect(within(chat).getByText("Ready")).toBeInTheDocument();
   });
 });
+
+// UX-MODEL-02 — "connected", "discovered", "selected" and "runs" were four facts
+// in four places. The decision now carries them as four ordered steps and one
+// next action, and the overview draws them while one is not done.
+describe("UX-MODEL-02 — a four-step readiness line with one next action", () => {
+  const steps = (states: string[]) =>
+    ["connect", "discover", "choose", "run"].map((id, index) => ({
+      id,
+      label: ["Provider connected", "Model found", "Model chosen", "Runs"][index],
+      state: states[index],
+    }));
+
+  async function renderWith(chat: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+    const fetchMock = stubFetch({
+      "GET /api/model-decisions": {
+        surfaces: { chat, build: decision("build"), design: decision("design") },
+      },
+      ...extra,
+    });
+    const onopen = vi.fn();
+    render(ModelsOverview, { models: modelsView({ profiles: [chatModel] }), onopen });
+    const label = await screen.findByText("Chat", { selector: ".surface-name" });
+    return { row: label.closest("li") as HTMLElement, onopen, fetchMock };
+  }
+
+  it("names the blocked step and offers only its action", async () => {
+    const { row, onopen } = await renderWith({
+      ...decision("chat"),
+      ready: false,
+      problem: {
+        reason_code: "provider_authentication_failed",
+        summary: "Anthropic rejected the saved credential.",
+        remediation: "Update the provider credential and check again.",
+      },
+      steps: steps(["blocked", "waiting", "waiting", "waiting"]),
+      next_action: { label: "Update the credential", target: "add" },
+    });
+
+    const line = within(row).getByRole("list", { name: "Chat readiness" });
+    const items = within(line).getAllByRole("listitem");
+    expect(items.map((item) => item.dataset.state)).toEqual([
+      "blocked", "waiting", "waiting", "waiting",
+    ]);
+    expect(within(items[0]).getByText(/needs you/)).toBeInTheDocument();
+    // One primary action in the row, and the attention list uses the same word.
+    const buttons = screen.getAllByRole("button", { name: "Update the credential" });
+    expect(buttons).toHaveLength(2);
+    within(row).getByRole("button", { name: "Update the credential" }).click();
+    expect(onopen).toHaveBeenCalledWith("add");
+  });
+
+  it("draws nothing extra on a ready row", async () => {
+    const { row } = await renderWith({
+      ...decision("chat"),
+      steps: steps(["done", "done", "done", "done"]),
+      next_action: null,
+    });
+    expect(within(row).getByText("Ready")).toBeInTheDocument();
+    expect(within(row).queryByTestId("model-readiness-steps")).not.toBeInTheDocument();
+  });
+
+  it("runs the exact-pair check in place for an unchecked model and re-reads", async () => {
+    const { row, fetchMock } = await renderWith(
+      {
+        ...decision("chat"),
+        ready: false,
+        problem: {
+          reason_code: "model_not_checked",
+          summary: "No readiness check exists for this exact model.",
+          remediation: "Set up or check this model before sending.",
+        },
+        steps: steps(["done", "unchecked", "done", "unchecked"]),
+        next_action: { label: "Check it now", target: "check" },
+      },
+      { "POST /api/model-readiness/check": { state: "ready", ready: true } },
+    );
+    within(row).getByRole("button", { name: "Check it now" }).click();
+    await vi.waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url, init]) =>
+          String(url).includes("/api/model-readiness") && (init as RequestInit | undefined)?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+    await vi.waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([url]) => String(url).includes("/api/model-decisions")).length,
+      ).toBeGreaterThan(1),
+    );
+  });
+
+  it("is absent on a host that sends no steps", async () => {
+    const { row } = await renderWith({ ...decision("chat"), ready: false, problem: null });
+    expect(within(row).queryByTestId("model-readiness-steps")).not.toBeInTheDocument();
+  });
+});

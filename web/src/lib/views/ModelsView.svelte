@@ -42,6 +42,7 @@
   import SpeechRuntimePanel from "./models/SpeechRuntimePanel.svelte";
   import ModelsOverview from "./models/ModelsOverview.svelte";
   import MyModels from "./models/MyModels.svelte";
+  import ModelComparison from "./models/ModelComparison.svelte";
   import WorkDefaults from "./models/WorkDefaults.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
@@ -327,6 +328,8 @@
   // Which provider's installer is being opened, and what to say afterwards.
   let installing = $state<string | null>(null);
   let installNotice = $state<string | null>(null);
+  /** UX-MODEL-04 — My models as the inventory list or as a comparison. */
+  let modelsLayout = $state<"list" | "compare">("list");
   let detailsFor = $state<ModelProfile | null>(null);
   // Governed refusals are policy outcomes, not faults. Hold the reason code so
   // the dialog can render the control that unblocks it instead of a bare code.
@@ -1327,10 +1330,33 @@
       id="panel-models"
       aria-labelledby="tab-models"
     >
-      <p class="tab-lead">
-        Every model you have set up, wherever it runs. The one in force is at
-        the top; a row asks something of you only when it needs it.
-      </p>
+      <div class="lead-row">
+        <p class="tab-lead">
+          Every model you have set up, wherever it runs. The one in force is at
+          the top; a row asks something of you only when it needs it.
+        </p>
+        <!-- UX-MODEL-04 — the same models as a comparison. Two presentations
+             of one inventory, so choosing still happens in the list. -->
+        <div class="view-switch" role="group" aria-label="Show models as">
+          <button
+            type="button"
+            class="btn btn-sm"
+            class:btn-ghost={modelsLayout !== "list"}
+            aria-pressed={modelsLayout === "list"}
+            onclick={() => (modelsLayout = "list")}>List</button
+          >
+          <button
+            type="button"
+            class="btn btn-sm"
+            class:btn-ghost={modelsLayout !== "compare"}
+            aria-pressed={modelsLayout === "compare"}
+            onclick={() => (modelsLayout = "compare")}>Compare</button
+          >
+        </div>
+      </div>
+      {#if modelsLayout === "compare"}
+        <ModelComparison profiles={models.profiles} />
+      {:else}
       <MyModels
         profiles={models.profiles}
         {decisions}
@@ -1340,6 +1366,7 @@
         ondetails={(profile) => (detailsFor = profile)}
         onchanged={() => void load()}
       />
+      {/if}
     </div>{/if}
   {#if showsProviderCards}
     <div
@@ -2510,6 +2537,18 @@
   }
   .panel > :global(*) {
     min-width: 0;
+  }
+  .lead-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+  }
+  .view-switch {
+    display: inline-flex;
+    gap: 0.25rem;
+    flex: none;
   }
   .tab-lead {
     margin: 0;

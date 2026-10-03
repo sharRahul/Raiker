@@ -33,7 +33,14 @@
   import { providerName } from "../../format";
   import { modelName } from "../../modelPresentation";
   import { drawsImages, isChoosableModel } from "../../modelReadiness.svelte";
-  import type { ModelDecision, ModelProfile, ModelsView } from "../../apiTypes";
+  import { api } from "../../api";
+  import ReadinessSteps from "./ReadinessSteps.svelte";
+  import type {
+    ModelDecision,
+    ModelNextAction,
+    ModelProfile,
+    ModelsView,
+  } from "../../apiTypes";
 
   let {
     models,
@@ -70,6 +77,44 @@
   async function load() {
     decisions = await modelDecisions();
     read = true;
+  }
+
+  /** The surface whose "Check it now" is running, so only its button waits. */
+  let checking = $state<string | null>(null);
+  let checkNotice = $state<string | null>(null);
+
+  /**
+   * UX-MODEL-02 — the one next action a readiness line offers.
+   *
+   * Most actions open the tab that owns the fix, as **Fix** always did. "Check
+   * it now" is the exception: it runs the same exact-pair check the composer
+   * runs and re-reads the decisions, so the line moves on the page the owner is
+   * already looking at instead of sending them somewhere to press a button.
+   */
+  async function takeAction(surface: string, action: ModelNextAction) {
+    if (action.target === "permissions") {
+      window.location.hash = "#/capabilities";
+      return;
+    }
+    if (action.target !== "check") {
+      onopen(action.target);
+      return;
+    }
+    const decision = decisionFor(surface);
+    if (decision === null || !decision.selected.profile_id) return;
+    checking = surface;
+    checkNotice = null;
+    try {
+      await api.checkModelReadiness(decision.selected.profile_id, decision.selected.model);
+    } catch {
+      checkNotice = "The check could not be started. Nothing was changed.";
+    } finally {
+      // The verdict — ready or the reason it is not — is read back through the
+      // decision rather than from this response, so the line and the
+      // composers keep answering from one place.
+      await load();
+      checking = null;
+    }
   }
 
   function decisionFor(surface: string): ModelDecision | null {
@@ -129,9 +174,11 @@
     workRows
       .filter((row) => row.decision !== null && row.decision.problem !== null)
       .map((row) => ({
+        id: row.id,
         surface: row.label,
         model: row.decision!.selected.model,
         problem: row.decision!.problem!,
+        action: row.decision!.next_action ?? null,
         // A local model that is selected and merely stopped is started from
         // Runtime; anything else is a connection or a catalogue, which is
         // where "Add model" and the provider list live.
@@ -202,11 +249,18 @@
                 <p class="attention-why">{item.problem.summary}</p>
                 <p class="attention-fix">{item.problem.remediation}</p>
               </div>
+              <!-- The server's own next action when it names one, so this list
+                   and the readiness line below never offer two different fixes
+                   for one problem. An older host that names none keeps Fix. -->
               <button
                 type="button"
                 class="btn btn-sm"
-                onclick={() => onopen(item.tab)}
-              >Fix</button>
+                disabled={checking === item.id}
+                onclick={() =>
+                  item.action !== null
+                    ? void takeAction(item.id, item.action)
+                    : onopen(item.tab)}
+              >{item.action?.label ?? "Fix"}</button>
             </li>
           {/each}
         </ul>
@@ -270,9 +324,26 @@
             >
               {row.researchOnly ? "Research only" : row.decision?.ready ? "Ready" : "Not ready"}
             </span>
+            {#if row.decision !== null && (row.decision.steps ?? []).length > 0 && (!row.decision.ready || row.decision.next_action !== null)}
+              <!-- UX-MODEL-02 — the four steps, only while one of them is not
+                   done. A ready row says Ready and nothing more: four ticks on
+                   every healthy row is the wall of green this page removed. -->
+              <div class="steps">
+                <ReadinessSteps
+                  steps={row.decision.steps}
+                  action={row.decision.next_action}
+                  busy={checking === row.id}
+                  label={`${row.label} readiness`}
+                  onaction={(action) => void takeAction(row.id, action)}
+                />
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>
+      {#if checkNotice !== null}
+        <p class="check-notice" role="alert">{checkNotice}</p>
+      {/if}
       <p class="captured">
         {#each CAPTURED as surface, index (surface.id)}
           {index > 0 ? " and " : ""}{surface.label}
@@ -437,6 +508,14 @@
   .state[data-state="blocked"] {
     color: var(--warn);
   }
+  .steps {
+    grid-column: 2 / -1;
+  }
+  .check-notice {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-xs);
+    color: var(--warn);
+  }
   .captured {
     margin: var(--space-3) 0 0;
     font-size: var(--text-xs);
@@ -467,6 +546,9 @@
       grid-template-columns: minmax(0, 1fr) auto;
     }
     .surface {
+      grid-column: 1 / -1;
+    }
+    .steps {
       grid-column: 1 / -1;
     }
   }

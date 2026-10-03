@@ -62,7 +62,8 @@ describe("stacked conversation layout", () => {
     // in both composers below 1024px.
     expect(source).toMatch(/\.composer-bar \{ flex-wrap: wrap;/);
     expect(source).toMatch(/:global\(\.composer-card \.send\) \{[\s\S]*?width: 2\.75rem;/);
-    expect(source).toMatch(/:global\(\.composer-card \.send-label\) \{ display: none; \}/);
+    // FIXED-735 — the label is hidden visually and stays the button's name.
+    expect(source).toMatch(/:global\(\.composer-card \.send-label\) \{[\s\S]*?clip: rect\(0 0 0 0\);/);
     expect(source).toMatch(/\.shortcut-hint/);
   });
 

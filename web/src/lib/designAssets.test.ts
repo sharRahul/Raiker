@@ -36,6 +36,8 @@ function gen(over: Partial<ImageGeneration> & { generation_id: string }): ImageG
     kind: "create",
     source_generation_id: null,
     project_id: null,
+    deleted_at: null,
+    references: [],
     ...over,
   };
 }

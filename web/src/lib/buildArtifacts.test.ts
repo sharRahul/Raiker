@@ -4,6 +4,7 @@ import {
   ARTIFACT_TABS,
   changesSummary,
   focusFor,
+  newlyRaisedApproval,
   readWorkbenchOpen,
   readWorkbenchTab,
   rememberWorkbenchOpen,
@@ -139,5 +140,17 @@ describe("what the workbench remembers", () => {
       getItem.mockRestore();
       setItem.mockRestore();
     }
+  });
+});
+
+describe("UX-BUILD-03 — a new approval takes priority over the inspector", () => {
+  it("fires only when an approval id appears that was not there before", () => {
+    expect(newlyRaisedApproval([], ["a"])).toBe(true);
+    expect(newlyRaisedApproval(["a"], ["a", "b"])).toBe(true);
+    // Still pending, already shown: the owner may have chosen to look elsewhere.
+    expect(newlyRaisedApproval(["a"], ["a"])).toBe(false);
+    // Resolved: nothing new to show.
+    expect(newlyRaisedApproval(["a", "b"], ["b"])).toBe(false);
+    expect(newlyRaisedApproval([], [])).toBe(false);
   });
 });

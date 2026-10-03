@@ -1072,6 +1072,49 @@ describe("Build inline diff review", () => {
     expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
   });
 
+  it("puts a narrow window's workbench drawer away when an approval is raised", async () => {
+    // UX-BUILD-03 — approval review overrides the normal inspector. Narrow, the
+    // workbench is a modal drawer over the transcript where the approval is.
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    stubFetch(
+      baseRoutes({
+        "GET /api/approvals": [PENDING],
+        "GET /api/approvals/apr_1": DETAIL,
+      }),
+    );
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: { ...finalResponse(""), status: "needs_approval" },
+        } as StreamEvent);
+      },
+    );
+    await renderBuildWithProject();
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Rename the entry point" },
+    });
+    // Taken before the drawer opens: a modal drawer hides the composer from
+    // the accessibility tree, which is exactly the problem being tested.
+    const send = sendButton();
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
+    expect(await screen.findByRole("dialog", { name: "Background work" })).toBeInTheDocument();
+
+    await fireEvent.click(send);
+
+    expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Background work" })).not.toBeInTheDocument(),
+    );
+  });
+
   it("keeps the decision when the preview cannot be read", async () => {
     stubFetch(
       baseRoutes({
@@ -1137,11 +1180,92 @@ describe("the execution boundary Build names", () => {
     await waitFor(() => expect(screen.getByText(/Docker sandbox/)).toBeInTheDocument());
   });
 
+  it("orders the boundary Project → repository → environment → model", async () => {
+    // UX-BUILD-02 — the line named where a turn runs and not what answers it.
+    stubFetch(
+      baseRoutes({
+        "GET /api/execution-environments": {
+          selected_profile_id: "env_local",
+          environments: [
+            {
+              profile_id: "env_local",
+              kind: "local",
+              name: "This computer",
+              enabled: true,
+              configured: true,
+              available: true,
+              status: "ready",
+              selected: true,
+              credential_configured: false,
+              budget: null,
+            },
+          ],
+        },
+      }),
+    );
+    await renderBuildWithProject();
+    await waitFor(() => expect(screen.getByText(/This computer/)).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: /^Context for this turn/ }));
+    const inspector = await screen.findByRole("dialog", { name: "Context for this turn" });
+    const labels = within(inspector)
+      .getAllByRole("term")
+      .map((term) => term.textContent?.trim());
+    const order = ["Project", "Runs on", "Model"].map((label) => labels.indexOf(label));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(within(inspector).getByText(/your default|chosen for this work/)).toBeInTheDocument();
+  });
+
   it("says nothing rather than guessing when the runtime cannot be read", async () => {
     // Claiming a destination because a probe failed is the silent retarget this
     // row exists to prevent.
     stubFetch(baseRoutes({ "GET /api/execution-environments": { __status: 503 } }));
     await renderBuildWithProject();
     await waitFor(() => expect(screen.queryByText("Runs on")).toBeNull());
+  });
+});
+
+// UX-CHAT-02 in Build — the closed evidence line counts what the turn read, as
+// Chat's does. Found by the 2026-10-03 live round: a turn that read two files
+// said only "5 calls".
+describe("Build's turn evidence", () => {
+  it("counts the sources a turn read beside its calls", async () => {
+    const source = (id: string, path: string) => ({
+      source_id: id,
+      turn_id: "turn_1",
+      ordinal: Number(id.slice(1)),
+      kind: "file",
+      title: path,
+      locator: path,
+      tool_name: "read_file",
+      detail: "",
+      attachment_id: "",
+      openable: true,
+    });
+    stubFetch(
+      baseRoutes({
+        "GET /api/sessions/sess_build/sources": {
+          session_id: "sess_build",
+          sources: [source("s1", "pricing.py"), source("s2", "test_pricing.py")],
+        },
+      }),
+    );
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+      onEvent({
+        kind: "tool",
+        text: "",
+        event_type: "tool_started",
+        payload: { action_id: "act_1", tool_name: "read_file", status: "success", label: "Read file", action: "pricing.py" },
+        response: null,
+      } as StreamEvent);
+      onEvent({ kind: "text_delta", text: "Fixed [s1].", event_type: "", payload: {}, response: null } as StreamEvent);
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Fixed [s1].") } as StreamEvent);
+    });
+    await renderBuildWithProject();
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Fix the pricing bug" },
+    });
+    await fireEvent.click(sendButton());
+    expect(await screen.findByText(/1 call · 2 sources/)).toBeInTheDocument();
   });
 });

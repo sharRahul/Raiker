@@ -361,3 +361,64 @@ class TestWriteBoundaries:
             SQLiteStore(workspace).load_approval("appr_1")["status"]  # type: ignore[index]
             == "execution_failed"
         )
+
+
+def _park_turn(workspace: Path, approval_id: str = "appr_1") -> SQLiteStore:
+    """The Build or Chat turn that proposed the action, parked on its approval."""
+    import json
+
+    store = SQLiteStore(workspace)
+    store.insert_suspended_turn(
+        {
+            "approval_id": approval_id,
+            "session_id": "sess_a",
+            "turn_id": "turn_a",
+            "request_id": "req_a",
+            "principal_id": "principal_owner",
+            "action_id": "act_1",
+            "tool_name": "write_file",
+            "call_id": "call_a",
+            "prompt_text": "write the file",
+            "messages_json": json.dumps([{"role": "user", "content": "write the file"}]),
+            "options_json": "{}",
+            "client_json": "{}",
+        }
+    )
+    return store
+
+
+class TestAFailedExecutionStillReachesTheTurn:
+    """UX-BUILD-04 — an approved action that ran and failed is an outcome.
+
+    The live round found the edit → test → fix loop dead at its first red test:
+    the route raised its 409 *before* recording an outcome on the parked turn,
+    so the turn stayed suspended forever and the model never saw the failure it
+    was asked to fix.
+    """
+
+    def test_the_parked_turn_hears_the_failure_and_becomes_resumable(
+        self, workspace: Path, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        import json
+
+        _pending(workspace, arguments={"path": ".raiker/hooks.json", "text": "owned"})
+        store = _park_turn(workspace)
+
+        resp = _resolve(client, headers, "appr_1")
+        # The response contract is unchanged: the decision could not be carried out.
+        assert resp.status_code == 409
+        assert store.load_approval("appr_1")["status"] == "execution_failed"  # type: ignore[index]
+
+        row = store.load_suspended_turn("appr_1")
+        assert row is not None and row["outcome_json"]
+        outcome = json.loads(row["outcome_json"])
+        assert outcome["status"] == "failed"
+        assert outcome["executed"] is True
+        assert "protected_workspace_path" in outcome["reason_code"]
+        assert "did not succeed" in outcome["note"]
+
+        listed = client.get(
+            "/api/approvals/resumable", params={"session_id": "sess_a"}, headers=headers
+        ).json()
+        assert [turn["approval_id"] for turn in listed["turns"]] == ["appr_1"]
+        assert listed["turns"][0]["outcome_status"] == "failed"

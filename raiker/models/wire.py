@@ -75,6 +75,29 @@ class DecisionProblem(TypedDict):
     remediation: str
 
 
+ReadinessStepId = Literal["connect", "discover", "choose", "run"]
+#: ``done`` passed; ``blocked`` is the one step stopping the work; ``waiting``
+#: has not been reached because an earlier step is blocked; ``unchecked`` has
+#: never been checked, which is not the same claim as failing.
+ReadinessStepState = Literal["done", "blocked", "waiting", "unchecked"]
+NextActionTarget = Literal["add", "models", "runtime", "check", "permissions"]
+
+
+class ReadinessStep(TypedDict):
+    """One of the four steps between "nothing set up" and "this work can run"."""
+
+    id: ReadinessStepId
+    label: str
+    state: ReadinessStepState
+
+
+class NextAction(TypedDict):
+    """The one thing that moves the first unfinished step forward."""
+
+    label: str
+    target: NextActionTarget
+
+
 class ModelDecisionView(TypedDict):
     """Which model is selected for a surface, and which one will actually run."""
 
@@ -85,6 +108,10 @@ class ModelDecisionView(TypedDict):
     running: bool | None
     problem: DecisionProblem | None
     revision: str
+    #: UX-MODEL-02 — the same answer as `ready` and `problem`, said as four
+    #: steps in the order an owner meets them, with one next action.
+    steps: list[ReadinessStep]
+    next_action: NextAction | None
 
 
 OperationKind = Literal["install", "download", "convert", "deploy", "pull"]

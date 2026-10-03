@@ -54,6 +54,24 @@ export function focusFor(event: ArtifactEvent, current: ArtifactTab): ArtifactTa
   }
 }
 
+/**
+ * UX-BUILD-03 — whether an approval has just been raised that the owner has not
+ * yet been shown.
+ *
+ * DEC-06 step 4: approval review overrides the normal inspector. On a narrow
+ * window the workbench and the file explorer are modal drawers over the
+ * transcript, and the transcript is where an approval is reviewed — so a pane
+ * the owner opened to read a file could sit on top of the one decision the turn
+ * is waiting for. A *new* approval id is the trigger, not the presence of one:
+ * an owner who reopens the workbench while an approval is still pending has
+ * chosen to look at something else, and closing it again would be the pane
+ * fighting them.
+ */
+export function newlyRaisedApproval(previous: readonly string[], next: readonly string[]): boolean {
+  const seen = new Set(previous);
+  return next.some((id) => !seen.has(id));
+}
+
 /** A count of changed files, as the pane's lead line and tab badge read it. */
 export function changesSummary(
   changes: { entries: { path: string }[] } | null,

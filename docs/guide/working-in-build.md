@@ -90,6 +90,13 @@ allowed to do and it changes from turn to turn. The repository and the project
 are in the context line, because a turn that may edit files or run a command has
 to say where — and that is a fact to read, not a control to operate.
 
+Open the context line and it reads as one boundary, in the order that decides
+where a turn's work lands: **Project → Repository → Runs on → Model**. The model
+entry says whether it is your default or this work's own choice, and names a
+fallback that would answer instead rather than letting it stand in silently.
+The line never guesses a fact it could not read — an environment that could not
+be read is absent, not assumed to be this machine.
+
 `+` adds to this turn: **Upload a file**, **Choose from the project**, **Mention
 a file from the code map**, **Work in a project**, **Dictate**.
 
@@ -286,6 +293,13 @@ Where you left it is where it comes back. The view you were reading and whether
 the pane was open survive a reload, the same way the file explorer's width and
 open state do — and, like the explorer, neither is restored as a drawer over a
 narrow window you did not ask to open.
+
+**An approval comes first.** On a narrow window the workbench and the file
+explorer open as drawers over the conversation, which is where an approval is
+reviewed. When a turn raises a new approval they step aside, keeping the view
+and place you had, so the decision is not hidden under something you were
+reading. Reopening one while the approval is still waiting is your choice, and
+it stays open.
 
 ## Finding your way around code
 

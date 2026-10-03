@@ -121,14 +121,11 @@
             <span class="provider-mark"><ProviderLogo provider={row.provider} size={26} /></span>
             <div>
               <h3>{providerName(row.provider)}</h3>
-              <!-- UX-MODEL-05 / REM-MODEL-02 — the profile id was the second
-                   line under the provider's name, in mono, which made an
-                   internal identifier a primary label on a page about money.
-                   It is still exactly here for anyone correlating a row with a
-                   log or an export — as the row's title, and in the connection
-                   detail below — and it is no longer the first thing an owner
-                   reads about their own provider. -->
-              <p class="profile-id" title={row.profile_id}>{row.profile_id}</p>
+              <!-- UX-MODEL-05 — the profile id was the second line under the
+                   provider's name, in mono, so an internal identifier was a
+                   primary label on a page about money. It lives in Details at
+                   the foot of the card, for anyone correlating a row with a log
+                   or an export. -->
             </div>
             <span class="window-chip">7 days</span>
           </header>
@@ -208,6 +205,13 @@
             {/if}
           </div>
           <p class="budget-note">Advisory Raiker control — not a provider subscription limit.</p>
+          <details class="ids">
+            <summary>Details</summary>
+            <dl>
+              <dt>Profile ID</dt>
+              <dd><code>{row.profile_id}</code></dd>
+            </dl>
+          </details>
         </article>
       {/each}
     </div>
@@ -216,6 +220,10 @@
 
 <style>
   .usage-panel { margin-bottom: var(--space-5); }
+  .ids { padding: 0 var(--space-3) var(--space-3); font-size: var(--text-2xs); color: var(--text-3); }
+  .ids summary { cursor: pointer; }
+  .ids dl { display: flex; gap: var(--space-2); margin: var(--space-1) 0 0; }
+  .ids dd { margin: 0; overflow-wrap: anywhere; }
   .usage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-3); }
   .usage-heading h2 { margin: .15rem 0 .35rem; font-size: var(--text-base); }
   .usage-heading p { margin: 0; color: var(--text-2); max-width: 68ch; font-size: var(--text-sm); }
@@ -224,14 +232,6 @@
   .usage-row { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
   .usage-row > header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--border); }
   .usage-row h3 { margin: 0; font-size: var(--text-md); }
-  .profile-id {
-    margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-3);
-    font-size: var(--text-2xs);
-  }
   .provider-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--sunken); }
   .window-chip { margin-left: auto; color: var(--text-2); font-size: var(--text-2xs); font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: .18rem .48rem; }
   .source-pair { display: grid; grid-template-columns: 1fr 1fr; }

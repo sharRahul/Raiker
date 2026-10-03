@@ -203,7 +203,7 @@
       <ul class="sync" aria-label="Provider synchronisation">
         {#each view.sync as state (state.provider)}
           <li class:stale={state.stale}>
-            <span class="sync-provider">{state.provider}</span>
+            <span class="sync-provider" title={state.provider}>{providerName(state.provider)}</span>
             {#if state.stale}
               <span class="badge badge-warn">Stale</span>
             {:else}

@@ -3977,6 +3977,18 @@ CREATE INDEX IF NOT EXISTS idx_memory_import_batches_owner
   ON memory_import_batches(owner_principal_id, created_at DESC);
 """
 
+# UX-TASK-02 — a schedule says which zone it was composed in, the slot it is
+# counted from, when it ends and what a missed slot does. All nullable: a row
+# written before this reads as UTC anchored to its current slot, which is what
+# it did, so no existing routine moves when the columns appear.
+TASK_SCHEDULE_TERMS_MIGRATION_ID = "RAIKER-2082-task-schedule-terms"
+TASK_SCHEDULE_TERMS_SQL = """
+ALTER TABLE tasks ADD COLUMN schedule_timezone TEXT;
+ALTER TABLE tasks ADD COLUMN schedule_anchor TEXT;
+ALTER TABLE tasks ADD COLUMN schedule_until TEXT;
+ALTER TABLE tasks ADD COLUMN missed_run_policy TEXT;
+"""
+
 
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
@@ -4203,6 +4215,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
         MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_MIGRATION_ID,
         MEMORY_RECALL_USAGE_AND_IMPORT_BATCHES_SQL,
     ),
+    Migration(TASK_SCHEDULE_TERMS_MIGRATION_ID, TASK_SCHEDULE_TERMS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_DERIVED_TITLE,
+  CALENDAR_STEP_DAYS,
   RECURRENCE_INTERVAL_MS,
   TASK_CADENCES,
   cadenceFor,
@@ -149,7 +150,7 @@ describe("the next runs a schedule would produce", () => {
 
   it("anchors a routine to the slot the owner picked", () => {
     const runs = nextRuns({
-      cadence: "routine", every: "daily", startAt: "2026-09-21T09:00:00Z", now,
+      cadence: "routine", every: "daily", zone: "UTC", startAt: "2026-09-21T09:00:00Z", now,
     });
     expect(runs.map((run) => run.toISOString())).toEqual([
       "2026-09-21T09:00:00.000Z",
@@ -162,18 +163,100 @@ describe("the next runs a schedule would produce", () => {
     // Four days of daily slots are behind `now`. The scheduler skips them, so
     // the preview must not imply four runs are queued up.
     const runs = nextRuns({
-      cadence: "routine", every: "daily", startAt: "2026-09-16T09:00:00Z", now, count: 1,
+      cadence: "routine", every: "daily", zone: "UTC", startAt: "2026-09-16T09:00:00Z", now, count: 1,
     });
     expect(runs.map((run) => run.toISOString())).toEqual(["2026-09-21T09:00:00.000Z"]);
   });
 
   it("says nothing at all until a first run has been chosen", () => {
-    expect(nextRuns({ cadence: "routine", every: "daily", startAt: "", now })).toEqual([]);
-    expect(nextRuns({ cadence: "routine", every: "daily", startAt: "not a time", now })).toEqual([]);
+    expect(nextRuns({ cadence: "routine", every: "daily", zone: "UTC", startAt: "", now })).toEqual([]);
+    expect(nextRuns({ cadence: "routine", every: "daily", zone: "UTC", startAt: "not a time", now })).toEqual([]);
   });
 
   it("covers every repeating cadence the composer offers", () => {
     const offered = AGENT_CADENCES.filter((entry) => entry.id !== "background").map((e) => e.id);
-    expect(offered.every((id) => id in RECURRENCE_INTERVAL_MS)).toBe(true);
+    expect(
+      offered.every((id) => id in RECURRENCE_INTERVAL_MS || id in CALENDAR_STEP_DAYS),
+    ).toBe(true);
+  });
+});
+
+/**
+ * UX-TASK-02 — the preview is read in the owner's zone, across clock changes,
+ * and stops where the schedule does. Every expectation here is the same slot
+ * `tests/test_task_schedule_terms.py` pins for the scheduler.
+ */
+describe("a schedule in the owner's zone", () => {
+  const iso = (runs: Date[]) => runs.map((run) => run.toISOString());
+
+  it("keeps 09:00 London across the autumn change", () => {
+    const runs = nextRuns({
+      cadence: "routine",
+      every: "daily",
+      zone: "Europe/London",
+      startAt: "2026-10-23T08:00:00Z",
+      now: new Date("2026-10-23T07:00:00Z"),
+      count: 4,
+    });
+    expect(iso(runs)).toEqual([
+      "2026-10-23T08:00:00.000Z",
+      "2026-10-24T08:00:00.000Z",
+      "2026-10-25T09:00:00.000Z",
+      "2026-10-26T09:00:00.000Z",
+    ]);
+  });
+
+  it("runs a skipped local time at the old offset, and a repeated one once", () => {
+    const gap = nextRuns({
+      cadence: "routine",
+      every: "daily",
+      zone: "Europe/London",
+      startAt: "2026-03-28T01:30:00Z",
+      now: new Date("2026-03-28T00:00:00Z"),
+    });
+    expect(iso(gap)).toEqual([
+      "2026-03-28T01:30:00.000Z",
+      "2026-03-29T01:30:00.000Z",
+      "2026-03-30T00:30:00.000Z",
+    ]);
+    const repeated = nextRuns({
+      cadence: "routine",
+      every: "daily",
+      zone: "Europe/London",
+      startAt: "2026-10-24T00:30:00Z",
+      now: new Date("2026-10-24T00:00:00Z"),
+    });
+    expect(iso(repeated)).toEqual([
+      "2026-10-24T00:30:00.000Z",
+      "2026-10-25T00:30:00.000Z",
+      "2026-10-26T01:30:00.000Z",
+    ]);
+  });
+
+  it("lands weekdays only on Monday to Friday", () => {
+    const runs = nextRuns({
+      cadence: "routine",
+      every: "weekdays",
+      zone: "Europe/Paris",
+      startAt: "2026-10-03T07:00:00Z",
+      now: new Date("2026-10-01T00:00:00Z"),
+    });
+    expect(iso(runs)).toEqual([
+      "2026-10-05T07:00:00.000Z",
+      "2026-10-06T07:00:00.000Z",
+      "2026-10-07T07:00:00.000Z",
+    ]);
+  });
+
+  it("previews nothing after the schedule ends", () => {
+    const runs = nextRuns({
+      cadence: "routine",
+      every: "daily",
+      zone: "UTC",
+      startAt: "2026-10-05T07:00:00Z",
+      until: "2026-10-06T23:59:00Z",
+      now: new Date("2026-10-01T00:00:00Z"),
+    });
+    expect(iso(runs)).toEqual(["2026-10-05T07:00:00.000Z", "2026-10-06T07:00:00.000Z"]);
   });
 });

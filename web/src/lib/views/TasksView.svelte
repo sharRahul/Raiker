@@ -24,6 +24,9 @@
     runModeFor,
     scheduleSummary,
     scheduleZone,
+    scheduleZoneName,
+    MISSED_RUN_POLICIES,
+    type MissedRunPolicy,
     TASK_RUN_MODES,
     TASK_TIMINGS,
     timingFor,
@@ -37,7 +40,8 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
-  import { resumeRun, startRunNow, stopRun } from "../taskLifecycle";
+  import { resumeRun, runAgain, startRunNow, stopRun } from "../taskLifecycle";
+  import { taskActionLabel, taskActions, taskPhase, taskPhaseLabel, type TaskAction } from "../taskPhase";
   import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
   import type {
@@ -118,6 +122,19 @@
   let routineEvery = $state("daily");
   let instructionEl: HTMLTextAreaElement | undefined = $state();
   let scheduledAt = $state("");
+  /**
+   * UX-TASK-02 — a routine's end and what it does about a slot Raiker slept
+   * through. Both are stored with the task and honoured by the scheduler; the
+   * defaults are the behaviour every routine had before they were choices.
+   */
+  let endsOn = $state("");
+  let missedRuns = $state<MissedRunPolicy>("run_once");
+  /**
+   * UX-TASK-06 — hierarchy is there when asked for. Most work is not part of
+   * other work, so the parent picker waits behind one control rather than
+   * sitting in every composition as a field to read past.
+   */
+  let partOfOther = $state(false);
   let modelProfile = $state("");
   let model = $state("");
   const attachStore = createAttachmentStore();
@@ -157,8 +174,22 @@
    * it, elapsed slots and all, so the preview cannot promise a run the runtime
    * would not take.
    */
+  const runUntil = $derived(
+    cadence === "routine" && endsOn ? new Date(`${endsOn}T23:59:59`).toISOString() : "",
+  );
   const upcoming = $derived(
-    nextRuns({ cadence, every: routineEvery, startAt: scheduledAt, count: cadence === "routine" ? 3 : 1 }),
+    nextRuns({
+      cadence,
+      every: routineEvery,
+      startAt: scheduledAt,
+      count: cadence === "routine" ? 3 : 1,
+      ...(runUntil ? { until: runUntil } : {}),
+    }),
+  );
+
+  /** A routine whose end comes before its first slot has nothing to run. */
+  const endsBeforeFirst = $derived(
+    cadence === "routine" && Boolean(scheduledAt) && Boolean(runUntil) && upcoming.length === 0,
   );
 
   /** The timing, in one line, whether or not the details are open. */
@@ -241,8 +272,49 @@
   // or stopped.
   const active = $derived((tasks ?? []).filter((task) => ACTIVE_TASK_STATES.includes(task.status)));
   const scheduled = $derived(active.filter((task) => task.scheduled_at));
-  const history = $derived((tasks ?? []).filter((task) => !ACTIVE_TASK_STATES.includes(task.status)));
-  const rows = $derived(flatten(active));
+  // A settled child of open work is listed under its parent, with the rest of
+  // that parent's delegated work, rather than a second time down here.
+  const openIds = $derived(new Set(active.map((task) => task.task_id)));
+  const history = $derived(
+    (tasks ?? []).filter(
+      (task) =>
+        !ACTIVE_TASK_STATES.includes(task.status) &&
+        !(task.parent_task_id && openIds.has(task.parent_task_id)),
+    ),
+  );
+  /**
+   * UX-TASK-06 — delegated work folds under the task that delegated it. A
+   * parent says how much of it is done; its children are one press away rather
+   * than a second tree an owner has to read past to find their own work.
+   */
+  let expanded = $state<string[]>([]);
+  const rows = $derived(flatten(active, expanded, tasks ?? []));
+
+  /** A parent's delegated work: how much there is, and how much has settled. */
+  function delegated(task: TaskView): { total: number; settled: number } {
+    const children = (tasks ?? []).filter((child) => child.parent_task_id === task.task_id);
+    return {
+      total: children.length,
+      settled: children.filter((child) =>
+        ["completed", "failed", "stopped"].includes(taskPhase(child)),
+      ).length,
+    };
+  }
+
+  function toggleDelegated(taskId: string) {
+    expanded = expanded.includes(taskId)
+      ? expanded.filter((id) => id !== taskId)
+      : [...expanded, taskId];
+  }
+
+  /**
+   * UX-TASK-05 — the badge says the phase where the status alone does not. A
+   * `queued` row is three different things to an owner: work nobody has started,
+   * work waiting for a time, and work about to be claimed.
+   */
+  function stateLabel(task: TaskView): string {
+    return task.status === "queued" ? taskPhaseLabel(taskPhase(task)) : taskStatusLabel(task.status);
+  }
 
   // A finished or blocked run always states why. The backend refuses to record a
   // terminal task without a reason (BUG-09); this is the line that shows it, so
@@ -252,17 +324,25 @@
     return task.summary?.trim() || "No reason was recorded for this outcome.";
   }
 
-  function flatten(items: TaskView[]): Array<{ task: TaskView; depth: number }> {
+  function flatten(
+    items: TaskView[],
+    open: string[] = [],
+    everything: TaskView[] = items,
+  ): Array<{ task: TaskView; depth: number }> {
     const ids = new Set(items.map((task) => task.task_id));
+    // Children are drawn from every task, finished ones included: opening a
+    // parent shows all of its delegated work, which is what its count counts.
     const children = new Map<string, TaskView[]>();
-    for (const task of items) {
-      if (task.parent_task_id && ids.has(task.parent_task_id)) {
+    for (const task of everything) {
+      if (task.parent_task_id && task.parent_task_id !== task.task_id) {
         children.set(task.parent_task_id, [...(children.get(task.parent_task_id) ?? []), task]);
       }
     }
     const result: Array<{ task: TaskView; depth: number }> = [];
     const visit = (task: TaskView, depth: number) => {
       result.push({ task, depth });
+      // A tree the server keeps acyclic; the bound is so a bad row cannot hang the page.
+      if (!open.includes(task.task_id) || depth > 16) return;
       for (const child of children.get(task.task_id) ?? []) visit(child, depth + 1);
     };
     for (const task of items) if (!task.parent_task_id || !ids.has(task.parent_task_id)) visit(task, 0);
@@ -285,7 +365,16 @@
     if (task.recurrence === "background") return task.status === "running" ? "Background agent working" : "Background agent ready to start";
     // Backlog #10 — every repeating cadence reads as a routine, so an hourly or
     // weekly one never looks like a one-shot whose next slot is its only one.
-    if (task.recurrence) return `${cadenceLabel(task.recurrence)}, next ${when}`;
+    // UX-TASK-02 — and the terms it runs on, so "which 09:00, until when, and
+    // what happens if the machine was off" is on the card rather than in a
+    // form that has since closed.
+    if (task.recurrence) {
+      const terms = [`${cadenceLabel(task.recurrence)}, next ${when}`];
+      if (task.schedule_timezone) terms.push(task.schedule_timezone);
+      if (task.schedule_until) terms.push(`until ${new Date(task.schedule_until).toLocaleDateString()}`);
+      if (task.missed_run_policy === "skip") terms.push("skips missed runs");
+      return terms.join(" · ");
+    }
     return `Scheduled for ${when}`;
   }
 
@@ -444,21 +533,28 @@
 
 
   async function createTask() {
-    if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt)) return;
+    if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt) || endsBeforeFirst) return;
     creating = true; notice = null; noticeHref = null;
     const attachments = wireAttachments(attachStore.take());
     try {
       await api.createTask({
         title: title.trim(), description: objective.trim(), priority,
         ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
-        ...(wantsStartTime ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+        ...(wantsStartTime
+          ? { scheduled_at: new Date(scheduledAt).toISOString(), timezone: scheduleZoneName() }
+          : {}),
+        ...(cadence === "routine" ? { missed_runs: missedRuns } : {}),
+        ...(runUntil ? { run_until: runUntil } : {}),
         ...(cadence === "routine" ? { recurrence: routineEvery } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
         ...(workMethod === "build" ? { surface: "build" } : {}),
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
-      titleOverride = ""; objective = ""; parentTaskId = ""; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
+      titleOverride = ""; objective = ""; parentTaskId = ""; partOfOther = false; endsOn = ""; missedRuns = "run_once"; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; workMethod = "chat";
+      // The model stays chosen: it is a choice about how this owner plans work,
+      // not part of the draft just filed, and clearing it left the next task's
+      // Create button disabled behind "No model is chosen".
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
@@ -504,6 +600,31 @@
     noticeHref = outcome.detailHref ?? null;
     await load();
     busyTask = null;
+  }
+
+  async function again(task: TaskView) {
+    busyTask = task.task_id;
+    notice = null;
+    noticeHref = null;
+    const outcome = await runAgain(task);
+    notice = outcome.notice;
+    await load();
+    busyTask = null;
+  }
+
+  /** One dispatch for every control the lifecycle offers (UX-TASK-05). */
+  function act(task: TaskView, action: TaskAction) {
+    if (action === "run_now") return runTask(task);
+    if (action === "continue") return resumeTask(task);
+    if (action === "run_again") return again(task);
+    return stopTask(task);
+  }
+
+  function busyLabel(action: TaskAction): string {
+    if (action === "run_now") return "Starting…";
+    if (action === "continue") return "Continuing…";
+    if (action === "run_again") return "Filing…";
+    return action === "cancel" ? "Cancelling…" : "Stopping…";
   }
 
   async function stopTask(task: TaskView) {
@@ -671,93 +792,136 @@
         <!-- COMPOSER-10 — "scheduling details expand only after requested". The
              summary above stays visible while they are open, so opening the
              details never becomes the only place the choice is legible. -->
-        <div class="task-details" role="group" aria-label="Work details">
-          <label>
-            Title
-            <input
-              class="input"
-              aria-label="Task title"
-              maxlength="240"
-              placeholder={title || "Derived from your instruction"}
-              bind:value={titleOverride}
-            />
-          </label>
-          {#if cadence === "routine"}
-            <label>
-              Repeat
-              <select class="select" aria-label="Repeat" bind:value={routineEvery}>
-                {#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}
-                  <option value={option.id}>{option.label}</option>
-                {/each}
-              </select>
-            </label>
-          {/if}
+        <!-- UX-TASK-03 — two groups, because they answer two questions. When
+             the work runs comes first and is the one an owner checks before
+             committing; how it is organised is detail most work never needs. -->
+        <div class="task-details" id="task-details">
           {#if wantsStartTime}
+            <fieldset class="detail-group" aria-label="Schedule">
+              <legend>Schedule</legend>
+              {#if cadence === "routine"}
+                <label>
+                  Repeat
+                  <select class="select" aria-label="Repeat" bind:value={routineEvery}>
+                    {#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}
+                      <option value={option.id}>{option.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              <label>
+                {cadence === "routine" ? "First run" : "Start time"}
+                <input
+                  class="input"
+                  aria-label={cadence === "routine" ? "First run" : "Start time"}
+                  type="datetime-local"
+                  bind:value={scheduledAt}
+                  required
+                />
+                <!-- REM-TASK-01 / UX-TASK-02 — the field reads this machine's
+                     zone, and the zone is now stored with the task, so a daily
+                     09:00 stays 09:00 here when the clocks change. -->
+                <small class="zone">Times are {scheduleZone()}.</small>
+              </label>
+              {#if cadence === "routine"}
+                <label>
+                  Ends
+                  <input
+                    class="input"
+                    type="date"
+                    aria-label="Last day it runs"
+                    bind:value={endsOn}
+                  />
+                  <small class="zone">{endsOn ? "Its last run is on or before this day." : "Leave empty to keep going until you stop it."}</small>
+                </label>
+                <label>
+                  If Raiker was not running
+                  <select class="select" aria-label="If a run is missed" bind:value={missedRuns}>
+                    {#each MISSED_RUN_POLICIES as option (option.id)}
+                      <option value={option.id}>{option.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              {#if upcoming.length > 0}
+                <div class="preview" role="status" aria-label="Next runs">
+                  <span class="preview-heading">Next {upcoming.length === 1 ? "run" : "runs"}</span>
+                  <ol>
+                    {#each upcoming as run, index (index)}
+                      <li>{run.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</li>
+                    {/each}
+                  </ol>
+                  {#if cadence === "routine"}
+                    <small>
+                      {missedRuns === "skip"
+                        ? "A slot Raiker was not running for is skipped; the routine waits for its next one."
+                        : "If Raiker was not running at a slot, it runs once when it is back, and never twice."}
+                    </small>
+                  {/if}
+                </div>
+              {:else if scheduledAt && cadence === "routine"}
+                <p class="preview-empty" role="status">This schedule ends before its first run.</p>
+              {/if}
+            </fieldset>
+          {/if}
+          <fieldset class="detail-group" aria-label="Organisation">
+            <legend>Organisation</legend>
             <label>
-              {cadence === "routine" ? "First run" : "Start time"}
+              Title
               <input
                 class="input"
-                aria-label={cadence === "routine" ? "First run" : "Start time"}
-                type="datetime-local"
-                bind:value={scheduledAt}
-                required
+                aria-label="Task title"
+                maxlength="240"
+                placeholder={title || "Derived from your instruction"}
+                bind:value={titleOverride}
               />
-              <!-- REM-TASK-01 — the field reads and writes this machine's zone,
-                   and the runtime stores UTC. An owner scheduling work for "09:00"
-                   is entitled to know which 09:00 that is without having to test
-                   it with a real run. -->
-              <small class="zone">Times are {scheduleZone()}.</small>
             </label>
-            {#if upcoming.length > 0}
-              <div class="preview" role="status" aria-label="Next runs">
-                <span class="preview-heading">Next {upcoming.length === 1 ? "run" : "runs"}</span>
-                <ol>
-                  {#each upcoming as run, index (index)}
-                    <li>{run.toLocaleString()}</li>
-                  {/each}
-                </ol>
-                {#if cadence === "routine"}
-                  <small>
-                    A slot that has already passed is skipped rather than owed, so a machine
-                    that was asleep does not wake up running the same cycle twice.
-                  </small>
-                {/if}
+            <label>
+              Priority
+              <select class="select" aria-label="Priority" bind:value={priority}>
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            {#if buildAvailable}
+              <div class="chip-row method" role="group" aria-label="How to work">
+                <button
+                  type="button"
+                  class="chip"
+                  aria-pressed={workMethod === "chat"}
+                  onclick={() => (workMethod = "chat")}>Chat</button
+                >
+                <button
+                  type="button"
+                  class="chip"
+                  aria-pressed={workMethod === "build"}
+                  onclick={() => (workMethod = "build")}>Build</button
+                >
               </div>
             {/if}
-          {/if}
-          <label>
-            Parent work
-            <select class="select" aria-label="Parent work" bind:value={parentTaskId}>
-              <option value="">No parent — top-level work</option>
-              {#each tasks ?? [] as task (task.task_id)}
-                <option value={task.task_id}>{task.title}</option>
-              {/each}
-            </select>
-          </label>
-          <label>
-            Priority
-            <select class="select" aria-label="Priority" bind:value={priority}>
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          {#if buildAvailable}
-            <div class="chip-row" role="group" aria-label="How to work">
+            <!-- UX-TASK-06 — hierarchy when asked for. A parent waits for
+                 its children before it settles, which is worth choosing on
+                 purpose rather than by reading past a select. -->
+            {#if partOfOther || parentTaskId}
+              <label class="parent">
+                Part of
+                <select class="select" aria-label="Parent work" bind:value={parentTaskId}>
+                  <option value="">No parent — top-level work</option>
+                  {#each tasks ?? [] as task (task.task_id)}
+                    <option value={task.task_id}>{task.title}</option>
+                  {/each}
+                </select>
+                <small class="zone">The parent finishes only when this does.</small>
+              </label>
+            {:else if (tasks ?? []).length > 0}
               <button
                 type="button"
-                class="chip"
-                aria-pressed={workMethod === "chat"}
-                onclick={() => (workMethod = "chat")}>Chat</button
+                class="btn btn-ghost btn-sm parent-toggle"
+                onclick={() => (partOfOther = true)}>Make this part of other work…</button
               >
-              <button
-                type="button"
-                class="chip"
-                aria-pressed={workMethod === "build"}
-                onclick={() => (workMethod = "build")}>Build</button
-              >
-            </div>
-          {/if}
+            {/if}
+          </fieldset>
         </div>
       {/if}
       <ModelReadinessStrip
@@ -811,7 +975,8 @@
           attachStore.uploading ||
           modelBlocked ||
           !objective.trim() ||
-          (wantsStartTime && !scheduledAt)}
+          (wantsStartTime && !scheduledAt) ||
+          endsBeforeFirst}
       >
         <Icon name={creating ? "clock" : "send"} size="sm" />
         <span class="send-label"
@@ -859,14 +1024,41 @@
         {#each rows as row (row.task.task_id)}
           {@const task = row.task}
           {@const pending = blockedBy(task)}
+          {@const children = delegated(task)}
           <article class="card task" style={`--depth:${row.depth}`}>
             <div class="task-main">
               <div class="task-title">
                 <span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span>
                 <div><h4>{task.title}</h4><p>{task.objective || "No additional instructions."}</p></div>
               </div>
-              <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
+              <Badge variant={taskBadge(task.status)} label={stateLabel(task)} />
             </div>
+            {#if children.total > 0}
+              <!-- UX-TASK-06 — a parent settles only when its own run and every
+                   task it delegated have: completed if all of them did, failed
+                   if any did not. The bar is that rule, counted. -->
+              <div class="delegated">
+                <div
+                  class="progress"
+                  role="progressbar"
+                  aria-label="Delegated work settled"
+                  aria-valuenow={children.settled}
+                  aria-valuemin="0"
+                  aria-valuemax={children.total}
+                >
+                  <div style={`width:${Math.round((children.settled / children.total) * 100)}%`}></div>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  aria-expanded={expanded.includes(task.task_id)}
+                  onclick={() => toggleDelegated(task.task_id)}
+                >
+                  {children.settled} of {children.total} delegated {children.total === 1 ? "task" : "tasks"} settled ·
+                  {expanded.includes(task.task_id) ? "Hide" : "Show"}
+                </button>
+              </div>
+            {/if}
             {#if (task.attachments ?? []).length > 0}
               <div class="task-attachments" aria-label="Files attached to this task">
                 {#each task.attachments ?? [] as attachment}
@@ -898,6 +1090,7 @@
               <p class="blocked" role="status">
                 <Icon name="tasks" size="sm" />
                 Its own run finished. Waiting on {childCount(task)} delegated {childCount(task) === 1 ? "task" : "tasks"}.
+                It completes when every one of them completes, and fails if any fails or is stopped.
               </p>
             {:else if task.status === "waiting_for_approval"}
               <!-- BUG-39 — granting the decision starts the continuation on its
@@ -918,7 +1111,10 @@
               <p class="outcome" role="status">{outcome(task)}</p>
             {/if}
 
-            {#if task.current_step}<p class="step">Now: {task.current_step}</p>{/if}
+            <!-- "Now:" is only true while the work is moving. A settled task's
+                 last step is history, and its outcome line already says how it
+                 ended. -->
+            {#if task.current_step && ["running", "waiting"].includes(taskPhase(task))}<p class="step">Now: {task.current_step}</p>{/if}
             {#if task.progress_percent !== null}
               <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
             {/if}
@@ -957,19 +1153,29 @@
                   <Icon name="activity" size="sm" />
                   History
                 </a>
-                {#if ACTIVE_TASK_STATES.includes(task.status)}
-                  {#if task.status === "queued" && !task.scheduled_at}
-                    <button type="button" class="btn btn-primary btn-sm" onclick={() => runTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Starting…" : "Run now"}</button>
-                  {/if}
-                  <button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Stopping…" : "Stop"}</button>
-                {/if}
+                <!-- UX-TASK-05 — the controls this task's phase offers, from the
+                     one module every surface asks. Continue for a parked
+                     approval is already on the line above, beside its reason. -->
+                {#each taskActions(task).filter((action) => !(action === "continue" && task.status === "waiting_for_approval")) as action (action)}
+                  <button
+                    type="button"
+                    class={action === "run_now" || action === "continue"
+                      ? "btn btn-primary btn-sm"
+                      : action === "run_again"
+                        ? "btn btn-ghost btn-sm"
+                        : "btn btn-danger btn-sm"}
+                    onclick={() => act(task, action)}
+                    disabled={busyTask === task.task_id}
+                    >{busyTask === task.task_id ? busyLabel(action) : taskActionLabel(action)}</button
+                  >
+                {/each}
               </span>
             </footer>
           </article>
         {/each}
       </section>
     {/if}
-    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span>{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
   {/if}
 </section>
 
@@ -977,8 +1183,14 @@
   .tasks{width:100%}.tasks header,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.task p{color:var(--text-2);font-size:var(--text-sm);margin:.35rem 0 0}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:var(--text-sm)}.summary strong{color:var(--text-1);font-size:var(--text-base)}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:var(--text-base)}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:var(--text-xs);gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:var(--text-sm);gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:var(--text-xs)}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:var(--text-xs);margin-top:.8rem}.task-actions{align-items:center;display:flex;flex-wrap:wrap;gap:.4rem}.thread-link{align-items:center;display:inline-flex;gap:.3rem;text-decoration:none}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:var(--text-sm)}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1);text-decoration:none}.history-title:hover{text-decoration:underline}.outcome{color:var(--text-2);font-size:var(--text-sm);margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}
   /* COMPOSER-10 — the details, when asked for. A grid rather than a column so
      four short fields do not become four full-width rows. */
-  .task-details{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:var(--space-2) 0}
+  .task-details{display:grid;gap:var(--space-3);margin:var(--space-2) 0}
+  /* UX-TASK-03 — Schedule and Organisation are two groups, each a grid of its
+     own short fields, so four of them do not become four full-width rows. */
+  .detail-group{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:0;padding:var(--space-3);border:1px solid var(--border);border-radius:var(--r-sm);min-width:0}
+  .detail-group legend{padding:0 .35rem;color:var(--text-3);font-size:var(--text-xs);font-weight:650;letter-spacing:.06em;text-transform:uppercase}
   .task-details label{color:var(--text-2);display:grid;font-size:var(--text-sm);gap:.35rem}
+  .parent-toggle,.method{align-self:end;justify-self:start}
+  .preview-empty{grid-column:1/-1;margin:0;color:var(--warn,var(--text-2));font-size:var(--text-sm)}
   .zone{color:var(--text-3);font-size:var(--text-xs)}
   /* The preview spans the details grid: three timestamps read as a list, not as
      a fourth field squeezed beside Parent work. */
@@ -992,5 +1204,7 @@
   .schedule-toggle{display:inline-flex;align-items:center;gap:.35rem;white-space:nowrap;max-width:16rem;overflow:hidden;text-overflow:ellipsis}
   .project-choice{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin:0 0 var(--space-2)}
   .project-choice label{color:var(--text-2);font-size:var(--text-sm)}
-  .project-choice select{min-width:12rem}@media(max-width:42rem){.tasks header{flex-direction:column}.task{margin-left:0;max-width:none}}
+  .delegated{display:flex;align-items:center;gap:var(--space-2);margin-top:.6rem}
+  .delegated .progress{flex:1 1 auto;margin-top:0}
+  .project-choice select{min-width:12rem}@media(max-width:42rem){.tasks header{flex-direction:column}.task{margin-left:0;max-width:none}.history-row{flex-wrap:wrap}.history-main{flex:1 1 100%}.history-row span:last-of-type,.history-row button{white-space:nowrap}}
 </style>

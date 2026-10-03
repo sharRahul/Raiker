@@ -717,6 +717,19 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-693](#fixed-693--nothing-on-the-memory-page-said-how-a-record-got-there) | Low | Memory | Fixed 2026-10-02 (closes UX-MEM-06) |
 | [FIXED-694](#fixed-694--an-import-was-a-count-not-a-batch-that-could-be-reviewed-or-taken-back) | Medium | Memory | Fixed 2026-10-02 (closes UX-MEM-08) |
 | [FIXED-695](#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks) | Low | Permissions | Fixed 2026-10-02 (closes UX-PERM-05) |
+| [FIXED-696](#fixed-696--daily-at-0900-moved-an-hour-when-the-clocks-changed) | Medium | Tasks / scheduler | Fixed 2026-10-03 (closes UX-TASK-02 with FIXED-697 and FIXED-698) |
+| [FIXED-697](#fixed-697--a-routine-could-not-skip-the-weekend-or-stop-on-a-date) | Low | Tasks / scheduler | Fixed 2026-10-03 (UX-TASK-02) |
+| [FIXED-698](#fixed-698--a-routine-always-ran-a-slot-it-slept-through) | Low | Tasks / scheduler | Fixed 2026-10-03 (UX-TASK-02) |
+| [FIXED-699](#fixed-699--when-work-runs-and-how-it-is-organised-were-one-list-of-fields) | Low | Tasks | Fixed 2026-10-03 (closes UX-TASK-03) |
+| [FIXED-700](#fixed-700--twelve-statuses-and-every-surface-deciding-its-own-buttons) | Medium | Tasks / Home / Build | Fixed 2026-10-03 (closes UX-TASK-05) |
+| [FIXED-701](#fixed-701--delegated-work-was-a-second-tree-to-read-past) | Low | Tasks | Fixed 2026-10-03 (closes UX-TASK-06) |
+| [FIXED-702](#fixed-702--opening-a-parent-showed-none-of-the-work-it-said-had-settled) | Low | Tasks | Fixed 2026-10-03 — found by the live round |
+| [FIXED-703](#fixed-703--a-finished-task-said-what-it-was-doing-now) | Low | Tasks | Fixed 2026-10-03 — found by the live round |
+| [FIXED-704](#fixed-704--filing-a-task-forgot-the-model-it-was-filed-with) | Low | Tasks | Fixed 2026-10-03 — found by the live round |
+| [FIXED-705](#fixed-705--more-grouped-its-rows-by-where-they-used-to-sit) | Low | Navigation | Fixed 2026-10-03 (closes UX-SETPOP-04) |
+| [FIXED-706](#fixed-706--two-search-boxes-for-one-question) | Low | Navigation | Fixed 2026-10-03 (closes UX-SETPOP-02) |
+| [FIXED-707](#fixed-707--more-was-a-desktop-dialog-on-a-phone) | Low | Navigation | Fixed 2026-10-03 (closes UX-SETPOP-03) |
+| [FIXED-708](#fixed-708--permissions-led-with-an-engineers-filing) | Low | Permissions | Fixed 2026-10-03 (closes UX-PERM-01) |
 
 ---
 
@@ -28711,3 +28724,293 @@ that decides it.
 **Evidence.** `permissionGoals.test.ts`; `CapabilitiesView.test.ts` — *posture
 by goal*; live captures `09-permissions-goals.png` and
 `11-permissions-390.png`.
+
+---
+
+## FIXED-696 — Daily at 09:00 moved an hour when the clocks changed
+
+**Severity: Medium. Area: Tasks / scheduler. Status: Fixed 2026-10-03.
+Closes [UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks) with FIXED-697 and FIXED-698.**
+
+**Observed.** A routine stored a UTC instant and stepped every cadence by a
+fixed number of seconds from the slot before. The composer read the first run in
+the browser's zone and said so (FIXED-584), but the zone was never stored: a
+routine composed for 09:00 in London ran at 10:00 the morning after the clocks
+went back, and stayed there until spring. A slot pushed sideways also dragged
+every later slot with it, because each was counted from the one before.
+
+**Fixed.** `raiker/tasks/schedule.py` owns *when next*. A task stores its IANA
+zone, its anchor (the first slot the owner picked), its end and its missed-run
+policy — four nullable columns, migration `RAIKER-2082-task-schedule-terms`.
+Calendar cadences (daily, weekly, weekdays) step local calendar days and keep the
+local time; interval cadences (continuous, hourly) stay absolute. Every slot is
+counted from the anchor, so a moved slot moves nothing after it. The two DST
+cases are decided and written down: a local time the clocks skip runs at the
+offset from before the change that day only, and a repeated one runs once, at
+the first. A task written before this has no zone and no anchor and reads as
+UTC anchored to its current slot — exactly what it did — so no existing routine
+moves. The composer sends the browser's zone with every scheduled task (Build's
+side panel too), and the preview computes slots with the same rules in that
+zone, so the three runs it shows are the three the scheduler will claim.
+
+**The guide had already promised it.** `docs/guide/tasks-and-projects.md` said
+`08:00 Europe/London` "stays 08:00 local across the GMT/BST change", and that an
+elapsed slot "is skipped rather than run late" — the first was untrue until now,
+and the second was half true (one late cycle always ran; FIXED-698 makes that a
+choice). The chapter now describes what the scheduler does.
+
+**Evidence.** `tests/test_task_schedule_terms.py` — the autumn and spring
+changes in London, the skipped and the repeated hour, weekly counted from the
+anchor, a zone-less schedule unchanged, elapsed slots skipped;
+`taskComposer.test.ts` asserts the same slots in the browser;
+`test_task_schedule_preview_contract.py` holds the calendar table on both sides.
+Live capture `02-routine-schedule-and-organisation.png`.
+
+---
+
+## FIXED-697 — A routine could not skip the weekend or stop on a date
+
+**Severity: Low. Area: Tasks / scheduler. Status: Fixed 2026-10-03. Part of
+[UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+
+**Observed.** The release review names weekdays and end conditions among what a
+recurrence select cannot express. A stand-up routine ran on Saturday, and the
+only way to end a routine was to remember to stop it.
+
+**Fixed.** **Weekdays** joins the cadences (Monday to Friday, at the local time
+of the first run; one anchored on a Saturday first runs on the Monday). **Ends**
+takes a last day; a routine whose next slot falls after it is completed instead
+of re-armed, and says *That was its last scheduled run.* An end before the first
+run is refused (`schedule_ends_before_first_run`) and the composer disables
+Create with the reason; an end or a policy on work that does not repeat is
+refused (`schedule_terms_need_a_repeating_task`) rather than stored and never
+read. The card states the terms: *Runs on weekdays, next … · Europe/London ·
+until … · skips missed runs*.
+
+**Evidence.** `test_task_schedule_terms.py` — weekdays skipping the weekend, the
+Saturday anchor, a routine past its end finishing, both refusals at the service
+and the route; `TasksView.test.ts`; live capture `03-routine-card-terms.png`.
+
+---
+
+## FIXED-698 — A routine always ran a slot it slept through
+
+**Severity: Low. Area: Tasks / scheduler. Status: Fixed 2026-10-03. Part of
+[UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+
+**Observed.** A host that was off at 09:00 claimed the slot when it woke and ran
+it late, whatever the routine was for. That is right for "summarise yesterday"
+and wrong for "post the 09:00 reminder".
+
+**Fixed.** **If Raiker was not running** — *Run it once when Raiker is back*
+(`run_once`, the default and the old behaviour) or *Skip it and wait for the next
+slot* (`skip`). A slot claimed more than fifteen minutes late is missed; under
+`skip` no turn runs, the routine moves to its next slot, and its history records
+the cycle as **skipped — missed while Raiker was not running**
+(`task_cycle_landed` with outcome `skipped`, which the attempt history now
+recognises). A one-off always runs late: skipping it would mean never running it.
+
+**Evidence.** `test_task_schedule_terms.py` — a skipped slot runs no turn, keeps
+09:00 London, and reads *skipped* in the task's history; the default runs once.
+
+---
+
+## FIXED-699 — When work runs and how it is organised were one list of fields
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-03.
+Closes [UX-TASK-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+
+**Observed.** The details under the task composer were one grid: Title, Repeat,
+Start time, Parent work, Priority and the working method, so the two fields an
+owner checks before committing — when it runs — sat among the ones most work
+never touches.
+
+**Fixed.** Two groups. **Schedule** — repeat, first run and its zone, ends, the
+missed-run policy and the preview — only when the work has a time. **Organisation**
+— title, priority, working method, and the parent behind a request (FIXED-701).
+Project stays in the composer's context line and *When* in the chips above, as
+the row asks.
+
+**Evidence.** `TasksView.test.ts` — *sends a routine's end and missed-run policy,
+in two groups*; live captures 02 and `10-tasks-details-390.png`.
+
+---
+
+## FIXED-700 — Twelve statuses and every surface deciding its own buttons
+
+**Severity: Medium. Area: Tasks / Home / Build. Status: Fixed 2026-10-03.
+Closes [UX-TASK-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+
+**Observed.** The runtime has twelve task statuses and each surface decided for
+itself what could be pressed. Home said **Cancel** for a scheduled run and
+**Stop** for the same request everywhere else; every active row, including one
+already stopping, offered Stop; a paused task offered nothing to resume it on
+the board; and nothing said whether finished work could be run again or what
+that would repeat.
+
+**Fixed.** One published lifecycle, `raiker/tasks/lifecycle.py`: *not started →
+scheduled / queued → running → waiting → completed / failed / stopped*, served
+as `phase` on every task. `web/src/lib/taskPhase.ts` is the one place that says
+what each phase offers — **Run now** only before work has started, **Cancel**
+before a run and **Stop** after it, nothing while a stop is under way,
+**Continue now** where a decision can release the run (paused included), and
+**Run again** on finished one-off work. Run again files *new* work with the same
+instruction, project, method, model and files (`taskLifecycle.runAgain`), so a
+finished run is never replayed in place and nothing it did is repeated by a
+button; a routine is never run again, because it re-arms itself. Tasks, Home's
+three boards and Build's side panel all draw from it, and a `queued` badge now
+says which of *not started*, *scheduled* or *queued* it is.
+
+**Evidence.** `taskPhase.test.ts` (seven cases); `tests/test_task_lifecycle_phases.py`
+holds the server's and the client's phase tables together and every status to a
+phase; `TasksView.test.ts` — *says Cancel for work that has not run, and offers
+Run again on finished work*. Live: the scheduled routine read **scheduled** with
+**Cancel** and no Stop, and a real Anthropic run's **Run again** filed new work
+(captures 03 and 05).
+
+---
+
+## FIXED-701 — Delegated work was a second tree to read past
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-03.
+Closes [UX-TASK-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+
+**Observed.** Every child of every open task was drawn indented under it, and
+**Parent work** was a select in every composition.
+
+**Fixed.** Children fold under their parent, which shows a bar and *N of M
+delegated tasks settled · Show*. The parent picker waits behind **Make this part
+of other work…**. Parent settlement — already enforced by BUG-220's
+`_settle_parent` — is stated where it applies: a parent completes when every
+delegated task completes, and fails if any fails or is stopped.
+
+**Evidence.** `TasksView.test.ts` — *keeps the parent picker behind an explicit
+request*, *folds delegated work under its parent and counts what has settled*;
+live capture `04-delegated-folded.png`.
+
+---
+
+## FIXED-702 — Opening a parent showed none of the work it said had settled
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-03. Found by the
+2026-10-03 live round.**
+
+**Observed.** With FIXED-701 in place, a parent read *1 of 1 delegated task
+settled · Show*, and **Show** revealed nothing: the tree was built from open
+work only, and the settled child had moved down to **Finished work**.
+
+**Fixed.** An opened parent lists all of its delegated work, finished children
+included, and a settled child of open work is listed under its parent rather
+than a second time under Finished work.
+
+**Evidence.** `TasksView.test.ts`; live capture `05-finished-run-again.png`.
+
+---
+
+## FIXED-703 — A finished task said what it was doing now
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-03. Found by the
+2026-10-03 live round.**
+
+**Observed.** A completed child card read *Now: Starting scheduled run* under its
+*completed* badge — `current_step` was printed whatever the task's state.
+
+**Fixed.** *Now:* is drawn only while the task is running or waiting.
+
+**Evidence.** `TasksView.test.ts` — *does not call a settled task's last step
+what it is doing now*; the live spec asserts it.
+
+---
+
+## FIXED-704 — Filing a task forgot the model it was filed with
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-03. Found by the
+2026-10-03 live round.**
+
+**Observed.** After **Create task**, the composer cleared its model choice with
+the draft, so the next task showed *No model is chosen* and a disabled Create
+until the model was picked again.
+
+**Fixed.** The model stays chosen after filing; only the draft is cleared.
+
+**Evidence.** The live spec asserts no *No model is chosen* after filing; capture 05.
+
+---
+
+## FIXED-705 — More grouped its rows by where they used to sit
+
+**Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
+Closes [UX-SETPOP-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+
+**Observed.** The More window grouped its destinations under *Work*, *Manage*,
+*Observe* and *Support* — the sidebar groups each had come from — so
+Observability, a diagnostic page, carried the same weight as Approvals.
+
+**Fixed.** The route registry gives every destination a product area
+(`PRODUCT_AREAS` in `nav.ts`, DEC-02 step 1) and More draws **Review**
+(Approvals), **Connect** (Messaging, Models, Extensions), **Settings** (the
+direct Settings link, Permissions and every section) and, last, **Diagnostics &
+help** (Observability, Guide). A destination added without an area fails
+`nav.test.ts`.
+
+**Evidence.** `nav.test.ts` — *product areas*; `AllPagesDialog.test.ts`; live
+capture `07-more-by-purpose.png`.
+
+---
+
+## FIXED-706 — Two search boxes for one question
+
+**Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
+Closes [UX-SETPOP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+
+**Observed.** More had its own *Find a page or setting* box beside the command
+palette's, two indexes answering "where is that page".
+
+**Fixed.** The palette owns discovery, as DEC-09 step 2 decides: More's box is
+now **Search pages, settings and commands** with the shortcut, and opens the
+palette. More keeps what a list does better — stable groups, **Recent** (the
+last places this viewer opened, kept in this browser only, empty rather than
+broken when storage refuses) and *You are on …*.
+
+**Evidence.** `recentPages.test.ts`, `AllPagesDialog.test.ts`; live captures 07
+and `08-palette-finds-settings.png`.
+
+---
+
+## FIXED-707 — More was a desktop dialog on a phone
+
+**Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
+Closes [UX-SETPOP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+
+**Observed.** At 390 wide More was the desktop panel inset by a few pixels, with
+Close at the far corner and nothing saying where you were.
+
+**Fixed.** Under 720 px it is a full-height sheet: edge to edge, its own scroll
+(`overscroll-behavior: contain`), safe-area padding, **Back** where a phone's
+back control sits, single-column rows at a 44 px height, and the current page
+named. Any route change — the browser's Back included — closes it.
+
+**Evidence.** `AllPagesDialog.test.ts`; the live spec measured the sheet at
+390×844 and capture `09-more-sheet-390.png`.
+
+---
+
+## FIXED-708 — Permissions led with an engineer's filing
+
+**Severity: Low. Area: Permissions. Status: Fixed 2026-10-03.
+Closes [UX-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#31-permissions).**
+
+**Observed.** FIXED-513 and FIXED-695 gave the page a posture sentence, an
+attention list, goals and a Build preset, but the registry still opened on the
+technical domains — *Workspace*, *Execution*, *Network*, *Automation* — which
+answer a question nobody arrives with.
+
+**Fixed.** The registry is grouped by the five task groups §3.1 recommends —
+**Files and code**, **Web and research**, **Messages and services**, **Memory**,
+**System and runtimes** — with memory and channels filed where an owner looks for
+them. The technical areas stay one switch away as **Technical area (advanced)**,
+remembered in this browser; search matches both headings whichever is drawn.
+Nothing about enforcement, the rows or the registry changes.
+
+**Evidence.** `capabilityModel.test.ts` — *task groups*;
+`CapabilitiesView.test.ts`; live capture `06-permissions-by-task.png`.

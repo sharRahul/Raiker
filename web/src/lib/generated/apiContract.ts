@@ -4291,6 +4291,9 @@ export type TaskCreateRequest = {
   model?: string | null;
   surface?: "chat" | "build" | "design";
   attachments?: Record<string, unknown>[] | null;
+  timezone?: string | null;
+  run_until?: string | null;
+  missed_runs?: "run_once" | "skip" | null;
 };
 
 /** One task at its own address, with the attempts behind its status. */
@@ -4349,6 +4352,10 @@ export type TaskView = {
   thread_session_id: string | null;
   thread_turns: number;
   attachments: (PathAttachment | UploadAttachment)[];
+  schedule_timezone: string | null;
+  schedule_until: string | null;
+  missed_run_policy: string | null;
+  phase: string;
 };
 
 export type TelemetryCadenceRequest = {

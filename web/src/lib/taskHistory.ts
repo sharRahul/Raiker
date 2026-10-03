@@ -65,6 +65,10 @@ export function attemptOutcomeLabel(outcome: string): string {
       return "still running";
     case "recorded":
       return "recorded";
+    // UX-TASK-02 — a slot Raiker was not running for, which the routine's
+    // missed-run policy said not to run late. No turn ran; nothing failed.
+    case "skipped":
+      return "skipped — missed while Raiker was not running";
     default:
       return outcome;
   }

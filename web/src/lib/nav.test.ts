@@ -370,3 +370,18 @@ describe("hard-coded destinations", () => {
     expect(unknown).toEqual([]);
   });
 });
+
+describe("product areas (UX-SETPOP-04)", () => {
+  it("gives every destination exactly one area", async () => {
+    const { NAV_ITEMS, PRODUCT_AREAS } = await import("./nav");
+    expect(new Set(Object.keys(PRODUCT_AREAS))).toEqual(new Set(NAV_ITEMS.map((item) => item.id)));
+  });
+
+  it("lists every off-rail destination in More exactly once", async () => {
+    const { MORE_GROUPS, NAV_ITEMS, SIDEBAR_ITEM_IDS } = await import("./nav");
+    const listed = MORE_GROUPS.flatMap((group) => group.items.map((item) => item.id));
+    const offRail = NAV_ITEMS.filter((item) => !SIDEBAR_ITEM_IDS.includes(item.id)).map((item) => item.id);
+    expect([...listed].sort()).toEqual([...offRail].sort());
+    expect(MORE_GROUPS.at(-1)?.id).toBe("diagnostics");
+  });
+});

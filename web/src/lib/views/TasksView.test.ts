@@ -297,6 +297,10 @@ describe("TasksView", () => {
       description: "Prepare the release notes.",
       priority: "high",
       scheduled_at: new Date("2026-07-14T09:30").toISOString(),
+      // UX-TASK-02 — the zone it was composed in and its missed-run policy
+      // travel with it, so the scheduler reads 09:30 where the owner is.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      missed_runs: "run_once",
       recurrence: "daily",
     });
   });
@@ -355,6 +359,10 @@ describe("TasksView", () => {
       description: "Report any failing job.",
       priority: "normal",
       scheduled_at: new Date("2026-07-14T09:30").toISOString(),
+      // UX-TASK-02 — the zone it was composed in and its missed-run policy
+      // travel with it, so the scheduler reads 09:30 where the owner is.
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      missed_runs: "run_once",
       recurrence: "hourly",
     });
   });
@@ -705,5 +713,120 @@ describe("TasksView blocked-on-approval pointer", () => {
     // The one control planning needs that asking does not, collapsed until
     // asked for — and still stating what was chosen while it is closed.
     expect(screen.getByRole("button", { expanded: false, name: /Runs now/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * UX-TASK-02/03/05/06 — the schedule's terms, the two detail groups, one
+ * lifecycle on the card, and delegated work folded under its parent.
+ */
+describe("TasksView schedule terms and lifecycle", () => {
+  const base = {
+    session_id: "sess_inbox",
+    objective: "Work.",
+    current_step: null,
+    progress_percent: null,
+    created_at: "2026-10-01T00:00:00Z",
+    updated_at: "2026-10-01T00:00:00Z",
+    completed_at: null,
+    summary: null,
+    priority: "normal",
+    scheduled_at: null,
+    recurrence: null,
+    reminder_at: null,
+    parent_task_id: null,
+    project_id: null,
+  };
+
+  it("sends a routine's end and missed-run policy, in two groups", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+      "POST /api/tasks": { ...base, task_id: "task_new", status: "queued", title: "Stand-up" },
+    });
+    render(TasksView);
+    await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Repeating" }));
+    await instruct("Draft my stand-up notes.");
+    await openDetails();
+    expect(screen.getByRole("group", { name: "Schedule" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Organisation" })).toBeInTheDocument();
+    await fireEvent.change(screen.getByLabelText("Repeat"), { target: { value: "weekdays" } });
+    await fireEvent.input(screen.getByLabelText("First run"), { target: { value: "2099-07-14T09:30" } });
+    await fireEvent.input(screen.getByLabelText("Last day it runs"), { target: { value: "2099-12-31" } });
+    await fireEvent.change(screen.getByLabelText("If a run is missed"), { target: { value: "skip" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Create routine/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(true));
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    const body = JSON.parse(String(post?.[1]?.body));
+    expect(body.recurrence).toBe("weekdays");
+    expect(body.missed_runs).toBe("skip");
+    expect(body.run_until).toBe(new Date("2099-12-31T23:59:59").toISOString());
+    expect(body.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("keeps the parent picker behind an explicit request", async () => {
+    stubFetch({
+      "GET /api/tasks": [{ ...base, task_id: "task_a", status: "running", title: "Release" }],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+    await waitFor(() => expect(screen.getByText("Release")).toBeInTheDocument());
+    await openDetails();
+    expect(screen.queryByLabelText("Parent work")).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Make this part of other work…" }));
+    expect(screen.getByLabelText("Parent work")).toBeInTheDocument();
+  });
+
+  it("folds delegated work under its parent and counts what has settled", async () => {
+    stubFetch({
+      "GET /api/tasks": [
+        { ...base, task_id: "task_p", status: "waiting_for_children", title: "Ship the release" },
+        { ...base, task_id: "task_c1", status: "running", title: "Write the notes", parent_task_id: "task_p" },
+        { ...base, task_id: "task_c2", status: "completed", title: "Tag the build", parent_task_id: "task_p" },
+      ],
+    });
+    render(TasksView);
+    await waitFor(() => expect(screen.getByText("Ship the release")).toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: "Write the notes" })).toBeNull();
+    const toggle = screen.getByRole("button", { name: /1 of 2 delegated tasks settled/ });
+    expect(screen.getByRole("progressbar", { name: "Delegated work settled" })).toHaveAttribute("aria-valuenow", "1");
+    // The settled child is listed under its open parent, not again in Finished work.
+    expect(screen.queryByRole("link", { name: "Tag the build" })).toBeNull();
+    await fireEvent.click(toggle);
+    expect(screen.getByRole("heading", { name: "Write the notes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Tag the build" })).toBeInTheDocument();
+  });
+
+  it("says Cancel for work that has not run, and offers Run again on finished work", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [
+        { ...base, task_id: "task_s", status: "queued", title: "Later", scheduled_at: "2099-01-01T09:00:00Z" },
+        { ...base, task_id: "task_f", status: "failed", title: "Broken", summary: "It failed." },
+      ],
+      "POST /api/tasks": { ...base, task_id: "task_new", status: "queued", title: "Broken" },
+    });
+    render(TasksView);
+    await waitFor(() => expect(screen.getByText("Later")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getAllByText("scheduled").length).toBeGreaterThan(0);
+    await fireEvent.click(screen.getByRole("button", { name: "Run again" }));
+    await waitFor(() => expect(screen.getByText(/Filed “Broken” again as new work/)).toBeInTheDocument());
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ title: "Broken", description: "Work." });
+  });
+
+  it("does not call a settled task's last step what it is doing now", async () => {
+    stubFetch({
+      "GET /api/tasks": [
+        { ...base, task_id: "task_p", status: "running", title: "Parent", current_step: "Reading the repository" },
+        { ...base, task_id: "task_c", status: "completed", title: "Child", parent_task_id: "task_p", current_step: "Starting scheduled run", summary: "ready." },
+      ],
+    });
+    render(TasksView);
+    await waitFor(() => expect(screen.getByText("Now: Reading the repository")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: /1 of 1 delegated task settled/ }));
+    expect(screen.getByRole("heading", { name: "Child" })).toBeInTheDocument();
+    expect(screen.queryByText("Now: Starting scheduled run")).toBeNull();
   });
 });

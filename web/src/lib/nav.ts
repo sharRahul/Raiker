@@ -145,16 +145,67 @@ export const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.filter((g) =>
   }))
   .filter((group) => group.items.length > 0);
 
+
 /**
- * Everything the gear's window lists, in the order it lists them.
+ * UX-SETPOP-04 / DEC-02 step 1 — where each destination belongs, as data on the
+ * one route registry rather than a second navigation list.
  *
- * Every destination that is not on the rail, which now includes the ones taken
- * off it above — a page with no link anywhere is a page that does not exist.
+ * The More window grouped its rows by the sidebar group each came from —
+ * *Work*, *Manage*, *Observe*, *Support* — which is a filing system for the
+ * rail, not an answer to "what am I here to do". An owner opens More to
+ * **review** something waiting on them, to **connect** Raiker to something, to
+ * change a **setting**, or to diagnose a problem; those are the groups now, and
+ * diagnostics and help come last because they are what an owner reaches for
+ * least often and knows where to find.
+ *
+ * Every route has exactly one area (`nav.test.ts` holds it), so a destination
+ * added to `NAV_GROUPS` without one fails the build rather than vanishing from
+ * More.
  */
-export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.map((group) => ({
-  ...group,
-  items: group.items.filter((item) => !SIDEBAR_ITEM_IDS.includes(item.id)),
-})).filter((group) => group.items.length > 0);
+export type ProductArea = "work" | "review" | "connect" | "settings" | "diagnostics";
+
+export const PRODUCT_AREAS: Record<string, ProductArea> = {
+  home: "work",
+  "new-chat": "work",
+  build: "work",
+  design: "work",
+  "search-chat": "work",
+  tasks: "work",
+  projects: "work",
+  memory: "work",
+  brain: "work",
+  approvals: "review",
+  messaging: "connect",
+  models: "connect",
+  extensions: "connect",
+  capabilities: "settings",
+  settings: "settings",
+  observe: "diagnostics",
+  guide: "diagnostics",
+};
+
+/** The More window's groups, in the order it draws them. */
+export const MORE_AREAS: { id: ProductArea; label: string }[] = [
+  { id: "work", label: "Work" },
+  { id: "review", label: "Review" },
+  { id: "connect", label: "Connect" },
+  { id: "settings", label: "Settings" },
+  { id: "diagnostics", label: "Diagnostics & help" },
+];
+
+/**
+ * Every destination that is not on the rail, grouped by what an owner goes
+ * there to do. An area with nothing off the rail is left out rather than drawn
+ * as an empty heading.
+ */
+export const MORE_GROUPS: { id: ProductArea; label: string; items: NavItem[] }[] = MORE_AREAS.map(
+  (area) => ({
+    ...area,
+    items: NAV_ITEMS.filter(
+      (item) => !SIDEBAR_ITEM_IDS.includes(item.id) && PRODUCT_AREAS[item.id] === area.id,
+    ),
+  }),
+).filter((group) => group.items.length > 0);
 
 /**
  * Tabs inside a consolidated destination. The hub owns the tab list so a deep

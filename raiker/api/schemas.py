@@ -251,6 +251,12 @@ class TaskCreateRequest(StrictModelRequest):
     # rather than accepted and quietly run as Chat.
     surface: Literal["chat", "build", "design"] = "chat"
     attachments: list[dict[str, Any]] | None = None
+    # UX-TASK-02 — a repeating schedule's terms: the IANA zone it was composed
+    # in, the last instant it may run, and what a missed slot does. Refused on a
+    # task that does not repeat, rather than stored and never read.
+    timezone: str | None = None
+    run_until: str | None = None
+    missed_runs: Literal["run_once", "skip"] | None = None
 
 
 class SetModelSelectionRequest(StrictModelRequest):

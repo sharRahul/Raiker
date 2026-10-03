@@ -45,3 +45,19 @@ def test_every_previewed_run_is_spaced_the_way_the_scheduler_spaces_it() -> None
     preview = _preview_intervals()
     for cadence, interval in RECURRING_INTERVALS.items():
         assert preview[cadence] == interval.total_seconds(), cadence
+
+
+_CALENDAR = re.compile(
+    r"export const CALENDAR_STEP_DAYS: Record<string, number> = \{(.*?)\};", re.S
+)
+_DAYS = re.compile(r"^\s*([a-z_]+):\s*([0-9]+),", re.M)
+
+
+def test_the_preview_steps_calendar_cadences_as_the_scheduler_does() -> None:
+    """UX-TASK-02 — daily, weekly and weekdays are calendar days in the owner's zone."""
+    from raiker.tasks.schedule import CALENDAR_STEP_DAYS
+
+    body = _CALENDAR.search(TASK_COMPOSER.read_text(encoding="utf-8"))
+    assert body is not None, "The preview's calendar table is not where the test expects it."
+    preview = {name: int(days) for name, days in _DAYS.findall(body.group(1))}
+    assert preview == CALENDAR_STEP_DAYS

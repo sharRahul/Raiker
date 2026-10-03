@@ -166,3 +166,53 @@ export async function startRunNow(task: TaskView): Promise<TaskLifecycleOutcome>
     return settleFailure(error, "run", task.title, task.task_id);
   }
 }
+
+/**
+ * UX-TASK-05 — run finished one-off work again, as new work.
+ *
+ * A terminal task is never replayed in place: its history is what happened,
+ * and re-running its turn would repeat whatever it already did. This files a
+ * new task with the same instruction, project, method, model and files, so the
+ * new run has its own attempts and its own approvals, and the old record stays
+ * exactly as it ended.
+ */
+export async function runAgain(task: TaskView): Promise<TaskLifecycleOutcome> {
+  try {
+    await api.createTask({
+      title: task.title,
+      description: task.objective,
+      ...(task.priority ? { priority: task.priority } : {}),
+      ...(task.project_id ? { project_id: task.project_id } : {}),
+      ...(task.surface && task.surface !== "chat"
+        ? { surface: task.surface as "build" | "design" }
+        : {}),
+      ...(task.model_profile && task.model
+        ? { model_profile: task.model_profile, model: task.model }
+        : {}),
+      ...((task.attachments ?? []).length > 0
+        ? { attachments: task.attachments as unknown as Record<string, unknown>[] }
+        : {}),
+    });
+    return {
+      ok: true,
+      settlement: "requested",
+      notice: `Filed “${task.title}” again as new work. The finished run's history is unchanged.`,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return {
+        ok: false,
+        settlement: "completed",
+        reasonCode: error.reasonCode ?? undefined,
+        notice: `Raiker refused to run “${task.title}” again (${error.reasonCode ?? error.status}). Nothing was filed.`,
+      };
+    }
+    return {
+      ok: false,
+      settlement: "outcome_unknown",
+      notice:
+        `Raiker did not answer the request to run “${task.title}” again, so it may ` +
+        "or may not have been filed. Refresh the board before trying again.",
+    };
+  }
+}

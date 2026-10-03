@@ -162,6 +162,46 @@ export const RECURRENCE_INTERVAL_MS: Record<string, number> = {
   weekly: 7 * 24 * 60 * 60_000,
 };
 
+/**
+ * UX-TASK-02 — cadences the scheduler steps in local calendar days, keeping the
+ * local time of day, mirroring `CALENDAR_STEP_DAYS` in `raiker/tasks/schedule.py`.
+ *
+ * "Daily at 09:00" is 09:00 where the owner lives on both sides of a clock
+ * change, so it is not a fixed number of milliseconds. `weekdays` steps a day at
+ * a time and lands only on Monday to Friday. The test beside this and
+ * `tests/test_task_schedule_preview_contract.py` hold the two lists together.
+ */
+export const CALENDAR_STEP_DAYS: Record<string, number> = {
+  daily: 1,
+  weekly: 7,
+  weekdays: 1,
+};
+
+/** What a routine does about a slot that passed while Raiker was not running. */
+export const MISSED_RUN_POLICIES = [
+  {
+    id: "run_once",
+    label: "Run it once when Raiker is back",
+    short: "runs a missed slot once",
+  },
+  {
+    id: "skip",
+    label: "Skip it and wait for the next slot",
+    short: "skips missed slots",
+  },
+] as const;
+
+export type MissedRunPolicy = (typeof MISSED_RUN_POLICIES)[number]["id"];
+
+/** The IANA zone this browser reads and writes times in, sent with a schedule. */
+export function scheduleZoneName(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
 /** The zone the times on this screen are read and written in. */
 export function scheduleZone(): string {
   try {
@@ -171,15 +211,68 @@ export function scheduleZone(): string {
   }
 }
 
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+interface Wall {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+/** The wall clock an instant reads as in `zone`, to the minute. */
+function wallAt(instant: number, zone: string): Wall {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+  }).formatToParts(new Date(instant));
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return {
+    year: read("year"),
+    month: read("month") - 1,
+    day: read("day"),
+    hour: read("hour") % 24,
+    minute: read("minute"),
+  };
+}
+
+/** How far `zone` is ahead of UTC at an instant, in milliseconds. */
+function offsetAt(instant: number, zone: string): number {
+  const wall = wallAt(instant, zone);
+  const asUtc = Date.UTC(wall.year, wall.month, wall.day, wall.hour, wall.minute);
+  return asUtc - Math.floor(instant / MINUTE) * MINUTE;
+}
+
+/**
+ * A wall-clock time in `zone` as an instant, deciding DST as the server does:
+ * a repeated hour resolves to the first of the two, and a time inside the hour
+ * the clocks skip uses the offset from before the change.
+ */
+function instantAt(wall: Wall, zone: string): number {
+  const guess = Date.UTC(wall.year, wall.month, wall.day, wall.hour, wall.minute);
+  const before = offsetAt(guess - 12 * 60 * MINUTE, zone);
+  const after = offsetAt(guess + 12 * 60 * MINUTE, zone);
+  const valid = [...new Set([before, after])]
+    .map((offset) => guess - offset)
+    .filter((instant) => offsetAt(instant, zone) === guess - instant);
+  return valid.length > 0 ? Math.min(...valid) : guess - before;
+}
+
 /**
  * The next runs this schedule would produce, as the scheduler would produce them.
  *
- * Two properties are copied from `next_run_after` rather than invented here,
- * because getting either wrong would make the preview a lie about the product:
- * a recurring schedule is anchored to the slot the owner picked rather than to
- * "now", and every slot that has already passed is skipped rather than owed. A
- * host that was asleep does not wake up running the same cycle six times, and
- * the preview must not imply that it does.
+ * Properties copied from `next_occurrence` rather than invented here, because
+ * getting any wrong would make the preview a lie about the product: every slot
+ * is counted from the slot the owner picked, every slot that has already passed
+ * is skipped rather than owed, calendar cadences keep their local time across a
+ * clock change, and nothing is previewed after the schedule's end.
  */
 export function nextRuns(options: {
   cadence: TaskCadence;
@@ -187,6 +280,10 @@ export function nextRuns(options: {
   startAt: string;
   count?: number;
   now?: Date;
+  /** The zone the schedule is read in; defaults to this browser's. */
+  zone?: string;
+  /** The last instant the schedule may run, if it ends. */
+  until?: string;
 }): Date[] {
   const count = options.count ?? 3;
   const start = new Date(options.startAt);
@@ -194,13 +291,47 @@ export function nextRuns(options: {
   const now = options.now ?? new Date();
   if (options.cadence === "once") return [start];
   if (options.cadence !== "routine") return [];
-  const interval = RECURRENCE_INTERVAL_MS[options.every];
-  if (!interval) return [start];
-  let next = start.getTime();
-  // The first slot that has not already passed. A first run in the future is
-  // itself that slot; one in the past steps forward until it is.
-  while (next <= now.getTime()) next += interval;
+  const zone = options.zone ?? scheduleZoneName();
+  const end = options.until ? new Date(options.until).getTime() : Number.POSITIVE_INFINITY;
   const runs: Date[] = [];
-  for (let index = 0; index < count; index += 1) runs.push(new Date(next + interval * index));
+  const keep = (at: number) => {
+    if (at > now.getTime() && at <= end) runs.push(new Date(at));
+  };
+  const interval = RECURRENCE_INTERVAL_MS[options.every];
+  const stepDays = CALENDAR_STEP_DAYS[options.every];
+  if (stepDays === undefined) {
+    if (!interval) return [start];
+    let next = start.getTime();
+    // The first slot that has not already passed. A first run in the future is
+    // itself that slot; one in the past steps forward until it is.
+    while (next <= now.getTime()) next += interval;
+    for (let index = 0; index < count && next <= end; index += 1, next += interval) keep(next);
+    return runs;
+  }
+  const anchor = wallAt(start.getTime(), zone);
+  let day = Date.UTC(anchor.year, anchor.month, anchor.day);
+  const today = wallAt(now.getTime(), zone);
+  const todayDay = Date.UTC(today.year, today.month, today.day);
+  if (todayDay > day) {
+    const whole = Math.floor((todayDay - day) / DAY / stepDays);
+    day += Math.max(0, whole - 1) * stepDays * DAY;
+  }
+  for (let guard = 0; runs.length < count && guard < 800; guard += 1, day += stepDays * DAY) {
+    const date = new Date(day);
+    const weekday = date.getUTCDay();
+    if (options.every === "weekdays" && (weekday === 0 || weekday === 6)) continue;
+    const at = instantAt(
+      {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth(),
+        day: date.getUTCDate(),
+        hour: anchor.hour,
+        minute: anchor.minute,
+      },
+      zone,
+    );
+    if (at > end) break;
+    keep(at);
+  }
   return runs;
 }

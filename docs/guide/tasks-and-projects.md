@@ -15,13 +15,14 @@ to run**, and — only where there is a choice — **how it runs**.
 | **Now** | One pass | — | Create task | Runs now, once |
 | **Now** | Until it is done | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
 | **At a time** | — | Start time | Schedule task | Runs once at that time |
-| **Repeating** | — | Repeat, First run | Create routine | Repeats on the chosen interval, anchored to the first run |
+| **Repeating** | — | Repeat, First run, Ends, If Raiker was not running | Create routine | Repeats on the chosen cadence, anchored to the first run, in your time zone |
 
 A background agent starts now, so **How it runs** is asked under **Now** and
 nowhere else — there is no scheduled variant of it to compose.
 
 **Repeat** offers every cadence the scheduler honours: **Keep going** (a cycle
-roughly every 20 minutes), **Hourly**, **Daily** and **Weekly**. A routine is
+roughly every 20 minutes), **Hourly**, **Daily**, **Weekdays** (Monday to
+Friday) and **Weekly**. A routine is
 anchored to its **First run**, and every later cycle is counted forward from
 that slot rather than from whenever the previous one happened to finish — so a
 daily routine created at 4pm for a 9am first run runs at 9am, not at 4pm. The
@@ -32,10 +33,35 @@ running the same cycle twice. Build's side panel offers the same choice for a
 standing agent; leaving its **First run** empty starts the first cycle on the
 next scheduler tick.
 
+**Daily, Weekdays and Weekly keep the time on your clock.** The zone the form
+names is stored with the routine, and each slot is counted in calendar days in
+that zone from the first run — so a routine for 09:00 in London runs at 09:00
+on both sides of the October and March clock changes. Two edge cases are decided
+rather than left to arithmetic: a time that does not exist on the day the clocks
+go forward (01:30 in London) runs at the old offset that day only, an hour later
+on the wall; a time that happens twice when the clocks go back runs once, at the
+first. **Keep going** and **Hourly** are measured in elapsed time instead, since
+"an hour from now" is still an hour across a clock change. A weekday routine
+whose first run falls on a weekend first runs on the Monday.
+
+**Ends** takes a last day. A routine whose next slot would fall after it
+finishes instead of re-arming, and its card says that was its last scheduled
+run. Leave it empty to keep going until you stop it.
+
 A cycle is one governed turn. Policy, permissions and approvals apply to cycle
 forty exactly as they did to cycle one, and a schedule only fires while Raiker is
-running on this device — a closed laptop is a missed slot, and an elapsed slot is
-skipped rather than run late.
+running on this device — a closed laptop is a missed slot. **If Raiker was not
+running** decides what a routine does about one:
+
+| Choice | What happens to a missed slot |
+|---|---|
+| **Run it once when Raiker is back** (default) | One late cycle runs when Raiker returns; any other slots missed while it was away are skipped, never owed |
+| **Skip it and wait for the next slot** | Nothing runs late. The routine moves to its next slot and its history records the slot as *skipped — missed while Raiker was not running* |
+
+A slot claimed within fifteen minutes is on time, not missed. A one-off task
+always runs late — skipping it would mean never running it. The card states a
+routine's terms on one line: cadence and next run, zone, end, and *skips missed
+runs* when that is the choice.
 
 ### The time a schedule is written in
 
@@ -46,7 +72,8 @@ access off does not cost a turn its calendar.
 
 That is what makes "remind me tomorrow at 9" and "every Friday at 16:00" mean
 what you meant. A recurring schedule keeps your zone rather than a fixed offset,
-so `08:00 Europe/London` stays 08:00 local across the GMT/BST change. And each
+so `08:00 Europe/London` stays 08:00 local across the GMT/BST change — the
+schedule stores the zone it was composed in, as described above. And each
 cycle reads the clock **when it runs**: a routine you created on Monday evening
 is told it is Tuesday morning, not Monday.
 
@@ -69,13 +96,16 @@ delivered when its scheduler turn starts. Attached files appear on the task card
 as their own group, not inside the instruction text. Workbench preserves these
 files when handing a draft to Task or Schedule.
 
-Common fields:
+The details under the composer are two groups. **Schedule** — repeat, first run,
+ends and the missed-run choice, with the preview — appears only when the work
+has a time. **Organisation** holds the rest:
 
-- **Title** — required.
-- **Instructions** — required. The outcome, context, or constraints.
-- **Parent work** — nest under an existing task. A child of a task is a subtask;
-  a child of a routine is a subroutine.
+- **Title** — derived from your instruction; type one to override it.
 - **Priority** — Low / Normal / High.
+- **Make this part of other work…** — reveals **Part of**, which nests the task
+  under an existing one. A child of a task is a subtask; a child of a routine is
+  a subroutine. It waits behind the button because most work is not part of
+  other work.
 - **How to work** — **Chat** or **Build**, offered inside a project. It picks the
   working method the cycles run under and nothing else: same tools, same
   permissions, same approvals. Choose **Build** when the work is *read this
@@ -99,9 +129,36 @@ the conversation the work is running in, never named in the request, so a task c
 only ever add to its own tree. Nothing is auto-denied for taking too long: a
 delegated child waits for you, as every other decision does.
 
-The list splits into **Open work** and **Completed work**, with counters for
-open, scheduled, and finished. Each running item has a **Stop** button; a task
-blocked on an approval says so and links to the decision.
+The list splits into **Open work** and **Finished work**, with counters for
+open, scheduled, and finished. A task blocked on an approval says so and links
+to the decision. Delegated work folds under the task that delegated it: the
+parent shows a bar and *N of M delegated tasks settled · Show*, and **Show**
+lists all of it — a settled child included, under its parent rather than again
+under Finished work.
+
+### One lifecycle, and what each part of it lets you press
+
+Every task is in one of these phases, served by the runtime with the task, and
+every surface — the Tasks page, Home's boards, Build's side panel — offers the
+same controls for the same phase:
+
+| Phase | Means | You can |
+|---|---|---|
+| **not started** | Filed and parked until you run it — how a task Raiker proposed arrives | **Run now**, **Cancel** |
+| **scheduled** | Waiting for a future slot | **Cancel** |
+| **queued** | Due; the next scheduler tick claims it | **Cancel** |
+| **running** | A turn is in flight, including a granted approval being replayed and a stop you already asked for | **Stop** (not again while it is stopping) |
+| **waiting** | Parked until something outside the run moves it: a decision, an answer, delegated work, or a pause | **Stop**; **Continue now** for a decided approval or a pause |
+| **completed / failed / stopped** | Finished | **Run again** on one-off work |
+
+**Cancel** and **Stop** are the same governed request; Cancel is its name before
+anything has run. **Run now** is offered only before work has started — a
+scheduled run keeps its slot, because running it early would be a second cycle.
+**Run again files new work** with the same instruction, project, method, model
+and files. A finished run is never replayed in place, so nothing it did — a
+message sent, a file written — is repeated by pressing a button, and its own
+history stays exactly as it ended. A routine is never run again: it re-arms
+itself.
 
 Every run stays governed: it uses the same policy, approval, and audit path as
 Chat, and stops at a safe boundary rather than being killed.

@@ -32,7 +32,12 @@ export const AGENT_CADENCES: readonly AgentCadence[] = [
   {
     id: "daily",
     label: "Daily",
-    detail: "One cycle a day, anchored to the time of its first run.",
+    detail: "One cycle a day, at the time of its first run in your time zone — clock changes included.",
+  },
+  {
+    id: "weekdays",
+    label: "Weekdays",
+    detail: "One cycle each Monday to Friday, at the time of its first run in your time zone.",
   },
   {
     id: "weekly",
@@ -50,6 +55,7 @@ const CADENCE_RUNNING_LABELS: Record<string, string> = {
   continuous: "Keeps going until stopped",
   hourly: "Runs hourly",
   daily: "Runs daily",
+  weekdays: "Runs on weekdays",
   weekly: "Runs weekly",
   background: "One background run",
 };

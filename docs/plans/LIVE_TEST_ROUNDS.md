@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-03 | Targeted | `2026-10-03-tasks-more-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real delegated task, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.8 Tasks (UX-TASK-02, -03, -05, -06), §3.6 the More window (UX-SETPOP-02 to -04) and UX-PERM-01, with UX-TASK-01 and UX-SETPOP-01 re-verified against FIXED-584 and FIXED-528. Proved live: a weekday routine with an end and a skip policy composed in two groups and stating its terms on its card, Cancel rather than Stop on work that has not run, delegated work folded and counted under its parent, a real run settling and **Run again** filing new work, Permissions by task group, More by purpose with Recent and the palette, More as a full-height sheet at 390 wide, and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — Show on a parent revealed none of its settled work, a finished task said *Now: Starting scheduled run*, and filing a task forgot its model |
 | 2026-10-02 (second) | Targeted | `2026-10-02-memory-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a real turn that recalled an imported memory, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.9 Memory (UX-MEM-01 to UX-MEM-08) and UX-PERM-02 to UX-PERM-05. Proved live: an import reviewed record by record with one left out and a receipt, a real turn given the imported memory and its record linking back to that turn, archive / retention / restore as one lifecycle, an undo that keeps the record the owner changed, Permissions by goal, and 390 wide with no horizontal overflow, with **no 4xx, no 5xx and no console error** in the Memory and Permissions steps. **Four defects found** — three fixed (the Expired filter could never show a record, *last included* ignored a turn's own recall, an imported record said *agent*) and one filed (BUG-313: an instruction in the prompt stops recall) |
 | 2026-10-02 | Targeted | `2026-10-02-contract-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and a Design research turn, the key entered through the Connect dialog | OPT-01 and OPT-02 Stage B — every ordinary route described and called through the generated client — and what describing them found. Proved live: Design's Research reaching its turn (it had been refused with 422), Models calling Design **Research only** with the way to fix it, MFA's recovery codes shown once and one of them recovering the password from the lock screen (and refused the second time), and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — the recovery codes were never shown, every composer called Web fetch off while Permissions said on, and research answers printed raw markdown |
 | 2026-10-01 (second) | Targeted | `2026-10-01-contract-round/` | Ollama `gpt-oss:20b-cloud` on the local Ollama service, no key; the Anthropic, OpenAI and OpenRouter keys the owner supplied were not entered by the agent | OPT-01 and OPT-02 Stage A and the rest of BUG-310. Proved live on Windows: setup → Ready → Chat on the chosen, checked model; a real tool-using turn; every destination through the generated contract and the split client with **no 4xx, no 5xx and no console error**; and a second instance created from the lock screen. **Four defects found and fixed** — the sandbox probe left a file in the workspace, Ready's Chat opened Home, Chat after setup offered the model setup had replaced, and a stale cookie cost a 401 on the lock screen; BUG-311 and BUG-312 filed |
@@ -82,6 +83,70 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-03 — A schedule in its owner's zone, one task lifecycle, and More by purpose
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, in a
+Linux container whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: the pre-installed Chromium, through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-03-tasks-more-live.spec.ts` (7 of 7 on the final, fresh
+workspace). Captures:
+[`docs/screenshots/2026-10-03-tasks-more-round/`](../screenshots/2026-10-03-tasks-more-round).**
+
+§3.1, §3.6 and §3.8 of the release-readiness review: FIXED-696 to FIXED-708,
+with UX-TASK-01 and UX-SETPOP-01 re-verified against FIXED-584 and FIXED-528.
+
+**What it proved.**
+
+1. **A weekday routine keeps its terms.** Composed with **Repeating →
+   Weekdays**, a first run two days out, an end and *Skip it and wait for the
+   next slot*, the details read as **Schedule** and **Organisation**, the
+   preview listed three runs with no Saturday or Sunday, and the parent picker
+   stayed behind its button. The card read *Runs on weekdays, next … · UTC ·
+   until … · skips missed runs*, badge **scheduled**, control **Cancel** and no
+   Stop (FIXED-696 to FIXED-700,
+   [02](../screenshots/2026-10-03-tasks-more-round/02-routine-schedule-and-organisation.png),
+   [03](../screenshots/2026-10-03-tasks-more-round/03-routine-card-terms.png)).
+2. **Delegated work folds, and a real run can be run again.** A task filed
+   *part of* the routine ran now against Anthropic and settled; the routine
+   read *1 of 1 delegated task settled*, **Show** listed the settled child under
+   it, and **Run again** filed new work (FIXED-700, FIXED-701,
+   [04](../screenshots/2026-10-03-tasks-more-round/04-delegated-folded.png),
+   [05](../screenshots/2026-10-03-tasks-more-round/05-finished-run-again.png)).
+3. **Permissions leads with the five task groups**, in order, and switches to
+   the technical areas and back (FIXED-708,
+   [06](../screenshots/2026-10-03-tasks-more-round/06-permissions-by-task.png)).
+4. **More is grouped by purpose and remembers where you were**: *Recent,
+   Review, Connect, Settings, Diagnostics & help*, Models under Recent after a
+   visit, *You are on Tasks*; its search button closed it and opened the
+   palette, which found **Privacy** (FIXED-705, FIXED-706,
+   [07](../screenshots/2026-10-03-tasks-more-round/07-more-by-purpose.png),
+   [08](../screenshots/2026-10-03-tasks-more-round/08-palette-finds-settings.png)).
+5. **At 390 × 844 More is a full-height sheet** with **Back**, and the Tasks
+   composer has no horizontal overflow with its details open (FIXED-707,
+   [09](../screenshots/2026-10-03-tasks-more-round/09-more-sheet-390.png),
+   [10](../screenshots/2026-10-03-tasks-more-round/10-tasks-details-390.png)).
+6. **Every destination** — seventeen routes — loaded with no 4xx, no 5xx and no
+   console error.
+
+**What it found.** Three Tasks defects, each fixed in the run and the round
+re-run from a fresh workspace: **Show** on a parent revealed none of the work
+it counted as settled (FIXED-702), a completed child read *Now: Starting
+scheduled run* (FIXED-703), and filing a task cleared the composer's model so
+the next one was blocked behind *No model is chosen* (FIXED-704). The first run
+of the spec also showed that the Tasks composer needs its own model choice on a
+fresh workspace, as Chat's does; the spec chooses it the way an owner would.
+
+**What it did not prove.** A slot actually missed while the host was down, and
+a clock change, in real time: both are pinned by `tests/test_task_schedule_terms.py`
+against fixed instants rather than waited for. The browser ran in UTC, so the
+live preview did not cross a DST boundary; `taskComposer.test.ts` covers London.
 
 ---
 

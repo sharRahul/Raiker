@@ -36,7 +36,13 @@ called impossible. **Change** opens the row that decides it.
 
 **Needs your attention** and **Common permissions** come next, when there is
 anything in them, and both are shortcuts into the registry rather than a second
-copy of it. **All permissions** holds everything, grouped, with one toolbar:
+copy of it. **All permissions** holds everything, grouped by what each
+permission is for — **Files and code**, **Web and research**, **Messages and
+services**, **Memory**, **System and runtimes**. **Group by → Technical area
+(advanced)** shows the same rows under the technical domains in the table
+further down (Workspace, Git, Execution, Network, …); the choice is remembered
+in this browser, and search matches either heading whichever is shown. It has
+one toolbar:
 search by tool name, identifier, description or group; narrow by **Group**;
 **Expand groups** and **Collapse groups**; and **Clear filters** to restore the
 full list. Searching reveals matching rows even in collapsed groups.

@@ -223,6 +223,12 @@ export function taskView(over: Partial<TaskView> = {}): TaskView {
     thread_session_id: null,
     thread_turns: 0,
     attachments: [],
+    schedule_timezone: null,
+    schedule_until: null,
+    missed_run_policy: null,
+    // Empty, so `taskPhase` derives the phase from the status a test sets
+    // rather than reading a default that disagrees with it.
+    phase: "",
     ...over,
   };
 }

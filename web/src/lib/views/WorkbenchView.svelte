@@ -35,6 +35,7 @@
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
   import { stopRun } from "../taskLifecycle";
+  import { haltAction, taskActionLabel } from "../taskPhase";
   // REM-HOME-01 asked a deduplicated row to "link to the canonical Tasks
   // detail", and the dedupe landed without the link because there was no such
   // route. BUG-299 built it; this is the row honouring the promise.
@@ -347,14 +348,17 @@
                     {#if task.status === "waiting_for_approval"}
                       <a class="btn btn-sm" href="#/approvals">Decide</a>
                     {/if}
+                    {#if haltAction(task)}
+                    {@const halt = haltAction(task) ?? "stop"}
                     <button
                       class="btn btn-ghost btn-sm"
                       type="button"
                       disabled={busyTask === task.task_id}
                       onclick={() => void stopTask(task)}
                     >
-                      {busyTask === task.task_id ? "Stopping…" : "Stop"}
+                      {busyTask === task.task_id ? (halt === "cancel" ? "Cancelling…" : "Stopping…") : taskActionLabel(halt)}
                     </button>
+                    {/if}
                   </div>
                 </li>
               {/each}
@@ -382,14 +386,17 @@
                     <span class="since">last moved {relativeTime(task.updated_at)}</span>
                   </div>
                   <div class="row-actions">
+                    {#if haltAction(task)}
+                    {@const halt = haltAction(task) ?? "stop"}
                     <button
                       class="btn btn-ghost btn-sm"
                       type="button"
                       disabled={busyTask === task.task_id}
                       onclick={() => void stopTask(task)}
                     >
-                      {busyTask === task.task_id ? "Stopping…" : "Stop"}
+                      {busyTask === task.task_id ? (halt === "cancel" ? "Cancelling…" : "Stopping…") : taskActionLabel(halt)}
                     </button>
+                    {/if}
                   </div>
                 </li>
               {/each}
@@ -415,14 +422,17 @@
                     <span class="kind">fires {relativeFuture(task.scheduled_at ?? task.created_at)}</span>
                   </div>
                   <div class="row-actions">
+                    {#if haltAction(task)}
+                    {@const halt = haltAction(task) ?? "stop"}
                     <button
                       class="btn btn-ghost btn-sm"
                       type="button"
                       disabled={busyTask === task.task_id}
                       onclick={() => void stopTask(task)}
                     >
-                      {busyTask === task.task_id ? "Cancelling…" : "Cancel"}
+                      {busyTask === task.task_id ? (halt === "cancel" ? "Cancelling…" : "Stopping…") : taskActionLabel(halt)}
                     </button>
+                    {/if}
                   </div>
                 </li>
               {/each}

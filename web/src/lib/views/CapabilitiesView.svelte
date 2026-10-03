@@ -19,7 +19,9 @@
     buildPresetPending,
     buildPresetSatisfied,
     enableableTargets,
-    groupByDomain,
+    capabilityGroup,
+    groupGates,
+    type RegistryGrouping,
     isAvailable,
     isDecisionMode,
     isDeferred,
@@ -81,6 +83,32 @@
   let statusFilter = $state("all");
   let domainFilter = $state("all");
   let refreshing = $state(false);
+  /**
+   * UX-PERM-01 — the registry leads with what each permission is *for*. The
+   * technical domains stay one switch away as the advanced view; the choice is
+   * this viewer's, so it is remembered in this browser only.
+   */
+  const GROUPING_KEY = "raiker.permissions.grouping";
+  let grouping = $state<RegistryGrouping>(readGrouping());
+  function readGrouping(): RegistryGrouping {
+    try {
+      return window.localStorage.getItem(GROUPING_KEY) === "domain" ? "domain" : "task";
+    } catch {
+      return "task";
+    }
+  }
+  function chooseGrouping(next: RegistryGrouping) {
+    if (next === grouping) return;
+    grouping = next;
+    // A group name from the other grouping would filter or fold nothing.
+    domainFilter = "all";
+    collapsedDomains = [];
+    try {
+      window.localStorage.setItem(GROUPING_KEY, next);
+    } catch {
+      // Remembering the view is a convenience.
+    }
+  }
 
   /**
    * Domain groups the owner has folded away.
@@ -368,16 +396,18 @@
 
   const filtered = $derived.by(() => {
     const q = search.trim().toLowerCase();
-    return groupByDomain(governedGates.filter(gate => {
-      const text = `${gate.capability} ${capabilityLabel(gate.capability)} ${capabilityDescription(gate.capability)} ${capabilityDomain(gate.capability)}`.toLowerCase();
+    return groupGates(governedGates.filter(gate => {
+      // Both headings are searchable whichever one is drawn, so "network" still
+      // finds what the technical view files under Network.
+      const text = `${gate.capability} ${capabilityLabel(gate.capability)} ${capabilityDescription(gate.capability)} ${capabilityDomain(gate.capability)} ${capabilityGroup(gate.capability, "task")}`.toLowerCase();
       if (q && !text.includes(q)) return false;
-      if (domainFilter !== "all" && capabilityDomain(gate.capability) !== domainFilter) return false;
+      if (domainFilter !== "all" && capabilityGroup(gate.capability, grouping) !== domainFilter) return false;
       if (statusFilter === "on") return isAvailable(gate);
       if (statusFilter === "off") return !isAvailable(gate);
       if (statusFilter === "attention") return attention.some(item => item.capability === gate.capability);
       if (statusFilter === "selected") return selectedCaps.has(gate.capability);
       return true;
-    }));
+    }), grouping);
   });
   const visibleCount = $derived(filtered.reduce((count, group) => count + group.gates.length, 0));
 
@@ -394,7 +424,7 @@
   // summary said nothing at all. Ranked by authority instead — see
   // `authorityMatrixGates`.
   const authorityGates = $derived(authorityMatrixGates(governedGates));
-  const domains = $derived(groupByDomain(governedGates).map(group => group.domain));
+  const domains = $derived(groupGates(governedGates, grouping).map(group => group.domain));
   const posture = $derived(permissionPosture(governedGates));
   const goals = $derived(goalSummaries(effective));
 
@@ -455,7 +485,7 @@
       return;
     }
     clearFilters();
-    const domain = capabilityDomain(capability);
+    const domain = capabilityGroup(capability, grouping);
     collapsedDomains = collapsedDomains.filter((entry) => entry !== domain);
     expanded = capability;
     await tick();
@@ -842,6 +872,13 @@
         {#if filtering}<button type="button" class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>{/if}
       </div>
     </div>
+    <!-- UX-PERM-01 — what each permission is for leads; the technical areas
+         are the advanced view of the same registry. -->
+    <div class="chip-row grouping" role="group" aria-label="Group permissions by">
+      <span class="grouping-label">Group by</span>
+      <button type="button" class="chip" aria-pressed={grouping === "task"} onclick={() => chooseGrouping("task")}>What it's for</button>
+      <button type="button" class="chip" aria-pressed={grouping === "domain"} onclick={() => chooseGrouping("domain")}>Technical area (advanced)</button>
+    </div>
 
     {#if selectedCaps.size > 0}
       <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
@@ -1218,6 +1255,8 @@
   .cap-list:last-child {
     margin-bottom: 0;
   }
+  .grouping{align-items:center;margin:0 0 var(--space-3)}
+  .grouping-label{color:var(--text-3);font-size:var(--text-xs)}
   /* A group heading, not another card: the rows underneath carry the surface. */
   .phase-head {
     display: flex;

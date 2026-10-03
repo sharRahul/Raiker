@@ -24,7 +24,9 @@ from raiker.control.views.tasks import (
 from raiker.events.writer import EventLogWriter
 from raiker.models.registry import ModelProfileRegistry
 from raiker.tasks.history import derive_attempts
+from raiker.tasks.lifecycle import task_phase
 from raiker.tasks.manager import TaskManager
+from raiker.tasks.schedule import schedule_terms
 
 if TYPE_CHECKING:
     from raiker.control.dashboard import DashboardService
@@ -145,6 +147,9 @@ class TaskService:
         surface: str = "chat",
         attachments: list[dict[str, Any]] | None = None,
         start_immediately: bool = True,
+        timezone: str | None = None,
+        run_until: str | None = None,
+        missed_runs: str | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
 
@@ -211,6 +216,18 @@ class TaskService:
             scheduled_at = None
         elif scheduled_at is None:
             scheduled_at = utc_now()
+        # UX-TASK-02 — the schedule's terms, validated before anything is
+        # written. A weekday routine anchored on a Saturday first runs on the
+        # Monday, so the stored first slot is the one the scheduler will claim.
+        terms = schedule_terms(
+            recurrence=recurrence,
+            scheduled_at=scheduled_at if start_immediately else None,
+            timezone=timezone,
+            run_until=run_until,
+            missed_runs=missed_runs,
+        )
+        if terms.first_run is not None:
+            scheduled_at = terms.first_run
         if project_id is None:
             project_id = self.store.get_active_project(user_id)
         elif self.store.load_project(project_id, user_id) is None:
@@ -280,6 +297,10 @@ class TaskService:
             model_profile=model_profile,
             model=model,
             attachments=clean_attachments,
+            schedule_timezone=terms.timezone,
+            schedule_anchor=terms.anchor,
+            schedule_until=terms.until,
+            missed_run_policy=terms.missed_run_policy,
         )
         return self._task_view(task)
 
@@ -328,4 +349,8 @@ class TaskService:
             thread_session_id=d.get("thread_session_id"),
             thread_turns=thread_turns,
             attachments=[cast(PathAttachment | UploadAttachment, item) for item in d.get("attachments") or []],
+            schedule_timezone=d.get("schedule_timezone"),
+            schedule_until=d.get("schedule_until"),
+            missed_run_policy=d.get("missed_run_policy"),
+            phase=task_phase(str(d.get("status", "")), d.get("scheduled_at")),
         )

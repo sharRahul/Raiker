@@ -1081,6 +1081,15 @@ class TaskRecord:
     #: the same tools, the same governance, the same approvals.
     surface: str = "chat"
     attachments: list[dict[str, Any]] = field(default_factory=list)
+    #: UX-TASK-02 — the schedule's own terms. The IANA zone it was composed in,
+    #: the first slot every later one is counted from, when it stops, and what a
+    #: host that slept through a slot does about it. All four are empty on a task
+    #: created before they existed, which reads as UTC anchored to its current
+    #: slot: exactly how it behaved before.
+    schedule_timezone: str | None = None
+    schedule_anchor: str | None = None
+    schedule_until: str | None = None
+    missed_run_policy: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

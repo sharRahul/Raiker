@@ -396,3 +396,35 @@ describe("the delegated-authority summary", () => {
     expect(input.at(-1)).toBe(acting);
   });
 });
+
+describe("task groups (UX-PERM-01)", () => {
+  it("files every permission under one of the five task groups", async () => {
+    const { capabilityTaskGroup, CAPABILITY_TASK_GROUP_ORDER } = await import("./capabilityModel");
+    for (const capability of [
+      "file_write_execution", "git_push_execution", "web_fetch", "email_runtime",
+      "memory_write_execution", "shell_execution", "hosted_model_runtime", "something_new",
+    ]) {
+      expect(CAPABILITY_TASK_GROUP_ORDER as readonly string[]).toContain(capabilityTaskGroup(capability));
+    }
+  });
+
+  it("files a permission where an owner looks for it", async () => {
+    const { capabilityTaskGroup } = await import("./capabilityModel");
+    expect(capabilityTaskGroup("file_write_execution")).toBe("Files and code");
+    expect(capabilityTaskGroup("git_push_execution")).toBe("Files and code");
+    expect(capabilityTaskGroup("web_fetch")).toBe("Web and research");
+    expect(capabilityTaskGroup("external_channel_runtime")).toBe("Messages and services");
+    expect(capabilityTaskGroup("connector_slack_runtime")).toBe("Messages and services");
+    expect(capabilityTaskGroup("memory_forget_execution")).toBe("Memory");
+    expect(capabilityTaskGroup("shell_execution")).toBe("System and runtimes");
+    expect(capabilityTaskGroup("something_new")).toBe("System and runtimes");
+  });
+
+  it("keeps the technical domains as the advanced grouping", async () => {
+    const { groupGates } = await import("./capabilityModel");
+    const gate = (capability: string) => ({ capability }) as never;
+    const gates = [gate("shell_execution"), gate("web_fetch")];
+    expect(groupGates(gates, "task").map((group) => group.domain)).toEqual(["Web and research", "System and runtimes"]);
+    expect(groupGates(gates, "domain").map((group) => group.domain)).toEqual(["Execution", "Network"]);
+  });
+});

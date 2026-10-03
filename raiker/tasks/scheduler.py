@@ -47,6 +47,14 @@ from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+from raiker.tasks.schedule import (
+    RECURRING_INTERVALS,
+    format_instant,
+    is_repeating,
+    missed,
+    next_occurrence,
+    parse_instant,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -319,20 +327,13 @@ class TaskScheduler:
         if task is None or task.status == "cancelled":
             return
         outcome, summary = run_outcome(status, message)
-        interval = RECURRING_INTERVALS.get(task.recurrence or "")
-        if interval is not None and task.scheduled_at:
-            next_run_at = next_run_after(task.scheduled_at, interval)
-            manager.store.reschedule_task(
-                task_id,
-                next_run_at,
-                summary if outcome == "completed" else f"Last run did not complete: {summary}",
-            )
-            # BUG-299 - a routine never reaches a terminal state, so without
-            # this the only trace of what Tuesday's cycle did was a summary
-            # string Wednesday's cycle overwrote. The cycle settles; the task
-            # stays armed.
-            manager.record_cycle_outcome(
-                task_id, outcome=outcome, summary=summary, next_run_at=next_run_at
+        if is_repeating(task.recurrence) and task.scheduled_at:
+            self._rearm(
+                manager,
+                task,
+                outcome=outcome,
+                summary=summary,
+                carried=summary if outcome == "completed" else f"Last run did not complete: {summary}",
             )
         elif outcome == "completed":
             manager.complete_task(task_id, summary)
@@ -340,6 +341,73 @@ class TaskScheduler:
             manager.block_task_on_approval(task_id, summary)
         else:
             manager.fail_task(task_id, summary)
+
+    def _rearm(
+        self,
+        manager: TaskManager,
+        task: TaskRecord,
+        *,
+        outcome: str,
+        summary: str,
+        carried: str,
+    ) -> None:
+        """Settle one cycle of a routine and move it to its next slot (UX-TASK-02).
+
+        The next slot is counted from the routine's anchor in the zone it was
+        composed in, so "daily at 09:00" is 09:00 on both sides of a clock
+        change. A routine whose next slot falls after its end is finished
+        instead of re-armed: its last cycle is the one that just settled, and the
+        card says so rather than showing a slot that will never be claimed.
+        """
+        scheduled_at = task.scheduled_at or utc_now()
+        now = datetime.now(UTC)
+        following = next_occurrence(
+            task.schedule_anchor or scheduled_at,
+            task.recurrence or "",
+            task.schedule_timezone,
+            max(now, parse_instant(scheduled_at)),
+        )
+        if task.schedule_until and following > parse_instant(task.schedule_until):
+            manager.record_cycle_outcome(task.task_id, outcome=outcome, summary=summary)
+            manager.complete_task(
+                task.task_id, f"{carried} That was its last scheduled run."
+            )
+            return
+        next_run_at = format_instant(following)
+        manager.store.reschedule_task(task.task_id, next_run_at, carried)
+        # BUG-299 - a routine never reaches a terminal state, so without
+        # this the only trace of what Tuesday's cycle did was a summary
+        # string Wednesday's cycle overwrote. The cycle settles; the task
+        # stays armed.
+        manager.record_cycle_outcome(
+            task.task_id, outcome=outcome, summary=summary, next_run_at=next_run_at
+        )
+
+    def _skip_missed(self, task: TaskRecord) -> bool:
+        """Leave a slot the host slept through, when the routine says to (UX-TASK-02).
+
+        A routine whose missed-run policy is ``skip`` does not run late: the
+        claimed slot is settled as *skipped* in its history and the routine
+        waits for its next one. ``run_once`` — the default, and what every
+        routine did before this was a choice — runs the one late cycle and
+        skips the rest. A one-off task always runs late: skipping it would mean
+        never running it at all.
+        """
+        if (
+            task.missed_run_policy != "skip"
+            or not is_repeating(task.recurrence)
+            or not task.scheduled_at
+            or not missed(task.scheduled_at, datetime.now(UTC))
+        ):
+            return False
+        self._rearm(
+            TaskManager(self.store, EventLogWriter(self.store)),
+            task,
+            outcome="skipped",
+            summary=MISSED_RUN_SKIPPED,
+            carried=MISSED_RUN_SKIPPED,
+        )
+        return True
 
     async def run_due(self) -> int:
         # BUG-40 — Pause means "start no new background work". A due task is new
@@ -352,6 +420,8 @@ class TaskScheduler:
         tasks = self.store.claim_due_tasks(utc_now())
         for task in tasks:
             try:
+                if self._skip_missed(task):
+                    continue
                 await self._run_claimed_task(task)
             except Exception as exc:  # noqa: BLE001 — one task's failure is its own
                 # GCR-39 — this loop had no containment, so a provider, storage
@@ -455,6 +525,12 @@ RUN_OUTCOMES: dict[str, tuple[str, str]] = {
 }
 
 
+#: What a skipped slot says, on the card and in the routine's history.
+MISSED_RUN_SKIPPED = (
+    "Skipped a run Raiker was not running for, as this routine's missed-run policy says."
+)
+
+
 def run_outcome(status: str, message: str) -> tuple[str, str]:
     """Map one governed turn's result onto ``(task status, stated summary)``.
 
@@ -477,21 +553,6 @@ def _resume_block_reason(error: str) -> str:
     if error in ("suspended_turn_unreadable", "suspended_turn_not_found"):
         return "This run's parked state could not be read, so it must be started again."
     return f"This run could not be continued automatically ({error}). You can run it again."
-
-
-# Recurring cadences and the gap between one governed cycle and the next. A
-# recurring task is re-armed after every cycle rather than closed, so a standing
-# agent — "keep improving the landing page", "watch the build" — keeps working
-# until the owner stops it. `continuous` is the shortest cadence offered: it is
-# still one discrete governed turn per cycle, never an unbounded loop, so every
-# cycle passes through policy, gates, and approvals exactly like a typed prompt.
-CONTINUOUS_INTERVAL = timedelta(minutes=20)
-RECURRING_INTERVALS: dict[str, timedelta] = {
-    "continuous": CONTINUOUS_INTERVAL,
-    "hourly": timedelta(hours=1),
-    "daily": timedelta(days=1),
-    "weekly": timedelta(weeks=1),
-}
 
 
 def next_run_after(iso: str, interval: timedelta) -> str:

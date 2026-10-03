@@ -456,6 +456,96 @@ export function groupByDomain(gates: CapabilityGate[]): { domain: string; gates:
   }));
 }
 
+/*
+ * UX-PERM-01 / DEC-03 step 3 — the registry grouped by what an owner is trying
+ * to let Raiker do, which is how the page now leads.
+ *
+ * The domain groups above are an engineer's filing: *Workspace*, *Execution*,
+ * *Network*, *Models*, *Automation*. Nobody arrives asking "what can Raiker do
+ * in Automation"; they arrive asking whether it may touch their files, read the
+ * web, send a message, remember something, or run things on this machine. Five
+ * groups answer those five questions. The domain grouping is still one switch
+ * away, as the advanced view, because an audit sometimes wants it — nothing
+ * about enforcement or the registry changes, only the headings over it.
+ */
+export const CAPABILITY_TASK_GROUP_ORDER = [
+  "Files and code",
+  "Web and research",
+  "Messages and services",
+  "Memory",
+  "System and runtimes",
+] as const;
+
+type TaskGroup = (typeof CAPABILITY_TASK_GROUP_ORDER)[number];
+
+/** Where each technical domain lands when no capability says otherwise. */
+const TASK_GROUP_OF_DOMAIN: Record<string, TaskGroup> = {
+  Workspace: "Files and code",
+  Git: "Files and code",
+  Execution: "System and runtimes",
+  Network: "Web and research",
+  Models: "System and runtimes",
+  Connectors: "Messages and services",
+  MCP: "Messages and services",
+  Automation: "System and runtimes",
+  "Other tools": "System and runtimes",
+};
+
+/**
+ * Capabilities whose domain is the wrong answer to "what is this for". Memory
+ * lived under Workspace because it writes this machine's database; an owner
+ * looks for it under Memory. A channel lived under Network because it reaches
+ * out; an owner looks for it beside email and calendar. Exports and the task
+ * and project bookkeeping are about running Raiker, not about the owner's files.
+ */
+const TASK_GROUP_OVERRIDES: Record<string, TaskGroup> = {
+  memory_write_execution: "Memory",
+  memory_forget_execution: "Memory",
+  semantic_memory_writes: "Memory",
+  semantic_memory_review_queue: "Memory",
+  semantic_memory_runtime: "Memory",
+  vector_embedding_runtime: "Memory",
+  graph_indexing_runtime: "Memory",
+  external_channel_runtime: "Messages and services",
+  channel_approval_relay: "Messages and services",
+  telemetry_export: "System and runtimes",
+  audit_export: "System and runtimes",
+  task_management_runtime: "System and runtimes",
+  project_assignment_runtime: "System and runtimes",
+};
+
+/** The task group one capability is listed under. Never hidden: an unknown one is System. */
+export function capabilityTaskGroup(capability: string): string {
+  return TASK_GROUP_OVERRIDES[capability] ?? TASK_GROUP_OF_DOMAIN[capabilityDomain(capability)] ?? "System and runtimes";
+}
+
+/** Two ways to head the same registry. */
+export type RegistryGrouping = "task" | "domain";
+
+/** The heading one capability sits under in the chosen grouping. */
+export function capabilityGroup(capability: string, grouping: RegistryGrouping): string {
+  return grouping === "task" ? capabilityTaskGroup(capability) : capabilityDomain(capability);
+}
+
+/** The registry grouped as asked, in that grouping's fixed order. */
+export function groupGates(
+  gates: CapabilityGate[],
+  grouping: RegistryGrouping,
+): { domain: string; gates: CapabilityGate[] }[] {
+  if (grouping === "domain") return groupByDomain(gates);
+  const byGroup = new Map<string, CapabilityGate[]>();
+  for (const gate of gates) {
+    const group = capabilityTaskGroup(gate.capability);
+    byGroup.set(group, [...(byGroup.get(group) ?? []), gate]);
+  }
+  return CAPABILITY_TASK_GROUP_ORDER.filter((group) => byGroup.has(group)).map((group) => ({
+    domain: group,
+    gates: [...byGroup.get(group)!].sort((a, b) =>
+      capabilityLabel(a.capability).localeCompare(capabilityLabel(b.capability)),
+    ),
+  }));
+}
+
 export interface CapabilityExplanation {
   status: string;
   why: string;

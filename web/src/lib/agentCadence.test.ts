@@ -9,6 +9,7 @@ describe("agent cadences", () => {
       "continuous",
       "hourly",
       "daily",
+      "weekdays",
       "weekly",
       "background",
     ]);

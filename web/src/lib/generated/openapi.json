@@ -21427,6 +21427,21 @@
             "title": "Description",
             "type": "string"
           },
+          "missed_runs": {
+            "anyOf": [
+              {
+                "enum": [
+                  "run_once",
+                  "skip"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missed Runs"
+          },
           "model": {
             "anyOf": [
               {
@@ -21504,6 +21519,17 @@
             ],
             "title": "Reminder At"
           },
+          "run_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Until"
+          },
           "scheduled_at": {
             "anyOf": [
               {
@@ -21524,6 +21550,17 @@
             ],
             "title": "Surface",
             "type": "string"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
           },
           "title": {
             "title": "Title",
@@ -21721,6 +21758,18 @@
             ],
             "title": "Current Step"
           },
+          "missed_run_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Missed Run Policy"
+          },
           "model": {
             "anyOf": [
               {
@@ -21760,6 +21809,11 @@
             ],
             "default": null,
             "title": "Parent Task Id"
+          },
+          "phase": {
+            "default": "queued",
+            "title": "Phase",
+            "type": "string"
           },
           "priority": {
             "anyOf": [
@@ -21819,6 +21873,30 @@
             ],
             "default": null,
             "title": "Reminder At"
+          },
+          "schedule_timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Schedule Timezone"
+          },
+          "schedule_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Schedule Until"
           },
           "scheduled_at": {
             "anyOf": [

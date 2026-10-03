@@ -10,14 +10,14 @@ from typing_extensions import TypedDict
 from raiker.contracts.views import View
 from raiker.control.views.approvals import ApprovalView
 from raiker.tasks.history import TaskAttemptView
-from raiker.tasks.scheduler import RECURRING_INTERVALS
+from raiker.tasks.schedule import TASK_REPEATING
 
 # Cadences a task/schedule may carry. `background` runs one governed cycle now;
 # the recurring cadences re-arm after every cycle so a standing agent keeps
 # working until the owner stops it. An unknown cadence is refused rather than
 # silently stored as a one-shot, which would make a "keep going" schedule stop
 # after its first run.
-TASK_RECURRENCES = frozenset({"background", *RECURRING_INTERVALS})
+TASK_RECURRENCES = frozenset({"background", *TASK_REPEATING})
 
 
 # Task states in which the stored summary *is* the outcome — what the run ended
@@ -77,6 +77,16 @@ class TaskView(View):
     # instead of the owner discovering it.
     thread_turns: int = 0
     attachments: list[PathAttachment | UploadAttachment] = field(default_factory=list)
+    # UX-TASK-02 — the schedule's own terms, so a card can say "weekdays at
+    # 09:00 Europe/London, until 31 Dec, skips missed runs" rather than a cadence
+    # and a UTC instant. Empty on a task created before they existed.
+    schedule_timezone: str | None = None
+    schedule_until: str | None = None
+    missed_run_policy: str | None = None
+    # UX-TASK-05 — the published lifecycle phase (`raiker/tasks/lifecycle.py`),
+    # served rather than re-derived so every surface offers the same actions
+    # for the same task.
+    phase: str = "queued"
 
 
 @dataclass(frozen=True)

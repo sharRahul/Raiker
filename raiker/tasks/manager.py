@@ -126,6 +126,10 @@ class TaskManager:
         attachments: list[dict[str, object]] | None = None,
         thread_session_id: str | None = None,
         surface: str = "chat",
+        schedule_timezone: str | None = None,
+        schedule_anchor: str | None = None,
+        schedule_until: str | None = None,
+        missed_run_policy: str | None = None,
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
@@ -148,6 +152,10 @@ class TaskManager:
             model=model,
             surface=surface,
             attachments=list(attachments or []),
+            schedule_timezone=schedule_timezone,
+            schedule_anchor=schedule_anchor,
+            schedule_until=schedule_until,
+            missed_run_policy=missed_run_policy,
         )
         self.store.insert_task(task)
         event = make_event(

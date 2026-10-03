@@ -91,6 +91,14 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-03.** §3.1 Permissions, §3.6 the Settings
+> popup and §3.8 Tasks are closed. UX-PERM-01 as FIXED-708; UX-SETPOP-02 to -04
+> as FIXED-705 to FIXED-707 with UX-SETPOP-01 recorded against FIXED-528; and
+> UX-TASK-02, -03, -05 and -06 as FIXED-696 to FIXED-701 with UX-TASK-01
+> recorded against FIXED-584. The live round that proved them found three Tasks
+> defects, fixed as FIXED-702 to FIXED-704. See the status notes at the head of
+> each section.
+>
 > **Implementation status, 2026-10-02.** §3.9 Memory is closed: UX-MEM-02 to
 > UX-MEM-06 and UX-MEM-08 as FIXED-687 and FIXED-689 to FIXED-694, with
 > UX-MEM-01 and UX-MEM-07 recorded against the §18.3 closures that had already
@@ -409,9 +417,10 @@ explicitly asks for them.
 > source (`permissionLanguage.ts`, `PermissionRow.svelte`, `AuthorityMatrix.svelte`).
 > UX-PERM-05 closed as
 > [FIXED-695](FIXED_ITEMS.md#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks).
-> **UX-PERM-01 remains open:** the posture summary, attention list and Build
-> preset ship, but the five task groups it recommends do not replace the
-> registry's domain grouping.
+> **UX-PERM-01 closed on 2026-10-03** as
+> [FIXED-708](FIXED_ITEMS.md#fixed-708--permissions-led-with-an-engineers-filing):
+> the registry leads with the five task groups below, and the domain grouping
+> is the advanced view of the same rows. **Every row in this table is closed.**
 
 ### Current strengths
 
@@ -425,7 +434,7 @@ explicitly asks for them.
 
 | ID | Priority | Finding | Simplification |
 |---|---:|---|---|
-| UX-PERM-01 | P1 | Sixty-plus capabilities create scan and comprehension load. | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. |
+| ~~UX-PERM-01~~ **closed** — [FIXED-708](FIXED_ITEMS.md#fixed-708--permissions-led-with-an-engineers-filing) | P1 | Sixty-plus capabilities create scan and comprehension load. | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. |
 | ~~UX-PERM-02~~ **closed** — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) | P1 | Availability and behavior are visually similar, so users can conflate “can exist” with “what happens when requested.” | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. |
 | ~~UX-PERM-03~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | P1 | Bulk actions still use “Ask” and “Deny” while other surfaces use “Ask me / Allow / Automatic / Never”. | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. |
 | ~~UX-PERM-04~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | P2 | Technical capability names are useful for evidence but weak as the first label. | Show plain-language action, consequence and example first; registry key in Details. |
@@ -557,6 +566,15 @@ fallback order and per-surface overrides remain available after setup.
 
 ## 3.6 Settings popup (“Settings & pages”)
 
+> **Implementation status, 2026-10-03. Every row in this table is closed.**
+> UX-SETPOP-01 had closed on 2026-09-14 as
+> [FIXED-528](FIXED_ITEMS.md#fixed-528--a-gear-opened-a-window-that-could-not-take-you-to-settings),
+> whose own record names it, and this table had gone on listing it as open. The
+> other three closed under DEC-09: More groups by product area read from the
+> route registry (FIXED-705), the command palette owns page search and More
+> keeps stable groups and recent destinations (FIXED-706), and on a phone More
+> is a full-height sheet with Back (FIXED-707).
+
 ### Current strengths
 
 - `AllPagesDialog.svelte` is searchable, grouped, keyboard-aware and acts as a
@@ -566,10 +584,10 @@ fallback order and per-surface overrides remain available after setup.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-SETPOP-01 | P1 | A gear opens both a settings navigator and an all-pages launcher. | Rename the trigger and dialog to “More” or split “More” from direct “Settings”. |
-| UX-SETPOP-02 | P1 | It overlaps conceptually with command/search navigation. | Give global search commands/pages and use the popup for stable navigation only, or merge them deliberately. |
-| UX-SETPOP-03 | P2 | On mobile, the mental model should be navigation rather than a desktop dialog. | Render as a full-height sheet with Back, recent pages and clear current-location state. |
-| UX-SETPOP-04 | P2 | Administrative and everyday destinations receive similar visual weight. | Group into Work, Review, Connect and Settings; put diagnostics/advanced last. |
+| ~~UX-SETPOP-01~~ **closed** — [FIXED-528](FIXED_ITEMS.md#fixed-528--a-gear-opened-a-window-that-could-not-take-you-to-settings) | P1 | A gear opens both a settings navigator and an all-pages launcher. | Rename the trigger and dialog to “More” or split “More” from direct “Settings”. |
+| ~~UX-SETPOP-02~~ **closed** — [FIXED-706](FIXED_ITEMS.md#fixed-706--two-search-boxes-for-one-question) | P1 | It overlaps conceptually with command/search navigation. | Give global search commands/pages and use the popup for stable navigation only, or merge them deliberately. |
+| ~~UX-SETPOP-03~~ **closed** — [FIXED-707](FIXED_ITEMS.md#fixed-707--more-was-a-desktop-dialog-on-a-phone) | P2 | On mobile, the mental model should be navigation rather than a desktop dialog. | Render as a full-height sheet with Back, recent pages and clear current-location state. |
+| ~~UX-SETPOP-04~~ **closed** — [FIXED-705](FIXED_ITEMS.md#fixed-705--more-grouped-its-rows-by-where-they-used-to-sit) | P2 | Administrative and everyday destinations receive similar visual weight. | Group into Work, Review, Connect and Settings; put diagnostics/advanced last. |
 
 ## 3.7 Settings pages
 
@@ -598,6 +616,19 @@ it must not be advertised as a shipped setting.
 
 ## 3.8 Tasks
 
+> **Implementation status, 2026-10-03. Every row in this table is closed.**
+> UX-TASK-01 had closed on 2026-09-20 under its §18.3 name, REM-TASK-01
+> ([FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips)),
+> and was re-verified in source (`taskComposer.ts`: *When to run* and *How it
+> runs*). UX-TASK-02 closed as FIXED-696 to FIXED-698 — a schedule stores its
+> zone, anchor, end and missed-run policy, steps calendar cadences in local time
+> across DST, and gained weekdays. UX-TASK-03, -05 and -06 closed as FIXED-699,
+> FIXED-700 and FIXED-701; the live round found and fixed three more
+> (FIXED-702 to FIXED-704). Of the automation reliability requirements below,
+> the occurrence ledger with fencing tokens, bounded retry with jitter, budget
+> enforcement and the doctor endpoint are DEC-12 steps 4, 6 and 8, which no row
+> of this table names; they remain open under DEC-12 rather than here.
+
 ### Current strengths
 
 - One composer supports run-now, one-time, routine and background work.
@@ -609,12 +640,12 @@ it must not be advertised as a shipped setting.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-TASK-01 | P1 | “Now”, “Schedule once”, “Routine” and “Background” combine timing and execution style. | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. |
-| UX-TASK-02 | P1 | A recurrence select cannot express timezone, weekdays, end conditions, missed-run policy or next-run preview. | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. |
-| UX-TASK-03 | P1 | Project, parent, priority, work method and model are hidden together under Details despite different importance. | Keep Project and When visible; group orchestration details separately. |
+| ~~UX-TASK-01~~ **closed** — [FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips) | P1 | “Now”, “Schedule once”, “Routine” and “Background” combine timing and execution style. | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. |
+| ~~UX-TASK-02~~ **closed** — [FIXED-696](FIXED_ITEMS.md#fixed-696--daily-at-0900-moved-an-hour-when-the-clocks-changed) | P1 | A recurrence select cannot express timezone, weekdays, end conditions, missed-run policy or next-run preview. | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. |
+| ~~UX-TASK-03~~ **closed** — [FIXED-699](FIXED_ITEMS.md#fixed-699--when-work-runs-and-how-it-is-organised-were-one-list-of-fields) | P1 | Project, parent, priority, work method and model are hidden together under Details despite different importance. | Keep Project and When visible; group orchestration details separately. |
 | ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | P1 | Users need one history of run attempts, approval pauses, retries and deliveries. | Open a task detail timeline with current state, next action, output and evidence. |
-| UX-TASK-05 | P1 | Destructive, duplicate, pause, resume, run-now and edit semantics need a consistent lifecycle. | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. |
-| UX-TASK-06 | P2 | Parent/child tasks are powerful but advanced. | Hide hierarchy unless requested; visualize child progress and define parent settlement. |
+| ~~UX-TASK-05~~ **closed** — [FIXED-700](FIXED_ITEMS.md#fixed-700--twelve-statuses-and-every-surface-deciding-its-own-buttons) | P1 | Destructive, duplicate, pause, resume, run-now and edit semantics need a consistent lifecycle. | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. |
+| ~~UX-TASK-06~~ **closed** — [FIXED-701](FIXED_ITEMS.md#fixed-701--delegated-work-was-a-second-tree-to-read-past) | P2 | Parent/child tasks are powerful but advanced. | Hide hierarchy unless requested; visualize child progress and define parent settlement. |
 
 ### Automation reliability requirements
 
@@ -2345,11 +2376,11 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-PERM-01 | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. | Presets reduce setup effort without creating a second policy engine; preview the exact grant diff. |
-| UX-PERM-02 | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. | Availability remains a hard gate even when behavior is Automatic; combining controls would conceal effective denial. |
-| UX-PERM-03 | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. | One vocabulary prevents users interpreting identical policy differently across surfaces. |
-| UX-PERM-04 | Show plain-language action, consequence and example first; registry key in Details. | Examples explain consequences while stable keys preserve diagnosability. |
-| UX-PERM-05 | Add read-only summaries such as “Can edit project files after asking” and “Cannot send messages”. | Compute posture from effective policy; manually maintained summaries would drift. |
+| ~~UX-PERM-01~~ **closed** — [FIXED-708](FIXED_ITEMS.md#fixed-708--permissions-led-with-an-engineers-filing) | Lead with task-based presets and “Recently used / Needs attention”; preserve the full registry under Advanced. | Presets reduce setup effort without creating a second policy engine; preview the exact grant diff. |
+| ~~UX-PERM-02~~ **closed** — [FIXED-513](FIXED_ITEMS.md#fixed-513--the-permissions-page-answered-what-am-i-looking-at-twice-and-led-with-neither) | Phrase them as two questions: “Can Raiker use this?” and “When Raiker wants to use it”. | Availability remains a hard gate even when behavior is Automatic; combining controls would conceal effective denial. |
+| ~~UX-PERM-03~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | Adopt the same four terms in buttons, MCP explanations, approvals and documentation. | One vocabulary prevents users interpreting identical policy differently across surfaces. |
+| ~~UX-PERM-04~~ **closed** — [FIXED-512](FIXED_ITEMS.md#fixed-512--one-policy-three-sets-of-words-on-one-screen) | Show plain-language action, consequence and example first; registry key in Details. | Examples explain consequences while stable keys preserve diagnosability. |
+| ~~UX-PERM-05~~ **closed** — [FIXED-695](FIXED_ITEMS.md#fixed-695--permissions-answered-sixty-questions-and-not-the-one-an-owner-asks) | Add read-only summaries such as “Can edit project files after asking” and “Cannot send messages”. | Compute posture from effective policy; manually maintained summaries would drift. |
 
 ## 14.2 CHAT decisions
 
@@ -2394,34 +2425,34 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-SETPOP-01 | Rename the trigger and dialog to “More” or split “More” from direct “Settings”. | A navigation launcher must have navigation language; the gear otherwise promises preferences. |
-| UX-SETPOP-02 | Give global search commands/pages and use the popup for stable navigation only, or merge them deliberately. | Assign navigation and command execution clear responsibilities to avoid duplicate discovery paths. |
-| UX-SETPOP-03 | Render as a full-height sheet with Back, recent pages and clear current-location state. | A mobile sheet supports reachable navigation, focus return and Back behavior. |
-| UX-SETPOP-04 | Group into Work, Review, Connect and Settings; put diagnostics/advanced last. | Use Connect as a subgroup under Manage, consistent with the three primary navigation groups. |
+| ~~UX-SETPOP-01~~ **closed** — [FIXED-528](FIXED_ITEMS.md#fixed-528--a-gear-opened-a-window-that-could-not-take-you-to-settings) | Rename the trigger and dialog to “More” or split “More” from direct “Settings”. | A navigation launcher must have navigation language; the gear otherwise promises preferences. |
+| ~~UX-SETPOP-02~~ **closed** — [FIXED-706](FIXED_ITEMS.md#fixed-706--two-search-boxes-for-one-question) | Give global search commands/pages and use the popup for stable navigation only, or merge them deliberately. | Assign navigation and command execution clear responsibilities to avoid duplicate discovery paths. |
+| ~~UX-SETPOP-03~~ **closed** — [FIXED-707](FIXED_ITEMS.md#fixed-707--more-was-a-desktop-dialog-on-a-phone) | Render as a full-height sheet with Back, recent pages and clear current-location state. | A mobile sheet supports reachable navigation, focus return and Back behavior. |
+| ~~UX-SETPOP-04~~ **closed** — [FIXED-705](FIXED_ITEMS.md#fixed-705--more-grouped-its-rows-by-where-they-used-to-sit) | Group into Work, Review, Connect and Settings; put diagnostics/advanced last. | Use Connect as a subgroup under Manage, consistent with the three primary navigation groups. |
 
 ## 14.7 TASK decisions
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-TASK-01 | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. | Timing and execution style are independent; background execution does not grant unattended authority. |
-| UX-TASK-02 | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. | Persist timezone and missed-run policy because local time and DST otherwise create surprises. |
-| UX-TASK-03 | Keep Project and When visible; group orchestration details separately. | Show scope and timing before commit because both materially change the requested work. |
+| ~~UX-TASK-01~~ **closed** — [FIXED-584](FIXED_ITEMS.md#fixed-584--when-work-runs-and-how-it-runs-were-one-row-of-chips) | Separate “When” from “Run mode”; explain that background is still governed and may pause for the owner. | Timing and execution style are independent; background execution does not grant unattended authority. |
+| ~~UX-TASK-02~~ **closed** — [FIXED-696](FIXED_ITEMS.md#fixed-696--daily-at-0900-moved-an-hour-when-the-clocks-changed) | Use a human schedule builder with timezone and the next three occurrences. Keep cron/raw recurrence in Advanced. | Persist timezone and missed-run policy because local time and DST otherwise create surprises. |
+| ~~UX-TASK-03~~ **closed** — [FIXED-699](FIXED_ITEMS.md#fixed-699--when-work-runs-and-how-it-is-organised-were-one-list-of-fields) | Keep Project and When visible; group orchestration details separately. | Show scope and timing before commit because both materially change the requested work. |
 | ~~UX-TASK-04~~ **closed** — [FIXED-535](FIXED_ITEMS.md#fixed-535--a-tasks-history-of-attempts-pauses-and-retries-had-nowhere-to-be-read) | Open a task detail timeline with current state, next action, output and evidence. | One attempt timeline distinguishes execution success from delivery success. |
-| UX-TASK-05 | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. | Explicit transitions prevent retries from creating duplicate external actions. |
-| UX-TASK-06 | Hide hierarchy unless requested; visualize child progress and define parent settlement. | Progressive disclosure keeps simple work simple while parent settlement remains deterministic. |
+| ~~UX-TASK-05~~ **closed** — [FIXED-700](FIXED_ITEMS.md#fixed-700--twelve-statuses-and-every-surface-deciding-its-own-buttons) | Define Draft → Scheduled/Queued → Running → Waiting → Completed/Failed/Stopped, with retry/idempotency rules. | Explicit transitions prevent retries from creating duplicate external actions. |
+| ~~UX-TASK-06~~ **closed** — [FIXED-701](FIXED_ITEMS.md#fixed-701--delegated-work-was-a-second-tree-to-read-past) | Hide hierarchy unless requested; visualize child progress and define parent settlement. | Progressive disclosure keeps simple work simple while parent settlement remains deterministic. |
 
 ## 14.8 MEM decisions
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-MEM-01 | Keep Edit, Pin and More; move source/scope/expiry/history/archive/delete into a details drawer. | A compact card makes review tractable while retaining deliberate lifecycle controls. |
-| UX-MEM-02 | Publish one lifecycle and use the same verbs in UI, API, audit and documentation. | Use separate lifecycle dimensions from section 13; archive, pin and expiry are not mutually exclusive states. |
-| UX-MEM-03 | Add a retention summary: permanent, expires soon, stale for review, archived and pending deletion. | Explain age using creation, verification, retrieval and expiry separately; old does not imply wrong. |
-| UX-MEM-04 | Translate into reasoned labels with “Why?”; retain raw scores in Advanced. | Explain evidence quality instead of presenting scores as calibrated probabilities. |
-| UX-MEM-05 | Add last recalled, recall count, which answer used it, and a direct turn link. | Extend existing last-used data with context inclusion and provenance; do not claim inclusion proves model use. |
-| UX-MEM-06 | Explain the pipeline: observed → suggested → approved → recalled → reviewed/expired. | Separate suggested observations from approved facts so inference cannot silently become identity. |
-| UX-MEM-07 | Move engine configuration to Advanced or Models; show only health and repair action in Memory. | Engine configuration belongs with operators; personal review should expose health and repair. |
-| UX-MEM-08 | Require a preview with merge/skip choices, source trust classification and reversible batch receipt. | Imports are untrusted batches; previews prevent conflicting facts becoming accepted memory. |
+| ~~UX-MEM-01~~ **closed** — [FIXED-561](FIXED_ITEMS.md#fixed-561--seven-equally-prominent-actions-on-every-memory-card) | Keep Edit, Pin and More; move source/scope/expiry/history/archive/delete into a details drawer. | A compact card makes review tractable while retaining deliberate lifecycle controls. |
+| ~~UX-MEM-02~~ **closed** — [FIXED-687](FIXED_ITEMS.md#fixed-687--archive-had-a-route-and-no-button-and-four-removal-words-meant-four-close-things) | Publish one lifecycle and use the same verbs in UI, API, audit and documentation. | Use separate lifecycle dimensions from section 13; archive, pin and expiry are not mutually exclusive states. |
+| ~~UX-MEM-03~~ **closed** — [FIXED-689](FIXED_ITEMS.md#fixed-689--retention-was-a-date-on-each-card-and-a-policy-nowhere) | Add a retention summary: permanent, expires soon, stale for review, archived and pending deletion. | Explain age using creation, verification, retrieval and expiry separately; old does not imply wrong. |
+| ~~UX-MEM-04~~ **closed** — [FIXED-690](FIXED_ITEMS.md#fixed-690--confidence-and-trust-were-decimals-that-read-as-probabilities) | Translate into reasoned labels with “Why?”; retain raw scores in Advanced. | Explain evidence quality instead of presenting scores as calibrated probabilities. |
+| ~~UX-MEM-05~~ **closed** — [FIXED-691](FIXED_ITEMS.md#fixed-691--a-memory-said-when-it-was-last-included-and-never-where) | Add last recalled, recall count, which answer used it, and a direct turn link. | Extend existing last-used data with context inclusion and provenance; do not claim inclusion proves model use. |
+| ~~UX-MEM-06~~ **closed** — [FIXED-693](FIXED_ITEMS.md#fixed-693--nothing-on-the-memory-page-said-how-a-record-got-there) | Explain the pipeline: observed → suggested → approved → recalled → reviewed/expired. | Separate suggested observations from approved facts so inference cannot silently become identity. |
+| ~~UX-MEM-07~~ **closed** — [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories) | Move engine configuration to Advanced or Models; show only health and repair action in Memory. | Engine configuration belongs with operators; personal review should expose health and repair. |
+| ~~UX-MEM-08~~ **closed** — [FIXED-694](FIXED_ITEMS.md#fixed-694--an-import-was-a-count-not-a-batch-that-could-be-reviewed-or-taken-back) | Require a preview with merge/skip choices, source trust classification and reversible batch receipt. | Imports are untrusted batches; previews prevent conflicting facts becoming accepted memory. |
 
 ## 14.9 MSG decisions
 

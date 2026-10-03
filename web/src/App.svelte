@@ -3,6 +3,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
   import AllPagesDialog from "./lib/components/AllPagesDialog.svelte";
+  import { rememberPage } from "./lib/recentPages";
   import CommandPalette from "./lib/components/CommandPalette.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import {
@@ -69,6 +70,10 @@
   // still holds them all, because routing resolves against that list.
   let allPagesOpen = $state(false);
   let allPagesTrigger = $state<HTMLElement | null>(null);
+  // UX-SETPOP-02 — the places this viewer opened last, for More's Recent group.
+  $effect(() => {
+    rememberPage(current);
+  });
   function openAllPages(trigger: HTMLElement) {
     allPagesTrigger = trigger;
     allPagesOpen = !allPagesOpen;
@@ -161,6 +166,10 @@
     navigationQuery?.addEventListener("change", updateNavigationMode);
     const handler = () => {
       navigationDrawerOpen = false;
+      // UX-SETPOP-03 — More is navigation: any route change, including the
+      // browser's Back, closes it, so the sheet never stands over a page it did
+      // not open.
+      allPagesOpen = false;
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
       currentFilter = routeStateFromHash(window.location.hash).filter;
@@ -301,6 +310,10 @@
         {current}
         returnFocusTo={allPagesTrigger}
         onClose={() => (allPagesOpen = false)}
+        onOpenPalette={() => {
+          paletteTrigger = allPagesTrigger;
+          paletteOpen = true;
+        }}
       />
       <main id="main" class="content" tabindex="-1">
         <!-- The topbar already shows the route title + hint; the page itself

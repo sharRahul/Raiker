@@ -169,9 +169,15 @@ def _settled_outcome(event_type: str, payload: dict[str, Any]) -> str:
         return mapped
     # `task_cycle_landed` — a routine's cycle, whose outcome is the cycle's and
     # not the task's. The payload states it; an unrecognised one is reported as
-    # recorded rather than guessed into a success or a failure.
+    # recorded rather than guessed into a success or a failure. `skipped` is a
+    # slot the host slept through and the routine's missed-run policy declined
+    # to run late (UX-TASK-02): no turn ran, and the history says so.
     stated = payload.get("outcome")
-    return stated if stated in {"completed", "failed", "waiting_for_approval"} else "recorded"
+    return (
+        stated
+        if stated in {"completed", "failed", "waiting_for_approval", "skipped"}
+        else "recorded"
+    )
 
 
 class _Segment:

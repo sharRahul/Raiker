@@ -302,13 +302,20 @@ work; everything you set up once lives behind **More** in the top bar.
 
 | Where | Group | Destinations |
 |---|---|---|
-| Sidebar | Core | Workbench, Chat, Build, Design, Threads, Tasks, Projects, Approvals, Messaging |
+| Sidebar | Work | Home, Chat, Build, Design, Threads, Tasks, Projects |
 | Sidebar | Knowledge | Memory, Knowledge Map |
-| More | — | Settings, directly, as the first row |
-| More | Manage | Permissions, Models, Extensions |
-| More | Observe | Observability |
-| More | Support | Guide |
-| More | Settings | the ten Settings sections, each as a direct link |
+| More | Recent | the last few places you opened, newest first |
+| More | Review | Approvals |
+| More | Connect | Messaging, Models, Extensions |
+| More | Settings | Settings itself, Permissions, and every Settings section as a direct link |
+| More | Diagnostics & help | Observability, Guide |
+
+More is grouped by what you come to do — review something, connect Raiker to
+something, change a setting — with diagnostics and help last. It has no search
+box of its own: **Search pages, settings and commands** at its top opens the
+command palette (`Ctrl K`, `⌘K` on a Mac), which finds every page and every
+Settings section by name. On a phone More is a full-height sheet with **Back**,
+and it says which page you are on.
 
 **More was a gear**, and it opened a window that could not take you to Settings:
 its ten sections were listed, the destination itself was not. A gear promises the
@@ -316,10 +323,10 @@ settings screen everywhere else you have used a computer, so it is named for wha
 it is now, and Settings leads the window.
 
 **Workbench** is the live board: what is running, which agents are standing,
-what is scheduled, and what needs a decision. **Approvals** sits in the sidebar
-rather than behind More because a decision waiting on you is the work, arriving
-many times a day, while Permissions and Models are configured once and
-revisited.
+what is scheduled, and what needs a decision. **Approvals** is a counted button
+in the top bar, visible from every page, because a decision waiting on you is
+the work, arriving many times a day, while Permissions and Models are configured
+once and revisited; More lists it under **Review** too.
 
 **Needs your attention** on that board means exactly that. A run that is running
 is progress and stays on the board below with its Stop control; what reaches the

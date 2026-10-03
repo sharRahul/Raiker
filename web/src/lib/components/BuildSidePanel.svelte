@@ -22,12 +22,14 @@
   import PageState from "./PageState.svelte";
   import { api, ApiError } from "../api";
   import { stopRun } from "../taskLifecycle";
+  import { haltAction, taskActionLabel } from "../taskPhase";
   // BUG-299 — the panel could stop a run and report `outcome_unknown`, and had
   // nowhere to send the owner it told to refresh. This is that address.
   import { taskDetailHref } from "../taskHistory";
   import type { ProjectsList, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
+  import { scheduleZoneName } from "../taskComposer";
   import { isActiveTask, taskBadge } from "../statusMaps";
 
   let {
@@ -108,6 +110,9 @@
         ...(firstRunAt && cadence !== "background"
           ? { scheduled_at: new Date(firstRunAt).toISOString() }
           : {}),
+        // UX-TASK-02 — a routine is read in the zone it was composed in, so a
+        // daily 09:00 stays 09:00 here across a clock change.
+        ...(cadence !== "background" ? { timezone: scheduleZoneName() } : {}),
         ...(agentProjectId ? { project_id: agentProjectId } : projectId ? { project_id: projectId } : {}),
       });
       title = "";
@@ -235,14 +240,17 @@
                     Review approval
                   </a>
                 {/if}
+                {#if haltAction(task)}
+                {@const halt = haltAction(task) ?? "stop"}
                 <button
                   type="button"
                   class="btn btn-ghost btn-sm"
                   onclick={() => stopTask(task)}
                   disabled={busyTask === task.task_id}
                 >
-                  {busyTask === task.task_id ? "Stopping…" : "Stop"}
+                  {busyTask === task.task_id ? (halt === "cancel" ? "Cancelling…" : "Stopping…") : taskActionLabel(halt)}
                 </button>
+                {/if}
               </footer>
             </li>
           {/each}

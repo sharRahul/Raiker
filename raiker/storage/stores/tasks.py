@@ -27,8 +27,8 @@ class TaskStore:
         self._execute(
             """
             INSERT OR IGNORE INTO tasks
-            (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json, schedule_timezone, schedule_anchor, schedule_until, missed_run_policy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task.task_id,
@@ -53,6 +53,10 @@ class TaskStore:
                 task.model,
                 task.surface,
                 json.dumps(task.attachments, sort_keys=True),
+                task.schedule_timezone,
+                task.schedule_anchor,
+                task.schedule_until,
+                task.missed_run_policy,
             ),
         )
 

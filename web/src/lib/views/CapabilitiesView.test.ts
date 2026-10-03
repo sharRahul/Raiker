@@ -50,6 +50,7 @@ const GATES = [
 ];
 
 afterEach(() => {
+  window.localStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -205,7 +206,11 @@ describe("CapabilitiesView", () => {
       expect(registry().getByText("Shell commands")).toBeInTheDocument();
     });
 
-    // Domain headings replace backend phase numbers.
+    // UX-PERM-01 — headings say what a permission is for; the technical
+    // domains that replaced backend phase numbers are the advanced view.
+    expect(registry().getByRole("checkbox", { name: "Select all System and runtimes capabilities" })).toBeInTheDocument();
+    expect(registry().getByRole("checkbox", { name: "Select all Web and research capabilities" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Technical area (advanced)" }));
     expect(registry().getByRole("checkbox", { name: "Select all Execution capabilities" })).toBeInTheDocument();
     expect(registry().getByRole("checkbox", { name: "Select all Network capabilities" })).toBeInTheDocument();
     expect(registry().queryByText(/^Phase \d/)).not.toBeInTheDocument();
@@ -281,7 +286,7 @@ describe("CapabilitiesView", () => {
     await waitFor(() => {
       expect(registry().getByText("Shell commands")).toBeInTheDocument();
     });
-    await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
+    await fireEvent.input(screen.getByLabelText("Search capabilities"), {
       target: { value: "web fetch" },
     });
     expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
@@ -297,7 +302,7 @@ describe("CapabilitiesView", () => {
 
     const fold = screen
       .getAllByRole("button", { expanded: true })
-      .find((b) => b.className.includes("phase-fold"));
+      .find((b) => b.className.includes("phase-fold") && /System and runtimes/.test(b.textContent ?? ""));
     expect(fold).toBeDefined();
     await fireEvent.click(fold!);
 
@@ -318,11 +323,11 @@ describe("CapabilitiesView", () => {
 
     const fold = screen
       .getAllByRole("button", { expanded: true })
-      .find((b) => b.className.includes("phase-fold"));
+      .find((b) => b.className.includes("phase-fold") && /System and runtimes/.test(b.textContent ?? ""));
     await fireEvent.click(fold!);
     expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
 
-    await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
+    await fireEvent.input(screen.getByLabelText("Search capabilities"), {
       target: { value: "shell" },
     });
     expect(registry().getByText("Shell commands")).toBeInTheDocument();
@@ -377,7 +382,7 @@ describe("Permissions — the sections above the registry", () => {
     // Fold the group away, so the shortcut has to undo it to reach the row.
     const fold = screen
       .getAllByRole("button", { expanded: true })
-      .find((b) => b.className.includes("phase-fold"));
+      .find((b) => b.className.includes("phase-fold") && /System and runtimes/.test(b.textContent ?? ""));
     await fireEvent.click(fold!);
     expect(registry().queryByText("Shell commands")).not.toBeInTheDocument();
 
@@ -421,7 +426,7 @@ describe("Permissions — the sections above the registry", () => {
       attention().getByRole("button", { name: /Review Shell commands/i }),
     ).toBeInTheDocument();
 
-    const board = screen.getAllByRole("group", { name: /when Raiker wants to use/i })[0];
+    const board = screen.getAllByRole("group", { name: /when Raiker wants to use Shell commands/i })[0];
     await fireEvent.click(within(board).getByRole("button", { name: "Never" }));
 
     await waitFor(() => expect(common().getByText("On · Never")).toBeInTheDocument());
@@ -521,7 +526,7 @@ describe("Permissions workspace", () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView);
     await registryWhenLoaded();
-    await fireEvent.change(screen.getByRole("combobox", { name: "Permission group" }), { target: { value: "Network" } });
+    await fireEvent.change(screen.getByRole("combobox", { name: "Permission group" }), { target: { value: "Web and research" } });
     expect(registry().queryByRole("button", { name: /Shell commands/i })).not.toBeInTheDocument();
     expect(registry().getByRole("button", { name: /Web fetch/i })).toBeInTheDocument();
     // REM-PERM-01 — the status filter is the posture chips, which are also the
@@ -542,7 +547,7 @@ describe("Permissions workspace", () => {
     render(CapabilitiesView);
     const list = await registryWhenLoaded();
     expect(list.getByRole("checkbox", { name: "Select Web fetch" })).toBeDisabled();
-    expect(list.getByRole("checkbox", { name: "Select all Network capabilities" })).toBeDisabled();
+    expect(list.getByRole("checkbox", { name: "Select all Web and research capabilities" })).toBeDisabled();
     await fireEvent.click(list.getByRole("checkbox", { name: "Select Shell commands" }));
     // The Selected chip appears only once there is a selection to filter to.
     await fireEvent.click(status().getByRole("button", { name: /Selected/ }));

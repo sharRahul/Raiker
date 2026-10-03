@@ -44,6 +44,7 @@ export type IconName =
   | "check"
   | "x"
   | "chevron-down"
+  | "chevron-left"
   | "chevron-right"
   | "chevron-up"
   | "search"
@@ -182,6 +183,8 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M9.5 11.5h5",
   ],
   "chevron-down": ["M6 9.5 12 15.5 18 9.5"],
+  // UX-SETPOP-03 — the More sheet's Back, where a phone's own back control sits.
+  "chevron-left": ["M14.5 6 8.5 12 14.5 18"],
   "chevron-right": ["M9.5 6 15.5 12 9.5 18"],
   // BUG-288 — the ascending half of a sortable column header. The set had
   // down and right and no up, so a sort direction could only be drawn by

@@ -1920,6 +1920,9 @@ async def create_task(
             model=body.model,
             surface=body.surface,
             attachments=body.attachments,
+            timezone=body.timezone,
+            run_until=body.run_until,
+            missed_runs=body.missed_runs,
         )
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc

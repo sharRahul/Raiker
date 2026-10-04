@@ -20,6 +20,8 @@ project-map.md
 docs/superpowers/
 .superpowers
 build/
+# Build view controllers are source, not build output.
+!web/src/lib/views/build/
 *.lock
 !/native/Cargo.lock
 native/target/

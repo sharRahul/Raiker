@@ -123,6 +123,19 @@ describe("utcOffset", () => {
     expect(utcOffset("Europe/London", new Date("2026-07-15T12:00:00Z"))).toBe("UTC+01:00");
   });
 
+  it("reads a zero offset as UTC however the engine spells it", async () => {
+    const { utcOffset } = await import("./environment");
+    const format = Intl.DateTimeFormat.prototype.formatToParts;
+    Intl.DateTimeFormat.prototype.formatToParts = function () {
+      return [{ type: "timeZoneName", value: "GMT+00:00" }] as Intl.DateTimeFormatPart[];
+    };
+    try {
+      expect(utcOffset("Europe/London", new Date("2026-01-15T12:00:00Z"))).toBe("UTC");
+    } finally {
+      Intl.DateTimeFormat.prototype.formatToParts = format;
+    }
+  });
+
   it("says nothing for a zone the browser does not know", async () => {
     const { utcOffset } = await import("./environment");
     expect(utcOffset("Not/A_Zone")).toBe("");

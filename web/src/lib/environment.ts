@@ -142,7 +142,8 @@ export function utcOffset(zone: string, at: Date = new Date()): string {
     if (!part) return "";
     const match = /^GMT(?:([+-\u2212])(\d{1,2})(?::(\d{2}))?)?$/.exec(part);
     if (!match) return "";
-    if (!match[1]) return "UTC";
+    // Engines differ on zero: some say `GMT`, others `GMT+00:00`. Both are UTC.
+    if (!match[1] || (Number(match[2]) === 0 && Number(match[3] ?? 0) === 0)) return "UTC";
     const sign = match[1] === "+" ? "+" : "\u2212";
     return `UTC${sign}${match[2].padStart(2, "0")}:${match[3] ?? "00"}`;
   } catch {

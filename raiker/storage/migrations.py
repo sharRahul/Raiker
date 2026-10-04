@@ -4063,6 +4063,26 @@ IMAGE_RESTORED_FROM_SQL = """
 ALTER TABLE image_generations ADD COLUMN restored_generation_id TEXT;
 """
 
+# DEC-15 step 10 — what the owner accepted of each MCP server's tools, as
+# `{tool name: fingerprint of its declaration}` (`raiker.tools.mcp_review`).
+# Null for every existing row on purpose: a profile written before this keeps
+# offering what it offered, and its stored tools become the accepted set the
+# first time the server is enumerated again.
+MCP_APPROVED_TOOLS_MIGRATION_ID = "RAIKER-2086-mcp-approved-tools"
+
+MCP_APPROVED_TOOLS_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN approved_tools TEXT;
+"""
+
+# DEC-12 step 6 — how many cycles of a routine in a row did not complete. A
+# routine re-arms whatever one cycle did, so without a count it failed every
+# morning for as long as nobody looked; at the limit it is paused instead.
+TASK_FAILED_CYCLES_MIGRATION_ID = "RAIKER-2087-task-failed-cycles"
+
+TASK_FAILED_CYCLES_SQL = """
+ALTER TABLE tasks ADD COLUMN failed_cycles INTEGER NOT NULL DEFAULT 0;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4294,6 +4314,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     ),
     Migration(IMAGE_DELETION_MIGRATION_ID, IMAGE_DELETION_SQL),
     Migration(IMAGE_RESTORED_FROM_MIGRATION_ID, IMAGE_RESTORED_FROM_SQL),
+    Migration(MCP_APPROVED_TOOLS_MIGRATION_ID, MCP_APPROVED_TOOLS_SQL),
+    Migration(TASK_FAILED_CYCLES_MIGRATION_ID, TASK_FAILED_CYCLES_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

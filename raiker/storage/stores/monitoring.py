@@ -12,6 +12,7 @@ turns off.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -20,6 +21,23 @@ from raiker.contracts.ids import new_id, utc_now
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
+
+#: DEC-24 step 1 — how long a background pass may go unrecorded before it reads
+#: as stale. The host tick records every fifteen seconds and the attached-folder
+#: watcher at most every two minutes when it is backing off, so five minutes is
+#: several missed cycles of the slowest, never one slow pass.
+BACKGROUND_PASS_STALE_SECONDS = 300
+
+
+def _older_than(stamp: str, now: datetime, seconds: int) -> bool:
+    """Whether ISO ``stamp`` is more than ``seconds`` before ``now``; unreadable is old."""
+    try:
+        recorded = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if recorded.tzinfo is None:
+        recorded = recorded.replace(tzinfo=UTC)
+    return (now - recorded).total_seconds() > seconds
 
 
 class MonitoringStore:
@@ -478,22 +496,40 @@ class MonitoringStore:
                 (pass_name, now, error_class[:120], now),
             )
 
-    def list_background_worker_health(self: SQLiteStore) -> list[dict[str, Any]]:
-        """Every recorded host-tick pass, worst first."""
+    def list_background_worker_health(
+        self: SQLiteStore, *, now: datetime | None = None
+    ) -> list[dict[str, Any]]:
+        """Every recorded host-tick pass, worst first.
+
+        DEC-24 step 1 — a pass whose last record is older than
+        :data:`BACKGROUND_PASS_STALE_SECONDS` is ``stale``, not ``ok``. Health
+        was read from the failure streak alone, so a tick that stopped running
+        altogether — a host that hung, a worker that died — kept the last
+        thing it said, which was "ok", for ever. Not having heard from a pass
+        is not evidence that it is well.
+        """
         rows = self._rows(
             """SELECT * FROM background_worker_health
             ORDER BY consecutive_failures DESC, pass_name""",
         )
-        return [
-            {
-                "pass_name": str(row["pass_name"]),
-                "last_success_at": row["last_success_at"],
-                "last_failure_at": row["last_failure_at"],
-                "last_error_class": row["last_error_class"],
-                "consecutive_failures": int(row["consecutive_failures"]),
-                "total_failures": int(row["total_failures"]),
-                "healthy": int(row["consecutive_failures"]) == 0,
-                "updated_at": str(row["updated_at"]),
-            }
-            for row in rows
-        ]
+        at = now or datetime.now(UTC)
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            failing = int(row["consecutive_failures"]) > 0
+            stale = _older_than(str(row["updated_at"]), at, BACKGROUND_PASS_STALE_SECONDS)
+            out.append(
+                {
+                    "pass_name": str(row["pass_name"]),
+                    "last_success_at": row["last_success_at"],
+                    "last_failure_at": row["last_failure_at"],
+                    "last_error_class": row["last_error_class"],
+                    "consecutive_failures": int(row["consecutive_failures"]),
+                    "total_failures": int(row["total_failures"]),
+                    "healthy": not failing and not stale,
+                    "state": "failing" if failing else "stale" if stale else "ok",
+                    "updated_at": str(row["updated_at"]),
+                }
+            )
+        # Worst first: failing, then stale, then the rest.
+        rank = {"failing": 0, "stale": 1, "ok": 2}
+        return sorted(out, key=lambda entry: rank[entry["state"]])

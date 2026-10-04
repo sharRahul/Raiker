@@ -382,6 +382,23 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "the request was cancelled before the provider answered.",
     ),
     (
+        # DEC-25 — Raiker stopped reading, so the owner is not told to retry a
+        # network that worked; the provider sent more than any answer is.
+        "provider_response_too_large",
+        "the provider sent back far more than any answer should be, so Raiker stopped "
+        "reading it. Check the endpoint on Models; it may not be the server you meant.",
+    ),
+    (
+        "provider_stream_too_large",
+        "the provider kept sending past the size any answer should be, so Raiker stopped "
+        "reading it. Check the endpoint on Models; it may not be the server you meant.",
+    ),
+    (
+        "provider_stream_line_too_large",
+        "the provider sent a stream Raiker could not read as events, so it stopped reading. "
+        "Check the endpoint on Models; it may not be the server you meant.",
+    ),
+    (
         "provider_stream_failed",
         "the connection to the provider ended before the answer did. Try again.",
     ),

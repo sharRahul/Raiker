@@ -91,6 +91,22 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-05. Ten decision-record steps closed.**
+> DEC-25 now bounds what a provider sends back — an answer by its decoded bytes
+> ([FIXED-750](FIXED_ITEMS.md#fixed-750--a-providers-answer-was-held-in-memory-in-full-before-anything-measured-it)) and a stream by its line and its total ([FIXED-751](FIXED_ITEMS.md#fixed-751--a-streamed-answers-line-could-grow-for-as-long-as-the-provider-kept-sending)) — and a sender that
+> stops part-way through a body is answered 408 ([FIXED-752](FIXED_ITEMS.md#fixed-752--a-sender-that-stopped-part-way-through-a-body-held-its-request-open)); only decompression of
+> *incoming* bodies remains, and no route decompresses one. DEC-15 step 10 holds
+> any MCP tool a server adds ([FIXED-753](FIXED_ITEMS.md#fixed-753--an-mcp-server-could-grow-new-tools-and-the-model-was-offered-them-on-the-next-turn)) or rewords ([FIXED-754](FIXED_ITEMS.md#fixed-754--an-mcp-tool-could-keep-its-name-and-change-what-it-told-the-model)) after the owner
+> accepted it, until the owner accepts it as it now reads. DEC-09 step 5 asks
+> before an unsaved Settings edit is left behind ([FIXED-755](FIXED_ITEMS.md#fixed-755--leaving-settings-dropped-an-edit-that-was-never-saved-and-said-nothing)); DEC-21's General
+> preview states the UTC offset ([FIXED-756](FIXED_ITEMS.md#fixed-756--the-time-zone-was-a-name-and-a-short-name-is-ambiguous)) and its Web access check says why and
+> which rule on which list ([FIXED-759](FIXED_ITEMS.md#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private)); DEC-12 step 6 pauses a routine after three
+> failed cycles in a row and tells the owner ([FIXED-757](FIXED_ITEMS.md#fixed-757--a-routine-that-failed-every-cycle-failed-every-morning-for-as-long-as-nobody-looked)); and DEC-24 step 1 stops
+> calling a background pass that has gone quiet *ok* ([FIXED-758](FIXED_ITEMS.md#fixed-758--a-background-pass-that-stopped-running-kept-saying-ok)). The live round
+> that proved them found two defects, fixed as FIXED-760 and FIXED-761, and
+> filed BUG-320 and BUG-321. RR-AUTHORITY-01, RR-INSTALL-01, RR-DESIGN-01 and
+> RR-VERIFY-01 and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-04. Every row of §3 is closed.** The three
 > large-view refactors closed as [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it), [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) and [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger):
 > each page's state machines now have one owner apiece, with behaviour
@@ -1645,6 +1661,10 @@ tools/vision and fallback. Test draft preservation through every setup path.
 
 ## DEC-09 — Clarify the Settings popup and Settings structure
 
+> **2026-10-05.** Step 5's warning before navigating away with unsaved changes
+> closed as [FIXED-755](FIXED_ITEMS.md#fixed-755--leaving-settings-dropped-an-edit-that-was-never-saved-and-said-nothing): a route away from Settings asks, a section change does not,
+> and a reload gets the browser's own prompt.
+
 **Decision:** Rename the mixed page launcher to **More** and reserve Settings for
 configuration. Group routes as Work, Review, Connect and Settings. On mobile,
 render navigation as a full-height sheet.
@@ -1735,6 +1755,11 @@ supervisor mismatch, egress denial, cost exhaustion, cancellation, restart and
 cleanup tests for every supported runtime type.
 
 ## DEC-12 — Define Tasks as a durable scheduler and run history
+
+> **2026-10-05.** Step 6's "visible incident after exhaustion" closed for
+> routines as [FIXED-757](FIXED_ITEMS.md#fixed-757--a-routine-that-failed-every-cycle-failed-every-morning-for-as-long-as-nobody-looked): three failed cycles in a row pause the routine with its
+> reason and notify the owner; Continue runs it once and re-arms it. No failed
+> run is retried on its own. Per-run tool and cost limits remain.
 
 **Decision:** Separate timing from execution style, use a human schedule builder
 and make each task open a durable occurrence/run timeline.
@@ -1853,6 +1878,13 @@ DM/group/thread routing, media limits, approval buttons, edit/delete, bot loop,
 delivery retry/dead letter, pause and secret-redaction tests.
 
 ## DEC-15 — Put every MCP server behind explicit trust and isolation
+
+> **2026-10-05.** Step 10's "updates show a permission diff and require review
+> when authority grows" holds for MCP servers: a tool a server adds or rewords
+> after the owner accepted it is held — not projected, refused if called — and
+> listed as *New* or *Changed* with the server's own sentence until the owner
+> accepts it ([FIXED-753](FIXED_ITEMS.md#fixed-753--an-mcp-server-could-grow-new-tools-and-the-model-was-offered-them-on-the-next-turn), [FIXED-754](FIXED_ITEMS.md#fixed-754--an-mcp-tool-could-keep-its-name-and-change-what-it-told-the-model)). Catalogue and plugin digests (the rest of step 10)
+> remain.
 
 **Decision:** All MCP transports use the common runtime services. Provide a
 catalogue/plugin/manual Add server journey with a permission and trust preview.
@@ -2253,6 +2285,12 @@ symbols and tests rather than relying on line numbers that drift after edits.
 
 ## 13.3 DEC-21 — Complete the smaller Settings-page contracts
 
+> **2026-10-05.** General's preview now states the UTC offset ([FIXED-756](FIXED_ITEMS.md#fixed-756--the-time-zone-was-a-name-and-a-short-name-is-ambiguous)), and Web
+> access's check says why in words, names the rule and which of the three lists
+> holds it, and no longer calls a name that does not resolve "private" ([FIXED-759](FIXED_ITEMS.md#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private)).
+> The owner decisions this section names (quiet-hour overrides, OAuth
+> providers) are still to be made.
+
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
 the recommendations previously summarized only in the Settings table.
@@ -2367,6 +2405,10 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 
 ## 13.6 DEC-24 — Operational recovery, budgets and diagnostics
 
+> **2026-10-05.** Step 1's "do not label missing observations Healthy" closed
+> for the host's background passes as [FIXED-758](FIXED_ITEMS.md#fixed-758--a-background-pass-that-stopped-running-kept-saying-ok): a pass that has recorded nothing
+> for five minutes reads **not running**.
+
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.
 
@@ -2412,6 +2454,13 @@ owner-approved hardware profile before being called release SLOs.
 > (FIXED-599). Decompression, multipart floods, slow senders and outgoing
 > provider/channel responses are still to be bounded through the shared egress
 > service.
+>
+> **2026-10-05.** The outgoing-provider half and the slow sender closed:
+> [FIXED-750](FIXED_ITEMS.md#fixed-750--a-providers-answer-was-held-in-memory-in-full-before-anything-measured-it), [FIXED-751](FIXED_ITEMS.md#fixed-751--a-streamed-answers-line-could-grow-for-as-long-as-the-provider-kept-sending) and [FIXED-752](FIXED_ITEMS.md#fixed-752--a-sender-that-stopped-part-way-through-a-body-held-its-request-open). Provider answers, refusals and SSE lines are read by
+> decoded bytes and refused past their bound; a body that stops arriving is
+> answered 408 `request_body_too_slow`. Channel and MCP-HTTP responses were
+> already bounded by `post_json_rpc` and the sandbox's readers. Decompression
+> of incoming bodies and multipart parts have no route that performs them today.
 
 **Decision:** Carry forward the previous audit's actual-byte body-limit gap
 explicitly. The declared-Content-Length middleware in

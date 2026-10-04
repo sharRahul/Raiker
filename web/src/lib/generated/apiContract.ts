@@ -158,6 +158,10 @@ export type ApprovalView = {
   queue_total: number;
 };
 
+export type ApproveMcpToolsRequest = {
+  tools: string[];
+};
+
 /** A folder of the owner's to put behind a project, and whether Raiker may write to it. */
 export type AttachProjectFolderRequest = {
   path: string;
@@ -245,6 +249,7 @@ export type BackgroundWorkerHealth = {
   consecutive_failures: number;
   total_failures: number;
   healthy: boolean;
+  state: "ok" | "failing" | "stale";
   updated_at: string;
 };
 
@@ -254,6 +259,9 @@ export type BlocklistProbe = {
   allowed: boolean;
   reason: string;
   addresses: string[];
+  explanation: string;
+  rule: string | null;
+  rule_source: "built_in" | "environment" | "yours" | null;
 };
 
 export type BlocklistRuleAdded = {
@@ -2564,6 +2572,7 @@ export type McpServerConnected = {
   server_id: string;
   status: string;
   tools: string[];
+  pending: string[];
 };
 
 export type McpServerCreated = {
@@ -2613,6 +2622,7 @@ export type McpServerView = {
   source_plugin: string | null;
   purpose: string | null;
   purpose_from: "plugin" | "server" | "none";
+  pending_tools: PendingTool[];
 };
 
 /** Owner-scoped, redacted monitor row for one MCP connection session. */
@@ -2640,6 +2650,14 @@ export type McpToolDeclaration = {
   schema_reason: string;
   arguments: string[];
   required: string[];
+};
+
+/** DEC-15 step 10 — tools accepted for a server, and what it still holds. */
+export type McpToolsApproved = {
+  ok: boolean;
+  server_id: string;
+  approved: string[];
+  pending: string[];
 };
 
 export type MemoryArchived = {
@@ -3387,6 +3405,13 @@ export type PathAttachment = {
 
 export type PauseHostRequest = {
   reason?: string | null;
+};
+
+/** One tool a server offers that the owner has not accepted as it is now. */
+export type PendingTool = {
+  name: string;
+  change: "new" | "changed";
+  description: string;
 };
 
 /** BUG-308 — where this plugin's own code would run on this machine. */
@@ -5229,6 +5254,8 @@ export const contract = {
     call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
+  approveMcpTools: (serverId: string, body: ApproveMcpToolsRequest) =>
+    call<McpToolsApproved>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/tools/approve`, { body }),
   listMemories: (query: { scope?: string; include_inactive?: boolean } = {}) =>
     request<MemoryControlView[]>(withQuery("/api/memory", query)),
   rebuildConversationIndex: () =>

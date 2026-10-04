@@ -123,6 +123,8 @@ names.
 | [BUG-317](#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build) | Low | Build / notifications | Open — on Build the *Approval needed* toast sits over the right end of the same decision's card |
 | [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
 | [BUG-319](#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page) | Low | Models / maintainability | Open — UX-MODEL-01 split the tabs and dialogs out; the Add tab's connection lifecycle and sign-in dialog are still the page's own state |
+| [BUG-320](#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat) | Low | Notifications / layout | Open — found by the 2026-10-05 live round; the dock covers Chat's newest prompt |
+| [BUG-321](#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones) | Low | Settings → General | Open — found by the 2026-10-05 live round; Chromium lists Asia/Calcutta, not Asia/Kolkata |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2346,3 +2348,37 @@ lines with the provider sections they drive.
 disconnect, workspace refusal) shared by Models and first-run setup, which
 today implements the same lifecycle a second time in `ProviderMatrix.svelte`.
 Behaviour unchanged; the two surfaces' tests are the characterization suite.
+
+## BUG-320 — A notification toast covers the newest prompt in Chat
+
+**Severity: Low. Area: Notifications / layout. Status: Open — found by the
+2026-10-05 live round.**
+
+**Observed.** The notification dock opens over the top-right of the page and
+stays until dismissed. In Chat it sat over the owner's own prompt bubble — the
+newest message, right-aligned under the context bar — for the whole of a turn
+([capture 11](../screenshots/2026-10-05-readiness-decisions-round/11-chat-real-answer-through-bounded-stream.png)).
+[BUG-309](#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header)
+and [BUG-317](#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build)
+are the same dock over Approvals' header and Build's decision; this is the
+general case on a work surface.
+
+**Proposed fix.** On work surfaces, dock notices below the context bar in the
+transcript's gutter (or collapse them to the bell after a few seconds) so they
+never cover the conversation; keep the current dock elsewhere. Measure the
+overlap in the round's 390 and 1440 sweeps.
+
+## BUG-321 — The time-zone list offers the browser's own zone ids, not the current ones
+
+**Severity: Low. Area: Settings → General. Status: Open — found by the
+2026-10-05 live round.**
+
+**Observed.** The list comes from `Intl.supportedValuesOf("timeZone")`. Chromium
+answers with ICU's canonical ids, some of which are the old names — `Asia/Calcutta`
+rather than `Asia/Kolkata`, `Europe/Kiev` rather than `Europe/Kyiv` — so an owner
+searching for the name they know does not find it. Both spellings work on the
+server (zoneinfo carries the links), so nothing is wrong once chosen.
+
+**Proposed fix.** Map the handful of renamed ICU ids to their current IANA names
+for display and storage (keeping the old value readable), and test the list
+against a fixture of both spellings.

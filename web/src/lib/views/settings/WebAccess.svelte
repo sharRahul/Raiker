@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
   import PageState from "../../components/PageState.svelte";
+  import type { WebBlocklistProbe as BlocklistProbe } from "../../apiTypes";
 
   type StoredRule = {
     rule_id: string;
@@ -27,7 +28,15 @@
   let busy = $state(false);
 
   let probe = $state("");
-  let probeResult = $state<{ host: string; allowed: boolean; reason: string; addresses: string[] } | null>(null);
+  let probeResult = $state<BlocklistProbe | null>(null);
+
+  // DEC-21 — which of the three sources a matching rule is in, so the owner
+  // knows whether removing it is theirs to do here.
+  const RULE_SOURCE: Record<string, string> = {
+    built_in: "built into Raiker",
+    environment: "set by RAIKER_WEB_EGRESS_BLACKLIST",
+    yours: "on your list below",
+  };
   let probing = $state(false);
 
   const KIND_LABEL: Record<string, string> = {
@@ -218,14 +227,29 @@
         <button class="btn" type="submit" disabled={probing || !probe.trim()}>Check</button>
       </form>
       {#if probeResult}
-        <p class="probe" class:blocked={!probeResult.allowed} role="status">
-          <strong>{probeResult.host}</strong>
-          {probeResult.allowed ? "is reachable" : "is refused"}
-          {#if !probeResult.allowed}<span class="reason">({probeResult.reason})</span>{/if}
-          {#if probeResult.addresses.length}
-            <span class="addresses">→ {probeResult.addresses.join(", ")}</span>
+        <div class="probe" class:blocked={!probeResult.allowed} role="status">
+          <p>
+            <strong>{probeResult.host}</strong>
+            {probeResult.allowed ? "is reachable" : "is refused"}
+            {#if probeResult.addresses.length}
+              <span class="addresses">→ {probeResult.addresses.join(", ")}</span>
+            {/if}
+          </p>
+          <!-- DEC-21 — the reason in words and the rule that said it, never
+               only a reason code. -->
+          {#if !probeResult.allowed}
+            {#if probeResult.rule}
+              <p class="why">
+                Matched <code>{probeResult.rule}</code>, {RULE_SOURCE[probeResult.rule_source ?? ""] ??
+                  "a rule in force"}.
+              </p>
+            {:else if probeResult.explanation}
+              <!-- A matched rule is the whole reason; the general sentence is
+                   for a refusal no rule on this page made. -->
+              <p class="why">{probeResult.explanation}</p>
+            {/if}
           {/if}
-        </p>
+        </div>
       {/if}
     </div>
 
@@ -304,9 +328,11 @@
   .rules li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
     padding: var(--row-y) var(--row-x); border: 1px solid var(--border); border-radius: var(--r-sm); }
   .kind, .note-text { color: var(--text-2); font-size: var(--text-xs); margin-left: var(--space-3); }
-  .probe { margin: var(--space-3) 0 0; font-size: var(--text-sm); }
-  .probe.blocked { color: var(--danger); }
-  .reason, .addresses { color: var(--text-2); font-family: var(--font-mono); font-size: var(--text-xs); }
+  .probe { margin: var(--space-3) 0 0; font-size: var(--text-sm); display: grid; gap: var(--space-1); }
+  .probe p { margin: 0; }
+  .probe.blocked > p:first-child { color: var(--danger); }
+  .probe .why { color: var(--text-2); }
+  .addresses { color: var(--text-2); font-family: var(--font-mono); font-size: var(--text-xs); }
   .source { color: var(--text-3); font-size: var(--text-xs); margin: var(--space-3) 0 0; text-transform: uppercase; letter-spacing: 0.04em; }
   .fixed li { color: var(--text-2); font-size: var(--text-sm); }
   @media (max-width: 40rem) { .add-row { grid-template-columns: 1fr; } }

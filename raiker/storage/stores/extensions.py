@@ -12,7 +12,7 @@ turns off.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -25,9 +25,19 @@ from raiker.contracts.models import (
     PluginInstallRecord,
     SkillCandidate,
 )
+from raiker.tools.mcp_review import decode_approved, fingerprints, settle_approved
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
+
+
+def _json_list(raw: Any) -> list[Any]:
+    """A stored JSON array column, or an empty list for anything else."""
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else []
+    except (TypeError, ValueError):
+        return []
+    return value if isinstance(value, list) else []
 
 
 class ExtensionStore:
@@ -133,6 +143,27 @@ class ExtensionStore:
         tool_list = list(tools) if tools is not None else None
         declarations = list(tool_schemas) if tool_schemas is not None else None
         with self.connect() as connection:
+            approved_json: str | None = None
+            if tool_list is not None:
+                # DEC-15 step 10 — an enumeration never widens what the owner
+                # accepted; it only fills in the record the first time
+                # (`raiker.tools.mcp_review.settle_approved`).
+                previous = connection.execute(
+                    "SELECT tools, tool_schemas, approved_tools FROM mcp_servers "
+                    "WHERE server_id = ? AND principal_id = ?",
+                    (server_id, principal_id),
+                ).fetchone()
+                if previous is not None:
+                    approved_json = json.dumps(
+                        settle_approved(
+                            decode_approved(previous["approved_tools"]),
+                            previous_tools=_json_list(previous["tools"]),
+                            previous_schemas=_json_list(previous["tool_schemas"]),
+                            tools=tool_list,
+                            tool_schemas=declarations,
+                        ),
+                        sort_keys=True,
+                    )
             cursor = connection.execute(
                 """UPDATE mcp_servers
                    SET status = ?,
@@ -141,7 +172,8 @@ class ExtensionStore:
                        tool_count = COALESCE(?, tool_count),
                        tool_schemas = COALESCE(?, tool_schemas),
                        server_features = COALESCE(?, server_features),
-                       protocol_version = COALESCE(?, protocol_version)
+                       protocol_version = COALESCE(?, protocol_version),
+                       approved_tools = COALESCE(?, approved_tools)
                    WHERE server_id = ? AND principal_id = ?""",
                 (
                     status,
@@ -151,11 +183,43 @@ class ExtensionStore:
                     json.dumps(declarations) if declarations is not None else None,
                     json.dumps(list(server_features)) if server_features is not None else None,
                     protocol_version,
+                    approved_json,
                     server_id,
                     principal_id,
                 ),
             )
             return cursor.rowcount > 0
+
+    def approve_mcp_tools(
+        self: SQLiteStore, server_id: str, principal_id: str, names: Sequence[str]
+    ) -> list[str] | None:
+        """Accept ``names`` as this server declares them now (DEC-15 step 10).
+
+        Owner-scoped. Returns the names that were held and are now accepted —
+        a name the server does not offer, or one already accepted as it is, is
+        not in the answer — or ``None`` when the profile is not the caller's.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT tools, tool_schemas, approved_tools FROM mcp_servers "
+                "WHERE server_id = ? AND principal_id = ?",
+                (server_id, principal_id),
+            ).fetchone()
+            if row is None:
+                return None
+            current = fingerprints(_json_list(row["tools"]), _json_list(row["tool_schemas"]))
+            approved = decode_approved(row["approved_tools"])
+            record = dict(current if approved is None else approved)
+            accepted = sorted(
+                name for name in set(names) if name in current and record.get(name) != current[name]
+            )
+            for name in accepted:
+                record[name] = current[name]
+            connection.execute(
+                "UPDATE mcp_servers SET approved_tools = ? WHERE server_id = ? AND principal_id = ?",
+                (json.dumps(record, sort_keys=True), server_id, principal_id),
+            )
+            return accepted
 
     def rename_mcp_server(self: SQLiteStore, server_id: str, principal_id: str, name: str) -> bool:
         """Owner-scoped rename of one MCP server profile. Returns False if the

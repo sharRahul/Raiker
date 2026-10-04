@@ -771,6 +771,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-747](#fixed-747--every-use-button-in-the-model-picker-had-the-same-name) | Low | Models / accessibility | Fixed 2026-10-04 — found by the live round |
 | [FIXED-748](#fixed-748--the-terminal-client-could-not-list-ollamas-models-until-one-was-chosen) | Low | Terminal client | Fixed 2026-10-04 — found by the work |
 | [FIXED-749](#fixed-749--a-turn-with-no-model-chosen-was-reported-as-a-provider-that-failed) | Low | Turn errors | Fixed 2026-10-04 — found by the work |
+| [FIXED-750](#fixed-750--a-providers-answer-was-held-in-memory-in-full-before-anything-measured-it) | Medium | Models / resource bounds | Fixed 2026-10-05 |
+| [FIXED-751](#fixed-751--a-streamed-answers-line-could-grow-for-as-long-as-the-provider-kept-sending) | Medium | Models / resource bounds | Fixed 2026-10-05 |
+| [FIXED-752](#fixed-752--a-sender-that-stopped-part-way-through-a-body-held-its-request-open) | Medium | API ingress | Fixed 2026-10-05 |
+| [FIXED-753](#fixed-753--an-mcp-server-could-grow-new-tools-and-the-model-was-offered-them-on-the-next-turn) | High | MCP / authority | Fixed 2026-10-05 |
+| [FIXED-754](#fixed-754--an-mcp-tool-could-keep-its-name-and-change-what-it-told-the-model) | High | MCP / authority | Fixed 2026-10-05 |
+| [FIXED-755](#fixed-755--leaving-settings-dropped-an-edit-that-was-never-saved-and-said-nothing) | Medium | Settings | Fixed 2026-10-05 |
+| [FIXED-756](#fixed-756--the-time-zone-was-a-name-and-a-short-name-is-ambiguous) | Low | Settings → General | Fixed 2026-10-05 |
+| [FIXED-757](#fixed-757--a-routine-that-failed-every-cycle-failed-every-morning-for-as-long-as-nobody-looked) | Medium | Tasks | Fixed 2026-10-05 |
+| [FIXED-758](#fixed-758--a-background-pass-that-stopped-running-kept-saying-ok) | Medium | Observability | Fixed 2026-10-05 |
+| [FIXED-759](#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private) | Low | Settings → Web access | Fixed 2026-10-05 |
+| [FIXED-760](#fixed-760--a-paused-routine-printed-the-slot-it-last-ran-as-its-next-run) | Low | Tasks | Fixed 2026-10-05 — found by the live round |
+| [FIXED-761](#fixed-761--the-live-chat-check-matched-the-owners-own-prompt) | Low | Live harness | Fixed 2026-10-05 — found by the live round |
 
 ---
 
@@ -30051,3 +30063,278 @@ for this provider; choose one on Models — for Ollama, one of the models it is
 serving.
 
 **Evidence.** `test_terminal_client_smoke.py`.
+
+---
+
+## FIXED-750 — A provider's answer was held in memory in full before anything measured it
+
+**Severity: Medium. Area: Models / resource bounds. Status: Fixed 2026-10-05.
+The outgoing-provider half of DEC-25 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#137-dec-25--enforce-streamed-request-bounds-at-ingress).**
+
+**Observed.** Every hosted adapter read its answer through `ProviderHttpTransport.request`,
+which called `client.request(...)` and so held the whole body before anything
+looked at it; a refusal's body was read the same way, and a streamed refusal
+with `aread()` under a comment saying it was bounded. llama.cpp's adapter read
+`response.read()` to the end. A provider is a destination the owner chose, not
+one Raiker trusts with its memory: a private server, a misbehaving proxy or a
+gzip body that inflates a thousandfold could hand the host as much as it liked.
+
+**Fixed.** The transport sends with `stream=True` and reads by *decoded* bytes —
+an answer is refused past 32 MB with `provider_response_too_large`, and a
+refusal is read to its first 64 kB, which is all classification needs (quota,
+workspace and auth are all said at the start). The answer handed back is
+already read and carries no encoding header, so nothing inflates it twice.
+llama.cpp reads one byte past the same bound. The new code has its own
+sentence in the turn's answer.
+
+**Evidence.** `tests/test_provider_http_transport.py` — an answer past the
+bound refused, a gzip bomb refused by what it inflates to, a bounded gzip
+answer decoded once, a refusal classified from its first 64 bytes, and the
+sentence; the provider contract and runtime suites unchanged. Live: a real
+Anthropic Chat turn answered through it (capture 11).
+
+---
+
+## FIXED-751 — A streamed answer's line could grow for as long as the provider kept sending
+
+**Severity: Medium. Area: Models / resource bounds. Status: Fixed 2026-10-05.
+DEC-25, with FIXED-750.**
+
+**Observed.** Both adapters read SSE with `httpx`'s `aiter_lines`, which buffers
+until it sees a line break. A server that never sends one grew that buffer
+without limit, and nothing bounded a stream's total either.
+
+**Fixed.** `bounded_lines` splits on the same three breaks — CRLF, CR, LF, and
+not on U+2028, which JSON carries unescaped and `str.splitlines` would have cut
+an event at — and stops with `provider_stream_line_too_large` past 4 MB of
+pending line or `provider_stream_too_large` past 128 MB of stream, before the
+excess is held. Both adapters read through it; a source check keeps
+`aiter_lines` out of them.
+
+**Evidence.** `tests/test_provider_http_transport.py` — the three breaks and
+U+2028, a line that never ends, a stream past its total, and the source check.
+Live capture 11.
+
+---
+
+## FIXED-752 — A sender that stopped part-way through a body held its request open
+
+**Severity: Medium. Area: API ingress. Status: Fixed 2026-10-05. DEC-25's
+slow-sender case.**
+
+**Observed.** FIXED-599 made the body cap count bytes, which a sender that
+dribbles one byte every few seconds never crosses. It held a connection and a
+route's buffer for as long as it liked.
+
+**Fixed.** `MaxBodySizeMiddleware` gives the body a deadline: each part within
+30 seconds of the last, and the whole within 30 seconds plus the route's own cap
+at 64 kB/s — 45 seconds for an ordinary 1 MB route, several minutes for an
+attachment on a slow link. Past either, the route is told the client has gone
+and the sender is answered **408** `request_body_too_slow`. The deadline ends
+with the body, so a streamed answer listening for a disconnect is not timed.
+
+**Evidence.** `tests/test_ingress_body_deadline.py` (5) — a body in time, a
+sender that stops, a dribbler inside every gap but outside the budget, a
+post-body wait left alone, and 413 unchanged; `test_api_rest_hardening.py`
+unchanged. Live: a raw socket that sent five bytes of a 64-byte body was
+answered `HTTP/1.1 408` with `request_body_too_slow` after 30 seconds.
+
+---
+
+## FIXED-753 — An MCP server could grow new tools and the model was offered them on the next turn
+
+**Severity: High. Area: MCP / authority. Status: Fixed 2026-10-05. Closes DEC-15
+step 10 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-15--put-every-mcp-server-behind-explicit-trust-and-isolation)
+for MCP servers, with CAP-12's "an update cannot silently add grants".**
+
+**Observed.** Every test and every enumerating session replaced a server's
+stored tool list with whatever the server said that time. A server the owner
+had accepted with two harmless tools could come back offering
+`delete_repository`, and the next turn's tool catalogue carried it with nobody
+having seen it.
+
+**Fixed.** What the owner accepted is stored per tool as a fingerprint of its
+declaration (`mcp_servers.approved_tools`, migration RAIKER-2086;
+`raiker/tools/mcp_review.py`). A tool is projected only when its current
+declaration matches; a tool that appears later is **held** as *New*. The first
+enumeration of a profile is the owner's own Test and is accepted, and a profile
+from before this keeps offering what it offered — its stored tools become the
+accepted set the first time it is enumerated again. A held tool is refused by
+the projected-tool service *and* by the executor (`mcp_tool_pending_review`), so
+no entry path reaches it. The owner accepts by name on the server's card —
+`POST /api/mcp/servers/{id}/tools/approve`, human-only, owner-scoped, audited as
+`mcp_tools_approved` with names and never descriptions — and is told once, by a
+notice, when a reconnect holds something new. Test's notice counts what it held.
+
+**Evidence.** `tests/test_mcp_tool_review.py` (14) — first look and legacy rows
+accepted, a new tool held and not projected, refusal by the service and by the
+executor, acceptance as declared now, a tool leaving and returning unchanged,
+owner scoping, one notice and not two, and the route with its audit event;
+`McpView.test.ts` (4 new); the contract suite verifies the route. Live captures
+08–10: a generated server edited to add `purge_notes`, Test reporting **3 tools ·
+2 held**, one accepted and one still held, and the block at 390 wide with no
+overflow.
+
+---
+
+## FIXED-754 — An MCP tool could keep its name and change what it told the model
+
+**Severity: High. Area: MCP / authority. Status: Fixed 2026-10-05. DEC-15 step
+10, with FIXED-753.**
+
+**Observed.** The tool list was compared — where it was compared at all — by
+name. A server could keep `search` and change its description to an
+instruction, or add an argument that sends data somewhere, and the model read
+the new promise as the old tool's.
+
+**Fixed.** The fingerprint covers name, title, description and input schema, so
+a changed declaration is held as *Changed* under the same name until the owner
+accepts it as it now reads; accepting it once does not accept a later change.
+The card's purpose line — the server's own sentence about a tool — is taken only
+from an accepted tool, so a held tool never speaks for the server (found by the
+live round, capture 08).
+
+**Evidence.** `tests/test_mcp_tool_review.py` — a changed description held, a
+new argument is a change, re-held after a later change, and the purpose line;
+`test_mcp_scope_preview.py` updated to a realistic row. Live captures 08 and 09:
+`echo` held as **Changed** with the server's new sentence beside it.
+
+---
+
+## FIXED-755 — Leaving Settings dropped an edit that was never saved, and said nothing
+
+**Severity: Medium. Area: Settings. Status: Fixed 2026-10-05. Closes DEC-09 step 5
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-09--clarify-the-settings-popup-and-settings-structure).**
+
+**Observed.** Settings marked an edited section with a dot and offered Save and
+Discard, and a click on any page in the rail unmounted it and took the edit
+with it. A reload or a closed tab did the same.
+
+**Fixed.** `web/src/lib/leaveGuard.ts`: a page may register a question the shell
+asks before any route change; when the owner says stay, the shell puts the
+address back without a second `hashchange` and does not change pages. Settings
+asks only when an edit is unsaved *and* the route leaves Settings — moving
+between its own sections keeps the draft and asks nothing — and holds the
+browser's own prompt for a reload while an edit is unsaved.
+
+**Evidence.** `leaveGuard.test.ts` (2); `SettingsView.test.ts` (4 new) — asks
+and stays, not after Discard, the reload prompt, and no guard once the page is
+gone. Live captures 04–05: a time-zone change left unsaved, a route away
+refused by the owner, the page and the edit still there, a section change that
+asked nothing, and the route allowed when the owner agreed.
+
+---
+
+## FIXED-756 — The time zone was a name, and a short name is ambiguous
+
+**Severity: Low. Area: Settings → General. Status: Fixed 2026-10-05. DEC-21
+(General): "show a preview with local time and UTC offset".**
+
+**Observed.** General showed the zone in force and the local time with a short
+zone name — *BST*, *IST*, *GMT-4* — which several zones share. The number a
+schedule is computed from was nowhere.
+
+**Fixed.** `utcOffset()` reads the zone's offset for an instant — `UTC+05:30`,
+`UTC−04:00`, `UTC` — and the line under the control says it, that it moves at a
+clock change, and that tasks already scheduled keep the zone they were composed
+in (UX-TASK-02 stores it per task).
+
+**Evidence.** `environment.test.ts` (3 new) — a half-hour and a negative zone, a
+clock change followed, an unknown zone silent. Live capture 04:
+`America/New_York` reading **UTC−04:00**.
+
+---
+
+## FIXED-757 — A routine that failed every cycle failed every morning for as long as nobody looked
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-10-05. Closes DEC-12 step 6
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-12--define-tasks-as-a-durable-scheduler-and-run-history).**
+
+**Observed.** A routine re-arms whatever one cycle did. One whose provider key
+had expired, or whose model had gone, ran and failed on every slot, and the
+only sign was a summary line overwritten by the next failure.
+
+**Fixed.** `tasks.failed_cycles` (migration RAIKER-2087) counts cycles in a row
+that did not complete; one that completes starts it again. At three the routine
+is **paused**, not failed and not retried — an uncertain external effect is
+never replayed on its own (§13.2 item 7) — with its last reason, a `task_paused`
+event and one notice to the owner. **Continue now** runs it once, with the count
+reset, and its schedule carries on.
+
+**Evidence.** `tests/test_routine_failure_limit.py` (6) — below the limit armed,
+a completed cycle resets, paused with reason and notice and not claimed again,
+Continue once, and another owner refused. Live captures 01–03: a real daily
+routine on a workspace with no model chosen, three host ticks, the card and the
+notification, and Continue.
+
+---
+
+## FIXED-758 — A background pass that stopped running kept saying "ok"
+
+**Severity: Medium. Area: Observability. Status: Fixed 2026-10-05. Closes DEC-24
+step 1's "do not label missing observations Healthy".**
+
+**Observed.** A pass's health was its failure streak alone. A tick that stopped
+running altogether — a hung host, a worker that died — kept the last thing it
+said, which was *ok*, for ever.
+
+**Fixed.** A pass with nothing recorded for five minutes — several cycles of the
+slowest pass — is `stale`, reported after failing ones and before the rest, and
+Diagnostics says **not running · nothing recorded since …** for it.
+
+**Evidence.** `test_task_scheduler.py::test_a_background_pass_that_stopped_reporting_is_stale_not_ok`;
+`DiagnosticsView.test.ts` (1 new). Live capture 12: a pass recorded three days
+ago reading **not running** beside six passes this host is running.
+
+---
+
+## FIXED-759 — A Web access check printed a reason code, and called a name that does not exist private
+
+**Severity: Low. Area: Settings → Web access. Status: Fixed 2026-10-05. DEC-21
+(Web access): "show effective rule source, destination … and reason".**
+
+**Observed.** *Check a destination* answered `is refused (web_egress_blocked:eu.ads.example.com)`
+and did not say which rule refused it or which of the three lists it was on.
+And a name that resolves to nothing was refused as
+`web_host_not_public` — *"resolves to a private, loopback, or link-local
+address"* — sending the owner to look for a network they do not have.
+
+**Fixed.** The check says why in a sentence, and when a rule refused it, names
+the rule as written and its list — built into Raiker, set by the environment
+variable, or yours. A name that does not resolve is `web_host_unresolved` with
+its own sentence, on the check and on a fetch; a literal address is never
+"unresolved".
+
+**Evidence.** `test_web_egress_blocklist.py` (3 new) and `test_web_access.py`
+updated; `WebAccess.test.ts` (3 new). Live captures 06–07.
+
+---
+
+## FIXED-760 — A paused routine printed the slot it last ran as its next run
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-05 — found by the live round.**
+
+**Observed.** The first live run of FIXED-757 showed the paused card reading
+*Runs daily, next 1/1/2020* — the slot that had just run, as the next one — and
+no reason: `paused` was left out of the outcome line, so why it stopped was one
+click away in History.
+
+**Fixed.** A paused routine reads *paused — no next run until you continue it*,
+and its card states the reason beside **Continue now**.
+
+**Evidence.** `TasksView.test.ts` (1 new). Live capture 01.
+
+---
+
+## FIXED-761 — The live Chat check matched the owner's own prompt
+
+**Severity: Low. Area: Live harness. Status: Fixed 2026-10-05 — found by
+reviewing the round's captures.**
+
+**Observed.** The round's Chat step asked for an exact phrase and waited for
+that phrase on the page — which the prompt itself contains, so it passed with
+the turn still *Working…* (the first capture 11 shows it).
+
+**Fixed.** The step waits for the phrase twice and for **Send** to come back.
+
+**Evidence.** Capture 11 retaken: the answer under the prompt, Send available.

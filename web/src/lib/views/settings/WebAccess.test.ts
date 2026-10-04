@@ -7,7 +7,7 @@
  * And it never stated the number a fetch is actually evaluated against, so an
  * owner had to add three lists up themselves and hope they matched.
  */
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import WebAccess from "./WebAccess.svelte";
 import { stubFetch } from "../../test-helpers";
@@ -76,5 +76,66 @@ describe("Settings → Web access", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Unblock ads.example.com" })).toBeInTheDocument(),
     );
+  });
+});
+
+// DEC-21 — a refused check says why in words and names the rule that said it,
+// with the list it is on; it never prints only a reason code.
+describe("Settings → Web access — checking a destination", () => {
+  async function check(probe: Record<string, unknown>) {
+    stubFetch({
+      "GET /api/web-access/blocklist": BLOCKLIST,
+      "POST /api/web-access/blocklist/test": probe,
+    });
+    render(WebAccess);
+    const input = await screen.findByLabelText("Hostname or address");
+    await fireEvent.input(input, { target: { value: String(probe.host) } });
+    await fireEvent.click(screen.getByRole("button", { name: "Check" }));
+  }
+
+  it("names the matching rule and the list it is on", async () => {
+    await check({
+      host: "eu.ads.example.com",
+      allowed: false,
+      reason: "web_egress_blocked:eu.ads.example.com",
+      addresses: [],
+      explanation: "That destination is on your blocked list.",
+      rule: "ads.example.com",
+      rule_source: "yours",
+    });
+    expect(await screen.findByText(/is refused/)).toBeInTheDocument();
+    const why = screen.getByText(/on your list below/);
+    expect(why).toHaveTextContent("Matched ads.example.com, on your list below.");
+    // The rule is the whole reason; the general sentence would only repeat it.
+    expect(screen.queryByText(/on your blocked list/)).toBeNull();
+    expect(screen.queryByText(/web_egress_blocked/)).toBeNull();
+  });
+
+  it("explains a refusal no rule made, in words", async () => {
+    await check({
+      host: "no-such-host.invalid",
+      allowed: false,
+      reason: "web_host_unresolved:no-such-host.invalid",
+      addresses: [],
+      explanation: "That name does not resolve to any address from this machine.",
+      rule: null,
+      rule_source: null,
+    });
+    expect(await screen.findByText(/does not resolve to any address/)).toBeInTheDocument();
+    expect(screen.queryByText(/Matched/)).toBeNull();
+  });
+
+  it("says a reachable host is reachable, with where it resolved", async () => {
+    await check({
+      host: "docs.python.org",
+      allowed: true,
+      reason: "",
+      addresses: ["151.101.0.223"],
+      explanation: "",
+      rule: null,
+      rule_source: null,
+    });
+    expect(await screen.findByText(/is reachable/)).toBeInTheDocument();
+    expect(screen.getByText(/151\.101\.0\.223/)).toBeInTheDocument();
   });
 });

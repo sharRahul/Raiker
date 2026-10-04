@@ -14,7 +14,9 @@ has a refusal of its own (Anthropic's thinking-shape 400) puts it in front of
 
 from __future__ import annotations
 
+import codecs
 import json
+import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Any
@@ -28,6 +30,7 @@ from raiker.models.exceptions import (
     ProviderQuotaExhaustedError,
     ProviderRateLimitError,
     ProviderResponseValidationError,
+    ProviderStreamError,
     ProviderTimeoutError,
     ProviderWorkspaceRequiredError,
     is_quota_exhausted,
@@ -35,7 +38,39 @@ from raiker.models.exceptions import (
     workspace_id_rejected,
 )
 
-__all__ = ["ProviderHttpTransport", "StatusMapper", "json_object", "provider_status_error"]
+__all__ = [
+    "MAX_ERROR_BODY_BYTES",
+    "MAX_RESPONSE_BYTES",
+    "MAX_STREAM_BYTES",
+    "MAX_STREAM_LINE_BYTES",
+    "ProviderHttpTransport",
+    "StatusMapper",
+    "bounded_lines",
+    "json_object",
+    "provider_status_error",
+]
+
+# DEC-25 — what a provider may send back, counted in bytes as they arrive.
+#
+# Every hosted adapter read its answer with ``client.request(...)``, which holds
+# the whole body in memory before anything looks at it, and a refusal's body was
+# read the same way. A provider is a destination the owner chose, not one Raiker
+# trusts with its memory: a private server, a misbehaving proxy or a gzip body
+# that inflates a thousandfold could hand the host as much as it liked. The
+# counts are of *decoded* bytes, so a compressed body is bounded by what it
+# inflates to rather than by what crossed the wire.
+#
+# The limits are generous for the real thing: the largest ordinary answer is a
+# catalogue (OpenRouter's is a few megabytes), and a stream carrying a maximal
+# answer with its reasoning is tens of megabytes of SSE framing at most.
+MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+#: A refusal is read to classify it (quota, workspace, auth); its first 64 kB say which.
+MAX_ERROR_BODY_BYTES = 64 * 1024
+#: One SSE line carries one event; a line that never ends is not an event.
+MAX_STREAM_LINE_BYTES = 4 * 1024 * 1024
+MAX_STREAM_BYTES = 128 * 1024 * 1024
+
+_LINE_BREAK = re.compile(r"\r\n|\r|\n")
 
 #: ``(status, body) -> exception``: what a refused request means to the caller.
 StatusMapper = Callable[[int, str], Exception]
@@ -79,6 +114,55 @@ def json_object(response: httpx.Response) -> dict[str, Any]:
     return data
 
 
+async def _read_capped(response: httpx.Response, limit: int) -> tuple[bytes, bool]:
+    """Up to ``limit`` decoded bytes of a streamed body, and whether there was more."""
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        room = limit - len(body)
+        if len(chunk) > room:
+            body.extend(chunk[:room])
+            return bytes(body), True
+        body.extend(chunk)
+    return bytes(body), False
+
+
+async def bounded_lines(
+    response: httpx.Response,
+    *,
+    max_line_bytes: int = MAX_STREAM_LINE_BYTES,
+    max_total_bytes: int = MAX_STREAM_BYTES,
+) -> AsyncIterator[str]:
+    """The lines of a streamed body, refusing a line or a stream past its bound.
+
+    ``httpx``'s own ``aiter_lines`` buffers until it sees a line break, so a
+    server that never sends one grows that buffer for as long as it likes. This
+    splits on the same three breaks (CRLF, CR, LF) and nothing
+    else — ``str.splitlines`` would also split on U+2028, which JSON carries
+    unescaped — and stops with :class:`ProviderStreamError` the moment either
+    bound is crossed, before the excess is held.
+    """
+    decoder = codecs.getincrementaldecoder("utf-8")("replace")
+    pending = ""
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > max_total_bytes:
+            raise ProviderStreamError("provider_stream_too_large")
+        pending += decoder.decode(chunk)
+        parts = _LINE_BREAK.split(pending)
+        pending = parts.pop()
+        # A lone CR at the end of a chunk may be the first half of a CRLF;
+        # splitting there costs one empty line, which every SSE reader skips.
+        for line in parts:
+            yield line
+        if len(pending) > max_line_bytes:
+            raise ProviderStreamError("provider_stream_line_too_large")
+    pending += decoder.decode(b"", final=True)
+    for line in _LINE_BREAK.split(pending):
+        if line:
+            yield line
+
+
 class ProviderHttpTransport:
     """One adapter's client, its headers, and how its refusals are read.
 
@@ -109,18 +193,43 @@ class ProviderHttpTransport:
     async def request(
         self, method: str, url: str, *, headers: Mapping[str, str] | None = None, **kwargs: Any
     ) -> httpx.Response:
-        """Send one request; a transport failure or a refusal raises a provider error."""
+        """Send one request; a transport failure or a refusal raises a provider error.
+
+        The body is read here, by its decoded bytes, and refused past
+        :data:`MAX_RESPONSE_BYTES` (a refusal's past :data:`MAX_ERROR_BODY_BYTES`,
+        which is truncated rather than refused: its first part classifies it).
+        The response handed back is already read, so ``.json()`` and ``.text``
+        never touch the network again.
+        """
+        timeout = kwargs.pop("timeout", httpx.USE_CLIENT_DEFAULT)
+        request = self.client.build_request(
+            method, url, headers={**self.headers, **(headers or {})}, timeout=timeout, **kwargs
+        )
         try:
-            response = await self.client.request(
-                method, url, headers={**self.headers, **(headers or {})}, **kwargs
-            )
+            response = await self.client.send(request, stream=True)
+            try:
+                limit = MAX_ERROR_BODY_BYTES if response.status_code >= 400 else MAX_RESPONSE_BYTES
+                body, over = await _read_capped(response, limit)
+            finally:
+                await response.aclose()
         except httpx.TimeoutException as exc:
             raise ProviderTimeoutError("provider_timeout") from exc
         except httpx.HTTPError as exc:
             raise ProviderConnectionError("provider_connection_failed") from exc
         if response.status_code >= 400:
-            raise self._map_status(response.status_code, response.text)
-        return response
+            raise self._map_status(response.status_code, body.decode("utf-8", "replace"))
+        if over:
+            raise ProviderResponseValidationError("provider_response_too_large")
+        # The bytes above are already decoded, so the copy must not claim an
+        # encoding (httpx would inflate them a second time) or a length.
+        kept = [
+            (name, value)
+            for name, value in response.headers.multi_items()
+            if name.lower() not in {"content-encoding", "content-length", "transfer-encoding"}
+        ]
+        return httpx.Response(
+            response.status_code, headers=kept, content=body, request=request
+        )
 
     @asynccontextmanager
     async def stream(
@@ -136,7 +245,7 @@ class ProviderHttpTransport:
         ) as response:
             if response.status_code >= 400:
                 # A streamed body has not been read yet, and classification
-                # needs it; an error body is bounded.
-                body = (await response.aread()).decode("utf-8", "replace")
-                raise self._map_status(response.status_code, body)
+                # needs it — its first part, never all of it (DEC-25).
+                body, _over = await _read_capped(response, MAX_ERROR_BODY_BYTES)
+                raise self._map_status(response.status_code, body.decode("utf-8", "replace"))
             yield response

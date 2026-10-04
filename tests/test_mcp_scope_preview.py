@@ -104,7 +104,9 @@ def test_provenance_names_the_sample_the_plugin_or_the_owner() -> None:
         "purpose": "Acme's docs.",
         "purpose_from": "plugin",
     }
-    own = _mcp_provenance({"name": "mine", "template": None, "tool_schemas": declared}, {})
+    own = _mcp_provenance(
+        {"name": "mine", "template": None, "tools": ["search"], "tool_schemas": declared}, {}
+    )
     # The server's own sentence, marked as the server's rather than Raiker's.
     assert own == {
         "source": "owner",

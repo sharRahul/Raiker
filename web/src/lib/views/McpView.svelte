@@ -242,13 +242,44 @@
     notice = null;
     try {
       const result = await api.connectMcpServer(server.server_id);
-      notice = `${server.name}: connected · ${result.tools.length} tool(s).`;
+      notice =
+        `${server.name}: connected · ${result.tools.length} tool(s)` +
+        (result.pending.length
+          ? ` · ${result.pending.length} held for your review below.`
+          : ".");
       await load();
     } catch (e) {
       error = `${server.name}: ${reason(e)}`;
     } finally {
       busy = null;
     }
+  }
+
+  /**
+   * DEC-15 step 10 — accept tools a server added, or now declares differently,
+   * since the owner accepted it. Until then Raiker never offers them to the
+   * model, and a call to one is refused.
+   */
+  async function acceptTools(server: McpServer, tools: string[]) {
+    busy = server.server_id;
+    error = null;
+    notice = null;
+    try {
+      const result = await api.approveMcpTools(server.server_id, tools);
+      const count = result.approved.length;
+      notice =
+        `${server.name}: accepted ${count} ${count === 1 ? "tool" : "tools"}` +
+        (result.pending.length ? ` · ${result.pending.length} still held.` : ".");
+      await load();
+    } catch (e) {
+      error = `${server.name}: ${reason(e)}`;
+    } finally {
+      busy = null;
+    }
+  }
+
+  function isHeld(s: McpServer, tool: string): boolean {
+    return s.pending_tools.some((held) => held.name === tool);
   }
 
   function startRename(server: McpServer) {
@@ -529,6 +560,53 @@
             <span class="muted">Run Test to discover this server's tools.</span>
           {/if}
         </div>
+        <!-- DEC-15 step 10 — what the server added or changed since the owner
+             accepted it. Held tools are never offered to the model; the
+             server's sentence is labelled as the server's. -->
+        {#if s.pending_tools.length}
+          <section class="held" aria-label={`Tools ${s.name} holds for your review`}>
+            <p class="held-lead">
+              <Icon name="warning" size="sm" />
+              <span>
+                <strong>{s.pending_tools.length} {s.pending_tools.length === 1 ? "tool" : "tools"}
+                waiting for your review.</strong>
+                {s.name} added or changed {s.pending_tools.length === 1 ? "it" : "them"} after you
+                accepted it. Raiker does not offer {s.pending_tools.length === 1 ? "it" : "them"} to
+                the model until you accept.
+              </span>
+            </p>
+            <ul>
+              {#each s.pending_tools as held (held.name)}
+                <li>
+                  <div class="held-copy">
+                    <span class="held-name"><code>{held.name}</code>
+                      <span class="held-change">{held.change === "new" ? "New" : "Changed"}</span></span>
+                    <span class="held-says">
+                      {held.description
+                        ? `The server says: “${held.description}”`
+                        : "The server gives no description."}
+                    </span>
+                  </div>
+                  <button
+                    class="btn btn-sm"
+                    type="button"
+                    onclick={() => acceptTools(s, [held.name])}
+                    disabled={busy === s.server_id}
+                    aria-label={`Accept ${held.name}`}
+                  >Accept</button>
+                </li>
+              {/each}
+            </ul>
+            {#if s.pending_tools.length > 1}
+              <button
+                class="btn btn-sm"
+                type="button"
+                onclick={() => acceptTools(s, s.pending_tools.map((held) => held.name))}
+                disabled={busy === s.server_id}
+              >Accept all {s.pending_tools.length}</button>
+            {/if}
+          </section>
+        {/if}
         <!-- BUG-234 — Raiker speaks the current revision and uses one part of
              it; what a server offers beyond that is said here, never left
              unsaid. -->
@@ -548,7 +626,7 @@
             {#each s.tools as tool (tool)}
               <div>
                 <dt>{tool}</dt>
-                <dd>{declaredArguments(s, tool)}</dd>
+                <dd>{isHeld(s, tool) ? "Held for your review" : declaredArguments(s, tool)}</dd>
               </div>
             {/each}
           </dl>
@@ -646,6 +724,15 @@
   .monitor { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor-banner { margin: var(--space-3) 0 0; }
   .finding { font-size: var(--text-xs); font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
+  .held { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: var(--r-sm); background: var(--warn-soft, var(--sunken)); display: grid; gap: var(--space-2); justify-items: start; }
+  .held-lead { margin: 0; display: flex; gap: 0.5rem; align-items: flex-start; font-size: var(--text-sm); color: var(--text-2); }
+  .held-lead :global(svg) { color: var(--warn); flex: none; margin-top: 0.15rem; }
+  .held ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); width: 100%; }
+  .held li { display: flex; gap: var(--space-3); align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+  .held-copy { display: grid; gap: 0.15rem; min-width: 0; flex: 1 1 16rem; }
+  .held-name { display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .held-change { font-size: var(--text-xs); font-weight: 600; color: var(--warn); text-transform: uppercase; letter-spacing: 0.04em; }
+  .held-says { font-size: var(--text-xs); color: var(--text-3); overflow-wrap: anywhere; }
   .unsupported { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
   .unsupported li { font-size: var(--text-xs); color: var(--text-3); }
   .unsupported .feature { font-family: var(--font-mono, monospace); color: var(--text-2); }

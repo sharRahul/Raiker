@@ -125,6 +125,31 @@ export function localTimeIn(zone: string, at: Date = new Date()): string {
   }
 }
 
+/**
+ * DEC-21 — the zone's offset from UTC at `at`, as `UTC+05:30`, `UTC−04:00` or
+ * `UTC`. A short zone name ("BST", "IST") is ambiguous across the world; the
+ * offset is the fact a schedule is computed from, and it changes at a clock
+ * change, which is why it is read for an instant rather than for the zone.
+ */
+export function utcOffset(zone: string, at: Date = new Date()): string {
+  try {
+    const part = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(at)
+      .find((piece) => piece.type === "timeZoneName")?.value;
+    if (!part) return "";
+    const match = /^GMT(?:([+-\u2212])(\d{1,2})(?::(\d{2}))?)?$/.exec(part);
+    if (!match) return "";
+    if (!match[1]) return "UTC";
+    const sign = match[1] === "+" ? "+" : "\u2212";
+    return `UTC${sign}${match[2].padStart(2, "0")}:${match[3] ?? "00"}`;
+  } catch {
+    return "";
+  }
+}
+
 /** Plain words for where the zone came from, for the line under the control. */
 export function timezoneSourceLabel(source: TimezoneSource): string {
   switch (source) {

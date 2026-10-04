@@ -8,6 +8,7 @@ from typing import Any, Literal, NotRequired
 from typing_extensions import TypedDict
 
 from raiker.contracts.views import View
+from raiker.tools.mcp_review import PendingTool
 
 
 def _handler_target(handler: Any) -> str:
@@ -172,6 +173,11 @@ class McpServerView(View):
     source_plugin: str | None = None
     purpose: str | None = None
     purpose_from: Literal["plugin", "server", "none"] = "none"
+    # DEC-15 step 10 — tools this server added, or declares differently, since
+    # the owner accepted it. None of them is offered to the model, and a call to
+    # one is refused, until the owner accepts it. The description is the
+    # server's own sentence, labelled as such where it is shown.
+    pending_tools: tuple[PendingTool, ...] = ()
 
 
 @dataclass(frozen=True)

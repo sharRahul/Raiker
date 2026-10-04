@@ -255,6 +255,8 @@ class TestUrlSafety:
         monkeypatch.setattr(
             "raiker.runtime.web_policy.resolve_public_addresses", lambda h, p=443: []
         )
+        # The name resolves — only privately — which is what makes it this refusal.
+        monkeypatch.setattr("raiker.runtime.web_policy.resolves_at_all", lambda h, p=443: True)
         assert check_url("https://docs.example.com/a", ()).reason == "web_host_not_public"
 
     def test_the_real_resolver_refuses_localhost(self) -> None:

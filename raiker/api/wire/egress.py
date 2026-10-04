@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from typing_extensions import TypedDict
 
@@ -63,3 +63,9 @@ class BlocklistProbe(TypedDict):
     allowed: bool
     reason: str
     addresses: list[str]
+    #: DEC-21 — the refusal in the owner's words; empty when it is reachable.
+    explanation: str
+    #: The blocklist rule that refused it, as written, or null.
+    rule: str | None
+    #: Where that rule comes from: ``built_in``, ``environment`` or ``yours``.
+    rule_source: Literal["built_in", "environment", "yours"] | None

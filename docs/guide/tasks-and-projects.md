@@ -77,6 +77,11 @@ schedule stores the zone it was composed in, as described above. And each
 cycle reads the clock **when it runs**: a routine you created on Monday evening
 is told it is Tuesday morning, not Monday.
 
+Under the control, Settings says what your clock reads in the chosen zone and
+its offset from UTC right now — `UTC+05:30`, `UTC−04:00` — and that the offset
+moves at a clock change. Changing the zone does not move a task already
+scheduled; each keeps the zone it was set in.
+
 If you have not set a zone, Raiker offers the one your browser reports and says
 so — it will not apply it for you. Setting `Europe/London` and then opening
 Raiker from another country is a statement about your schedule, and Raiker does
@@ -159,6 +164,15 @@ and files. A finished run is never replayed in place, so nothing it did — a
 message sent, a file written — is repeated by pressing a button, and its own
 history stays exactly as it ended. A routine is never run again: it re-arms
 itself.
+
+**A routine that keeps failing is paused.** A routine re-arms after every cycle,
+whatever the cycle did, so one whose key expired or whose model went away would
+otherwise fail on every slot. After **three cycles in a row** that did not
+complete, Raiker pauses it instead, says why on its card — with what the last
+cycle said — and tells you in the notification centre. A cycle that completes
+starts the count again, so an occasional failure never stops a working routine.
+Nothing is retried on its own: **Continue now** runs it once and puts it back on
+its schedule, and **Stop** ends it.
 
 Every run stays governed: it uses the same policy, approval, and audit path as
 Chat, and stops at a safe boundary rather than being killed.

@@ -88,6 +88,7 @@ class ExtensionService:
         (through the authority/executor path), never a plain REST mutation, so
         this surface is read-only by design."""
         from raiker.plugins.contributions import contributed_mcp_servers
+        from raiker.tools.mcp_review import pending_tools
 
         offered = {
             str(offer["name"]): (plugin_id, str(offer.get("description") or ""))
@@ -129,6 +130,7 @@ class ExtensionService:
                         else None
                     ),
                 ),
+                pending_tools=tuple(pending_tools(row)),
                 **_mcp_provenance(row, offered),
             )
             for row in self.store.list_mcp_servers(principal_id)
@@ -214,6 +216,12 @@ class ExtensionService:
     ) -> ControlResult:
         """Owner-scoped, human-only instant kill switch (delegates)."""
         return self.control.kill_mcp_server(acting_principal_id, server_id, reason)
+
+    def approve_mcp_tools(
+        self: DashboardService, acting_principal_id: str | None, server_id: str, tools: list[str]
+    ) -> ControlResult:
+        """Owner-scoped, human-only acceptance of held tools (DEC-15 step 10; delegates)."""
+        return self.control.approve_mcp_tools(acting_principal_id, server_id, tools)
 
     #: Event types the dispatcher writes, newest-first, for the hooks surface.
     _HOOK_EVENT_TYPES = (
@@ -895,7 +903,15 @@ def _mcp_provenance(row: dict[str, Any], offered: dict[str, tuple[str, str]]) ->
         if description:
             purpose, purpose_from = description, "plugin"
     if purpose is None:
+        # DEC-15 step 10 — only a tool the owner has accepted as it is speaks
+        # for the server. A tool it added or reworded since is held, and its
+        # sentence is shown under review, never as what the server is for.
+        from raiker.tools.mcp_review import approved_tool_names
+
+        accepted = approved_tool_names(row)
         for declaration in _declaration_summaries(row.get("tool_schemas")):
+            if declaration.get("name") not in accepted:
+                continue
             text = (declaration.get("description") or "").strip()
             if text:
                 purpose, purpose_from = text[:240], "server"

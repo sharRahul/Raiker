@@ -369,7 +369,14 @@
     // what happens if the machine was off" is on the card rather than in a
     // form that has since closed.
     if (task.recurrence) {
-      const terms = [`${cadenceLabel(task.recurrence)}, next ${when}`];
+      // DEC-12 step 6 — a paused routine has no next run until the owner
+      // continues it; its stored slot is the one that last ran, and printing it
+      // as "next" put a date in the past on the card.
+      const terms = [
+        task.status === "paused"
+          ? `${cadenceLabel(task.recurrence)}, paused — no next run until you continue it`
+          : `${cadenceLabel(task.recurrence)}, next ${when}`,
+      ];
       if (task.schedule_timezone) terms.push(task.schedule_timezone);
       if (task.schedule_until) terms.push(`until ${new Date(task.schedule_until).toLocaleDateString()}`);
       if (task.missed_run_policy === "skip") terms.push("skips missed runs");
@@ -1107,6 +1114,12 @@
                     {busyTask === task.task_id ? "Continuing…" : "Continue now"}
                   </button>
                 </span>
+              </p>
+            {:else if task.status === "paused" && task.summary?.trim()}
+              <!-- DEC-12 step 6 — why it stopped, beside the Continue that
+                   starts it again; "paused" alone sent the owner to History. -->
+              <p class="blocked" role="status">
+                <Icon name="warning" size="sm" /> {task.summary.trim()}
               </p>
             {:else if outcome(task)}
               <p class="outcome" role="status">{outcome(task)}</p>

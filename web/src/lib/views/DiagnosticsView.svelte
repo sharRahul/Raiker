@@ -266,9 +266,15 @@
         <ul class="monitor">
           {#each diag.background_workers as worker (worker.pass_name)}
             <li>
+              <!-- DEC-24 step 1 — a pass that has stopped reporting is not
+                   well; it says so instead of keeping its last "ok". -->
               <Badge
                 variant={worker.healthy ? "implemented" : "approval-required"}
-                label={worker.healthy ? "ok" : `${worker.consecutive_failures} in a row`}
+                label={worker.state === "stale"
+                  ? "not running"
+                  : worker.healthy
+                    ? "ok"
+                    : `${worker.consecutive_failures} in a row`}
               />
               <span class="monitor-code">{humanize(worker.pass_name)}</span>
               {#if !worker.healthy && worker.last_error_class}
@@ -278,9 +284,11 @@
                 class="monitor-when"
                 title={worker.last_success_at ?? worker.updated_at}
               >
-                {worker.last_success_at
-                  ? `succeeded ${relativeTime(worker.last_success_at)}`
-                  : "never succeeded"}
+                {worker.state === "stale"
+                  ? `nothing recorded since ${relativeTime(worker.updated_at)}`
+                  : worker.last_success_at
+                    ? `succeeded ${relativeTime(worker.last_success_at)}`
+                    : "never succeeded"}
               </span>
             </li>
           {/each}

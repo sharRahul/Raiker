@@ -775,6 +775,23 @@
         "title": "ApprovalView",
         "type": "object"
       },
+      "ApproveMcpToolsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tools"
+        ],
+        "title": "ApproveMcpToolsRequest",
+        "type": "object"
+      },
       "AttachProjectFolderRequest": {
         "additionalProperties": false,
         "description": "A folder of the owner's to put behind a project, and whether Raiker may write to it.",
@@ -1244,6 +1261,15 @@
             "title": "Pass Name",
             "type": "string"
           },
+          "state": {
+            "enum": [
+              "ok",
+              "failing",
+              "stale"
+            ],
+            "title": "State",
+            "type": "string"
+          },
           "total_failures": {
             "title": "Total Failures",
             "type": "integer"
@@ -1261,6 +1287,7 @@
           "consecutive_failures",
           "total_failures",
           "healthy",
+          "state",
           "updated_at"
         ],
         "title": "BackgroundWorkerHealth",
@@ -1280,6 +1307,10 @@
             "title": "Allowed",
             "type": "boolean"
           },
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
           "host": {
             "title": "Host",
             "type": "string"
@@ -1287,13 +1318,43 @@
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "rule_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "built_in",
+                  "environment",
+                  "yours"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Source"
           }
         },
         "required": [
           "host",
           "allowed",
           "reason",
-          "addresses"
+          "addresses",
+          "explanation",
+          "rule",
+          "rule_source"
         ],
         "title": "BlocklistProbe",
         "type": "object"
@@ -12947,6 +13008,13 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "pending": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pending",
+            "type": "array"
+          },
           "server_id": {
             "title": "Server Id",
             "type": "string"
@@ -12967,7 +13035,8 @@
           "ok",
           "server_id",
           "status",
-          "tools"
+          "tools",
+          "pending"
         ],
         "title": "McpServerConnected",
         "type": "object"
@@ -13130,6 +13199,14 @@
             ],
             "default": null,
             "title": "Paused Reason"
+          },
+          "pending_tools": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PendingTool"
+            },
+            "title": "Pending Tools",
+            "type": "array"
           },
           "protocol_version": {
             "anyOf": [
@@ -13390,6 +13467,41 @@
           "required"
         ],
         "title": "McpToolDeclaration",
+        "type": "object"
+      },
+      "McpToolsApproved": {
+        "description": "DEC-15 step 10 — tools accepted for a server, and what it still holds.",
+        "properties": {
+          "approved": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approved",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pending": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pending",
+            "type": "array"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "approved",
+          "pending"
+        ],
+        "title": "McpToolsApproved",
         "type": "object"
       },
       "MemoryArchived": {
@@ -17467,6 +17579,34 @@
           }
         },
         "title": "PauseHostRequest",
+        "type": "object"
+      },
+      "PendingTool": {
+        "description": "One tool a server offers that the owner has not accepted as it is now.",
+        "properties": {
+          "change": {
+            "enum": [
+              "new",
+              "changed"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "change",
+          "description"
+        ],
+        "title": "PendingTool",
         "type": "object"
       },
       "PluginCodeRuntime": {
@@ -31224,6 +31364,56 @@
           }
         },
         "summary": "List Mcp Sessions"
+      }
+    },
+    "/api/mcp/servers/{server_id}/tools/approve": {
+      "post": {
+        "description": "Accept tools a server holds for review, as declared now (DEC-15 step 10).\n\nHuman-only, owner-scoped. A tool is held when the server added it, or\nchanged how it declares it, after the owner accepted the server; until it\nis accepted here the model is never offered it and a call to it is refused.",
+        "operationId": "approve_mcp_tools_api_mcp_servers__server_id__tools_approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveMcpToolsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpToolsApproved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Mcp Tools"
       }
     },
     "/api/memory": {

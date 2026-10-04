@@ -302,6 +302,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/mcp/servers/{server_id}/kill"),
         ("POST", "/api/mcp/servers/{server_id}/pause"),
         ("POST", "/api/mcp/servers/{server_id}/resume"),
+        ("POST", "/api/mcp/servers/{server_id}/tools/approve"),
         ("POST", "/api/memory/conversation-index/rebuild"),
         ("POST", "/api/memory/eidetic/cleanup"),
         ("POST", "/api/memory/embedding-index"),

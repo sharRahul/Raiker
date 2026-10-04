@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-05 | Targeted | `2026-10-05-readiness-decisions-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a routine run by the host on a workspace with no model chosen | Ten decision-record steps from the release-readiness review — DEC-25's provider and slow-sender bounds, DEC-15 step 10 for MCP servers, DEC-09 step 5, DEC-21 (General, Web access), DEC-12 step 6 and DEC-24 step 1 (FIXED-750 to FIXED-759). Proved live: **a routine paused by the host after three failed cycles** with its reason and a notice, and Continue re-arming it; a time zone's UTC offset; **an unsaved Settings edit kept when the owner chose to stay**; a Web access check naming the rule and its list; **an MCP server edited to add a tool and reword another, both held until accepted**, the block at 390 wide with no overflow; a real Anthropic answer through the bounded stream; a slow sender answered **408 after 30 s**; and a quiet background pass reading *not running*. **Two defects found and fixed** — a paused routine printed its last slot as *next* without a reason, and the purpose line was taken from a held tool; one harness defect fixed (the Chat check matched the prompt); BUG-320 and BUG-321 filed |
 | 2026-10-04 | Targeted | `2026-10-04-ollama-readiness-round/` | Ollama served by `scripts/live_ollama_standin.py` on 127.0.0.1:11434 (`llama3.2:3b`, `qwen3:8b` — this host cannot download Ollama); Anthropic (`claude-haiku-4-5-20251001`) answering a Build turn and a Chat turn, the key entered through the Connect dialog | The owner's Ollama decision (FIXED-737 to FIXED-739) and ten items from the release-readiness review: UX-CHAT-01, UX-BUILD-01, UX-MODEL-01, DEC-06 step 1, DEC-07 step 4, the stdio half of DEC-25 and §13.1's workspace metadata. Proved live: a running Ollama **offered with nothing chosen**, the model chosen from what it serves and **Ready at once**, a Chat turn answered by it after a reload, **the service stopped and started under an open Models page with Ready following it and no Check pressed**, Build's boundary equal to the server's answer and naming a hosted model as leaving the machine before a real Anthropic turn, Chat's Continuity menu after a real answer, Design comparing two versions and **going back as a new version**, Models' Runtime tab saving a fallback and its Details dialog, and four work surfaces at 390 wide with no horizontal overflow and **no console error**. **Two defects found and fixed** — the picker's Use buttons all had one name, and the round's own wait read a page that never reloaded; BUG-318 and BUG-319 filed |
 | 2026-10-03 (third) | Targeted | `2026-10-03-models-build-design-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real Build turn through three owner approvals, the key entered through the Connect dialog; Design's pictures seeded into the workspace's own store | Ten items from the release-readiness review: UX-MODEL-02, -04, -05, UX-BUILD-02 to -04 and UX-DESIGN-01 to -04. Proved live: a readiness line walking connect → choose → check → Ready on one page, a comparison with Unknown kept Unknown, Build's boundary ending at the model, **a real model running a failing test, reading the failure, fixing the module and re-running it green**, a narrow window's drawer stepping aside for an approval, and Design's Unfiled destination, download, delete, restore and removal. **Three defects found and fixed** — an approved command that failed left its turn waiting forever, every composer's primary action was nameless at phone width, and Build's evidence line did not count sources; BUG-316 and BUG-317 filed |
 | 2026-10-03 (second) | Targeted | `2026-10-03-messaging-mcp-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a turn routed in from a webhook channel and a Chat turn, the key entered through the Connect dialog; a local receiver standing in for a webhook destination | Ten items from the release-readiness review: §3.10 Messaging (UX-MSG-03 to -06), §3.11 MCP (UX-MCP-02, -03), UX-CHAT-03 to -05 and UX-MODEL-03, with UX-CHAT-02 completed and UX-MSG-01/-02, SEC-MCP-01 to -03 and UX-MCP-01 recorded against earlier closures. Proved live: a channel set up step by step, its test refused at the gate and then **delivered while the channel was still off**, a real Anthropic answer to a routed message with each receipt stage separate, Telegram group scope and a bot's update ignored, an MCP sample stating its reach before Test and its trust after, Chat's filing line, labelled background work and grouped actions, and a model reset that holds across a reload, with no horizontal overflow at 390 wide. **Five defects found and fixed** — a refused channel action left the page stale, a failed routed turn read *Failed: failed*, every routed Telegram message failed validation, the MCP notice named a server that did not exist, and a searched model was shown as the default; BUG-314 and BUG-315 filed |
@@ -86,6 +87,89 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-05 — A routine that stops itself, MCP tools held for review, and bounds on what comes back
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` on a
+workspace reset with `scripts/reset_live_workspace.py`, in a Linux container
+whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: the pre-installed Chromium, through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-05-readiness-decisions-live.spec.ts` (7 of 7 on the
+final, fresh workspace; the Chat and Diagnostics steps were re-run on the same
+workspace after their harness fixes — see *What it found*). Harness:
+`scripts/live_failing_routine.py`, which files a real daily routine through
+`TaskManager` and moves its next slot to the past between host ticks. Captures:
+[`docs/screenshots/2026-10-05-readiness-decisions-round/`](../screenshots/2026-10-05-readiness-decisions-round).**
+
+FIXED-750 to FIXED-761.
+
+**What it proved.**
+
+1. **A routine that keeps failing stops, and says so.** A daily routine on a
+   workspace with no model chosen was claimed by the running host three times;
+   the third failure paused it. The card read *Paused after 3 runs in a row did
+   not complete. The last said: …* beside **Continue now**, with *paused — no
+   next run until you continue it*; the notification centre had **A routine was
+   paused**; Continue re-armed it with the count reset (FIXED-757, FIXED-760,
+   [01](../screenshots/2026-10-05-readiness-decisions-round/01-tasks-routine-paused-after-three-failures.png), [02](../screenshots/2026-10-05-readiness-decisions-round/02-notifications-routine-paused.png), [03](../screenshots/2026-10-05-readiness-decisions-round/03-tasks-routine-continued.png)).
+2. **The offset as a number.** Choosing `America/New_York` read **That is
+   UTC−04:00 right now; the offset moves at a clock change** (FIXED-756,
+   [04](../screenshots/2026-10-05-readiness-decisions-round/04-settings-time-zone-offset.png)).
+3. **An unsaved edit is not dropped.** With that choice unsaved, a route to
+   Tasks asked *not saved … Leave without saving them?*; staying kept the page,
+   the bar and the value; a section change asked nothing; agreeing left
+   (FIXED-755, [05](../screenshots/2026-10-05-readiness-decisions-round/05-settings-stayed-with-unsaved-edit.png)).
+4. **A check that says why.** `no-such-host.invalid` read *That name does not
+   resolve to any address from this machine* — not "private"; with
+   `ads.example.com` blocked, `eu.ads.example.com` read **Matched
+   ads.example.com, on your list below**; `127.0.0.1` read the private-network
+   sentence; no reason code anywhere (FIXED-759,
+   [06](../screenshots/2026-10-05-readiness-decisions-round/06-web-access-name-that-does-not-resolve.png), [07](../screenshots/2026-10-05-readiness-decisions-round/07-web-access-matched-rule-and-list.png)).
+5. **An MCP server that grows is held.** A generated sample was tested (2
+   tools), then its file was edited to add `purge_notes` and to reword `echo`.
+   Test said **connected · 3 tool(s) · 2 held for your review below**; the card
+   listed `purge_notes` **New** and `echo` **Changed** with the server's own
+   sentences, the tool list said *Held for your review*, and accepting
+   `purge_notes` left `echo` held. At 390 wide, no overflow (FIXED-753,
+   FIXED-754, [08](../screenshots/2026-10-05-readiness-decisions-round/08-mcp-tools-held-for-review.png), [09](../screenshots/2026-10-05-readiness-decisions-round/09-mcp-one-accepted-one-still-held.png), [10](../screenshots/2026-10-05-readiness-decisions-round/10-mcp-held-390.png)).
+   The existing monitor also paused the connection on `tool_set_changed`; the
+   two agree, and the hold outlasts a Resume.
+6. **A real answer through the bounded stream.** Anthropic answered *the
+   bounded stream arrived* through `bounded_lines` (FIXED-750, FIXED-751,
+   [11](../screenshots/2026-10-05-readiness-decisions-round/11-chat-real-answer-through-bounded-stream.png)).
+7. **A slow sender is let go.** A raw socket that sent five bytes of a 64-byte
+   body to the running server was answered `HTTP/1.1 408 Request Timeout`
+   `{"reason_code": "request_body_too_slow"}` after 30.0 s (FIXED-752).
+8. **A quiet pass is not "ok".** A pass recorded three days ago read **not
+   running · nothing recorded since 3d ago** beside the six this host is
+   running, all *ok* (FIXED-758, [12](../screenshots/2026-10-05-readiness-decisions-round/12-diagnostics-pass-not-running.png)).
+
+**What it found.**
+
+* The first run's paused card printed the slot that had just run as *next*, and
+  left the reason in History — fixed as FIXED-760 before the final run.
+* The MCP card's purpose line, the server's own sentence about its first tool,
+  came from the held `purge_notes` — fixed in FIXED-754: only an accepted tool
+  speaks for the server.
+* The Web check's sentence began in lower case and, when a rule matched,
+  repeated it — fixed in FIXED-759.
+* Harness: the Chat step matched the phrase in the owner's own prompt and
+  captured *Working…* (FIXED-761); the Diagnostics step captured the overview
+  because the passes sit under *Runtime health, in detail*. Both re-run.
+* Filed: the notification dock covers Chat's newest prompt
+  ([BUG-320](TO_BE_FIXED.md#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat)),
+  and Chromium's zone list spells some zones by their old names
+  ([BUG-321](TO_BE_FIXED.md#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones)).
+
+**What it could not prove.** Provider bodies past 32 MB and SSE lines past
+4 MB were not provoked from a real provider; the unit suite proves them against
+a mock transport.
 
 ---
 

@@ -458,3 +458,31 @@ def test_a_background_pass_records_its_failures_and_its_recovery(tmp_path: Path)
     assert recovered["telemetry_delivery"]["healthy"] is True
     # The history is kept: a pass that recovered is not a pass that never failed.
     assert recovered["telemetry_delivery"]["total_failures"] == 2
+
+
+def test_a_background_pass_that_stopped_reporting_is_stale_not_ok(tmp_path: Path) -> None:
+    """DEC-24 step 1 — not having heard from a pass is not evidence it is well.
+
+    Health was the failure streak alone, so a tick that stopped running kept
+    the last thing it said — "ok" — for ever.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from raiker.storage.stores.monitoring import BACKGROUND_PASS_STALE_SECONDS
+
+    store = SQLiteStore(tmp_path)
+    store.record_background_pass("scheduled_tasks")
+    store.record_background_pass("telemetry_delivery", error_class="ProviderConnectionError")
+
+    fresh = {row["pass_name"]: row for row in store.list_background_worker_health()}
+    assert fresh["scheduled_tasks"]["state"] == "ok"
+    assert fresh["telemetry_delivery"]["state"] == "failing"
+
+    later = datetime.now(UTC) + timedelta(seconds=BACKGROUND_PASS_STALE_SECONDS + 5)
+    rows = store.list_background_worker_health(now=later)
+    by_name = {row["pass_name"]: row for row in rows}
+    assert by_name["scheduled_tasks"]["state"] == "stale"
+    assert by_name["scheduled_tasks"]["healthy"] is False
+    # A failing pass is still reported as failing, and comes first.
+    assert by_name["telemetry_delivery"]["state"] == "failing"
+    assert [row["state"] for row in rows] == ["failing", "stale"]

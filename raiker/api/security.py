@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import time
@@ -132,6 +133,21 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, wrapped)
 
 
+#: DEC-25 — how long a request body may take (see :class:`MaxBodySizeMiddleware`).
+BODY_IDLE_SECONDS = 30.0
+BODY_BASE_SECONDS = 30.0
+BODY_MIN_BYTES_PER_SECOND = 64 * 1024
+
+_TOO_LARGE: tuple[int, dict[str, object]] = (
+    413,
+    {"ok": False, "reason_code": "request_body_too_large"},
+)
+_TOO_SLOW: tuple[int, dict[str, object]] = (
+    408,
+    {"ok": False, "reason_code": "request_body_too_slow"},
+)
+
+
 class MaxBodySizeMiddleware:
     """Rejects a request body larger than ``max_bytes`` (413), by the bytes sent.
 
@@ -150,6 +166,17 @@ class MaxBodySizeMiddleware:
     honest oversized client should get. What actually enforces the cap is the
     count of bytes received: the body stream is wrapped, and the request is
     refused at the moment it goes over whatever it said it would be.
+
+    DEC-25 — a cap on bytes says nothing about *time*. A sender that dribbles
+    one byte every few seconds never crosses it, and holds a connection and a
+    route's buffer for as long as it likes. So the body also has a deadline:
+    each part must arrive within ``idle_seconds`` of the last, and the whole body
+    within ``base_seconds`` plus the time the route's own cap takes at
+    ``min_bytes_per_second`` — 45 seconds for an ordinary 1 MB route, several
+    minutes for an attachment on a slow link. Past either, the route is told the
+    client has gone and the sender is answered 408 ``request_body_too_slow``.
+    The deadline ends with the body: a streamed answer still listening for the
+    client to disconnect is not timed.
     """
 
     def __init__(
@@ -158,10 +185,16 @@ class MaxBodySizeMiddleware:
         *,
         max_bytes: int = 1_000_000,
         path_overrides: dict[str, int] | None = None,
+        idle_seconds: float = BODY_IDLE_SECONDS,
+        base_seconds: float = BODY_BASE_SECONDS,
+        min_bytes_per_second: int = BODY_MIN_BYTES_PER_SECOND,
     ) -> None:
         self.app = app
         self._max_bytes = max_bytes
         self._path_overrides = dict(path_overrides or {})
+        self._idle_seconds = idle_seconds
+        self._base_seconds = base_seconds
+        self._min_rate = max(1, min_bytes_per_second)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -184,13 +217,28 @@ class MaxBodySizeMiddleware:
 
         received = 0
         refused = False
+        #: Which refusal ``refused`` is: too large (413) or too slow (408).
+        refusal = _TOO_LARGE
+        body_done = False
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._base_seconds + limit / self._min_rate
 
         async def counted() -> Message:
-            """The body, refused the moment it exceeds the cap."""
-            nonlocal received, refused
-            message = await receive()
+            """The body, refused the moment it exceeds the cap or its time."""
+            nonlocal received, refused, refusal, body_done
+            if body_done:
+                return await receive()
+            wait = min(self._idle_seconds, deadline - loop.time())
+            try:
+                message = await asyncio.wait_for(receive(), timeout=max(wait, 0.0))
+            except TimeoutError:
+                refused = True
+                refusal = _TOO_SLOW
+                return {"type": "http.disconnect"}
             if message["type"] != "http.request":
                 return message
+            if not message.get("more_body", False):
+                body_done = True
             received += len(message.get("body", b"") or b"")
             if received <= limit:
                 return message
@@ -211,11 +259,7 @@ class MaxBodySizeMiddleware:
             if message["type"] != "http.response.start" or answered:
                 return
             answered = True
-            await _send_json(
-                send,
-                413,
-                {"ok": False, "reason_code": "request_body_too_large"},
-            )
+            await _send_json(send, *refusal)
 
         try:
             await self.app(scope, counted, guarded)
@@ -227,11 +271,7 @@ class MaxBodySizeMiddleware:
                 raise
         if refused and not answered:
             answered = True
-            await _send_json(
-                send,
-                413,
-                {"ok": False, "reason_code": "request_body_too_large"},
-            )
+            await _send_json(send, *refusal)
 
 
 class RateLimitMiddleware:

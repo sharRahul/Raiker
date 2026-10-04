@@ -457,6 +457,59 @@ class TaskManager:
         )
         return task
 
+    def pause_routine_after_failures(
+        self, task_id: str, *, failures: int, last_summary: str
+    ) -> TaskRecord | None:
+        """Pause a routine whose last ``failures`` cycles did not complete (DEC-12 step 6).
+
+        Paused, not failed: the routine keeps its schedule terms and its thread,
+        and *Continue now* runs it once more and puts it back on its schedule.
+        The owner is told, because a routine nobody is watching is the whole
+        reason the limit exists.
+        """
+        summary = (
+            f"Paused after {failures} runs in a row did not complete. "
+            f"The last said: {_stated(last_summary, NO_STATED_FAILURE_REASON)} "
+            "Continue runs it once more and puts it back on its schedule."
+        )
+        self.store.pause_routine(task_id, summary)
+        task = self.get_task(task_id)
+        if task is None:
+            return None
+        self.writer.append(
+            make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_paused",
+                actor="task_scheduler",
+                payload={"task_id": task_id, "reason": "repeated_failures", "failures": failures},
+            )
+        )
+        try:
+            from raiker.notify.task_notifier import notify_routine_paused
+
+            notify_routine_paused(self.store, task, failures=failures)
+        except Exception:  # noqa: BLE001 - the pause is already recorded
+            pass
+        return task
+
+    def resume_paused_routine(self, task_id: str) -> TaskRecord | None:
+        """The owner's *Continue* on a routine its failures paused: run once now."""
+        if not self.store.resume_paused_routine(task_id):
+            return self.get_task(task_id)
+        task = self.get_task(task_id)
+        if task is not None:
+            self.writer.append(
+                make_event(
+                    session_id=task.session_id,
+                    turn_id=task.parent_turn_id,
+                    event_type="task_run_requested",
+                    actor="owner",
+                    payload={"task_id": task_id, "reason": "resumed_after_failures"},
+                )
+            )
+        return task
+
     def mark_task_continuing(
         self, task_id: str, tool_name: str = "", *, approval_id: str = ""
     ) -> TaskRecord | None:

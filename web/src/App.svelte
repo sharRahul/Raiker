@@ -26,6 +26,7 @@
   // mounted across route visits to keep their transcripts alive.
   import LazyRoute from "./lib/components/LazyRoute.svelte";
   import { prefetchRoutes } from "./lib/routeComponents";
+  import { mayLeave } from "./lib/leaveGuard";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
   // REM-SET-NOTIFY — unread notices belong wherever the owner is. The strip was
@@ -164,7 +165,16 @@
     };
     updateNavigationMode();
     navigationQuery?.addEventListener("change", updateNavigationMode);
+    // DEC-09 step 5 — the address the shell last showed, so a page that asks
+    // to stay (unsaved work) can be stayed on: the address is put back without
+    // a second hashchange and nothing below runs.
+    let shownHash = window.location.hash;
     const handler = () => {
+      if (window.location.hash !== shownHash && !mayLeave(window.location.hash)) {
+        history.replaceState(history.state, "", shownHash || "#/");
+        return;
+      }
+      shownHash = window.location.hash;
       navigationDrawerOpen = false;
       // UX-SETPOP-03 — More is navigation: any route change, including the
       // browser's Back, closes it, so the sheet never stands over a page it did

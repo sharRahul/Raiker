@@ -2,6 +2,7 @@
   import {
     TIMEZONE_KEY,
     localTimeIn,
+    utcOffset,
     resolvedTimezone,
     timezoneOptions,
     timezoneProposal,
@@ -59,6 +60,7 @@
     return () => clearInterval(timer);
   });
   const sample = $derived(localTimeIn(resolved.zone, now));
+  const offset = $derived(utcOffset(resolved.zone, now));
 </script>
 
 <header class="section-heading">
@@ -139,6 +141,12 @@
   <p class="resolved" data-testid="timezone-resolved">
     <strong>{resolved.zone}</strong> · {timezoneSourceLabel(resolved.source)}
     {#if sample}<br /><span class="clock">Right now that reads {sample}.</span>{/if}
+    <!-- DEC-21 — the offset a schedule is computed from, said as a number. A
+         task stores the zone it was composed in (UX-TASK-02), so changing this
+         does not move a task that is already scheduled. -->
+    {#if offset}<br /><span class="clock" data-testid="timezone-offset">That is {offset} right
+      now; the offset moves at a clock change. Tasks already scheduled keep the zone they
+      were set in.</span>{/if}
   </p>
   {#if proposal}
     <p class="proposal" data-testid="timezone-proposal">

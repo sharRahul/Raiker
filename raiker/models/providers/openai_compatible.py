@@ -31,6 +31,7 @@ from raiker.models.exceptions import (
 from raiker.models.health import ProviderHealth
 from raiker.models.providers.http import (
     ProviderHttpTransport,
+    bounded_lines,
     json_object,
     provider_status_error,
 )
@@ -495,7 +496,7 @@ class AsyncOpenAICompatibleProvider:
                 json=self._payload(request, stream=True),
                 timeout=self.timeout,
             ) as response:
-                async for line in response.aiter_lines():
+                async for line in bounded_lines(response):
                     if not line or not line.startswith("data:"):
                         continue
                     data = line.removeprefix("data:").strip()

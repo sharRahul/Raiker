@@ -441,3 +441,65 @@ describe("saving while the owner is still editing", () => {
     expect(marks[0].closest("button")?.textContent).toMatch(/Personalisation/);
   });
 });
+
+// DEC-09 step 5 — leaving Settings with an edit that was never saved asks
+// first; moving between its own sections does not, and nothing asks once the
+// edit is saved or discarded.
+describe("unsaved changes when leaving Settings", () => {
+  async function editSomething() {
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+  }
+
+  it("asks before another page, and stays when the owner says so", async () => {
+    stubApi();
+    const { mayLeave } = await import("../leaveGuard");
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmSpy);
+    render(SettingsView, { props: { principal: "alice" } });
+    await editSomething();
+
+    expect(mayLeave("#/settings?tab=general")).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(mayLeave("#/chat")).toBe(false);
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/not saved/));
+
+    confirmSpy.mockReturnValue(true);
+    expect(mayLeave("#/chat")).toBe(true);
+  });
+
+  it("does not ask once the edit is discarded", async () => {
+    stubApi();
+    const { mayLeave } = await import("../leaveGuard");
+    const confirmSpy = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirmSpy);
+    render(SettingsView, { props: { principal: "alice" } });
+    await editSomething();
+    await fireEvent.click(screen.getByRole("button", { name: /discard/i }));
+    expect(mayLeave("#/chat")).toBe(true);
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it("holds the browser's own prompt for a reload while an edit is unsaved", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+    await editSomething();
+    const pending = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(pending);
+    expect(pending.defaultPrevented).toBe(true);
+  });
+
+  it("stops asking when the page is gone", async () => {
+    stubApi();
+    const { mayLeave } = await import("../leaveGuard");
+    vi.stubGlobal("confirm", vi.fn(() => false));
+    const view = render(SettingsView, { props: { principal: "alice" } });
+    await editSomething();
+    view.unmount();
+    expect(mayLeave("#/chat")).toBe(true);
+  });
+});

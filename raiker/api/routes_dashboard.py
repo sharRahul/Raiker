@@ -12,6 +12,7 @@ from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
+    ApproveMcpToolsRequest,
     AuthSessionRequest,
     AvailableModelsRequest,
     BrainSourceRequest,
@@ -68,6 +69,7 @@ from raiker.api.wire.mcp import (
     McpServerCreated,
     McpServerDeleted,
     McpServerRenamed,
+    McpToolsApproved,
     RemoteMcpServerCreated,
 )
 from raiker.api.wire.models import (
@@ -595,6 +597,30 @@ async def kill_mcp_server(
         McpContainment,
         _mcp_result(
             _service(request).kill_mcp_server(auth_data[0].principal_id, server_id, reason)
+        ),
+    )
+    return serialize_dto(answer)
+
+
+@router.post("/api/mcp/servers/{server_id}/tools/approve")
+async def approve_mcp_tools(
+    server_id: str,
+    body: ApproveMcpToolsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Accept tools a server holds for review, as declared now (DEC-15 step 10).
+
+    Human-only, owner-scoped. A tool is held when the server added it, or
+    changed how it declares it, after the owner accepted the server; until it
+    is accepted here the model is never offered it and a call to it is refused.
+    """
+    answer = cast(
+        McpToolsApproved,
+        _mcp_result(
+            _service(request).approve_mcp_tools(
+                auth_data[0].principal_id, server_id, list(body.tools)[:500]
+            )
         ),
     )
     return serialize_dto(answer)

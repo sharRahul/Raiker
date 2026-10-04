@@ -20,6 +20,9 @@ from raiker.contracts.models import HostedRoutine, SubagentContract, TaskRecord,
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
+#: The step a routine its failure streak paused shows (DEC-12 step 6).
+ROUTINE_PAUSED_STEP = "Paused after repeated failed runs"
+
 
 class TaskStore:
 
@@ -203,6 +206,53 @@ class TaskStore:
             progress_percent=0,
             completed_at=None,
             summary=summary,
+        )
+
+    def count_routine_cycle(self: SQLiteStore, task_id: str, *, failed: bool) -> int:
+        """Count one settled cycle into the routine's failure streak; return the streak.
+
+        DEC-12 step 6. A cycle that did not complete adds one; one that
+        completed starts the count again.
+        """
+        with self.connect() as connection:
+            if failed:
+                connection.execute(
+                    "UPDATE tasks SET failed_cycles = failed_cycles + 1 WHERE task_id = ?",
+                    (task_id,),
+                )
+            else:
+                connection.execute(
+                    "UPDATE tasks SET failed_cycles = 0 WHERE task_id = ?", (task_id,)
+                )
+            row = connection.execute(
+                "SELECT failed_cycles FROM tasks WHERE task_id = ?", (task_id,)
+            ).fetchone()
+        return int(row["failed_cycles"]) if row is not None else 0
+
+    def pause_routine(self: SQLiteStore, task_id: str, summary: str) -> None:
+        """Park a routine its failure streak stopped; it keeps its schedule terms."""
+        self._update_task(
+            task_id,
+            status="paused",
+            current_step=ROUTINE_PAUSED_STEP,
+            progress_percent=0,
+            summary=summary,
+        )
+
+    def resume_paused_routine(self: SQLiteStore, task_id: str) -> bool:
+        """Make a routine its failure streak paused due now, with the count reset.
+
+        Atomic on the status, so two presses of Continue run it once. Returns
+        whether this call was the one that resumed it.
+        """
+        now = utc_now()
+        return (
+            self._execute(
+                "UPDATE tasks SET status = 'queued', scheduled_at = ?, failed_cycles = 0, "
+                "current_step = ?, updated_at = ? WHERE task_id = ? AND status = 'paused'",
+                (now, "Ready to start", now, task_id),
+            )
+            == 1
         )
 
     def _update_task(self: SQLiteStore, task_id: str, **updates: str | int | None) -> None:

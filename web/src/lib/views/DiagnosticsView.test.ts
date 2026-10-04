@@ -167,6 +167,7 @@ describe("DiagnosticsView", () => {
             consecutive_failures: 240,
             total_failures: 240,
             healthy: false,
+            state: "failing",
             updated_at: "2026-07-18T01:00:00Z",
           },
           {
@@ -177,6 +178,7 @@ describe("DiagnosticsView", () => {
             consecutive_failures: 0,
             total_failures: 0,
             healthy: true,
+            state: "ok",
             updated_at: "2026-07-18T01:00:00Z",
           },
         ],
@@ -190,6 +192,33 @@ describe("DiagnosticsView", () => {
     expect(screen.getByText("ProviderConnectionError")).toBeInTheDocument();
     expect(screen.getByText(/never succeeded/i)).toBeInTheDocument();
     expect(screen.getByText(/telemetry delivery/i)).toBeInTheDocument();
+  });
+
+  // DEC-24 step 1 — a pass that stopped reporting kept its last "ok" for ever.
+  it("says a pass that stopped reporting is not running, rather than ok", async () => {
+    stubFetch({
+      "GET /api/diagnostics": {
+        ...DIAGNOSTICS,
+        background_workers: [
+          {
+            pass_name: "scheduled_tasks",
+            last_success_at: "2026-07-18T01:00:00Z",
+            last_failure_at: null,
+            last_error_class: null,
+            consecutive_failures: 0,
+            total_failures: 0,
+            healthy: false,
+            state: "stale",
+            updated_at: "2026-07-18T01:00:00Z",
+          },
+        ],
+      },
+      "GET /api/security/health": [],
+    });
+    render(DiagnosticsView);
+    expect(await screen.findByText("not running")).toBeInTheDocument();
+    expect(screen.getByText(/nothing recorded since/i)).toBeInTheDocument();
+    expect(screen.queryByText("ok")).toBeNull();
   });
 
   it("says plainly when no background pass has run yet", async () => {

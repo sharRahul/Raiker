@@ -229,3 +229,59 @@ def test_the_framing_names_the_source_and_leads_the_content() -> None:
     body = as_model_content(sanitize_text("some page text"), source="https://example.com/x")
     assert body.index("https://example.com/x") < body.index("some page text")
     assert "not an instruction" in body
+
+
+# DEC-21 (Web access) — a refusal names the rule that made it and says why in
+# words; a name that does not resolve is not reported as a private address.
+
+
+def test_a_refusal_carries_the_rule_that_made_it() -> None:
+    from raiker.runtime.web_policy import evaluate_host, parse_rules
+
+    rules = tuple(parse_rules(["ads.example.com"]))
+    decision = evaluate_host("eu.ads.example.com", rules)
+    assert decision.reason == "web_egress_blocked"
+    assert decision.rule == "ads.example.com"
+
+
+def test_a_name_that_does_not_resolve_is_not_called_private(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from raiker.runtime.web_policy import evaluate_host, refusal_message
+
+    monkeypatch.setattr("raiker.runtime.web_policy.resolve_public_addresses", lambda h, p=443: [])
+    monkeypatch.setattr("raiker.runtime.web_policy.resolves_at_all", lambda h, p=443: False)
+    decision = evaluate_host("no-such-host.invalid", ())
+    assert decision.reason == "web_host_unresolved"
+    assert "does not resolve" in refusal_message(decision.reason_code)
+    assert "private" not in refusal_message(decision.reason_code)
+
+    # A literal address is never "unresolved": it is the address.
+    assert evaluate_host("127.0.0.1", ()).reason == "web_host_not_public"
+
+
+def test_the_check_route_says_why_and_which_list(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.cli.principal_resolver import bootstrap_owner
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    client = TestClient(create_app(tmp_path))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    assert client.post(
+        "/api/web-access/blocklist", json={"rule": "ads.example.com", "note": ""}
+    ).status_code == 201
+
+    blocked = client.post("/api/web-access/blocklist/test", json={"host": "eu.ads.example.com"})
+    assert blocked.status_code == 200, blocked.text
+    body = blocked.json()
+    assert body["allowed"] is False
+    assert body["rule"] == "ads.example.com"
+    assert body["rule_source"] == "yours"
+    assert body["explanation"].startswith("That destination is on your blocked list")
+
+    private = client.post("/api/web-access/blocklist/test", json={"host": "127.0.0.1"}).json()
+    assert private["rule"] is None and private["rule_source"] is None
+    assert "private, loopback, or link-local" in private["explanation"]

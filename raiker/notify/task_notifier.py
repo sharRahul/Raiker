@@ -120,3 +120,45 @@ def notify_task_finished(
         subject_id=task.task_id,
     )
     return notification_id
+
+
+#: DEC-12 step 6 — a routine stopped by its own failures.
+ROUTINE_PAUSED_KIND = "task_paused"
+
+
+def notify_routine_paused(store: SQLiteStore, task: TaskRecord, *, failures: int) -> str | None:
+    """Tell the owner a routine was paused after ``failures`` failed runs in a row.
+
+    Always sent: a routine is background work by definition, and this is the
+    notice the limit exists to give. ``None`` when no owner account exists or
+    the store refuses the write — the pause itself is already recorded.
+    """
+    owner = resolve_owner_principal_id(
+        store, task.session_id.removeprefix("sess_inbox_") or None
+    )
+    if not owner:
+        return None
+    title = "A routine was paused"
+    body = (
+        f"“{_title(task)}” did not complete {failures} times in a row, so Raiker paused it "
+        "rather than keep running it. Open it in Tasks to read why, then Continue or Stop it."
+    )
+    try:
+        notification_id = store.insert_notification(
+            principal_id=owner,
+            kind=ROUTINE_PAUSED_KIND,
+            title=title,
+            body=body,
+            subject_id=task.task_id,
+        )
+    except Exception:  # noqa: BLE001 - a notice must not fail the task
+        return None
+    fire_os_notification(title, body)
+    dispatch_notification_hook(
+        store,
+        owner_principal_id=owner,
+        kind=ROUTINE_PAUSED_KIND,
+        notification_id=notification_id,
+        subject_id=task.task_id,
+    )
+    return notification_id

@@ -14,7 +14,8 @@ from raiker.models.contracts import (
     ToolSpec,
     new_call_id,
 )
-from raiker.models.exceptions import ProviderConnectionError
+from raiker.models.exceptions import ProviderConnectionError, ProviderResponseValidationError
+from raiker.models.providers.http import MAX_ERROR_BODY_BYTES, MAX_RESPONSE_BYTES
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
 DEFAULT_ENDPOINT = "http://127.0.0.1:8080"
@@ -39,9 +40,12 @@ def _http_post_json(endpoint: str, path: str, payload: dict[str, Any], timeout: 
     try:
         conn.request("POST", path, body=body, headers={"Content-Type": "application/json"})
         response = conn.getresponse()
-        raw = response.read()
+        # DEC-25 — read one byte past the bound, never the whole body.
+        raw = response.read(MAX_RESPONSE_BYTES + 1)
         if response.status != 200:
             raise ProviderConnectionError(f"http_status:{response.status}")
+        if len(raw) > MAX_RESPONSE_BYTES:
+            raise ProviderResponseValidationError("provider_response_too_large")
     except (OSError, http.client.HTTPException) as exc:
         raise ProviderConnectionError(f"connection_failed:{exc}") from exc
     finally:
@@ -61,7 +65,7 @@ def _http_get_ok(endpoint: str, path: str, timeout: float) -> bool:
     try:
         conn.request("GET", path)
         response = conn.getresponse()
-        response.read()
+        response.read(MAX_ERROR_BODY_BYTES)
         return response.status == 200
     except (OSError, http.client.HTTPException):
         return False

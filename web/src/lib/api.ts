@@ -304,6 +304,8 @@ export const api = {
   mcpFindings: (serverId: string) => contract.listMcpFindings(serverId),
   pauseMcpServer: (serverId: string) => contract.pauseMcpServer(serverId),
   resumeMcpServer: (serverId: string) => contract.resumeMcpServer(serverId),
+  approveMcpTools: (serverId: string, tools: string[]) =>
+    contract.approveMcpTools(serverId, { tools }),
   notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) => contract.markNotificationRead(id),
   standingGrants: (includeInactive = true) =>

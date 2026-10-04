@@ -709,6 +709,10 @@ class McpConnectorExecutor:
             if not isinstance(raw_arguments, dict):
                 return self._fail(action.action_id, "mcp_tool_arguments_invalid")
             tool_arguments = raw_arguments
+            # DEC-15 step 10 — the same refusal the projected-tool service
+            # makes, here too, so no entry path can call a held tool.
+            if self._tool_held(action, principal.principal_id, tool_name):
+                return self._fail(action.action_id, "mcp_tool_pending_review")
             requests = [
                 _initialize_rpc(),
                 _notification("notifications/initialized"),
@@ -1308,6 +1312,56 @@ class McpConnectorExecutor:
                 ctx.note_server_request(str(message.get("method", "")))
         return responses, bytes_in, bytes_out
 
+    def _notify_newly_held(self, before: dict[str, Any], principal_id: str) -> None:
+        """Tell the owner once when a re-enumeration holds a tool for review.
+
+        DEC-15 step 10. A held tool is invisible to the model, so without a word
+        to the owner a server that grew would simply look like it had not. Only
+        a tool that was not already held is news; reconnecting a server whose
+        held tools are unchanged says nothing again.
+        """
+        from raiker.tools.mcp_review import pending_tools
+
+        server_id = str(before.get("server_id", ""))
+        after = self._store.get_mcp_server(server_id, principal_id)
+        if after is None:
+            return
+        already = {tool["name"] for tool in pending_tools(before)}
+        fresh = [tool for tool in pending_tools(after) if tool["name"] not in already]
+        if not fresh:
+            return
+        name = str(after.get("name", "")) or "An MCP server"
+        count = len(fresh)
+        noun = "tool" if count == 1 else "tools"
+        self._store.insert_notification(
+            principal_id=principal_id,
+            kind="mcp_tools_held",
+            title=f"{name} offers {count} {noun} you have not reviewed",
+            body=(
+                f"{name} added or changed {', '.join(tool['name'] for tool in fresh[:5])}"
+                f"{' and more' if count > 5 else ''} since you accepted it. Raiker is not "
+                "offering them to the model until you review them in Extensions → MCP servers."
+            ),
+            subject_id=server_id,
+        )
+
+    def _tool_held(self, action: GovernedAction, principal_id: str, tool_name: str) -> bool:
+        """True when a stored profile holds ``tool_name`` for the owner's review.
+
+        A call naming no stored profile (the ad-hoc stdio path) has no accepted
+        set to compare with and is governed as it always was.
+        """
+        from raiker.tools.mcp_review import approved_tool_names
+
+        server_id = str(action.arguments.get("server_id", "")).strip()
+        try:
+            row = self._store.get_mcp_server(server_id, principal_id) if server_id else None
+        except Exception:  # noqa: BLE001 — an unreadable profile cannot prove acceptance
+            return True
+        if row is None:
+            return False
+        return tool_name not in approved_tool_names(row)
+
     def _record_connection(
         self,
         action: GovernedAction,
@@ -1348,6 +1402,8 @@ class McpConnectorExecutor:
                     server_features=server_features, last_connected_at=utc_now(),
                     protocol_version=protocol_version,
                 )
+                if tools is not None:
+                    self._notify_newly_held(existing, principal_id)
                 return
             fallback = (
                 name

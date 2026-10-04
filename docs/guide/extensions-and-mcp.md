@@ -208,6 +208,32 @@ available and in what form. Each connected card carries the matching **Callable
 by Raiker** / **Not callable yet** chip, so a card can no longer disagree with
 the runtime.
 
+### When a server's tools change
+
+A server says what tools it has every time Raiker connects to it, and it can say
+something different next time. Raiker does not take its word for the change.
+What you accepted is remembered per tool — its name, its description and the
+arguments it takes — and the model is offered a tool only while it still reads
+the way you accepted it.
+
+- The first **Test** of a server is where you see its tools, so those are
+  accepted. A server you added before this keeps offering what it offered.
+- A tool that appears later is **held** as **New**. A tool that keeps its name
+  but changes its description or its arguments is **held** as **Changed** — a
+  reworded description is a different promise to the model.
+- A held tool is not offered to the model, and a call to it is refused, from
+  every path. The server's card lists each held tool with the server's own
+  sentence about it, and **Accept** (or **Accept all**) takes it as it reads
+  now; if it changes again, it is held again. Each acceptance is recorded in the
+  audit log by tool name.
+- **Test** says how many it held, and the notification centre tells you once
+  when a reconnect holds something new. The card's purpose line only ever
+  quotes a tool you have accepted.
+
+The monitor's own *tool set changed* finding, which can pause the connection, is
+separate and still applies: resuming a paused server does not accept its held
+tools.
+
 A call's arguments stay out of the audit trail — the record keeps
 `arguments_length` and `content_redacted: true`, not the payload. Reaching a
 registered server runs code Raiker does not own, which is why the call carries

@@ -306,6 +306,9 @@ EVENT_TYPES = {
     # payload is redacted metadata only (name, transport, host) — never a token.
     "mcp_connection_added",
     "mcp_connection_removed",
+    # DEC-15 step 10 — the owner accepted tools a server held for review. The
+    # payload names the server and the tools, never their descriptions.
+    "mcp_tools_approved",
     # Installed-skill lifecycle. A skill is instruction text, so these record
     # what the owner installed, renamed, turned on or off, and removed — the
     # payload is metadata (name, source, checksum, sizes), never the document.
@@ -1093,6 +1096,10 @@ class TaskRecord:
     schedule_anchor: str | None = None
     schedule_until: str | None = None
     missed_run_policy: str | None = None
+    #: DEC-12 step 6 — cycles of this routine in a row that did not complete.
+    #: Reset by a cycle that completes and by the owner continuing a routine
+    #: this count paused.
+    failed_cycles: int = 0
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

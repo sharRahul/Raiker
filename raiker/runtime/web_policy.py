@@ -254,6 +254,14 @@ def resolve_public_addresses(host: str, port: int = 443) -> list[str]:
     return addresses
 
 
+def resolves_at_all(host: str, port: int = 443) -> bool:
+    """Whether *host* has any address at all from this machine, public or not."""
+    try:
+        return bool(socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP))
+    except OSError:
+        return False
+
+
 def literal_address(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
     """The address *host* literally is, including bracketed IPv6 and integer forms."""
     text = host.strip().strip("[]")
@@ -284,6 +292,8 @@ class EgressDecision:
     reason: str = ""
     detail: str = ""
     addresses: tuple[str, ...] = ()
+    #: DEC-21 (Web access) — the blocklist rule that refused it, as written.
+    rule: str = ""
 
     @property
     def reason_code(self) -> str:
@@ -304,23 +314,30 @@ def evaluate_host(
 
     for rule in rules:
         if rule.matches_host(target):
-            return EgressDecision(False, "web_egress_blocked", target)
+            return EgressDecision(False, "web_egress_blocked", target, rule=rule.raw)
 
     literal = literal_address(target)
     if literal is not None:
         for rule in rules:
             if rule.matches_address(literal):
-                return EgressDecision(False, "web_egress_blocked", target)
+                return EgressDecision(False, "web_egress_blocked", target, rule=rule.raw)
 
     addresses = resolve_public_addresses(target, port)
     if not addresses:
+        # DEC-21 — "resolves to a private address" was said of a name that
+        # does not resolve at all, sending the owner to look for a network
+        # they do not have. Both are refused; only the reason differs.
+        if literal is None and not resolves_at_all(target, port):
+            return EgressDecision(False, "web_host_unresolved", target)
         return EgressDecision(False, "web_host_not_public", target)
 
     for address in addresses:
         parsed = ipaddress.ip_address(address)
         for rule in rules:
             if rule.matches_address(parsed):
-                return EgressDecision(False, "web_egress_blocked", f"{target} ({address})")
+                return EgressDecision(
+                    False, "web_egress_blocked", f"{target} ({address})", rule=rule.raw
+                )
 
     return EgressDecision(True, addresses=tuple(addresses))
 
@@ -337,6 +354,10 @@ def refusal_message(reason_code: str) -> str:
         "web_egress_blocked": (
             "Web access denied: that destination is on your blocked list "
             "(Settings → Web access, or RAIKER_WEB_EGRESS_BLACKLIST)."
+        ),
+        "web_host_unresolved": (
+            "Web access denied: that name does not resolve to any address from this "
+            "machine. Check the spelling, or whether this machine can look names up."
         ),
         "web_host_not_public": (
             "Web access denied: that host resolves to a private, loopback, or link-local "

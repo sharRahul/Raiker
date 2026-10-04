@@ -830,3 +830,29 @@ describe("TasksView schedule terms and lifecycle", () => {
     expect(screen.queryByText("Now: Starting scheduled run")).toBeNull();
   });
 });
+
+// DEC-12 step 6 — a routine its failures paused says why, offers Continue, and
+// does not print the slot that last ran as its "next" run.
+describe("TasksView — a routine paused after repeated failures", () => {
+  it("states the reason and no next run", async () => {
+    const task = {
+      task_id: "task_digest", session_id: "sess_inbox", status: "paused",
+      title: "Morning inbox digest", objective: "Summarise the inbox.",
+      current_step: "Paused after repeated failed runs", progress_percent: 0,
+      created_at: "2026-10-01T09:00:00Z", updated_at: "2026-10-05T09:00:00Z",
+      completed_at: null,
+      summary: "Paused after 3 runs in a row did not complete. The last said: no model is chosen. Continue runs it once more and puts it back on its schedule.",
+      project_id: null, scheduled_at: "2026-10-05T09:00:00Z", recurrence: "daily",
+      reminder_at: null, parent_task_id: null,
+    };
+    stubFetch({
+      "GET /api/tasks": [task],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+    expect(await screen.findByText(/Paused after 3 runs in a row did not complete/)).toBeInTheDocument();
+    expect(screen.getByText(/paused — no next run until you continue it/)).toBeInTheDocument();
+    expect(screen.queryByText(/, next /)).toBeNull();
+    expect(screen.getByRole("button", { name: "Continue now" })).toBeInTheDocument();
+  });
+});

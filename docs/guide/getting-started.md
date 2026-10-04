@@ -375,6 +375,11 @@ nothing.
 The theme is a preference rather than a shell control, and lives in
 **Settings → Personalisation**.
 
+Settings keeps your edits until you press **Save changes** or **Discard
+changes**, across all of its sections. If you leave Settings for another page
+with an edit unsaved, Raiker asks first, and staying keeps the edit where it
+was; reloading or closing the tab gets your browser's own *Leave site?* prompt.
+
 The layout adapts live: below 1024 px the header menu opens navigation as an
 overlay without changing the workspace width. At 1024 px and wider, the
 256-pixel sidebar shares screen space and reflows the canvas; collapsing it

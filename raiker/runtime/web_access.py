@@ -548,6 +548,10 @@ def _url_refusal_message(reason: str) -> str:
         return "Web access denied: only https URLs may be fetched."
     if reason == "web_url_invalid":
         return "Web access denied: that is not a fetchable URL."
+    if reason.startswith("web_host_unresolved"):
+        return (
+            "Web access denied: that name does not resolve to any address from this machine."
+        )
     if reason.startswith("web_host_not_public"):
         return (
             "Web access denied: that host resolves to a private or loopback address, "

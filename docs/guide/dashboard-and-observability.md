@@ -117,7 +117,9 @@ work from starting — and each is now recorded rather than merely survived. A
 pass that is fine is one line. A pass that is failing says how many times in a
 row, the exception class it last raised, and when it last succeeded, so a
 systemic fault cannot run for days behind a page that says the runtime is
-healthy.
+healthy. A pass that has recorded nothing at all for five minutes reads **not
+running** with when it last did — the tick stopping is a fault too, and not
+having heard from a pass is never shown as *ok*.
 
 The same section names which built-in model registry this host is running:
 the packaged one, or the file an explicit `RAIKER_CONFIG_DIR` supplied. Raiker
@@ -249,6 +251,12 @@ the three sources that add up to it: your own, this host's environment, and the
 ones built into the build. The last two are read-only there, folded away and
 each naming who *can* change it — the environment list is set before Raiker is
 started, and the built-in list ships with the build.
+
+**Check a destination** answers without contacting the host. A refusal says why
+in a sentence: when a rule refused it, which rule, as written, and which of the
+three lists it is on; otherwise whether the name points inside your network or
+does not resolve from this machine at all — two different problems with two
+different fixes.
 
 A page that builds itself in the browser is reported as such rather than
 guessed at. Interactive browsing — running a page's scripts, filling a form,

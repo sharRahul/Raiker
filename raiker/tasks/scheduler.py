@@ -250,6 +250,17 @@ class TaskScheduler:
             return {"ok": False, "reason_code": "task_not_found"}
         if task.status not in ("waiting_for_approval", "paused"):
             return {"ok": False, "reason_code": f"task_not_resumable:{task.status}"}
+        if task.status == "paused" and task.failed_cycles >= ROUTINE_FAILURE_LIMIT:
+            # DEC-12 step 6 — the owner continuing a routine its failures
+            # paused: one run now, then its schedule as before.
+            TaskManager(self.store, EventLogWriter(self.store)).resume_paused_routine(task_id)
+            current = self.store.load_task(task_id)
+            return {
+                "ok": current is not None and current.status == "queued",
+                "reason_code": None,
+                "task_status": current.status if current is not None else "",
+                "summary": (current.summary if current is not None else "") or "",
+            }
         ran = await self._resume_task(task)
         current = self.store.load_task(task_id)
         return {
@@ -359,6 +370,19 @@ class TaskScheduler:
         instead of re-armed: its last cycle is the one that just settled, and the
         card says so rather than showing a slot that will never be claimed.
         """
+        # DEC-12 step 6 — a routine re-arms whatever one cycle did, so one that
+        # fails every cycle used to fail every morning for as long as nobody
+        # looked. A cycle that completes starts the count again; at the limit
+        # the routine is paused and the owner told, rather than retried blind
+        # (an uncertain external effect is never replayed on its own).
+        if outcome in ("completed", "failed"):
+            streak = manager.store.count_routine_cycle(task.task_id, failed=outcome == "failed")
+            if streak >= ROUTINE_FAILURE_LIMIT:
+                manager.record_cycle_outcome(task.task_id, outcome=outcome, summary=summary)
+                manager.pause_routine_after_failures(
+                    task.task_id, failures=streak, last_summary=summary
+                )
+                return
         scheduled_at = task.scheduled_at or utc_now()
         now = datetime.now(UTC)
         following = next_occurrence(
@@ -524,6 +548,11 @@ RUN_OUTCOMES: dict[str, tuple[str, str]] = {
     "failed": ("failed", "The run failed without a stated reason."),
 }
 
+
+#: DEC-12 step 6 — cycles of a routine in a row that may fail before it is
+#: paused and the owner told. Three is "this is not a one-off": a provider blip
+#: or a host that woke offline fails once, a broken routine fails every time.
+ROUTINE_FAILURE_LIMIT = 3
 
 #: What a skipped slot says, on the card and in the routine's history.
 MISSED_RUN_SKIPPED = (

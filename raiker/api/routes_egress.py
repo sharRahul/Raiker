@@ -8,7 +8,7 @@ accepts it takes it and does not read it back.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
@@ -34,6 +34,7 @@ from raiker.runtime.web_policy import (
     evaluate_host,
     load_blocklist,
     parse_rule,
+    refusal_message,
 )
 from raiker.storage.sqlite import SQLiteStore
 
@@ -161,8 +162,29 @@ async def test_blocklist(
         # The addresses are the evidence for the verdict; they are the machine's
         # own DNS answer, not content from the host.
         "addresses": list(decision.addresses),
+        # DEC-21 — the verdict in words, and which rule (from which of the
+        # three sources) said it, so a refusal can be acted on without reading
+        # a reason code or guessing which list it is on.
+        "explanation": "" if decision.allowed else _explanation(decision.reason_code),
+        "rule": decision.rule or None,
+        "rule_source": _rule_source(decision.rule) if decision.rule else None,
     }
     return serialize_dto(probe)
+
+
+def _explanation(reason_code: str) -> str:
+    """The refusal as a sentence of its own, for a check rather than a fetch."""
+    sentence = refusal_message(reason_code).removeprefix("Web access denied: ")
+    return sentence[:1].upper() + sentence[1:]
+
+
+def _rule_source(raw: str) -> Literal["built_in", "environment", "yours"]:
+    """Which of the three unioned sources a matched rule came from (built-in first)."""
+    if raw in DEFAULT_BLOCKED_NAMES:
+        return "built_in"
+    if raw in {rule.raw for rule in env_blocklist()}:
+        return "environment"
+    return "yours"
 
 
 # ── Git credential and grants ────────────────────────────────────────────────

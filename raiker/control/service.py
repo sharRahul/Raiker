@@ -724,12 +724,17 @@ class RuntimeControlService:
         if not mapped.ok:
             return mapped
         updated = self._store.get_mcp_server(server_id, principal.principal_id) or {}
+        from raiker.tools.mcp_review import pending_tools
+
         return ControlResult(
             ok=True,
             data={
                 "server_id": server_id,
                 "status": updated.get("status", "connected"),
                 "tools": list(updated.get("tools", [])),
+                # DEC-15 step 10 — what this test found that the owner has not
+                # accepted; none of it is offered to the model yet.
+                "pending": [tool["name"] for tool in pending_tools(updated)],
             },
         )
 
@@ -1498,6 +1503,47 @@ class RuntimeControlService:
     ) -> ControlResult:
         """Owner-scoped, human-only resume — revoke a pause/kill back to active."""
         return self._containment_transition(acting_principal_id, server_id, "resume", None)
+
+    def approve_mcp_tools(
+        self, acting_principal_id: str | None, server_id: str, tools: list[str]
+    ) -> ControlResult:
+        """Accept tools a server holds for review, as it declares them now (DEC-15 step 10).
+
+        Human-only and owner-scoped: widening what a server may offer the model
+        is the owner's act, never an agent's. Only the names asked for are
+        accepted, and only as currently declared — a tool that changes again
+        after this is held again. The audit event names the tools, never their
+        descriptions or schemas.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        accepted = self._store.approve_mcp_tools(server_id, principal.principal_id, tools)
+        if accepted is None:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        if accepted:
+            self._writer.append(
+                make_event(
+                    session_id="mcp",
+                    turn_id=None,
+                    event_type="mcp_tools_approved",
+                    actor="control_service",
+                    payload={"server_id": server_id, "tools": accepted},
+                )
+            )
+        server = self._store.get_mcp_server(server_id, principal.principal_id) or {}
+        from raiker.tools.mcp_review import pending_tools
+
+        return ControlResult(
+            ok=True,
+            data={
+                "server_id": server_id,
+                "approved": accepted,
+                "pending": [tool["name"] for tool in pending_tools(server)],
+            },
+        )
 
     def _remove_generated_mcp_file(self, server: dict[str, Any]) -> None:
         from raiker.runtime.executors.mcp import _MCP_SERVERS_DIR, _safe_workspace_relative

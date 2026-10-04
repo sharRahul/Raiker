@@ -45,6 +45,7 @@ from typing_extensions import TypedDict
 
 from raiker.models.contracts import ToolSpec
 from raiker.models.tool_registry import mcp_tool_risk_band
+from raiker.tools.mcp_review import approved_tool_names
 from raiker.tools.mcp_schema import McpToolDeclaration, decode_declarations
 
 if TYPE_CHECKING:
@@ -266,9 +267,12 @@ class McpToolService:
             if not _SEGMENT.match(server) or _SEPARATOR in server:
                 continue
             declarations = declared.get(server, {})
+            # DEC-15 step 10 — a tool the owner has not accepted as it is now
+            # (new since they looked, or declared differently) is not offered.
+            accepted = approved_tool_names(row)
             for tool in row.get("tools", []):
                 tool_name = str(tool)
-                if not _SEGMENT.match(tool_name):
+                if not _SEGMENT.match(tool_name) or tool_name not in accepted:
                     continue
                 specs.append(
                     _projected_spec(server, tool_name, declarations.get(tool_name))
@@ -330,6 +334,12 @@ class McpToolService:
             return _failed(
                 "mcp_tool_not_advertised",
                 f"The server '{server_name}' did not advertise a tool named '{tool_name}'.",
+            )
+        if tool_name not in approved_tool_names(server):
+            return _denied(
+                "mcp_tool_pending_review",
+                f"The tool '{tool_name}' on '{server_name}' is new or has changed since the "
+                "owner accepted this server, and is held until they review it on Extensions.",
             )
         if not isinstance(arguments, dict):
             return _failed("mcp_tool_arguments_invalid", "arguments must be an object.")

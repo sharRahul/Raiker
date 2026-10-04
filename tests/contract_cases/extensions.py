@@ -489,6 +489,9 @@ CASES: Cases = {
     ("POST", "/api/mcp/servers/{server_id}/pause"): _on_mcp("/pause", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/kill"): _on_mcp("/kill", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/resume"): _on_mcp("/resume"),
+    ("POST", "/api/mcp/servers/{server_id}/tools/approve"): _on_mcp(
+        "/tools/approve", {"tools": ["echo"]}
+    ),
     ("GET", "/api/mcp/offers"): _mcp_offer,
     ("GET", "/api/mcp/agent-access"): plain("/api/mcp/agent-access"),
     ("GET", "/api/command-runs"): _runs,

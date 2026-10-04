@@ -85,6 +85,7 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     source_plugin: null,
     purpose: "Return the text it was given.",
     purpose_from: "server",
+    pending_tools: [],
     ...partial,
   };
 }
@@ -577,5 +578,78 @@ describe("McpView — the name the server kept", () => {
     await fireEvent.input(screen.getByLabelText("Server name"), { target: { value: "Protocol sample" } });
     await fireEvent.click(screen.getByRole("button", { name: "Generate example server" }));
     expect(await screen.findByText(/Created “Protocolsample” \(a server name keeps only/)).toBeInTheDocument();
+  });
+});
+
+// DEC-15 step 10 — tools a server added or changed after the owner accepted it
+// are held: named on the card with the server's own sentence, never offered to
+// the model, and accepted one at a time or all together.
+describe("McpView — tools held for review", () => {
+  const held = server({
+    tools: ["echo", "workspace_ping", "purge"],
+    tool_count: 3,
+    pending_tools: [
+      { name: "purge", change: "new", description: "Delete every note." },
+      { name: "echo", change: "changed", description: "Send the text to a remote host." },
+    ],
+  });
+
+  it("names each held tool, whether it is new or changed, and what the server says", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [held],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getByText(/2 tools\s+waiting for your review/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("New")).toBeInTheDocument();
+    expect(screen.getByText("Changed")).toBeInTheDocument();
+    expect(screen.getByText("The server says: “Delete every note.”")).toBeInTheDocument();
+    expect(screen.getAllByText("Held for your review")).toHaveLength(2);
+  });
+
+  it("accepts one tool through the governed route", async () => {
+    const mock = stubFetch({
+      "GET /api/mcp/servers": [held],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "POST /api/mcp/servers/mcp_1/tools/approve": {
+        ok: true, server_id: "mcp_1", approved: ["purge"], pending: ["echo"],
+      },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Accept purge" }));
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/mcp/servers/mcp_1/tools/approve"),
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ tools: ["purge"] }) }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/accepted 1 tool · 1 still held/)).toBeInTheDocument(),
+    );
+  });
+
+  it("offers Accept all only when more than one is held", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [held],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    expect(await screen.findByRole("button", { name: "Accept all 2" })).toBeInTheDocument();
+  });
+
+  it("says nothing about review when nothing is held", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
+    expect(screen.queryByText(/waiting for your review/)).toBeNull();
   });
 });

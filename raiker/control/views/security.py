@@ -78,6 +78,9 @@ class BackgroundWorkerHealth(TypedDict):
     consecutive_failures: int
     total_failures: int
     healthy: bool
+    #: DEC-24 step 1 — ``failing`` (its last run threw), ``stale`` (nothing
+    #: recorded for longer than its cadence allows) or ``ok``.
+    state: Literal["ok", "failing", "stale"]
     updated_at: str
 
 

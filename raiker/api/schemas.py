@@ -664,6 +664,12 @@ class ContainMcpServerRequest(StrictRequest):
     reason: str | None = None
 
 
+class ApproveMcpToolsRequest(StrictRequest):
+    # DEC-15 step 10 — the held tools the owner accepts, by name. Only names
+    # the server offers and holds are accepted; anything else is ignored.
+    tools: list[str]
+
+
 class BreachCheckRequest(StrictRequest):
     password: str
     enabled: bool = False

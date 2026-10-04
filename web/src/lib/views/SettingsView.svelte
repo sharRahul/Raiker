@@ -3,6 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import { applyUiPrefs } from "../prefs.svelte";
+  import { guardUnload, registerLeaveGuard } from "../leaveGuard";
   import General from "./settings/General.svelte";
   import Notification from "./settings/Notification.svelte";
   import Personalisation from "./settings/Personalisation.svelte";
@@ -169,7 +170,31 @@
     window.location.hash = `#/settings?tab=${encodeURIComponent(id)}`;
   }
 
-  onMount(load);
+  /**
+   * DEC-09 step 5 — leaving Settings with edits that were never saved asks
+   * first. Moving between sections keeps the draft (this page stays mounted),
+   * so only a route away from Settings is a question; a reload or a closed tab
+   * gets the browser's own prompt.
+   */
+  const UNSAVED_PROMPT =
+    "You have changes in Settings that are not saved. Leave without saving them?";
+
+  function leavingSettings(nextHash: string): boolean {
+    return !/^#\/settings(?:[?/]|$)/.test(nextHash);
+  }
+
+  onMount(() => {
+    void load();
+    const unguard = registerLeaveGuard((nextHash) => {
+      if (!dirty || !leavingSettings(nextHash)) return true;
+      return window.confirm(UNSAVED_PROMPT);
+    });
+    const unguardUnload = guardUnload(() => dirty);
+    return () => {
+      unguard();
+      unguardUnload();
+    };
+  });
 </script>
 
 <!-- The topbar already says "Settings" and lists what is here. Repeating both

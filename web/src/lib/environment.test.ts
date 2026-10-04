@@ -106,3 +106,25 @@ describe("localTimeIn", () => {
     expect(localTimeIn("Europe/Lundun")).toBe("");
   });
 });
+
+// DEC-21 — the offset a schedule is computed from, as a number, for an instant.
+describe("utcOffset", () => {
+  it("names a half-hour zone and a negative zone exactly", async () => {
+    const { utcOffset } = await import("./environment");
+    const at = new Date("2026-07-06T09:06:00Z");
+    expect(utcOffset("Asia/Kolkata", at)).toBe("UTC+05:30");
+    expect(utcOffset("America/New_York", at)).toBe("UTC−04:00");
+    expect(utcOffset("UTC", at)).toBe("UTC");
+  });
+
+  it("follows a clock change rather than the zone's name", async () => {
+    const { utcOffset } = await import("./environment");
+    expect(utcOffset("Europe/London", new Date("2026-01-15T12:00:00Z"))).toBe("UTC");
+    expect(utcOffset("Europe/London", new Date("2026-07-15T12:00:00Z"))).toBe("UTC+01:00");
+  });
+
+  it("says nothing for a zone the browser does not know", async () => {
+    const { utcOffset } = await import("./environment");
+    expect(utcOffset("Not/A_Zone")).toBe("");
+  });
+});

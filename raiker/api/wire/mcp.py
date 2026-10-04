@@ -28,6 +28,8 @@ class McpServerConnected(TypedDict):
     server_id: str
     status: str
     tools: list[str]
+    #: DEC-15 step 10 — tools found that the owner has not accepted as they are.
+    pending: list[str]
 
 
 class McpServerRenamed(TypedDict):
@@ -47,3 +49,14 @@ class McpContainment(TypedDict):
     ok: bool
     server_id: str
     monitor_state: Literal["active", "paused", "killed"]
+
+
+class McpToolsApproved(TypedDict):
+    """DEC-15 step 10 — tools accepted for a server, and what it still holds."""
+
+    ok: bool
+    server_id: str
+    #: The held tools this call accepted, as they are declared now.
+    approved: list[str]
+    #: What the server still holds for review after it.
+    pending: list[str]

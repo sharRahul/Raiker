@@ -59,13 +59,13 @@ it("leaves out what cannot answer a turn, and says how many", () => {
 it("marks the current default instead of offering to set it again", () => {
   mount({ defaultModel: "openai/gpt-4o", onuse: vi.fn() });
   expect(screen.getByText("Default")).toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: "Use" })).toHaveLength(2);
+  expect(screen.getAllByRole("button", { name: /^Use / })).toHaveLength(2);
 });
 
 it("hands one model back as the new default", async () => {
   const onuse = vi.fn();
   mount({ onuse });
-  await fireEvent.click(screen.getAllByRole("button", { name: "Use" })[0]);
+  await fireEvent.click(screen.getAllByRole("button", { name: /^Use / })[0]);
   expect(onuse).toHaveBeenCalledWith("anthropic/claude-opus-4-5");
 });
 

@@ -35,6 +35,7 @@ function gen(over: Partial<ImageGeneration> & { generation_id: string }): ImageG
     created_at: "2026-09-12T10:00:00Z",
     kind: "create",
     source_generation_id: null,
+    restored_generation_id: null,
     project_id: null,
     deleted_at: null,
     references: [],
@@ -167,12 +168,14 @@ describe("the variation grid", () => {
       kind: "variation",
       created_at: "2026-09-12T11:00:00Z",
       source_generation_id: null,
+      restored_generation_id: null,
     }),
     gen({
       generation_id: "s2",
       kind: "variation",
       created_at: "2026-09-12T11:00:00Z",
       source_generation_id: null,
+      restored_generation_id: null,
     }),
   ];
 

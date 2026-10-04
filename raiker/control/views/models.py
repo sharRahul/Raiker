@@ -110,6 +110,10 @@ class ModelProfileView(View):
     # depend on a local runtime, and the UI says nothing in that case rather
     # than claiming an absence it has not established.
     provider_detected: bool | None = None
+    # Whether the runtime's service answered on this machine just now, for the
+    # runtimes Raiker can ask over loopback (Ollama). `None` for every other
+    # profile, and for one whose endpoint is off-machine: not asked, not "off".
+    provider_running: bool | None = None
     readiness_state: ReadinessState = "not_configured"
     readiness_summary: str = "No readiness check exists for this exact model."
     readiness_reason_code: str = "model_not_checked"

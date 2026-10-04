@@ -407,6 +407,15 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "this model would not think before answering, in any form this provider "
         "offers. Set Thinking back to default, or choose a model that supports it.",
     ),
+    # No model was chosen for the profile this turn reached — since the Ollama
+    # profile ships none (owner decision, 2026-10-04), the state a fresh
+    # workspace is in. Sending the owner to a readiness check would check
+    # nothing; the fix is choosing one.
+    (
+        "model_name_not_configured",
+        "no model is chosen for this provider. Choose one on Models — for Ollama, "
+        "one of the models it is serving.",
+    ),
     # GCR-31 — the model and the provider are both fine; the turn's own output
     # limit is too small to hold a minimum thinking budget and an answer. The
     # remediation is the number, so the sentence names it.

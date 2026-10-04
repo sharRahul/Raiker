@@ -90,6 +90,10 @@
     connected: boolean;
     /** The model currently pinned to this profile, or "" for none. */
     pinned: string;
+    /** Whether the service answered on this machine just now; null when not asked. */
+    running: boolean | null;
+    /** Whether the pinned model's last check passed. */
+    ready: boolean;
   }
 
   // One row per provider. llama.cpp publishes four identical slot profiles (four
@@ -131,6 +135,8 @@
         // untrue.
         pinned:
           kind !== "gguf" && profile.model && profile.model !== "<model>" ? profile.model : "",
+        running: profile.provider_running ?? null,
+        ready: profile.ready === true,
       });
     }
     // On this machine first: it needs no account, so it is the cheapest answer to
@@ -778,7 +784,11 @@
       </div>
 
       <p class="state">
-        {#if row.pinned}<span class="pinned">Selected: {modelName(row.pinned)}</span>{/if}
+        <!-- Owner decision, 2026-10-04 — a running service is said to be
+             running before anything is chosen from it, and a chosen model says
+             whether its check passed. Raiker re-checks both on its own. -->
+        {#if row.running === true}<span class="running" data-testid="service-running">Running on this device</span>{/if}
+        {#if row.pinned}<span class="pinned">Selected: {modelName(row.pinned)}</span>{#if row.ready}<span class="ready">Ready</span>{/if}{/if}
         {#if failure[row.profileId]}<span class="failed" role="alert">{failure[row.profileId]}</span>
         {:else if note[row.profileId]}<span role="status">{note[row.profileId]}</span>
         {:else if row.kind === "gguf" && ggufError}<span class="failed" role="alert">{ggufError}</span>
@@ -1117,6 +1127,11 @@
   }
   .failed {
     color: var(--danger);
+  }
+  .running,
+  .ready {
+    color: var(--ok);
+    font-weight: 700;
   }
   @media (max-width: 52rem) {
     .row {

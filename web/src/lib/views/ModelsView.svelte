@@ -32,18 +32,16 @@
   import { detectionNotice, onReturnToApp } from "../returnAndDetect";
   import { setModels } from "../models.svelte";
   import { modelDecisions } from "../surfaceModel.svelte";
-  import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
-  import DownloadsPanel from "./models/DownloadsPanel.svelte";
-  import AvailableModels from "./models/AvailableModels.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
-  import LocalFrameworkRow from "./models/LocalFrameworkRow.svelte";
-  import SpeechRuntimePanel from "./models/SpeechRuntimePanel.svelte";
   import ModelsOverview from "./models/ModelsOverview.svelte";
   import MyModels from "./models/MyModels.svelte";
   import ModelComparison from "./models/ModelComparison.svelte";
-  import WorkDefaults from "./models/WorkDefaults.svelte";
+  import { brand } from "./models/providerBrands";
+  import ModelDetailsDialog from "./models/ModelDetailsDialog.svelte";
+  import RuntimeTab from "./models/RuntimeTab.svelte";
+  import ModelPickerDialog from "./models/ModelPickerDialog.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload. `tab`
@@ -123,12 +121,8 @@
     profile.connection_configured ||
     (isCodexSubscription(profile) && codexSubscriptionStatus === "connected");
 
-  // Editable copy of the user-owned fallback sequence (ordered profile ids).
-  let sequence = $state<string[]>([]);
-  let saving = $state(false);
-  let saveError = $state<string | null>(null);
-  let saved = $state(false);
-  let addChoice = $state("");
+  /** Counts full reads, so a panel holding an edit can tell a reload from a re-read. */
+  let loadRevision = $state(0);
 
   async function load() {
     loadError = null;
@@ -163,8 +157,9 @@
       // connecting a provider, selecting a model, or reordering the fallback
       // all flow through here.
       setModels(models);
-      sequence = [...models.fallback_sequence];
-      advisorChoice = models.advisor_profile_id ?? "";
+      // A full read resets what Advanced routing is editing; the quiet
+      // re-read below does not, so a half-made sequence survives it.
+      loadRevision += 1;
     } catch (e) {
       models = null;
       // A 429 is the runtime's own request limiter, not a broken page — and
@@ -338,19 +333,6 @@
   const signInProfile = $derived(
     models?.profiles.find((p) => p.profile_id === signInFor) ?? null,
   );
-
-  function contextCapacity(profile: ModelProfile): string {
-    if (!profile.context_window_tokens) {
-      return "Not reported by this runtime. Refresh its model catalogue or configure an exact fallback before relying on a percentage.";
-    }
-    const source =
-      profile.context_window_source === "owner"
-        ? "Administrator override"
-        : profile.context_window_source === "provider"
-          ? "Reported by the provider runtime"
-          : "Configured in Raiker";
-    return `${new Intl.NumberFormat().format(profile.context_window_tokens)} tokens · ${source}`;
-  }
 
   async function configureCapacity(profile: ModelProfile) {
     const raw = window.prompt(
@@ -734,156 +716,12 @@
     }
   }
 
-  // ── Advisor model ──────────────────────────────────────────────────
-  let advisorChoice = $state("");
-  let advisorSaving = $state(false);
-  let advisorError = $state<string | null>(null);
-  let advisorSaved = $state(false);
-
-  const advisorCandidates = $derived(
-    (models?.profiles ?? []).filter((p) => p.model !== "<model>"),
-  );
-  const advisorDirty = $derived(
-    models !== null && advisorChoice !== (models.advisor_profile_id ?? ""),
-  );
-
   // FIXED-160 — the runtime's own request limiter is not a broken page, and
   // "could not check" tells an owner neither what happened nor that it clears by
   // itself. Every check on this page says so in the same words.
   const THROTTLED =
     "Too many requests in the last minute. Raiker throttled this check; wait a moment and try again.";
   const throttled = (e: unknown) => e instanceof ApiError && e.status === 429;
-
-  // BUG-82 — the advisor gets the same readiness chip and repair sentence a
-  // provider card gets, because it is a second model this runtime really calls.
-  let advisorChecking = $state(false);
-  let advisorCheckNote = $state<string | null>(null);
-  const advisorChip = $derived(
-    models?.advisor_profile_id ? readinessLabel(models.advisor_readiness_state) : null,
-  );
-
-  async function checkAdvisor() {
-    if (models === null || !models.advisor_profile_id || !models.advisor_model) return;
-    advisorChecking = true;
-    advisorCheckNote = null;
-    try {
-      const readiness = await api.checkModelReadiness(
-        models.advisor_profile_id,
-        models.advisor_model,
-      );
-      advisorCheckNote = readiness.remediation
-        ? `${readiness.summary} ${readiness.remediation}`
-        : readiness.summary;
-      await load();
-    } catch (e) {
-      advisorCheckNote = throttled(e) ? THROTTLED : "Raiker could not check the advisor model.";
-    } finally {
-      advisorChecking = false;
-    }
-  }
-
-  async function saveAdvisor() {
-    advisorSaving = true;
-    advisorError = null;
-    advisorSaved = false;
-    advisorCheckNote = null;
-    try {
-      const result = await api.setModelAdvisor(advisorChoice || null);
-      if (models !== null) {
-        models = { ...models, advisor_profile_id: result.advisor_profile_id };
-      }
-      advisorChoice = result.advisor_profile_id ?? "";
-      advisorSaved = true;
-      // A new choice has its own readiness; re-read so the chip describes the
-      // model now selected rather than the one it replaced.
-      await load();
-    } catch (e) {
-      advisorError =
-        e instanceof ApiError
-          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not save";
-    } finally {
-      advisorSaving = false;
-    }
-  }
-
-  function pickerNote(list: ProviderModelList): string {
-    switch (list.status) {
-      case "policy_denied":
-        return "Model list denied by provider policy — enable the provider's gate first. You can still type a model id.";
-      case "unsupported":
-        return "This provider does not support model listing — type a model id.";
-      default: {
-        // The FIXED-355 / FIXED-370 defect, alive in the *other* control on
-        // this page. `testNote` has read the server's classification since
-        // BUG-272; this one printed "Provider unreachable" for every failure —
-        // and it is the one on the path an owner actually walks, because
-        // choosing a model is what you do straight after connecting.
-        //
-        // A live run against an identity-linked key showed it: the provider
-        // answered in full, naming the workspace id it wanted, and the picker
-        // said the provider could not be reached.
-        const guidance = providerErrorGuidance(list.reason_code);
-        if (guidance !== null) return `${guidance.message} ${guidance.fix}`;
-        return "Provider unreachable — type a model id if you know it.";
-      }
-    }
-  }
-
-  const addable = $derived(
-    (models?.profiles ?? []).filter((p) => !sequence.includes(p.profile_id)),
-  );
-
-  const dirty = $derived(
-    models !== null &&
-      JSON.stringify(sequence) !== JSON.stringify(models.fallback_sequence),
-  );
-
-  function profileLabel(id: string): string {
-    const p = models?.profiles.find((x) => x.profile_id === id);
-    return p ? providerName(p.provider) : id;
-  }
-
-  function move(index: number, delta: number) {
-    const next = index + delta;
-    if (next < 0 || next >= sequence.length) return;
-    const copy = [...sequence];
-    [copy[index], copy[next]] = [copy[next], copy[index]];
-    sequence = copy;
-    saved = false;
-  }
-
-  function remove(index: number) {
-    sequence = sequence.filter((_, i) => i !== index);
-    saved = false;
-  }
-
-  function add() {
-    if (addChoice === "" || sequence.includes(addChoice)) return;
-    sequence = [...sequence, addChoice];
-    addChoice = "";
-    saved = false;
-  }
-
-  async function save() {
-    saving = true;
-    saveError = null;
-    saved = false;
-    try {
-      const result = await api.setModelFallback(sequence);
-      sequence = [...result.fallback_sequence];
-      if (models !== null)
-        models = { ...models, fallback_sequence: result.fallback_sequence };
-      saved = true;
-    } catch (e) {
-      saveError =
-        e instanceof ApiError
-          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not save";
-    } finally {
-      saving = false;
-    }
-  }
 
   function endpointLabel(kind: string): string {
     switch (kind) {
@@ -1080,116 +918,6 @@
     return "Sign in with your provider key, enable the required policy gate, then choose a model.";
   }
 
-  // Provider brand metadata for the sign-in screen. Each provider is researched
-  // and matches its real auth surface:
-  //   - Anthropic: API key only (docs.anthropic.com — x-api-key, no OAuth)
-  //   - OpenAI: API key (platform.openai.com — Bearer; account login is for the
-  //     dashboard, not the API itself)
-  //   - Gemini: API key (AI Studio) AND Google login (Vertex AI / ADC)
-  //   - OpenRouter: API key only (openrouter.ai — Bearer)
-  //   - Hugging Face: access token AND login (HF tokens "used in place of
-  //     password"; huggingface.co/docs)
-  //   - Ollama local: no auth; Ollama Cloud: API key
-  // Raiker stores the credential in its encrypted vault — it does not perform a
-  // real OAuth redirect (that needs backend client-id/redirect support). The
-  // "Sign in" button links to the provider's key/token page so the user can
-  // grab one, then paste it here.
-  type AuthMethod = "login" | "apikey";
-  interface Brand {
-    tint: string;
-    headline: string;
-    credentialLabel: string;
-    hint: string;
-    authMethods: AuthMethod[];
-    loginUrl?: string;
-    loginLabel?: string;
-  }
-  function brand(provider: string): Brand {
-    switch (provider) {
-      case "anthropic":
-        return {
-          tint: "#d97757",
-          headline: "Connect to Anthropic",
-          credentialLabel: "Anthropic API key",
-          hint: "Create a key at console.anthropic.com. Anthropic uses API keys only — no email login.",
-          authMethods: ["apikey"],
-          loginUrl: "https://console.anthropic.com/settings/keys",
-          loginLabel: "Get an Anthropic key",
-        };
-      case "openai":
-        // Sign-in here means signing in to the OpenAI *platform* account —
-        // Google, Microsoft, and Apple all work — to create an API key, which
-        // is then pasted below. It deliberately does not claim to use a ChatGPT
-        // subscription: ChatGPT Plus/Pro and the API are separately billed, and
-        // no subscription grants a third-party app API access. Saying so here
-        // is cheaper than a user discovering it through a 401.
-        return {
-          tint: "#10a37f",
-          headline: "Connect to OpenAI",
-          credentialLabel: "OpenAI API key",
-          hint: "Sign in to platform.openai.com with Google, Microsoft, Apple, or email, then create an API key and paste it below. API usage is billed separately from a ChatGPT subscription — a Plus or Pro plan does not include API access.",
-          authMethods: ["login", "apikey"],
-          loginUrl: "https://platform.openai.com/api-keys",
-          loginLabel: "Sign in with Google or email",
-        };
-      case "gemini":
-        return {
-          tint: "#4285f4",
-          headline: "Connect to Google AI",
-          credentialLabel: "Gemini API key",
-          hint: "Create a key in Google AI Studio. Google also supports sign-in with your Google account via Vertex AI.",
-          authMethods: ["login", "apikey"],
-          loginUrl: "https://aistudio.google.com/apikey",
-          loginLabel: "Sign in with Google",
-        };
-      case "openrouter":
-        return {
-          tint: "#6b3fa0",
-          headline: "Connect to OpenRouter",
-          credentialLabel: "OpenRouter API key",
-          hint: "Create a key at openrouter.ai/keys. OpenRouter uses API keys only.",
-          authMethods: ["apikey"],
-          loginUrl: "https://openrouter.ai/keys",
-          loginLabel: "Get an OpenRouter key",
-        };
-      case "huggingface":
-        return {
-          tint: "#ff9d00",
-          headline: "Connect to Hugging Face",
-          credentialLabel: "Hugging Face access token",
-          hint: "Create a token at huggingface.co/settings/tokens. You can also sign in with your Hugging Face account.",
-          authMethods: ["login", "apikey"],
-          loginUrl: "https://huggingface.co/settings/tokens",
-          loginLabel: "Sign in to Hugging Face",
-        };
-      case "ollama-cloud":
-        return {
-          tint: "#22c55e",
-          headline: "Connect to Ollama Cloud",
-          credentialLabel: "Ollama Cloud API key",
-          hint: "Managed Ollama endpoint key. Create one from your Ollama Cloud account.",
-          authMethods: ["apikey"],
-        };
-      case "openai-compatible":
-        return {
-          tint: "#0f766e",
-          headline: "Connect your endpoint",
-          credentialLabel: "API key (optional)",
-          hint: "A custom OpenAI-compatible endpoint you control (vLLM, home-lab, etc.).",
-          authMethods: ["apikey"],
-        };
-      default:
-        return {
-          tint: "#0f766e",
-          headline: `Connect to ${providerName(provider)}`,
-          credentialLabel: "API key",
-          hint: "Your provider key, stored encrypted in this Raiker instance.",
-          authMethods: ["apikey"],
-        };
-    }
-  }
-
-
   /**
    * Escape closes whichever of this page's three modals is open, as it does
    * every other dialog in the product. Innermost first, so Escape
@@ -1211,6 +939,36 @@
   });
 
   onMount(load);
+
+  /**
+   * Owner decision, 2026-10-04 — Raiker re-checks a model chosen on a local
+   * service it can ask (Ollama) on every host tick. An open page reads that
+   * answer again so *Ready* never outlives the service it describes.
+   *
+   * Quiet on purpose: no loading state and no reset of anything being edited.
+   * It skips a hidden tab, an open picker or details dialog and a selection in
+   * flight, and only runs while some profile is a watched one — a page with no
+   * local service to follow has nothing to re-read. Two reads every fifteen
+   * seconds stay far inside the host's per-minute request budget.
+   */
+  const WATCH_INTERVAL_MS = 15_000;
+  async function rereadQuietly() {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (pickerFor !== null || detailsFor !== null || selecting) return;
+    if (!models?.profiles.some((profile) => typeof profile.provider_running === "boolean")) return;
+    try {
+      const fresh = await api.models();
+      models = fresh;
+      setModels(fresh);
+      void modelDecisions().then((answer) => (decisions = answer));
+    } catch {
+      // The last answer stands; the next tick asks again.
+    }
+  }
+  onMount(() => {
+    const timer = window.setInterval(() => void rereadQuietly(), WATCH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  });
 </script>
 
 <div class="head-row">
@@ -1497,7 +1255,31 @@
                              only when detection has an answer — `undefined`
                              means nothing has looked, and silence is honest
                              then. -->
-                        {#if p.provider_detected === false}
+                        <!-- Owner decision, 2026-10-04 — a service Raiker can
+                             ask over loopback (Ollama) says whether it is
+                             running now, not only whether it is installed. A
+                             running service with no model chosen is the one
+                             state that needs the owner, and the row's primary
+                             action below says so. -->
+                        {#if p.provider_running === true}
+                          <p class="posture-line runtime-running" data-testid="runtime-running">
+                            <Icon name="check" size="sm" />
+                            {namesAModel(p)
+                              ? "Running on this device. Raiker checks it and this model on its own."
+                              : "Running on this device. Choose one of its models."}
+                          </p>
+                        {:else if p.provider_running === false && (p.provider_detected === true || namesAModel(p))}
+                          <!-- A model already chosen here is the owner's evidence
+                               that the service exists, whatever the PATH says
+                               (the Ollama desktop app is not on it): stopped,
+                               not missing. -->
+                          <p class="posture-line runtime-missing" data-testid="runtime-stopped">
+                            <Icon name="warning" size="sm" />
+                            {p.provider_detected === true ? "Installed, but not running." : "Not running on this device."}
+                            Start {providerName(p.provider)} and Raiker will notice.
+                          </p>
+                        {/if}
+                        {#if p.provider_detected === false && !(p.provider_running === false && namesAModel(p))}
                           <p class="posture-line runtime-missing">
                             <Icon name="warning" size="sm" />
                             Not installed on this machine
@@ -1566,9 +1348,10 @@
                           <button
                             type="button"
                             class="btn btn-sm"
+                            class:btn-primary={p.provider_running === true}
                             onclick={() => void openPicker(p.profile_id)}
                             aria-expanded={pickerFor === p.profile_id}
-                            >Select models…</button
+                            >{p.provider_running === true ? "Choose a model" : "Select models…"}</button
                           >
                         {:else if !p.selected}
                           <button
@@ -1923,227 +1706,19 @@
         reads differently.
       </p>
 
-      <!-- Local serving, in the section about runtime rather than
-           in the middle of the list of things you could add. The slot rows are
-           unchanged; what moved is which question they answer. -->
-      <div class="local-list local-serving">
-        {#if frameworkProfiles("llama.cpp").length > 0}
-          <LocalFrameworkRow
-            provider="llama.cpp"
-            title="GGUF"
-            format="gguf"
-            profiles={frameworkProfiles("llama.cpp")}
-            description="Up to four detected GGUF models, each served in its own slot by the llama.cpp server Raiker runs for you."
-            onchanged={() => void load()}
-            ontest={(profile) => void testConnection(profile)}
-            ondetails={(profile) => (detailsFor = profile)}
-            onselect={(profile) => void select(profile.profile_id)}
-            testing={testing[frameworkProfiles("llama.cpp")[0].profile_id] === true}
-            {selecting}
-            testResult={testResults[frameworkProfiles("llama.cpp")[0].profile_id] ?? null}
-          />
-        {/if}
-        {#if frameworkProfiles("mlx").length > 0}
-          <LocalFrameworkRow
-            provider="mlx"
-            title="MLX"
-            format="mlx"
-            profiles={frameworkProfiles("mlx")}
-            description="Choose up to four detected MLX models optimized for Apple silicon."
-            onchanged={() => void load()}
-            ontest={(profile) => void testConnection(profile)}
-            ondetails={(profile) => (detailsFor = profile)}
-            onselect={(profile) => void select(profile.profile_id)}
-            testing={testing[frameworkProfiles("mlx")[0].profile_id] === true}
-            {selecting}
-            testResult={testResults[frameworkProfiles("mlx")[0].profile_id] ?? null}
-          />
-        {/if}
-        <!-- BUG-256 — dictation's runtime is a local runtime, and it
-             belongs beside the others rather than in a category of
-             its own. Nothing here is contacted until Save and test. -->
-        <SpeechRuntimePanel />
-      </div>
-
-      <!-- The library answers "what is on disk"; the serving rows
-           above answer "what is running". They were interleaved. -->
-      <LocalLibraryPanel />
-
-      <!-- Two facts told apart: what each surface starts on, and what would
-           really answer right now. The fallback sequence that produces the second is edited
-           directly beneath, so cause and effect are on one screen. -->
-      <WorkDefaults {models} />
-
-      <!-- REM-MODEL-02 / UX-MODEL-05 — orchestration tuning, one reach down.
-           The two controls below decide what happens when the owner's model
-           *cannot* serve, and what a local model may consult. Both are real and
-           both stay editable; neither is what somebody opens this tab to find
-           out. Above them, `WorkDefaults` already answers the ordinary
-           questions — what each surface starts on, and what would really answer
-           right now — and it keeps naming a fallback that displaced a selection
-           **outside** this disclosure, because a substitution that changes
-           provider, and therefore where the owner's words go, is never
-           something to fold away. What is folded is the tuning, not the
-           disclosure. -->
-      <details class="advanced-routing">
-        <summary>
-          <span>
-            <strong>Advanced routing</strong>
-            <small>What runs when the selected model cannot, and the advisor a local model may consult.</small>
-          </span>
-          <Icon name="chevron-down" size="md" />
-        </summary>
-
-        <section class="card fallback" aria-labelledby="fallback-h">
-          <h2 id="fallback-h">Model fallback sequence</h2>
-
-          {#if sequence.length === 0}
-            <p class="fallback-empty">
-              No fallback configured. The turn fails closed if the selected
-              provider is unavailable.
-            </p>
-          {:else}
-            <ol class="fallback-list">
-              {#each sequence as id, i (id)}
-                <li class="fallback-item">
-                  <span class="rank">{i + 1}</span>
-                  <span class="fallback-name">
-                    {profileLabel(id)}
-                  </span>
-                  <span class="fallback-actions">
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      onclick={() => move(i, -1)}
-                      disabled={i === 0}
-                      aria-label="Move up">↑</button
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      onclick={() => move(i, 1)}
-                      disabled={i === sequence.length - 1}
-                      aria-label="Move down">↓</button
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-sm"
-                      onclick={() => remove(i)}
-                      aria-label="Remove">Remove</button
-                    >
-                  </span>
-                </li>
-              {/each}
-            </ol>
-          {/if}
-
-          <div class="fallback-add">
-            <select bind:value={addChoice} aria-label="Add a fallback backend">
-              <option value="">Add a backend…</option>
-              {#each addable as p (p.profile_id)}
-                <option value={p.profile_id}
-                  >{providerName(p.provider)}{namesAModel(p)
-                    ? ` (${modelName(p.model)})`
-                    : " (no model)"}</option
-                >
-              {/each}
-            </select>
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={add}
-              disabled={addChoice === ""}>Add</button
-            >
-          </div>
-
-          <div class="fallback-save">
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              onclick={save}
-              disabled={!dirty || saving}
-            >
-              {saving ? "Saving…" : "Save sequence"}
-            </button>
-            {#if saveError}
-              <span class="error" role="alert">{saveError}</span>
-            {:else if saved && !dirty}
-              <span class="ok-note">Saved.</span>
-            {/if}
-          </div>
-        </section>
-
-        <section class="card advisor" aria-labelledby="advisor-h">
-          <h2 id="advisor-h">Advisor model</h2>
-          <p class="sub">
-            A local model can consult one advisor through the governed
-            <code>consult_advisor</code> tool. Picking one grants nothing: every
-            consult is still gated at call time.
-            <GuideLink section="connecting-a-model" label="How an advisor is governed" />
-          </p>
-          <div class="advisor-row">
-            <select bind:value={advisorChoice} aria-label="Advisor model profile">
-              <option value="">No advisor</option>
-              {#each advisorCandidates as p (p.profile_id)}
-                <option value={p.profile_id}
-                  >{providerName(p.provider)} — {modelName(p.model)}</option
-                >
-              {/each}
-            </select>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              onclick={saveAdvisor}
-              disabled={!advisorDirty || advisorSaving}
-            >
-              {advisorSaving ? "Saving…" : "Save advisor"}
-            </button>
-            {#if advisorError}
-              <span class="error" role="alert">{advisorError}</span>
-            {:else if advisorSaved && !advisorDirty}
-              <span class="ok-note">Saved.</span>
-            {/if}
-          </div>
-          <!-- BUG-82 — what the last check of the *exact* advisor model found, and
-               the one control that repairs it. Without this an owner could pin an
-               advisor with no credential, no credit or no running runtime and see
-               nothing wrong until a consult failed mid-turn. -->
-          {#if models?.advisor_profile_id}
-            <div class="advisor-readiness">
-              {#if advisorChip}
-                <span
-                  class="chip"
-                  class:chip-ok={models.advisor_readiness_state === "ready"}
-                  class:chip-warn={models.advisor_readiness_state !== "ready"}
-                  data-testid="advisor-readiness-chip"
-                  title={models.advisor_readiness_summary ?? undefined}>{advisorChip}</span
-                >
-              {/if}
-              <span class="advisor-model-name">{modelName(models.advisor_model ?? "")}</span>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                onclick={checkAdvisor}
-                disabled={advisorChecking || !models.advisor_model}
-              >
-                {advisorChecking ? "Checking…" : "Check advisor"}
-              </button>
-            </div>
-            {#if advisorCheckNote}
-              <p class="sub" role="status">{advisorCheckNote}</p>
-            {:else if models.advisor_readiness_state !== "ready" && models.advisor_readiness_remediation}
-              <p class="sub" role="status">
-                {models.advisor_readiness_summary} {models.advisor_readiness_remediation}
-              </p>
-            {/if}
-          {/if}
-        </section>
-      </details>
-
-      <!-- Downloads, conversions and pulls are what the
-           runtime is *doing*, so they belong to the runtime rather than beside
-           Pricing as a sixth peer tab. -->
-      <DownloadsPanel />
+      <RuntimeTab
+        {models}
+        revision={loadRevision}
+        onreload={load}
+        gguf={frameworkProfiles("llama.cpp")}
+        mlx={frameworkProfiles("mlx")}
+        {testing}
+        {testResults}
+        {selecting}
+        ontest={(profile) => void testConnection(profile)}
+        ondetails={(profile) => (detailsFor = profile)}
+        onselect={(profile) => void select(profile.profile_id)}
+      />
     </div>
   {/if}
 
@@ -2167,124 +1742,15 @@
 
 
 {#if detailsFor}
-  {@const capacityEntry = capacities?.entries.find(
-    (entry) =>
-      entry.profile_id === detailsFor!.profile_id &&
-      entry.model === detailsFor!.model,
-  )}
-  <div
-    class="details-overlay"
-    role="presentation"
-    onclick={(event) =>
-      event.target === event.currentTarget && (detailsFor = null)}
-  >
-    <div
-      class="details-dialog card"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="model-details-title"
-      tabindex="-1"
-    >
-      <button
-        class="close"
-        aria-label="Close model details"
-        onclick={() => (detailsFor = null)}>×</button
-      >
-      <p class="eyebrow">Model details</p>
-      <div class="details-heading">
-        <ProviderLogo provider={detailsFor.provider} size={28} />
-        <h2 id="model-details-title">{providerName(detailsFor.provider)}</h2>
-      </div>
-      <dl class="details-grid">
-        <div>
-          <dt>Selected model</dt>
-          <dd>
-            <code
-              >{detailsFor.selected
-                ? modelName(detailsFor.model)
-                : "Not selected"}</code
-            >
-          </dd>
-        </div>
-        <div>
-          <dt>Connection</dt>
-          <dd>
-            {detailsFor.connection_configured
-              ? "Encrypted instance connection saved"
-              : "Not configured"}
-            <!-- BUG-274 — that a workspace is named, never which one. Here
-                 rather than on the card: the card carries readiness and nothing
-                 else by design (BUG-208 slice E), and this is credential
-                 management, which is what Details already holds. -->
-            {#if detailsFor.workspace_configured}
-              · workspace named
-            {/if}
-          </dd>
-        </div>
-        <div>
-          <dt>Context capacity</dt>
-          <dd>{contextCapacity(detailsFor)}</dd>
-        </div>
-        <div>
-          <dt>Local refresh</dt>
-          <dd>
-            {capacities?.sync.find(
-              (state) => state.profile_id === detailsFor?.profile_id,
-            )?.next_refresh_at
-              ? `Next check ${capacities.sync.find((state) => state.profile_id === detailsFor?.profile_id)?.next_refresh_at}`
-              : "Scheduled when this local runtime is available"}
-          </dd>
-        </div>
-        <div>
-          <dt>Current context usage</dt>
-          <dd>
-            No provider context telemetry has been received for this model yet.
-          </dd>
-        </div>
-        <div>
-          <dt>Subscription / rate limits</dt>
-          <dd>
-            Not available through this connection. Raiker only displays daily or
-            weekly limits when an authorized provider API exposes them.
-          </dd>
-        </div>
-      </dl>
-      {#if detailsFor.connection_configured}
-        <div class="details-actions">
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            onclick={() => openSignIn(detailsFor!.profile_id)}>Reconnect</button
-          >
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-label={`Disconnect ${providerName(detailsFor.provider)}`}
-            onclick={() => void disconnectConnection(detailsFor!)}
-            disabled={disconnecting[detailsFor.profile_id] === true}
-            >{disconnecting[detailsFor.profile_id] === true
-              ? "Disconnecting…"
-              : "Disconnect"}</button
-          >
-        </div>
-      {/if}
-      {#if capacities?.can_override}<button
-          class="btn btn-ghost btn-sm"
-          onclick={() => void configureCapacity(detailsFor!)}
-          >Configure exact capacity</button
-        >{/if}
-      {#if capacityEntry?.history.length}<details>
-          <summary>Administrator override history</summary>
-          <ol>
-            {#each capacityEntry.history as event}<li>
-                {event.action} · {event.context_window_tokens?.toLocaleString() ??
-                  "cleared"} · {event.recorded_at}{#if event.reason}
-                  — {event.reason}{/if}
-              </li>{/each}
-          </ol>
-        </details>{/if}
-    </div>
-  </div>
+  <ModelDetailsDialog
+    profile={detailsFor}
+    {capacities}
+    disconnecting={disconnecting[detailsFor.profile_id] === true}
+    onclose={() => (detailsFor = null)}
+    onreconnect={(profile) => openSignIn(profile.profile_id)}
+    ondisconnect={(profile) => void disconnectConnection(profile)}
+    onconfigure={(profile) => void configureCapacity(profile)}
+  />
 {/if}
 
 <!-- Choosing a model is a decision with a catalogue behind it, so it gets a
@@ -2292,67 +1758,18 @@
      other provider down the page and turned a six-model list into a scroll
      inside a scroll. -->
 {#if pickerFor !== null && pickerProfile !== null}
-  <div
-    class="signin-overlay"
-    role="presentation"
-    onclick={(event) => event.target === event.currentTarget && closePicker()}
-  >
-    <div
-      class="signin-dialog picker-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="picker-title"
-      tabindex="-1"
-    >
-      <button class="close" aria-label="Close model picker" onclick={closePicker}>×</button>
-      <div class="signin-logo">
-        <ProviderLogo provider={pickerProfile.provider} size={40} />
-      </div>
-      <h2 id="picker-title">{providerName(pickerProfile.provider)} models</h2>
-      {#if pickerLoading}
-        <p class="picker-note" role="status">
-          Loading models from {providerName(pickerProfile.provider)}…
-        </p>
-      {:else if pickerList !== null && pickerList.status === "available" && pickerList.models.length > 0}
-        <!-- Each switch is the whole decision: on means this model is offered
-             everywhere, off means it is not. There is no second "Use model"
-             step, because there was never a second question. -->
-        <AvailableModels
-          profileId={pickerProfile.profile_id}
-          catalogue={pickerList.models}
-          chosen={availableModelsFor(pickerProfile.profile_id)}
-          onsaved={() => void load()}
-        />
-        <div class="picker-actions">
-          <button type="button" class="btn btn-ghost btn-sm" onclick={closePicker}>Done</button>
-        </div>
-      {:else}
-        <p class="picker-note">
-          {pickerList !== null
-            ? pickerNote(pickerList)
-            : "Model list unavailable — enter a custom model name."}
-        </p>
-        <input
-          class="picker-input"
-          type="text"
-          placeholder="Custom model name"
-          bind:value={pickerChoice}
-          aria-label="Custom model name"
-        />
-        <div class="picker-actions">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            onclick={() => pickerFor && void select(pickerFor, pickerChoice)}
-            disabled={selecting || pickerChoice.trim() === ""}
-            >{selecting ? "Selecting…" : "Use model"}</button
-          >
-          <button type="button" class="btn btn-ghost btn-sm" onclick={closePicker}>Cancel</button>
-        </div>
-        {#if selectError}<p class="error picker-error" role="alert">{selectError}</p>{/if}
-      {/if}
-    </div>
-  </div>
+  <ModelPickerDialog
+    profile={pickerProfile}
+    list={pickerList}
+    loading={pickerLoading}
+    chosen={availableModelsFor(pickerProfile.profile_id)}
+    {selecting}
+    {selectError}
+    bind:choice={pickerChoice}
+    onclose={closePicker}
+    onuse={(model) => pickerFor && void select(pickerFor, model)}
+    onsaved={() => void load()}
+  />
 {/if}
 
 {#if signInFor !== null && signInProfile !== null}
@@ -2509,20 +1926,6 @@
 {/if}
 
 <style>
-  /* REM-MODEL-02 — the advanced-routing disclosure, in the same shape Memory's
-     "Advanced memory management" already uses, so a second idiom for "this is
-     the tuning" does not appear on a second page. */
-  .advanced-routing { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--raised); }
-  .advanced-routing > summary {
-    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
-    padding:var(--space-3) var(--space-4); cursor:pointer; color:var(--text-1);
-  }
-  .advanced-routing > summary span { display:grid; gap:2px; min-width:0; }
-  .advanced-routing > summary small { color:var(--text-3); font-size:var(--text-xs); }
-  .advanced-routing[open] > summary { border-bottom:1px solid var(--border); }
-  .advanced-routing[open] > summary :global(svg) { transform:rotate(180deg); }
-  .advanced-routing > :global(section.card) { border:0; border-radius:0; background:transparent; }
-
   /* Each panel keeps the vertical rhythm the page had as one scroll, so moving
      a section into a tab changed where it lives, not how it reads. */
   /* A grid column left at `auto` is sized by the widest thing inside it, so one
@@ -2659,10 +2062,11 @@
   .install-notice {
     color: var(--text-2);
   }
-  .details-actions {
+  .runtime-running {
     display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--ok, var(--text-2));
   }
   .usage-strip {
     border-top: 1px solid var(--border);
@@ -2871,37 +2275,6 @@
     color: var(--warn);
   }
 
-  .picker-dialog {
-    display: grid;
-    gap: 0.7rem;
-    text-align: left;
-  }
-  .picker-dialog h2 {
-    margin: 0;
-  }
-  .picker-input {
-    padding: 0.35rem 0.5rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text-1);
-    max-width: 100%;
-    font: inherit;
-    font-size: var(--text-md);
-  }
-  .picker-note {
-    font-size: var(--text-xs);
-    color: var(--text-3);
-    margin: 0;
-  }
-  .picker-actions {
-    display: flex;
-    gap: 0.4rem;
-  }
-  .picker-error {
-    font-size: var(--text-sm);
-    margin: 0;
-  }
   .test-result {
     color: var(--text-2);
     font-size: var(--text-xs);
@@ -3087,31 +2460,7 @@
     font-size: var(--text-xs);
   }
 
-  /* ── Details modal ── */
-  .details-overlay {
-    align-items: center;
-    background: var(--overlay);
-    display: flex;
-    inset: 0;
-    justify-content: center;
-    padding: var(--space-4);
-    position: fixed;
-    z-index: var(--z-scrim);
-  }
-  .details-dialog {
-    max-width: 42rem;
-    position: relative;
-    width: min(100%, 42rem);
-  }
-  .details-heading {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    margin-bottom: 0.9rem;
-  }
-  .details-dialog h2 {
-    margin: 0;
-  }
+  /* The picker's and the sign-in dialog's close control. */
   .close {
     background: transparent;
     border: 0;
@@ -3123,120 +2472,7 @@
     right: 0.75rem;
     top: 0.65rem;
   }
-  .details-grid {
-    display: grid;
-    gap: 0.85rem;
-    margin: var(--space-4) 0 0;
-  }
-  .details-grid div {
-    border-top: 1px solid var(--border);
-    padding-top: 0.65rem;
-  }
-  .details-grid dt {
-    color: var(--text-3);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .details-grid dd {
-    color: var(--text-2);
-    line-height: 1.45;
-    margin: 0.2rem 0 0;
-  }
 
-  /* ── Fallback / advisor / gates ── */
-  .fallback {
-    margin-top: var(--space-4);
-  }
-  .fallback-empty {
-    color: var(--text-3);
-    font-size: var(--text-sm);
-    margin: 0.5rem 0;
-  }
-  .fallback-list {
-    list-style: none;
-    margin: var(--space-3) 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .fallback-item {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    border: 1px solid var(--neutral-border);
-    border-radius: var(--r-md);
-    background: var(--neutral-soft);
-    padding: 0.4rem 0.6rem;
-  }
-  .rank {
-    font-weight: 700;
-    color: var(--text-3);
-    min-width: 1.2rem;
-    text-align: center;
-  }
-  .fallback-name {
-    flex: 1;
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-  .fallback-actions {
-    display: flex;
-    gap: 0.25rem;
-  }
-  .fallback-add,
-  .fallback-save {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin-top: var(--space-3);
-    flex-wrap: wrap;
-  }
-  .fallback-add select {
-    max-width: 22rem;
-    font-size: var(--text-sm);
-  }
-  .ok-note {
-    color: var(--ok);
-    font-size: var(--text-sm);
-  }
-  .advisor {
-    margin-top: var(--space-4);
-  }
-  .advisor .sub {
-    margin-bottom: var(--space-3);
-  }
-  .advisor-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-  }
-  /* BUG-82 — the advisor's readiness sits directly under its selector, in the
-     same chip vocabulary a provider card uses, so the two models this runtime
-     runs are reported the same way. */
-  .advisor-readiness {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-top: 0.6rem;
-  }
-  .advisor-model-name {
-    font-family: var(--font-mono, monospace);
-    font-size: var(--text-sm);
-    color: var(--text-2);
-  }
-  .advisor-row select {
-    max-width: 22rem;
-    font-size: var(--text-sm);
-  }
   /* The four off-machine facts, read as a strip above the Hosted cards rather
      than as a card of their own on a tab of their own. */
   .gates {
@@ -3257,11 +2493,6 @@
   }
   .gates dd {
     margin: 0.1rem 0 0;
-  }
-  .sub {
-    color: var(--text-3);
-    font-size: var(--text-sm);
-    margin: 0;
   }
   @media (max-width: 44rem) {
     .setup-overview,

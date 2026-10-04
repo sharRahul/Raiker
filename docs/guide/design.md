@@ -81,6 +81,14 @@ picture twice, those are two branches, and putting both in one strip would claim
 the second came after the first when neither came from the other. **Variations**
 is the set of pictures one request produced, side by side.
 
+**Compare with**, under the version strip, puts an earlier version of this
+picture beside the one you are looking at, each named by its place in the line.
+**Go back to version N** then adds a *new* version carrying that earlier picture
+on top of the line — nothing you made since is removed or changed, no provider
+is asked to draw it again, and the inspector says which version it **Went back
+to**. You can only go back along this picture's own line, never sideways to a
+different picture.
+
 **Refused attempts** sits with them. An edit the provider refused is still
 something you asked of *this* picture, so it is recorded against it and shown
 there, with the reason, rather than disappearing.
@@ -106,7 +114,9 @@ lineage. A picture in Recently deleted cannot be the subject of an edit.
 
 **Remove for good** is only offered there — always the second step, never the
 first — and asks you to confirm. It deletes the record and the image together,
-so nothing is left behind pointing at bytes that are gone.
+so nothing is left behind pointing at bytes that are gone. A version you went
+back to shares its image with the version it came from, so removing one of them
+for good keeps the image for the other.
 
 ## What it needs before it can generate anything
 

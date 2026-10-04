@@ -47,6 +47,7 @@
     ondelete = undefined,
     onrestore = undefined,
     onpurge = undefined,
+    onrevert = undefined,
   }: {
     turns: ImageGeneration[];
     loading?: boolean;
@@ -76,6 +77,8 @@
     ondelete?: (generationId: string) => Promise<void>;
     onrestore?: (generationId: string) => Promise<void>;
     onpurge?: (generationId: string) => Promise<void>;
+    /** DEC-07 step 4 — bring `toId` back as a new version on top of `headId`. */
+    onrevert?: (headId: string, toId: string) => Promise<void>;
   } = $props();
 
   /** The picture whose lifecycle request is in flight, so only its controls wait. */
@@ -117,6 +120,34 @@
   const versions = $derived(selectedId ? versionChain(turns, selectedId) : []);
   const variations = $derived(selectedId ? variationSet(turns, selectedId) : []);
   const refusals = $derived(selectedId ? refusalsFor(turns, selectedId) : []);
+
+  /**
+   * DEC-07 step 4 — compare the selected version with an earlier one in its
+   * own line, side by side, and offer to go back to it. Only ever an ancestor:
+   * comparing across branches would invite a revert sideways, which the
+   * server refuses anyway.
+   */
+  let compareId = $state<string | null>(null);
+  const earlier = $derived(versions.slice(0, -1));
+  const compared = $derived(
+    compareId === null ? null : (earlier.find((version) => version.generation_id === compareId) ?? null),
+  );
+  const ordinalOf = (generationId: string) =>
+    versions.findIndex((version) => version.generation_id === generationId) + 1;
+  $effect(() => {
+    if (compareId !== null && compared === null) compareId = null;
+  });
+  let reverting = $state(false);
+  async function goBack() {
+    if (onrevert === undefined || compared === null || selectedId === null || reverting) return;
+    reverting = true;
+    try {
+      await onrevert(selectedId, compared.generation_id);
+      compareId = null;
+    } finally {
+      reverting = false;
+    }
+  }
 
   // A selection that no longer exists is not a selection. Clearing it here
   // rather than rendering an empty canvas keeps the button's word honest.
@@ -248,8 +279,33 @@
         <Icon name="x" size="sm" />
         Back to everything
       </button>
-      <img src={shot(selected.generation)} alt={selected.generation.prompt} />
-      <p class="prompt">{selected.generation.prompt}</p>
+      {#if compared !== null}
+        <!-- DEC-07 step 4 — side by side, the earlier version first, each
+             named by its place in the line, so "which one is current" is
+             never a guess. -->
+        <div class="compare" data-testid="design-compare">
+          <figure>
+            <img src={shot(compared)} alt={compared.prompt} />
+            <figcaption>Version {ordinalOf(compared.generation_id)} · {compared.prompt}</figcaption>
+          </figure>
+          <figure>
+            <img src={shot(selected.generation)} alt={selected.generation.prompt} />
+            <figcaption>Version {ordinalOf(selected.generation.generation_id)} (this one) · {selected.generation.prompt}</figcaption>
+          </figure>
+        </div>
+        <div class="compare-actions">
+          {#if onrevert}
+            <button type="button" class="btn btn-sm btn-primary" disabled={reverting} onclick={() => void goBack()}>
+              {reverting ? "Going back…" : `Go back to version ${ordinalOf(compared.generation_id)}`}
+            </button>
+          {/if}
+          <button type="button" class="btn btn-sm btn-ghost" onclick={() => (compareId = null)}>Stop comparing</button>
+          <p class="sub">Going back adds a new version. Every version stays in the history.</p>
+        </div>
+      {:else}
+        <img src={shot(selected.generation)} alt={selected.generation.prompt} />
+        <p class="prompt">{selected.generation.prompt}</p>
+      {/if}
     </section>
 
     <aside class="inspector" aria-label="Inspector">
@@ -276,6 +332,25 @@
               </li>
             {/each}
           </ol>
+          {#if earlier.length > 0}
+            <label class="compare-pick">
+              <span>Compare with</span>
+              <select
+                class="select"
+                aria-label="Compare with an earlier version"
+                value={compareId ?? ""}
+                onchange={(event) => {
+                  const value = (event.currentTarget as HTMLSelectElement).value;
+                  compareId = value === "" ? null : value;
+                }}
+              >
+                <option value="">No comparison</option>
+                {#each earlier as version, index (version.generation_id)}
+                  <option value={version.generation_id}>Version {index + 1}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
         </section>
       {/if}
 
@@ -306,7 +381,20 @@
             <dt>Made</dt>
             <dd>
               {KIND_LABEL[selected.generation.kind ?? "create"] ?? "Generated"}
-              {#if selected.parent}
+              {#if selected.generation.kind === "revert" && selected.generation.restored_generation_id}
+                <!-- The version whose picture this carries, which the parent
+                     link (the version it was made on top of) cannot say. -->
+                {@const restored = turns.find((item) => item.generation_id === selected!.generation.restored_generation_id)}
+                {#if restored}
+                  <button
+                    type="button"
+                    class="link"
+                    onclick={() => (selectedId = restored.generation_id)}
+                  >{restored.prompt}</button>
+                {:else}
+                  <span class="muted">a version no longer stored</span>
+                {/if}
+              {:else if selected.parent}
                 <button
                   type="button"
                   class="link"
@@ -400,6 +488,50 @@
 {/if}
 
 <style>
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    width: 100%;
+  }
+  .compare figure {
+    margin: 0;
+    display: grid;
+    gap: var(--space-1);
+  }
+  .compare img {
+    width: 100%;
+    height: auto;
+    border-radius: var(--r-md);
+  }
+  .compare figcaption {
+    font-size: var(--text-xs);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+  .compare-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .compare-actions .sub {
+    margin: 0;
+    flex-basis: 100%;
+  }
+  .compare-pick {
+    display: grid;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--text-2);
+  }
+  @media (max-width: 40rem) {
+    .compare {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
   .references {
     list-style: none;
     margin: 0;

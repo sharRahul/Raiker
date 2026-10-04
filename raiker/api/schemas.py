@@ -132,6 +132,12 @@ class GenerateImageRequest:
     references: list[ImageReferenceRequest] = field(default_factory=list)
 
 
+class RevertImageRequest(StrictRequest):
+    # DEC-07 step 4 — the earlier version, in the head's own history, whose
+    # picture comes back as a new version.
+    to: str
+
+
 @dataclass
 class TelemetryCadenceRequest:
     # BUG-276 — how often this destination is delivered to. `off` is the shipped

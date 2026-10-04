@@ -174,7 +174,7 @@ All actions available through one enabled primary interface must have an equival
 
 ### Model Runtime
 
-- Ollama provider with `gemma4:31b-cloud` as the native default; llama.cpp remains available.
+- Ollama provider as the native default profile, shipping no model: a running Ollama is offered and the owner chooses one of its models (FIXED-737 to FIXED-739); llama.cpp remains available.
 - LM Studio/OpenAI-compatible local provider.
 - Model profiles.
 - Streaming.

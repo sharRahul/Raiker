@@ -79,3 +79,53 @@ class ExecutionEnvironmentsView(TypedDict):
     selected_profile_id: str
     environments: list[ExecutionEnvironmentView]
     container_options: ContainerOptions
+
+
+BoundaryStep = Literal["project", "repository", "environment", "model"]
+
+
+class BoundaryRefusal(TypedDict):
+    """The first link that stops a Build turn, and the one thing that moves it."""
+
+    step: BoundaryStep
+    reason_code: str
+    summary: str
+    remediation: str
+    #: Where the remedy is done, as an in-app route.
+    action_href: str
+    action_label: str
+
+
+class ExecutionBoundaryView(TypedDict):
+    """DEC-06 step 1 — where a Build turn would run, as the server resolves it.
+
+    Build used to assemble this line from three independent reads and its own
+    client state, so the sentence an owner read was the browser's opinion of
+    the boundary rather than the one the turn would be held to. Every fact here
+    is resolved server-side from the same stored selections a turn reads; the
+    client proposes changes through the selection routes and renders this.
+    """
+
+    project_id: str | None
+    project_name: str | None
+    repo_id: str | None
+    repo_label: str | None
+    repo_kind: Literal["local", "github"] | None
+    #: The workspace-relative folder a turn may write in; null for a GitHub
+    #: coordinate, which has no files on this machine.
+    writable_root: str | None
+    environment_id: str
+    environment_name: str
+    environment_available: bool
+    #: How the environment isolates a command, as it was measured.
+    environment_boundary: str | None
+    model_profile_id: str | None
+    model: str | None
+    provider: str | None
+    #: ``selected``, ``fallback`` or ``no_ready_candidate``, as the model decision says.
+    model_source: str | None
+    model_ready: bool
+    #: True when the model is reached over the network rather than on this machine.
+    model_off_machine: bool | None
+    ready: bool
+    refusal: BoundaryRefusal | None

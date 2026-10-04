@@ -466,6 +466,8 @@ export const api = {
   deleteImage: (generationId: string) => contract.deleteImage(generationId),
   restoreImage: (generationId: string) => contract.restoreImage(generationId),
   purgeImage: (generationId: string) => contract.purgeImage(generationId),
+  // DEC-07 step 4 — an earlier version back as a new version on top of `head`.
+  revertImage: (headId: string, to: string) => contract.revertImage(headId, { to }),
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => contract.getModelPricing(),
   refreshModelPricing: () => contract.refreshModelPricing(),
@@ -789,6 +791,10 @@ export const api = {
   // and performs no network call — its content still reaches a turn through the
   // brokered `github_read` tool under the connector_github_runtime gate.
   codeRepos: () => contract.listCodeRepos(),
+  // DEC-06 step 1 — where a Build turn would run, resolved by the server from
+  // the same selections a turn reads. The project is the one proposal sent.
+  buildBoundary: (projectId: string | null) =>
+    contract.getBuildBoundary(projectId ? { project_id: projectId } : {}),
   // B13 — the connected repository, one directory at a time and one bounded
   // file at a time. Both are reads through the same path authority a turn
   // writes through, so the explorer can never reach further than the agent can.

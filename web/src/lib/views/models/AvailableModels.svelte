@@ -132,7 +132,14 @@
           {#if defaultModel === model}
             <span class="is-default">Default</span>
           {:else}
-            <button type="button" class="use" onclick={() => onuse?.(model)}>Use</button>
+            <!-- Named for its model: a column of identical "Use" buttons leaves a
+                 screen reader with nothing to tell them apart. -->
+            <button
+              type="button"
+              class="use"
+              aria-label={`Use ${modelName(model)}`}
+              onclick={() => onuse?.(model)}>Use</button
+            >
           {/if}
         {/if}
       </div>

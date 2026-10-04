@@ -12,7 +12,9 @@ stoppable; what changed is that you are not made to prove a choice you already
 made.
 
 > **Local models (llama.cpp, Ollama, LM Studio)**: start the local server, press
-> **Choose model…**, then **Select**. Nothing leaves your machine.
+> **Choose a model**, then **Use** the one you want. Nothing leaves your machine.
+> A running Ollama is found on its own; see [Ollama: found running, chosen
+> once, kept checked](#ollama-found-running-chosen-once-kept-checked).
 
 ## Configured is not ready
 
@@ -86,10 +88,31 @@ page, you decide. When you have installed it, **Look again** re-runs the lookup
 and the card stops saying it is missing. A runtime Raiker has no reviewed source
 for offers no button rather than one that cannot work.
 
+## Ollama: found running, chosen once, kept checked
+
+Raiker ships no Ollama model as a default. When Ollama is running on this
+machine — the desktop app included, even when `ollama` is not on your PATH —
+Models and first-run setup say **Running on this device** and offer **Choose a
+model**, listing exactly the models your Ollama is serving. Nothing is chosen
+for you.
+
+The model you choose is remembered, and it is checked as you choose it, so it
+reads **Ready** straight away. From then on Raiker checks it again on its own
+every fifteen seconds: stop Ollama and the row says it is not running and
+Overview offers **Start the runtime**; remove the model and it says the model is
+missing; start Ollama again and **Ready** comes back. An open Models page
+follows those changes without a reload, and you never have to press **Check**
+to keep a local model ready.
+
+The check is a read of Ollama's own model list on this machine. It never leaves
+the machine, never goes through a proxy, and changes nothing — your choice is
+still only ever made by you.
+
 ## Local discovery and acquisition
 
 - **Ollama:** open the official installer from Models and pull a model by exact
-  name. Raiker tracks progress and rechecks the catalogue when the pull ends.
+  name — the box starts empty, so nothing is pulled that you did not type.
+  Raiker tracks progress and rechecks the catalogue when the pull ends.
 - **LM Studio:** Raiker opens LM Studio's official download; Raiker does not
   redistribute it. Start the local server, then select an exact catalogue model.
 - **Existing GGUF files:** add an explicit folder under **Local library**.

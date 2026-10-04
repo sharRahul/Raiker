@@ -95,9 +95,9 @@ def test_select_profile_leaks_no_client() -> None:
     )
     before = _open_async_clients()
     for _ in range(5):
-        router.select_profile("ollama-local-openai-compatible")
+        router.select_profile("raiker-local-llama-cpp")
     assert _open_async_clients() == before
-    assert router.active_profile_id == "ollama-local-openai-compatible"
+    assert router.active_profile_id == "raiker-local-llama-cpp"
 
 
 def test_launch_leaks_no_client() -> None:
@@ -105,7 +105,7 @@ def test_launch_leaks_no_client() -> None:
         ModelProfileRegistry.load(),
         runtime_policy=ProviderRuntimePolicy(),
     )
-    profile = router.registry.resolve_profile_id("ollama-local-openai-compatible")
+    profile = router.registry.resolve_profile_id("raiker-local-llama-cpp")
     before = _open_async_clients()
     for _ in range(5):
         result = router.launch(

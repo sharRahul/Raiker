@@ -47,12 +47,12 @@ test("setup chooses Ollama, and Ready's Chat opens Chat on that model", async ({
   await expect(page.getByText("Ollama is installed here")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Other options" }).click();
   const ollama = page.getByRole("group", { name: "Ollama", exact: true });
-  await ollama.getByRole("button", { name: "Change model" }).click();
+  await ollama.getByRole("button", { name: /^(Change|Choose a) model$/ }).click();
   const picker = page.getByRole("dialog", { name: "Ollama models" });
   await picker.getByRole("searchbox", { name: "Search models" }).fill("oss:20b");
   await expect(picker.getByRole("checkbox")).toHaveCount(1);
   await expect(picker.getByRole("checkbox", { name: MODEL })).toBeVisible();
-  await picker.getByRole("button", { name: "Use" }).click();
+  await picker.getByRole("button", { name: /^Use / }).first().click();
   await picker.getByRole("button", { name: "Done" }).click();
   await expect(ollama.getByText("Selected: GPT oss:20B Cloud")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();

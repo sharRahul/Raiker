@@ -113,6 +113,21 @@ class ModelService:
             runtime: result.present
             for runtime, result in local_presence.detect(self.store).items()
         }
+        # The owner's decision of 2026-10-04: a service *running* on this machine
+        # is present whatever the PATH says — the Ollama desktop app is not on
+        # it. One loopback catalogue read, cached for seconds; see
+        # `local_service` for why it may never leave the machine.
+        from raiker.models import local_service
+
+        running: dict[str, bool] = {
+            runtime: answer.running
+            for runtime, answer in local_service.owner_services(
+                self.store, acting_principal_id
+            ).items()
+        }
+        for runtime, is_running in running.items():
+            if is_running:
+                presence[runtime] = True
         # A model the owner deployed into a managed slot, or connected. Either is
         # the owner's own evidence that the profile serves something, and it
         # outranks detection: a slot with a model in it is not "undetected".
@@ -277,6 +292,7 @@ class ModelService:
                     if profile.provider in LOCAL_RUNTIME_PROVIDERS
                     else None
                 ),
+                provider_running=running.get(profile.provider),
                 readiness_state=(readiness.state.value if readiness else "not_configured"),
                 readiness_summary=(
                     readiness.summary
@@ -1617,9 +1633,31 @@ class ModelService:
                 "resolved_model": resolved_model,
             },
         )
+        await self._check_local_selection(principal.principal_id, profile, resolved_model)
         return ControlResult(
             ok=True, data={"profile_id": profile.profile_id, "model": resolved_model}
         )
+
+    async def _check_local_selection(
+        self: DashboardService, principal_id: str, profile: Any, model: str
+    ) -> None:
+        """Check a model the owner just chose on a service Raiker watches.
+
+        A local runtime's check is a catalogue read on this machine and nothing
+        else (no generation, no credential), so choosing an Ollama model reports
+        Ready at once instead of after the next background pass. Anything that
+        goes wrong leaves the selection standing and the readiness row saying
+        why; the selection is the owner's, and a check is only evidence about it.
+        """
+        from raiker.models import local_service
+        from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
+
+        if not profile.local_only or profile.provider not in local_service.WATCHED_RUNTIMES:
+            return
+        with contextlib.suppress(Exception):
+            await ModelReadinessService(
+                self.store, probe=ProviderCatalogueProbe(self.store)
+            ).check_selected(principal_id, profile.profile_id, model)
 
     def _append_model_event(self: DashboardService, event_type: str, payload: dict[str, Any]) -> None:
         from raiker.contracts.models import ClientMetadata

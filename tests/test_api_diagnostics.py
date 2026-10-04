@@ -63,16 +63,17 @@ class TestDiagnostics:
             assert "not probed" in entry["detail"]
             assert {"profile_id", "provider", "requires_network", "local_only"} <= set(entry)
 
-    def test_fresh_workspace_has_a_shipped_default_model(self, workspace: Path, client: TestClient) -> None:
-        # Ollama gemma4:31b-cloud is the usable local default *once the runtime
-        # is on the machine*. BUG-270: it was reported as the selection whether
-        # or not it was, so diagnostics stayed silent on a host that could not
-        # run a turn. With the runtime detected, the original contract holds.
+    def test_detected_ollama_still_needs_a_model_chosen(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        # The Ollama profile ships no model (owner decision, 2026-10-04): a
+        # detected runtime is offered, not chosen, so diagnostics still names
+        # the gap until the owner picks one of its models.
         SQLiteStore(workspace).save_local_runtime_presence(
             "ollama", present=True, executable="/usr/local/bin/ollama"
         )
         body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
-        assert not any("model profile" in gap.lower() for gap in body["missing_config"])
+        assert any("model profile" in gap.lower() for gap in body["missing_config"])
 
     def test_fresh_workspace_without_the_runtime_names_the_gap(
         self, workspace: Path, client: TestClient

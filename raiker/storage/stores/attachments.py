@@ -221,12 +221,90 @@ class AttachmentStore:
                 "DELETE FROM image_generations WHERE generation_id = ? AND owner_principal_id = ?",
                 (generation_id, owner_principal_id),
             )
-            if attachment_id:
+            # DEC-07 step 4 — a reverted version shares its bytes with the
+            # version it restored. They go only when no picture is left that
+            # points at them.
+            shared = attachment_id and connection.execute(
+                "SELECT 1 FROM image_generations WHERE attachment_id = ? LIMIT 1",
+                (attachment_id,),
+            ).fetchone()
+            if attachment_id and not shared:
                 connection.execute(
                     "DELETE FROM attachments WHERE attachment_id = ? AND owner_principal_id = ?",
                     (attachment_id, owner_principal_id),
                 )
             return True
+
+    def revert_image_generation(
+        self: SQLiteStore,
+        *,
+        head_generation_id: str,
+        target_generation_id: str,
+        owner_principal_id: str,
+        generation_id: str,
+    ) -> dict[str, Any] | None:
+        """Go back to ``target`` as a new version on top of ``head``.
+
+        DEC-07 step 4. Nothing in the history is rewritten or removed: the new
+        row's parent is the head the owner was looking at, it carries the
+        target's picture and prompt, and it names the target it restored. No
+        provider is contacted — the picture already exists.
+
+        ``None`` when either id is not this owner's, either is in Recently
+        deleted, the target has no picture, or the two are not in one lineage
+        (a revert reaches back along the head's own history, never sideways
+        into another picture's).
+        """
+        if not owner_principal_id:
+            return None
+        head = self.get_image_generation(head_generation_id, owner_principal_id=owner_principal_id)
+        target = self.get_image_generation(
+            target_generation_id, owner_principal_id=owner_principal_id
+        )
+        if head is None or target is None or head.get("deleted_at") or target.get("deleted_at"):
+            return None
+        if not target.get("attachment_id") or head_generation_id == target_generation_id:
+            return None
+        ancestors: set[str] = set()
+        cursor: dict[str, Any] | None = head
+        while cursor is not None and len(ancestors) < 500:
+            ancestors.add(str(cursor["generation_id"]))
+            parent = cursor.get("source_generation_id")
+            cursor = (
+                self.get_image_generation(str(parent), owner_principal_id=owner_principal_id)
+                if parent
+                else None
+            )
+        if target_generation_id not in ancestors:
+            return None
+        self._execute(
+                """
+                INSERT INTO image_generations
+                (generation_id, owner_principal_id, profile_id, provider, model, prompt,
+                 size, status, reason_code, attachment_id, media_type, byte_size, created_at,
+                 source_generation_id, kind, project_id, references_json,
+                 restored_generation_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'ok', NULL, ?, ?, ?, ?, ?, 'revert', ?, ?, ?)
+                """,
+                (
+                    generation_id,
+                    owner_principal_id,
+                    target["profile_id"],
+                    target["provider"],
+                    target["model"],
+                    target["prompt"],
+                    target["size"],
+                    target["attachment_id"],
+                    target["media_type"],
+                    target["byte_size"],
+                    utc_now(),
+                    head_generation_id,
+                    head.get("project_id"),
+                    target.get("references_json"),
+                    target_generation_id,
+                ),
+        )
+        return self.get_image_generation(generation_id, owner_principal_id=owner_principal_id)
 
     def get_image_generation(
         self: SQLiteStore, generation_id: str, *, owner_principal_id: str | None = None

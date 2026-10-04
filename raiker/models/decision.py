@@ -307,7 +307,18 @@ class ModelDecisionService:
         except Exception:  # noqa: BLE001 — unknown, not "not connected"
             return None
         if not profile_id:
-            return bool(connected)
+            if connected:
+                return True
+            # A local service running on this machine is a provider the owner
+            # can choose from with nothing to connect (owner decision,
+            # 2026-10-04), so the first step is done and the next is choosing.
+            from raiker.models import local_service
+
+            try:
+                services = local_service.owner_services(self.store, owner_principal_id)
+            except Exception:  # noqa: BLE001 — unknown, not "not connected"
+                return False
+            return any(answer.running for answer in services.values())
         if profile_id in connected:
             return True
         try:

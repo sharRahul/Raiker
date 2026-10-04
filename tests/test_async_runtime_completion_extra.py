@@ -136,7 +136,7 @@ def test_gateway_async_and_sync_loop_policy(tmp_path: Path) -> None:
     envelope = build_prompt_envelope("hello")
     response = asyncio.run(gateway.submit_prompt_async(envelope))
     assert isinstance(response, AgentResponse)
-    assert gateway.default_provider == ("ollama", "gemma4:31b-cloud")
+    assert gateway.default_provider == ("ollama", "<model>")
 
     async def active() -> None:
         with pytest.raises(RuntimeError, match="submit_prompt_async"):
@@ -185,7 +185,7 @@ def test_models_unavailable(tmp_path: Path) -> None:
     router = ModelRouter(registry)
 
     class BadFactory:
-        def create(self, profile: object) -> object:
+        def create(self, profile: object, **_options: object) -> object:
             raise ProviderConnectionError("boom")
 
     def bad_factory(profile: object | None = None) -> BadFactory:
@@ -227,7 +227,7 @@ def test_cli_model_and_reasoning_events_are_safe(tmp_path: Path) -> None:
 
 def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
     r = ModelProfileRegistry.load()
-    assert ModelRouter(r).default_provider() == ("ollama", "gemma4:31b-cloud")
+    assert ModelRouter(r).default_provider() == ("ollama", "<model>")
     for profile_id in ["lm-studio-local-openai-compatible", "openrouter-policy-gated"]:
         with pytest.raises(Exception) as excinfo:
             ModelProviderFactory(

@@ -280,7 +280,30 @@ def _stored_image(deleted: bool, suffix: str = "") -> Seed:
     return seed
 
 
+def _image_lineage(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """DEC-07 step 4 — an edit on top of an original, so the head can go back."""
+    _stored_image(deleted=False)(ws, client, h)
+    store = SQLiteStore(ws)
+    store.record_image_generation(
+        generation_id="img_contract_edit",
+        owner_principal_id=OWNER,
+        profile_id="openai-hosted",
+        provider="openai",
+        model="gpt-image-1",
+        prompt="a cat in a hat",
+        size="1024x1024",
+        status="ok",
+        attachment_id="att_contract",
+        media_type="image/png",
+        byte_size=len(_PNG),
+        source_generation_id="img_contract",
+        kind="edit",
+    )
+    return "/api/images/img_contract_edit/revert", {"to": "img_contract"}
+
+
 CASES: Cases = {
+    ("POST", "/api/images/{generation_id}/revert"): _image_lineage,
     ("GET", "/api/model-readiness"): plain("/api/model-readiness"),
     ("POST", "/api/model-readiness/check"): plain(
         "/api/model-readiness/check", {"profile_id": OLLAMA, "model": "llama3"}

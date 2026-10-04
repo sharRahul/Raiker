@@ -55,6 +55,12 @@ def _repo(ws: Path, client: TestClient, h: dict[str, str]) -> str:
     return "/api/code/repos"
 
 
+def _boundary(ws: Path, client: TestClient, h: dict[str, str]) -> str:
+    created = client.post("/api/projects", json={"name": "Alpha"}, headers=h).json()
+    _repo(ws, client, h)
+    return f"/api/build/boundary?project_id={created['project_id']}"
+
+
 def _mcp(suffix: str) -> Seed:
     def seed(_ws: Path, _client: TestClient, _h: dict[str, str]) -> str:
         store = SQLiteStore(_ws)
@@ -115,6 +121,7 @@ CASES: Cases = {
     ("GET", "/api/approvals"): _approval,
     ("GET", "/api/capability-gates"): plain("/api/capability-gates"),
     ("GET", "/api/checkpoints"): with_turn("/api/checkpoints"),
+    ("GET", "/api/build/boundary"): _boundary,
     ("GET", "/api/code/repos"): _repo,
     ("GET", "/api/connections"): plain("/api/connections"),
     ("GET", "/api/events"): with_turn("/api/events"),

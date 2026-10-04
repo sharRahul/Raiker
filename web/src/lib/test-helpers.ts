@@ -256,6 +256,7 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     context_window_source: null,
     configured: false,
     provider_detected: null,
+    provider_running: null,
     readiness_state: "not_configured",
     readiness_summary: "No readiness check exists for this exact model.",
     readiness_reason_code: "model_not_checked",

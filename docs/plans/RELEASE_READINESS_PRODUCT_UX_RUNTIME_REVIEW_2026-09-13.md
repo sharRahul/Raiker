@@ -91,6 +91,21 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-04. Every row of §3 is closed.** The three
+> large-view refactors closed as [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it), [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) and [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger):
+> each page's state machines now have one owner apiece, with behaviour
+> unchanged (UX-MODEL-01's connection-lifecycle remainder is
+> [BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page)).
+> Four decision-record steps beyond the §3 rows closed with them: DEC-06 step 1,
+> Build's boundary as one server-issued view ([FIXED-740](FIXED_ITEMS.md#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run)); DEC-07 step 4's compare
+> and revert-as-new-version ([FIXED-743](FIXED_ITEMS.md#fixed-743--going-back-to-an-earlier-picture-meant-generating-it-again)); the stdio half of DEC-25 ([FIXED-741](FIXED_ITEMS.md#fixed-741--a-local-mcp-servers-output-was-held-in-memory-in-full-before-anything-measured-it)); and
+> §13.1's workspace-metadata row ([FIXED-742](FIXED_ITEMS.md#fixed-742--every-turn-told-the-provider-where-the-owners-encrypted-store-lives)). By the owner's decision of the same
+> day (§13.2 item 9) the Ollama profile no longer ships a model: a running
+> service is offered, the owner's choice is checked at once and re-checked on
+> every host tick ([FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default) to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking)). What this document still holds open is
+> the release blockers below — RR-AUTHORITY-01, RR-INSTALL-01, RR-DESIGN-01 and
+> RR-VERIFY-01 — and the decision records' later steps.
+>
 > **Implementation status, 2026-10-03 (third round).** §3.4 Design is closed —
 > UX-DESIGN-01 to -03 as FIXED-731 to FIXED-733 and UX-DESIGN-04 recorded
 > against FIXED-517. In §3.3, UX-BUILD-02 to -04 closed as FIXED-728 to
@@ -482,6 +497,11 @@ language and progressive disclosure, not the security model.
 > and what failed, and conversation actions are grouped as Conversation, Evidence
 > and Continuity. **UX-CHAT-01 — splitting `ChatView.svelte` by state machine — is
 > the one row left**; it is a refactor with no owner-visible change.
+>
+> **2026-10-04 — every row in this table is closed.** UX-CHAT-01 closed as
+> [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions): the file and source pane, the recall ledger, the Continuity actions
+> and the composer's lookups are controllers with one owner each
+> (`web/src/lib/views/chat/`, `composerLookups.svelte.ts`).
 
 ### Current strengths
 
@@ -495,7 +515,7 @@ language and progressive disclosure, not the security model.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-CHAT-01 | P1 | `ChatView.svelte` is about 2,825 lines and coordinates history, streaming, citations, approvals, memory, project filing, speech, attachment and menu state. | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. |
+| ~~UX-CHAT-01~~ **closed** — [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) | P1 | `ChatView.svelte` is about 2,825 lines and coordinates history, streaming, citations, approvals, memory, project filing, speech, attachment and menu state. | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. |
 | ~~UX-CHAT-02~~ **closed** — [FIXED-724](FIXED_ITEMS.md#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | P1 | Advanced governance/tool details can visually compete with the answer. | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. |
 | ~~UX-CHAT-03~~ **closed** — [FIXED-715](FIXED_ITEMS.md#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) | P1 | Project filing and owner-wide Chat retrieval are easy to misunderstand. | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” |
 | ~~UX-CHAT-04~~ **closed** — [FIXED-716](FIXED_ITEMS.md#fixed-716--background-work-was-an-unlabelled-icon) | P2 | Background work is an icon-only rail and may be undiscoverable. | Add a first-use label/badge and surface active count or failure state. |
@@ -522,6 +542,16 @@ never need to visit Settings to understand why Send is disabled.
 > **UX-BUILD-01 — splitting `BuildView.svelte` — is the one row left.** Of the
 > runtime expectation below, the server-issued `ExecutionBoundaryView`
 > (DEC-06 step 1) remains open: the line is still assembled from three reads.
+>
+> **2026-10-04 — every row in this table is closed.** UX-BUILD-01 closed as
+> [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger) (approval review, inline sources and the shared composer lookups
+> each owned by one controller), and the runtime expectation's first half as
+> [FIXED-740](FIXED_ITEMS.md#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run): `GET /api/build/boundary` resolves Project → repository →
+> environment → model from the selections a turn reads, says where a local
+> repository may be written and whether the model leaves this machine, and
+> names the first link that would stop the turn with its remedy. Egress class,
+> resource budget, credential loans and the cancellation tree are not in it
+> yet; they belong to RR-AUTHORITY-01's authority context.
 
 ### Current strengths
 
@@ -536,7 +566,7 @@ never need to visit Settings to understand why Send is disabled.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-BUILD-01 | P1 | `BuildView.svelte` is about 3,311 lines, the largest requested surface. | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. |
+| ~~UX-BUILD-01~~ **closed** — [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger) | P1 | `BuildView.svelte` is about 3,311 lines, the largest requested surface. | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. |
 | ~~UX-BUILD-02~~ **closed** — [FIXED-728](FIXED_ITEMS.md#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it) | P1 | Repository, project, runtime and model are separate concepts but can read as competing “where work happens” selectors. | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. |
 | ~~UX-BUILD-03~~ **closed** — [FIXED-729](FIXED_ITEMS.md#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for) | P1 | The page can expose file tree, transcript, artifact panel, terminal output and approval review simultaneously. | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. |
 | ~~UX-BUILD-04~~ **closed** — [FIXED-730](FIXED_ITEMS.md#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) | P1 | Autonomous completion is not proven by UI sophistication alone. | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. |
@@ -568,6 +598,11 @@ client state.
 > have no governed path — are absent. Of the staged model below, stage 1 is
 > complete; reference *images*, compare-and-revert as a new version, masks and
 > the canvas document remain DEC-07 steps 5–8 beyond these rows.
+>
+> **2026-10-04.** Stage 2's compare and revert landed as [FIXED-743](FIXED_ITEMS.md#fixed-743--going-back-to-an-earlier-picture-meant-generating-it-again): any earlier
+> version in a picture's line can be compared side by side, and **Go back to
+> version N** writes a new version carrying it — history untouched, no provider
+> contacted. Reference *images*, masks and the canvas document remain.
 
 ### Current strengths
 
@@ -606,6 +641,13 @@ client state.
 > `ModelsView.svelte` — is the one row left**; like UX-CHAT-01 it is a refactor
 > with no owner-visible change.
 >
+> **2026-10-04 — every row in this table is closed.** UX-MODEL-01 closed as
+> [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it) (Runtime tab, advanced routing, the two dialogs and the brand table
+> out of the page); the shared connection-lifecycle service it also asks for is
+> [BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page).
+> The same day, by the owner's decision, Ollama stopped shipping a model and is
+> offered when running, with the chosen model watched ([FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default) to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking)).
+>
 > **Implementation status, 2026-10-03.** UX-MODEL-03 closed as
 > [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold): every composer's model menu says **Default model** and, when
 > the work is on something else, **This work uses … · Reset to default**, and the
@@ -628,7 +670,7 @@ client state.
 
 | ID | Priority | Finding | Recommendation |
 |---|---:|---|---|
-| UX-MODEL-01 | P1 | `ModelsView.svelte` is about 3,235 lines and owns discovery, credentials, catalogue, selection, pricing/usage, runtime setup and modal state. | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. |
+| ~~UX-MODEL-01~~ **closed** — [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it) | P1 | `ModelsView.svelte` is about 3,235 lines and owns discovery, credentials, catalogue, selection, pricing/usage, runtime setup and modal state. | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. |
 | ~~UX-MODEL-02~~ **closed** — [FIXED-725](FIXED_ITEMS.md#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) | P1 | “Provider connected”, “models discovered”, “model selected” and “runtime available” still demand expert interpretation. | Use a four-step readiness line and give one primary next action. |
 | ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | P1 | Users can choose globally and again inside composers without a clear override hierarchy. | State: “Default model” and “This work uses …”; offer Reset to default. |
 | ~~UX-MODEL-04~~ **closed** — [FIXED-726](FIXED_ITEMS.md#fixed-726--choosing-between-models-meant-opening-each-one-and-remembering-the-last) | P1 | Cost, context, privacy and tool support are spread across tabs/cards. | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. |
@@ -2138,7 +2180,7 @@ an earlier blanket rule, this section governs. All decisions remain proposed.
 | SBOM | `.github/workflows/licensing.yml` already generates an SPDX SBOM. The remaining recommendation is retained, artifact-bound publication/provenance and verification, not first-time generation. |
 | Screenshots and installers | No new live screenshots, clean-machine runs or installer-page visual proofs were produced in this documentation-only review. Existing evidence remains historical unless its commit and scenario match the candidate. |
 | New schemas | Names such as `design_assets`, `WorkIntent` and `ExecutionBoundaryView` are proposed logical contracts. Map them to existing tables/types before adding storage or APIs; do not create duplicate records just to match this prose. |
-| Workspace metadata privacy | `ContextGatherer._workspace_summary` includes absolute workspace/database paths. Review whether each provider request actually needs them. Prefer logical/relative paths in ordinary model context, retain full paths only for authorized operations, and test hosted-provider projections for unnecessary local-account/path disclosure. This is a data-minimization recommendation under DEC-01/10, not proof of an external leak in this review. |
+| Workspace metadata privacy | **Closed 2026-10-04 — [FIXED-742](FIXED_ITEMS.md#fixed-742--every-turn-told-the-provider-where-the-owners-encrypted-store-lives): the item names the workspace folder only.** `ContextGatherer._workspace_summary` includes absolute workspace/database paths. Review whether each provider request actually needs them. Prefer logical/relative paths in ordinary model context, retain full paths only for authorized operations, and test hosted-provider projections for unnecessary local-account/path disclosure. This is a data-minimization recommendation under DEC-01/10, not proof of an external leak in this review. |
 
 ### Source anchors for implementers
 
@@ -2200,6 +2242,14 @@ symbols and tests rather than relying on line numbers that drift after edits.
    optional feature dependencies unless the release manifest proves otherwise.
    Offer them on demand with size, license, source and consent. Offline launch
    means the shell works; inference requires already-installed model assets.
+9. **Local model service liveness (owner decision, 2026-10-04).** No Ollama
+   model is shipped as a default. When Ollama is running on this machine Raiker
+   marks it available and offers the models it serves; the model the owner
+   chooses is remembered, checked at once and re-checked on every host tick, so
+   Ready follows the service. The check is a loopback catalogue read — it never
+   leaves the machine, never goes through a proxy and adopts nothing — which is
+   why it is allowed where FIXED-357 forbids a read that adopts an identity.
+   Implemented as [FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default) to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking).
 
 ## 13.3 DEC-21 — Complete the smaller Settings-page contracts
 
@@ -2356,6 +2406,13 @@ owner-approved hardware profile before being called release SLOs.
 
 ## 13.7 DEC-25 — Enforce streamed request bounds at ingress
 
+> **2026-10-04.** The stdio MCP half closed as [FIXED-741](FIXED_ITEMS.md#fixed-741--a-local-mcp-servers-output-was-held-in-memory-in-full-before-anything-measured-it): both pipes are drained
+> concurrently in bounded chunks, the process group is stopped at the cap, and
+> only a 4 kB stderr tail is kept. The ingress byte cap closed earlier
+> (FIXED-599). Decompression, multipart floods, slow senders and outgoing
+> provider/channel responses are still to be bounded through the shared egress
+> service.
+
 **Decision:** Carry forward the previous audit's actual-byte body-limit gap
 explicitly. The declared-Content-Length middleware in
 `raiker/api/security.py` is not sufficient for omitted/false lengths.
@@ -2492,7 +2549,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-CHAT-01 | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. | Domain controllers isolate streaming and navigation races; file splitting alone does not improve correctness. |
+| ~~UX-CHAT-01~~ **closed** — [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) | Split by state machine/domain: session controller, turn renderer, composer controller, citation/source panel and conversation actions. | Domain controllers isolate streaming and navigation races; file splitting alone does not improve correctness. |
 | ~~UX-CHAT-02~~ **closed** — [FIXED-724](FIXED_ITEMS.md#fixed-724--a-turns-evidence-counted-its-calls-and-not-its-sources-or-approvals) | Default to a compact “Used 3 tools · 2 sources · 1 approval” disclosure; retain full evidence on expansion. | Progressive disclosure preserves audit evidence while prioritizing the answer. |
 | ~~UX-CHAT-03~~ **closed** — [FIXED-715](FIXED_ITEMS.md#fixed-715--a-chat-filed-in-a-project-read-as-a-chat-that-could-see-only-that-project) | Label the distinction: “Filed in Project X; Chat can still use account-wide memory.” | Filing is organization, not authorization; project selection must not silently widen retrieval. |
 | ~~UX-CHAT-04~~ **closed** — [FIXED-716](FIXED_ITEMS.md#fixed-716--background-work-was-an-unlabelled-icon) | Add a first-use label/badge and surface active count or failure state. | Visible status makes failed background work discoverable without opening Tasks. |
@@ -2502,7 +2559,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-BUILD-01 | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. | Extract ownership of state and effects before presentation; preserve session and approval contracts. |
+| ~~UX-BUILD-01~~ **closed** — [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger) | Extract repository, conversation, approval review, artifact, command and layout controllers with contract tests. | Extract ownership of state and effects before presentation; preserve session and approval contracts. |
 | ~~UX-BUILD-02~~ **closed** — [FIXED-728](FIXED_ITEMS.md#fixed-728--builds-boundary-named-where-a-turn-ran-and-not-what-answered-it) | Present one “Work boundary” summary: Project → repository → environment → model, with only the currently actionable control expanded. | A single summary makes the execution destination reviewable before a write. |
 | ~~UX-BUILD-03~~ **closed** — [FIXED-729](FIXED_ITEMS.md#fixed-729--on-a-narrow-window-a-drawer-could-sit-over-the-approval-a-turn-was-waiting-for) | Use task-aware panel priority and one right-side inspector at a time; preserve state when switching. | Exclusive inspectors reduce simultaneous cognitive load without losing user state. |
 | ~~UX-BUILD-04~~ **closed** — [FIXED-730](FIXED_ITEMS.md#fixed-730--builds-closed-loop-was-claimed-from-its-parts-not-proven-end-to-end) | Release acceptance must cover edit → test → diagnose → retry → green → summary, including failure and approval interruption. | A passing tool call is insufficient evidence of a working change; require the entire recovery loop. |
@@ -2521,7 +2578,7 @@ All decisions below are **proposed implementation decisions**, not claims of imp
 
 | Finding | Decision | Explanation |
 | --- | --- | --- |
-| UX-MODEL-01 | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. | Shared connection lifecycle prevents tabs from disagreeing about readiness. |
+| ~~UX-MODEL-01~~ **closed** — [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it) | Split by the existing five tabs; put connection lifecycle and global selection into shared stores/services. | Shared connection lifecycle prevents tabs from disagreeing about readiness. |
 | ~~UX-MODEL-02~~ **closed** — [FIXED-725](FIXED_ITEMS.md#fixed-725--readiness-was-four-facts-in-four-places-and-nothing-said-which-one-stopped-the-work) | Use a four-step readiness line and give one primary next action. | One next action makes missing credentials distinguishable from unavailable execution. |
 | ~~UX-MODEL-03~~ **closed** — [FIXED-718](FIXED_ITEMS.md#fixed-718--the-picker-did-not-say-what-was-default-and-reset-to-default-did-not-hold) | State: “Default model” and “This work uses …”; offer Reset to default. | Explicit inheritance avoids unexpected model and privacy changes. |
 | ~~UX-MODEL-04~~ **closed** — [FIXED-726](FIXED_ITEMS.md#fixed-726--choosing-between-models-meant-opening-each-one-and-remembering-the-last) | Add a comparable decision table with Locality, Context, Tools, Vision, Estimated cost and Availability. | Comparable verified fields support informed choice; unknown pricing must remain unknown. |

@@ -10,7 +10,10 @@
     /** A completed pull changed a runtime catalogue outside the current snapshot. */
     onCatalogueChanged?: (profileIds: string[]) => void;
   } = $props();
-  let model = $state("gemma4:31b-cloud");
+  // Empty on purpose (owner decision, 2026-10-04): a pre-filled name is a
+  // model Raiker chose, and pulling it costs the owner gigabytes. The owner
+  // types the one they want; the placeholder only shows the shape of a name.
+  let model = $state("");
   let busy = $state<string | null>(null);
   let message = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -143,6 +146,7 @@
         <label
           ><span>Model to pull</span><input
             bind:value={model}
+            placeholder="e.g. llama3.2:3b"
             aria-label="Ollama model to pull"
           /></label
         ><button

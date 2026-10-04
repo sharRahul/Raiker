@@ -248,7 +248,8 @@ def _is_workspace_invalid(error: Exception | None) -> bool:
     return error is not None and str(error).startswith("provider_workspace_invalid")
 
 
-def _effective_endpoint(profile: Any, connection: dict[str, str] | None) -> str:
+def effective_endpoint(profile: Any, connection: dict[str, str] | None) -> str:
+    """The endpoint a profile is reached at for one owner: theirs, the env's, or the shipped one."""
     if connection and connection.get("endpoint", "").strip():
         return connection["endpoint"].strip()
     endpoint_env = profile.raw.get("endpoint_env")
@@ -257,6 +258,7 @@ def _effective_endpoint(profile: Any, connection: dict[str, str] | None) -> str:
         if configured:
             return configured
     return str(profile.raw.get("endpoint") or profile.raw.get("base_url") or "").strip()
+
 
 
 def _endpoint_fingerprint(provider: str, endpoint: str) -> str:
@@ -506,7 +508,7 @@ class ProviderCatalogueProbe:
 
         profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
         connection = get_model_connection(self.store, owner_principal_id, profile_id)
-        endpoint = _effective_endpoint(profile, connection)
+        endpoint = effective_endpoint(profile, connection)
         return ModelReadinessKey(
             owner_principal_id=owner_principal_id,
             profile_id=profile_id,

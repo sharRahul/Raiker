@@ -17,6 +17,11 @@ const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshot
  *
  * The CI host has no Ollama, so this now walks the three surfaces the old spec
  * walked and asserts that none of them names it — and that Models says why.
+ *
+ * Since 2026-10-04 the profile ships no model at all (owner decision): a
+ * running Ollama is offered and the owner chooses one of its models. That
+ * journey is `round-2026-10-04-ollama-and-readiness-live.spec.ts`; this one
+ * still needs a host with no Ollama running.
  */
 test("a fresh workspace names no model when the runtime is not installed", async ({ page }) => {
   await signInAsOwner(page, BASE);

@@ -17,6 +17,10 @@
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
+  import { ComposerLookups } from "../composerLookups.svelte";
+  import { SourceInspector } from "./chat/sourceInspector.svelte";
+  import { RecallLedger } from "./chat/recallLedger.svelte";
+  import { TurnContinuity } from "./chat/turnContinuity.svelte";
   import { modelDecision, forgetSurfaceModel, rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import {
     classifyResumeFailure,
@@ -27,17 +31,12 @@
   import type {
     AgentPlan,
     AgentResponse,
-    AttachmentPreview,
     ContextUsage,
     CapabilityGate,
-    ConversationBranchOrigin,
     ModelDecision,
     ProjectsList,
-    RecalledMemory,
     SessionDetail,
-    SourceExcerptView,
     StreamEvent,
-    TurnSourceView,
   } from "../apiTypes";
   import AttachmentCard from "../components/AttachmentCard.svelte";
   import Composer from "../components/Composer.svelte";
@@ -69,7 +68,6 @@
     mentionAt,
     slashFragment,
     stripSlashToken,
-    type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
   import { setWorkProject, workProject } from "../workProject.svelte";
@@ -285,7 +283,7 @@
     untrack(() => {
       sessionId = id;
       void loadHistory(id);
-      void loadBranchOrigin(id);
+      void continuity.loadBranchOrigin(id);
     });
   });
 
@@ -606,286 +604,16 @@
     }
   }
 
-  // ── File inspector (BUG-07) ───────────────────────────────────────────────
-  // An attachment chip opens a view-only preview of the file it names. Nothing
-  // is fetched until the chip is clicked, the preview is authorized by the
-  // conversation that carried the file (a chip from another chat previews
-  // nothing), and the pane offers no upload, edit, or download control.
-  let inspecting = $state<{ attachmentId: string; filename: string } | null>(null);
-  let preview = $state<AttachmentPreview | null>(null);
-  let previewLoading = $state(false);
-  let previewError = $state<string | null>(null);
-  // Object URL for a preview served as bytes (a PDF or an image): neither an
-  // <object> nor an <img> can send the bearer token, so the bytes are fetched
-  // here and handed over as a blob. Revoked on close and whenever another file
-  // is opened — a stale handle keeps the whole file alive in memory.
-  let objectUrl = $state<string | null>(null);
-
-  function releaseObjectUrl() {
-    if (objectUrl === null) return;
-    URL.revokeObjectURL?.(objectUrl);
-    objectUrl = null;
-  }
-
-  async function openInspector(attachmentId: string, filename: string) {
-    if (sessionId === null) return;
-    const openedSession = sessionId;
-    // One detail panel at a time — they share the right-hand column (B18).
-    rewindCheckpointId = null;
-    releaseObjectUrl();
-    inspecting = { attachmentId, filename };
-    preview = null;
-    previewError = null;
-    previewLoading = true;
-    try {
-      const result = await api.attachmentPreview(openedSession, attachmentId);
-      // A second chip clicked while this was in flight wins; drop the late one
-      // rather than overwriting the file the user is now looking at.
-      if (inspecting?.attachmentId !== attachmentId) return;
-      preview = result;
-      // PDFs and images are the two kinds whose content is bytes rather than
-      // JSON; everything else is already in the preview.
-      const bytesPath = result.pdf_url ?? result.image_url;
-      if (bytesPath !== null) {
-        const url = await api.attachmentPreviewObjectUrl(bytesPath);
-        if (inspecting?.attachmentId === attachmentId) {
-          objectUrl = url;
-        } else {
-          URL.revokeObjectURL?.(url);
-        }
-      }
-    } catch (e) {
-      if (inspecting?.attachmentId !== attachmentId) return;
-      previewError =
-        e instanceof ApiError && e.status === 404
-          ? "This file is no longer available in this conversation."
-          : "Could not open this file.";
-    } finally {
-      if (inspecting?.attachmentId === attachmentId) previewLoading = false;
-    }
-  }
-
-  function closeInspector() {
-    releaseObjectUrl();
-    inspecting = null;
-    preview = null;
-    previewError = null;
-    previewLoading = false;
-    inspectorSource = null;
-    sourceLoading = false;
-    openSourceId = null;
-    openSourceTurnId = null;
-    downloadState = "idle";
-    downloadError = null;
-  }
-
-  // BUG-27 — where a generated file came from. Resolved on demand, because the
-  // answer depends on what is still readable *now*, not on what was true when
-  // the file was written.
-  let inspectorSource = $state<SourceExcerptView | null>(null);
-  let sourceLoading = $state(false);
-
-  // ── C6/C4: the turn source ledger ─────────────────────────────────────────
-  //
-  // What each turn in this conversation actually read. Fetched as labels only —
-  // opening a chip is what fetches the passage behind it — and refreshed
-  // whenever a turn lands, so a citation the model just wrote has something to
-  // resolve against by the time the answer finishes rendering.
-  let turnSources = $state<TurnSourceView[]>([]);
-  // Which source is open, as (turn, id): ids restart at `s1` in every turn, so
-  // the id alone would mark a chip open under every turn that happens to have one.
-  let openSourceId = $state<string | null>(null);
-  let openSourceTurnId = $state<string | null>(null);
-
-  // C17 — what Raiker remembered for each turn of this conversation. Loaded
-  // with the transcript and refreshed after a correction, so the strip under an
-  // answer says what Raiker knows now rather than what it knew when the turn
-  // ran. A failed read leaves the strip absent: recall that cannot be shown
-  // must never be implied.
-  let recalled = $state<RecalledMemory[]>([]);
-  let recallNotice = $state<string | null>(null);
-
-  async function refreshRecall(id: string) {
-    try {
-      recalled = (await api.sessionRecall(id)).memories;
-    } catch {
-      recalled = [];
-    }
-  }
-
-  function recalledForTurn(turnId: string | undefined): RecalledMemory[] {
-    if (turnId === undefined || turnId === "") return [];
-    return recalled.filter((memory) => memory.turn_id === turnId);
-  }
-
-  async function forgetRecalled(memory: RecalledMemory) {
-    recallNotice = null;
-    try {
-      await api.forgetMemory(memory.memory_id);
-      recallNotice = "Forgotten.";
-    } catch {
-      recallNotice = "Could not forget that memory.";
-    }
-    if (sessionId !== null) await refreshRecall(sessionId);
-  }
-
-  async function correctRecalled(memory: RecalledMemory, text: string) {
-    if (text === "" || text === memory.text) return;
-    recallNotice = null;
-    try {
-      await api.editMemory(memory.memory_id, text);
-      recallNotice = "Corrected.";
-    } catch {
-      recallNotice = "Could not correct that memory.";
-    }
-    if (sessionId !== null) await refreshRecall(sessionId);
-  }
-
-  async function refreshTurnSources(id: string) {
-    try {
-      turnSources = (await api.sessionSources(id)).sources;
-    } catch {
-      // The ledger is provenance for an answer that already arrived. Losing it
-      // must not cost the transcript, so the chips simply do not appear.
-      turnSources = [];
-    }
-  }
-
-  /**
-   * Open one cited source at the passage the turn used (C4).
-   *
-   * An attachment is opened in the file pane *and* marked at its passage, so
-   * "which document" and "which part of it" are the same action. Everything
-   * else — a web page, an email, a connector response — has no second copy on
-   * this machine, so what is shown is the exact text that reached the model.
-   */
-  async function openSource(source: TurnSourceView, quote = "") {
-    if (sessionId === null || !source.openable) return;
-    const opened = sessionId;
-    openSourceId = source.source_id;
-    openSourceTurnId = source.turn_id;
-    if (source.attachment_id !== "") {
-      await openInspector(source.attachment_id, source.title);
-    } else {
-      rewindCheckpointId = null;
-      releaseObjectUrl();
-      inspecting = { attachmentId: "", filename: source.title };
-      preview = null;
-      previewError = null;
-      previewLoading = false;
-    }
-    inspectorSource = null;
-    sourceLoading = true;
-    try {
-      const resolved = await api.turnSourceExcerpt(opened, source.turn_id, source.source_id, quote);
-      if (openSourceId === source.source_id) inspectorSource = resolved;
-    } catch {
-      if (openSourceId === source.source_id) {
-        inspectorSource = {
-          status: "source_deleted",
-          kind: source.kind,
-          title: source.title,
-          excerpt: "",
-          highlight_start: -1,
-          highlight_length: 0,
-          session_id: opened,
-          turn_id: source.turn_id,
-          attachment_id: source.attachment_id,
-          truncated: false,
-          resolution_method: "",
-        };
-      }
-    } finally {
-      if (openSourceId === source.source_id) sourceLoading = false;
-    }
-  }
-
-  /**
-   * A `[s1]` chip inside the answer opens the same source the strip does — and,
-   * unlike the strip, it knows which sentence rests on it, so the pane can open
-   * at that part of the source rather than at the whole of it.
-   */
-  function openSourceById(turnId: string, sourceId: string, answer: string) {
-    const match = turnSources.find(
-      (source) => source.turn_id === turnId && source.source_id === sourceId,
-    );
-    if (match !== undefined) void openSource(match, sentenceAround(answer, sourceId));
-  }
-
-  async function openGeneratedFile(attachmentId: string, label: string) {
-    await openInspector(attachmentId, label);
-    if (sessionId === null || inspecting?.attachmentId !== attachmentId) return;
-    sourceLoading = true;
-    try {
-      const resolved = await api.attachmentProvenance(sessionId, attachmentId);
-      if (inspecting?.attachmentId === attachmentId) inspectorSource = resolved;
-    } catch {
-      // Provenance is supplementary to the file itself. A failure leaves the
-      // preview intact and simply shows no source panel rather than replacing a
-      // readable document with an error.
-      if (inspecting?.attachmentId === attachmentId) inspectorSource = null;
-    } finally {
-      if (inspecting?.attachmentId === attachmentId) sourceLoading = false;
-    }
-  }
-
-  // BUG-28 — the file itself, saved where the owner wants it. Distinct from
-  // Preview (which reads it here) and from conversation export (which writes a
-  // transcript). Every outcome is stated: a refusal, an expired retention, and
-  // an unreachable runtime all say which one happened.
-  let downloadState = $state<"idle" | "working" | "done">("idle");
-  let downloadError = $state<string | null>(null);
-
-  /** Download straight from an artifact card, without opening the pane first. */
-  async function downloadArtifact(attachmentId: string, label: string) {
-    if (sessionId === null) return;
-    try {
-      const blob = await api.attachmentDownload(sessionId, attachmentId);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = label || "download";
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      artifactNotice = null;
-    } catch (e) {
-      artifactNotice = {
-        attachmentId,
-        text:
-          e instanceof ApiError && e.status === 404
-            ? `“${label}” is no longer kept in this conversation, so it cannot be downloaded.`
-            : `Could not download “${label}”.`,
-      };
-    }
-  }
-  // Scoped to the card that failed: a refusal on one artifact must not appear
-  // under every other turn that happens to have produced a file.
-  let artifactNotice = $state<{ attachmentId: string; text: string } | null>(null);
-
-  async function downloadInspected() {
-    if (inspecting === null || sessionId === null) return;
-    const { attachmentId, filename } = inspecting;
-    downloadState = "working";
-    downloadError = null;
-    try {
-      const blob = await api.attachmentDownload(sessionId, attachmentId);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = preview?.filename || filename || "download";
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      downloadState = "done";
-    } catch (e) {
-      downloadState = "idle";
-      downloadError =
-        e instanceof ApiError && e.status === 404
-          ? "This file is no longer kept in this conversation, so it cannot be downloaded."
-          : e instanceof ApiError && e.status === 403
-            ? "This account is not permitted to download this file."
-            : "Could not download this file.";
-    }
-  }
+  // UX-CHAT-01 — the file/source pane and the recall ledger are their own
+  // state machines, each with one owner (see `./chat/`). Opening either side
+  // panel closes the rewind panel: they share the right-hand column (B18).
+  const inspector = new SourceInspector(
+    () => sessionId,
+    () => {
+      continuity.rewindCheckpointId = null;
+    },
+  );
+  const recall = new RecallLedger(() => sessionId);
 
   // Chips show only the file/folder name; the full workspace path stays in the
   // tooltip and is what actually rides the prompt.
@@ -975,10 +703,10 @@
 
   async function loadHistory(id: string) {
     historyLoading = true;
-    closeInspector();
+    inspector.close();
     // B18 — a preflight belongs to one conversation. Left open across a load
     // it would describe a checkpoint from a conversation no longer on screen.
-    rewindCheckpointId = null;
+    continuity.rewindCheckpointId = null;
     landedAnchor = null;
     try {
       const detail = await api.session(id);
@@ -986,8 +714,8 @@
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
-      await refreshTurnSources(id);
-      await refreshRecall(id);
+      await inspector.refreshTurnSources(id);
+      await recall.refresh(id);
       // MEM-08 — a link that named an exchange lands on it; everything else
       // opens where the conversation left off. The landing itself belongs to
       // the effect below, so a *second* link into the same conversation is
@@ -1108,8 +836,8 @@
             void restoreAttachmentChips(event.response.session_id);
             // C6 — the citation markers this answer just wrote need the ledger
             // they resolve against, so it is refreshed with the turn.
-            void refreshTurnSources(event.response.session_id);
-            void refreshRecall(event.response.session_id);
+            void inspector.refreshTurnSources(event.response.session_id);
+            void recall.refresh(event.response.session_id);
             void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
@@ -1211,42 +939,28 @@
   let modelPickerOpen = $state(false);
   let menuKind = $state<"none" | "slash" | "mention">("none");
   let menuActive = $state(0);
-  let mentionItems = $state<MenuItem[]>([]);
-  let mentionNotice = $state<{ text: string; href?: string; linkLabel?: string } | null>(null);
+  // UX-CHAT-01 / UX-BUILD-01 — the mention lookup and the owner's skill
+  // commands, one controller shared with the other composer.
+  const lookups = new ComposerLookups({ href: "#/build", label: "Build" });
   let shortcutsOpen = $state(false);
-  let ownerSlashCommands = $state<SlashCommand[]>([]);
-  let mentionRequest = 0;
 
   const slashItems = $derived.by<MenuItem[]>(() => {
     const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
     if (fragment === null) return [];
-    return matchCommands("chat", fragment, ownerSlashCommands).map((command) => ({
+    return matchCommands("chat", fragment, lookups.slashCommands).map((command) => ({
       id: command.name,
       label: `/${command.name}`,
       detail: command.summary,
     }));
   });
-  const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
+  const menuItems = $derived(menuKind === "slash" ? slashItems : lookups.mentionItems);
 
   function caret(): number {
     return promptEl?.selectionStart ?? draft.text.length;
   }
 
-  async function loadOwnerSlashCommands() {
-    try {
-      ownerSlashCommands = (await api.skills())
-        .filter((skill) => skill.active && skill.command_trigger)
-        .map((skill) => ({
-          name: skill.command_trigger as string,
-          summary: `Use ${skill.name} · permissions unchanged`,
-          action: "skill" as const,
-        }));
-    } catch {
-      ownerSlashCommands = [];
-    }
-  }
 
-  onMount(loadOwnerSlashCommands);
+  onMount(lookups.loadSlashCommands);
 
   function trackPromptSelection() {
     promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
@@ -1300,42 +1014,13 @@
     const mention = mentionAt(draft.text, position);
     if (mention !== null) {
       menuKind = "mention";
-      void loadMentions(mention.fragment);
+      void lookups.loadMentions(mention.fragment);
       return;
     }
     menuKind = "none";
-    mentionNotice = null;
+    lookups.mentionNotice = null;
   }
 
-  async function loadMentions(fragment: string) {
-    const request = ++mentionRequest;
-    try {
-      const view = await api.codeMapPaths(fragment);
-      if (request !== mentionRequest) return;
-      if (view.status !== "success") {
-        // A refusal is not an empty menu. Say which one it is, and offer the
-        // control that changes it — an owner who has never built the index and
-        // an owner whose search matched nothing need different next steps.
-        mentionItems = [];
-        mentionNotice = {
-          text: view.error?.message ?? "Workspace file mentions are unavailable.",
-          href: view.error?.type === "code_map_gate_disabled" ? "#/capabilities" : "#/build",
-          linkLabel: view.error?.type === "code_map_gate_disabled" ? "Permissions" : "Build",
-        };
-        return;
-      }
-      mentionNotice = null;
-      mentionItems = (view.paths ?? []).map((entry) => ({
-        id: entry.path,
-        label: entry.path,
-        detail: entry.language,
-      }));
-    } catch {
-      if (request !== mentionRequest) return;
-      mentionItems = [];
-      mentionNotice = { text: "Could not reach the local runtime to look up files." };
-    }
-  }
 
   function chooseMenuItem(item: MenuItem) {
     if (menuKind === "slash") {
@@ -1358,7 +1043,7 @@
 
   /** Run one command. Each of these is a control the owner already has. */
   function runSlashCommand(name: string) {
-    if (ownerSlashCommands.some((command) => command.name === name)) {
+    if (lookups.slashCommands.some((command) => command.name === name)) {
       const args = draft.text.trim();
       draft.text = `/${name}${args ? ` ${args}` : ""}`;
       void submit();
@@ -1425,121 +1110,16 @@
     void submit();
   }
 
-  // ── C14 — branch from here ───────────────────────────────────────────
-  // The last open part of C14. Edit and Retry both continue *this* conversation;
-  // branching opens a second one from a chosen point, so two lines of thought can
-  // exist side by side without either overwriting the other. It is deliberately
-  // not "edit the message and throw away what followed": this conversation keeps
-  // every turn it had, and the branch says where it grew from.
-  let branchingTurn = $state<string | null>(null);
-  /** Where this conversation came from, when it is itself a branch. */
-  let branchOrigin = $state<ConversationBranchOrigin | null>(null);
-
-  async function loadBranchOrigin(id: string | null) {
-    if (id === null) {
-      branchOrigin = null;
-      return;
-    }
-    try {
-      const origin = await api.conversationBranchOrigin(id);
-      branchOrigin = origin.source_session_id ? origin : null;
-    } catch {
-      // Lineage is context, not content: a failed read leaves the banner off
-      // rather than claiming the conversation is a root when that is unknown.
-      branchOrigin = null;
-    }
-  }
-
-  async function branchFromTurn(turnId: string) {
-    if (sessionId === null || streaming) return;
-    branchingTurn = turnId;
-    projectNotice = null;
-    try {
-      const checkpoints = await api.checkpoints(sessionId);
-      const point = checkpoints.find((checkpoint) => checkpoint.turn_id === turnId);
-      if (point === undefined) {
-        // No checkpoint means no state to seed a branch from. Saying so is the
-        // honest answer; inventing a seed from the transcript is not.
-        projectNotice =
-          "No checkpoint was written for that turn, so there is no point to branch from.";
-        return;
-      }
-      const branch = await api.branchConversation(point.checkpoint_id);
-      window.location.hash = `#/new-chat?session=${encodeURIComponent(branch.session_id)}`;
-    } catch (error) {
-      projectNotice =
-        error instanceof ApiError
-          ? `That conversation could not be branched (${error.reasonCode ?? error.status}).`
-          : "That conversation could not be branched.";
-    } finally {
-      branchingTurn = null;
-    }
-  }
-
-  // ── B18 — rewind to before this turn ─────────────────────────────────
-  // Checkpoints have been restorable through a governed approval since
-  // BUG-230, and the control lived in the Checkpoints route: to undo the turn
-  // that broke something the owner had to leave the conversation, find the
-  // right snapshot by id, and come back. The checkpoint the turn wrote is
-  // already addressable from the turn, so the ask belongs here. This resolves
-  // the coordinate and opens the shared funnel; it performs nothing.
-  let rewindCheckpointId = $state<string | null>(null);
-  let rewindingTurn = $state<string | null>(null);
-
-  async function rewindFromTurn(turnId: string) {
-    if (sessionId === null || streaming) return;
-    rewindingTurn = turnId;
-    projectNotice = null;
-    try {
-      const checkpoints = await api.checkpoints(sessionId);
-      const point = checkpoints.find((checkpoint) => checkpoint.turn_id === turnId);
-      if (point === undefined) {
-        projectNotice = "No checkpoint was written for that turn, so there is nothing to rewind to.";
-        return;
-      }
-      closeInspector();
-      rewindCheckpointId = point.checkpoint_id;
-    } catch (error) {
-      projectNotice =
-        error instanceof ApiError
-          ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
-          : "Could not read this conversation's checkpoints.";
-    } finally {
-      rewindingTurn = null;
-    }
-  }
-
-  // ── Backlog #9 — summarise up to here ────────────────────────────────
-  // Compaction was the threshold's decision: a conversation crossed 90% of the
-  // window and Raiker summarised the oldest exchanges it was allowed to. The
-  // owner is the one who knows the first forty turns were a digression, so this
-  // is the same operation started for a different reason. It shortens what the
-  // *model* is sent and removes nothing: every turn stays in the transcript,
-  // which is why the notice says so rather than asking for a confirmation.
-  let compactingTurn = $state<string | null>(null);
-
-  async function compactThroughTurn(turnId: string) {
-    if (sessionId === null || streaming) return;
-    compactingTurn = turnId;
-    projectNotice = null;
-    try {
-      const result = await api.compactConversation(sessionId, turnId);
-      projectNotice = result.compacted
-        ? `Summarised ${result.source_turn_count} earlier ${
-            result.source_turn_count === 1 ? "exchange" : "exchanges"
-          } for the model. Nothing was removed from this transcript.`
-        : result.reason_code === "nothing_to_summarise"
-          ? "Everything up to that point is already summarised."
-          : `That range could not be summarised (${result.reason_code}).`;
-    } catch (error) {
-      projectNotice =
-        error instanceof ApiError
-          ? `That range could not be summarised (${error.reasonCode ?? error.status}).`
-          : "That range could not be summarised.";
-    } finally {
-      compactingTurn = null;
-    }
-  }
+  // UX-CHAT-01 — branch, rewind and summarise: the Continuity actions, owned
+  // by one controller (see `./chat/turnContinuity.svelte.ts`).
+  const continuity = new TurnContinuity(
+    () => sessionId,
+    () => streaming,
+    (text) => {
+      projectNotice = text;
+    },
+    () => inspector.close(),
+  );
 
   async function stopRunningTurn() {
     if (sessionId === null) return;
@@ -1565,7 +1145,7 @@
     }
     // An open menu owns the arrows, Enter, Tab and Escape — otherwise Enter
     // would send the half-typed `/mo` the owner is picking from.
-    if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
+    if (menuKind !== "none" && (menuItems.length > 0 || lookups.mentionNotice !== null)) {
       if (e.key === "Escape") {
         e.preventDefault();
         menuKind = "none";
@@ -1616,11 +1196,10 @@
      */
     pendingProjectId = projectId === "" ? null : projectId;
     plan = null;
-    rewindCheckpointId = null;
+    continuity.rewindCheckpointId = null;
     anchorNotice = null;
     landedAnchor = null;
-    recalled = [];
-    recallNotice = null;
+    recall.reset();
   }
 
   // B6 — the same plan checklist Build shows. The `update_plan` tool is
@@ -1787,7 +1366,7 @@
           turn.resumeState = null;
           turn.resumeNote = null;
           void restoreAttachmentChips(event.response.session_id);
-          void refreshTurnSources(event.response.session_id);
+          void inspector.refreshTurnSources(event.response.session_id);
           void refreshContextUsage();
         } else if (event.kind === "error") {
           turn.error = event.text || "The continuation reported an error.";
@@ -1895,7 +1474,7 @@
   data-primary-object={surface.primaryObject}
   data-density={surface.density}
   style={`--surface-gap:${densityGap(surface.density)}`}
-  class:with-inspector={inspecting !== null || rewindCheckpointId !== null}
+  class:with-inspector={inspector.inspecting !== null || continuity.rewindCheckpointId !== null}
   class:with-rail={backgroundWorkOpen}
 >
 <div class="chat">
@@ -1998,18 +1577,18 @@
   {#if anchorNotice}<span class="export-notice" role="status">{anchorNotice}</span>{/if}
   <!-- C17 — the result of a correction or a forget made from the transcript,
        said once, where the other turn-level outcomes are said. -->
-  {#if recallNotice}<span class="export-notice" role="status" aria-live="polite">{recallNotice}</span>{/if}
+  {#if recall.notice}<span class="export-notice" role="status" aria-live="polite">{recall.notice}</span>{/if}
   <!-- C14 — a branch says where it grew from, which is what makes two branches of
        one conversation legible rather than two unrelated chats that happen to
        start the same way. The original is reachable and unchanged. -->
-  {#if branchOrigin !== null}
+  {#if continuity.branchOrigin !== null}
     <p class="branch-origin">
       <Icon name="branch" size="sm" />
       <span>
         Branched from
-        <a href={`#/new-chat?session=${encodeURIComponent(branchOrigin.source_session_id ?? "")}`}
-          >{branchOrigin.source_title ?? "an earlier conversation"}</a
-        >{#if branchOrigin.summary}, at “{branchOrigin.summary}”{/if}. That conversation kept every
+        <a href={`#/new-chat?session=${encodeURIComponent(continuity.branchOrigin.source_session_id ?? "")}`}
+          >{continuity.branchOrigin.source_title ?? "an earlier conversation"}</a
+        >{#if continuity.branchOrigin.summary}, at “{continuity.branchOrigin.summary}”{/if}. That conversation kept every
         turn it had.
       </span>
     </p>
@@ -2045,7 +1624,7 @@
       {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
-      {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
+      {@const turnSourceList = sourcesForTurn(inspector.turnSources, turn.response?.turn_id)}
       <!-- MEM-08 — the coordinate a link can name. Present on every settled
            turn, so a search result, a citation or a checkpoint can land here. -->
       <div class="turn" data-turn-id={turn.response?.turn_id ?? undefined}>
@@ -2063,17 +1642,17 @@
               onedit={editPrompt}
               onretry={(text: string) => retryPrompt(text, toolRows)}
               onbranch={turn.response?.turn_id
-                ? () => void branchFromTurn(turn.response?.turn_id ?? "")
+                ? () => void continuity.branchFromTurn(turn.response?.turn_id ?? "")
                 : undefined}
-              branching={branchingTurn === turn.response?.turn_id}
+              branching={continuity.branchingTurn === turn.response?.turn_id}
               oncompact={turn.response?.turn_id
-                ? () => void compactThroughTurn(turn.response?.turn_id ?? "")
+                ? () => void continuity.compactThroughTurn(turn.response?.turn_id ?? "")
                 : undefined}
-              compacting={compactingTurn === turn.response?.turn_id}
+              compacting={continuity.compactingTurn === turn.response?.turn_id}
               onrewind={turn.response?.turn_id
-                ? () => void rewindFromTurn(turn.response?.turn_id ?? "")
+                ? () => void continuity.rewindFromTurn(turn.response?.turn_id ?? "")
                 : undefined}
-              rewinding={rewindingTurn === turn.response?.turn_id}
+              rewinding={continuity.rewindingTurn === turn.response?.turn_id}
             />
           {/if}
           <!-- BUG-208 slice F — nothing is appended to the owner's message. A
@@ -2089,9 +1668,9 @@
                 <AttachmentCard
                   attachment={a}
                   thumbnail={a.attachmentId ? (thumbnails[a.attachmentId] ?? null) : null}
-                  expanded={inspecting?.attachmentId === a.attachmentId}
+                  expanded={inspector.inspecting?.attachmentId === a.attachmentId}
                   onopen={a.attachmentId !== undefined && sessionId !== null
-                    ? () => void openInspector(a.attachmentId as string, a.label)
+                    ? () => void inspector.openFile(a.attachmentId as string, a.label)
                     : null}
                 />
               {/each}
@@ -2146,7 +1725,7 @@
                 text={answer}
                 parts={turn.response?.content_parts ?? []}
                 citations={renderableCitations(turnSourceList)}
-                oncite={(sourceId) => openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
+                oncite={(sourceId) => inspector.openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
               />
             </div>
             {#if !turn.streaming}
@@ -2188,8 +1767,8 @@
             <SourceChips
               sources={turnSourceList}
               citedIds={citedSourceIds(answer, turnSourceList)}
-              openSourceId={openSourceTurnId === turn.response?.turn_id ? openSourceId : null}
-              onopen={(source) => void openSource(source, sentenceAround(answer, source.source_id))}
+              openSourceId={inspector.openSourceTurnId === turn.response?.turn_id ? inspector.openSourceId : null}
+              onopen={(source) => void inspector.openSource(source, sentenceAround(answer, source.source_id))}
             />
           {/if}
 
@@ -2199,9 +1778,9 @@
                them is the Memory route, never the answer it shaped. -->
           {#if !turn.streaming}
             <RecallStrip
-              memories={recalledForTurn(turn.response?.turn_id)}
-              onforget={forgetRecalled}
-              oncorrect={correctRecalled}
+              memories={recall.forTurn(turn.response?.turn_id)}
+              onforget={recall.forget}
+              oncorrect={recall.correct}
             />
           {/if}
 
@@ -2226,8 +1805,8 @@
                       <button
                         type="button"
                         class="btn btn-primary btn-sm artifact-preview"
-                        aria-expanded={inspecting?.attachmentId === file.attachmentId}
-                        onclick={() => void openGeneratedFile(file.attachmentId as string, file.label)}
+                        aria-expanded={inspector.inspecting?.attachmentId === file.attachmentId}
+                        onclick={() => void inspector.openGeneratedFile(file.attachmentId as string, file.label)}
                       >Preview</button>
                       <!-- BUG-28 — Download is its own action, not a second
                            name for Preview: it produces the file on disk. -->
@@ -2235,14 +1814,14 @@
                         type="button"
                         class="btn btn-ghost btn-sm artifact-download"
                         aria-label={`Download ${file.label}`}
-                        onclick={() => void downloadArtifact(file.attachmentId as string, file.label)}
+                        onclick={() => void inspector.downloadArtifact(file.attachmentId as string, file.label)}
                       ><Icon name="download" size="sm" /> Download</button>
                     </div>
                   {:else}
                     <span class="artifact-unavailable">Preview unavailable</span>
                   {/if}
-                  {#if artifactNotice !== null && artifactNotice.attachmentId === file.attachmentId}
-                    <p class="artifact-error error-line" role="alert">{artifactNotice.text}</p>
+                  {#if inspector.artifactNotice !== null && inspector.artifactNotice.attachmentId === file.attachmentId}
+                    <p class="artifact-error error-line" role="alert">{inspector.artifactNotice.text}</p>
                   {/if}
                 </article>
               {/each}
@@ -2366,7 +1945,7 @@
           items={menuItems}
           active={menuActive}
           heading={menuKind === "slash" ? "Commands" : "Files in the code map"}
-          notice={menuKind === "mention" ? mentionNotice : null}
+          notice={menuKind === "mention" ? lookups.mentionNotice : null}
           onchoose={chooseMenuItem}
         />
       {/if}
@@ -2532,21 +2111,21 @@
 {/if}
 
 <!-- B18 — the same rewind funnel Checkpoints opens, asked for at the turn. -->
-<RewindPanel checkpointId={rewindCheckpointId} onclose={() => (rewindCheckpointId = null)} />
+<RewindPanel checkpointId={continuity.rewindCheckpointId} onclose={() => (continuity.rewindCheckpointId = null)} />
 
-{#if inspecting !== null}
+{#if inspector.inspecting !== null}
   <FileInspector
-    preview={preview}
-    filename={inspecting.filename}
-    loading={previewLoading}
-    error={previewError}
-    objectUrl={objectUrl}
-    source={inspectorSource}
-    {sourceLoading}
-    ondownload={inspecting.attachmentId === "" ? null : downloadInspected}
-    {downloadState}
-    {downloadError}
-    onclose={closeInspector}
+    preview={inspector.preview}
+    filename={inspector.inspecting.filename}
+    loading={inspector.previewLoading}
+    error={inspector.previewError}
+    objectUrl={inspector.objectUrl}
+    source={inspector.source}
+    sourceLoading={inspector.sourceLoading}
+    ondownload={inspector.inspecting.attachmentId === "" ? null : inspector.downloadInspected}
+    downloadState={inspector.downloadState}
+    downloadError={inspector.downloadError}
+    onclose={inspector.close}
   />
 {/if}
 </div>

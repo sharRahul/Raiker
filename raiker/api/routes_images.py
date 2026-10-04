@@ -24,14 +24,16 @@ from fastapi import APIRouter, Request, Response, status
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
-from raiker.api.schemas import GenerateImageRequest, serialize_dto
+from raiker.api.schemas import GenerateImageRequest, RevertImageRequest, serialize_dto
 from raiker.api.wire.models import (
     ImageGallery,
     ImageGeneration,
     ImageLifecycleChanged,
     ImageReference,
+    ImageReverted,
     ImagesGenerated,
 )
+from raiker.contracts.ids import new_id
 from raiker.runtime.executors.tier2_image import SIZED_PROVIDERS, SUPPORTED_SIZES
 from raiker.storage.sqlite import SQLiteStore
 
@@ -68,6 +70,7 @@ def _public(row: dict[str, Any]) -> ImageGeneration:
         "source_generation_id": row.get("source_generation_id"),
         "kind": row.get("kind") or "create",
         "project_id": row.get("project_id"),
+        "restored_generation_id": row.get("restored_generation_id"),
         "deleted_at": row.get("deleted_at"),
         "references": _references(row.get("references_json")),
     }
@@ -166,6 +169,31 @@ def _download_name(row: dict[str, Any]) -> str:
     stem = "-".join(words)[:48].strip("-") or "image"
     extension = _EXTENSIONS.get(str(row.get("media_type") or ""), "png")
     return f"raiker-{stem}-{str(row['generation_id'])[-6:]}.{extension}"
+
+
+@router.post("/api/images/{generation_id}/revert")
+async def revert_image(
+    generation_id: str, body: RevertImageRequest, request: Request
+) -> dict[str, Any]:
+    """Go back to an earlier version as a new version (DEC-07 step 4).
+
+    ``generation_id`` is the head the owner is looking at; ``body.to`` is the
+    earlier version in its own history whose picture comes back. Nothing is
+    rewritten or removed and no provider is contacted. Anything that is not a
+    version of this owner's picture in that lineage answers 404.
+    """
+    _, principal = _auth(request)
+    store = SQLiteStore(_ws(request))
+    row = store.revert_image_generation(
+        head_generation_id=generation_id,
+        target_generation_id=body.to.strip(),
+        owner_principal_id=principal.principal_id,
+        generation_id=new_id("img_"),
+    )
+    if row is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "unknown_version_in_lineage")
+    answer: ImageReverted = {"ok": True, "generation": _public(row)}
+    return serialize_dto(answer)
 
 
 @router.delete("/api/images/{generation_id}")

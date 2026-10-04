@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**356 operations: 345 verified, 0 eligible, 0 deferred, 11 special.**
+**358 operations: 347 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -58,6 +58,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/brain/sources/review` | BrainSourceRequest | BrainSourceReview | verified | DashboardService.review_brain_source |
 | GET | `/api/brain/sources/roots` |  | BrainSourceRoots | verified | DashboardService.brain_source_roots |
 | POST | `/api/brain/sources/upload` | BrainSourceUploadRequest | BrainSourceUploaded | verified | DashboardService.upload_brain_source_file |
+| GET | `/api/build/boundary` |  | ExecutionBoundaryView | verified | DashboardService.execution_boundary |
 | GET | `/api/capability-gates` |  | CapabilityGateView[] | verified | RuntimeControlService.list_capability_gates |
 | GET | `/api/capability-gates/{capability}` |  | CapabilityGateView | verified | RuntimeControlService.get_capability_gate |
 | POST | `/api/capability-gates/{capability}/disable` | DisableCapabilityRequest | CapabilityDisabled | verified | declared CapabilityDisabled |
@@ -152,6 +153,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/images/{generation_id}/bytes` |  |  | special | special |
 | DELETE | `/api/images/{generation_id}/purge` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
 | POST | `/api/images/{generation_id}/restore` |  | ImageLifecycleChanged | verified | declared ImageLifecycleChanged |
+| POST | `/api/images/{generation_id}/revert` | RevertImageRequest | ImageReverted | verified | declared ImageReverted |
 | POST | `/api/instances` | InstanceCreateRequest | InstanceCreated | verified | declared InstanceCreated |
 | POST | `/api/interrupts` | InterruptRequest | InterruptResult | verified | declared InterruptResult |
 | DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |

@@ -111,8 +111,17 @@ class InstanceRuntime:
             # Contained on its own like every pass above it: a collector
             # that is down must not stop due work from starting.
             await self._contained("telemetry_delivery", scheduler.deliver_due_telemetry())
+            # The owner's decision of 2026-10-04: a model chosen on a local
+            # service (Ollama) is re-checked on every tick, so Ready follows
+            # the service rather than the last time somebody pressed Check.
+            await self._contained("local_model_watch", self._watch_local_models())
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=TICK_SECONDS)
+
+    async def _watch_local_models(self) -> None:
+        from raiker.models.local_watch import recheck_local_selections
+
+        await recheck_local_selections(SQLiteStore(self.workspace_root))
 
     async def _continuations(self) -> None:
         """Start explicitly requested work or a continuation without delay.

@@ -97,6 +97,13 @@ fallback that would answer instead rather than letting it stand in silently.
 The line never guesses a fact it could not read — an environment that could not
 be read is absent, not assumed to be this machine.
 
+The whole line is Raiker's own answer, read from the same selections a turn is
+held to, rather than pieced together by the page. It also says where a local
+repository may be written and whether the model **leaves this machine**. When a
+link would stop the turn — no project, an environment that is not available, a
+model that cannot run — the line under the composer names that one link and
+offers the place that fixes it.
+
 `+` adds to this turn: **Upload a file**, **Choose from the project**, **Mention
 a file from the code map**, **Work in a project**, **Dictate**.
 

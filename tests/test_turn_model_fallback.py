@@ -100,11 +100,9 @@ class TestResolveFallbackChain:
             TERMINAL_MODEL_SESSION_ID,
             ["missing-profile", "ollama-local-openai-compatible", "raiker-local-llama-cpp"],
         )
-        # The unknown profile drops out; both concrete local backends remain.
-        assert gw._resolve_fallback_chain() == [
-            ("ollama", "gemma4:31b-cloud"),
-            ("llama.cpp", "local-gguf"),
-        ]
+        # The unknown profile drops out, and so does Ollama with no model
+        # chosen for it; the concrete local backend remains.
+        assert gw._resolve_fallback_chain() == [("llama.cpp", "local-gguf")]
 
     def test_deduplicates(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
@@ -123,9 +121,9 @@ class TestProviderChain:
             TERMINAL_MODEL_SESSION_ID, ["raiker-local-llama-cpp", "anthropic-hosted"]
         )
         chain = gw.runtime._provider_chain(_envelope())
-        assert chain[0] == ("ollama", "gemma4:31b-cloud")
+        assert chain[0] == ("ollama", "<model>")
         assert chain == [
-            ("ollama", "gemma4:31b-cloud"),
+            ("ollama", "<model>"),
             ("llama.cpp", "local-gguf"),
             ("anthropic", "claude-opus-4-8"),
         ]

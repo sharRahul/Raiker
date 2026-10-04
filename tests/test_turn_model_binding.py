@@ -61,12 +61,13 @@ class TestResolveProfileForTurn:
         gateway = _gateway(tmp_path)
         assert gateway._resolve_profile_for_turn("no-such-profile") is None
 
-    def test_default_ollama_profile_resolves_without_selection(self, tmp_path: Path) -> None:
+    def test_ollama_profile_without_a_chosen_model_does_not_resolve(
+        self, tmp_path: Path
+    ) -> None:
+        # The shipped Ollama profile names no model (owner decision,
+        # 2026-10-04): with nothing chosen there is nothing to run.
         gateway = _gateway(tmp_path)
-        assert gateway._resolve_profile_for_turn("ollama-local-openai-compatible") == (
-            "ollama",
-            "gemma4:31b-cloud",
-        )
+        assert gateway._resolve_profile_for_turn("ollama-local-openai-compatible") is None
 
     def test_placeholder_model_resolves_via_persisted_selection(self, tmp_path: Path) -> None:
         gateway = _gateway(tmp_path)
@@ -136,7 +137,9 @@ class TestContextModelProfileItem:
         item = ContextGatherer()._model_profile(tmp_path)
         assert item is not None
         assert "provider: ollama" in item.content
-        assert "model: gemma4:31b-cloud" in item.content
+        # No model is invented for a profile nobody chose one for.
+        assert "model: <model>" in item.content
+        assert "gemma" not in item.content
 
 
 class TestOrchestratorTurnProvider:

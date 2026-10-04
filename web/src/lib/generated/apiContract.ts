@@ -279,6 +279,16 @@ export type BootstrapStatusView = {
   can_register: boolean;
 };
 
+/** The first link that stops a Build turn, and the one thing that moves it. */
+export type BoundaryRefusal = {
+  step: "project" | "repository" | "environment" | "model";
+  reason_code: string;
+  summary: string;
+  remediation: string;
+  action_href: string;
+  action_label: string;
+};
+
 export type BrainEdgeView = {
   source: string;
   target: string;
@@ -1636,6 +1646,28 @@ export type EventView = {
   machine_identity: IdentityView | null;
 };
 
+/** DEC-06 step 1 — where a Build turn would run, as the server resolves it. */
+export type ExecutionBoundaryView = {
+  project_id: string | null;
+  project_name: string | null;
+  repo_id: string | null;
+  repo_label: string | null;
+  repo_kind: "local" | "github" | null;
+  writable_root: string | null;
+  environment_id: string;
+  environment_name: string;
+  environment_available: boolean;
+  environment_boundary: string | null;
+  model_profile_id: string | null;
+  model: string | null;
+  provider: string | null;
+  model_source: string | null;
+  model_ready: boolean;
+  model_off_machine: boolean | null;
+  ready: boolean;
+  refusal: BoundaryRefusal | null;
+};
+
 export type ExecutionEnvironmentConfigured = {
   ok: boolean;
   profile_id: string;
@@ -2113,8 +2145,9 @@ export type ImageGeneration = {
   byte_size: number | null;
   created_at: string;
   source_generation_id: string | null;
-  kind: "create" | "edit" | "variation";
+  kind: "create" | "edit" | "variation" | "revert";
   project_id: string | null;
+  restored_generation_id: string | null;
   deleted_at: string | null;
   references: ImageReference[];
 };
@@ -2138,6 +2171,12 @@ export type ImageReferenceRequest = {
   name: string;
   text: string;
   sources?: string[];
+};
+
+/** An earlier picture brought back as a new version, with the version made. */
+export type ImageReverted = {
+  ok: boolean;
+  generation: ImageGeneration;
 };
 
 /** One governed generation request; ``generation_ids`` holds every variation made. */
@@ -3042,6 +3081,7 @@ export type ModelProfileView = {
   context_window_source: string | null;
   configured: boolean;
   provider_detected: boolean | null;
+  provider_running: boolean | null;
   readiness_state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
   readiness_summary: string;
   readiness_reason_code: string;
@@ -3899,6 +3939,10 @@ export type ResumeHandle = {
   queue_position?: number;
   queue_total?: number;
   queued_calls?: number;
+};
+
+export type RevertImageRequest = {
+  to: string;
 };
 
 export type RuntimeModeActivated = {
@@ -4951,6 +4995,8 @@ export const contract = {
     request<BrainSourceRoots>("/api/brain/sources/roots"),
   uploadBrainSourceFile: (body: BrainSourceUploadRequest) =>
     call<BrainSourceUploaded>("POST", "/api/brain/sources/upload", { body }),
+  getBuildBoundary: (query: { project_id?: string } = {}) =>
+    request<ExecutionBoundaryView>(withQuery("/api/build/boundary", query)),
   listCapabilityGates: () =>
     request<CapabilityGateView[]>("/api/capability-gates"),
   getCapabilityGate: (capability: string) =>
@@ -5137,6 +5183,8 @@ export const contract = {
     call<ImageLifecycleChanged>("DELETE", `/api/images/${encodeURIComponent(generationId)}/purge`),
   restoreImage: (generationId: string) =>
     call<ImageLifecycleChanged>("POST", `/api/images/${encodeURIComponent(generationId)}/restore`),
+  revertImage: (generationId: string, body: RevertImageRequest) =>
+    call<ImageReverted>("POST", `/api/images/${encodeURIComponent(generationId)}/revert`, { body }),
   createInstance: (body: InstanceCreateRequest) =>
     call<InstanceCreated>("POST", "/api/instances", { body }),
   interrupts: (body: InterruptRequest) =>

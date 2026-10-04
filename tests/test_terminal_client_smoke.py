@@ -25,8 +25,11 @@ def test_terminal_prompt_simple_and_list_files(
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
     simple = submit_terminal_prompt("Hello Raiker", workspace_root=tmp_path)
     listing = submit_terminal_prompt("List files in this project", workspace_root=tmp_path)
-    assert "model_unavailable: provider_connection_failed" in simple
-    assert "model_unavailable: provider_connection_failed" in listing
+    # No model is chosen in a fresh workspace (the Ollama profile ships none),
+    # and the answer says so rather than inventing one.
+    assert "model_unavailable: model_name_not_configured" in simple
+    assert "no model is chosen" in simple
+    assert "model_unavailable: model_name_not_configured" in listing
     assert (tmp_path / ".raiker" / "events").exists()
     assert (tmp_path / ".raiker" / "checkpoints").exists()
 
@@ -42,8 +45,7 @@ def test_terminal_approval_and_registry_commands(
             (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
         )
     approval = submit_terminal_prompt("!echo hi", workspace_root=tmp_path)
-    assert "model_unavailable: provider_connection_failed" in approval
-    assert "model_unavailable: provider_connection_failed" in approval
+    assert "model_unavailable: model_name_not_configured" in approval
     assert "Apple Mobile App" in handle_slash_command("/channels", workspace_root=tmp_path)
     assert "raiker-local-llama-cpp" in handle_slash_command("/models", workspace_root=tmp_path)
     assert "unknown_model_profile:mock:anything" in handle_slash_command(

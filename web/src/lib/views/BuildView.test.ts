@@ -1153,54 +1153,62 @@ describe("Build inline diff review", () => {
  * owner who switched execution environment and returned to a half-written
  * prompt had no way to see it from the surface they were about to submit from.
  */
+function boundaryView(over: Record<string, unknown> = {}) {
+  return {
+    project_id: "proj_1",
+    project_name: "Alpha",
+    repo_id: null,
+    repo_label: null,
+    repo_kind: null,
+    writable_root: null,
+    environment_id: "local_native",
+    environment_name: "Local strict",
+    environment_available: true,
+    environment_boundary: "host_reduced_isolation",
+    model_profile_id: "ollama-local-openai-compatible",
+    model: "llama3.2:3b",
+    provider: "ollama",
+    model_source: "selected",
+    model_ready: true,
+    model_off_machine: false,
+    ready: true,
+    refusal: null,
+    ...over,
+  };
+}
+
 describe("the execution boundary Build names", () => {
+  // DEC-06 step 1 — the line is the server's answer, not three reads and the
+  // browser's opinion of them.
   it("names where the turn would run, beside what it would touch", async () => {
     stubFetch(
-      baseRoutes({
-      "GET /api/execution-environments": {
-        selected_profile_id: "env_container",
-        environments: [
-          {
-            profile_id: "env_container",
-            kind: "container",
-            name: "Docker sandbox",
-            enabled: true,
-            configured: true,
-            available: true,
-            status: "ready",
-            selected: true,
-            credential_configured: false,
-            budget: null,
-          },
-        ],
-      },
-      }),
+      baseRoutes({ "GET /api/build/boundary": boundaryView({ environment_name: "Docker sandbox" }) }),
     );
     await renderBuildWithProject();
     await waitFor(() => expect(screen.getByText(/Docker sandbox/)).toBeInTheDocument());
+  });
+
+  it("sends the project it carries and reads the boundary for it", async () => {
+    const mock = stubFetch(baseRoutes({ "GET /api/build/boundary": boundaryView() }));
+    await renderBuildWithProject();
+    await waitFor(() =>
+      expect(
+        mock.mock.calls.some(([url]) => String(url).includes("/api/build/boundary?project_id=proj_1")),
+      ).toBe(true),
+    );
   });
 
   it("orders the boundary Project → repository → environment → model", async () => {
     // UX-BUILD-02 — the line named where a turn runs and not what answers it.
     stubFetch(
       baseRoutes({
-        "GET /api/execution-environments": {
-          selected_profile_id: "env_local",
-          environments: [
-            {
-              profile_id: "env_local",
-              kind: "local",
-              name: "This computer",
-              enabled: true,
-              configured: true,
-              available: true,
-              status: "ready",
-              selected: true,
-              credential_configured: false,
-              budget: null,
-            },
-          ],
-        },
+        "GET /api/build/boundary": boundaryView({
+          environment_name: "This computer",
+          repo_id: "repo_1",
+          repo_label: "app",
+          repo_kind: "local",
+          writable_root: "projects/app",
+        }),
       }),
     );
     await renderBuildWithProject();
@@ -1210,16 +1218,57 @@ describe("the execution boundary Build names", () => {
     const labels = within(inspector)
       .getAllByRole("term")
       .map((term) => term.textContent?.trim());
-    const order = ["Project", "Runs on", "Model"].map((label) => labels.indexOf(label));
+    const order = ["Project", "Repository", "Runs on", "Model"].map((label) => labels.indexOf(label));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((left, right) => left - right));
+    expect(within(inspector).getByText(/may write in projects\/app/)).toBeInTheDocument();
     expect(within(inspector).getByText(/your default|chosen for this work/)).toBeInTheDocument();
   });
 
-  it("says nothing rather than guessing when the runtime cannot be read", async () => {
+  it("says when the model leaves this machine", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/build/boundary": boundaryView({
+          model_profile_id: "anthropic-hosted",
+          model: "claude-haiku-4-5-20251001",
+          provider: "anthropic",
+          model_off_machine: true,
+        }),
+      }),
+    );
+    await renderBuildWithProject();
+    await fireEvent.click(await screen.findByRole("button", { name: /^Context for this turn/ }));
+    const inspector = await screen.findByRole("dialog", { name: "Context for this turn" });
+    expect(within(inspector).getAllByText(/leaves this machine/).length).toBeGreaterThan(0);
+  });
+
+  it("names the link that would stop the turn and where to fix it", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/build/boundary": boundaryView({
+          ready: false,
+          model_ready: false,
+          refusal: {
+            step: "model",
+            reason_code: "local_runtime_unreachable",
+            summary: "Ollama is not running on this device.",
+            remediation: "Start Ollama, then check again.",
+            action_href: "#/models",
+            action_label: "Open Models",
+          },
+        }),
+      }),
+    );
+    await renderBuildWithProject();
+    const line = await screen.findByTestId("boundary-refusal");
+    expect(line).toHaveTextContent("Ollama is not running on this device.");
+    expect(within(line).getByRole("link", { name: "Open Models" })).toHaveAttribute("href", "#/models");
+  });
+
+  it("says nothing rather than guessing when the boundary cannot be read", async () => {
     // Claiming a destination because a probe failed is the silent retarget this
     // row exists to prevent.
-    stubFetch(baseRoutes({ "GET /api/execution-environments": { __status: 503 } }));
+    stubFetch(baseRoutes({ "GET /api/build/boundary": { __status: 503 } }));
     await renderBuildWithProject();
     await waitFor(() => expect(screen.queryByText("Runs on")).toBeNull());
   });

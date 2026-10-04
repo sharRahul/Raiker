@@ -42,6 +42,27 @@ def _ensure_git_identity() -> None:
     os.environ.setdefault("GIT_COMMITTER_EMAIL", "raiker-test@example.com")
 
 
+@pytest.fixture(autouse=True)
+def _no_local_model_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test reads whether Ollama is running on the machine running the suite.
+
+    The Models read asks the loopback service (owner decision, 2026-10-04), so
+    without this a developer with Ollama open would see every presence test
+    answer differently from CI. A test about liveness states the answer itself
+    by patching ``local_service.probe`` again.
+    """
+    from raiker.models import local_service
+
+    local_service.forget()
+
+    def not_running(
+        runtime: str, endpoint: str, *, timeout: float = 0.0
+    ) -> local_service.ServiceLiveness:
+        return local_service.ServiceLiveness(runtime, endpoint, False, (), utc_now())
+
+    monkeypatch.setattr(local_service, "probe", not_running)
+
+
 @pytest.fixture()
 def offline_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make tests that exercise offline finalisation independent of local Ollama.
@@ -139,6 +160,23 @@ def mark_model_ready() -> MarkModelReady:
                 evidence={"source": "test_fixture"},
             )
         )
+        # Nothing is implied any more: the shipped Ollama profile names no
+        # model, so an owner whose tests are not about choosing one still has
+        # to have chosen it. An existing choice is left alone.
+        from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
+
+        if store.get_account(principal_id) is not None:
+            if store.load_principal_model_state(principal_id) is None:
+                store.save_principal_model_state(
+                    principal_id,
+                    ModelSessionState(session_id=principal_id, profile_id=profile_id, model=model),
+                )
+        elif store.load_model_session_state(TERMINAL_MODEL_SESSION_ID) is None:
+            store.save_model_session_state(
+                ModelSessionState(
+                    session_id=TERMINAL_MODEL_SESSION_ID, profile_id=profile_id, model=model
+                )
+            )
 
     return _mark
 

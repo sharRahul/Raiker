@@ -10,7 +10,7 @@ from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionS
 from raiker.storage.sqlite import SQLiteStore
 
 OLLAMA = "ollama-local-openai-compatible"
-OLLAMA_DEFAULT = ("ollama", "gemma4:31b-cloud")
+OLLAMA_DEFAULT = ("ollama", "<model>")
 
 
 def test_model_session_state_persists_resolved_model(tmp_path: Path) -> None:
@@ -24,13 +24,19 @@ def test_model_session_state_persists_resolved_model(tmp_path: Path) -> None:
     assert loaded.model == "llama3.1"
 
 
-def test_factory_can_create_the_concrete_default_ollama_profile() -> None:
+def test_the_shipped_ollama_profile_names_no_model() -> None:
+    # Owner decision, 2026-10-04: the model is the one the owner picks from
+    # what their Ollama serves. A shipped name was a claim about their machine.
+    profile = ModelProfileRegistry.load().resolve_profile_id(OLLAMA)
+    assert profile.model == "<model>"
+
+
+def test_factory_can_create_the_ollama_profile_with_a_chosen_model() -> None:
     registry = ModelProfileRegistry.load()
-    profile = registry.resolve_profile_id(OLLAMA)
+    profile = profile_with_model(registry.resolve_profile_id(OLLAMA), "llama3.2:3b")
     provider = ModelProviderFactory().create(profile)
     try:
-        assert profile.model == "gemma4:31b-cloud"
-        assert provider.model == "gemma4:31b-cloud"
+        assert provider.model == "llama3.2:3b"
     finally:
         import asyncio
 

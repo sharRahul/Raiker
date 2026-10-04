@@ -31,7 +31,7 @@ from raiker.models.exceptions import (
 )
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
-from raiker.models.registry import ModelProfileRegistry
+from raiker.models.registry import ModelProfileRegistry, profile_with_model
 
 
 def run(coro: Any) -> Any:
@@ -74,11 +74,15 @@ def test_factory_openai_profiles() -> None:
     provider = ModelProviderFactory().create(r.resolve_profile_id("raiker-local-llama-cpp"))
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     run(provider.aclose())
-    ollama = ModelProviderFactory().create(r.resolve_profile_id("ollama-local-openai-compatible"))
+    ollama = ModelProviderFactory().create(
+        profile_with_model(r.resolve_profile_id("ollama-local-openai-compatible"), "llama3.2:3b")
+    )
     assert isinstance(ollama, AsyncOpenAICompatibleProvider)
-    assert ollama.model == "gemma4:31b-cloud"
+    assert ollama.model == "llama3.2:3b"
     run(ollama.aclose())
     for profile_id in [
+        # The Ollama profile names no model until the owner chooses one.
+        "ollama-local-openai-compatible",
         "lm-studio-local-openai-compatible",
         "generic-openai-compatible",
         "openrouter-policy-gated",

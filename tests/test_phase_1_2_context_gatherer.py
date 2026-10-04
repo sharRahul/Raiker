@@ -88,7 +88,18 @@ def test_workspace_summary_item_is_included(tmp_path: Path) -> None:
     summaries = [i for i in bundle.included_items if i.source.source_type == "workspace_summary"]
     assert len(summaries) == 1
     assert summaries[0].source.trust_level == "local_metadata"
-    assert "workspace_root:" in summaries[0].content
+    assert f"workspace: {tmp_path.name}" in summaries[0].content
+
+
+def test_workspace_summary_sends_no_absolute_path_to_a_provider(tmp_path: Path) -> None:
+    """§13.1 — the item reaches hosted providers; local paths stay local."""
+    bundle = _gather(tmp_path)
+    summary = next(
+        i for i in bundle.included_items if i.source.source_type == "workspace_summary"
+    )
+    assert str(tmp_path) not in summary.content
+    assert "database" not in summary.content
+    assert ".db" not in summary.content
 
 
 def test_workspace_summary_reports_the_live_runtime_rather_than_a_fixed_string(

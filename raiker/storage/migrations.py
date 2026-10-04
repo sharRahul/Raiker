@@ -4049,6 +4049,20 @@ ALTER TABLE image_generations ADD COLUMN deleted_at TEXT;
 ALTER TABLE image_generations ADD COLUMN references_json TEXT;
 """
 
+# DEC-07 step 4 — revert as a new version.
+#
+# Going back to an earlier picture must not rewrite history: the versions made
+# since stay in the strip, and the return is itself a version, with the current
+# head as its parent. `restored_generation_id` names the version whose picture
+# it carries, which is the one fact the parent link cannot say. The bytes are
+# shared with that version rather than copied, so purging either one keeps them
+# while the other still points at them.
+IMAGE_RESTORED_FROM_MIGRATION_ID = "RAIKER-2085-image-restored-from"
+
+IMAGE_RESTORED_FROM_SQL = """
+ALTER TABLE image_generations ADD COLUMN restored_generation_id TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4279,6 +4293,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
         CHANNEL_DESTINATION_AND_RECEIPTS_MIGRATION_ID, CHANNEL_DESTINATION_AND_RECEIPTS_SQL
     ),
     Migration(IMAGE_DELETION_MIGRATION_ID, IMAGE_DELETION_SQL),
+    Migration(IMAGE_RESTORED_FROM_MIGRATION_ID, IMAGE_RESTORED_FROM_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

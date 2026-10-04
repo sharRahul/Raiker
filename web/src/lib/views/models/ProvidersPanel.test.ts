@@ -33,6 +33,15 @@ describe("ProvidersPanel local runtime setup", () => {
     );
   });
 
+  it("names no model to pull until the owner types one", () => {
+    // Owner decision, 2026-10-04: nothing pre-fills a model name, so nothing
+    // can be pulled that the owner did not ask for.
+    stubFetch({});
+    render(ProvidersPanel);
+    expect(screen.getByLabelText("Ollama model to pull")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Pull model" })).toBeDisabled();
+  });
+
   it("requires confirmation before starting an Ollama pull", async () => {
     vi.stubGlobal(
       "confirm",
@@ -42,6 +51,9 @@ describe("ProvidersPanel local runtime setup", () => {
       "POST /api/ollama/pull": { operation_id: "mop_1", state: "queued" },
     });
     render(ProvidersPanel);
+    await fireEvent.input(screen.getByLabelText("Ollama model to pull"), {
+      target: { value: "llama3.2:3b" },
+    });
     await fireEvent.click(screen.getByRole("button", { name: "Pull model" }));
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
@@ -69,6 +81,9 @@ describe("ProvidersPanel local runtime setup", () => {
     });
     render(ProvidersPanel, { props: { onCatalogueChanged } });
 
+    await fireEvent.input(screen.getByLabelText("Ollama model to pull"), {
+      target: { value: "qwen3" },
+    });
     await fireEvent.click(screen.getByRole("button", { name: "Pull model" }));
 
     await waitFor(() =>

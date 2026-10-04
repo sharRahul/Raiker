@@ -610,6 +610,22 @@
     await load();
   }
 
+  /**
+   * DEC-07 step 4 — go back to an earlier version. The server makes a new
+   * version on top of the one being looked at; nothing in the history moves.
+   */
+  async function revertAsset(headId: string, toId: string): Promise<void> {
+    lifecycleNotice = null;
+    try {
+      const answer = await api.revertImage(headId, toId);
+      await load();
+      selectedId = answer.generation.generation_id;
+    } catch {
+      lifecycleNotice = "That version could not be brought back. Nothing was changed.";
+      await load();
+    }
+  }
+
   async function purgeAsset(generationId: string) {
     lifecycleNotice = null;
     try {
@@ -707,6 +723,7 @@
       ondelete={deleteAsset}
       onrestore={restoreAsset}
       onpurge={purgeAsset}
+      onrevert={revertAsset}
     />
   </div>
 

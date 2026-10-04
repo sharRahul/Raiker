@@ -62,6 +62,7 @@ import type {
   EmbeddingSpaceView,
   EnvironmentContextView,
   EventView,
+  ExecutionBoundaryView,
   ExecutionEnvironmentsView,
   ExecutionEnvironmentView,
   ExtensionsOverviewView,
@@ -729,7 +730,7 @@ export type ExecutionEnvironment = ExecutionEnvironmentView;
 
 export type ProbeVerdict = "enforced" | "unenforced" | "indeterminate";
 
-export type { ExecutionEnvironmentsView };
+export type { ExecutionBoundaryView, ExecutionEnvironmentsView };
 
 export type CommandRunState =
   | "queued"

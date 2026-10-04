@@ -206,7 +206,10 @@ async def render_models_async(
     lines.extend(["Live models for selected provider:"])
     live_router = router or ModelRouter(registry)
     try:
-        models = await live_router.alist_models(selected.provider, selected.model)
+        # Listing what a provider serves needs no model chosen — it is how one
+        # gets chosen. Asking through the profile keeps an Ollama with nothing
+        # selected yet listable instead of reporting it unreachable.
+        models = await live_router.alist_models_for_profile(selected)
     except ProviderPolicyError as exc:
         lines.extend(["status: policy_denied", f"reason: {safe_error(str(exc))}"])
     except ModelProviderError as exc:

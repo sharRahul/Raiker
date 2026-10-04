@@ -56,27 +56,26 @@
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
+  import { ComposerLookups } from "../composerLookups.svelte";
+  import { ApprovalReview } from "./build/approvalReview.svelte";
+  import { InlineSources } from "./build/inlineSources.svelte";
   import {
     classifyResumeFailure,
-    publishApprovalResolved,
     watchForResumableTurns,
     type ResumeWatcher,
   } from "../approvalResume";
   import type {
     AgentPlan,
     AgentResponse,
-    ApprovalView,
     CodeRepo,
     CodeReposView,
     CapabilityGate,
     ContextUsage,
-    ExecutionEnvironment,
+    ExecutionBoundaryView,
     ModelDecision,
     ProjectsList,
     SessionDetail,
     StreamEvent,
-    TurnSourceExcerptView,
-    TurnSourceView,
   } from "../apiTypes";
   import {
     BUILD_WRITE_CAPABILITIES,
@@ -137,7 +136,6 @@
     mentionAt,
     slashFragment,
     stripSlashToken,
-    type SlashCommand,
   } from "../composerCommands";
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
@@ -309,66 +307,9 @@
   // markers, so it owes the same account of where an answer came from. Build has
   // no inspector pane (B13/B14), so a cited source opens inline, under the
   // answer that cited it, rather than in a pane that does not exist.
-  let turnSources = $state<TurnSourceView[]>([]);
-  // Which source is open, as (turn, id): ids restart at `s1` in every turn, so
-  // the id alone would open the panel under every turn that happens to have one.
-  let openSourceId = $state<string | null>(null);
-  let openSourceTurnId = $state<string | null>(null);
-  let openSource = $state<TurnSourceExcerptView | null>(null);
-  let openSourceLoading = $state(false);
-
-  async function refreshTurnSources(id: string) {
-    try {
-      turnSources = (await api.sessionSources(id)).sources;
-    } catch {
-      // Provenance for an answer that already arrived: losing it must not cost
-      // the transcript, so the chips simply do not appear.
-      turnSources = [];
-    }
-  }
-
-  function closeSource() {
-    openSourceId = null;
-    openSourceTurnId = null;
-    openSource = null;
-    openSourceLoading = false;
-  }
-
-  function isOpen(source: TurnSourceView): boolean {
-    return openSourceId === source.source_id && openSourceTurnId === source.turn_id;
-  }
-
-  async function showSource(source: TurnSourceView, quote = "") {
-    if (sessionId === null || !source.openable) return;
-    if (isOpen(source)) {
-      closeSource();
-      return;
-    }
-    openSourceId = source.source_id;
-    openSourceTurnId = source.turn_id;
-    openSource = null;
-    openSourceLoading = true;
-    try {
-      const resolved = await api.turnSourceExcerpt(sessionId, source.turn_id, source.source_id, quote);
-      if (isOpen(source)) openSource = resolved;
-    } catch {
-      if (isOpen(source)) openSource = null;
-    } finally {
-      if (isOpen(source)) openSourceLoading = false;
-    }
-  }
-
-  /**
-   * A `[s1]` chip inside the answer opens the same source the strip does — and,
-   * unlike the strip, it knows which sentence rests on it, so the panel can open
-   * at that part of the source rather than at the whole of it.
-   */
-  function showSourceById(turnId: string, sourceId: string, answer: string) {
-    const match = turnSources.find(
-      (source) => source.turn_id === turnId && source.source_id === sourceId,
-    );
-    if (match !== undefined) void showSource(match, sentenceAround(answer, sourceId));
-  }
+  // UX-BUILD-01 — the ledger and the inline excerpt are one small state
+  // machine with one owner (see `./build/inlineSources.svelte.ts`).
+  const sources = new InlineSources(() => sessionId);
 
   async function refreshContextUsage() {
     if (sessionId === null) {
@@ -396,7 +337,7 @@
 
   async function loadHistory(id: string) {
     historyLoading = true;
-    closeSource();
+    sources.close();
     // B18 — a preflight belongs to one conversation. Left open across a load
     // it would describe a checkpoint from a conversation no longer on screen.
     rewindCheckpointId = null;
@@ -407,8 +348,8 @@
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
-      await refreshTurnSources(id);
-      await loadApprovals();
+      await sources.refresh(id);
+      await review.load();
       // MEM-08 — a link that named an exchange lands on it, through the effect
       // below rather than here, so a second link into the same conversation is
       // honoured too.
@@ -632,7 +573,7 @@
    */
   let approvalIdsSeen: string[] = [];
   $effect(() => {
-    const ids = approvals.map((approval) => approval.approval_id);
+    const ids = review.approvals.map((approval) => approval.approval_id);
     const raised = newlyRaisedApproval(approvalIdsSeen, ids);
     approvalIdsSeen = ids;
     if (!raised || !compactRail) return;
@@ -837,26 +778,35 @@
    * more: an owner who changed their execution environment and came back to a
    * half-written prompt had no way to see it from here.
    *
-   * Read once per mount and refreshed when the runtime settings say so. A read
-   * that fails leaves it `null`, and the fact is then absent rather than
-   * guessed — claiming "Local" because a probe timed out is exactly the
+   * A read that fails leaves it `null`, and the fact is then absent rather
+   * than guessed — claiming "Local" because a probe timed out is exactly the
    * silent retarget this row exists to prevent.
+   *
+   * DEC-06 step 1 — the whole line now comes from one server read,
+   * `GET /api/build/boundary`, resolved from the same stored selections a
+   * turn reads. Build used to assemble it from three reads and its own state,
+   * so the sentence was the browser's opinion of the boundary. The selectors
+   * on this page *propose* (the project travels with the read; repository,
+   * environment and model are saved by their own routes) and this re-reads
+   * after each of them. A response older than the latest request is dropped.
    */
-  let runtimeEnvironment = $state<ExecutionEnvironment | null>(null);
+  let boundary = $state<ExecutionBoundaryView | null>(null);
+  let boundaryRequest = 0;
 
-  async function loadRuntimeEnvironment() {
+  async function loadBoundary() {
+    const request = ++boundaryRequest;
     try {
-      const view = await api.executionEnvironments();
-      runtimeEnvironment = view.environments.find((item) => item.selected) ?? null;
+      const answer = await api.buildBoundary(projectId || null);
+      if (request === boundaryRequest) boundary = answer;
     } catch {
-      runtimeEnvironment = null;
+      if (request === boundaryRequest) boundary = null;
     }
   }
 
   // UX-BUILD-02 — `$derived.by`, because the model fact reads the composer's
   // model state, which is declared further down this script.
   const contextFacts = $derived.by(() => [
-    ...(selectedProject !== null
+    ...(boundary?.project_id && boundary.project_name
       ? [
           /*
            * UX-BUILD-05 — the link goes to this project, not to the list of
@@ -866,28 +816,31 @@
            */
           {
             label: "Project",
-            value: selectedProject.name,
-            short: selectedProject.name,
-            href: `#/projects?project=${encodeURIComponent(selectedProject.project_id)}`,
+            value: boundary.project_name,
+            short: boundary.project_name,
+            href: `#/projects?project=${encodeURIComponent(boundary.project_id)}`,
             action: "Open project work",
           },
         ]
       : []),
-    ...(activeRepo !== null
+    ...(boundary?.repo_label
       ? [
           {
             label: "Repository",
-            value: activeRepo.label,
-            short: activeRepo.label,
+            value:
+              boundary.writable_root !== null
+                ? `${boundary.repo_label} — may write in ${boundary.writable_root}`
+                : boundary.repo_label,
+            short: boundary.repo_label,
           },
         ]
       : []),
-    ...(runtimeEnvironment !== null
+    ...(boundary !== null
       ? [
           {
             label: "Runs on",
-            value: `${runtimeEnvironment.name}${runtimeEnvironment.available ? "" : " — setup required"}`,
-            short: runtimeEnvironment.name,
+            value: `${boundary.environment_name}${boundary.environment_available ? "" : " — setup required"}`,
+            short: boundary.environment_name,
             href: "#/settings?tab=runtime",
             action: "Change",
           },
@@ -902,16 +855,15 @@
      * inspector says whether it is the default or this work's own choice, and
      * names a fallback rather than letting it stand in silently.
      */
-    ...(activeProfile !== null && activeProfile.model !== ""
+    ...(boundary?.model && boundary.provider
       ? [
           {
             label: "Model",
             value:
-              `${modelName(activeProfile.model)} · ${providerName(activeProfile.provider)}` +
+              `${modelName(boundary.model)} · ${providerName(boundary.provider)}` +
               (modelProfile !== "" ? " — chosen for this work" : " — your default") +
-              (decision?.effective.reason === "fallback"
-                ? ` — using ${modelName(decision.effective.model)} for now`
-                : ""),
+              (boundary.model_source === "fallback" ? " — standing in for your choice" : "") +
+              (boundary.model_off_machine === true ? " — leaves this machine" : ""),
             href: "#/models",
             action: "Models",
           },
@@ -945,9 +897,6 @@
   let projectNotice = $state<string | null>(null);
 
   // ── Approvals raised by this conversation ────────────────────────────
-  let approvals = $state<ApprovalView[]>([]);
-  let approvalBusy = $state<string | null>(null);
-  let approvalNotice = $state<string | null>(null);
 
   let modelProfile = $state("");
   let model = $state("");
@@ -1010,7 +959,6 @@
     railOpen = readWorkbenchOpen() && !compactRail;
     void loadRepos();
     void refreshModels();
-    void loadRuntimeEnvironment();
     // Build keeps its own model. Coding work and conversation rarely want the
     // same one, and before this both surfaces shared the global default.
     void surfaceModel("build").then((remembered) => {
@@ -1045,6 +993,16 @@
       window.removeEventListener("raiker:build-compose", onCompose);
       audioSessionCoordinator.stopAll("route");
     };
+  });
+
+  // Re-read the boundary whenever one of its proposals changes: the project
+  // this page carries, the repository selection, and the model this work uses.
+  $effect(() => {
+    void projectId;
+    void repos?.selected_repo_id;
+    void modelProfile;
+    void model;
+    void loadBoundary();
   });
 
   async function loadRepos() {
@@ -1160,42 +1118,28 @@
   }
   let menuKind = $state<"none" | "slash" | "mention">("none");
   let menuActive = $state(0);
-  let mentionItems = $state<MenuItem[]>([]);
-  let mentionNotice = $state<{ text: string; href?: string; linkLabel?: string } | null>(null);
+  // UX-CHAT-01 / UX-BUILD-01 — the mention lookup and the owner's skill
+  // commands, one controller shared with the other composer.
+  const lookups = new ComposerLookups({ href: "#/build?tab=repositories", label: "Repositories" });
   let shortcutsOpen = $state(false);
-  let ownerSlashCommands = $state<SlashCommand[]>([]);
-  let mentionRequest = 0;
 
   const slashItems = $derived.by<MenuItem[]>(() => {
     const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
     if (fragment === null) return [];
-    return matchCommands("build", fragment, ownerSlashCommands).map((command) => ({
+    return matchCommands("build", fragment, lookups.slashCommands).map((command) => ({
       id: command.name,
       label: `/${command.name}`,
       detail: command.summary,
     }));
   });
-  const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
+  const menuItems = $derived(menuKind === "slash" ? slashItems : lookups.mentionItems);
 
   function caret(): number {
     return promptEl?.selectionStart ?? draft.text.length;
   }
 
-  async function loadOwnerSlashCommands() {
-    try {
-      ownerSlashCommands = (await api.skills())
-        .filter((skill) => skill.active && skill.command_trigger)
-        .map((skill) => ({
-          name: skill.command_trigger as string,
-          summary: `Use ${skill.name} · permissions unchanged`,
-          action: "skill" as const,
-        }));
-    } catch {
-      ownerSlashCommands = [];
-    }
-  }
 
-  onMount(loadOwnerSlashCommands);
+  onMount(lookups.loadSlashCommands);
 
   function trackPromptSelection() {
     promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
@@ -1248,42 +1192,13 @@
     const mention = mentionAt(draft.text, position);
     if (mention !== null) {
       menuKind = "mention";
-      void loadMentions(mention.fragment);
+      void lookups.loadMentions(mention.fragment);
       return;
     }
     menuKind = "none";
-    mentionNotice = null;
+    lookups.mentionNotice = null;
   }
 
-  async function loadMentions(fragment: string) {
-    const request = ++mentionRequest;
-    try {
-      const view = await api.codeMapPaths(fragment);
-      if (request !== mentionRequest) return;
-      if (view.status !== "success") {
-        // An unbuilt map and a search that matched nothing look identical as an
-        // empty list and are not the same problem, so the reason is shown with
-        // the control that fixes it.
-        mentionItems = [];
-        mentionNotice = {
-          text: view.error?.message ?? "Workspace file mentions are unavailable.",
-          href: view.error?.type === "code_map_gate_disabled" ? "#/capabilities" : "#/build?tab=repositories",
-          linkLabel: view.error?.type === "code_map_gate_disabled" ? "Permissions" : "Repositories",
-        };
-        return;
-      }
-      mentionNotice = null;
-      mentionItems = (view.paths ?? []).map((entry) => ({
-        id: entry.path,
-        label: entry.path,
-        detail: entry.language,
-      }));
-    } catch {
-      if (request !== mentionRequest) return;
-      mentionItems = [];
-      mentionNotice = { text: "Could not reach the local runtime to look up files." };
-    }
-  }
 
   function chooseMenuItem(item: MenuItem) {
     if (menuKind === "slash") {
@@ -1341,7 +1256,7 @@
 
   /** Run one command. Each is a control this surface already has. */
   function runSlashCommand(name: string) {
-    if (ownerSlashCommands.some((command) => command.name === name)) {
+    if (lookups.slashCommands.some((command) => command.name === name)) {
       const args = draft.text.trim();
       draft.text = `/${name}${args ? ` ${args}` : ""}`;
       void submit();
@@ -1414,7 +1329,7 @@
       return;
     }
     // An open menu owns the arrows, Enter, Tab and Escape.
-    if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
+    if (menuKind !== "none" && (menuItems.length > 0 || lookups.mentionNotice !== null)) {
       if (event.key === "Escape") {
         event.preventDefault();
         menuKind = "none";
@@ -1537,12 +1452,12 @@
             sessionId = event.response.session_id;
             // C6 — the citation markers this answer just wrote need the ledger
             // they resolve against, so it is refreshed with the turn.
-            void refreshTurnSources(event.response.session_id);
+            void sources.refresh(event.response.session_id);
             void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
             void applyPendingProject();
-            void loadApprovals();
+            void review.load();
           } else {
             turn.events = [...turn.events, event];
             const streamed = planFromEvent(event);
@@ -1654,9 +1569,9 @@
           turn.response = event.response;
           turn.resumeState = null;
           turn.resumeNote = null;
-          void refreshTurnSources(event.response.session_id);
+          void sources.refresh(event.response.session_id);
           void refreshContextUsage();
-          void loadApprovals();
+          void review.load();
         } else {
           turn.events = [...turn.events, event];
           const streamed = planFromEvent(event);
@@ -1697,12 +1612,12 @@
     try {
       const { turns: resumable } = await api.resumableTurns(sessionId);
       if (resumable.length === 0) {
-        approvalNotice = "No decision has been recorded for this turn yet.";
+        review.notice = "No decision has been recorded for this turn yet.";
         return;
       }
       await resumeTurn(resumable[0].approval_id, resumable[0].outcome_status);
     } catch {
-      approvalNotice = "Could not check for a decision — the local runtime is unreachable.";
+      review.notice = "Could not check for a decision — the local runtime is unreachable.";
     }
   }
 
@@ -1786,8 +1701,7 @@
     resetVoiceProvenance();
     turns = [];
     sessionId = null;
-    approvals = [];
-    approvalDiffs = {};
+    review.reset();
     plan = null;
     rewindCheckpointId = null;
     anchorNotice = null;
@@ -1849,175 +1763,14 @@
   // about the decision moves — Accept and Reject still resolve the same record,
   // and per-hunk acceptance is not offered because the runtime has no such
   // decision to record.
-  let approvalDiffs = $state<
-    Record<string, { diff: string | null; path: string | null; kind: string }>
-  >({});
-  /**
-   * B14 — per decision, the hunks the reviewer has accepted, keyed by approval.
-   *
-   * Absent means they have not narrowed this one and Accept means all of it,
-   * which is what a decision has always meant. Keyed rather than held as one
-   * value because Build renders every pending decision at once, and a selection
-   * belongs to the diff it was made on.
-   */
-  let approvalHunks = $state<Record<string, string[] | undefined>>({});
-  /**
-   * BUG-271 — the reviewer's own version of a proposed patch, per approval,
-   * while they are writing it. `undefined` is the resting state: correcting a
-   * change is the rarer thing to want, and an open editor under every patch
-   * would crowd a panel that has to stay a review surface.
-   */
-  let approvalEdits = $state<Record<string, string | undefined>>({});
-
-  async function loadApprovals() {
-    if (sessionId === null) return;
-    try {
-      const pending = await api.approvals();
-      approvals = pending.filter((approval) => approval.session_id === sessionId);
-    } catch {
-      approvals = [];
-      approvalDiffs = {};
-      return;
-    }
-    await loadApprovalDiffs();
-  }
-
-  async function loadApprovalDiffs() {
-    const wanted = approvals.filter((approval) => approvalDiffs[approval.approval_id] === undefined);
-    const loaded = await Promise.all(
-      wanted.map(async (approval) => {
-        try {
-          const detail = await api.approval(approval.approval_id);
-          const shows =
-            detail.preview_kind === "file_diff" ||
-            detail.preview_kind === "patch" ||
-            detail.preview_kind === "git_change";
-          // Only a change with a diff gets one. Everything else keeps the
-          // inbox's own presentation rather than being forced into this shape.
-          return shows
-            ? ([
-                approval.approval_id,
-                // BUG-271 — `kind` decides whether the edit control is offered:
-                // only a proposed patch can be corrected as text.
-                { diff: detail.diff, path: detail.diff_path, kind: detail.preview_kind },
-              ] as const)
-            : null;
-        } catch {
-          // The preview is a convenience on top of the decision. Losing it must
-          // not remove the Accept and Reject the turn is parked on.
-          return null;
-        }
-      }),
-    );
-    approvalDiffs = {
-      ...approvalDiffs,
-      ...Object.fromEntries(loaded.filter((entry) => entry !== null)),
-    };
-  }
-
-  /**
-   * BUG-271 — propose the reviewer's own version instead of this one.
-   *
-   * The same route Approvals uses, so a correction means the same thing
-   * wherever it is made: the proposal in front of the reviewer is denied and
-   * theirs is raised as a new one with its own preview and its own hash.
-   * Nothing runs until they accept that.
-   */
-  async function proposeEdit(approval: ApprovalView) {
-    const patch = approvalEdits[approval.approval_id];
-    if (patch === undefined || approvalBusy !== null) return;
-    approvalBusy = approval.approval_id;
-    approvalNotice = null;
-    try {
-      await api.replaceApproval(approval.approval_id, {
-        patch,
-        reason: "edited in the Build workspace",
-      });
-      approvalEdits = { ...approvalEdits, [approval.approval_id]: undefined };
-      approvalNotice =
-        "The proposed change was denied and yours is waiting for your approval. Nothing has run.";
-      approvalDiffs = {};
-      await loadApprovals();
-    } catch (error) {
-      approvalNotice =
-        error instanceof ApiError && error.reasonCode
-          ? `That version was not accepted (${error.reasonCode}).`
-          : "That version was not accepted.";
-    } finally {
-      approvalBusy = null;
-    }
-  }
-
-  async function resolve(approval: ApprovalView, approve: boolean) {
-    approvalBusy = approval.approval_id;
-    approvalNotice = null;
-    try {
-      const accepted = approvalHunks[approval.approval_id];
-      const result = await api.resolveApproval(approval.approval_id, {
-        approve,
-        reason: approve ? "accepted in the Build workspace" : "rejected in the Build workspace",
-        // B14 — sent only when this reviewer actually narrowed this change.
-        ...(approve && accepted !== undefined ? { accepted_hunks: accepted } : {}),
-      });
-      approvalNotice = !approve
-        ? "Rejection recorded."
-        : result.executes_action
-          ? result.execution?.path
-            ? `Applied once — wrote ${result.execution.path}. The previous contents were checkpointed.`
-            : // BUG-62 — a capability whose result is a row, not a file, names it.
-              result.execution?.receipt
-              ? `Applied once — “${result.execution.receipt.title}” now exists. ${result.execution.receipt.label}.`
-              : "Applied once, under a fresh capability, policy and posture check."
-          : "Decision recorded. Raiker re-governs the action before anything runs.";
-      await loadApprovals();
-      // BUG-24 — tell every other tab of this browser immediately, so a Chat
-      // window showing the same parked turn continues without a reload. This is
-      // a hint only: the receiving tab re-checks with the server before acting.
-      publishApprovalResolved({
-        approvalId: approval.approval_id,
-        sessionId: approval.session_id ?? null,
-        turnId: result.resume?.turn_id ?? null,
-        approved: approve,
-      });
-      // B2 — the decision closed the tool call the model was waiting on, so the
-      // turn it parked picks up from here instead of costing a re-prompt.
-      if (result.resume?.resumable) {
-        await resumeTurn(approval.approval_id, approve ? "success" : "rejected");
-      }
-    } catch (error) {
-      /*
-       * UX-BUILD-04 — `target_not_executed` is two different outcomes. If
-       * governance stopped the action before it ran, the approval went back to
-       * pending and the card stays. If it ran once and failed — a red test is
-       * the ordinary case — the decision is spent, the server has handed the
-       * failure to the parked turn, and the card must not go on offering
-       * Accept. Re-reading the pending decisions is what tells them apart.
-       */
-      let spent = false;
-      if (
-        approve &&
-        error instanceof ApiError &&
-        (error.reasonCode ?? "").startsWith("target_not_executed")
-      ) {
-        await loadApprovals();
-        spent = !approvals.some((item) => item.approval_id === approval.approval_id);
-      }
-      if (spent && error instanceof ApiError) {
-        const detail = (error.reasonCode ?? "")
-          .replace(/^target_not_executed:/, "")
-          .replace(/^exit_code:(\d+)$/, "exit code $1");
-        approvalNotice = `Approved and run once — it did not succeed (${detail}). The turn continues with the output.`;
-        resumeWatcher?.checkNow();
-      } else {
-        approvalNotice =
-          error instanceof ApiError
-            ? `The decision was not accepted (${error.reasonCode ?? error.status}).`
-            : "The decision could not be recorded.";
-      }
-    } finally {
-      approvalBusy = null;
-    }
-  }
+  // UX-BUILD-01 — the decisions this conversation raised, their previews,
+  // narrowed hunks and edited patches: one controller with one owner (see
+  // `./build/approvalReview.svelte.ts`).
+  const review = new ApprovalReview(
+    () => sessionId,
+    (approvalId, outcome) => resumeTurn(approvalId, outcome),
+    () => resumeWatcher?.checkNow(),
+  );
 
   // Copying a response, matching Chat exactly (BUG-23 / composer parity). The
   // clipboard is not always available — an insecure origin, a denied
@@ -2279,7 +2032,7 @@
         {@const answer = answerText(turn)}
         {@const toolRows = toolActivity(turn.events)}
         {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
-        {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
+        {@const turnSourceList = sourcesForTurn(sources.turnSources, turn.response?.turn_id)}
         <!-- MEM-08 — the coordinate a link can name. -->
         <article class="turn" data-turn-id={turn.response?.turn_id ?? undefined}>
           <div class="user-message">
@@ -2392,7 +2145,7 @@
                   text={answer}
                   parts={turn.response?.content_parts ?? []}
                   citations={renderableCitations(turnSourceList)}
-                  oncite={(sourceId) => showSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
+                  oncite={(sourceId) => sources.showById(turn.response?.turn_id ?? "", sourceId, answer)}
                 />
               </div>
               {#if !turn.streaming}
@@ -2428,14 +2181,14 @@
               <SourceChips
                 sources={turnSourceList}
                 citedIds={citedSourceIds(answer, turnSourceList)}
-                openSourceId={openSourceTurnId === turn.response?.turn_id ? openSourceId : null}
-                onopen={(source) => void showSource(source, sentenceAround(answer, source.source_id))}
+                openSourceId={sources.openSourceTurnId === turn.response?.turn_id ? sources.openSourceId : null}
+                onopen={(source) => void sources.show(source, sentenceAround(answer, source.source_id))}
               />
-              {#if openSourceId !== null && openSourceTurnId === turn.response?.turn_id}
+              {#if sources.openSourceId !== null && sources.openSourceTurnId === turn.response?.turn_id}
                 <SourceExcerptPanel
-                  source={openSource}
-                  loading={openSourceLoading}
-                  onclose={closeSource}
+                  source={sources.excerpt}
+                  loading={sources.loading}
+                  onclose={sources.close}
                 />
               {/if}
             {/if}
@@ -2471,14 +2224,14 @@
         </article>
       {/each}
 
-      {#if approvals.length > 0}
+      {#if review.approvals.length > 0}
         <section class="decisions" aria-labelledby="build-decisions">
           <h2 id="build-decisions">Waiting on you</h2>
           <p class="decisions-lead">
             Raiker re-governs every accepted action before it runs — a recorded decision is never treated as permission
             it already had. Each decision below reports afterwards whether it was applied or only recorded.
           </p>
-          {#each approvals as approval (approval.approval_id)}
+          {#each review.approvals as approval (approval.approval_id)}
             <div class="decision">
               <div class="decision-head">
                 <span class="decision-title">{humanize(approval.tool_name)}</span>
@@ -2487,21 +2240,21 @@
               <p class="decision-meta">
                 {humanize(approval.capability)} · raised {relativeTime(approval.created_at)}
               </p>
-              {#if approvalDiffs[approval.approval_id] !== undefined}
+              {#if review.diffs[approval.approval_id] !== undefined}
                 <!-- B14 — the change, read *and decided* where it was
                      proposed, including accepting part of it. -->
                 <DiffView
-                  diff={approvalDiffs[approval.approval_id].diff}
-                  path={approvalDiffs[approval.approval_id].path}
+                  diff={review.diffs[approval.approval_id].diff}
+                  path={review.diffs[approval.approval_id].path}
                   selectable={approval.status === "pending"}
-                  bind:selection={approvalHunks[approval.approval_id]}
+                  bind:selection={review.hunks[approval.approval_id]}
                 />
               {/if}
               <!-- BUG-271 — the reviewer can correct the change as well as
                    narrow it. An edit is a different action, so it denies this
                    proposal and raises theirs; the copy says so rather than
                    letting it read as an amendment. -->
-              {#if approvalEdits[approval.approval_id] !== undefined}
+              {#if review.edits[approval.approval_id] !== undefined}
                 <div class="decision-edit">
                   <label class="sr-only" for={`edit-${approval.approval_id}`}>
                     Your version of this change
@@ -2511,8 +2264,8 @@
                     class="textarea"
                     rows="10"
                     spellcheck="false"
-                    disabled={approvalBusy === approval.approval_id}
-                    bind:value={approvalEdits[approval.approval_id]}
+                    disabled={review.busy === approval.approval_id}
+                    bind:value={review.edits[approval.approval_id]}
                   ></textarea>
                   <p class="decision-meta">
                     Denies the change above and proposes yours. You will be asked to accept it.
@@ -2521,17 +2274,17 @@
                     <button
                       type="button"
                       class="btn btn-primary btn-sm"
-                      disabled={approvalBusy === approval.approval_id}
-                      onclick={() => proposeEdit(approval)}
+                      disabled={review.busy === approval.approval_id}
+                      onclick={() => review.proposeEdit(approval)}
                     >
                       Propose as a new change
                     </button>
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
-                      disabled={approvalBusy === approval.approval_id}
+                      disabled={review.busy === approval.approval_id}
                       onclick={() =>
-                        (approvalEdits = { ...approvalEdits, [approval.approval_id]: undefined })}
+                        (review.edits = { ...review.edits, [approval.approval_id]: undefined })}
                     >
                       Cancel
                     </button>
@@ -2542,29 +2295,29 @@
                   <button
                     type="button"
                     class="btn btn-primary btn-sm"
-                    disabled={approvalBusy === approval.approval_id}
-                    onclick={() => resolve(approval, true)}
+                    disabled={review.busy === approval.approval_id}
+                    onclick={() => review.resolve(approval, true)}
                   >
                     Accept
                   </button>
                   <button
                     type="button"
                     class="btn btn-ghost btn-sm"
-                    disabled={approvalBusy === approval.approval_id}
-                    onclick={() => resolve(approval, false)}
+                    disabled={review.busy === approval.approval_id}
+                    onclick={() => review.resolve(approval, false)}
                   >
                     Reject
                   </button>
-                  {#if approval.status === "pending" && approvalDiffs[approval.approval_id]?.kind === "patch" && approvalDiffs[approval.approval_id]?.diff}
+                  {#if approval.status === "pending" && review.diffs[approval.approval_id]?.kind === "patch" && review.diffs[approval.approval_id]?.diff}
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
-                      disabled={approvalBusy === approval.approval_id}
+                      disabled={review.busy === approval.approval_id}
                       onclick={() =>
-                        (approvalEdits = {
-                          ...approvalEdits,
+                        (review.edits = {
+                          ...review.edits,
                           [approval.approval_id]:
-                            approvalDiffs[approval.approval_id]?.diff ?? "",
+                            review.diffs[approval.approval_id]?.diff ?? "",
                         })}
                     >
                       Edit…
@@ -2575,7 +2328,7 @@
               {/if}
             </div>
           {/each}
-          {#if approvalNotice}<p class="line-notice" role="status">{approvalNotice}</p>{/if}
+          {#if review.notice}<p class="line-notice" role="status">{review.notice}</p>{/if}
         </section>
       {/if}
     </div>
@@ -2635,7 +2388,7 @@
             items={menuItems}
             active={menuActive}
             heading={menuKind === "slash" ? "Commands" : "Files in the code map"}
-            notice={menuKind === "mention" ? mentionNotice : null}
+            notice={menuKind === "mention" ? lookups.mentionNotice : null}
             onchoose={chooseMenuItem}
           />
         {/if}
@@ -2798,6 +2551,13 @@
               class="link-button"
               onclick={() => (projectPickerOpen = true)}>Choose one</button
             >
+          </p>
+        {:else if boundary?.refusal && boundary.refusal.step !== "project"}
+          <!-- DEC-06 — the first link the server says would stop this turn,
+               and the one place that fixes it. -->
+          <p class="project-boundary boundary-refusal" role="status" data-testid="boundary-refusal">
+            {boundary.refusal.summary}
+            <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
           </p>
         {:else}
           <p class="project-boundary" role="status">

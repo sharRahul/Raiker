@@ -121,6 +121,8 @@ names.
 | [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) | Medium | Messaging / Telegram | Open — a routed Telegram message runs its turn and the answer stays in Raiker; the page now says so (FIXED-711, FIXED-712), but nothing delivers it |
 | [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in) | Medium | Build / Projects | Open — Build says *Working in <project>*, while its reads, writes and commands are relative to the workspace and the project's own folder is protected |
 | [BUG-317](#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build) | Low | Build / notifications | Open — on Build the *Approval needed* toast sits over the right end of the same decision's card |
+| [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
+| [BUG-319](#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page) | Low | Models / maintainability | Open — UX-MODEL-01 split the tabs and dialogs out; the Add tab's connection lifecycle and sign-in dialog are still the page's own state |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2303,3 +2305,44 @@ decision.
 **Required user-interface outcome.** On the surface already showing a decision,
 the toast is not shown, or does not cover it.
 
+---
+
+## BUG-318 — The Ollama journey is proven against a loopback stand-in, not a real Ollama
+
+**Severity: Low. Area: Models / Ollama / evidence. Status: Open — raised
+2026-10-04 by the live round.**
+
+**Observed.** [FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default)
+to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking)
+were driven live end to end — detection with no binary on PATH, the choice in
+setup, Ready at once, a Chat turn answered by the chosen model, the service
+stopped and started under an open page — but this host's egress refuses both
+`ollama.com` and GitHub releases, so the service on 11434 was
+`scripts/live_ollama_standin.py`, which serves Ollama's catalogue and
+OpenAI-compatible paths and answers with a fixed sentence. The probe, the
+readiness check and the turn all speak the real protocol; the answers do not
+come from a model.
+
+**Required evidence before this closes.** The same round
+(`round-2026-10-04-ollama-and-readiness-live.spec.ts`) run on a host with the
+Ollama desktop app and at least two pulled models — including one the app
+serves while `ollama` is not on PATH — with a real answer to the Chat turn.
+
+---
+
+## BUG-319 — The Models page's connection lifecycle still lives in the page
+
+**Severity: Low (maintainability). Area: Models. Status: Open — the remainder
+of UX-MODEL-01, recorded 2026-10-04.**
+
+**Observed.** [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it)
+split `ModelsView.svelte` by tab and dialog. UX-MODEL-01 also asks for
+connection lifecycle and global selection in shared stores or services; the
+Add tab's sign-in dialog, saving and disconnecting a credential, the provider
+test, and the global selection are still the page's own state, about 2,500
+lines with the provider sections they drive.
+
+**Proposed fix.** A `ProviderConnections` controller (sign-in, save, test,
+disconnect, workspace refusal) shared by Models and first-run setup, which
+today implements the same lifecycle a second time in `ProviderMatrix.svelte`.
+Behaviour unchanged; the two surfaces' tests are the characterization suite.

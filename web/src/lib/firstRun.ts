@@ -111,7 +111,11 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
     return {
       profileId: detected.profile_id,
       provider: detected.provider,
-      label: `${providerName(detected.provider)} is installed here`,
+      // A service Raiker asked over loopback is said to be running — the
+      // stronger, measured fact — rather than merely installed.
+      label: `${providerName(detected.provider)} is ${
+        detected.provider_running === true ? "running" : "installed"
+      } here`,
       detail:
         "It needs no account and no API key, and its models never leave this device.",
     };

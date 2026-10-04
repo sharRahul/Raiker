@@ -19,7 +19,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
-from raiker.control.views.execution import ExecutionEnvironmentsView, ExecutionEnvironmentView
+from raiker.control.views.execution import (
+    BoundaryRefusal,
+    ExecutionBoundaryView,
+    ExecutionEnvironmentsView,
+    ExecutionEnvironmentView,
+)
 from raiker.control.views.models import _DISABLED_STATES
 from raiker.execution.profiles import (
     CONTAINER_PROFILE_TOOLS,
@@ -37,6 +42,108 @@ if TYPE_CHECKING:
 
 
 class ExecutionService:
+
+    def execution_boundary(
+        self: DashboardService,
+        owner_principal_id: str,
+        *,
+        project_id: str | None,
+        user_id: str | None,
+    ) -> ExecutionBoundaryView:
+        """DEC-06 step 1 — Project → repository → environment → model, resolved here.
+
+        ``project_id`` is the one input the client supplies, because Build's
+        project travels with each turn rather than living in a server
+        selection; it is resolved against this owner's own projects, and an id
+        that names none is reported as no project, never trusted. Everything
+        else is read from the stored selections a turn reads. The first link
+        that would stop a turn is named, in order, with its one remedy.
+        """
+        from raiker.models.decision import ModelDecisionService
+        from raiker.models.registry import ModelProfileRegistry
+
+        project = (
+            self.store.load_project(project_id, user_id) if project_id else None
+        )
+        repos = self.list_code_repos(owner_principal_id=owner_principal_id)
+        repo = next(
+            (item for item in repos.repos if item.repo_id == repos.selected_repo_id), None
+        )
+        environments = self.execution_environments(owner_principal_id)
+        environment = next(
+            (item for item in environments["environments"] if item["selected"]),
+            next(iter(environments["environments"])),
+        )
+        decision = ModelDecisionService(self.store).decide(
+            owner_principal_id, "build", project_id if project is not None else None
+        )
+        effective = decision.effective
+        model_profile_id = effective.profile_id or None
+        provider: str | None = None
+        off_machine: bool | None = None
+        if model_profile_id:
+            try:
+                profile = ModelProfileRegistry.load().resolve_profile_id(model_profile_id)
+                provider = profile.provider
+                off_machine = str(profile.raw.get("endpoint_kind", "")) in {
+                    "remote_hosted",
+                    "private_network",
+                }
+            except Exception:  # noqa: BLE001 — an unknown profile names no provider
+                provider = None
+        model = effective.model if effective.model and "<" not in effective.model else None
+
+        refusal: BoundaryRefusal | None = None
+        if project is None:
+            refusal = {
+                "step": "project",
+                "reason_code": "build_project_required",
+                "summary": "Build needs a project to run inside.",
+                "remediation": "Choose or create a project for this work.",
+                "action_href": "#/projects",
+                "action_label": "Choose a project",
+            }
+        elif not environment["available"]:
+            refusal = {
+                "step": "environment",
+                "reason_code": environment["availability_reason"] or "environment_unavailable",
+                "summary": f"{environment['name']} is not available on this machine.",
+                "remediation": "Set it up, or choose another place for commands to run.",
+                "action_href": "#/settings?tab=runtime",
+                "action_label": "Change where it runs",
+            }
+        elif model is None or not decision.ready:
+            problem = decision.problem or {}
+            refusal = {
+                "step": "model",
+                "reason_code": problem.get("reason_code", "no_model_selected"),
+                "summary": problem.get("summary", "No model is selected."),
+                "remediation": problem.get("remediation", "Choose a model on the Models page."),
+                "action_href": "#/models",
+                "action_label": "Open Models",
+            }
+        return {
+            "project_id": project["project_id"] if project is not None else None,
+            "project_name": project["name"] if project is not None else None,
+            "repo_id": repo.repo_id if repo is not None else None,
+            "repo_label": repo.label if repo is not None else None,
+            "repo_kind": cast(Any, repo.kind) if repo is not None else None,
+            "writable_root": (
+                repo.local_subpath if repo is not None and repo.kind == "local" else None
+            ),
+            "environment_id": environment["profile_id"],
+            "environment_name": environment["name"],
+            "environment_available": bool(environment["available"]),
+            "environment_boundary": environment.get("boundary"),
+            "model_profile_id": model_profile_id,
+            "model": model,
+            "provider": provider,
+            "model_source": effective.source or None,
+            "model_ready": bool(decision.ready),
+            "model_off_machine": off_machine,
+            "ready": refusal is None,
+            "refusal": refusal,
+        }
 
     def execution_environments(
         self: DashboardService, owner_principal_id: str

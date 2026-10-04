@@ -94,6 +94,101 @@ function models(partial: Partial<ModelsData>): ModelsData {
   });
 }
 
+describe("a running Ollama is offered and its chosen model is watched", () => {
+  // Owner decision, 2026-10-04: no Ollama model is shipped. A running service
+  // asks for a choice; a chosen model says Raiker keeps checking it.
+  it("says Ollama is running and makes choosing a model the primary action", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "<model>",
+            configured: false,
+            provider_detected: true,
+            provider_running: true,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "add" });
+
+    expect(
+      await screen.findByText("Running on this device. Choose one of its models."),
+    ).toBeTruthy();
+    const choose = screen.getByRole("button", { name: "Choose a model" });
+    expect(choose.className).toContain("btn-primary");
+  });
+
+  it("says a chosen model is checked on its own", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "llama3.2:3b",
+            configured: true,
+            selected: true,
+            ready: true,
+            provider_detected: true,
+            provider_running: true,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "add" });
+    expect(
+      await screen.findByText(
+        "Running on this device. Raiker checks it and this model on its own.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says a stopped Ollama with a chosen model is not running, not missing", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "llama3.2:3b",
+            configured: true,
+            provider_detected: false,
+            provider_running: false,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "add" });
+    expect(await screen.findByTestId("runtime-stopped")).toHaveTextContent(
+      "Not running on this device. Start Ollama and Raiker will notice.",
+    );
+    expect(screen.queryByText(/Not installed on this machine/)).toBeNull();
+  });
+
+  it("says an installed Ollama that is not running is stopped", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "<model>",
+            provider_detected: true,
+            provider_running: false,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "add" });
+    expect(await screen.findByTestId("runtime-stopped")).toHaveTextContent(
+      "Installed, but not running. Start Ollama and Raiker will notice.",
+    );
+  });
+});
+
 describe("BUG-270 — a card never claims a runtime that is not here", () => {
   it("says a local runtime is not installed and offers to look again", async () => {
     const mock = stubFetch({

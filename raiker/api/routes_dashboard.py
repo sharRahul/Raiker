@@ -1434,6 +1434,30 @@ async def connect_code_repo(
     return serialize_dto(answer)
 
 
+@router.get("/api/build/boundary")
+def get_build_boundary(
+    request: Request,
+    project_id: str | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Where a Build turn would run: Project → repository → environment → model.
+
+    DEC-06 step 1. Resolved from the same stored selections a turn reads, with
+    the first link that would stop a turn named and its one remedy. The
+    project is the client's proposal, resolved against this owner's projects;
+    an id that names none comes back as no project.
+    """
+    # A plain `def`: FastAPI runs it on a worker thread, which this needs —
+    # resolving the environment measures the sandbox, and that must not hold
+    # the event loop.
+    boundary = _service(request).execution_boundary(
+        auth_data[0].principal_id,
+        project_id=(project_id or "").strip() or None,
+        user_id=auth_data[1].delegated_by_user_id,
+    )
+    return serialize_dto(boundary)
+
+
 @router.put("/api/code/repos/selection")
 async def select_code_repo(
     body: SelectCodeRepoRequest,

@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-04 | Targeted | `2026-10-04-ollama-readiness-round/` | Ollama served by `scripts/live_ollama_standin.py` on 127.0.0.1:11434 (`llama3.2:3b`, `qwen3:8b` — this host cannot download Ollama); Anthropic (`claude-haiku-4-5-20251001`) answering a Build turn and a Chat turn, the key entered through the Connect dialog | The owner's Ollama decision (FIXED-737 to FIXED-739) and ten items from the release-readiness review: UX-CHAT-01, UX-BUILD-01, UX-MODEL-01, DEC-06 step 1, DEC-07 step 4, the stdio half of DEC-25 and §13.1's workspace metadata. Proved live: a running Ollama **offered with nothing chosen**, the model chosen from what it serves and **Ready at once**, a Chat turn answered by it after a reload, **the service stopped and started under an open Models page with Ready following it and no Check pressed**, Build's boundary equal to the server's answer and naming a hosted model as leaving the machine before a real Anthropic turn, Chat's Continuity menu after a real answer, Design comparing two versions and **going back as a new version**, Models' Runtime tab saving a fallback and its Details dialog, and four work surfaces at 390 wide with no horizontal overflow and **no console error**. **Two defects found and fixed** — the picker's Use buttons all had one name, and the round's own wait read a page that never reloaded; BUG-318 and BUG-319 filed |
 | 2026-10-03 (third) | Targeted | `2026-10-03-models-build-design-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real Build turn through three owner approvals, the key entered through the Connect dialog; Design's pictures seeded into the workspace's own store | Ten items from the release-readiness review: UX-MODEL-02, -04, -05, UX-BUILD-02 to -04 and UX-DESIGN-01 to -04. Proved live: a readiness line walking connect → choose → check → Ready on one page, a comparison with Unknown kept Unknown, Build's boundary ending at the model, **a real model running a failing test, reading the failure, fixing the module and re-running it green**, a narrow window's drawer stepping aside for an approval, and Design's Unfiled destination, download, delete, restore and removal. **Three defects found and fixed** — an approved command that failed left its turn waiting forever, every composer's primary action was nameless at phone width, and Build's evidence line did not count sources; BUG-316 and BUG-317 filed |
 | 2026-10-03 (second) | Targeted | `2026-10-03-messaging-mcp-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a turn routed in from a webhook channel and a Chat turn, the key entered through the Connect dialog; a local receiver standing in for a webhook destination | Ten items from the release-readiness review: §3.10 Messaging (UX-MSG-03 to -06), §3.11 MCP (UX-MCP-02, -03), UX-CHAT-03 to -05 and UX-MODEL-03, with UX-CHAT-02 completed and UX-MSG-01/-02, SEC-MCP-01 to -03 and UX-MCP-01 recorded against earlier closures. Proved live: a channel set up step by step, its test refused at the gate and then **delivered while the channel was still off**, a real Anthropic answer to a routed message with each receipt stage separate, Telegram group scope and a bot's update ignored, an MCP sample stating its reach before Test and its trust after, Chat's filing line, labelled background work and grouped actions, and a model reset that holds across a reload, with no horizontal overflow at 390 wide. **Five defects found and fixed** — a refused channel action left the page stale, a failed routed turn read *Failed: failed*, every routed Telegram message failed validation, the MCP notice named a server that did not exist, and a searched model was shown as the default; BUG-314 and BUG-315 filed |
 | 2026-10-03 | Targeted | `2026-10-03-tasks-more-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real delegated task, the key entered through the Connect dialog | Ten items from the release-readiness review: §3.8 Tasks (UX-TASK-02, -03, -05, -06), §3.6 the More window (UX-SETPOP-02 to -04) and UX-PERM-01, with UX-TASK-01 and UX-SETPOP-01 re-verified against FIXED-584 and FIXED-528. Proved live: a weekday routine with an end and a skip policy composed in two groups and stating its terms on its card, Cancel rather than Stop on work that has not run, delegated work folded and counted under its parent, a real run settling and **Run again** filing new work, Permissions by task group, More by purpose with Recent and the palette, More as a full-height sheet at 390 wide, and every destination with **no 4xx, no 5xx and no console error**. **Three defects found and fixed** — Show on a parent revealed none of its settled work, a finished task said *Now: Starting scheduled run*, and filing a task forgot its model |
@@ -85,6 +86,92 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-04 — Ollama found running and kept checked, a boundary from the server, and a picture taken back
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, in a
+Linux container whose egress is limited to a proxy that refuses `ollama.com`
+and GitHub releases. Ollama: `scripts/live_ollama_standin.py` on
+127.0.0.1:11434, serving `llama3.2:3b` and `qwen3:8b` with Ollama's own paths,
+started with a pidfile so the spec could stop and start it; no `ollama` on
+PATH. Provider: Anthropic `claude-haiku-4-5-20251001`, the key the owner
+supplied entered through the Connect dialog by the spec from the process
+environment — never written to a file. Browser: the pre-installed Chromium,
+through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-04-ollama-and-readiness-live.spec.ts` (7 of 7: the two
+Ollama scenarios on the fresh workspace, the five others on the same workspace
+after the spec's selectors were corrected — see *What it found*). Captures:
+[`docs/screenshots/2026-10-04-ollama-readiness-round/`](../screenshots/2026-10-04-ollama-readiness-round).**
+
+The owner's Ollama decision (FIXED-737 to FIXED-739) and FIXED-740 to FIXED-749.
+
+**What it proved.**
+
+1. **Ollama running, nothing chosen.** First-run setup's Ollama row said
+   **Running on this device** with **Choose a model**, no *Selected*, and no
+   Gemma anywhere on the page — with no `ollama` binary on the host
+   (FIXED-737, FIXED-738, [01](../screenshots/2026-10-04-ollama-readiness-round/01-setup-ollama-running-nothing-chosen.png)).
+2. **The models it serves, and Ready at once.** The picker listed exactly
+   *Llama 3.2:3B* and *Qwen 3:8B*; **Use Llama 3.2:3B** made it the selection,
+   setup said **Ollama is running here**, and Models' row read **Running on this
+   device. Raiker checks it and this model on its own** with **Ready · confirmed
+   just now** — nobody pressed Check (FIXED-739,
+   [02](../screenshots/2026-10-04-ollama-readiness-round/02-setup-ollama-models-it-serves.png), [03](../screenshots/2026-10-04-ollama-readiness-round/03-setup-model-chosen.png), [04](../screenshots/2026-10-04-ollama-readiness-round/04-models-ollama-ready.png)).
+3. **Remembered, and it answers.** After a reload Chat's picker named *Llama
+   3.2:3B* and a turn was answered by it
+   ([05](../screenshots/2026-10-04-ollama-readiness-round/05-chat-answered-by-the-chosen-model.png)).
+4. **Raiker follows the service.** With Models open and untouched, stopping the
+   service turned the row to *Runtime stopped* with the not-running line, and
+   Overview offered **Start the runtime**; starting it again brought **Ready**
+   back — no reload, no Check (FIXED-739,
+   [06](../screenshots/2026-10-04-ollama-readiness-round/06-models-ollama-stopped.png), [07](../screenshots/2026-10-04-ollama-readiness-round/07-overview-start-the-runtime.png), [08](../screenshots/2026-10-04-ollama-readiness-round/08-models-ollama-back-and-ready.png)).
+5. **Build's boundary is the server's.** With Anthropic connected and Haiku
+   chosen, `GET /api/build/boundary` answered the project, *Local strict*, the
+   model, `model_off_machine: true` and `ready: true`, and the context line
+   said the same — *Haiku 4.5 · Anthropic — chosen for this work — leaves this
+   machine* — in Project → Runs on → Model order; a real Build turn answered
+   (FIXED-740, FIXED-746, [09](../screenshots/2026-10-04-ollama-readiness-round/09-build-boundary-from-the-server.png), [10](../screenshots/2026-10-04-ollama-readiness-round/10-build-real-turn.png)).
+6. **Chat after the split.** A real Anthropic answer, and its message menu's
+   **Continuity** group offering Branch and Summarise up to here (FIXED-745,
+   [11](../screenshots/2026-10-04-ollama-readiness-round/11-chat-continuity-actions.png)).
+7. **Design takes a picture back.** On seeded pictures, **Compare with Version
+   1** showed the two side by side, named by their place in the line; **Go back
+   to version 1** added a third version that says **Went back to** the first,
+   with both earlier versions still in the strip and the gallery, and the
+   compare view held at 390 wide with no horizontal overflow (FIXED-743,
+   [12](../screenshots/2026-10-04-ollama-readiness-round/12-design-compare.png), [13](../screenshots/2026-10-04-ollama-readiness-round/13-design-went-back-as-a-new-version.png), [14](../screenshots/2026-10-04-ollama-readiness-round/14-design-compare-390.png)).
+8. **Models after the split.** The Runtime tab's Advanced routing added and saved
+   an Anthropic fallback, the server listed it, and removing it saved too; the
+   Ollama row's Details opened with its capacity and closed on Escape; Chat,
+   Build, Design and three Models tabs at 390 wide with no horizontal overflow,
+   and no console error in any scenario (FIXED-744,
+   [15](../screenshots/2026-10-04-ollama-readiness-round/15-models-runtime-fallback-saved.png), [16](../screenshots/2026-10-04-ollama-readiness-round/16-models-details-dialog.png), [17](../screenshots/2026-10-04-ollama-readiness-round/17-models-overview-390.png)).
+
+**What it found**, all fixed in this change:
+
+* **Every Use button in the model picker had the same name** (FIXED-747) — the
+  spec could not choose a model by role, and neither could a screen reader.
+* **The first run of the stop-and-start scenario read a page that never
+  reloaded.** Navigating to the same hash does not re-render the page, so the
+  row kept its old answer while the server had already recorded the stop. The
+  server was right; the gap was real: an open Models page never re-read. The
+  page now re-reads quietly while a watched service exists (FIXED-739), and the
+  spec waits on the open page instead of navigating.
+* Two of the spec's own selectors were wrong (Build's project menu, and the
+  header's conversation menu taken for a message's); corrected, not product
+  defects.
+
+**Filed:** [BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama)
+(the Ollama journey still wants a run against a real Ollama) and
+[BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page)
+(UX-MODEL-01's connection-lifecycle remainder).
+
+**What it could not prove.** A real Ollama model's answer (BUG-318), and the
+MCP stdio bound against a real misbehaving server — `tests/test_mcp_stdio_bounds.py`
+drives real child processes, and no MCP scenario was run live.
 
 ---
 

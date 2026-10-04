@@ -272,7 +272,7 @@
       "profile_id": "ollama-local-openai-compatible",
       "provider": "ollama",
       "backend": "openai_compatible",
-      "model": "gemma4:31b-cloud",
+      "model": "<model>",
       "endpoint": "http://127.0.0.1:11434/v1",
       "build_phase": "phase_2",
       "default_state": "disabled_until_provider_detected",

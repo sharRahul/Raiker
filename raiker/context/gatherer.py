@@ -1073,9 +1073,14 @@ class ContextGatherer:
         # says everything is off argues the model out of tools the owner enabled
         # before it reads its own schema.
         runtime_status = self._runtime_status(store, owner_principal_id)
+        # §13.1 of the release-readiness review — this item goes to whichever
+        # provider answers the turn, hosted ones included. The absolute paths
+        # named the owner's account directory and where their encrypted store
+        # lives, and no answer needs either: file tools take workspace-relative
+        # paths and resolve them here. The folder's own name is enough to talk
+        # about it; the full path stays in local provenance for evidence.
         lines = [
-            f"workspace_root: {root}",
-            f"database: {store.db_path}",
+            f"workspace: {root.name or 'workspace'}",
             f"event_count: {event_count}",
             f"checkpoint_count: {checkpoint_count}",
             f"task_count: {task_count}",

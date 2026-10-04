@@ -323,8 +323,10 @@ class ImageGeneration(TypedDict):
     byte_size: int | None
     created_at: str
     source_generation_id: str | None
-    kind: Literal["create", "edit", "variation"]
+    kind: Literal["create", "edit", "variation", "revert"]
     project_id: str | None
+    #: DEC-07 step 4 — for a ``revert``, the version whose picture it carries.
+    restored_generation_id: str | None
     #: UX-DESIGN-01 — when this was put in Recently deleted; ``None`` in the
     #: gallery.
     deleted_at: str | None
@@ -347,6 +349,13 @@ class ImageLifecycleChanged(TypedDict):
     ok: bool
     generation_id: str
     state: Literal["deleted", "restored", "removed"]
+
+
+class ImageReverted(TypedDict):
+    """An earlier picture brought back as a new version, with the version made."""
+
+    ok: bool
+    generation: ImageGeneration
 
 
 class ImagesGenerated(TypedDict):

@@ -1385,6 +1385,51 @@
         "title": "BootstrapStatusView",
         "type": "object"
       },
+      "BoundaryRefusal": {
+        "description": "The first link that stops a Build turn, and the one thing that moves it.",
+        "properties": {
+          "action_href": {
+            "title": "Action Href",
+            "type": "string"
+          },
+          "action_label": {
+            "title": "Action Label",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "step": {
+            "enum": [
+              "project",
+              "repository",
+              "environment",
+              "model"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "reason_code",
+          "summary",
+          "remediation",
+          "action_href",
+          "action_label"
+        ],
+        "title": "BoundaryRefusal",
+        "type": "object"
+      },
       "BrainEdgeView": {
         "properties": {
           "evidence_memory_id": {
@@ -8036,6 +8081,199 @@
         "title": "EventView",
         "type": "object"
       },
+      "ExecutionBoundaryView": {
+        "description": "DEC-06 step 1 — where a Build turn would run, as the server resolves it.\n\nBuild used to assemble this line from three independent reads and its own\nclient state, so the sentence an owner read was the browser's opinion of\nthe boundary rather than the one the turn would be held to. Every fact here\nis resolved server-side from the same stored selections a turn reads; the\nclient proposes changes through the selection routes and renders this.",
+        "properties": {
+          "environment_available": {
+            "title": "Environment Available",
+            "type": "boolean"
+          },
+          "environment_boundary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Boundary"
+          },
+          "environment_id": {
+            "title": "Environment Id",
+            "type": "string"
+          },
+          "environment_name": {
+            "title": "Environment Name",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_off_machine": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Off Machine"
+          },
+          "model_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile Id"
+          },
+          "model_ready": {
+            "title": "Model Ready",
+            "type": "boolean"
+          },
+          "model_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Source"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundaryRefusal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Id"
+          },
+          "repo_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "local",
+                  "github"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Kind"
+          },
+          "repo_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Label"
+          },
+          "writable_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Writable Root"
+          }
+        },
+        "required": [
+          "project_id",
+          "project_name",
+          "repo_id",
+          "repo_label",
+          "repo_kind",
+          "writable_root",
+          "environment_id",
+          "environment_name",
+          "environment_available",
+          "environment_boundary",
+          "model_profile_id",
+          "model",
+          "provider",
+          "model_source",
+          "model_ready",
+          "model_off_machine",
+          "ready",
+          "refusal"
+        ],
+        "title": "ExecutionBoundaryView",
+        "type": "object"
+      },
       "ExecutionEnvironmentConfigured": {
         "properties": {
           "ok": {
@@ -10530,7 +10768,8 @@
             "enum": [
               "create",
               "edit",
-              "variation"
+              "variation",
+              "revert"
             ],
             "title": "Kind",
             "type": "string"
@@ -10591,6 +10830,17 @@
             "title": "References",
             "type": "array"
           },
+          "restored_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restored Generation Id"
+          },
           "size": {
             "title": "Size",
             "type": "string"
@@ -10627,6 +10877,7 @@
           "source_generation_id",
           "kind",
           "project_id",
+          "restored_generation_id",
           "deleted_at",
           "references"
         ],
@@ -10713,6 +10964,24 @@
           "text"
         ],
         "title": "ImageReferenceRequest",
+        "type": "object"
+      },
+      "ImageReverted": {
+        "description": "An earlier picture brought back as a new version, with the version made.",
+        "properties": {
+          "generation": {
+            "$ref": "#/components/schemas/ImageGeneration"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "generation"
+        ],
+        "title": "ImageReverted",
         "type": "object"
       },
       "ImagesGenerated": {
@@ -15468,6 +15737,18 @@
             "default": null,
             "title": "Provider Detected"
           },
+          "provider_running": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Running"
+          },
           "rate_currency": {
             "anyOf": [
               {
@@ -19865,6 +20146,20 @@
           "resumable"
         ],
         "title": "ResumeHandle",
+        "type": "object"
+      },
+      "RevertImageRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "title": "RevertImageRequest",
         "type": "object"
       },
       "RuntimeModeActivated": {
@@ -26310,6 +26605,53 @@
         "summary": "Upload Brain Source File"
       }
     },
+    "/api/build/boundary": {
+      "get": {
+        "description": "Where a Build turn would run: Project → repository → environment → model.\n\nDEC-06 step 1. Resolved from the same stored selections a turn reads, with\nthe first link that would stop a turn named and its one remedy. The\nproject is the client's proposal, resolved against this owner's projects;\nan id that names none comes back as no project.",
+        "operationId": "get_build_boundary_api_build_boundary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionBoundaryView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Build Boundary"
+      }
+    },
     "/api/capability-gates": {
       "get": {
         "operationId": "list_capability_gates_api_capability_gates_get",
@@ -30027,6 +30369,56 @@
           }
         },
         "summary": "Restore Image"
+      }
+    },
+    "/api/images/{generation_id}/revert": {
+      "post": {
+        "description": "Go back to an earlier version as a new version (DEC-07 step 4).\n\n``generation_id`` is the head the owner is looking at; ``body.to`` is the\nearlier version in its own history whose picture comes back. Nothing is\nrewritten or removed and no provider is contacted. Anything that is not a\nversion of this owner's picture in that lineage answers 404.",
+        "operationId": "revert_image_api_images__generation_id__revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "generation_id",
+            "required": true,
+            "schema": {
+              "title": "Generation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevertImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageReverted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Image"
       }
     },
     "/api/instances": {

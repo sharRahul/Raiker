@@ -235,7 +235,7 @@ describe("first-run setup", () => {
       [...dialog.querySelectorAll(".name")].map((name) => name.textContent),
     ).toEqual(["Opus 4.5", "Haiku 4.5"]);
 
-    await fireEvent.click(within(dialog).getAllByRole("button", { name: "Use" })[0]);
+    await fireEvent.click(within(dialog).getAllByRole("button", { name: /^Use / })[0]);
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(

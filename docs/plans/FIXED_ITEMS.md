@@ -758,6 +758,19 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-734](#fixed-734--an-approved-command-that-failed-left-its-turn-waiting-forever) | High | Approvals / Build / Chat | Fixed 2026-10-03 — found by the live round |
 | [FIXED-735](#fixed-735--every-composers-primary-action-had-no-name-at-phone-width) | Medium | Composer / accessibility | Fixed 2026-10-03 — found by the live round |
 | [FIXED-736](#fixed-736--builds-evidence-line-counted-calls-and-not-what-the-turn-read) | Low | Build | Fixed 2026-10-03 — found by the live round |
+| [FIXED-737](#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default) | High | Models / Ollama | Fixed 2026-10-04 (owner decision) |
+| [FIXED-738](#fixed-738--ollama-running-on-this-machine-read-as-not-installed) | Medium | Models / Ollama | Fixed 2026-10-04 (owner decision) |
+| [FIXED-739](#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking) | Medium | Models / Ollama | Fixed 2026-10-04 (owner decision) |
+| [FIXED-740](#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run) | Medium | Build | Fixed 2026-10-04 (closes DEC-06 step 1) |
+| [FIXED-741](#fixed-741--a-local-mcp-servers-output-was-held-in-memory-in-full-before-anything-measured-it) | Medium | MCP / resource bounds | Fixed 2026-10-04 (DEC-25, stdio half) |
+| [FIXED-742](#fixed-742--every-turn-told-the-provider-where-the-owners-encrypted-store-lives) | Low | Context / privacy | Fixed 2026-10-04 (§13.1 workspace metadata) |
+| [FIXED-743](#fixed-743--going-back-to-an-earlier-picture-meant-generating-it-again) | Medium | Design | Fixed 2026-10-04 (DEC-07 step 4, compare and revert) |
+| [FIXED-744](#fixed-744--the-models-page-owned-every-state-machine-on-it) | Medium | Models / maintainability | Fixed 2026-10-04 (closes UX-MODEL-01) |
+| [FIXED-745](#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) | Medium | Chat / maintainability | Fixed 2026-10-04 (closes UX-CHAT-01) |
+| [FIXED-746](#fixed-746--builds-view-owned-its-approval-review-and-source-ledger) | Medium | Build / maintainability | Fixed 2026-10-04 (closes UX-BUILD-01) |
+| [FIXED-747](#fixed-747--every-use-button-in-the-model-picker-had-the-same-name) | Low | Models / accessibility | Fixed 2026-10-04 — found by the live round |
+| [FIXED-748](#fixed-748--the-terminal-client-could-not-list-ollamas-models-until-one-was-chosen) | Low | Terminal client | Fixed 2026-10-04 — found by the work |
+| [FIXED-749](#fixed-749--a-turn-with-no-model-chosen-was-reported-as-a-provider-that-failed) | Low | Turn errors | Fixed 2026-10-04 — found by the work |
 
 ---
 
@@ -29716,3 +29729,325 @@ Chat does.
 
 **Evidence.** `BuildView.test.ts` — *counts the sources a turn read beside its
 calls*, which fails without the change.
+
+---
+
+## FIXED-737 — An Ollama model nobody chose was shipped as everyone's default
+
+**Severity: High. Area: Models / Ollama. Status: Fixed 2026-10-04 by the
+owner's decision: no Ollama model is hard-coded; when Ollama is running Raiker
+offers the models it serves, remembers the one chosen and keeps checking it.**
+
+**Observed.** On a fresh workspace on a machine whose Ollama served
+`llama3.2:3b` and `qwen3:8b`, first-run setup's Ollama row read **Selected:
+Gemma 4:31B Cloud** beside *2 models from Ollama*. Nobody had chosen it and the
+service did not have it. Models' **Model to pull** box was pre-filled with the
+same name, so pressing **Pull model** would have downloaded gigabytes the owner
+never asked for. BUG-270 had stopped the name reaching pickers on a host with no
+Ollama; on a host *with* Ollama it was still the selection.
+
+**Root cause.** `ollama-local-openai-compatible` in `model-profiles.json` named
+`gemma4:31b-cloud` as its model and carried `is_native_default`, so every read
+that fell back to the native default — the setup row, the card model, the
+pull box's initial value — printed a third-party model as the owner's choice.
+
+**Fixed.** The profile names no model (`<model>`), like every other provider
+that publishes a catalogue. A running Ollama is *offered*: setup says **Running
+on this device** and **Choose a model**, the picker lists exactly what the
+service serves, and choosing one saves it as the owner's selection. The pull
+box starts empty with a placeholder. Selecting the Ollama profile without naming
+a model is refused (`model_required_for_profile:…`), and no surface names a
+model for it until one is chosen.
+
+**Evidence.** `tests/test_local_model_service.py` (26) — including *running
+Ollama is present with no binary and chooses nothing*; the selection, readiness,
+turn-binding and out-of-box suites rewritten to the contract (no implied model);
+`ProvidersPanel.test.ts` — *names no model to pull until the owner types one*.
+Live: [2026-10-04 round](LIVE_TEST_ROUNDS.md), captures 01–03.
+
+---
+
+## FIXED-738 — Ollama running on this machine read as not installed
+
+**Severity: Medium. Area: Models / Ollama. Status: Fixed 2026-10-04 (owner
+decision of the same day).**
+
+**Observed.** BUG-270's detector is a PATH lookup. The Ollama desktop app on
+Windows and macOS runs its service without putting `ollama` on the PATH of the
+process that started Raiker, and a service started in a container or under
+another account is not on it either — so a machine serving models was told
+*Not installed on this machine*, and the readiness line said *Connect a
+provider* with Ollama answering on 11434.
+
+**Fixed.** `raiker/models/local_service.py` asks the service itself: one
+`GET /api/tags` to the profile's endpoint (or the owner's saved one), loopback
+only — any endpoint that is not this machine is refused before a socket opens —
+never through a proxy, with a 1.5 s timeout and a 10 s cache shared by every
+read in the process. A running service counts as present whatever the PATH
+says. `ModelProfileView` carries `provider_running`; Models says **Running on
+this device** (or *Installed, but not running* / *Not running on this device*
+when a chosen model's service is down), setup says **Ollama is running here**,
+and the readiness line's first step is done when only a local service is
+available, with **Choose a model** as the action.
+
+**Why a read may now make a connection.** FIXED-357 drew the line at a status
+read *adopting an identity*. This read adopts nothing — it lists models on the
+owner's own machine, over loopback, and the selection is still the owner's act —
+and the owner asked for it explicitly on 2026-10-04.
+
+**Evidence.** `test_local_model_service.py` — the loopback-only and no-proxy
+rules, every non-catalogue answer read as not running, the cache window, and
+the readiness line's steps; `ModelsView.test.ts` — the running, stopped and
+not-installed lines. Live captures 01, 04, 06.
+
+---
+
+## FIXED-739 — A chosen Ollama model was Ready until somebody stopped looking
+
+**Severity: Medium. Area: Models / Ollama. Status: Fixed 2026-10-04 (owner
+decision of the same day: "Raiker shouldn't forget and always check").**
+
+**Observed.** Readiness was a snapshot the owner renewed with **Check**. A model
+chosen in setup was not checked at all until someone pressed it, and a service
+stopped after a check went on reading **Ready** until the observation's window
+ran out.
+
+**Fixed.** Three parts, all using the exact-model check **Check** runs — for a
+local profile a catalogue read on this machine and nothing else:
+
+* choosing a model on a watched local service checks it at once, so setup and
+  Models say **Ready** the moment it is chosen;
+* a new host-tick pass, `local_model_watch`, re-checks every owner's watched
+  choices — the default model, each surface's model and each model kept offered
+  — every fifteen seconds, recording *Runtime stopped* or *Model missing* the
+  moment either stops being true and **Ready** again when it comes back;
+* an open Models page re-reads the view quietly every fifteen seconds while a
+  watched service exists, skipping a hidden tab, an open dialog and a selection
+  in flight, so the page follows the service without a reload.
+
+The choice itself is the stored selection it always was, so it survives a
+reload and a restart.
+
+**Evidence.** `test_local_model_service.py` — *the watch follows the service
+down and back up* (Ready → Runtime stopped → Model missing → Ready), *checks
+nothing nobody chose*, *only reads watched local profiles*, and *choosing an
+Ollama model is remembered and ready at once* across a second app instance.
+Live: the stand-in stopped and started under an open Models page, captures
+06–08, with no reload and no **Check**.
+
+---
+
+## FIXED-740 — Build's boundary line was the browser's opinion of where a turn would run
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-10-04. Closes DEC-06 step 1
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+
+**Observed.** Build's context line — Project → Repository → Runs on → Model —
+was assembled in the browser from three reads and its own state: the project
+list, the repository list, the execution-environment list, and the composer's
+model. The sentence an owner read was the client's reconstruction, not the
+boundary the turn would be held to.
+
+**Fixed.** `GET /api/build/boundary?project_id=…` resolves every link
+server-side from the same stored selections a turn reads, and names the first
+link that would stop a turn with its one remedy (`build_project_required`, an
+unavailable environment, or the model decision's own problem). The project is
+the client's proposal and is resolved against the owner's own projects; an id
+that names none comes back as no project. The view also says where a local
+repository may be written and whether the model leaves this machine. Build
+re-reads it whenever the project, the repository selection or the model
+changes, drops a response older than its latest request, and shows nothing
+rather than a guess when the read fails.
+
+**Evidence.** `tests/test_build_boundary.py` (4); the route verified by the
+contract suite; `BuildView.test.ts` — six boundary cases, including the request
+carrying the project and the refusal line linking to Models. Live capture 09:
+the line equal to the server's answer, with a real Anthropic turn after it (10).
+
+---
+
+## FIXED-741 — A local MCP server's output was held in memory in full before anything measured it
+
+**Severity: Medium. Area: MCP / resource bounds. Status: Fixed 2026-10-04. The
+stdio half of DEC-25 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#137-dec-25--enforce-streamed-request-bounds-at-ingress).**
+
+**Observed.** A stdio MCP session ran through `Popen.communicate()`, which reads
+both pipes to the end before returning. The 200 kB response cap was checked
+afterwards, so a server that wrote gigabytes cost gigabytes of memory first,
+and a server that flooded stderr while Raiker waited could not be bounded at
+all.
+
+**Fixed.** `run_bounded_stdio` drains stdout and stderr concurrently in 64 kB
+chunks. Stdout stops being kept — and the server's whole process group is
+stopped — the moment it passes the cap; stderr is drained to the end and only
+its last 4 kB is kept; a session past its timeout is stopped the same way. The
+server runs in its own session on POSIX so a helper it started goes with it.
+The refusal codes are the ones the session already had.
+
+**Evidence.** `tests/test_mcp_stdio_bounds.py` (5) — real child processes: an
+ordinary session, a stdout flood stopped at the bound well before the timeout,
+five megabytes of stderr drained with the answer intact, a timeout, and a
+grandchild stopped with its parent; the MCP runtime, environment and
+containment suites unchanged.
+
+---
+
+## FIXED-742 — Every turn told the provider where the owner's encrypted store lives
+
+**Severity: Low. Area: Context / privacy. Status: Fixed 2026-10-04. The
+workspace-metadata row of §13.1 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#131-evidence-and-release-scope-corrections).**
+
+**Observed.** `ContextGatherer._workspace_summary` put `workspace_root:` and
+`database:` — absolute paths naming the owner's account directory and their
+SQLCipher file — into an item every turn sends, to hosted providers included.
+No answer needs either: file tools take workspace-relative paths.
+
+**Fixed.** The item names the workspace folder only. The full path stays in the
+item's local provenance, which is evidence on this machine and is not sent.
+
+**Evidence.** `test_phase_1_2_context_gatherer.py` — *sends no absolute path to
+a provider*.
+
+---
+
+## FIXED-743 — Going back to an earlier picture meant generating it again
+
+**Severity: Medium. Area: Design. Status: Fixed 2026-10-04. DEC-07 step 4's
+compare and revert of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design).**
+
+**Observed.** A picture's versions were a strip of thumbnails. Telling two apart
+meant clicking between them, and the only way back to an earlier one was to
+describe it again to a provider — a new generation, a new cost, and not the
+same picture.
+
+**Fixed.** The inspector offers **Compare with** any earlier version in the
+picture's own line; the canvas shows the two side by side, each named by its
+place in the line. **Go back to version N** calls `POST
+/api/images/{head}/revert` with `{"to": …}`, which writes a new version on top
+of the head carrying the earlier picture and prompt, with
+`restored_generation_id` naming it (migration `RAIKER-2085`). Nothing in the
+history moves and no provider is contacted. Only an ancestor of the head can be
+reverted to — never another picture, another owner's, or one in Recently
+deleted. The bytes are shared, so removing either version for good keeps them
+while the other still shows them.
+
+**Evidence.** `tests/test_design_revert.py` (6) — including the sideways,
+foreign and deleted refusals and the shared-bytes purge; the route verified by
+the contract suite; `DesignView.test.ts` — compare and go back, and no
+comparison offered for a first version. Live captures 12–14 (390 px included).
+
+---
+
+## FIXED-744 — The Models page owned every state machine on it
+
+**Severity: Medium (maintainability). Area: Models. Status: Fixed 2026-10-04.
+Closes [UX-MODEL-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+
+**Observed.** `ModelsView.svelte` was 3,292 lines owning discovery, credentials,
+catalogue, selection, pricing and usage, runtime set-up, fallback routing, the
+advisor, three dialogs and the provider brand table.
+
+**Fixed.** Split by its tabs and dialogs, behaviour unchanged: the Runtime tab
+is `RuntimeTab.svelte`; its fallback sequence and advisor are
+`AdvancedRouting.svelte`, which owns both state machines and is reset only by a
+full read (a counter the page bumps), so the page's quiet re-read cannot discard
+a half-made sequence; model details and the model picker are their own
+dialogs; the sign-in brand facts are `providerBrands.ts`. Overview, My models
+and Usage were already components. The page is 2,523 lines. What stays in it is
+the Add tab's connection lifecycle and sign-in dialog — see
+[BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page).
+
+**Evidence.** The 127 Models tests unchanged and green; `controllers.test.ts`;
+live captures 15–17 (fallback saved and removed, details dialog, 390 px).
+
+---
+
+## FIXED-745 — Chat's view owned its file pane, recall strip and continuity actions
+
+**Severity: Medium (maintainability). Area: Chat. Status: Fixed 2026-10-04.
+Closes [UX-CHAT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+
+**Observed.** `ChatView.svelte` was 2,991 lines coordinating history,
+streaming, citations, the file pane, approvals, memory, project filing, speech
+and menus in one script.
+
+**Fixed.** Split by state machine, behaviour unchanged, each with one owner:
+`SourceInspector` (the file and source pane, object URLs, provenance, the turn
+source ledger and both downloads), `RecallLedger` (C17's strip and its two
+corrections), `TurnContinuity` (branch, rewind and summarise — UX-CHAT-05's
+Continuity group) and `ComposerLookups` (the `@` mention lookup and the owner's
+skill commands, now shared with Build). Every race guard moved with its state.
+The view is 2,570 lines.
+
+**Evidence.** The Chat suites (94) unchanged and green; `controllers.test.ts`
+(7); live capture 11 — a real Anthropic answer and its Continuity menu.
+
+---
+
+## FIXED-746 — Build's view owned its approval review and source ledger
+
+**Severity: Medium (maintainability). Area: Build. Status: Fixed 2026-10-04.
+Closes [UX-BUILD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+
+**Observed.** `BuildView.svelte` was 3,438 lines, and its `@` mention lookup and
+skill-command read were line-for-line copies of Chat's.
+
+**Fixed.** `ApprovalReview` owns the decisions a conversation raised, their
+previews, narrowed hunks and edited patches, and resolving one — including
+UX-BUILD-04's spent-decision path; `InlineSources` owns Build's inline source
+ledger; `ComposerLookups` replaces both copies of the lookups; the boundary is
+the server's ([FIXED-740](#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run)).
+The view is 3,198 lines.
+
+**Evidence.** The Build suites (51) unchanged and green; `controllers.test.ts` —
+*tells a decision that ran and failed apart from one governance stopped*; live
+captures 09–10.
+
+---
+
+## FIXED-747 — Every Use button in the model picker had the same name
+
+**Severity: Low. Area: Models / accessibility. Status: Fixed 2026-10-04 — found
+by the live round.**
+
+**Observed.** Driving setup's Ollama picker by role, two buttons were both named
+**Use**: a screen reader could not tell which model each one chooses.
+
+**Fixed.** Each is named for its model (*Use Llama 3.2:3B*); the visible word is
+unchanged.
+
+**Evidence.** `AvailableModels.test.ts`, `ModelSetupView.test.ts`; the live
+round chooses the model by that name.
+
+---
+
+## FIXED-748 — The terminal client could not list Ollama's models until one was chosen
+
+**Severity: Low. Area: Terminal client. Status: Fixed 2026-10-04 — found by the
+work.**
+
+**Observed.** `/models` listed the selected provider's live catalogue by building
+a provider for the selected *model*. With Ollama naming no model, it reported
+the provider unreachable — the one listing that is how a model gets chosen.
+
+**Fixed.** The listing goes through the profile path that needs no model chosen.
+
+**Evidence.** `test_async_runtime_completion_extra.py` — the live listing and
+the unavailable case.
+
+---
+
+## FIXED-749 — A turn with no model chosen was reported as a provider that failed
+
+**Severity: Low. Area: Turn errors. Status: Fixed 2026-10-04 — found by the
+work.**
+
+**Observed.** A turn reaching a profile with no model chosen answered *the
+provider did not complete the request. Run the readiness check on Models* —
+sending the owner to a check that has nothing to check.
+
+**Fixed.** `model_name_not_configured` has its own sentence: no model is chosen
+for this provider; choose one on Models — for Ollama, one of the models it is
+serving.
+
+**Evidence.** `test_terminal_client_smoke.py`.

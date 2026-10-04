@@ -47,17 +47,17 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_native_default_is_selected_but_not_ready_without_a_check(
+def test_detected_ollama_is_offered_but_not_selected(
     client: TestClient,
     owner_token: str,
     workspace: Path,
 ) -> None:
-    """With Ollama installed, the shipped default is selected and unproven.
+    """With Ollama installed, the provider is offered and nothing is chosen.
 
-    BUG-270 made `configured` mean "names a model that exists here" rather than
-    "names a model string", so this — the case where it does exist — states the
-    detection that makes the claim true. `ready` is still False: detection finds
-    a binary, and only a readiness check finds a model that answers.
+    The shipped profile used to name `gemma4:31b-cloud`, so detection selected
+    a model the machine may never have pulled. It names no model now: detection
+    makes Ollama available, and which of its models answers is the owner's
+    choice (owner decision, 2026-10-04).
     """
     SQLiteStore(workspace).save_local_runtime_presence(
         "ollama", present=True, executable="/usr/local/bin/ollama"
@@ -69,12 +69,11 @@ def test_native_default_is_selected_but_not_ready_without_a_check(
         for profile in body["profiles"]
         if profile["profile_id"] == "ollama-local-openai-compatible"
     )
-    assert ollama["selected"] is True
-    assert ollama["configured"] is True
+    assert ollama["selected"] is False
+    assert ollama["configured"] is False
     assert ollama["provider_detected"] is True
     assert ollama["ready"] is False
-    assert ollama["readiness_state"] == "not_configured"
-    assert body["ready_provider_count"] == 0
+    assert body["current_profile_id"] is None
 
 
 def test_undetected_native_default_is_not_configured_and_not_selected(
@@ -82,7 +81,7 @@ def test_undetected_native_default_is_not_configured_and_not_selected(
     owner_token: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """BUG-270 — nothing on this host serves `gemma4:31b-cloud`, so nothing says so.
+    """BUG-270 — nothing on this host serves an Ollama model, so nothing says so.
 
     The "nothing on this host" is stated rather than assumed. It used to depend
     on the machine running the suite genuinely not having Ollama installed, so
@@ -115,6 +114,12 @@ def test_check_marks_only_the_exact_catalogue_model_ready(
         return [ProviderModelInfo(id="gemma4:31b-cloud", owned_by="library")]
 
     monkeypatch.setattr(ModelRouter, "alist_models_for_profile", catalogue)
+    chosen = client.put(
+        "/api/model-selection",
+        headers=_auth(owner_token),
+        json={"profile_id": "ollama-local-openai-compatible", "model": "gemma4:31b-cloud"},
+    )
+    assert chosen.status_code == 200, chosen.text
     response = client.post(
         "/api/model-readiness/check",
         headers=_auth(owner_token),
@@ -258,12 +263,17 @@ def test_selection_change_invalidates_profile_readiness(
     )
 
     assert changed.status_code == 200
-    rows = SQLiteStore(workspace).list_model_readiness(
-        "principal_owner", "ollama-local-openai-compatible"
-    )
-    assert len(rows) == 1
-    assert rows[0].state is ModelReadinessState.STALE
-    assert rows[0].reason_code == "model_selection_changed"
+    rows = {
+        row.key.model: row
+        for row in SQLiteStore(workspace).list_model_readiness(
+            "principal_owner", "ollama-local-openai-compatible"
+        )
+    }
+    assert rows["gemma4:31b-cloud"].state is ModelReadinessState.STALE
+    assert rows["gemma4:31b-cloud"].reason_code == "model_selection_changed"
+    # A model chosen on a watched local service is checked as it is chosen
+    # (owner decision, 2026-10-04): a catalogue read on this machine, no more.
+    assert rows["qwen2.5"].state is ModelReadinessState.READY
 
 
 def test_connection_change_invalidates_profile_readiness(

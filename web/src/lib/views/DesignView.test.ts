@@ -679,3 +679,61 @@ describe("research as a reference", () => {
     ]);
   });
 });
+
+// DEC-07 step 4 — compare a version with an earlier one in its own line, and go
+// back to it as a new version rather than by rewriting the history.
+describe("Design compares versions and goes back without rewriting history", () => {
+  const LINE = [
+    generation({ generation_id: "img_head", prompt: "a red leaf", source_generation_id: "img_mid", kind: "edit", created_at: "2026-09-13T12:00:00Z" }),
+    generation({ generation_id: "img_mid", prompt: "an orange leaf", source_generation_id: "img_root", kind: "edit", created_at: "2026-09-13T11:00:00Z" }),
+    generation({ generation_id: "img_root", prompt: "a green leaf", created_at: "2026-09-13T10:00:00Z" }),
+  ];
+  const REVERTED = generation({
+    generation_id: "img_back",
+    prompt: "a green leaf",
+    source_generation_id: "img_head",
+    restored_generation_id: "img_root",
+    kind: "revert",
+    created_at: "2026-09-13T13:00:00Z",
+  });
+
+  it("shows two versions side by side and offers the way back", async () => {
+    stubFetch(
+      routes({
+        "GET /api/images": { sizes: ["1024x1024"], generations: LINE, deleted: [] },
+        "POST /api/images/img_head/revert": { ok: true, generation: REVERTED },
+      }),
+    );
+    render(DesignView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open a red leaf on the canvas" }));
+    const picker = await screen.findByLabelText("Compare with an earlier version");
+    await fireEvent.change(picker, { target: { value: "img_root" } });
+
+    const compare = await screen.findByTestId("design-compare");
+    expect(compare).toHaveTextContent("Version 1 · a green leaf");
+    expect(compare).toHaveTextContent("Version 3 (this one) · a red leaf");
+
+    const after = stubFetch(
+      routes({
+        "GET /api/images": { sizes: ["1024x1024"], generations: [REVERTED, ...LINE], deleted: [] },
+        "POST /api/images/img_head/revert": { ok: true, generation: REVERTED },
+      }),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Go back to version 1" }));
+    await waitFor(() => expect(screen.queryByTestId("design-compare")).toBeNull());
+    const revert = after.mock.calls.find(([url]) => String(url).endsWith("/api/images/img_head/revert"));
+    expect(JSON.parse(String((revert?.[1] as RequestInit).body))).toEqual({ to: "img_root" });
+    // The new version is selected and says which version it carries.
+    const inspector = await screen.findByRole("complementary", { name: "Inspector" });
+    await waitFor(() => expect(inspector).toHaveTextContent("Went back to"));
+    expect(inspector).toHaveTextContent("a green leaf");
+  });
+
+  it("offers no comparison for a picture with no earlier version", async () => {
+    stubFetch(routes({ "GET /api/images": { sizes: ["1024x1024"], generations: [LINE[2]], deleted: [] } }));
+    render(DesignView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Open a green leaf on the canvas" }));
+    await screen.findByRole("complementary", { name: "Inspector" });
+    expect(screen.queryByLabelText("Compare with an earlier version")).toBeNull();
+  });
+});

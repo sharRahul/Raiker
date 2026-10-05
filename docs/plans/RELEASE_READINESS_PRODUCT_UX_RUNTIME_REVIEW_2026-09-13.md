@@ -2332,8 +2332,8 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > access's check says why in words, names the rule and which of the three lists
 > holds it, and no longer calls a name that does not resolve "private" ([FIXED-759](FIXED_ITEMS.md#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private)).
 > The owner decisions this section names (quiet-hour overrides, OAuth
-> providers) remain pending acceptance; recommendations and code evidence are
-> now recorded in DEC-21a and DEC-21b below.
+> providers) were accepted by the product owner on 2026-10-05 and are finalised
+> in DEC-21a and DEC-21b below. Implementation and verification remain open.
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2348,14 +2348,17 @@ the recommendations previously summarized only in the Settings table.
 | Git credential | Prefer supported OAuth/device flow or OS credential-manager integration; retain scoped-token fallback. Bind grants to repository/host/operation, show expiry and last use, and issue credentials only to the selected runtime. Review requested scopes before authorizing. | Invalid/expired credentials, OAuth state/PKCE where applicable, wrong-host redirect, revoked grant and process-output redaction tests. Disconnect revokes handles without deleting repositories. |
 | Updates | Show installed/candidate version, channel, platform, download size, signature verification, notes and schema compatibility. Use DEC-17's staged update; the UI offers rollback only when the server confirms it is supported. | Tampered download, offline check, interrupted swap, disk-full, incompatible downgrade and restored workspace tests. Failure leaves the last usable app/data pair intact. |
 
-**Owner decision status — recommendations recorded 2026-10-05; pending owner
-acceptance.** The choices below fill the missing recommendations. They are not
-claims that the owner has approved them or that either feature is implemented.
-Until accepted and implemented, preserve current settings and behavior.
+**Owner decision status — Accepted / finalised, 2026-10-05.** Rahul Sharma,
+acting as product owner, accepted DEC-21a and DEC-21b by instructing that these
+decisions be finalised. Both are now the implementation requirements; no further
+owner choice is pending for quiet-hour override defaults or the initial Git
+OAuth provider scope. This acceptance does not mark either feature implemented
+or verified. Preserve current settings and behavior until the implementation
+and migration contracts below are delivered.
 
 ### DEC-21a — Quiet hours are quiet unless the owner chooses an exception
 
-**Recommended decision.** Quiet hours are opt-in; do not invent a schedule for
+**Accepted decision.** Quiet hours are opt-in; do not invent a schedule for
 an existing account. Once enabled, suppress interruptive notification toasts
 and desktop alerts during the configured interval, including approval-needed,
 routine-failure and security notices. Keep the bell, notification history,
@@ -2399,11 +2402,11 @@ state/deduplication work; it is not already supplied by the current in-memory se
 
 ### DEC-21b — Start Git OAuth with GitHub.com and keep the existing grant boundary
 
-**Recommended decision.** Scope the first OAuth integration to **GitHub.com**.
+**Accepted decision.** Scope the first OAuth integration to **GitHub.com**.
 Retain the current GitHub token fallback. Defer GitLab.com, Bitbucket Cloud,
 Azure DevOps and self-hosted/enterprise forge endpoints to separate provider
 adapters with explicit host, token-audience and scope contracts. This is a
-release-scope recommendation, not a claim that other providers cannot support
+release-scope decision, not a claim that other providers cannot support
 OAuth. Do not add generic account-login providers to Git credential settings.
 
 **Reason and alternatives.** GitHub.com fits the host boundary the product
@@ -2442,9 +2445,11 @@ deployments working; any new credential schema requires an additive migration,
 and rollback must never restore revoked grants.
 
 **Related decisions.** DEC-21's Settings contracts above, DEC-16's runtime
-authority, and section 13.9's acceptance lifecycle remain applicable. Recording
-these recommendations closes the documentation omission, not either pending
-owner decision or the implementation work.
+authority, and section 13.9's acceptance lifecycle remain applicable. Owner
+acceptance closes both pending product decisions. Engineering must implement
+the contracts and supply their acceptance evidence before either is marked
+Verified; additional providers or changed quiet-hour defaults require an
+explicit amendment to these decisions.
 
 ## 13.4 DEC-22 — Session steering, compaction and delegation
 

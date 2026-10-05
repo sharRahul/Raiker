@@ -7,8 +7,8 @@
  * same decision a second time. A page that shows a decision inline marks it
  * with {@link shownInline}; the approval card leaves it alone *while it is on
  * screen*. Chat and Build stay mounted, hidden, when the owner moves to another
- * route, so a mark alone would have hidden the card everywhere (found by the
- * live round); visibility is read from the element itself.
+ * route, so a mark alone would hide the card everywhere; visibility is read
+ * from the element itself.
  */
 // Element references, not state: `inlineDecisions.version` is what readers track.
 // eslint-disable-next-line svelte/prefer-svelte-reactivity

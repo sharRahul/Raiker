@@ -135,12 +135,10 @@
   });
 
   /**
-   * The unread set the last poll saw. Found by this round's live run: the
-   * bell read notifications once on mount and then only when something
-   * announced a change, so a notice that arrived later was docked here and
-   * not counted there — and a notice folded into the bell (BUG-320) folded
-   * into a bell that did not count it. When the unread set changes, this poll
-   * is what announces it.
+   * The unread set the last poll saw. The bell reads notices on mount and
+   * whenever a change is announced; this poll is what announces a notice that
+   * arrived since, so a notice folded into the bell (BUG-320) is one the bell
+   * counts.
    */
   let unreadKey = "";
 

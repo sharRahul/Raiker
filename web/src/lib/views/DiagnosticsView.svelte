@@ -106,8 +106,8 @@
 
   /**
    * BUG-322 — Observability's attention list sits above this view and reads
-   * the same records. Found live: after a repair here, the item above still
-   * said the index was damaged until the page was reloaded. A repair says so.
+   * the same records, so a repair here announces itself and the list re-reads
+   * rather than keep naming an index that has just been rebuilt.
    */
   function announceRepaired() {
     window.dispatchEvent(new Event(RUNTIME_HEALTH_CHANGED));

@@ -113,5 +113,9 @@ export const auth = {
     contract.changePassword({ old_password: oldPassword, new_password: newPassword }),
   listDeviceSessions: () => contract.listDeviceSessions(),
   revokeDeviceSession: (sessionId: string) => contract.revokeDeviceSession(sessionId),
-  deleteAccount: () => contract.deleteAccount(),
+  // DEC-10 step 8 — the username typed as confirmation travels with the
+  // request, so the server refuses a delete nobody spelled out.
+  deleteAccount: (confirm: string) => contract.deleteAccount({ confirm }),
+  deletionPreview: () => contract.accountDeletionPreview(),
+  sessionState: () => contract.sessionState(),
 };

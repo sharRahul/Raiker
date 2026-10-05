@@ -77,6 +77,24 @@ class SessionStateView(View):
 
 
 @dataclass(frozen=True)
+class AccountDeletionPreview(View):
+    """What deleting this account removes and keeps, counted by the server (DEC-10 step 8).
+
+    ``username`` is what the confirmation asks the owner to type; ``kept`` is
+    what the delete does not reach, said rather than implied.
+    """
+
+    username: str
+    conversations: int
+    tasks: int
+    projects: int
+    memories: int
+    connector_credentials: int
+    mcp_servers: int
+    kept: list[str]
+
+
+@dataclass(frozen=True)
 class DeviceSessionView(View):
     """One sign-in of this account, without its token."""
 

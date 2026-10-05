@@ -337,7 +337,9 @@ describe("McpView", () => {
         summary: "New host with sensitive data", redacted_detail: {}, subject_id: "mcp_1", state: "open",
         created_at: "2026-07-18T10:00:00Z",
       }],
-      "POST /api/mcp/servers/mcp_1/resume": { ok: true, monitor_state: "active" },
+      "POST /api/mcp/servers/mcp_1/resume": {
+        ok: true, server_id: "mcp_1", monitor_state: "active", check: "passed", check_reason: null, pending: [],
+      },
     });
     render(McpView);
     await waitFor(() => expect(screen.getByText("Paused: New host with sensitive data")).toBeInTheDocument());
@@ -348,6 +350,24 @@ describe("McpView", () => {
       expect.stringContaining("/api/mcp/servers/mcp_1/resume"),
       expect.objectContaining({ method: "POST" }),
     ));
+  });
+
+  // DEC-15 step 12 — Resume re-runs the connection test. A server that fails
+  // it stays stopped, and the page says so rather than "resumed".
+  it("says a server that failed its resume check stays paused, and why", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server({ monitor_state: "paused", paused_reason: "Paused by owner." })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "POST /api/mcp/servers/mcp_1/resume": {
+        ok: true, server_id: "mcp_1", monitor_state: "paused", check: "failed",
+        check_reason: "mcp_initialize_failed", pending: [],
+      },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    expect(await screen.findByText(/did not pass its connection test, so it stays paused: the server did not complete its handshake/)).toBeInTheDocument();
+    expect(screen.queryByText(/resumed after a passing/)).toBeNull();
   });
 
   // B8 — connecting a server and the agent being able to call it are two

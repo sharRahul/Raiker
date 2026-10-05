@@ -105,6 +105,7 @@ describe("DiagnosticsView", () => {
     index_engine_mismatch_count: 0,
     conversation_index_count: 12,
     stale_conversation_index_count: 0,
+    damaged_text_indexes: [] as string[],
   };
 
   it("reports a clean memory store without listing ten zeroes", async () => {
@@ -149,6 +150,39 @@ describe("DiagnosticsView", () => {
     );
     expect(await screen.findByText(/12 rows indexed/i)).toBeInTheDocument();
   });
+  // DEC-24 step 6 — an index SQLite reports as damaged fails every search
+  // through it. It is a rebuildable degraded state, and says so.
+  it("names a damaged search index, says the data is unaffected and rebuilds them all", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/security/health": [],
+      "GET /api/memory/integrity": {
+        ...CLEAN_INTEGRITY,
+        clean: false,
+        damaged_text_indexes: ["conversation_fts"],
+      },
+      "POST /api/memory/text-indexes/rebuild": {
+        ok: true,
+        indexed_rows: { approved_memory_fts: 4, conversation_fts: 12, managed_file_chunk_fts: 0 },
+        damaged_text_indexes: [],
+      },
+    });
+    render(DiagnosticsView);
+
+    const notice = await screen.findByTestId("damaged-text-indexes");
+    expect(notice).toHaveTextContent(/Conversation search index is damaged/);
+    expect(notice).toHaveTextContent(/not affected/);
+    expect(screen.queryByRole("button", { name: /rebuild conversation index/i })).toBeNull();
+
+    screen.getByRole("button", { name: /rebuild search indexes/i }).click();
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes("/api/memory/text-indexes/rebuild")),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/16 rows indexed, and every search index passes/i)).toBeInTheDocument();
+  });
+
   it("names a background pass that keeps failing, and how long since it worked", async () => {
     // GCR-38 — the host tick's four passes were each `with suppress(Exception)`.
     // A pass could throw every fifteen seconds for days and this page reported a

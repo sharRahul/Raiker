@@ -90,7 +90,10 @@ button:
 it: whether direct messages and groups are both heard (Telegram) or there is one
 caller (the webhook), that no @mention is needed, whether messages share one
 conversation or each starts a new one, who may start work, what stops a bot
-loop — Telegram updates written by a bot are ignored — and where an answer goes.
+loop — Telegram updates written by a bot are ignored; on the webhook, which has
+no such flag, a message that repeats one of Raiker's own recent replies, or the
+same message a third time in ten minutes, is refused before it reaches a model
+and its receipt says so — and where an answer goes.
 A Telegram answer stays in Raiker; nothing is sent back over the channel yet.
 
 **Recent activity** lists each message and test with its stages as separate

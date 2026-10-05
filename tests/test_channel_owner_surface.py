@@ -454,10 +454,13 @@ def test_an_allowlisted_sender_is_still_bounded(
 
     client = TestClient(create_app(workspace_root=workspace))
     headers = {"X-Raiker-Channel-Secret": "s3cret"}
-    body = {"sender_id": "ops", "text": "status?"}
     codes = [
-        client.post(f"/api/channels/{WEBHOOKS}/inbound", json=body, headers=headers).status_code
-        for _ in range(4)
+        client.post(
+            f"/api/channels/{WEBHOOKS}/inbound",
+            json={"sender_id": "ops", "text": f"status {n}?"},
+            headers=headers,
+        ).status_code
+        for n in range(4)
     ]
 
     assert codes[:3] == [200, 200, 200]
@@ -615,3 +618,59 @@ def test_the_surface_says_whether_deliveries_are_signed(
     assert DashboardService(workspace).list_channels(owner)["outbound"][
         "signing_configured"
     ] is True
+
+
+# ── Loop guard (DEC-14 step 9) ───────────────────────────────────────────────
+
+
+def test_an_echo_of_raikers_own_reply_and_a_third_repeat_are_refused(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The webhook has no bot flag, so the guard reads lineage instead.
+
+    Two automated parties pointed at each other answer each other until the
+    rate limit, and every answer is a model call. An inbound message that is
+    one of Raiker's own recent replies is an echo; the same message from the
+    same sender a third time in the window is a repeat. Both are refused before
+    routing and both leave a receipt with the reason.
+    """
+    from fastapi.testclient import TestClient
+
+    from raiker.api import routes_channels
+    from raiker.api.app import create_app
+
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    routes_channels._inbound_hits.clear()
+
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+    service.set_channel_enabled(owner, pairing_id, True)
+    client = TestClient(create_app(workspace_root=workspace))
+    headers = {"X-Raiker-Channel-Secret": "s3cret"}
+
+    def send(text: str) -> Any:
+        return client.post(
+            f"/api/channels/{WEBHOOKS}/inbound",
+            json={"sender_id": "ops", "text": text},
+            headers=headers,
+        )
+
+    # Raiker said this on the connector a moment ago; the other side feeds it back.
+    routes_channels._remember_reply(WEBHOOKS, "The build is green.")
+    echo = send("the build is   GREEN.")
+    assert echo.status_code == 409
+    assert echo.json()["detail"]["reason_code"] == "loop_echo"
+
+    assert send("ping").status_code == 200
+    assert send("ping").status_code == 200
+    third = send("ping")
+    assert third.status_code == 409
+    assert third.json()["detail"]["reason_code"] == "loop_repeated"
+    # A different message from the same sender is still heard.
+    assert send("what changed today?").status_code == 200
+
+    reasons = {
+        row.get("reason_code")
+        for row in service.store.list_channel_receipts(WEBHOOKS, limit=20)
+    }
+    assert {"loop_echo", "loop_repeated"} <= reasons

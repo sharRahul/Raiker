@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import hmac
 import json
 import os
@@ -127,6 +128,63 @@ def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
         return False
     hits.append(now)
     return True
+
+
+# ── Loop guard (DEC-14 step 9) ───────────────────────────────────────────────
+#
+# Telegram marks another bot's message and it is never routed (UX-MSG-05). The
+# generic webhook has no such flag: whatever is on the other end — a person, a
+# script, another assistant — reaches Raiker as a sender id and a string, and
+# the reply goes back to it. Two automated parties pointed at each other answer
+# each other until the rate limit, sixty times a minute, and every answer is a
+# model call. So the guard reads lineage rather than a flag:
+#
+# * an inbound message that *is* one of Raiker's own recent replies on this
+#   connector is an echo — the other side fed the answer back in;
+# * the same message from the same sender a third time inside the window is a
+#   repeat, which is what a stuck automation sends and a person rarely does.
+#
+# Fingerprints only (a hash of the normalised text), process-local and windowed
+# like the budget above. Both refusals are recorded with their reason, so a
+# channel that went quiet is answerable from its receipts.
+
+CHANNEL_LOOP_WINDOW_SECONDS = 600.0
+CHANNEL_LOOP_REPEAT_LIMIT = 3
+
+_recent_replies: dict[str, deque[tuple[float, str]]] = defaultdict(deque)
+_recent_inbound: dict[tuple[str, str], deque[tuple[float, str]]] = defaultdict(deque)
+
+
+def _fingerprint(text: str) -> str:
+    normalised = " ".join(text.split()).casefold()
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
+def _prune(seen: deque[tuple[float, str]], cutoff: float) -> None:
+    while seen and seen[0][0] < cutoff:
+        seen.popleft()
+
+
+def _loop_reason(connector_id: str, sender_id: str, text: str) -> str | None:
+    """``loop_echo``, ``loop_repeated`` or None — and records this message."""
+    now = time.monotonic()
+    cutoff = now - CHANNEL_LOOP_WINDOW_SECONDS
+    mark = _fingerprint(text)
+    replies = _recent_replies[connector_id]
+    _prune(replies, cutoff)
+    if any(seen == mark for _at, seen in replies):
+        return "loop_echo"
+    inbound = _recent_inbound[(connector_id, sender_id)]
+    _prune(inbound, cutoff)
+    inbound.append((now, mark))
+    if sum(1 for _at, seen in inbound if seen == mark) >= CHANNEL_LOOP_REPEAT_LIMIT:
+        return "loop_repeated"
+    return None
+
+
+def _remember_reply(connector_id: str, reply: str) -> None:
+    if reply.strip():
+        _recent_replies[connector_id].append((time.monotonic(), _fingerprint(reply)))
 
 
 # ── Owner surface (BUG-225) ──────────────────────────────────────────────────
@@ -503,6 +561,36 @@ async def _handle_inbound(
             },
         )
 
+    loop = _loop_reason(connector_id, sender_id, text)
+    if loop is not None:
+        _receipt(
+            {"failed_at": utc_now()},
+            role="owner" if is_owner else "allowed",
+            reason=loop,
+        )
+        writer.append(make_event(
+            session_id="channels",
+            turn_id=None,
+            event_type="channel_message_rejected",
+            actor="channel_receiver",
+            payload={
+                "connector_id": connector_id,
+                "channel_type": channel_type,
+                "sender_id": sender_id,
+                "trust_level": "untrusted",
+                "reason": loop,
+            },
+        ))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "ok": False,
+                "reason_code": loop,
+                "trust_level": "untrusted",
+                "quarantined": True,
+            },
+        )
+
     # Allowlisted sender, within budget: content stays structurally untrusted.
     # The stored owner route — never a field in this request — decides whether
     # anything else happens.
@@ -534,6 +622,7 @@ async def _handle_inbound(
         is_owner=is_owner,
     )
     _settle_receipt(store, channel_message_id, routed, channel_type=channel_type)
+    _remember_reply(connector_id, str(routed.get("reply") or ""))
     answer = cast(ChannelInboundAccepted, {
         "ok": True,
         "channel_message_id": channel_message_id,

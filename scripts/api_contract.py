@@ -75,6 +75,7 @@ INVENTORY_MD = REPO_ROOT / "docs" / "architecture" / "API_CONTRACT_INVENTORY.md"
 VERIFIED: frozenset[tuple[str, str]] = frozenset(
     {
         ("DELETE", "/api/account"),
+        ("GET", "/api/account/deletion-preview"),
         ("DELETE", "/api/brain/sources"),
         ("DELETE", "/api/brain/sources/grants"),
         ("DELETE", "/api/channels/pairings/{pairing_id}"),
@@ -304,6 +305,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/mcp/servers/{server_id}/resume"),
         ("POST", "/api/mcp/servers/{server_id}/tools/approve"),
         ("POST", "/api/memory/conversation-index/rebuild"),
+        ("POST", "/api/memory/text-indexes/rebuild"),
         ("POST", "/api/memory/eidetic/cleanup"),
         ("POST", "/api/memory/embedding-index"),
         ("POST", "/api/memory/entity-proposals/scan"),

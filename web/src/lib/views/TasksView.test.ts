@@ -856,3 +856,46 @@ describe("TasksView — a routine paused after repeated failures", () => {
     expect(screen.getByRole("button", { name: "Continue now" })).toBeInTheDocument();
   });
 });
+
+// DEC-12 step 5 — whether the owner was told is separate from whether it worked.
+describe("TasksView — a completed run whose notice did not arrive", () => {
+  it("stays completed and says Delivery failed", async () => {
+    const task = {
+      task_id: "task_digest", session_id: "sess_inbox", status: "completed",
+      title: "Morning inbox digest", objective: "Summarise the inbox.",
+      current_step: null, progress_percent: 100,
+      created_at: "2026-10-01T09:00:00Z", updated_at: "2026-10-05T09:00:00Z",
+      completed_at: "2026-10-05T09:01:00Z", summary: "Three threads need a reply.",
+      project_id: null, scheduled_at: "2026-10-05T09:00:00Z", recurrence: null,
+      reminder_at: null, parent_task_id: null,
+      delivery_state: "failed",
+      delivery_detail: "The notice is in Raiker, but the desktop notification command failed.",
+    };
+    stubFetch({
+      "GET /api/tasks": [task],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+    const line = await screen.findByTestId("task-delivery-failed");
+    expect(line).toHaveTextContent(/Delivery failed\./);
+    expect(line).toHaveTextContent(/desktop notification command failed/);
+    expect(screen.getByText("Three threads need a reply.")).toBeInTheDocument();
+  });
+
+  it("says nothing about delivery when it arrived", async () => {
+    stubFetch({
+      "GET /api/tasks": [{
+        task_id: "task_ok", session_id: "sess_inbox", status: "completed", title: "Digest",
+        objective: "x", current_step: null, progress_percent: 100,
+        created_at: "2026-10-01T09:00:00Z", updated_at: "2026-10-05T09:00:00Z",
+        completed_at: "2026-10-05T09:01:00Z", summary: "Done.", project_id: null,
+        scheduled_at: null, recurrence: null, reminder_at: null, parent_task_id: null,
+        delivery_state: "delivered", delivery_detail: null,
+      }],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+    expect(await screen.findByText("Done.")).toBeInTheDocument();
+    expect(screen.queryByTestId("task-delivery-failed")).toBeNull();
+  });
+});

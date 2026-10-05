@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 from raiker.notify.approval_notifier import (
     dispatch_notification_hook,
     fire_os_notification,
+    os_notification_outcome,
     resolve_owner_principal_id,
 )
 
@@ -109,9 +110,22 @@ def notify_task_finished(
             body=body,
             subject_id=task.task_id,
         )
-    except Exception:  # noqa: BLE001 - a notice must not fail the task
+    except Exception as exc:  # noqa: BLE001 - a notice must not fail the task
+        _record_delivery(
+            store, task.task_id, "failed",
+            f"The notice could not be written ({type(exc).__name__}).",
+        )
         return None
-    fire_os_notification(title, body)
+    # DEC-12 step 5 — the notice in Raiker is the delivery; the desktop notice
+    # the owner configured is a second one, and its failure is said too.
+    desktop = os_notification_outcome(title, body)
+    if desktop == "failed":
+        _record_delivery(
+            store, task.task_id, "failed",
+            "The notice is in Raiker, but the desktop notification command failed.",
+        )
+    else:
+        _record_delivery(store, task.task_id, "delivered", None)
     dispatch_notification_hook(
         store,
         owner_principal_id=owner,
@@ -120,6 +134,14 @@ def notify_task_finished(
         subject_id=task.task_id,
     )
     return notification_id
+
+
+def _record_delivery(store: SQLiteStore, task_id: str, state: str, detail: str | None) -> None:
+    """Write the delivery state; a store that refuses this too loses nothing else."""
+    try:
+        store.record_task_delivery(task_id, state, detail)
+    except Exception:  # noqa: BLE001 - the outcome is already recorded
+        return
 
 
 #: DEC-12 step 6 — a routine stopped by its own failures.

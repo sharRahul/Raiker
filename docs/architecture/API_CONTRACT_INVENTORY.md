@@ -12,11 +12,12 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**359 operations: 348 verified, 0 eligible, 0 deferred, 11 special.**
+**361 operations: 350 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
 | DELETE | `/api/account` |  | Ok | verified | built as Ok |
+| GET | `/api/account/deletion-preview` |  | AccountDeletionPreview | verified | built as AccountDeletionPreview |
 | GET | `/api/approvals` |  | ApprovalView[] | verified | DashboardService.list_approvals |
 | GET | `/api/approvals/resumable` |  | ResumableTurns | verified | declared ResumableTurns |
 | GET | `/api/approvals/{approval_id}` |  | ApprovalDetailView | verified | DashboardService.get_approval |
@@ -174,7 +175,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/mcp/servers/{server_id}/findings` |  | SecurityFindingView[] | verified | DashboardService.list_mcp_findings |
 | POST | `/api/mcp/servers/{server_id}/kill` |  | McpContainment | verified | declared by cast |
 | POST | `/api/mcp/servers/{server_id}/pause` |  | McpContainment | verified | declared by cast |
-| POST | `/api/mcp/servers/{server_id}/resume` |  | McpContainment | verified | declared by cast |
+| POST | `/api/mcp/servers/{server_id}/resume` |  | McpResumed | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/sessions` |  | McpSessionView[] | verified | DashboardService.list_mcp_sessions |
 | POST | `/api/mcp/servers/{server_id}/tools/approve` | ApproveMcpToolsRequest | McpToolsApproved | verified | declared by cast |
 | GET | `/api/memory` |  | MemoryControlView[] | verified | DashboardService.list_memories |
@@ -205,6 +206,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/memory/relationship-proposals/scan` |  | RelationshipScan | verified | declared by cast |
 | POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict | RelationshipDecided | verified | declared by cast |
 | GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
+| POST | `/api/memory/text-indexes/rebuild` |  | TextIndexesRebuilt | verified | declared by cast |
 | DELETE | `/api/memory/{memory_id}` |  | MemoryForgotten | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}` | dict | MemoryUpdated | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}/archive` | dict | MemoryArchived | verified | declared by cast |

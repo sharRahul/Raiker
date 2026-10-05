@@ -124,7 +124,8 @@ names.
 | [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
 | [BUG-319](#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page) | Low | Models / maintainability | Open — UX-MODEL-01 split the tabs and dialogs out; the Add tab's connection lifecycle and sign-in dialog are still the page's own state |
 | [BUG-320](#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat) | Low | Notifications / layout | Open — found by the 2026-10-05 live round; the dock covers Chat's newest prompt |
-| [BUG-321](#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones) | Low | Settings → General | Open — found by the 2026-10-05 live round; Chromium lists Asia/Calcutta, not Asia/Kolkata |
+| [BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | **Closed 2026-10-05 ([FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones))** — renamed ICU ids map to their current IANA names |
+| [BUG-322](#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold) | Low | Observability / search | Open — found by the 2026-10-05 (second) live round; FIXED-763's notice is inside *Runtime health, in detail*, not in *Needs your attention* |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2370,8 +2371,9 @@ overlap in the round's 390 and 1440 sweeps.
 
 ## BUG-321 — The time-zone list offers the browser's own zone ids, not the current ones
 
-**Severity: Low. Area: Settings → General. Status: Open — found by the
-2026-10-05 live round.**
+**Severity: Low. Area: Settings → General. Status: Closed 2026-10-05 as
+[FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones)
+— found by the 2026-10-05 live round.**
 
 **Observed.** The list comes from `Intl.supportedValuesOf("timeZone")`. Chromium
 answers with ICU's canonical ids, some of which are the old names — `Asia/Calcutta`
@@ -2382,3 +2384,21 @@ server (zoneinfo carries the links), so nothing is wrong once chosen.
 **Proposed fix.** Map the handful of renamed ICU ids to their current IANA names
 for display and storage (keeping the old value readable), and test the list
 against a fixture of both spellings.
+
+## BUG-322 — A damaged search index is named only under Diagnostics' fold
+
+**Severity: Low. Area: Observability / search. Status: Open — found by the
+2026-10-05 (second) live round.**
+
+**Observed.** [FIXED-763](FIXED_ITEMS.md#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it)
+names a damaged text index and offers the rebuild — inside the Overview's
+*Runtime health, in detail* disclosure, which is closed on a healthy install.
+The *Needs your attention* list above it, which an owner reads first, does not
+mention it, so search can keep failing behind a fold
+([capture 06](../screenshots/2026-10-05-readiness-recovery-round/06-diagnostics-damaged-index.png)
+was taken with the fold opened by hand).
+
+**Proposed fix.** Add a `damaged_text_index` attention item from the integrity
+report's `damaged_text_indexes`, deep-linking to the rebuild, and run the
+integrity check on the host tick (it is read-only and cheap) rather than only
+when Diagnostics opens.

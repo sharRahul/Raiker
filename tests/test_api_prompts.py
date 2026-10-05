@@ -289,6 +289,60 @@ class TestInterrupts:
         types = {e["event_type"] for e in store.list_event_index(session_id="sess_i", limit=200)}
         assert {"interrupt_received", "safe_boundary_reached", "task_cancelled"} <= types
 
+    def test_a_decision_on_a_parent_reaches_every_task_it_delegated(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        """DEC-12 step 7 — pause, resume and stop carry down delegation.
+
+        The parent was the owner's one handle on the work it delegated; stopping
+        it settled its own row and left the children running.
+        """
+        store = SQLiteStore(workspace)
+        store.create_session("sess_p", str(workspace))
+        manager = TaskManager(store, EventLogWriter(store))
+        parent = manager.create_task(session_id="sess_p", title="parent", objective="split")
+        child = manager.create_task(
+            session_id="sess_p", title="child", objective="a", parent_task_id=parent.task_id
+        )
+        grandchild = manager.create_task(
+            session_id="sess_p", title="grandchild", objective="b", parent_task_id=child.task_id
+        )
+        finished = manager.create_task(
+            session_id="sess_p", title="done", objective="c", parent_task_id=parent.task_id
+        )
+        manager.complete_task(finished.task_id, "done already")
+        headers = _headers(_token(client))
+
+        def act(action: str) -> None:
+            resp = client.post(
+                "/api/interrupts",
+                json={"session_id": "sess_p", "task_id": parent.task_id,
+                      "action_type": action, "reason": "owner decision"},
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.text
+
+        def status(task_id: str) -> str:
+            loaded = store.load_task(task_id)
+            assert loaded is not None
+            return loaded.status
+
+        act("pause")
+        assert [status(t.task_id) for t in (parent, child, grandchild)] == ["paused"] * 3
+        act("resume")
+        assert [status(t.task_id) for t in (parent, child, grandchild)] == ["running"] * 3
+        act("cancel")
+        assert [status(t.task_id) for t in (parent, child, grandchild)] == ["cancelled"] * 3
+        # A child that had already ended is history and is not rewritten.
+        assert status(finished.task_id) == "completed"
+        reasons = store.load_task(grandchild.task_id)
+        assert reasons is not None and "stopped" in (reasons.summary or "")
+        propagated = [
+            e for e in store.list_event_index(session_id="sess_p", limit=200)
+            if e["event_type"] == "task_cancelled"
+        ]
+        assert len(propagated) == 3
+
     def test_ai_principal_cannot_interrupt(self, workspace: Path, client: TestClient) -> None:
         store = SQLiteStore(workspace)
         with store.connect() as connection:

@@ -733,6 +733,30 @@ class TestMemoryApi:
         assert repaired.json() == {"ok": True, "indexed_rows": 4}
         assert client.get("/api/memory/integrity", headers=headers).json()["clean"] is True
 
+    def test_a_damaged_index_is_reported_and_rebuilt_through_the_route(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        """DEC-24 step 6 — damage, not drift: every search through it fails."""
+        assert client.post("/api/memory/text-indexes/rebuild").status_code == 401
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_session("sess_damage", "projects/demo")
+        store.insert_turn("sess_damage", "turn_a", "Where do backups go?")
+        store.complete_turn("turn_a", "completed", "The encrypted NAS.")
+        with store.connect() as connection:
+            connection.execute("DELETE FROM conversation_fts_data WHERE id NOT IN (1, 10)")
+
+        damaged = client.get("/api/memory/integrity", headers=headers).json()
+        assert damaged["clean"] is False
+        assert damaged["damaged_text_indexes"] == ["conversation_fts"]
+
+        repaired = client.post("/api/memory/text-indexes/rebuild", headers=headers)
+        assert repaired.status_code == 200, repaired.text
+        body = repaired.json()
+        assert body["damaged_text_indexes"] == []
+        assert body["indexed_rows"]["conversation_fts"] == 2
+        assert client.get("/api/memory/integrity", headers=headers).json()["clean"] is True
+
     def test_recall_is_readable_and_correctable_from_the_transcript(
         self, client: TestClient, workspace: Path
     ) -> None:

@@ -177,6 +177,11 @@ class MaxBodySizeMiddleware:
     client has gone and the sender is answered 408 ``request_body_too_slow``.
     The deadline ends with the body: a streamed answer still listening for the
     client to disconnect is not timed.
+
+    And a body sent with a ``Content-Encoding`` other than ``identity`` is
+    refused 415 ``request_body_encoding_unsupported`` before any of it is read:
+    nothing here decompresses, so the byte cap could only count the compressed
+    size of whatever a later decoder expanded.
     """
 
     def __init__(
@@ -202,6 +207,18 @@ class MaxBodySizeMiddleware:
             return
         limit = self._path_overrides.get(str(scope.get("path", "")), self._max_bytes)
         for key, value in scope.get("headers", []):
+            if key.lower() == b"content-encoding" and value.strip().lower() not in (b"", b"identity"):
+                # DEC-25 — no route decompresses a request body, so an encoded
+                # one would reach a JSON parser as bytes it cannot read, and the
+                # cap above would be counting compressed bytes. Refused here, by
+                # name, so a later route that does decompress has to bound the
+                # decoded size on purpose rather than inherit an unbounded path.
+                await _send_json(
+                    send,
+                    415,
+                    {"ok": False, "reason_code": "request_body_encoding_unsupported"},
+                )
+                return
             if key.lower() == b"content-length":
                 try:
                     declared = int(value)

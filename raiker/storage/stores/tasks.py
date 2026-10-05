@@ -319,6 +319,59 @@ class TaskStore:
         rows = self._rows("SELECT status FROM tasks WHERE parent_task_id = ?", (parent_task_id,))
         return [str(row["status"]) for row in rows]
 
+    #: How far down a delegation tree a stop or pause is carried. Delegation is
+    #: itself depth-bounded far below this; the bound keeps a malformed parent
+    #: chain (a cycle written by hand) from turning one stop into a loop.
+    MAX_DELEGATION_DEPTH = 16
+
+    def descendant_tasks(
+        self: SQLiteStore, task_id: str, user_id: str | None = None
+    ) -> list[TaskRecord]:
+        """Every task delegated below *task_id*, nearest first (DEC-12 step 7).
+
+        Breadth-first over ``parent_task_id``, each task once, bounded by
+        :attr:`MAX_DELEGATION_DEPTH`. With *user_id*, only tasks whose session
+        this account can see — the same scope :meth:`list_tasks` applies.
+        """
+        found: list[TaskRecord] = []
+        seen = {task_id}
+        frontier = [task_id]
+        scope = ""
+        scope_params: list[Any] = []
+        if user_id is not None:
+            scope = (
+                " AND session_id IN (SELECT session_id FROM sessions "
+                "WHERE user_id = ? OR user_id IS NULL)"
+            )
+            scope_params = [user_id]
+        for _depth in range(self.MAX_DELEGATION_DEPTH):
+            if not frontier:
+                break
+            marks = ", ".join("?" for _ in frontier)
+            rows = self._rows(
+                f"SELECT * FROM tasks WHERE parent_task_id IN ({marks}){scope} "  # noqa: S608 - placeholders only
+                "ORDER BY created_at, task_id",
+                (*frontier, *scope_params),
+            )
+            frontier = []
+            for row in rows:
+                child_id = str(row["task_id"])
+                if child_id in seen:
+                    continue
+                seen.add(child_id)
+                found.append(self._task_from_row(row))
+                frontier.append(child_id)
+        return found
+
+    def record_task_delivery(
+        self: SQLiteStore, task_id: str, state: str, detail: str | None = None
+    ) -> None:
+        """DEC-12 step 5 — record whether the owner was told, beside the outcome."""
+        self._execute(
+            "UPDATE tasks SET delivery_state = ?, delivery_detail = ? WHERE task_id = ?",
+            (state, detail, task_id),
+        )
+
     def hold_task_for_children(self: SQLiteStore, task_id: str, summary: str | None) -> None:
         """A parent whose own run finished while a child is still open.
 

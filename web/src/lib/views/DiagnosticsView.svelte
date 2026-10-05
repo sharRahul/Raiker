@@ -30,6 +30,7 @@
   // one number that is not zero.
   const integrityFindings = $derived.by(() => {
     if (integrity === null) return [];
+    const damaged = integrity.damaged_text_indexes?.length ?? 0;
     const labels: Array<[keyof MemoryIntegrity, string]> = [
       ["stale_fts_count", "Memory search index"],
       ["stale_conversation_index_count", "Conversation search index"],
@@ -44,7 +45,8 @@
     ];
     return labels
       .map(([key, label]) => ({ key, label, count: Number(integrity?.[key] ?? 0) }))
-      .filter((finding) => finding.count > 0);
+      .filter((finding) => finding.count > 0)
+      .concat(damaged > 0 ? [{ key: "damaged_text_indexes" as keyof MemoryIntegrity, label: "Damaged search indexes", count: damaged }] : []);
   });
 
   async function loadIntegrity() {
@@ -63,6 +65,34 @@
     try {
       const result = await api.rebuildConversationIndex();
       integrityNotice = `Rebuilt — ${result.indexed_rows} rows indexed.`;
+      await loadIntegrity();
+    } catch (e) {
+      integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
+    } finally {
+      integrityBusy = false;
+    }
+  }
+
+  /** DEC-24 step 6 — the indexes SQLite itself reports as damaged, by name. */
+  const TEXT_INDEX_LABELS: Record<string, string> = {
+    approved_memory_fts: "Memory search",
+    conversation_fts: "Conversation search",
+    managed_file_chunk_fts: "File search",
+  };
+  const damagedIndexes = $derived(
+    (integrity?.damaged_text_indexes ?? []).map((table) => TEXT_INDEX_LABELS[table] ?? table),
+  );
+
+  async function rebuildTextIndexes() {
+    integrityBusy = true;
+    integrityNotice = null;
+    try {
+      const result = await api.rebuildTextIndexes();
+      const rows = Object.values(result.indexed_rows).reduce((sum, count) => sum + count, 0);
+      integrityNotice =
+        result.damaged_text_indexes.length === 0
+          ? `Rebuilt — ${rows} rows indexed, and every search index passes its check.`
+          : `Rebuilt, but ${result.damaged_text_indexes.length} still fails its check.`;
       await loadIntegrity();
     } catch (e) {
       integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
@@ -185,6 +215,16 @@
             label={integrity.clean ? "clean" : `${integrityFindings.length} to repair`}
           />
         </p>
+        {#if damagedIndexes.length > 0}
+          <!-- DEC-24 step 6 — a rebuildable degraded state, said as one. The
+               index is damaged, not the data: every row it held is recomputed
+               from the table that owns the text. -->
+          <p class="notice notice-warn" role="status" data-testid="damaged-text-indexes">
+            {damagedIndexes.join(", ")} {damagedIndexes.length === 1 ? "index is" : "indexes are"} damaged,
+            so searching {damagedIndexes.length === 1 ? "it" : "them"} fails. Your conversations, memories
+            and files are not affected — a rebuild recomputes the index from them.
+          </p>
+        {/if}
         {#if integrityFindings.length > 0}
           <dl class="kv">
             {#each integrityFindings as finding (finding.key)}
@@ -196,7 +236,16 @@
           <button type="button" class="btn btn-ghost btn-sm" onclick={() => void loadIntegrity()}>
             Rescan
           </button>
-          {#if integrity.stale_conversation_index_count > 0}
+          {#if damagedIndexes.length > 0}
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={integrityBusy}
+              onclick={() => void rebuildTextIndexes()}
+            >
+              Rebuild search indexes
+            </button>
+          {:else if integrity.stale_conversation_index_count > 0}
             <!-- MEM-09 — the stated repair, offered where the drift is reported.
                  The index is a projection of the turns, so a rebuild recomputes
                  every row and can lose nothing. -->

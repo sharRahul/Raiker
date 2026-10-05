@@ -120,6 +120,14 @@ Controls: **Test**, **Stop** / **Resume**, **Rename**, **Delete**. Stop is an
 instant containment switch — it refuses all sessions for that connection and is
 revocable.
 
+**Resume checks before it trusts.** Resuming re-runs the same connection test
+**Test** runs — the handshake, the endpoint's network rules, the tool list and
+the review of any tool the server added or reworded while it was stopped. A
+server that passes is active again, and any tool it now holds for your review is
+named. One that fails stays stopped, and its card says what failed — *the server
+did not complete its handshake*, for one whose program no longer starts — so the
+button cannot put a server back that is not the one you stopped.
+
 ### What a local server is started with
 
 A local (stdio) MCP server is a program Raiker starts, and it is started with a

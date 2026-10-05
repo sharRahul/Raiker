@@ -582,7 +582,9 @@ async def interrupts(
             steer_text=body.steer_text,
         )
         # Governed safe-boundary interrupt: emits interrupt_received + safe_boundary_reached.
-        result = controller.apply_at_safe_boundary(action)
+        # DEC-12 step 7 — carried to the tasks this one delegated, within this
+        # account's own sessions.
+        result = controller.apply_at_safe_boundary(action, user_id=user_id)
         applied.append({"task_id": task.task_id, "result": result})
 
     # B17/C13 — the same governed request also reaches the *turn* streaming in
@@ -735,6 +737,8 @@ async def stop_all(
     reason = "owner pressed stop (all work)"
 
     def cancel(task: Any) -> str:
+        # Every active task is in the sweep already, children included, so
+        # the cascade would only cancel each child twice.
         return controller.apply_at_safe_boundary(
             InterruptAction(
                 action_id=new_id("act_"),
@@ -743,7 +747,8 @@ async def stop_all(
                 action_type="cancel",
                 reason=reason,
                 steer_text=None,
-            )
+            ),
+            propagate=False,
         )
 
     tasks: list[TaskInterrupted] = [

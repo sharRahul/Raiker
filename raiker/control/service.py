@@ -64,6 +64,20 @@ _DANGEROUS_CAPS = frozenset({
 _ALLOWED_RUNTIME_MODES = (RAIKER_RUNTIME,)
 
 
+#: DEC-15 step 12 — what a failed resume check means, in the owner's words. The
+#: containment reason is shown on the server's card, so it says what happened
+#: rather than carrying the code; the code stays in the answer and the audit.
+_MCP_CHECK_WORDS: dict[str, str] = {
+    "mcp_initialize_failed": "the server did not complete its handshake",
+    "mcp_list_tools_failed": "the server did not list its tools",
+    "mcp_spawn_failed": "the server's program could not be started",
+    "mcp_command_not_found": "the server's program was not found",
+    "mcp_command_not_allowlisted": "the server's command is not one Raiker runs",
+    "mcp_session_timeout": "the server did not answer in time",
+    "mcp_response_too_large": "the server answered with more than Raiker reads",
+    "mcp_monitor_unavailable": "the connection monitor is not running",
+}
+
 class RuntimeControlService:
     """Interface-agnostic control-plane facade.
 
@@ -1501,8 +1515,55 @@ class RuntimeControlService:
     def resume_mcp_server(
         self, acting_principal_id: str | None, server_id: str
     ) -> ControlResult:
-        """Owner-scoped, human-only resume — revoke a pause/kill back to active."""
-        return self._containment_transition(acting_principal_id, server_id, "resume", None)
+        """Owner-scoped, human-only resume — and the checks a resume owes (DEC-15 step 12).
+
+        Resume used to put the old trust straight back: a server paused for
+        misbehaving was active again on the word of the button, whatever it had
+        become in the meantime. It now re-runs the same governed connection test
+        Add server ends with — handshake, endpoint policy, tool enumeration and
+        the review that holds any tool added or reworded since the owner accepted
+        it — and only a server that passes stays active. One that fails goes back
+        to the state it was resumed from, with the check's reason as its reason.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        before = self._store.get_mcp_server(server_id, principal.principal_id)
+        previous = str((before or {}).get("monitor_state") or "active")
+        resumed = self._containment_transition(acting_principal_id, server_id, "resume", None)
+        if not resumed.ok:
+            return resumed
+        checked = self.connect_mcp_server(acting_principal_id, server_id)
+        if checked.ok:
+            return ControlResult(
+                ok=True,
+                data={
+                    "server_id": server_id,
+                    "monitor_state": "active",
+                    "check": "passed",
+                    "check_reason": None,
+                    "pending": list((checked.data or {}).get("pending", [])),
+                },
+            )
+        reason_code = checked.reason_code or "mcp_resume_check_failed"
+        verb = "kill" if previous == "killed" else "pause"
+        said = _MCP_CHECK_WORDS.get(reason_code.split(":", 1)[0], "its connection test failed")
+        self._containment_transition(
+            acting_principal_id,
+            server_id,
+            verb,
+            f"Resume check did not pass: {said}. Fix the server, then resume it again.",
+        )
+        return ControlResult(
+            ok=True,
+            data={
+                "server_id": server_id,
+                "monitor_state": "killed" if verb == "kill" else "paused",
+                "check": "failed",
+                "check_reason": reason_code,
+                "pending": [],
+            },
+        )
 
     def approve_mcp_tools(
         self, acting_principal_id: str | None, server_id: str, tools: list[str]

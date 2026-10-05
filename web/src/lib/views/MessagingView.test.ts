@@ -54,7 +54,7 @@ describe("MessagingView", () => {
           mention_required: false,
           thread_mapping: "none",
           starts_work: "nobody",
-          bot_loop_protection: "rate_limit_only",
+          bot_loop_protection: "echo_and_repeat_refused",
           reply_path: "none",
         },
         receipts: [],

@@ -103,7 +103,22 @@ runtime's own monitors recorded, the memory integrity report and the one repair
 it offers, the background passes the host runs on its own, and any readiness
 check that actually failed, with its reason code and remediation. When one of
 those does have something to say, it is already named in **Needs your
-attention** above — you do not have to open it to find out.
+attention** above — you do not have to open it to find out. (One exception
+today: a damaged search index is named only inside the disclosure —
+[BUG-322](../plans/TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold).)
+
+**A damaged search index is a state with a repair.** The memory integrity report
+asks SQLite to check the three text indexes behind memory, conversation and file
+search. One it reports as damaged — every search through it fails — is named,
+with the sentence that matters most: your conversations, memories and files are
+not affected, because an index is rebuilt from them. **Rebuild search indexes**
+recomputes all three and re-runs the check, so *repaired* is a measurement.
+
+**The support bundle is checked after it is redacted.** Raiker re-reads the
+redacted bundle before it shows it: a secret-named field must read redacted, and
+no value may be one the redactor would still change. If anything is left, or the
+redaction itself fails, there is no bundle — the page says it was refused for
+your protection, and nothing was produced to copy.
 
 One thing is never folded away. A containment signal that is *alerting* is a
 boundary the runtime believes is being crossed, and it leads that list whatever

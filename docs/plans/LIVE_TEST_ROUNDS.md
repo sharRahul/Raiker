@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-05 (second) | Targeted | `2026-10-05-readiness-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a local Python MCP sample; a generic webhook channel | Ten more decision-record steps from the release-readiness review — DEC-24 steps 4 and 6, DEC-12 steps 5 and 7, DEC-15 step 12, DEC-01 step 5, DEC-10 step 8, DEC-14 step 9 and DEC-25's last path (FIXED-762 to FIXED-773). Proved live: a real Anthropic answer; **the internal account ID folded away on Account** and **a deletion confirmation counting what goes and what stays**, refusing a mistyped name and deleting on the typed one; **Stop on a parent cancelling its child and grandchild**; a completed task reading **Delivery failed** beside its outcome; **a damaged conversation index named and rebuilt**; **an MCP server that broke while paused staying paused on Resume**, at 390 wide with no overflow; **a webhook sender's third identical message refused as a loop**; the support bundle passing its own check; a gzip body answered **415**; Asia/Kolkata offered; and **a workspace with its key moved aside refusing to mint a new one**, then opening once the key was back. **Two defects found and fixed** — a resume failure printed its code, and the deletion label broke into three rows; the work found every resume through the stop control refusing (FIXED-765); BUG-322 filed |
 | 2026-10-05 | Targeted | `2026-10-05-readiness-decisions-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a routine run by the host on a workspace with no model chosen | Ten decision-record steps from the release-readiness review — DEC-25's provider and slow-sender bounds, DEC-15 step 10 for MCP servers, DEC-09 step 5, DEC-21 (General, Web access), DEC-12 step 6 and DEC-24 step 1 (FIXED-750 to FIXED-759). Proved live: **a routine paused by the host after three failed cycles** with its reason and a notice, and Continue re-arming it; a time zone's UTC offset; **an unsaved Settings edit kept when the owner chose to stay**; a Web access check naming the rule and its list; **an MCP server edited to add a tool and reword another, both held until accepted**, the block at 390 wide with no overflow; a real Anthropic answer through the bounded stream; a slow sender answered **408 after 30 s**; and a quiet background pass reading *not running*. **Two defects found and fixed** — a paused routine printed its last slot as *next* without a reason, and the purpose line was taken from a held tool; one harness defect fixed (the Chat check matched the prompt); BUG-320 and BUG-321 filed |
 | 2026-10-04 | Targeted | `2026-10-04-ollama-readiness-round/` | Ollama served by `scripts/live_ollama_standin.py` on 127.0.0.1:11434 (`llama3.2:3b`, `qwen3:8b` — this host cannot download Ollama); Anthropic (`claude-haiku-4-5-20251001`) answering a Build turn and a Chat turn, the key entered through the Connect dialog | The owner's Ollama decision (FIXED-737 to FIXED-739) and ten items from the release-readiness review: UX-CHAT-01, UX-BUILD-01, UX-MODEL-01, DEC-06 step 1, DEC-07 step 4, the stdio half of DEC-25 and §13.1's workspace metadata. Proved live: a running Ollama **offered with nothing chosen**, the model chosen from what it serves and **Ready at once**, a Chat turn answered by it after a reload, **the service stopped and started under an open Models page with Ready following it and no Check pressed**, Build's boundary equal to the server's answer and naming a hosted model as leaving the machine before a real Anthropic turn, Chat's Continuity menu after a real answer, Design comparing two versions and **going back as a new version**, Models' Runtime tab saving a fallback and its Details dialog, and four work surfaces at 390 wide with no horizontal overflow and **no console error**. **Two defects found and fixed** — the picker's Use buttons all had one name, and the round's own wait read a page that never reloaded; BUG-318 and BUG-319 filed |
 | 2026-10-03 (third) | Targeted | `2026-10-03-models-build-design-round/` | Anthropic (`claude-haiku-4-5-20251001`) running a real Build turn through three owner approvals, the key entered through the Connect dialog; Design's pictures seeded into the workspace's own store | Ten items from the release-readiness review: UX-MODEL-02, -04, -05, UX-BUILD-02 to -04 and UX-DESIGN-01 to -04. Proved live: a readiness line walking connect → choose → check → Ready on one page, a comparison with Unknown kept Unknown, Build's boundary ending at the model, **a real model running a failing test, reading the failure, fixing the module and re-running it green**, a narrow window's drawer stepping aside for an approval, and Design's Unfiled destination, download, delete, restore and removal. **Three defects found and fixed** — an approved command that failed left its turn waiting forever, every composer's primary action was nameless at phone width, and Build's evidence line did not count sources; BUG-316 and BUG-317 filed |
@@ -87,6 +88,92 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-10-05 (second) — A key that is not replaced, a stop that reaches delegated work, and a resume that checks
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` and
+`RAIKER_CHANNEL_INBOUND_SECRET` set for the round, on a workspace reset with
+`scripts/reset_live_workspace.py`, in a Linux container whose egress is limited
+to a proxy. Provider: Anthropic `claude-haiku-4-5-20251001`, the key the owner
+supplied entered through the Connect dialog by the spec from the process
+environment — never written to a file. Browser: the pre-installed Chromium,
+through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Spec:
+`web/e2e/round-2026-10-05-readiness-recovery-live.spec.ts` (10 of 10; scenarios
+after a harness fix were re-run on the same workspace, and the Account and MCP
+scenarios once more on a fresh one after FIXED-774/775 — see *What it found*).
+Harness: `scripts/live_readiness_harness.py`, which files the starting states
+through `TaskManager`, `DashboardService` and the store. Captures:
+[`docs/screenshots/2026-10-05-readiness-recovery-round/`](../screenshots/2026-10-05-readiness-recovery-round).**
+
+FIXED-762 to FIXED-775.
+
+**What it proved.**
+
+1. **A real answer.** Anthropic answered *recovery round answered* in Chat
+   ([01](../screenshots/2026-10-05-readiness-recovery-round/01-chat-real-answer.png)).
+2. **The account ID, where support can ask for it.** Account's *Support details*
+   showed `principal_user_…` with **Copy ID** and *It is not your name*
+   (FIXED-768, [02](../screenshots/2026-10-05-readiness-recovery-round/02-account-support-details.png)).
+3. **Delete says what it removes.** The confirmation read *1 conversation · 0
+   tasks and routines · … · 1 stored connector credential* and the four things it
+   does not reach; a mistyped name left **Permanently delete** disabled
+   (FIXED-769, FIXED-775, [03](../screenshots/2026-10-05-readiness-recovery-round/03-account-deletion-impact.png)).
+4. **Stop reaches delegated work.** **Stop** on a running parent cancelled its
+   running child and queued grandchild, each reading *Delegated by a task the
+   owner stopped: …* (FIXED-764, [04](../screenshots/2026-10-05-readiness-recovery-round/04-tasks-parent-and-delegated-work-stopped.png)).
+5. **Worked, and not told.** A scheduled task completed while the desktop notice
+   command failed: **completed** beside **Delivery failed. The notice is in
+   Raiker, but the desktop notification command failed.** (FIXED-766,
+   [05](../screenshots/2026-10-05-readiness-recovery-round/05-tasks-delivery-failed.png)).
+6. **A damaged index is a state, not a mystery.** With the conversation index's
+   segments removed, Diagnostics read *Conversation search index is damaged … not
+   affected*; **Rebuild search indexes** answered *every search index passes its
+   check* and the notice went (FIXED-763, [06](../screenshots/2026-10-05-readiness-recovery-round/06-diagnostics-damaged-index.png), [07](../screenshots/2026-10-05-readiness-recovery-round/07-diagnostics-index-rebuilt.png)).
+7. **Resume checks.** A sample server stopped and resumed read **resumed after a
+   passing connection test**; broken while paused and resumed, it read **did not
+   pass its connection test, so it stays paused: the server did not complete its
+   handshake**, with no overflow at 390 wide (FIXED-767, FIXED-774,
+   [08](../screenshots/2026-10-05-readiness-recovery-round/08-mcp-resume-passed.png), [09](../screenshots/2026-10-05-readiness-recovery-round/09-mcp-resume-failed-stays-paused.png), [10](../screenshots/2026-10-05-readiness-recovery-round/10-mcp-resume-failed-390.png)).
+8. **A loop is refused.** The same webhook message a third time was answered 409
+   `loop_repeated`, a different one 200, and the receipt read *Failed: the same
+   message arrived a third time in ten minutes* (FIXED-771,
+   [11](../screenshots/2026-10-05-readiness-recovery-round/11-messaging-loop-refused-receipt.png)).
+9. **The bundle is checked, and an encoded body refused.** The support bundle
+   passed its post-redaction check; a gzip login was answered 415
+   `request_body_encoding_unsupported` (FIXED-770, FIXED-772,
+   [12](../screenshots/2026-10-05-readiness-recovery-round/12-support-bundle-checked.png)).
+10. **Current zone names.** The list offered Asia/Kolkata and Europe/Kyiv and not
+    Asia/Calcutta; Kolkata read UTC+05:30 (FIXED-773, [13](../screenshots/2026-10-05-readiness-recovery-round/13-settings-time-zone-kolkata.png)).
+11. **Delete on the typed name.** The username typed, the account was deleted and
+    the lock screen offered a new account ([14](../screenshots/2026-10-05-readiness-recovery-round/14-account-deleted-fresh-lock-screen.png)).
+12. **A missing key is not replaced.** With the host stopped and `app.key` moved
+    aside, the restarted host served the lock screen with *The workspace key
+    (.raiker/app.key) is missing … Nothing in the workspace has been changed*; no
+    key was written; with the key back, the store opened (FIXED-762,
+    [15](../screenshots/2026-10-05-readiness-recovery-round/15-lock-screen-key-missing.png)).
+
+**What it found.**
+
+* The resume failure printed `mcp_initialize_failed` in the banner and the
+  paused reason — fixed as FIXED-774 and re-captured.
+* The deletion label rendered the username as its own row — fixed as FIXED-775
+  and re-captured.
+* Writing FIXED-764's test found every resume through the stop control refused
+  with `invalid_event_type:task_resumed` — fixed as FIXED-765.
+* The damaged-index notice is inside *Runtime health, in detail*, not in *Needs
+  your attention* — filed as
+  [BUG-322](TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold).
+* Harness: the deletion-count regex met adjacent list items, the receipt
+  assertion matched hidden route-scope text, and a retried loop scenario met the
+  guard's own ten-minute window. Each fixed in the spec and re-run.
+
+**What it could not prove.** A bundle the live redactor leaves unclean was not
+provoked; the unit suite proves the refusal with a redactor that misses one
+value. An echo of a real routed reply needs a route that answers; the echo half
+of the guard is unit-tested.
 
 ---
 

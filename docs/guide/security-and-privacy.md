@@ -48,7 +48,16 @@ Two identities belong to your account and they are not interchangeable.
 The principal ID is what ownership, policy and audit are keyed on, and changing
 your display name never moves it or re-files anything. It is not a name and
 Raiker will not present it as one: an ordinary answer, page, card or notification
-that quotes one is a defect.
+that quotes one is a defect. The one place it is shown is **Settings → Account →
+Support details**, folded away, with **Copy ID** — for when someone helping you
+asks for it.
+
+**Deleting the account says what it removes.** The confirmation shows the
+server's own count of what goes — conversations, tasks, projects, memories,
+stored connector credentials, MCP servers — and what does not: folders you
+attached, the audit log and files in `.raiker`, anything already sent to a
+provider or service, and your backups. It needs your password and your username
+typed out; the server refuses a delete without the name.
 
 The display name reaches a turn as **data**, resolved server-side from your
 authenticated account — never from anything a browser, a paired channel or a

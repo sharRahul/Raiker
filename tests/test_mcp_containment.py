@@ -317,13 +317,26 @@ def test_owner_present_stop_pauses_in_one_call(tmp_path: Path) -> None:
     assert _row(SQLiteStore(ws), sid)["monitor_state"] == "paused"
 
 
-def test_kill_then_resume_via_control_service(tmp_path: Path) -> None:
+def test_kill_then_resume_re_runs_the_connection_test(tmp_path: Path) -> None:
+    """DEC-15 step 12 — Resume re-checks rather than restoring the old trust.
+
+    The seeded server's command cannot start, so its test fails and Resume puts
+    it back to the state it was resumed from, with the check as its reason.
+    """
     ws = _ws(tmp_path)
     svc, sid, _ = _owner_service(ws)
     assert svc.kill_mcp_server("principal_owner", sid).ok is True
     assert _row(SQLiteStore(ws), sid)["monitor_state"] == "killed"
-    assert svc.resume_mcp_server("principal_owner", sid).ok is True
-    assert _row(SQLiteStore(ws), sid)["monitor_state"] == "active"
+    resumed = svc.resume_mcp_server("principal_owner", sid)
+    assert resumed.ok is True, resumed.reason_code
+    assert resumed.data["check"] == "failed"
+    assert resumed.data["monitor_state"] == "killed"
+    assert resumed.data["check_reason"]
+    row = _row(SQLiteStore(ws), sid)
+    assert row["monitor_state"] == "killed"
+    reason = str(row.get("paused_reason") or "")
+    assert reason.startswith("Resume check did not pass: ")
+    assert "mcp_" not in reason
 
 
 def test_containment_rejects_ai_principal(tmp_path: Path) -> None:
@@ -429,6 +442,8 @@ def test_api_pause_resume_kill_flow(tmp_path: Path) -> None:
 
     resumed = client.post(f"/api/mcp/servers/{sid}/resume")
     assert resumed.status_code == 200, resumed.text
+    # DEC-15 step 12 — a server that passes its test again is active again.
+    assert resumed.json()["check"] == "passed"
     assert client.get("/api/mcp/servers").json()[0]["monitor_state"] == "active"
 
     killed = client.post(f"/api/mcp/servers/{sid}/kill")

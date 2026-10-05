@@ -226,6 +226,8 @@ export function taskView(over: Partial<TaskView> = {}): TaskView {
     schedule_timezone: null,
     schedule_until: null,
     missed_run_policy: null,
+    delivery_state: null,
+    delivery_detail: null,
     // Empty, so `taskPhase` derives the phase from the status a test sets
     // rather than reading a default that disagrees with it.
     phase: "",

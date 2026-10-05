@@ -4083,6 +4083,18 @@ TASK_FAILED_CYCLES_SQL = """
 ALTER TABLE tasks ADD COLUMN failed_cycles INTEGER NOT NULL DEFAULT 0;
 """
 
+# DEC-12 step 5 — whether the owner was told a background task ended, kept
+# apart from whether it worked. `delivered`, `failed` (with what failed in
+# `delivery_detail`), or null when no notice was owed — a foreground run, or a
+# task that has not ended. A completed task whose notice failed is still
+# completed; it says "Delivery failed" beside it rather than being retried.
+TASK_DELIVERY_STATE_MIGRATION_ID = "RAIKER-2088-task-delivery-state"
+
+TASK_DELIVERY_STATE_SQL = """
+ALTER TABLE tasks ADD COLUMN delivery_state TEXT;
+ALTER TABLE tasks ADD COLUMN delivery_detail TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4316,6 +4328,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(IMAGE_RESTORED_FROM_MIGRATION_ID, IMAGE_RESTORED_FROM_SQL),
     Migration(MCP_APPROVED_TOOLS_MIGRATION_ID, MCP_APPROVED_TOOLS_SQL),
     Migration(TASK_FAILED_CYCLES_MIGRATION_ID, TASK_FAILED_CYCLES_SQL),
+    Migration(TASK_DELIVERY_STATE_MIGRATION_ID, TASK_DELIVERY_STATE_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

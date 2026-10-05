@@ -782,7 +782,10 @@ def _channel_route_scope(channel_type: str, pairing: dict[str, Any] | None) -> C
         "mention_required": False,
         "thread_mapping": thread,
         "starts_work": starts,
-        "bot_loop_protection": "bot_messages_ignored" if telegram else "rate_limit_only",
+        # DEC-14 step 9 — the webhook has no bot flag to read, so it reads
+        # lineage: an echo of Raiker's own reply, or the same message a third
+        # time in ten minutes, is refused before it reaches a model.
+        "bot_loop_protection": "bot_messages_ignored" if telegram else "echo_and_repeat_refused",
         "reply_path": reply,
     }
 

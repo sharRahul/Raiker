@@ -194,6 +194,22 @@ describe("ObserveView", () => {
     expect(screen.queryByLabelText(/redacted support bundle/i)).not.toBeInTheDocument();
   });
 
+  // DEC-24 step 4 — the server refuses a bundle its own check finds unclean.
+  it("explains a support bundle the server refused for holding a secret", async () => {
+    stubFetch(
+      routes({
+        "GET /api/diagnostics/export": {
+          __status: 422,
+          detail: { reason_code: "support_export_blocked", paths: ["$.provider_health[0].label"] },
+        },
+      }),
+    );
+    render(ObserveView, { props: { tab: "overview" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /build support bundle/i }));
+    expect(await screen.findByText(/still looked like a secret/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/redacted support bundle/i)).not.toBeInTheDocument();
+  });
+
   it("shows notification history with an unread badge on its tab", async () => {
     stubFetch(
       routes({

@@ -47,6 +47,10 @@ export function testReason(code: string | null | undefined): string {
   if (value.startsWith("fetch_failed")) return "the destination could not be reached";
   if (value === "sender_not_allowlisted") return "the sender is not on the allowlist";
   if (value === "rate_limited") return "the sender went over the rate limit";
+  // DEC-14 step 9 — the loop guard's two refusals.
+  if (value === "loop_echo") return "it repeated one of Raiker's own replies, so it was not answered again";
+  if (value === "loop_repeated")
+    return "the same message arrived a third time in ten minutes, so it was not answered again";
   if (value === "channel_owner_sender_required") return "only you can start work on this route";
   if (value === "channel_target_session_required") return "the route has no conversation";
   if (value.startsWith("turn_"))
@@ -184,7 +188,7 @@ export function routeScopeFacts(scope: RouteScope): { label: string; value: stri
       value:
         scope.bot_loop_protection === "bot_messages_ignored"
           ? "Messages from bots are ignored, so two bots cannot answer each other."
-          : "Only the per-sender rate limit stops an automated caller.",
+          : "A message that echoes one of Raiker's replies, or repeats itself a third time in ten minutes, is refused — so an automated caller cannot keep a loop going.",
     },
     {
       label: "Replies",

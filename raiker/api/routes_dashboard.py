@@ -65,6 +65,7 @@ from raiker.api.wire.execution import (
 )
 from raiker.api.wire.mcp import (
     McpContainment,
+    McpResumed,
     McpServerConnected,
     McpServerCreated,
     McpServerDeleted,
@@ -572,10 +573,10 @@ async def resume_mcp_server(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Revoke containment: resume a paused/killed connection back to active.
-    Human-only, owner-scoped."""
+    """Resume a paused/killed connection — only if it passes its connection test
+    again (DEC-15 step 12). Human-only, owner-scoped."""
     answer = cast(
-        McpContainment,
+        McpResumed,
         _mcp_result(
             _service(request).resume_mcp_server(auth_data[0].principal_id, server_id)
         ),
@@ -2864,4 +2865,17 @@ async def get_diagnostics_export(
 ) -> dict[str, Any]:
     """A copyable, redacted support bundle of the runtime's readiness facts."""
     _session, principal = auth_data
-    return serialize_dto(_read_models(request).diagnostics_export(acting_principal_id=principal.principal_id))
+    from raiker.control.web_read_models import SupportExportBlocked
+
+    try:
+        bundle = _read_models(request).diagnostics_export(
+            acting_principal_id=principal.principal_id
+        )
+    except SupportExportBlocked as blocked:
+        # DEC-24 step 4 — refused rather than sent: the paths say where, and
+        # nothing found there is repeated.
+        raise HTTPException(
+            status_code=422,
+            detail={"reason_code": "support_export_blocked", "paths": blocked.paths[:20]},
+        ) from None
+    return serialize_dto(bundle)

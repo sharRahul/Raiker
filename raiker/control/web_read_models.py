@@ -24,7 +24,7 @@ from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from raiker.api.redaction import redact_response_body
+from raiker.api.redaction import redact_response_body, residual_secret_paths
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import utc_now
 from raiker.contracts.views import View
@@ -162,6 +162,18 @@ class ProjectFilesView(View):
         "Metadata only. Raiker never serves workspace file content to the browser; "
         "changes are made through the governed approval path."
     )
+
+
+
+class SupportExportBlocked(RuntimeError):
+    """The support bundle failed its post-redaction check (DEC-24 step 4).
+
+    ``paths`` names where, as JSON paths — never the values found there.
+    """
+
+    def __init__(self, paths: list[str]) -> None:
+        super().__init__("support_export_blocked")
+        self.paths = paths
 
 
 class WebReadModels:
@@ -597,7 +609,17 @@ class WebReadModels:
                 "file content, or workspace path outside the runtime's own state."
             ),
         }
-        redacted: DiagnosticsExport = redact_response_body(bundle)
+        # DEC-24 step 4 — the redactor's answer is checked, not trusted. A
+        # redaction that fails, or leaves anything the redactor would still
+        # change, blocks the export: the owner pastes this into an issue, and a
+        # bundle that is "probably" clean is the one that is not.
+        try:
+            redacted: DiagnosticsExport = redact_response_body(bundle)
+        except Exception as exc:  # noqa: BLE001 - any failure is the same refusal
+            raise SupportExportBlocked(["redaction_failed"]) from exc
+        residual = residual_secret_paths(redacted)
+        if residual:
+            raise SupportExportBlocked(residual)
         return redacted
 
 

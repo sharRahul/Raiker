@@ -27,6 +27,10 @@ from raiker.storage.migrations import (
     memory_sqlcipher_fts_sql,
 )
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
+from raiker.storage.store_errors import (
+    STORE_UNREADABLE,
+    StoreUnavailableError,
+)
 
 # ── The keyed-connection cache ───────────────────────────────────────────────
 #
@@ -111,21 +115,6 @@ _OPERATION_COLUMNS = frozenset(
         "error_detail",
     }
 )
-
-
-class StoreUnavailableError(RuntimeError):
-    """The encrypted store could not be opened. ``reason`` is a stable code.
-
-    Raised instead of letting a platform-level failure — a locked-memory
-    allowance the process cannot satisfy, most of all — surface as a bare
-    ``MemoryError`` from inside a request handler. Callers turn it into a named
-    condition the owner can act on rather than a generic failure.
-    """
-
-    def __init__(self, reason: str, detail: str = "") -> None:
-        super().__init__(detail or reason)
-        self.reason = reason
-        self.detail = detail or reason
 
 
 def connection_cache_limit() -> int:
@@ -634,6 +623,20 @@ class SQLiteStore(
                 _MEMORY_SECURITY_EVER_ENABLED = True
             key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
             connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
+            # DEC-24 step 6 — the first read is what proves the key opens this
+            # file. A database made with another key, or damaged, fails here
+            # with "file is not a database"; named, it is a condition the owner
+            # can act on, and nothing after this point gets to write over it.
+            try:
+                connection.execute("SELECT count(*) FROM sqlite_master").fetchone()
+            except sqlite3.DatabaseError as exc:
+                raise StoreUnavailableError(
+                    STORE_UNREADABLE,
+                    "The workspace database exists but this workspace key does not "
+                    "open it: it was made with another key, or the file is damaged. "
+                    "Raiker has not changed it. Restore the matching .raiker/app.key, "
+                    "or restore the database from a backup.",
+                ) from exc
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA busy_timeout = 5000")
@@ -841,6 +844,63 @@ class SQLiteStore(
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (TEXT_SEARCH_FTS5_MIGRATION_ID, utc_now()),
             )
+
+    # ── Text-index damage and repair (DEC-24 step 6) ─────────────────────
+    #
+    # The three text indexes are projections: every row is recomputed from the
+    # table that owns the content, so a damaged one is a *rebuildable degraded
+    # state*, never a reason to touch the data behind it. Drift (a count that
+    # disagrees) was already reported by the memory integrity report; damage —
+    # an index SQLite itself reports as corrupt — was not, and a damaged index
+    # fails every search with "database disk image is malformed".
+
+    TEXT_INDEX_TABLES: tuple[str, ...] = (
+        "approved_memory_fts",
+        "conversation_fts",
+        "managed_file_chunk_fts",
+    )
+
+    def damaged_text_indexes(self) -> list[str]:
+        """The text indexes SQLite's own ``integrity-check`` rejects."""
+        damaged: list[str] = []
+        with self.connect() as connection:
+            for table in self.TEXT_INDEX_TABLES:
+                if self._index_engine(connection, table) is None:
+                    continue
+                try:
+                    connection.execute(
+                        f"INSERT INTO {table}({table}) VALUES ('integrity-check')"
+                    )
+                except sqlite3.DatabaseError:
+                    damaged.append(table)
+        return damaged
+
+    def rebuild_text_indexes(self) -> dict[str, int]:
+        """Drop and recompute every text index from the rows that own its text.
+
+        Drop-and-create rather than ``DELETE``: a damaged index can refuse the
+        delete as well. Returns each index's row count afterwards.
+        """
+        rebuilders = {
+            "approved_memory_fts": (memory_sqlcipher_fts_sql, self._rebuild_memory_fts),
+            "conversation_fts": (conversation_fts_sql, self._rebuild_conversation_fts),
+            "managed_file_chunk_fts": (
+                managed_file_chunk_fts_sql,
+                self._rebuild_managed_file_chunk_fts,
+            ),
+        }
+        counts: dict[str, int] = {}
+        with self.connect() as connection:
+            engine = self.text_search_engine(connection)
+            for table in self.TEXT_INDEX_TABLES:
+                script, rebuild = rebuilders[table]
+                connection.execute(f"DROP TABLE IF EXISTS {table}")
+                connection.executescript(script(engine))
+                rebuild(connection)
+                counts[table] = int(
+                    connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                )
+        return counts
 
     @staticmethod
     def _original_owner_from_connection(connection: sqlite3.Connection) -> str | None:

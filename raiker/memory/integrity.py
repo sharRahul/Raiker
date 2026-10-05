@@ -37,10 +37,16 @@ class MemoryIntegrityReport:
     #: found last week. ``rebuild_conversation_fts()`` is the stated repair.
     conversation_index_count: int = 0
     stale_conversation_index_count: int = 0
+    #: DEC-24 step 6 — indexes SQLite's own ``integrity-check`` reports as
+    #: damaged. Drift above is a count that disagrees; this is an index every
+    #: search through it fails on. Both are repaired by a rebuild, and neither
+    #: is a reason to touch the rows the index was built from.
+    damaged_text_indexes: tuple[str, ...] = ()
 
     @property
     def clean(self) -> bool:
         return not any((
+            self.damaged_text_indexes,
             self.index_engine_mismatch_count,
             self.stale_fts_count,
             self.stale_conversation_index_count,
@@ -56,6 +62,15 @@ class MemoryIntegrityReport:
 
 def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) -> MemoryIntegrityReport:
     now = utc_now()
+    damaged = tuple(store.damaged_text_indexes())
+
+    def index_count(connection: object, table: str) -> int:
+        # A damaged index can refuse even a count; it is reported as damaged,
+        # which says more than a number would.
+        if table in damaged:
+            return 0
+        return int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])  # type: ignore[attr-defined]
+
     with store.connect() as connection:
         active_memory_count = int(connection.execute(
             """SELECT COUNT(*) FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -63,13 +78,11 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
             AND (valid_from IS NULL OR valid_from <= ?)
             AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now, now)
         ).fetchone()[0])
-        fts_count = int(connection.execute("SELECT COUNT(*) FROM approved_memory_fts").fetchone()[0])
+        fts_count = index_count(connection, "approved_memory_fts")
         # MEM-09 — the same comparison, for the index behind Search chats. The
         # expected count is what `_rebuild_conversation_fts` would insert: one
         # row per non-empty prompt and one per non-empty answer.
-        conversation_index_count = int(
-            connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0]
-        )
+        conversation_index_count = index_count(connection, "conversation_fts")
         indexable_turn_rows = int(connection.execute(
             """SELECT
                  (SELECT COUNT(*) FROM turns WHERE prompt_text IS NOT NULL AND TRIM(prompt_text) != '')
@@ -149,4 +162,5 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         index_engine_mismatch_count=index_engine_mismatch_count,
         conversation_index_count=conversation_index_count,
         stale_conversation_index_count=abs(indexable_turn_rows - conversation_index_count),
+        damaged_text_indexes=damaged,
     )

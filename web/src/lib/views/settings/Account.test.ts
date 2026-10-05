@@ -45,6 +45,16 @@ function stubHeldDelete() {
         if (bootstrapUnreachable) throw new TypeError("network");
         return new Response(JSON.stringify(bootstrapBody ?? {}), { status: 200 });
       }
+      if (url.includes("/api/account/deletion-preview")) {
+        return new Response(JSON.stringify({
+          ok: true, username: "rahul", conversations: 12, tasks: 1, projects: 2, memories: 30,
+          connector_credentials: 0, mcp_servers: 1,
+          kept: ["Folders you attached to a project stay on disk, untouched."],
+        }), { status: 200 });
+      }
+      if (url.includes("/api/auth/session-state")) {
+        return new Response(JSON.stringify({ principal_id: "principal_user_ac5eb6e5f7620f0d", display_name: "Rahul", scope: "control" }), { status: 200 });
+      }
       if (url.includes("/api/account") && method === "DELETE") {
         return new Promise((resolve, reject) => {
           release = resolve;
@@ -80,6 +90,9 @@ function mount() {
 
 async function startDeletion() {
   await fireEvent.click(screen.getByRole("button", { name: /delete my account/i }));
+  await fireEvent.input(screen.getByLabelText(/type your username/i), {
+    target: { value: "rahul" },
+  });
   await fireEvent.input(screen.getByLabelText(/confirm your password/i), {
     target: { value: "hunter2" },
   });
@@ -192,5 +205,45 @@ describe("deleting an account", () => {
 
     expect(screen.getByRole("button", { name: /delete my account/i })).toBeInTheDocument();
     expect(screen.queryByLabelText(/confirm your password/i)).toBeNull();
+  });
+});
+
+// DEC-10 step 8 — the server's own count of what goes, what stays, and the name typed out.
+describe("the deletion confirmation", () => {
+  it("shows what the delete removes and keeps, and needs the username typed", async () => {
+    const server = stubHeldDelete();
+    mount();
+    await fireEvent.click(screen.getByRole("button", { name: /delete my account/i }));
+
+    const impact = await screen.findByTestId("account-deletion-impact");
+    await waitFor(() => expect(impact).toHaveTextContent(/12 conversations/));
+    expect(impact).toHaveTextContent(/30 memories/);
+    expect(impact).toHaveTextContent(/1 MCP server/);
+    expect(impact).toHaveTextContent(/Folders you attached to a project stay on disk/);
+
+    await fireEvent.input(screen.getByLabelText(/confirm your password/i), { target: { value: "hunter2" } });
+    await fireEvent.input(screen.getByLabelText(/type your username/i), { target: { value: "Rahul" } });
+    expect(screen.getByRole("button", { name: /permanently delete/i })).toBeDisabled();
+
+    await fireEvent.input(screen.getByLabelText(/type your username/i), { target: { value: "rahul" } });
+    await fireEvent.click(screen.getByRole("button", { name: /permanently delete/i }));
+    await waitFor(() => expect(server.deleteCalls()).toBe(1));
+    expect(server.calls.find((call) => call.startsWith("DELETE"))).toContain("confirm=rahul");
+  });
+});
+
+// DEC-01 step 5 — the internal account ID, folded away and explained.
+describe("support details", () => {
+  it("shows the internal account ID with what it is and a copy action", async () => {
+    stubHeldDelete();
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    mount();
+    const id = await screen.findByTestId("account-principal-id");
+    expect(id).toHaveTextContent("principal_user_ac5eb6e5f7620f0d");
+    expect(screen.getByTestId("account-support-details")).toHaveTextContent(/It is not your name/);
+    await fireEvent.click(screen.getByRole("button", { name: /copy id/i }));
+    expect(writeText).toHaveBeenCalledWith("principal_user_ac5eb6e5f7620f0d");
+    expect(await screen.findByRole("button", { name: /copied/i })).toBeInTheDocument();
   });
 });

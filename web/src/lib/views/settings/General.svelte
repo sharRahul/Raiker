@@ -46,6 +46,10 @@
   const zones = timezoneOptions();
   const resolved = $derived(resolvedTimezone(settings));
   const explicit = $derived((settings[TIMEZONE_KEY] as string) ?? "");
+  // BUG-321 — a zone saved under its old name (Asia/Calcutta) is still the
+  // owner's choice and still shown as chosen; the list itself offers the
+  // current names.
+  const zoneChoices = $derived(explicit && !zones.includes(explicit) ? [explicit, ...zones] : zones);
   // A device zone is *offered*, never applied. Somebody who set Europe/London
   // and opened Raiker from a hotel in Denver has said something about their
   // schedule; rewriting it silently would move every recurring task to fix a
@@ -133,7 +137,7 @@
       onchange={(e) => save({ [TIMEZONE_KEY]: e.currentTarget.value })}
     >
       <option value="">Not set — Raiker falls back to UTC</option>
-      {#each zones as zone (zone)}
+      {#each zoneChoices as zone (zone)}
         <option value={zone}>{zone}</option>
       {/each}
     </select>

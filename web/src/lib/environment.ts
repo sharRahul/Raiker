@@ -33,6 +33,32 @@ export interface ResolvedTimezone {
   source: TimezoneSource;
 }
 
+/**
+ * BUG-321 — zones the IANA database renamed and ICU still lists by the old name.
+ *
+ * Chromium answers `supportedValuesOf("timeZone")` with ICU's canonical ids, and
+ * for these that is the name the place no longer uses: an owner looking for
+ * Kolkata or Kyiv did not find it. Both spellings are links in zoneinfo, so the
+ * server reads either; the list offers, and stores, the current one.
+ */
+const RENAMED_ZONES: Readonly<Record<string, string>> = {
+  "Asia/Calcutta": "Asia/Kolkata",
+  "Asia/Katmandu": "Asia/Kathmandu",
+  "Asia/Rangoon": "Asia/Yangon",
+  "Asia/Saigon": "Asia/Ho_Chi_Minh",
+  "Atlantic/Faeroe": "Atlantic/Faroe",
+  "America/Godthab": "America/Nuuk",
+  "Europe/Kiev": "Europe/Kyiv",
+  "Pacific/Enderbury": "Pacific/Kanton",
+  "Pacific/Ponape": "Pacific/Pohnpei",
+  "Pacific/Truk": "Pacific/Chuuk",
+};
+
+/** The current IANA name for *zone*; unchanged when it was not renamed. */
+export function currentZoneName(zone: string): string {
+  return RENAMED_ZONES[zone] ?? zone;
+}
+
 /** Every zone this browser knows, or a short list when it cannot enumerate them. */
 export function timezoneOptions(): string[] {
   try {
@@ -40,7 +66,8 @@ export function timezoneOptions(): string[] {
       Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
     ).supportedValuesOf?.("timeZone");
     if (Array.isArray(supported) && supported.length > 0) {
-      return supported.includes("UTC") ? supported : ["UTC", ...supported];
+      const current = [...new Set(supported.map(currentZoneName))].sort();
+      return current.includes("UTC") ? current : ["UTC", ...current];
     }
   } catch {
     // An older engine without `supportedValuesOf` falls through to the list
@@ -71,7 +98,7 @@ export function timezoneOptions(): string[] {
 export function deviceTimezone(): string | null {
   try {
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return typeof zone === "string" && zone.trim() ? zone.trim() : null;
+    return typeof zone === "string" && zone.trim() ? currentZoneName(zone.trim()) : null;
   } catch {
     return null;
   }

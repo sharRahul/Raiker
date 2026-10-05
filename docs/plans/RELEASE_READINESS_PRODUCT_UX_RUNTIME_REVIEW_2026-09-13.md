@@ -91,6 +91,24 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-05 (second round). Ten more decision-record
+> steps closed.** DEC-24 step 6: a missing key file is refused rather than
+> replaced by a key that opens nothing ([FIXED-762](FIXED_ITEMS.md#fixed-762--a-missing-key-file-was-replaced-by-a-new-key-that-could-open-nothing)), and a damaged search index is a
+> named, rebuildable state ([FIXED-763](FIXED_ITEMS.md#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it)). DEC-12 steps 7 and 5: pause, resume and stop
+> reach every task a parent delegated ([FIXED-764](FIXED_ITEMS.md#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running)), and a finished task records
+> whether the owner was told apart from whether it worked ([FIXED-766](FIXED_ITEMS.md#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it)). DEC-15 step 12:
+> Resume re-runs an MCP server's connection test instead of restoring its trust
+> ([FIXED-767](FIXED_ITEMS.md#fixed-767--resuming-an-mcp-server-restored-its-old-trust-without-checking-it)). DEC-01 step 5 and DEC-10 step 8: Account shows the internal ID folded
+> away ([FIXED-768](FIXED_ITEMS.md#fixed-768--support-could-ask-for-the-account-id-and-no-page-showed-it)), and Delete shows the server's own counts and limits and needs the
+> username typed ([FIXED-769](FIXED_ITEMS.md#fixed-769--delete-account-said-the-same-words-whatever-the-account-held)). DEC-24 step 4: the support bundle is checked after
+> redaction and refused if anything secret-shaped is left ([FIXED-770](FIXED_ITEMS.md#fixed-770--the-support-bundle-trusted-its-own-redaction)). DEC-14 step 9:
+> the webhook refuses an echo of Raiker's own reply and a third repeat
+> ([FIXED-771](FIXED_ITEMS.md#fixed-771--two-automated-parties-on-a-webhook-could-answer-each-other-until-the-rate-limit)). DEC-25's last path, incoming decompression, is refused at ingress
+> ([FIXED-772](FIXED_ITEMS.md#fixed-772--an-encoded-request-body-would-have-been-counted-compressed)). The work found [FIXED-765](FIXED_ITEMS.md#fixed-765--resuming-a-paused-task-from-the-stop-control-always-refused) (every resume through the stop control refused),
+> the live round found FIXED-774 and FIXED-775, BUG-321 closed as [FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones), and
+> BUG-322 was filed. RR-AUTHORITY-01, RR-INSTALL-01, RR-DESIGN-01 and RR-VERIFY-01
+> and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-05. Ten decision-record steps closed.**
 > DEC-25 now bounds what a provider sends back — an answer by its decoded bytes
 > ([FIXED-750](FIXED_ITEMS.md#fixed-750--a-providers-answer-was-held-in-memory-in-full-before-anything-measured-it)) and a stream by its line and its total ([FIXED-751](FIXED_ITEMS.md#fixed-751--a-streamed-answers-line-could-grow-for-as-long-as-the-provider-kept-sending)) — and a sender that
@@ -1370,6 +1388,10 @@ vertically complete slice that has an honest UI and a fully enforcing backend.
 
 ## DEC-01 — Separate presentation identity from authorization identity
 
+> **2026-10-05.** Step 5 closed as [FIXED-768](FIXED_ITEMS.md#fixed-768--support-could-ask-for-the-account-id-and-no-page-showed-it): Account's folded *Support details*
+> shows the internal account ID with Copy and what it is — not a name, shared
+> only when someone helping asks.
+
 **Decision:** Keep `principal_id` as the immutable security key and use a
 server-resolved `display_name` for all ordinary UI and model-facing references
 to the owner. Do not rename principal IDs or use display names in authorization
@@ -1693,6 +1715,11 @@ entries.
 
 ## DEC-10 — Separate Account, Privacy and Security responsibilities
 
+> **2026-10-05.** Step 8 closed as [FIXED-769](FIXED_ITEMS.md#fixed-769--delete-account-said-the-same-words-whatever-the-account-held): the deletion confirmation shows the
+> server's count of what the purge removes and what it does not reach, and the
+> server refuses a delete without the username typed. Backup/restore options
+> remain DEC-17/DEC-24 work.
+
 **Decision:** Split the dense Security page into Sign-in & devices, Secrets &
 vault, Security findings and Standing access. Make Privacy answer “what leaves
 this device?” and Account own presentation identity and account lifecycle.
@@ -1760,6 +1787,13 @@ cleanup tests for every supported runtime type.
 > routines as [FIXED-757](FIXED_ITEMS.md#fixed-757--a-routine-that-failed-every-cycle-failed-every-morning-for-as-long-as-nobody-looked): three failed cycles in a row pause the routine with its
 > reason and notify the owner; Continue runs it once and re-arms it. No failed
 > run is retried on its own. Per-run tool and cost limits remain.
+>
+> **2026-10-05 (second round).** Step 7 closed as [FIXED-764](FIXED_ITEMS.md#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running): pause, resume and stop
+> carry down the delegation tree, each child recording the decision it came
+> from. Step 5 closed as [FIXED-766](FIXED_ITEMS.md#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it): a finished background task records
+> `delivery_state` beside its status and Tasks says **Delivery failed** without
+> changing the outcome. Process-tree propagation for a child's running commands
+> is the existing turn-stop path.
 
 **Decision:** Separate timing from execution style, use a human schedule builder
 and make each task open a durable occurrence/run timeline.
@@ -1837,6 +1871,11 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-05.** Step 9 closed for the generic webhook as [FIXED-771](FIXED_ITEMS.md#fixed-771--two-automated-parties-on-a-webhook-could-answer-each-other-until-the-rate-limit): an inbound
+> message that echoes one of Raiker's recent replies, or repeats itself a third
+> time in ten minutes, is refused before routing with a receipt. Telegram
+> already ignored bots (UX-MSG-05).
+
 **Decision:** Users connect a Messaging account/channel through a wizard.
 Connector is an implementation term under Extensions. Routing, pairing and
 delivery use shared durable contracts.
@@ -1885,6 +1924,10 @@ delivery retry/dead letter, pause and secret-redaction tests.
 > listed as *New* or *Changed* with the server's own sentence until the owner
 > accepts it ([FIXED-753](FIXED_ITEMS.md#fixed-753--an-mcp-server-could-grow-new-tools-and-the-model-was-offered-them-on-the-next-turn), [FIXED-754](FIXED_ITEMS.md#fixed-754--an-mcp-tool-could-keep-its-name-and-change-what-it-told-the-model)). Catalogue and plugin digests (the rest of step 10)
 > remain.
+>
+> **2026-10-05 (second round).** Step 12's "Resume re-runs readiness, integrity
+> and policy checks" closed as [FIXED-767](FIXED_ITEMS.md#fixed-767--resuming-an-mcp-server-restored-its-old-trust-without-checking-it): a resumed server passes the connection
+> test and tool review again or goes back to the state it was resumed from.
 
 **Decision:** All MCP transports use the common runtime services. Provide a
 catalogue/plugin/manual Add server journey with a permission and trust preview.
@@ -2408,6 +2451,12 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > **2026-10-05.** Step 1's "do not label missing observations Healthy" closed
 > for the host's background passes as [FIXED-758](FIXED_ITEMS.md#fixed-758--a-background-pass-that-stopped-running-kept-saying-ok): a pass that has recorded nothing
 > for five minutes reads **not running**.
+>
+> **2026-10-05 (second round).** Step 6 closed for the key and the text indexes:
+> a missing key over an existing store is `store_key_missing` and nothing is
+> written ([FIXED-762](FIXED_ITEMS.md#fixed-762--a-missing-key-file-was-replaced-by-a-new-key-that-could-open-nothing)); a damaged FTS index is named and rebuilt from its source rows
+> ([FIXED-763](FIXED_ITEMS.md#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it)). Step 4's "redaction failure blocks export" closed as [FIXED-770](FIXED_ITEMS.md#fixed-770--the-support-bundle-trusted-its-own-redaction). Vector
+> index corruption and quarantine of a damaged database file remain.
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.
@@ -2461,6 +2510,10 @@ owner-approved hardware profile before being called release SLOs.
 > answered 408 `request_body_too_slow`. Channel and MCP-HTTP responses were
 > already bounded by `post_json_rpc` and the sandbox's readers. Decompression
 > of incoming bodies and multipart parts have no route that performs them today.
+>
+> **2026-10-05 (second round).** Incoming decompression is now refused rather
+> than merely unused: any `Content-Encoding` other than `identity` is answered
+> 415 `request_body_encoding_unsupported` before the body is read ([FIXED-772](FIXED_ITEMS.md#fixed-772--an-encoded-request-body-would-have-been-counted-compressed)).
 
 **Decision:** Carry forward the previous audit's actual-byte body-limit gap
 explicitly. The declared-Content-Length middleware in

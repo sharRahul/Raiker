@@ -142,6 +142,22 @@
     return parts.join(" · ");
   }
 
+  /** DEC-15 step 12 — a failed resume check, said rather than coded. */
+  function checkFailure(code: string | null): string {
+    const words: Record<string, string> = {
+      mcp_initialize_failed: "the server did not complete its handshake",
+      mcp_list_tools_failed: "the server did not list its tools",
+      mcp_spawn_failed: "its program could not be started",
+      mcp_command_not_found: "its program was not found",
+      mcp_command_not_allowlisted: "its command is not one Raiker runs",
+      mcp_session_timeout: "it did not answer in time",
+      mcp_response_too_large: "it answered with more than Raiker reads",
+      disabled_by_capability_gate: "the MCP capability is off in Permissions",
+    };
+    const key = (code ?? "").split(":", 1)[0];
+    return words[key] ?? (code ? `its test failed (${code})` : "its test failed");
+  }
+
   function reason(e: unknown): string {
     if (e instanceof ApiError) {
       if (e.reasonCode === "disabled_by_capability_gate")
@@ -327,11 +343,31 @@
     error = null;
     notice = null;
     try {
-      const result = server.monitor_state === "active"
-        ? await api.pauseMcpServer(server.server_id)
-        : await api.resumeMcpServer(server.server_id);
-      notice = `${server.name}: ${result.monitor_state === "active" ? "resumed" : "stopped"}.`;
+      let failed: string | null = null;
+      if (server.monitor_state === "active") {
+        await api.pauseMcpServer(server.server_id);
+        notice = `${server.name}: stopped.`;
+      } else {
+        // DEC-15 step 12 — Resume re-runs the connection test rather than
+        // restoring the old trust; a server that fails it stays stopped, and
+        // the page says why instead of claiming it resumed.
+        const result = await api.resumeMcpServer(server.server_id);
+        if (result.check === "failed") {
+          failed =
+            `${server.name} did not pass its connection test, so it stays ` +
+            `${result.monitor_state === "killed" ? "stopped" : "paused"}: ` +
+            `${endpointRefusal(result.check_reason) ?? checkFailure(result.check_reason)}.`;
+        } else if (result.pending.length > 0) {
+          notice =
+            `${server.name}: resumed after a passing connection test. ` +
+            `${result.pending.length} ${result.pending.length === 1 ? "tool is" : "tools are"} held for your review.`;
+        } else {
+          notice = `${server.name}: resumed after a passing connection test.`;
+        }
+      }
       await load();
+      // After the reload, which clears the page's error line on its way in.
+      if (failed) error = failed;
     } catch (e) {
       error = `${server.name}: ${reason(e)}`;
     } finally {

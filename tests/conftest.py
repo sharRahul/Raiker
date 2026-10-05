@@ -233,3 +233,16 @@ def seed_account() -> SeedAccount:
         return principal_id, token
 
     return _seed
+
+
+@pytest.fixture(autouse=True)
+def _fresh_channel_loop_guard() -> None:
+    """Each test starts with no remembered channel traffic (DEC-14 step 9).
+
+    The loop guard is process-local by design, like the per-sender budget; a
+    message one test sent must not read as a repeat in the next.
+    """
+    from raiker.api.routes_channels import _recent_inbound, _recent_replies
+
+    _recent_inbound.clear()
+    _recent_replies.clear()

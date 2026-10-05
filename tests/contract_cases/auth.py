@@ -95,7 +95,11 @@ def _revoke(_ws: Path, client: TestClient, _h: dict[str, str]) -> Call:
 
 def _delete_account(_ws: Path, client: TestClient, _h: dict[str, str]) -> Call:
     headers = _register(client)
-    return "/api/account", None, _elevated(client, headers)
+    return f"/api/account?confirm={USER}", None, _elevated(client, headers)
+
+
+def _deletion_preview(_ws: Path, client: TestClient, _h: dict[str, str]) -> Call:
+    return "/api/account/deletion-preview", None, _register(client)
 
 
 CASES: Cases = {
@@ -121,4 +125,5 @@ CASES: Cases = {
     ("GET", "/api/auth/sessions"): _account("/api/auth/sessions"),
     ("POST", "/api/auth/sessions/{session_id}/revoke"): fresh(_revoke),
     ("DELETE", "/api/account"): fresh(_delete_account),
+    ("GET", "/api/account/deletion-preview"): fresh(_deletion_preview),
 }

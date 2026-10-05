@@ -51,6 +51,7 @@ from raiker.api.wire.memory import (
     RelationshipDecided,
     RelationshipRejected,
     RelationshipScan,
+    TextIndexesRebuilt,
     memory_proposal,
     relationship_proposal,
 )
@@ -345,6 +346,18 @@ async def rebuild_conversation_index(
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(ConversationIndexRebuilt, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/text-indexes/rebuild")
+async def rebuild_text_indexes(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """DEC-24 step 6 — rebuild every text index; the repair for a damaged one."""
+    result = _service(request).rebuild_text_indexes(auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(TextIndexesRebuilt, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import TaskRecord
 from raiker.events.summaries import task_completed_summary
@@ -329,7 +331,14 @@ class TaskManager:
             notify_task_finished(
                 self.store, task, outcome=outcome, was_background=was_background
             )
-        except Exception:  # noqa: BLE001 - the task's outcome is already recorded
+        except Exception as exc:  # noqa: BLE001 - the task's outcome is already recorded
+            # DEC-12 step 5 — the work's outcome stands; the notice about it
+            # is what failed, and the task says so rather than nothing.
+            with contextlib.suppress(Exception):
+                self.store.record_task_delivery(
+                    task.task_id, "failed",
+                    f"The notice could not be sent ({type(exc).__name__}).",
+                )
             return
 
     # ── Delegation ownership (BUG-220) ──────────────────────────────────────

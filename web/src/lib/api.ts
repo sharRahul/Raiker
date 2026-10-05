@@ -126,6 +126,9 @@ export const api = {
   // separate, named action over a projection that can lose nothing.
   memoryIntegrity: () => contract.memoryIntegrity(),
   rebuildConversationIndex: () => contract.rebuildConversationIndex(),
+  // DEC-24 step 6 — every text index at once: the repair for one SQLite reports
+  // as damaged, where a drifted count only needed the conversation rebuild.
+  rebuildTextIndexes: () => contract.rebuildTextIndexes(),
   models: () => contract.getModels(),
   weeklyModelUsage: (refreshNative = false) =>
     contract.getWeeklyModelUsage(refreshNative ? { refresh_native: true } : {}),

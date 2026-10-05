@@ -30,6 +30,7 @@ from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSessionStore
 from raiker.api.wire import Ok
 from raiker.api.wire.auth import (
+    AccountDeletionPreview,
     BootstrapStatusView,
     DeviceSessionView,
     ElevatedTokenView,
@@ -288,13 +289,62 @@ async def revoke_device_session(session_id: str, request: Request) -> dict[str, 
     return serialize_dto(Ok())
 
 
+#: DEC-10 step 8 — what deleting an account does not reach. Said on the
+#: confirmation, because "permanently removes this account" read as "and
+#: everything it ever touched".
+ACCOUNT_DELETION_KEEPS: tuple[str, ...] = (
+    "Folders you attached to a project stay on disk, untouched.",
+    "Raiker's audit log, checkpoints and generated files in this workspace's "
+    ".raiker folder stay until you delete that folder.",
+    "Anything already sent to a model provider, a messaging service or an MCP "
+    "server stays with them under their own retention.",
+    "Backups you made of this workspace keep a copy.",
+)
+
+
+def _account_username(workspace: Any, principal_id: str) -> str:
+    from raiker.storage.sqlite import SQLiteStore
+
+    for account in SQLiteStore(workspace).list_accounts():
+        if account.get("principal_id") == principal_id:
+            return str(account.get("username") or "")
+    return ""
+
+
+@router.get("/api/account/deletion-preview")
+async def account_deletion_preview(request: Request) -> dict[str, Any]:
+    """DEC-10 step 8 — the server's own count of what Delete account removes."""
+    _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    from raiker.storage.sqlite import SQLiteStore
+
+    counts = SQLiteStore(_ws(request)).account_deletion_preview(principal.principal_id)
+    return serialize_dto(
+        AccountDeletionPreview(
+            username=_account_username(_ws(request), principal.principal_id),
+            kept=list(ACCOUNT_DELETION_KEEPS),
+            **counts,
+        )
+    )
+
+
 @router.delete("/api/account")
-async def delete_account(request: Request) -> dict[str, Any]:
-    # Irreversible: requires an elevated (re-authenticated) session.
+async def delete_account(request: Request, confirm: str = "") -> dict[str, Any]:
+    """Irreversibly delete this account (DEC-10 step 8).
+
+    Requires an elevated (re-authenticated) session *and* the account's
+    username typed as ``confirm``: the step-up proves who is asking, the typed
+    name proves which irreversible thing they meant to ask for.
+    """
     _session, principal = AuthMiddleware(_ws(request)).authenticate(
         request, required_scope="elevated"
     )
     from raiker.storage.sqlite import SQLiteStore
 
+    username = _account_username(_ws(request), principal.principal_id)
+    if not username or confirm != username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason_code": "account_delete_unconfirmed"},
+        )
     SQLiteStore(_ws(request)).purge_account(principal.principal_id)
     return serialize_dto(Ok())

@@ -1046,6 +1046,22 @@ class MemoryService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         return ControlResult(ok=True, data={"indexed_rows": self.store.rebuild_conversation_fts()})
 
+    def rebuild_text_indexes(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        """DEC-24 step 6's repair for a damaged text index — all three, at once.
+
+        Owner-started and as safe as the conversation rebuild above, for the
+        same reason: each index is a projection, so dropping and recomputing it
+        from the tables that own the text can lose nothing. The answer re-runs
+        SQLite's own check, so "repaired" is a measurement, not a hope.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        counts = self.store.rebuild_text_indexes()
+        return ControlResult(
+            ok=True,
+            data={"indexed_rows": counts, "damaged_text_indexes": self.store.damaged_text_indexes()},
+        )
+
     def list_observations(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
         """MEM-04 — what the runtime captured, and what it refused to.
 

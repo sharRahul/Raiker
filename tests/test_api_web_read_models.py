@@ -379,6 +379,48 @@ class TestDiagnosticsExport:
             assert {"capability", "state", "decision_mode", "runtime_enabled"} == set(gate)
 
 
+class TestSupportExportIsCheckedNotTrusted:
+    """DEC-24 step 4 — a bundle that still holds something secret is refused."""
+
+    def test_the_residual_scan_names_paths_and_never_values(self) -> None:
+        from raiker.api.redaction import REDACTED_VALUE, residual_secret_paths
+
+        secret = "sk-ant-api03-" + "a1B2c3D4e5" * 6
+        assert residual_secret_paths({"note": "fine", "api_key": REDACTED_VALUE}) == []
+        found = residual_secret_paths(
+            {"note": f"pasted {secret}", "api_key": "plain", "rows": [{"label": secret}]}
+        )
+        assert found == ["$.note", "$.api_key", "$.rows[0].label"]
+        assert all(secret not in path for path in found)
+
+    def test_a_bundle_that_fails_its_check_is_refused(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import raiker.control.web_read_models as read_models
+
+        # A redactor that misses something: the check after it must not.
+        monkeypatch.setattr(read_models, "redact_response_body", lambda body: {**body, "note": "token sk-ant-api03-" + "Zz9" * 20})
+        response = client.get("/api/diagnostics/export", headers=_headers(client))
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert detail["reason_code"] == "support_export_blocked"
+        assert detail["paths"] == ["$.note"]
+        assert "sk-ant" not in response.text
+
+    def test_a_redactor_that_raises_is_refused_too(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import raiker.control.web_read_models as read_models
+
+        def broken(_body: object) -> object:
+            raise ValueError("boom")
+
+        monkeypatch.setattr(read_models, "redact_response_body", broken)
+        response = client.get("/api/diagnostics/export", headers=_headers(client))
+        assert response.status_code == 422
+        assert response.json()["detail"]["paths"] == ["redaction_failed"]
+
+
 def response_text(body: object) -> str:
     import json
 

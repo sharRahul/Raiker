@@ -485,6 +485,50 @@ class AccountStore:
                 connection.execute(f'DELETE FROM "{violation[0]}" WHERE rowid = ?', (violation[1],))
         raise RuntimeError("purge_orphan_cleanup_did_not_converge")
 
+    def account_deletion_preview(self: SQLiteStore, principal_id: str) -> dict[str, int]:
+        """What :meth:`purge_account` would remove, counted the way it removes it.
+
+        DEC-10 step 8 — the confirmation said "sessions, settings and connector
+        credentials" whatever the account held. These are the same selections
+        the purge sweeps by, so the number the owner reads before deleting is
+        the number the delete removes.
+        """
+        with self.connect() as connection:
+            user_id = self._principal_user_id_from_connection(connection, principal_id)
+
+            def count(sql: str, params: tuple[object, ...]) -> int:
+                return int(connection.execute(sql, params).fetchone()[0])
+
+            sessions = (
+                count("SELECT COUNT(*) FROM sessions WHERE user_id = ?", (user_id,)) if user_id else 0
+            )
+            return {
+                "conversations": sessions,
+                "tasks": count(
+                    "SELECT COUNT(*) FROM tasks WHERE parent_turn_id IS NULL AND session_id IN "
+                    "(SELECT session_id FROM sessions WHERE user_id = ?)",
+                    (user_id,),
+                )
+                if user_id
+                else 0,
+                "projects": count(
+                    "SELECT COUNT(*) FROM projects WHERE owner_user_id = ?", (user_id,)
+                )
+                if user_id
+                else 0,
+                "memories": count(
+                    "SELECT COUNT(*) FROM approved_memory WHERE owner_principal_id = ?",
+                    (principal_id,),
+                ),
+                "connector_credentials": count(
+                    "SELECT COUNT(*) FROM connector_credentials WHERE principal_id = ?",
+                    (principal_id,),
+                ),
+                "mcp_servers": count(
+                    "SELECT COUNT(*) FROM mcp_servers WHERE principal_id = ?", (principal_id,)
+                ),
+            }
+
     def purge_account(self: SQLiteStore, principal_id: str) -> None:
         """Irreversibly remove an account and all its per-principal data."""
         with self.connect() as connection:

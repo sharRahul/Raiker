@@ -122,8 +122,11 @@ has a time. **Organisation** holds the rest:
 **A parent owns its children's outcomes.** A task that delegated work does not
 report *completed* while a child is still open: when its own run finishes it
 reads **waiting on delegated work**, and it settles when the last child lands —
-completed if every child completed, failed if any failed or was cancelled. The
-ownership runs one way only. A child carries its own approvals, because one
+completed if every child completed, failed if any failed or was cancelled.
+**A decision on the parent reaches its children.** Pausing, resuming or stopping
+a parent carries down to every task it delegated, and their children, each
+reading *Delegated by a task the owner stopped: …*; a child that had already
+finished is history and is left alone. The ownership runs one way only. A child carries its own approvals, because one
 decision standing in for an unbounded number of later ones is exactly what the
 per-turn permission envelope exists to prevent.
 
@@ -140,6 +143,12 @@ to the decision. Delegated work folds under the task that delegated it: the
 parent shows a bar and *N of M delegated tasks settled · Show*, and **Show**
 lists all of it — a settled child included, under its parent rather than again
 under Finished work.
+
+**Whether you were told is its own fact.** Background work that ends sends you a
+notice, and if that notice could not be written — or the desktop notification
+command you configured failed — the task still reads as what it was, *completed*
+or *failed*, with **Delivery failed** and why beside it. Raiker never re-runs
+work because its notice did not arrive.
 
 ### One lifecycle, and what each part of it lets you press
 

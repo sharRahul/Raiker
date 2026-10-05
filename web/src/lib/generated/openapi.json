@@ -1,6 +1,58 @@
 {
   "components": {
     "schemas": {
+      "AccountDeletionPreview": {
+        "description": "What deleting this account removes and keeps, counted by the server (DEC-10 step 8).\n\n``username`` is what the confirmation asks the owner to type; ``kept`` is\nwhat the delete does not reach, said rather than implied.",
+        "properties": {
+          "connector_credentials": {
+            "title": "Connector Credentials",
+            "type": "integer"
+          },
+          "conversations": {
+            "title": "Conversations",
+            "type": "integer"
+          },
+          "kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kept",
+            "type": "array"
+          },
+          "mcp_servers": {
+            "title": "Mcp Servers",
+            "type": "integer"
+          },
+          "memories": {
+            "title": "Memories",
+            "type": "integer"
+          },
+          "projects": {
+            "title": "Projects",
+            "type": "integer"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "conversations",
+          "tasks",
+          "projects",
+          "memories",
+          "connector_credentials",
+          "mcp_servers",
+          "kept"
+        ],
+        "title": "AccountDeletionPreview",
+        "type": "object"
+      },
       "ActivateRuntimeModeRequest": {
         "properties": {
           "as_principal": {
@@ -3320,7 +3372,7 @@
           "bot_loop_protection": {
             "enum": [
               "bot_messages_ignored",
-              "rate_limit_only"
+              "echo_and_repeat_refused"
             ],
             "title": "Bot Loop Protection",
             "type": "string"
@@ -12869,6 +12921,64 @@
         "title": "McpOffer",
         "type": "object"
       },
+      "McpResumed": {
+        "description": "A resume and the connection test it re-ran (DEC-15 step 12).\n\n``check`` is ``failed`` when the server did not pass, and then\n``monitor_state`` is the contained state it went back to, with\n``check_reason`` the refusal. ``pending`` names tools held for review.",
+        "properties": {
+          "check": {
+            "enum": [
+              "passed",
+              "failed"
+            ],
+            "title": "Check",
+            "type": "string"
+          },
+          "check_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Reason"
+          },
+          "monitor_state": {
+            "enum": [
+              "active",
+              "paused",
+              "killed"
+            ],
+            "title": "Monitor State",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pending": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pending",
+            "type": "array"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "monitor_state",
+          "check",
+          "check_reason",
+          "pending"
+        ],
+        "title": "McpResumed",
+        "type": "object"
+      },
       "McpScope": {
         "description": "UX-MCP-02 — what adding or testing a server exposes, before it is done.\n\nRead from the launcher and the endpoint policy rather than written as\ncopy, so the preview cannot claim a boundary the process does not have.",
         "properties": {
@@ -14198,6 +14308,13 @@
             "title": "Conversation Index Count",
             "type": "integer"
           },
+          "damaged_text_indexes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Damaged Text Indexes",
+            "type": "array"
+          },
           "failed_purge_location_count": {
             "title": "Failed Purge Location Count",
             "type": "integer"
@@ -14263,7 +14380,8 @@
           "text_search_engine",
           "index_engine_mismatch_count",
           "conversation_index_count",
-          "stale_conversation_index_count"
+          "stale_conversation_index_count",
+          "damaged_text_indexes"
         ],
         "title": "MemoryIntegrity",
         "type": "object"
@@ -23041,6 +23159,30 @@
             ],
             "title": "Current Step"
           },
+          "delivery_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delivery Detail"
+          },
+          "delivery_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delivery State"
+          },
           "missed_run_policy": {
             "anyOf": [
               {
@@ -23493,6 +23635,36 @@
           "destination"
         ],
         "title": "TelemetryExportRun",
+        "type": "object"
+      },
+      "TextIndexesRebuilt": {
+        "description": "Every text index recomputed from the rows that own its text.",
+        "properties": {
+          "damaged_text_indexes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Damaged Text Indexes",
+            "type": "array"
+          },
+          "indexed_rows": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Indexed Rows",
+            "type": "object"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "indexed_rows",
+          "damaged_text_indexes"
+        ],
+        "title": "TextIndexesRebuilt",
         "type": "object"
       },
       "ThreatModelAcknowledged": {
@@ -25265,7 +25437,20 @@
   "paths": {
     "/api/account": {
       "delete": {
+        "description": "Irreversibly delete this account (DEC-10 step 8).\n\nRequires an elevated (re-authenticated) session *and* the account's\nusername typed as ``confirm``: the step-up proves who is asking, the typed\nname proves which irreversible thing they meant to ask for.",
         "operationId": "delete_account_api_account_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Confirm",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -25276,9 +25461,38 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Delete Account"
+      }
+    },
+    "/api/account/deletion-preview": {
+      "get": {
+        "description": "DEC-10 step 8 — the server's own count of what Delete account removes.",
+        "operationId": "account_deletion_preview_api_account_deletion_preview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Account Deletion Preview"
       }
     },
     "/api/approvals": {
@@ -31285,7 +31499,7 @@
     },
     "/api/mcp/servers/{server_id}/resume": {
       "post": {
-        "description": "Revoke containment: resume a paused/killed connection back to active.\nHuman-only, owner-scoped.",
+        "description": "Resume a paused/killed connection — only if it passes its connection test\nagain (DEC-15 step 12). Human-only, owner-scoped.",
         "operationId": "resume_mcp_server_api_mcp_servers__server_id__resume_post",
         "parameters": [
           {
@@ -31303,7 +31517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/McpContainment"
+                  "$ref": "#/components/schemas/McpResumed"
                 }
               }
             },
@@ -32327,6 +32541,25 @@
           }
         },
         "summary": "Get Memory Settings"
+      }
+    },
+    "/api/memory/text-indexes/rebuild": {
+      "post": {
+        "description": "DEC-24 step 6 — rebuild every text index; the repair for a damaged one.",
+        "operationId": "rebuild_text_indexes_api_memory_text_indexes_rebuild_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextIndexesRebuilt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rebuild Text Indexes"
       }
     },
     "/api/memory/{memory_id}": {

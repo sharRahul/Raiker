@@ -188,11 +188,21 @@ class MemoryIntegrity(TypedDict):
     index_engine_mismatch_count: int
     conversation_index_count: int
     stale_conversation_index_count: int
+    #: DEC-24 step 6 — the text indexes SQLite reports as damaged.
+    damaged_text_indexes: list[str]
 
 
 class ConversationIndexRebuilt(TypedDict):
     ok: bool
     indexed_rows: int
+
+
+class TextIndexesRebuilt(TypedDict):
+    """Every text index recomputed from the rows that own its text."""
+
+    ok: bool
+    indexed_rows: dict[str, int]
+    damaged_text_indexes: list[str]
 
 
 class ObservationsView(TypedDict):

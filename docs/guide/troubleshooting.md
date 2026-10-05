@@ -80,6 +80,9 @@ in the process environment.
 | Symptom | Fix |
 |---|---|
 | Reload returns you to the lock screen | Expected. The bearer token is in memory only, never `localStorage`. |
+| Lock screen: *The workspace key (.raiker/app.key) is missing, but the database it unlocks is still here* (`store_key_missing`) | The key file was moved or lost. Raiker will not make a new one — a new key cannot open this data. Put the original `app.key` back from your backup and restart. Nothing in the workspace was changed. |
+| Lock screen: *this workspace key does not open it* (`store_unreadable`) | The key in `.raiker/` is not the one the database was made with, or the database file is damaged. Restore the matching key, or the database from a backup; Raiker writes nothing over it. |
+| A request answered 415 `request_body_encoding_unsupported` | The client compressed its request body. Raiker reads only uncompressed bodies; send it without `Content-Encoding`. |
 | `Refusing to bind to non-loopback host … without --allow-public` | Add `--allow-public` **and** set `RAIKER_OWNER_TOKEN` |
 | Dashboard is blank or stale | `npm --prefix web run build`, then restart `raiker-web` |
 | Backend change has no effect | Restart `raiker-web` — Python is not hot-reloaded |

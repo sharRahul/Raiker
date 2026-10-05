@@ -194,3 +194,72 @@ class TestANoticeNeverFailsTheTask:
 
         assert finished is not None
         assert finished.status == "completed"
+
+
+class TestDeliveryIsSeparateFromOutcome:
+    """DEC-12 step 5 — whether the owner was told, beside whether it worked."""
+
+    def _scheduled(self, manager: TaskManager, session_id: str) -> str:
+        task = manager.create_task(
+            session_id=session_id,
+            title="Nightly digest",
+            objective="Summarise the inbox.",
+            scheduled_at="2026-09-04T02:00:00Z",
+        )
+        return task.task_id
+
+    def test_a_delivered_notice_is_recorded(
+        self, manager: TaskManager, store: SQLiteStore, session_id: str
+    ) -> None:
+        task_id = self._scheduled(manager, session_id)
+        manager.complete_task(task_id, "Done.")
+        task = store.load_task(task_id)
+        assert task is not None
+        assert (task.status, task.delivery_state) == ("completed", "delivered")
+
+    def test_a_notice_that_could_not_be_written_leaves_the_work_completed(
+        self,
+        manager: TaskManager,
+        store: SQLiteStore,
+        session_id: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        task_id = self._scheduled(manager, session_id)
+
+        def refuse(*_args: object, **_kwargs: object) -> str:
+            raise OSError("disk full")
+
+        monkeypatch.setattr(store, "insert_notification", refuse)
+        manager.complete_task(task_id, "Done.")
+
+        task = store.load_task(task_id)
+        assert task is not None
+        assert task.status == "completed"
+        assert task.delivery_state == "failed"
+        assert "OSError" in (task.delivery_detail or "")
+
+    def test_a_failing_desktop_command_is_said_too(
+        self,
+        manager: TaskManager,
+        store: SQLiteStore,
+        session_id: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("RAIKER_OS_NOTIFY_CMD", "false")
+        task_id = self._scheduled(manager, session_id)
+        manager.complete_task(task_id, "Done.")
+
+        task = store.load_task(task_id)
+        assert task is not None
+        assert task.status == "completed"
+        assert task.delivery_state == "failed"
+        assert "desktop" in (task.delivery_detail or "")
+        assert len(_notices(store)) == 1
+
+    def test_a_foreground_run_owes_no_notice(
+        self, manager: TaskManager, store: SQLiteStore, session_id: str
+    ) -> None:
+        task = manager.create_task(session_id=session_id, title="Chat turn", objective="x")
+        manager.complete_task(task.task_id, "Done.")
+        loaded = store.load_task(task.task_id)
+        assert loaded is not None and loaded.delivery_state is None

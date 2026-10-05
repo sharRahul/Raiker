@@ -783,6 +783,20 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-759](#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private) | Low | Settings → Web access | Fixed 2026-10-05 |
 | [FIXED-760](#fixed-760--a-paused-routine-printed-the-slot-it-last-ran-as-its-next-run) | Low | Tasks | Fixed 2026-10-05 — found by the live round |
 | [FIXED-761](#fixed-761--the-live-chat-check-matched-the-owners-own-prompt) | Low | Live harness | Fixed 2026-10-05 — found by the live round |
+| [FIXED-762](#fixed-762--a-missing-key-file-was-replaced-by-a-new-key-that-could-open-nothing) | High | Storage / recovery | Fixed 2026-10-05 (DEC-24 step 6) |
+| [FIXED-763](#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it) | Medium | Memory / search | Fixed 2026-10-05 (DEC-24 step 6) |
+| [FIXED-764](#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running) | Medium | Tasks | Fixed 2026-10-05 (DEC-12 step 7) |
+| [FIXED-765](#fixed-765--resuming-a-paused-task-from-the-stop-control-always-refused) | Medium | Tasks / events | Fixed 2026-10-05 — found by the work |
+| [FIXED-766](#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it) | Low | Tasks / notifications | Fixed 2026-10-05 (DEC-12 step 5) |
+| [FIXED-767](#fixed-767--resuming-an-mcp-server-restored-its-old-trust-without-checking-it) | Medium | MCP / authority | Fixed 2026-10-05 (DEC-15 step 12) |
+| [FIXED-768](#fixed-768--support-could-ask-for-the-account-id-and-no-page-showed-it) | Low | Account / identity | Fixed 2026-10-05 (DEC-01 step 5) |
+| [FIXED-769](#fixed-769--delete-account-said-the-same-words-whatever-the-account-held) | Medium | Account | Fixed 2026-10-05 (DEC-10 step 8) |
+| [FIXED-770](#fixed-770--the-support-bundle-trusted-its-own-redaction) | Medium | Diagnostics / privacy | Fixed 2026-10-05 (DEC-24 step 4) |
+| [FIXED-771](#fixed-771--two-automated-parties-on-a-webhook-could-answer-each-other-until-the-rate-limit) | Medium | Messaging | Fixed 2026-10-05 (DEC-14 step 9) |
+| [FIXED-772](#fixed-772--an-encoded-request-body-would-have-been-counted-compressed) | Low | API ingress | Fixed 2026-10-05 (DEC-25) |
+| [FIXED-773](#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | Fixed 2026-10-05 (closes BUG-321) |
+| [FIXED-774](#fixed-774--a-failed-resume-check-printed-its-reason-code) | Low | MCP | Fixed 2026-10-05 — found by the live round |
+| [FIXED-775](#fixed-775--the-deletion-confirmations-label-broke-into-three-lines) | Low | Account / layout | Fixed 2026-10-05 — found by the live round |
 
 ---
 
@@ -30338,3 +30352,296 @@ the turn still *Working…* (the first capture 11 shows it).
 **Fixed.** The step waits for the phrase twice and for **Send** to come back.
 
 **Evidence.** Capture 11 retaken: the answer under the prompt, Send available.
+
+---
+
+## FIXED-762 — A missing key file was replaced by a new key that could open nothing
+
+**Severity: High. Area: Storage / recovery. Status: Fixed 2026-10-05. Closes DEC-24
+step 6's "database corruption never causes silent empty-workspace creation" for
+the key, and the *missing key* drill of the
+[release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#136-dec-24--operational-recovery-budgets-and-diagnostics).**
+
+**Observed.** `ensure_app_key` treated "no `.raiker/app.key`" as first use
+whatever else the workspace held. A key file lost beside an existing
+`raiker.db` — a partial restore, a sync tool, a mistaken delete — was replaced
+by a fresh key that could not open the database, written into the very path
+the owner needed to restore the original to. The host then failed on its first
+read with a bare `DatabaseError`.
+
+**Fixed.** `raiker/storage/store_errors.py` holds the store's named conditions.
+A key file missing while the database holds data raises
+`store_key_missing` and writes nothing; a key that does not open the database
+(another key, or a damaged file) is `store_unreadable`, measured by the first
+read after keying. The host still starts, every store read answers 503 with the
+reason, and the lock screen says what to restore — *Nothing in the workspace has
+been changed.* A zero-byte database is still first use.
+
+**Evidence.** `tests/test_store_key_guard.py` (6) — first use, zero-byte file,
+refusal that writes nothing, health naming it, another key named and the file
+byte-identical, and the host starting. Live capture 15: the round's workspace
+with its key moved aside, the lock screen's sentence, no key minted, and the
+store opening again once the key was put back.
+
+---
+
+## FIXED-763 — A damaged search index failed every search and nothing named it
+
+**Severity: Medium. Area: Memory / search. Status: Fixed 2026-10-05. Closes DEC-24
+step 6's "FTS/vector corruption triggers a rebuildable degraded state".**
+
+**Observed.** The memory integrity report measured *drift* — an index whose row
+count disagreed with its table — and nothing measured *damage*. An FTS index
+SQLite itself reports as corrupt answers every query through it with
+`fts5: corruption found reading blob`, and the only repair on offer rebuilt the
+conversation index by `DELETE`, which a damaged index can refuse too.
+
+**Fixed.** `SQLiteStore.damaged_text_indexes()` runs SQLite's own
+`integrity-check` on the three text indexes; `rebuild_text_indexes()` drops and
+recomputes all three from the rows that own their text. The integrity report
+carries `damaged_text_indexes` (and is not clean while any is listed), and
+`POST /api/memory/text-indexes/rebuild` is the human-only repair, answering
+with the check re-run. Diagnostics says which index is damaged, that the
+conversations, memories and files behind it are not affected, and offers
+**Rebuild search indexes**.
+
+**Evidence.** `tests/test_text_index_damage.py` (3);
+`test_memory_controls.py::test_a_damaged_index_is_reported_and_rebuilt_through_the_route`;
+`DiagnosticsView.test.ts` (1 new). Live captures 06–07: a conversation index
+with its segments removed, named on Diagnostics, rebuilt, and clean.
+
+---
+
+## FIXED-764 — Stopping a parent task left the work it had delegated running
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-10-05. Closes DEC-12 step 7
+of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-12--define-tasks-as-a-durable-scheduler-and-run-history).**
+
+**Observed.** A parent is the owner's one handle on what it delegated, and
+pausing or stopping it from Tasks settled the parent's own row only: each child
+kept running, and the stop-all sweep was the only control that reached them.
+
+**Fixed.** `InterruptController` carries pause, resume and stop down the
+delegation tree (`SQLiteStore.descendant_tasks`, breadth-first, within the
+account's sessions, bounded at 16 levels). A child that already ended is not
+touched; resume reaches only paused children. Each child records its own event
+with `propagated_from` and a reason naming the decision — *Delegated by a task
+the owner stopped: …*. Stop-all, which already sweeps every task, does not ask
+for the cascade a second time.
+
+**Evidence.** `test_api_prompts.py::test_a_decision_on_a_parent_reaches_every_task_it_delegated`
+— pause, resume and stop over a parent, child and grandchild, with a finished
+child left alone. Live capture 04: **Stop** on a running parent and its child
+and grandchild cancelled with the reason.
+
+---
+
+## FIXED-765 — Resuming a paused task from the stop control always refused
+
+**Severity: Medium. Area: Tasks / events. Status: Fixed 2026-10-05 — found
+writing FIXED-764's test.**
+
+**Observed.** The interrupt route's `resume` wrote a `task_resumed` event, and
+`task_resumed` was never in the event-type registry, so every resume raised
+`invalid_event_type:task_resumed` before it reached the store. No test had ever
+resumed through the route.
+
+**Fixed.** `task_resumed` is registered, and the task history reads it as
+*Resumed.*
+
+**Evidence.** The FIXED-764 test resumes a paused tree through
+`/api/interrupts`, which failed without the registration.
+
+---
+
+## FIXED-766 — A routine that worked but whose notice failed said nothing about it
+
+**Severity: Low. Area: Tasks / notifications. Status: Fixed 2026-10-05. Closes
+DEC-12 step 5 — work and delivery recorded separately.**
+
+**Observed.** A background task's notice was a courtesy that swallowed every
+failure, so a completed routine whose notice could not be written — or whose
+owner-configured desktop command failed — looked exactly like one the owner had
+been told about.
+
+**Fixed.** `tasks.delivery_state` and `delivery_detail` (migration RAIKER-2088):
+`delivered`, `failed` with what failed, or null when no notice was owed. The
+task's status is never changed by it. Tasks shows **Delivery failed.** and the
+reason beside a finished task. `os_notification_outcome` reports whether the
+desktop command exited 0.
+
+**Evidence.** `test_task_finished_notification.py::TestDeliveryIsSeparateFromOutcome`
+(4); `TasksView.test.ts` (2 new). Live capture 05: a completed scheduled task
+with a failing desktop command, **completed** and **Delivery failed** side by side.
+
+---
+
+## FIXED-767 — Resuming an MCP server restored its old trust without checking it
+
+**Severity: Medium. Area: MCP / authority. Status: Fixed 2026-10-05. Closes
+DEC-15 step 12's "Resume re-runs readiness, integrity and policy checks rather
+than restoring old trust blindly".**
+
+**Observed.** **Resume** flipped a paused or killed server back to active on the
+word of the button, whatever the server had become while it was stopped.
+
+**Fixed.** Resume re-runs the governed connection test Add server ends with —
+handshake, endpoint policy, tool enumeration, and FIXED-753/754's review of any
+tool added or reworded. A server that passes is active, with any held tools
+named; one that fails goes back to the state it was resumed from, its reason
+saying what failed in words. `POST /api/mcp/servers/{id}/resume` answers
+`McpResumed` with `check`, `check_reason` and `pending`.
+
+**Evidence.** `test_mcp_containment.py` — a server whose program cannot start
+stays killed with a worded reason; the generated echo server passes and is
+active. `McpView.test.ts` (1 new). Live captures 08–10: a sample server stopped
+and resumed after a passing test, then broken and resumed — **stays paused:
+the server did not complete its handshake** — at 1440 and 390 wide with no
+overflow.
+
+---
+
+## FIXED-768 — Support could ask for the account ID and no page showed it
+
+**Severity: Low. Area: Account / identity. Status: Fixed 2026-10-05. Closes
+DEC-01 step 5.**
+
+**Observed.** FIXED-501 took the internal principal ID out of every ordinary
+page and every model-facing sentence. That left no place an owner could read
+it when someone helping them asked for it.
+
+**Fixed.** Account has a folded **Support details** section with the internal
+account ID, **Copy ID**, and what it is: *not your name … share it only if
+someone helping you with a problem asks for it.* It is read from
+`/api/auth/session-state`, never typed.
+
+**Evidence.** `Account.test.ts` (1 new). Live capture 02.
+
+---
+
+## FIXED-769 — Delete account said the same words whatever the account held
+
+**Severity: Medium. Area: Account. Status: Fixed 2026-10-05. Closes DEC-10 step 8.**
+
+**Observed.** The confirmation said it removed "sessions, settings, and stored
+connector credentials" for every account, said nothing about what it would not
+reach, and the server accepted any elevated `DELETE /api/account`.
+
+**Fixed.** `GET /api/account/deletion-preview` counts what the purge removes by
+the same selections it sweeps — conversations, tasks, projects, memories,
+connector credentials, MCP servers — and lists what it keeps: attached folders,
+the audit log and files in `.raiker`, copies already sent to providers and
+services, and backups. The confirmation shows both and asks for the username
+typed; `DELETE /api/account?confirm=` refuses `account_delete_unconfirmed`
+without it, so the step-up proves who asks and the name proves what they meant.
+
+**Evidence.** `test_account_management_routes.py` (deletion refused unconfirmed
+and with another name; preview counts and limits); `Account.test.ts` (1 new).
+Live captures 03 and 14: the counts for the round's account, Delete disabled
+for a mistyped name, and the typed name deleting it to a fresh lock screen.
+
+---
+
+## FIXED-770 — The support bundle trusted its own redaction
+
+**Severity: Medium. Area: Diagnostics / privacy. Status: Fixed 2026-10-05.
+Closes DEC-24 step 4's "secret scanning/redaction failure blocks export".**
+
+**Observed.** The bundle an owner pastes into an issue was passed through the
+redactor and sent, whatever the redactor returned. A redaction that raised was
+a 500; one that missed something was the bundle.
+
+**Fixed.** `residual_secret_paths` re-checks the redacted bundle — a
+secret-named field must read redacted, and no string may be one the redactor
+would still change — and answers JSON paths, never values. A finding, or a
+redactor that raises, refuses the export 422 `support_export_blocked`, and
+Observability says it was refused for the owner's protection.
+
+**Evidence.** `test_api_web_read_models.py::TestSupportExportIsCheckedNotTrusted`
+(3); `ObserveView.test.ts` (1 new). Live capture 12: the round's bundle passing
+its check.
+
+---
+
+## FIXED-771 — Two automated parties on a webhook could answer each other until the rate limit
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-05. Closes DEC-14
+step 9 for the generic webhook.**
+
+**Observed.** Telegram marks a bot's message and it is never routed. The
+webhook has no such flag; its route scope said *Only the per-sender rate limit
+stops an automated caller* — sixty model calls a minute.
+
+**Fixed.** The receiver reads lineage. A message that is one of Raiker's own
+recent replies on the connector is `loop_echo`; the same message from the same
+sender a third time in ten minutes is `loop_repeated`. Both are refused 409
+before routing, with a receipt and a `channel_message_rejected` event; only
+fingerprints are kept. The route scope says so, and receipts say why in words.
+
+**Evidence.** `test_channel_owner_surface.py::test_an_echo_of_raikers_own_reply_and_a_third_repeat_are_refused`;
+`channelSetup.test.ts` (1 new). Live capture 11: a third identical message
+refused, a different one heard, and the receipt reading *the same message
+arrived a third time in ten minutes*. The round's own retries met the window
+too, which is the guard working.
+
+---
+
+## FIXED-772 — An encoded request body would have been counted compressed
+
+**Severity: Low. Area: API ingress. Status: Fixed 2026-10-05. Closes the last
+DEC-25 path, incoming decompression.**
+
+**Observed.** No route decompresses a request body, so a `Content-Encoding:
+gzip` body reached a JSON parser as bytes it could not read, and the body cap
+counted the compressed size of whatever a later decoder would expand.
+
+**Fixed.** `MaxBodySizeMiddleware` refuses any `Content-Encoding` other than
+`identity` with 415 `request_body_encoding_unsupported` before reading the body.
+
+**Evidence.** `tests/test_ingress_body_encoding.py` (2). Live: a gzip login
+answered 415 by the running host (scenario 8).
+
+---
+
+## FIXED-773 — The time-zone list offered the old names of renamed zones
+
+**Severity: Low. Area: Settings → General. Status: Fixed 2026-10-05. Closes
+[BUG-321](TO_BE_FIXED.md#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones).**
+
+**Observed.** Chromium's `supportedValuesOf("timeZone")` answers with ICU ids,
+which for renamed zones are the old names — `Asia/Calcutta`, `Europe/Kiev`.
+
+**Fixed.** Ten renamed ids map to their current IANA names for the list and for
+the device's proposal; a zone saved under an old name is still shown as chosen.
+
+**Evidence.** `environment.test.ts` (1 new). Live capture 13: Asia/Kolkata and
+Europe/Kyiv offered, Asia/Calcutta not, and Kolkata reading UTC+05:30.
+
+---
+
+## FIXED-774 — A failed resume check printed its reason code
+
+**Severity: Low. Area: MCP. Status: Fixed 2026-10-05 — found by the live round.**
+
+**Observed.** The first capture of FIXED-767 read *stays paused:
+mcp_initialize_failed* in the banner and *(mcp_initialize_failed)* in the
+server's paused reason.
+
+**Fixed.** Both say what failed — *the server did not complete its handshake* —
+with the code kept in the answer and the audit.
+
+**Evidence.** `McpView.test.ts`, `test_mcp_containment.py`. Captures 09–10 retaken.
+
+---
+
+## FIXED-775 — The deletion confirmation's label broke into three lines
+
+**Severity: Low. Area: Account / layout. Status: Fixed 2026-10-05 — found by the
+live round.**
+
+**Observed.** *Type your username, **Rahul**, to confirm* rendered as three
+stacked rows: the label is a grid, and the bold name became its own row.
+
+**Fixed.** The sentence is one span.
+
+**Evidence.** Capture 03 retaken.

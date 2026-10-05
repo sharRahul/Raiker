@@ -195,6 +195,48 @@ def redact_response_body(body: Any) -> Any:
     return _redact_value(body)
 
 
+def residual_secret_paths(body: Any) -> list[str]:
+    """Where a redacted body still holds something secret-shaped (DEC-24 step 4).
+
+    The second pass a support export runs over what the redactor already
+    returned: a secret-named field must read :data:`REDACTED_VALUE`, and no
+    string may be one the redactor would still change. Answers JSON paths, never
+    the values found there — the report of a leak must not be the leak.
+    """
+    found: list[str] = []
+
+    def walk(value: Any, path: str, flags: dict[str, bool]) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if is_token_count_field(key, item) or isinstance(item, bool):
+                    continue
+                child = f"{path}.{key}"
+                if _is_secret_key(key):
+                    if item != REDACTED_VALUE:
+                        found.append(child)
+                    continue
+                walk(
+                    item,
+                    child,
+                    {
+                        "locator_value": is_locator_field(key),
+                        "identifier_value": is_identifier_field(key),
+                        "digest_value": is_digest_field(key),
+                        "model_value": is_model_field(key),
+                    },
+                )
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                walk(item, f"{path}[{index}]", flags)
+        elif isinstance(value, str):
+            _redacted, changed = redact_text(value, **flags)
+            if changed:
+                found.append(path)
+
+    walk(body, "$", {})
+    return found
+
+
 def assert_no_secrets_in_body(body: Any) -> None:
     """Assert that no secret-like data remains in an API response body."""
     _check_no_secrets(body)

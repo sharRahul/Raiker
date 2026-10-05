@@ -45,7 +45,7 @@ function profile(overrides: Partial<ChannelProfile> = {}): ChannelProfile {
       mention_required: false,
       thread_mapping: "none",
       starts_work: "nobody",
-      bot_loop_protection: "rate_limit_only",
+      bot_loop_protection: "echo_and_repeat_refused",
       reply_path: "none",
     },
     receipts: [],
@@ -161,5 +161,13 @@ describe("receipts", () => {
   it("words the codes a test comes back with", () => {
     expect(testReason("disabled_by_capability_gate")).toMatch(/Permissions/);
     expect(testReason("http_error:502")).toBe("the destination answered 502");
+  });
+});
+
+describe("the loop guard's refusals", () => {
+  it("are said in the owner's words", async () => {
+    const { testReason } = await import("./channelSetup");
+    expect(testReason("loop_echo")).toMatch(/one of Raiker's own replies/);
+    expect(testReason("loop_repeated")).toMatch(/third time in ten minutes/);
   });
 });

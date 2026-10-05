@@ -83,6 +83,10 @@ class TaskView(View):
     schedule_timezone: str | None = None
     schedule_until: str | None = None
     missed_run_policy: str | None = None
+    # DEC-12 step 5 — whether the owner was told it ended, separate from
+    # whether it worked: `delivered`, `failed`, or null when nothing was owed.
+    delivery_state: str | None = None
+    delivery_detail: str | None = None
     # UX-TASK-05 — the published lifecycle phase (`raiker/tasks/lifecycle.py`),
     # served rather than re-derived so every surface offers the same actions
     # for the same task.

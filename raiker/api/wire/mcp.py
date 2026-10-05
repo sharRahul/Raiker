@@ -51,6 +51,19 @@ class McpContainment(TypedDict):
     monitor_state: Literal["active", "paused", "killed"]
 
 
+class McpResumed(McpContainment):
+    """A resume and the connection test it re-ran (DEC-15 step 12).
+
+    ``check`` is ``failed`` when the server did not pass, and then
+    ``monitor_state`` is the contained state it went back to, with
+    ``check_reason`` the refusal. ``pending`` names tools held for review.
+    """
+
+    check: Literal["passed", "failed"]
+    check_reason: str | None
+    pending: list[str]
+
+
 class McpToolsApproved(TypedDict):
     """DEC-15 step 10 — tools accepted for a server, and what it still holds."""
 

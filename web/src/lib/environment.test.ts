@@ -87,6 +87,20 @@ describe("timezoneOptions", () => {
   it("always includes UTC, which is the documented final fallback", () => {
     expect(timezoneOptions()).toContain("UTC");
   });
+
+  // BUG-321 — ICU's ids for renamed zones are the old names.
+  it("offers the current names for zones the engine lists by their old ones", () => {
+    vi.stubGlobal("Intl", {
+      ...Intl,
+      supportedValuesOf: () => ["Asia/Calcutta", "Asia/Kolkata", "Europe/Kiev", "Europe/London"],
+    });
+    const zones = timezoneOptions();
+    expect(zones).toContain("Asia/Kolkata");
+    expect(zones).toContain("Europe/Kyiv");
+    expect(zones).not.toContain("Asia/Calcutta");
+    expect(zones).not.toContain("Europe/Kiev");
+    expect(zones.filter((zone) => zone === "Asia/Kolkata")).toHaveLength(1);
+  });
 });
 
 describe("localTimeIn", () => {

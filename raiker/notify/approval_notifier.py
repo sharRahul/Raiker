@@ -75,6 +75,30 @@ def resolve_owner_principal_id(
     return store.original_account_principal_id()
 
 
+def os_notification_outcome(title: str, body: str) -> str:
+    """Run the owner-configured OS notice hook and say how it went.
+
+    ``off`` when ``RAIKER_OS_NOTIFY_CMD`` is unset, ``sent`` when the command
+    ran and exited 0, ``failed`` when it could not be started, timed out or
+    exited non-zero. Never raises. DEC-12 step 5 reads the answer, so a
+    routine's delivery state can say the desktop notice did not arrive.
+    """
+    command = os.environ.get(OS_NOTIFY_ENV, "").strip()
+    if not command:
+        return "off"
+    try:
+        argv = shlex.split(command) + [title, body]
+        completed = subprocess.run(  # noqa: S603 - owner-configured command, redacted args only
+            argv,
+            check=False,
+            capture_output=True,
+            timeout=5,
+        )
+    except Exception:
+        return "failed"
+    return "sent" if completed.returncode == 0 else "failed"
+
+
 def fire_os_notification(title: str, body: str) -> bool:
     """Best-effort OS-level notification via the owner-configured hook.
 
@@ -82,20 +106,7 @@ def fire_os_notification(title: str, body: str) -> bool:
     when ``RAIKER_OS_NOTIFY_CMD`` is unset. Never raises — a hook failure must not
     affect the approval flow.
     """
-    command = os.environ.get(OS_NOTIFY_ENV, "").strip()
-    if not command:
-        return False
-    try:
-        argv = shlex.split(command) + [title, body]
-        subprocess.run(  # noqa: S603 - owner-configured command, redacted args only
-            argv,
-            check=False,
-            capture_output=True,
-            timeout=5,
-        )
-        return True
-    except Exception:
-        return False
+    return os_notification_outcome(title, body) != "off"
 
 
 def notify_approval_pending(

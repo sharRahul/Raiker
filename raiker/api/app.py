@@ -544,7 +544,12 @@ def create_app(
     # is unset. The vault key remains fail-closed if neither is present.
     from raiker.auth.app_key import ensure_app_key
 
-    ensure_app_key(app.state.workspace_root)
+    # DEC-24 step 6 — a workspace whose key has gone missing still serves:
+    # every store read then answers 503 ``store_key_missing`` through the
+    # handler below, and the lock screen says what to restore, instead of the
+    # host failing to start with nothing on screen at all.
+    with suppress(StoreUnavailableError):
+        ensure_app_key(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
 

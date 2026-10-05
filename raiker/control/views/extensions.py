@@ -466,7 +466,7 @@ class ChannelRouteScope(TypedDict):
     thread_mapping: Literal["none", "one_conversation", "new_conversation_each_message"]
     #: Who may make a message start or steer work under this route.
     starts_work: Literal["nobody", "owner_only", "any_allowed_sender"]
-    bot_loop_protection: Literal["bot_messages_ignored", "rate_limit_only"]
+    bot_loop_protection: Literal["bot_messages_ignored", "echo_and_repeat_refused"]
     #: Where an answer goes: back in the response to the caller, or nowhere —
     #: it stays in Raiker's conversation.
     reply_path: Literal["returned_to_caller", "kept_in_raiker", "none"]

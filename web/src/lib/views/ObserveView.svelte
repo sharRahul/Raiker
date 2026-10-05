@@ -168,10 +168,17 @@
       bundle = await api.diagnosticsExport();
     } catch (error) {
       bundle = null;
+      // DEC-24 step 4 — the server checks its own redaction and refuses a
+      // bundle that still holds anything secret-shaped. Said as a refusal for
+      // the owner's protection, not as a fault, so nobody retries around it.
       bundleError =
-        error instanceof ApiError
-          ? `Could not build the support bundle (${error.status}).`
-          : "Could not build the support bundle.";
+        error instanceof ApiError && error.reasonCode === "support_export_blocked"
+          ? "Raiker did not build the support bundle: after redaction, something in it still " +
+            "looked like a secret, so nothing was produced to copy. Check Settings → Security for " +
+            "a credential stored where a name or label belongs."
+          : error instanceof ApiError
+            ? `Could not build the support bundle (${error.status}).`
+            : "Could not build the support bundle.";
     } finally {
       bundleBusy = false;
     }

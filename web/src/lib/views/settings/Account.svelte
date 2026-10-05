@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { auth, getToken, setToken, ApiError } from "../../api";
+  import type { AccountDeletionPreview } from "../../generated/apiContract";
 
   let {
     settings,
@@ -15,6 +17,65 @@
 
   let confirmingDelete = $state(false);
   let deletePassword = $state("");
+  let typedUsername = $state("");
+
+  /*
+   * DEC-10 step 8 — the confirmation said "sessions, settings and connector
+   * credentials" whatever the account held, and nothing about what it would
+   * not reach. It now shows the server's own count of what the delete removes
+   * (the same selections the purge sweeps by), what it leaves where it is,
+   * and asks for the username typed out: the password proves who is asking,
+   * the name proves which irreversible thing they meant.
+   */
+  let preview = $state<AccountDeletionPreview | null>(null);
+  let previewError = $state(false);
+  const confirmName = $derived(preview?.username || status.username);
+  const typedMatches = $derived(typedUsername === confirmName && confirmName !== "");
+  const REMOVES: { key: keyof AccountDeletionPreview; one: string; many: string }[] = [
+    { key: "conversations", one: "conversation", many: "conversations" },
+    { key: "tasks", one: "task or routine", many: "tasks and routines" },
+    { key: "projects", one: "project", many: "projects" },
+    { key: "memories", one: "memory", many: "memories" },
+    { key: "connector_credentials", one: "stored connector credential", many: "stored connector credentials" },
+    { key: "mcp_servers", one: "MCP server", many: "MCP servers" },
+  ];
+
+  async function beginDelete() {
+    confirmingDelete = true;
+    typedUsername = "";
+    previewError = false;
+    try {
+      preview = await auth.deletionPreview();
+    } catch {
+      preview = null;
+      previewError = true;
+    }
+  }
+
+  /*
+   * DEC-01 step 5 — the internal account ID, where support can ask for it.
+   * Every ordinary page names the owner by display name; this is the one place
+   * the key behind it is shown, folded away and explained, so the ID that once
+   * reached a model's answer as if it were a name is never mistaken for one.
+   */
+  let principalId = $state<string | null>(null);
+  let copied = $state(false);
+  onMount(() => {
+    void auth.sessionState().then(
+      (who) => (principalId = who.principal_id),
+      () => (principalId = null),
+    );
+  });
+  async function copyPrincipalId() {
+    if (!principalId) return;
+    try {
+      await navigator.clipboard.writeText(principalId);
+      copied = true;
+      setTimeout(() => (copied = false), 2000);
+    } catch {
+      copied = false;
+    }
+  }
   let busy = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -58,7 +119,7 @@
     try {
       const { token: elevated } = await auth.elevate(deletePassword);
       setToken(elevated);
-      await auth.deleteAccount();
+      await auth.deleteAccount(typedUsername);
       // Account gone — drop the session and return to the lock screen.
       setToken(null);
       window.location.reload();
@@ -120,17 +181,69 @@
   </label>
 </section>
 
+<section class="settings-card">
+  <details class="support" data-testid="account-support-details">
+    <summary>Support details</summary>
+    <p class="sub">
+      Raiker files and authorises your work under an internal account ID. It is not your name and
+      no ordinary page shows it — share it only if someone helping you with a problem asks for it.
+    </p>
+    {#if principalId}
+      <div class="id-row">
+        <code data-testid="account-principal-id">{principalId}</code>
+        <button type="button" class="btn btn-soft btn-sm" onclick={copyPrincipalId}>
+          {copied ? "Copied" : "Copy ID"}
+        </button>
+      </div>
+    {:else}
+      <p class="sub">The account ID could not be read just now.</p>
+    {/if}
+  </details>
+</section>
+
 <section class="card danger-zone">
   <h3>Delete account</h3>
   <p class="sub">
-    Permanently removes this account, its sessions, settings, and stored connector credentials.
-    This cannot be undone.
+    Permanently removes this account and everything Raiker keeps for it. This cannot be undone.
   </p>
   {#if !confirmingDelete}
-    <button type="button" class="btn btn-danger" onclick={() => (confirmingDelete = true)}>
+    <button type="button" class="btn btn-danger" onclick={beginDelete}>
       Delete my account
     </button>
   {:else}
+    <div class="impact" data-testid="account-deletion-impact">
+      {#if preview}
+        <h4>This removes</h4>
+        <ul>
+          {#each REMOVES as row (row.key)}
+            {@const count = Number(preview[row.key] ?? 0)}
+            <li>{count} {count === 1 ? row.one : row.many}</li>
+          {/each}
+          <li>Your settings, sign-in, devices and permissions</li>
+        </ul>
+        <h4>This does not remove</h4>
+        <ul>
+          {#each preview.kept as line (line)}<li>{line}</li>{/each}
+        </ul>
+      {:else if previewError}
+        <p class="sub" role="alert">
+          Raiker could not count what this would remove. Everything this account holds will be
+          deleted; reload to see the counts before you continue.
+        </p>
+      {:else}
+        <p class="sub">Counting what this removes…</p>
+      {/if}
+    </div>
+    <label>
+      <span>Type your username, <strong>{confirmName}</strong>, to confirm</span>
+      <input
+        class="settings-input"
+        bind:value={typedUsername}
+        autocomplete="off"
+        spellcheck="false"
+        disabled={busy}
+      />
+    </label>
     <label>
       Confirm your password
       <input
@@ -141,7 +254,7 @@
       />
     </label>
     <div class="actions">
-      <button type="button" class="btn btn-danger" disabled={busy || !deletePassword} onclick={deleteAccount}>
+      <button type="button" class="btn btn-danger" disabled={busy || !deletePassword || !typedMatches} onclick={deleteAccount}>
         {busy ? "Deleting account…" : "Permanently delete"}
       </button>
       {#if !busy}
@@ -184,4 +297,11 @@
     color: var(--text-2);
   }
   .deleting { margin: var(--space-2) 0 0; }
+  .support summary { cursor: pointer; font-weight: 650; }
+  .support .sub { margin: .5rem 0 0; max-width: 40rem; }
+  .id-row { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  .id-row code { background: var(--sunken); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: var(--text-sm); overflow-wrap: anywhere; padding: .3rem .5rem; }
+  .impact { margin-top: var(--space-3); }
+  .impact h4 { font-size: var(--text-sm); margin: var(--space-3) 0 .25rem; }
+  .impact ul { color: var(--text-2); font-size: var(--text-sm); margin: 0; padding-left: 1.2rem; }
 </style>

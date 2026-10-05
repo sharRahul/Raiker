@@ -64,9 +64,31 @@ def test_delete_account_requires_elevation_and_purges(client: TestClient) -> Non
     elevated = client.post(
         "/api/auth/elevate", json={"password": "right-pass-123"}, headers=_h(token)
     ).json()["token"]
-    assert client.delete("/api/account", headers=_h(elevated)).status_code == 200
+    # DEC-10 step 8 — the step-up is not enough on its own: the username has
+    # to be typed, and a different one is refused without deleting anything.
+    unconfirmed = client.delete("/api/account", headers=_h(elevated))
+    assert unconfirmed.status_code == 400
+    assert unconfirmed.json()["detail"]["reason_code"] == "account_delete_unconfirmed"
+    assert client.delete("/api/account?confirm=bob", headers=_h(elevated)).status_code == 400
+    assert client.get("/api/sessions", headers=_h(token)).status_code == 200
+    assert client.delete("/api/account?confirm=alice", headers=_h(elevated)).status_code == 200
     # account is gone: cannot log in
     assert (
         client.post("/api/auth/login", json={"username": "alice", "password": "right-pass-123"}).status_code
         == 401
     )
+
+
+def test_deletion_preview_counts_what_the_delete_removes(client: TestClient) -> None:
+    """DEC-10 step 8 — the confirmation shows the server's own counts and limits."""
+    token = _register(client)
+    preview = client.get("/api/account/deletion-preview", headers=_h(token))
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["username"] == "alice"
+    for key in ("conversations", "tasks", "projects", "memories", "connector_credentials", "mcp_servers"):
+        assert isinstance(body[key], int)
+    assert any("attached" in line for line in body["kept"])
+    assert any("provider" in line for line in body["kept"])
+    client.cookies.clear()
+    assert client.get("/api/account/deletion-preview").status_code == 401

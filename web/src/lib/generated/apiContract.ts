@@ -4,6 +4,18 @@
 
 import { call, request, withQuery } from "../api/core";
 
+/** What deleting this account removes and keeps, counted by the server (DEC-10 step 8). */
+export type AccountDeletionPreview = {
+  username: string;
+  conversations: number;
+  tasks: number;
+  projects: number;
+  memories: number;
+  connector_credentials: number;
+  mcp_servers: number;
+  kept: string[];
+};
+
 export type ActivateRuntimeModeRequest = {
   mode_name: string;
   reason?: string;
@@ -673,7 +685,7 @@ export type ChannelRouteScope = {
   mention_required: boolean;
   thread_mapping: "none" | "one_conversation" | "new_conversation_each_message";
   starts_work: "nobody" | "owner_only" | "any_allowed_sender";
-  bot_loop_protection: "bot_messages_ignored" | "rate_limit_only";
+  bot_loop_protection: "bot_messages_ignored" | "echo_and_repeat_refused";
   reply_path: "returned_to_caller" | "kept_in_raiker" | "none";
 };
 
@@ -2549,6 +2561,16 @@ export type McpOffer = {
   scope: McpScope;
 };
 
+/** A resume and the connection test it re-ran (DEC-15 step 12). */
+export type McpResumed = {
+  ok: boolean;
+  server_id: string;
+  monitor_state: "active" | "paused" | "killed";
+  check: "passed" | "failed";
+  check_reason: string | null;
+  pending: string[];
+};
+
 /** UX-MCP-02 — what adding or testing a server exposes, before it is done. */
 export type McpScope = {
   runs_on: "this_machine" | "remote";
@@ -2813,6 +2835,7 @@ export type MemoryIntegrity = {
   index_engine_mismatch_count: number;
   conversation_index_count: number;
   stale_conversation_index_count: number;
+  damaged_text_indexes: string[];
 };
 
 export type MemoryPinned = {
@@ -4553,6 +4576,8 @@ export type TaskView = {
   schedule_timezone: string | null;
   schedule_until: string | null;
   missed_run_policy: string | null;
+  delivery_state: string | null;
+  delivery_detail: string | null;
   phase: string;
 };
 
@@ -4601,6 +4626,13 @@ export type TelemetryExportRun = {
   destination: string;
   include_content?: boolean;
   cursor_event_id?: string;
+};
+
+/** Every text index recomputed from the rows that own its text. */
+export type TextIndexesRebuilt = {
+  ok: boolean;
+  indexed_rows: Record<string, number>;
+  damaged_text_indexes: string[];
 };
 
 export type ThreatModelAcknowledged = {
@@ -4940,8 +4972,10 @@ export type WorkThreadView = {
 
 /** One typed wrapper per verified operation, on the shared transport core. */
 export const contract = {
-  deleteAccount: () =>
-    call<Ok>("DELETE", "/api/account"),
+  deleteAccount: (query: { confirm?: string } = {}) =>
+    call<Ok>("DELETE", withQuery("/api/account", query)),
+  accountDeletionPreview: () =>
+    request<AccountDeletionPreview>("/api/account/deletion-preview"),
   listApprovals: (query: { status_filter?: string } = {}) =>
     request<ApprovalView[]>(withQuery("/api/approvals", query)),
   listResumableTurns: (query: { session_id?: string } = {}) =>
@@ -5251,7 +5285,7 @@ export const contract = {
   pauseMcpServer: (serverId: string, body?: ContainMcpServerRequest | null) =>
     call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`, { body }),
   resumeMcpServer: (serverId: string) =>
-    call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
+    call<McpResumed>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   approveMcpTools: (serverId: string, body: ApproveMcpToolsRequest) =>
@@ -5312,6 +5346,8 @@ export const contract = {
     call<RelationshipDecided>("POST", `/api/memory/relationship-proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
   getMemorySettings: () =>
     request<MemorySettingsView>("/api/memory/settings"),
+  rebuildTextIndexes: () =>
+    call<TextIndexesRebuilt>("POST", "/api/memory/text-indexes/rebuild"),
   forgetMemory: (memoryId: string) =>
     call<MemoryForgotten>("DELETE", `/api/memory/${encodeURIComponent(memoryId)}`),
   editMemory: (memoryId: string, body: Record<string, unknown>) =>

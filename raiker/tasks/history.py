@@ -86,6 +86,7 @@ _FALLBACK_DETAIL: dict[str, str] = {
     "task_started": "This cycle started.",
     "task_progress": "Progress recorded.",
     "task_paused": "Paused.",
+    "task_resumed": "Resumed.",
     "task_resume_started": "A granted approval is being replayed into this run.",
     "task_resume_blocked": "The continuation could not proceed.",
     "task_blocked": "Waiting for a decision.",

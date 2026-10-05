@@ -382,6 +382,10 @@ EVENT_TYPES = {
     "task_started",
     "task_progress",
     "task_paused",
+    # The owner resumed a paused task from the stop control. Written by the
+    # interrupt route since it existed, and never registered, so every resume
+    # refused with ``invalid_event_type`` before it reached the store.
+    "task_resumed",
     "task_cancelled",
     "task_completed",
     "task_failed",
@@ -1100,6 +1104,11 @@ class TaskRecord:
     #: Reset by a cycle that completes and by the owner continuing a routine
     #: this count paused.
     failed_cycles: int = 0
+    #: DEC-12 step 5 — whether the owner was told this background task ended:
+    #: ``delivered``, ``failed`` (``delivery_detail`` says what failed) or
+    #: ``None`` when no notice was owed. Separate from ``status`` on purpose.
+    delivery_state: str | None = None
+    delivery_detail: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

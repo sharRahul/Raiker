@@ -352,5 +352,7 @@ class TaskService:
             schedule_timezone=d.get("schedule_timezone"),
             schedule_until=d.get("schedule_until"),
             missed_run_policy=d.get("missed_run_policy"),
+            delivery_state=d.get("delivery_state"),
+            delivery_detail=d.get("delivery_detail"),
             phase=task_phase(str(d.get("status", "")), d.get("scheduled_at")),
         )

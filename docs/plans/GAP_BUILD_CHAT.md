@@ -914,7 +914,8 @@ boundary independently. Read [BUG-315/316 decision statements](TO_BE_FIXED.md#de
 for the unresolved choices; [DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen)
 for collaboration scope; and
 [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)
-for the recorded B20 policy. This addendum changes no completion stat
+for the recorded B20 policy. This addendum changes no completion status.
+
 ## Competitive completion contract — 2026-10-05
 
 **Decision.** Apply [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) to B/C acceptance without changing historical closure status. “Working tool” and “completed user task” are separate claims.
@@ -929,4 +930,3 @@ for the recorded B20 policy. This addendum changes no completion stat
 | Shared experience | User can start, approve, recover and find results without unnecessary re-prompts | CR-10/12: first-time-user observations plus keyboard/responsive/state-transition evidence |
 
 **Acceptance.** Run identical natural-language repository tasks against named Codex, Cursor and Claude Code configurations; use the Claude app only for labelled assistant journeys. Five clean trials per model-driven task/configuration, all failures retained, matched-model and native-product results separated. Do not equate the earlier predetermined edit replays with this requirement. Confirm results through the manual procedure and record them in LIVE_TEST_ROUNDS; no new run is asserted here.
-us.

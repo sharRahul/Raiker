@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from raiker.contracts.views import json_ready
 
@@ -277,6 +277,14 @@ class TaskCreateRequest(StrictModelRequest):
     timezone: str | None = None
     run_until: str | None = None
     missed_runs: Literal["run_once", "skip"] | None = None
+    # DEC-12 step 6 — the longest one run may take, in minutes. Omitted is the
+    # default limit, never "no limit".
+    max_run_minutes: int | None = Field(default=None, ge=1, le=720)
+
+
+class TaskRunLimitRequest(StrictModelRequest):
+    # DEC-12 step 6 — null restores the default limit.
+    max_run_minutes: int | None = Field(default=None, ge=1, le=720)
 
 
 class SetModelSelectionRequest(StrictModelRequest):
@@ -668,6 +676,12 @@ class ApproveMcpToolsRequest(StrictRequest):
     # DEC-15 step 10 — the held tools the owner accepts, by name. Only names
     # the server offers and holds are accepted; anything else is ignored.
     tools: list[str]
+
+
+class AcknowledgeHeldNotificationsRequest(StrictRequest):
+    # DEC-21a — the held notices the end-of-interval summary listed. Only the
+    # owner's own rows that quiet hours actually held are changed.
+    notification_ids: list[str]
 
 
 class BreachCheckRequest(StrictRequest):

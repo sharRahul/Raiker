@@ -10,7 +10,8 @@ turns off.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
@@ -23,9 +24,11 @@ from raiker.control.views.tasks import (
 )
 from raiker.events.writer import EventLogWriter
 from raiker.models.registry import ModelProfileRegistry
+from raiker.tasks.doctor import RoutineDoctor, routine_doctor
 from raiker.tasks.history import derive_attempts
 from raiker.tasks.lifecycle import task_phase
 from raiker.tasks.manager import TaskManager
+from raiker.tasks.run_limit import effective_minutes
 from raiker.tasks.schedule import schedule_terms
 
 if TYPE_CHECKING:
@@ -150,6 +153,7 @@ class TaskService:
         timezone: str | None = None,
         run_until: str | None = None,
         missed_runs: str | None = None,
+        max_run_minutes: int | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
 
@@ -302,7 +306,34 @@ class TaskService:
             schedule_until=terms.until,
             missed_run_policy=terms.missed_run_policy,
         )
+        if max_run_minutes is not None:
+            self.store.set_task_run_limit(task.task_id, max_run_minutes)
+            task = replace(task, max_run_minutes=max_run_minutes)
         return self._task_view(task)
+
+    def set_task_run_limit(
+        self: DashboardService, task_id: str, minutes: int | None, *, user_id: str | None
+    ) -> TaskView | None:
+        """DEC-12 step 6 — change one routine's run limit; ``None`` restores the default."""
+        record = self.store.load_task_for_user(task_id, user_id)
+        if record is None:
+            return None
+        self.store.set_task_run_limit(task_id, minutes)
+        return self._task_view(replace(record, max_run_minutes=minutes))
+
+    def task_doctor(
+        self: DashboardService, task_id: str, *, user_id: str | None, owner_principal_id: str
+    ) -> RoutineDoctor | None:
+        """DEC-12 step 8 — whether this routine will be able to run, from records only."""
+        record = self.store.load_task_for_user(task_id, user_id)
+        if record is None:
+            return None
+        return routine_doctor(
+            self.store,
+            record,
+            owner_principal_id=owner_principal_id,
+            workspace_root=Path(self.store.paths.workspace_root),
+        )
 
     def run_task_now(self: DashboardService, task_id: str, *, user_id: str | None) -> TaskView:
         """Schedule one visible, queued, unscheduled task for immediate claim."""
@@ -354,5 +385,6 @@ class TaskService:
             missed_run_policy=d.get("missed_run_policy"),
             delivery_state=d.get("delivery_state"),
             delivery_detail=d.get("delivery_detail"),
+            max_run_minutes=effective_minutes(d.get("max_run_minutes")),
             phase=task_phase(str(d.get("status", "")), d.get("scheduled_at")),
         )

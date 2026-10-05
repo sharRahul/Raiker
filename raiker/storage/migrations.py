@@ -4095,6 +4095,48 @@ ALTER TABLE tasks ADD COLUMN delivery_state TEXT;
 ALTER TABLE tasks ADD COLUMN delivery_detail TEXT;
 """
 
+# DEC-21a — whether a notice was put in front of the owner, per channel, kept
+# apart from whether they have read it. `interrupt`, `critical_exception`,
+# `quiet_hours` or `muted`, decided when the notice is written. Null for every
+# existing row on purpose: a notice written before quiet hours existed keeps
+# the behaviour it was written under. `quiet_until` is when the interval a held
+# notice waited for ends; `summarised_at` is when the one end-of-interval
+# summary that listed it was acknowledged, so no tab offers it again.
+NOTIFICATION_PRESENTATION_MIGRATION_ID = "RAIKER-2089-notification-presentation"
+
+NOTIFICATION_PRESENTATION_SQL = """
+ALTER TABLE notifications ADD COLUMN in_app_presentation TEXT;
+ALTER TABLE notifications ADD COLUMN desktop_presentation TEXT;
+ALTER TABLE notifications ADD COLUMN quiet_until TEXT;
+ALTER TABLE notifications ADD COLUMN summarised_at TEXT;
+"""
+
+# DEC-24 step 6 / BUG-322 — the last result of the host's search-index check,
+# one row per index (the three text indexes and the vector store). The check is
+# read-only and runs on the host tick, so a damaged index is named on the
+# attention list without anyone opening Diagnostics first. `first_damaged_at`
+# is when it was first seen damaged, so the owner is told once, not every tick.
+SEARCH_INDEX_HEALTH_MIGRATION_ID = "RAIKER-2090-search-index-health"
+
+SEARCH_INDEX_HEALTH_SQL = """
+CREATE TABLE IF NOT EXISTS search_index_health (
+  index_name TEXT PRIMARY KEY,
+  state TEXT NOT NULL,
+  damaged_count INTEGER NOT NULL DEFAULT 0,
+  checked_at TEXT NOT NULL,
+  first_damaged_at TEXT
+);
+"""
+
+# DEC-12 step 6 — the longest one run of a routine may take, in minutes. Null
+# reads as the default (`raiker.tasks.run_limit.DEFAULT_MAX_RUN_MINUTES`), so
+# every existing routine gets a bound without a value invented per row.
+TASK_RUN_LIMIT_MIGRATION_ID = "RAIKER-2091-task-run-limit"
+
+TASK_RUN_LIMIT_SQL = """
+ALTER TABLE tasks ADD COLUMN max_run_minutes INTEGER;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4329,6 +4371,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(MCP_APPROVED_TOOLS_MIGRATION_ID, MCP_APPROVED_TOOLS_SQL),
     Migration(TASK_FAILED_CYCLES_MIGRATION_ID, TASK_FAILED_CYCLES_SQL),
     Migration(TASK_DELIVERY_STATE_MIGRATION_ID, TASK_DELIVERY_STATE_SQL),
+    Migration(NOTIFICATION_PRESENTATION_MIGRATION_ID, NOTIFICATION_PRESENTATION_SQL),
+    Migration(SEARCH_INDEX_HEALTH_MIGRATION_ID, SEARCH_INDEX_HEALTH_SQL),
+    Migration(TASK_RUN_LIMIT_MIGRATION_ID, TASK_RUN_LIMIT_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

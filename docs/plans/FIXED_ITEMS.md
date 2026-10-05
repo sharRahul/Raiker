@@ -797,6 +797,19 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-773](#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | Fixed 2026-10-05 (closes BUG-321) |
 | [FIXED-774](#fixed-774--a-failed-resume-check-printed-its-reason-code) | Low | MCP | Fixed 2026-10-05 — found by the live round |
 | [FIXED-775](#fixed-775--the-deletion-confirmations-label-broke-into-three-lines) | Low | Account / layout | Fixed 2026-10-05 — found by the live round |
+| [FIXED-776](#fixed-776--quiet-hours-were-a-promise-nothing-could-keep) | Medium | Notifications | Fixed 2026-10-05 (DEC-21a) |
+| [FIXED-777](#fixed-777--nothing-could-break-quiet-hours-and-nothing-said-what-would) | Low | Notifications / security | Fixed 2026-10-05 (DEC-21a) |
+| [FIXED-778](#fixed-778--the-end-of-quiet-hours-would-have-replayed-the-night) | Low | Notifications | Fixed 2026-10-05 (DEC-21a) |
+| [FIXED-779](#fixed-779--every-kind-of-notice-interrupted-or-none-did) | Low | Notifications | Fixed 2026-10-05 (DEC-21 Notifications) |
+| [FIXED-780](#fixed-780--there-was-no-way-to-see-what-a-notice-would-do) | Low | Notifications | Fixed 2026-10-05 (DEC-21 Notifications) |
+| [FIXED-781](#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn) | Low | Notifications / layout | Fixed 2026-10-05 (closes BUG-320) |
+| [FIXED-782](#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other) | Low | Build / notifications | Fixed 2026-10-05 (closes BUG-317) |
+| [FIXED-783](#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold) | Low | Observability / search | Fixed 2026-10-05 (closes BUG-322; DEC-24 steps 1 and 6) |
+| [FIXED-784](#fixed-784--a-damaged-vector-was-skipped-in-silence) | Low | Memory / search | Fixed 2026-10-05 (DEC-24 step 6) |
+| [FIXED-785](#fixed-785--a-routine-failed-at-0300-for-reasons-already-true-at-1700) | Medium | Tasks | Fixed 2026-10-05 (DEC-12 step 8) |
+| [FIXED-786](#fixed-786--one-run-of-a-routine-had-no-time-limit) | Medium | Tasks / runtime | Fixed 2026-10-05 (DEC-12 step 6) |
+| [FIXED-787](#fixed-787--the-bell-counted-what-it-saw-when-the-page-opened) | Low | Notifications | Fixed 2026-10-05 — found by the live round |
+| [FIXED-788](#fixed-788--a-repair-on-the-overview-left-the-item-above-it-saying-damaged) | Low | Observability | Fixed 2026-10-05 — found by the live round |
 
 ---
 
@@ -30645,3 +30658,279 @@ stacked rows: the label is a grid, and the bold name became its own row.
 **Fixed.** The sentence is one span.
 
 **Evidence.** Capture 03 retaken.
+
+---
+
+## FIXED-776 — Quiet hours were a promise nothing could keep
+
+**Severity: Medium. Area: Notifications. Status: Fixed 2026-10-05. Implements
+DEC-21a, accepted by the owner on 2026-10-05.**
+
+**Observed.** Settings → Notifications had two switches and no quiet hours. The
+decision record names why a settings-only toggle would not have been one: the
+dock kept an in-memory set of what it had shown, so a second tab, a reload or a
+restart would have replayed the night's toasts at 07:01, and the owner's OS
+notice command had no notion of time at all.
+
+**Fixed.** One delivery policy, on the server (`raiker/notify/delivery_policy.py`),
+decided **when a notice is written** and stored on its row beside — never in
+place of — `read`: `in_app_presentation` and `desktop_presentation`
+(`interrupt`, `critical_exception`, `quiet_hours`, `muted`) and `quiet_until`
+(migration RAIKER-2089). Quiet hours are opt-in (`notification.quiet_hours.*`:
+enabled, start, end, IANA zone, defaulting to the account's own zone) and read
+on the owner's wall clock, so 22:00 is 22:00 either side of a clock change; a
+time inside a spring-forward gap resolves to the jump, a repeated autumn hour
+to its first occurrence. During the interval nothing interrupts — approvals,
+routine failures and security notices included — while the record, the bell,
+the approval queue and the page that raised something are unchanged. The dock,
+the browser's desktop alert, the floating approval card and the OS command
+(`RAIKER_OS_NOTIFY_CMD`, now `held` rather than run) all obey the stored
+decision. A save the policy cannot evaluate is refused with a worded reason
+(`invalid_quiet_hours_time`, `quiet_hours_empty`, …). An existing account
+upgrades with quiet hours off: nothing it relied on is suppressed.
+`GET /api/notifications/delivery` is the live state every tab reads.
+
+**Evidence.** `tests/test_notification_quiet_hours.py` (policy, both DST
+transitions, the account zone, refusals, the stored decision, the OS command
+held); `QuietHours.test.ts` (dock, approval card, Settings). Live captures 04–06
+in [`2026-10-05-quiet-hours-round/`](../screenshots/2026-10-05-quiet-hours-round):
+quiet hours on and *Quiet now, until …* read from the server, a test notice
+held, an approval notice and a paused routine held from the corner while the
+bell counts them and the record lists them.
+
+---
+
+## FIXED-777 — Nothing could break quiet hours, and nothing said what would
+
+**Severity: Low. Area: Notifications / security. Status: Fixed 2026-10-05.
+Implements DEC-21a's exception rule.**
+
+**Observed.** The decision allows exactly one exception: enumerated critical
+security and containment events, per channel, off by default, never decided by
+a model's wording.
+
+**Fixed.** `CRITICAL_KINDS` — `security_alert`, `anomaly`,
+`capability_contained`, `integrity_deviation` — is the kind a subsystem wrote,
+so a model that writes "URGENT" into a title changes nothing. Two switches,
+*Let security alerts through inside Raiker* and *… outside Raiker*, both off;
+each sets its own channel's presentation to `critical_exception`. A critical
+*approval* is a decision, not a security event, and stays held.
+
+**Evidence.** `test_critical_exceptions_are_per_channel_and_only_for_enumerated_kinds`.
+Live capture 07: with only the in-app exception on, a containment notice is
+docked (`critical_exception`) while its desktop channel stays `quiet_hours` and
+a paused routine written in the same minute stays held.
+
+---
+
+## FIXED-778 — The end of quiet hours would have replayed the night
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-05. Implements
+DEC-21a's end-of-interval summary.**
+
+**Observed.** The decision asks for one summary of still-relevant unread
+notices when the interval ends, offered once, rather than every toast again.
+
+**Fixed.** `held` in the delivery answer lists unread notices quiet hours held
+whose interval is over and that nobody has summarised; an approval notice
+whose approval is no longer pending is left out. The dock shows one card —
+*While quiet hours were on: N notices were held until 07:00* — with **Open
+notices** and **Later**; either posts
+`POST /api/notifications/held/acknowledge`, which stamps `summarised_at` on the
+server, so another tab or a reload does not offer it again. The notices stay
+unread: seeing that three things arrived is not reading them. Raiker hidden,
+the summary is one desktop notice, tagged so it replaces rather than stacks.
+
+**Evidence.** `test_the_summary_lists_what_is_still_relevant_once`;
+`QuietHours.test.ts`. Live capture 08: three notices written inside an interval
+that had ended; the summary lists the paused routine and not the approval whose
+approval was gone; **Later**, then a second tab and a reload show nothing, and
+the store shows the rows summarised and still unread.
+
+---
+
+## FIXED-779 — Every kind of notice interrupted, or none did
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-05. DEC-21
+Notifications: per-event delivery preferences.**
+
+**Observed.** The only choices were the two global switches. REM-SET-NOTIFY
+removed dummy per-channel toggles because nothing evaluated them; a policy now
+does.
+
+**Fixed.** *What interrupts you*: background work finished or paused, security
+findings and containment, extensions and MCP servers
+(`notification.interrupt.<category>`). A muted category is recorded as `muted`,
+counted by the bell and listed in the record. Decisions have no switch — work
+waits on them — and a test notice is never muted.
+
+**Evidence.** `test_a_muted_category_is_recorded_and_never_interrupts`. Live
+capture 09: three switches and none for approvals; an MCP notice written
+`muted` and not docked while a finished-task notice written the same minute is.
+
+---
+
+## FIXED-780 — There was no way to see what a notice would do
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-05. DEC-21
+Notifications: "route test and real delivery through the same outbox".**
+
+**Fixed.** **Send a test notice** (`POST /api/notifications/test`) writes a
+`test_notice` through `insert_notification` and the OS command exactly as a
+real notice goes, using what is saved, and says what happened to it: shown,
+recorded without interrupting, or *Sent and held: quiet hours are on until
+07:00*.
+
+**Evidence.** `test_the_test_notice_goes_through_the_same_policy`;
+`QuietHours.test.ts`. Live capture 05.
+
+---
+
+## FIXED-781 — A notice sat over Chat's newest prompt for a whole turn
+
+**Severity: Low. Area: Notifications / layout. Status: Fixed 2026-10-05.
+Closes [BUG-320](TO_BE_FIXED.md#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat).**
+
+**Fixed.** On Chat, Build and Design the dock shows a notice for six seconds
+and then folds it into the bell, which keeps counting it; pointing at it or
+focusing it holds it open. Elsewhere it stays until read, as before.
+
+**Evidence.** `QuietHours.test.ts` (folds on a work surface, stays elsewhere).
+Live captures 02 and 03: a notice over Chat, then the same Chat with the bell
+reading *1 unread* and nothing over the conversation.
+
+---
+
+## FIXED-782 — Build's decision was offered twice, one card over the other
+
+**Severity: Low. Area: Build / notifications. Status: Fixed 2026-10-05.
+Closes [BUG-317](TO_BE_FIXED.md#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build).**
+
+**Fixed.** A page showing a decision inline marks it (`use:shownInline`, Build's
+*Waiting on you*); the floating approval card leaves it alone while that
+element is on screen, and floats it again the moment the page is hidden.
+Nothing is deferred or resolved by it. The live round found the first version
+wrong: Chat and Build stay mounted, hidden, on other routes, so a mark alone
+kept the card off Home too; visibility is now read from the element itself.
+
+**Evidence.** `QuietHours.test.ts` (an inline decision is not floated, and is
+once its page is hidden). Live captures 17–18 (Build spec): a real
+Anthropic Build turn's shell command under *Waiting on you* with no card over
+it, and the same pending decision floating on Home.
+
+---
+
+## FIXED-783 — A damaged search index waited behind a closed fold
+
+**Severity: Low. Area: Observability / search. Status: Fixed 2026-10-05.
+Closes [BUG-322](TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold);
+DEC-24 steps 1 and 6.**
+
+**Fixed.** The host tick runs the read-only index check on its first pass and
+every five minutes (`search_index_check`) and records the answer per index
+(`search_index_health`, migration RAIKER-2090). `GET /api/diagnostics` carries
+it as `search_indexes`; Observability's *Needs your attention* names a damaged
+index as blocking — *Conversation search is damaged* — with **Rebuild it**, a
+link that opens the detail with the repair in view. The first check that finds
+an index damaged tells the owner once (`search_index_damaged`); every rebuild
+re-runs the check.
+
+**Evidence.** `tests/test_search_index_health.py`; `observeAttention.test.ts`.
+Live captures 10–11: a conversation index damaged on disk, found by the host's
+own check, on the attention list; the link opening the repair in place; the
+rebuild passing and the item gone.
+
+---
+
+## FIXED-784 — A damaged vector was skipped in silence
+
+**Severity: Low. Area: Memory / search. Status: Fixed 2026-10-05. Closes DEC-24
+step 6's "vector index corruption triggers a rebuildable degraded state".**
+
+**Observed.** Recall skipped a stored vector it could not parse, so the memory
+behind it stopped being found by meaning and nothing said so.
+
+**Fixed.** `damaged_vector_ids()` asks the store's JSON functions for vectors
+that are not an array of their own dimensions; the integrity report counts
+them, the host check records them, and Diagnostics offers **Remove damaged
+vectors** (`POST /api/memory/vectors/remove-damaged`). Removal deletes the
+vectors and their links only; the memories become *not yet indexed*, which the
+Memory engine's index action finishes with the owner's provider. Nothing is
+embedded on the owner's behalf.
+
+**Evidence.** `tests/test_search_index_health.py`; `DiagnosticsView.test.ts`.
+Live captures 12–13: two mangled vectors named and removed; the store shows
+both memories intact and waiting to be indexed.
+
+---
+
+## FIXED-785 — A routine failed at 03:00 for reasons already true at 17:00
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-10-05. Closes DEC-12 step 8.**
+
+**Fixed.** **Will it run?** on a scheduled task asks
+`GET /api/tasks/{id}/doctor`, which reads records only — the scheduler's pass
+record and whether the host is paused, the schedule's terms and next run, the
+clock it reads, the stored model check, whether quiet hours will hold its
+notice, its run limit and failure count — and answers each `ok`, `warn`,
+`blocked` or `unknown` with a link to where it is fixed. Nothing is sent to a
+provider and nothing is started; an answer that could not be read is
+*unknown*, never fine. With no model chosen anywhere it says so — **Will not
+run** — rather than naming the registry's placeholder (found by the live round).
+
+**Evidence.** `tests/test_routine_run_limit_and_doctor.py`;
+`RoutineCheck.test.ts`. Live captures 14–15 at 1440 and 390 wide.
+
+---
+
+## FIXED-786 — One run of a routine had no time limit
+
+**Severity: Medium. Area: Tasks / runtime. Status: Fixed 2026-10-05. Closes
+DEC-12 step 6's maximum runtime.**
+
+**Fixed.** `tasks.max_run_minutes` (migration RAIKER-2091; null is the default
+of 60 minutes, bounded 1–720) is set at creation or with
+`PUT /api/tasks/{id}/run-limit`. At the limit the scheduler asks the turn to
+stop at its next safe boundary through the owner's own Stop control
+(`run_time_limit`), waits two minutes for it, then abandons the wait; the run is
+recorded as stopped by its limit and counts towards FIXED-757's three failed
+cycles. The doctor says the limit and **Will it run?** edits it.
+
+**Evidence.** `tests/test_routine_run_limit_and_doctor.py` (inside the limit,
+a stop requested at the boundary, a stuck turn abandoned, the scheduler's
+record). Live capture 14: the limit changed to 30 minutes and read back after
+a reload. A run reaching its limit was not driven live — a Haiku turn does not
+last a minute — so that path is test evidence only.
+
+---
+
+## FIXED-787 — The bell counted what it saw when the page opened
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-05 — found by this
+round's live run.**
+
+**Observed.** The dock re-read notices every thirty seconds; the bell read them
+once on mount and then only when something announced a change. A notice that
+arrived later was docked and not counted — and a notice folded into the bell
+(FIXED-781) folded into a bell that did not count it.
+
+**Fixed.** The dock's poll announces when the unread set changes, and the bell
+re-reads then.
+
+**Evidence.** `QuietHours.test.ts`; live capture 03.
+
+---
+
+## FIXED-788 — A repair on the Overview left the item above it saying damaged
+
+**Severity: Low. Area: Observability. Status: Fixed 2026-10-05 — found by this
+round's live run.**
+
+**Observed.** After **Rebuild search indexes** inside *Runtime health, in
+detail*, the attention list above still named the index damaged until the page
+was reloaded: the Overview read its records once.
+
+**Fixed.** A repair raises `raiker:runtime-health-changed` and the Overview
+re-reads.
+
+**Evidence.** `DiagnosticsView.test.ts`; live round scenario 8.

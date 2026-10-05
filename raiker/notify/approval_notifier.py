@@ -48,7 +48,7 @@ def notify_integrity_deviation(store: SQLiteStore, principal_id: str, count: int
         title=title,
         body=body,
     )
-    fire_os_notification(title, body)
+    fire_os_notification(title, body, store=store, notification_id=notification_id)
     dispatch_notification_hook(
         store,
         owner_principal_id=principal_id,
@@ -75,17 +75,37 @@ def resolve_owner_principal_id(
     return store.original_account_principal_id()
 
 
-def os_notification_outcome(title: str, body: str) -> str:
+def os_notification_outcome(
+    title: str,
+    body: str,
+    *,
+    store: SQLiteStore | None = None,
+    notification_id: str | None = None,
+) -> str:
     """Run the owner-configured OS notice hook and say how it went.
 
     ``off`` when ``RAIKER_OS_NOTIFY_CMD`` is unset, ``sent`` when the command
     ran and exited 0, ``failed`` when it could not be started, timed out or
     exited non-zero. Never raises. DEC-12 step 5 reads the answer, so a
     routine's delivery state can say the desktop notice did not arrive.
+
+    DEC-21a — ``held`` when the notice it mirrors was decided not to interrupt
+    on the desktop channel (quiet hours, or a category the owner muted). The
+    command is a desktop alert like any other, so it obeys the same stored
+    decision the browser's does; the notice itself is in Raiker regardless.
     """
     command = os.environ.get(OS_NOTIFY_ENV, "").strip()
     if not command:
         return "off"
+    if store is not None and notification_id is not None:
+        from raiker.notify.delivery_policy import interrupts
+
+        try:
+            presentation = store.notification_desktop_presentation(notification_id)
+        except Exception:  # noqa: BLE001 - an unreadable decision falls back to alerting
+            presentation = None
+        if not interrupts(presentation):
+            return "held"
     try:
         argv = shlex.split(command) + [title, body]
         completed = subprocess.run(  # noqa: S603 - owner-configured command, redacted args only
@@ -99,14 +119,22 @@ def os_notification_outcome(title: str, body: str) -> str:
     return "sent" if completed.returncode == 0 else "failed"
 
 
-def fire_os_notification(title: str, body: str) -> bool:
+def fire_os_notification(
+    title: str,
+    body: str,
+    *,
+    store: SQLiteStore | None = None,
+    notification_id: str | None = None,
+) -> bool:
     """Best-effort OS-level notification via the owner-configured hook.
 
     Returns True only if the configured command was launched. Off (returns False)
-    when ``RAIKER_OS_NOTIFY_CMD`` is unset. Never raises — a hook failure must not
-    affect the approval flow.
+    when ``RAIKER_OS_NOTIFY_CMD`` is unset or the notice was held (DEC-21a).
+    Never raises — a hook failure must not affect the approval flow.
     """
-    return os_notification_outcome(title, body) != "off"
+    return os_notification_outcome(
+        title, body, store=store, notification_id=notification_id
+    ) not in {"off", "held"}
 
 
 def notify_approval_pending(
@@ -141,7 +169,7 @@ def notify_approval_pending(
     )
     # Best-effort OS-level push. Isolated: a failure here never affects the row
     # above or the parked turn.
-    fire_os_notification(title, body)
+    fire_os_notification(title, body, store=store, notification_id=notification_id)
     dispatch_notification_hook(
         store,
         owner_principal_id=owner_principal_id,
@@ -188,7 +216,7 @@ def notify_critical_approval_pending(
         body=body,
         subject_id=approval_id,
     )
-    fire_os_notification(title, body)
+    fire_os_notification(title, body, store=store, notification_id=notification_id)
     dispatch_notification_hook(
         store,
         owner_principal_id=owner_principal_id,

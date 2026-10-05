@@ -1109,6 +1109,9 @@ class TaskRecord:
     #: ``None`` when no notice was owed. Separate from ``status`` on purpose.
     delivery_state: str | None = None
     delivery_detail: str | None = None
+    #: DEC-12 step 6 — the longest one run may take, in minutes; ``None`` is
+    #: the default bound (``raiker.tasks.run_limit``), never "unbounded".
+    max_run_minutes: int | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

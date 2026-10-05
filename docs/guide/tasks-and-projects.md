@@ -150,6 +150,22 @@ command you configured failed — the task still reads as what it was, *complete
 or *failed*, with **Delivery failed** and why beside it. Raiker never re-runs
 work because its notice did not arrive.
 
+**Will it run?** A scheduled or repeating task has a **Will it run?** button. It
+answers before the run rather than after it, from what Raiker has on record:
+whether the scheduler is running (or Raiker is paused), the routine's next run
+and the clock it is read on, whether its model passed its last check, whether
+quiet hours will hold its notice, and its limits. Each line reads *Fine*,
+*Check*, *Will not run* or *Unknown*, with **Fix it** where something in Raiker
+fixes it. It sends nothing to a provider and starts nothing — and a fact it could
+not read is *Unknown*, never fine.
+
+**One run has a time limit.** Each run of a routine is stopped after an hour
+unless you set its own limit, from 1 to 720 minutes, under **Will it run?**. At
+the limit the run is asked to stop at its next safe point, the same way **Stop**
+asks — a step already under way finishes and is recorded — and the run is
+recorded as stopped by its limit. It counts as a run that did not complete, so a
+routine that always overruns is paused after three, like one that always fails.
+
 ### One lifecycle, and what each part of it lets you press
 
 Every task is in one of these phases, served by the runtime with the task, and
@@ -356,6 +372,30 @@ silently does nothing.
 
 Every notice is recorded in **Observability → Notifications** whether or not
 either switch showed it, so turning both off loses nothing.
+
+**Quiet hours** are off until you turn them on. Choose when they start and end;
+they are read on your own time zone's clock (the one in **General**), so 22:00 is
+22:00 on both sides of a clock change. While they are on, nothing interrupts you
+— not an approval, not a routine that stopped, not a security notice. Everything
+is still recorded, the bell still counts it, and work that needs a decision
+waits for one in **Approvals**. When they end you get one summary of what is
+still unread — *While quiet hours were on: 3 notices were held* — not every
+notice again, and it is offered once, whichever tab or device you open next.
+
+The only way through is an **exception** you turn on: *Let security alerts
+through*, inside Raiker, outside it, or both. Both start off. It covers security
+findings and containment — a capability or server Raiker has stopped — and
+nothing else; what a model writes in a notice can never make it urgent.
+
+**What interrupts you** lets you stop a kind of notice from appearing in the
+corner and on the desktop at any time of day — background work, security
+findings and containment, or extensions and MCP servers. It is still recorded and
+counted. Decisions have no such switch: work is waiting on them.
+
+**Send a test notice** sends one through exactly the path a real notice takes,
+using what is saved, and says what happened to it — shown now, or held until
+quiet hours end. The desktop notification command you may have configured
+(`RAIKER_OS_NOTIFY_CMD`) follows the same rules.
 
 **Only work you were not watching notifies.** An ordinary Chat turn is a task
 too, and a banner behind an answer you are reading is noise, so those are

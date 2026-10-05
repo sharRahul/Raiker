@@ -22,6 +22,7 @@ from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.memory import (
     ConversationIndexRebuilt,
+    DamagedVectorsRemoved,
     EmbeddingBackendSet,
     EmbeddingIndexBuilt,
     GistDiscarded,
@@ -358,6 +359,18 @@ async def rebuild_text_indexes(
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(TextIndexesRebuilt, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/vectors/remove-damaged")
+async def remove_damaged_vectors(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """DEC-24 step 6 — remove vectors that cannot be read, so they can be indexed again."""
+    result = _service(request).remove_damaged_vectors(auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer = cast(DamagedVectorsRemoved, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

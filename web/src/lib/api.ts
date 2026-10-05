@@ -129,6 +129,7 @@ export const api = {
   // DEC-24 step 6 — every text index at once: the repair for one SQLite reports
   // as damaged, where a drifted count only needed the conversation rebuild.
   rebuildTextIndexes: () => contract.rebuildTextIndexes(),
+  removeDamagedVectors: () => contract.removeDamagedVectors(),
   models: () => contract.getModels(),
   weeklyModelUsage: (refreshNative = false) =>
     contract.getWeeklyModelUsage(refreshNative ? { refresh_native: true } : {}),
@@ -311,6 +312,10 @@ export const api = {
     contract.approveMcpTools(serverId, { tools }),
   notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) => contract.markNotificationRead(id),
+  notificationDelivery: () => contract.notificationDelivery(),
+  acknowledgeHeldNotifications: (notificationIds: string[]) =>
+    contract.acknowledgeHeldNotifications({ notification_ids: notificationIds }),
+  sendTestNotice: () => contract.sendTestNotice(),
   standingGrants: (includeInactive = true) =>
     contract.listStandingGrants({ include_inactive: includeInactive }),
   createStandingGrant: (body: CreateStandingGrantRequest) => contract.createStandingGrant(body),
@@ -924,6 +929,9 @@ export const api = {
   // Home's deduplicated rows, Build's task panel and the Stop control's honest
   // "refresh to see the run's current state" all point here.
   taskDetail: (taskId: string) => contract.getTaskDetail(taskId),
+  taskDoctor: (taskId: string) => contract.taskDoctor(taskId),
+  setTaskRunLimit: (taskId: string, maxRunMinutes: number | null) =>
+    contract.setTaskRunLimit(taskId, { max_run_minutes: maxRunMinutes }),
   createTask: (body: TaskCreateRequest) => contract.createTask(body),
   // BUG-64 — creation alone does not execute model-proposed work. This is the
   // owner's separate, explicit intent to make one parked task due now.

@@ -53,6 +53,23 @@
         "title": "AccountDeletionPreview",
         "type": "object"
       },
+      "AcknowledgeHeldNotificationsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "notification_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notification Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "notification_ids"
+        ],
+        "title": "AcknowledgeHeldNotificationsRequest",
+        "type": "object"
+      },
       "ActivateRuntimeModeRequest": {
         "properties": {
           "as_principal": {
@@ -7374,6 +7391,30 @@
         "title": "CriticalApprovalResolved",
         "type": "object"
       },
+      "DamagedVectorsRemoved": {
+        "description": "Damaged vectors removed; the memories behind them are waiting to be indexed again.",
+        "properties": {
+          "damaged_vector_count": {
+            "title": "Damaged Vector Count",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "removed",
+          "damaged_vector_count"
+        ],
+        "title": "DamagedVectorsRemoved",
+        "type": "object"
+      },
       "DecisionProblem": {
         "properties": {
           "reason_code": {
@@ -7718,6 +7759,14 @@
             "title": "Scope Note",
             "type": "string"
           },
+          "search_indexes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SearchIndexHealth"
+            },
+            "title": "Search Indexes",
+            "type": "array"
+          },
           "summary": {
             "additionalProperties": true,
             "title": "Summary",
@@ -7776,6 +7825,52 @@
           }
         },
         "title": "DisableRuntimeModeRequest",
+        "type": "object"
+      },
+      "DoctorCheck": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warn",
+              "blocked",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "state",
+          "detail",
+          "href"
+        ],
+        "title": "DoctorCheck",
         "type": "object"
       },
       "EffectiveChoice": {
@@ -9623,6 +9718,19 @@
           "connection_ceiling"
         ],
         "title": "HealthView",
+        "type": "object"
+      },
+      "HeldNotificationsAcknowledged": {
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "acknowledged"
+        ],
+        "title": "HeldNotificationsAcknowledged",
         "type": "object"
       },
       "HfDownloadPreview": {
@@ -11699,6 +11807,29 @@
           "url"
         ],
         "title": "InstanceCreated",
+        "type": "object"
+      },
+      "InterruptCategory": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "interrupts": {
+            "title": "Interrupts",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "label",
+          "interrupts"
+        ],
+        "title": "InterruptCategory",
         "type": "object"
       },
       "InterruptRequest": {
@@ -14315,6 +14446,10 @@
             "title": "Damaged Text Indexes",
             "type": "array"
           },
+          "damaged_vector_count": {
+            "title": "Damaged Vector Count",
+            "type": "integer"
+          },
           "failed_purge_location_count": {
             "title": "Failed Purge Location Count",
             "type": "integer"
@@ -14381,7 +14516,8 @@
           "index_engine_mismatch_count",
           "conversation_index_count",
           "stale_conversation_index_count",
-          "damaged_text_indexes"
+          "damaged_text_indexes",
+          "damaged_vector_count"
         ],
         "title": "MemoryIntegrity",
         "type": "object"
@@ -16944,6 +17080,40 @@
         "title": "NextAction",
         "type": "object"
       },
+      "NotificationDelivery": {
+        "description": "The one delivery policy, as every tab and alert reads it.",
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptCategory"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "decisions_interrupt": {
+            "title": "Decisions Interrupt",
+            "type": "boolean"
+          },
+          "held": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationView"
+            },
+            "title": "Held",
+            "type": "array"
+          },
+          "quiet_hours": {
+            "$ref": "#/components/schemas/QuietHoursState"
+          }
+        },
+        "required": [
+          "quiet_hours",
+          "decisions_interrupt",
+          "categories",
+          "held"
+        ],
+        "title": "NotificationDelivery",
+        "type": "object"
+      },
       "NotificationView": {
         "description": "Owner-scoped view of one notification (Phase C). Redacted human-readable\ncopy only; ``finding_id`` / ``subject_id`` link back to what raised it.",
         "properties": {
@@ -16954,6 +17124,18 @@
           "created_at": {
             "title": "Created At",
             "type": "string"
+          },
+          "desktop_presentation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Desktop Presentation"
           },
           "finding_id": {
             "anyOf": [
@@ -16966,6 +17148,18 @@
             ],
             "title": "Finding Id"
           },
+          "in_app_presentation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In App Presentation"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -16973,6 +17167,18 @@
           "notification_id": {
             "title": "Notification Id",
             "type": "string"
+          },
+          "quiet_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Quiet Until"
           },
           "read": {
             "title": "Read",
@@ -16988,6 +17194,18 @@
               }
             ],
             "title": "Subject Id"
+          },
+          "summarised_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Summarised At"
           },
           "title": {
             "title": "Title",
@@ -19625,6 +19843,74 @@
         "title": "ProviderWeeklyUsage",
         "type": "object"
       },
+      "QuietHoursState": {
+        "description": "The owner's quiet-hours terms and where the clock is now, decided server-side.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "critical_desktop": {
+            "title": "Critical Desktop",
+            "type": "boolean"
+          },
+          "critical_in_app": {
+            "title": "Critical In App",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "next_starts_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Starts At"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled",
+          "start",
+          "end",
+          "timezone",
+          "active",
+          "ends_at",
+          "next_starts_at",
+          "critical_in_app",
+          "critical_desktop"
+        ],
+        "title": "QuietHoursState",
+        "type": "object"
+      },
       "ReadCapabilities": {
         "properties": {
           "administrative_surfaces": {
@@ -20420,6 +20706,43 @@
         "title": "RevertImageRequest",
         "type": "object"
       },
+      "RoutineDoctor": {
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DoctorCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "warn",
+              "blocked",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "state",
+          "checked_at",
+          "checks"
+        ],
+        "title": "RoutineDoctor",
+        "type": "object"
+      },
       "RuntimeModeActivated": {
         "properties": {
           "mode_name": {
@@ -20549,6 +20872,56 @@
           }
         },
         "title": "SaveProjectContextRequest",
+        "type": "object"
+      },
+      "SearchIndexHealth": {
+        "description": "One search index as the host's last check found it (BUG-322, DEC-24 step 6).",
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "damaged_count": {
+            "title": "Damaged Count",
+            "type": "integer"
+          },
+          "first_damaged_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Damaged At"
+          },
+          "index_name": {
+            "title": "Index Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "damaged"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index_name",
+          "label",
+          "state",
+          "damaged_count",
+          "checked_at",
+          "first_damaged_at"
+        ],
+        "title": "SearchIndexHealth",
         "type": "object"
       },
       "SecurityFindingView": {
@@ -22828,6 +23201,19 @@
             "title": "Description",
             "type": "string"
           },
+          "max_run_minutes": {
+            "anyOf": [
+              {
+                "maximum": 720.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Run Minutes"
+          },
           "missed_runs": {
             "anyOf": [
               {
@@ -23117,6 +23503,26 @@
         "title": "TaskResumed",
         "type": "object"
       },
+      "TaskRunLimitRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "max_run_minutes": {
+            "anyOf": [
+              {
+                "maximum": 720.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Run Minutes"
+          }
+        },
+        "title": "TaskRunLimitRequest",
+        "type": "object"
+      },
       "TaskView": {
         "properties": {
           "attachments": {
@@ -23182,6 +23588,11 @@
             ],
             "default": null,
             "title": "Delivery State"
+          },
+          "max_run_minutes": {
+            "default": 60,
+            "title": "Max Run Minutes",
+            "type": "integer"
           },
           "missed_run_policy": {
             "anyOf": [
@@ -23635,6 +24046,19 @@
           "destination"
         ],
         "title": "TelemetryExportRun",
+        "type": "object"
+      },
+      "TestNoticeSent": {
+        "description": "A test notice, written through the same policy as a real one.",
+        "properties": {
+          "notification": {
+            "$ref": "#/components/schemas/NotificationView"
+          }
+        },
+        "required": [
+          "notification"
+        ],
+        "title": "TestNoticeSent",
         "type": "object"
       },
       "TextIndexesRebuilt": {
@@ -32562,6 +32986,25 @@
         "summary": "Rebuild Text Indexes"
       }
     },
+    "/api/memory/vectors/remove-damaged": {
+      "post": {
+        "description": "DEC-24 step 6 — remove vectors that cannot be read, so they can be indexed again.",
+        "operationId": "remove_damaged_vectors_api_memory_vectors_remove_damaged_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DamagedVectorsRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove Damaged Vectors"
+      }
+    },
     "/api/memory/{memory_id}": {
       "delete": {
         "description": "Forget a memory through the governed path (human-only).",
@@ -34637,6 +35080,83 @@
           }
         },
         "summary": "List Notifications"
+      }
+    },
+    "/api/notifications/delivery": {
+      "get": {
+        "description": "DEC-21a — whether notices may interrupt now, and what quiet hours held.\n\nEvery tab, the approval card and the desktop alert read this one answer, so\ntwo tabs cannot disagree about whether it is quiet.",
+        "operationId": "notification_delivery_api_notifications_delivery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDelivery"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Notification Delivery"
+      }
+    },
+    "/api/notifications/held/acknowledge": {
+      "post": {
+        "description": "DEC-21a — the end-of-interval summary was seen; it is not offered again.\n\nThe notices stay unread: seeing that three things arrived is not reading them.",
+        "operationId": "acknowledge_held_notifications_api_notifications_held_acknowledge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcknowledgeHeldNotificationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeldNotificationsAcknowledged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge Held Notifications"
+      }
+    },
+    "/api/notifications/test": {
+      "post": {
+        "description": "DEC-21 — a test notice through the same record and policy as a real one.",
+        "operationId": "send_test_notice_api_notifications_test_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestNoticeSent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Send Test Notice"
       }
     },
     "/api/notifications/{notification_id}/read": {
@@ -38365,6 +38885,46 @@
         "summary": "Get Task Detail"
       }
     },
+    "/api/tasks/{task_id}/doctor": {
+      "get": {
+        "description": "DEC-12 step 8 — whether this routine will be able to run, read from records.\n\nNothing is sent to a provider and nothing is started: the answer comes from\nthe scheduler's pass record, the stored model check, the schedule's terms\nand the owner's delivery policy.",
+        "operationId": "task_doctor_api_tasks__task_id__doctor_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineDoctor"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Task Doctor"
+      }
+    },
     "/api/tasks/{task_id}/resume": {
       "post": {
         "description": "Continue one parked scheduled run whose approval has been granted (BUG-25).\n\nThe scheduler already does this on its own tick; this is the owner saying\n\"try that again\" when automatic continuation could not proceed — a browser\ntab won the claim, the host was down when the decision landed, the\ncontinuation threw. It runs exactly the same code path, so it can never\ncontinue something the automatic pass would have refused, and exactly-once\nis still the store's atomic claim rather than anything added here.",
@@ -38443,6 +39003,56 @@
           }
         },
         "summary": "Run Task"
+      }
+    },
+    "/api/tasks/{task_id}/run-limit": {
+      "put": {
+        "description": "DEC-12 step 6 — how long one run of this routine may take.",
+        "operationId": "set_task_run_limit_api_tasks__task_id__run_limit_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskRunLimitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Task Run Limit"
       }
     },
     "/api/telemetry/destinations": {

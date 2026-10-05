@@ -41,6 +41,10 @@ _LOG = logging.getLogger(__name__)
 #: How long a host-tick pass waits before sweeping again, in seconds.
 TICK_SECONDS = 15.0
 
+#: BUG-322 — the search-index check runs on the first tick and then every this
+#: many ticks (five minutes). It is read-only, but it reads every index.
+INDEX_CHECK_EVERY_TICKS = 20
+
 
 class InstanceRuntime:
     """The background services of one workspace, started and stopped together.
@@ -97,7 +101,14 @@ class InstanceRuntime:
         from raiker.tasks.scheduler import TaskScheduler
 
         scheduler = TaskScheduler(self.workspace_root)
+        ticks = 0
         while not self._stop.is_set():
+            # BUG-322 — a damaged search index was named only when somebody
+            # opened Diagnostics. Checked here, it reaches the attention list
+            # and, the first time, the owner.
+            if ticks % INDEX_CHECK_EVERY_TICKS == 0:
+                await self._contained("search_index_check", asyncio.to_thread(self._check_indexes))
+            ticks += 1
             await self._contained("scheduled_tasks", scheduler.run_due())
             # Continuing approved work is a separate pass from starting due
             # work, and it is contained separately: a continuation that
@@ -117,6 +128,13 @@ class InstanceRuntime:
             await self._contained("local_model_watch", self._watch_local_models())
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=TICK_SECONDS)
+
+    def _check_indexes(self) -> None:
+        from raiker.notify.index_notifier import notify_search_index_damaged
+
+        store = SQLiteStore(self.workspace_root)
+        for damaged in store.check_search_indexes():
+            notify_search_index_damaged(store, damaged["index_name"], int(damaged["damaged_count"]))
 
     async def _watch_local_models(self) -> None:
         from raiker.models.local_watch import recheck_local_selections

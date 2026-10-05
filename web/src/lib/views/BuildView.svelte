@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shownInline } from "../inlineDecisions.svelte";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
   import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
@@ -2232,7 +2233,7 @@
             it already had. Each decision below reports afterwards whether it was applied or only recorded.
           </p>
           {#each review.approvals as approval (approval.approval_id)}
-            <div class="decision">
+            <div class="decision" use:shownInline={approval.approval_id}>
               <div class="decision-head">
                 <span class="decision-title">{humanize(approval.tool_name)}</span>
                 <Badge variant={approvalBadge(approval.status)} label={`${approval.risk_level} risk`} />

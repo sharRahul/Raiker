@@ -20,6 +20,10 @@ function notice(kind: string): RaikerNotification {
     subject_id: null,
     read: false,
     created_at: "2026-09-28T00:00:00Z",
+    in_app_presentation: null,
+    desktop_presentation: null,
+    quiet_until: null,
+    summarised_at: null,
   };
 }
 

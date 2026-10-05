@@ -41,6 +41,7 @@ from raiker.control.views.security import (
     DiagnosticsView,
     ModelProfileSource,
     ProviderHealthView,
+    SearchIndexHealth,
 )
 from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
@@ -60,6 +61,7 @@ from raiker.models.registry import ModelProfileRegistry, profile_with_model, res
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.models.tool_projection import ALWAYS_PROJECTED, DEFERRABLE_TOOL_NAMES
+from raiker.notify.index_notifier import INDEX_LABELS
 from raiker.runtime.executors.tier2_image import declared_image_models
 from raiker.runtime.model_facts_store import ModelFactsStore
 
@@ -1713,6 +1715,13 @@ class ModelService:
             provider_health=provider_health,
             background_workers=tuple(
                 cast(BackgroundWorkerHealth, row) for row in self.store.list_background_worker_health()
+            ),
+            search_indexes=tuple(
+                cast(
+                    SearchIndexHealth,
+                    {**row, "label": INDEX_LABELS.get(str(row["index_name"]), str(row["index_name"]))},
+                )
+                for row in self.store.list_search_index_health()
             ),
             model_profile_source=cast(
                 ModelProfileSource, resolve_builtin_config("config/model-profiles.json").as_dict()

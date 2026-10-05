@@ -5,6 +5,7 @@ containment and health, the vault, and the environment a turn sees."""
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -222,6 +223,23 @@ def _notification_read(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return f"/api/notifications/{first(client, h, '/api/notifications', 'notification_id')}/read"
 
 
+def _held_acknowledge(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """DEC-21a — a notice quiet hours held, acknowledged by the summary."""
+    settings = client.get("/api/settings", headers=h).json()["settings"]
+    quiet = {
+        "notification.quiet_hours.enabled": True,
+        "notification.quiet_hours.start": "22:00",
+        "notification.quiet_hours.end": "07:00",
+        "notification.quiet_hours.timezone": "UTC",
+    }
+    client.put("/api/settings", json={"settings": {**settings, **quiet}}, headers=h)
+    notification_id = SQLiteStore(ws).insert_notification(
+        principal_id=OWNER, kind="task_finished", title="Done", body="It ran.",
+        now=datetime(2026, 1, 1, 23, 30, tzinfo=UTC),
+    )
+    return "/api/notifications/held/acknowledge", {"notification_ids": [notification_id]}
+
+
 def _no_vault_key(monkeypatch: Any) -> None:
     monkeypatch.delenv("RAIKER_CONNECTOR_VAULT_KEY", raising=False)
 
@@ -275,6 +293,9 @@ CASES: Cases = {
         _on_destination("/export"), _fake_collector
     ),
     ("POST", "/api/notifications/{notification_id}/read"): _notification_read,
+    ("GET", "/api/notifications/delivery"): plain("/api/notifications/delivery"),
+    ("POST", "/api/notifications/held/acknowledge"): _held_acknowledge,
+    ("POST", "/api/notifications/test"): plain("/api/notifications/test"),
     ("GET", "/api/security/containment"): plain("/api/security/containment"),
     ("POST", "/api/security/containment/{capability}/{subject_id}/{action}"): plain(
         "/api/security/containment/connector/github/pause"

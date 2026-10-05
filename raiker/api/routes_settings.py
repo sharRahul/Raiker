@@ -26,6 +26,7 @@ from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ContractValidationError, normalize_approval_mode
 from raiker.hooks.contracts import HookInput
 from raiker.hooks.factory import dispatcher_for_workspace
+from raiker.notify.delivery_policy import validate as validate_notification_settings
 from raiker.runtime.identity.presentation import resolve_presentation_identity
 from raiker.storage.sqlite import SQLiteStore
 
@@ -176,6 +177,15 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="invalid_speech_language",
+        )
+    # DEC-21a — quiet hours and interrupt preferences are policy the server
+    # evaluates on every notice, so a value it cannot evaluate is refused here
+    # rather than stored and silently read as the default.
+    notification_refusal = validate_notification_settings(body.settings)
+    if notification_refusal is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=notification_refusal,
         )
     stored = _load(ws, principal.principal_id)
     # BUG-256 — the `voice` section has two editors: the Voice settings section

@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**361 operations: 350 verified, 0 eligible, 0 deferred, 11 special.**
+**367 operations: 356 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -207,6 +207,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/memory/relationship-proposals/{candidate_id}/decision` | dict | RelationshipDecided | verified | declared by cast |
 | GET | `/api/memory/settings` |  | MemorySettingsView | verified | DashboardService.get_memory_settings |
 | POST | `/api/memory/text-indexes/rebuild` |  | TextIndexesRebuilt | verified | declared by cast |
+| POST | `/api/memory/vectors/remove-damaged` |  | DamagedVectorsRemoved | verified | declared by cast |
 | DELETE | `/api/memory/{memory_id}` |  | MemoryForgotten | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}` | dict | MemoryUpdated | verified | declared by cast |
 | PUT | `/api/memory/{memory_id}/archive` | dict | MemoryArchived | verified | declared by cast |
@@ -262,6 +263,9 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | verified | DashboardService.list_provider_models |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
+| GET | `/api/notifications/delivery` |  | NotificationDelivery | verified | declared NotificationDelivery |
+| POST | `/api/notifications/held/acknowledge` | AcknowledgeHeldNotificationsRequest | HeldNotificationsAcknowledged | verified | declared HeldNotificationsAcknowledged |
+| POST | `/api/notifications/test` |  | TestNoticeSent | verified | declared TestNoticeSent |
 | POST | `/api/notifications/{notification_id}/read` |  | Ok | verified | built as Ok |
 | POST | `/api/ollama/pull` | OllamaPullRequestBody | ModelOperationView | verified | ModelOperationService.start |
 | GET | `/api/plugins` |  | PluginsView | verified | DashboardService.list_plugins |
@@ -358,8 +362,10 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
 | POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | DashboardService.create_task |
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
+| GET | `/api/tasks/{task_id}/doctor` |  | RoutineDoctor | verified | declared RoutineDoctor |
 | POST | `/api/tasks/{task_id}/resume` |  | TaskResumed | verified | declared TaskResumed |
 | POST | `/api/tasks/{task_id}/run` |  | TaskView | verified | DashboardService.run_task_now |
+| PUT | `/api/tasks/{task_id}/run-limit` | TaskRunLimitRequest | TaskView | verified | DashboardService.set_task_run_limit |
 | GET | `/api/telemetry/destinations` |  | TelemetryDestinationView[] | verified | declared TelemetryDestinationView[] |
 | POST | `/api/telemetry/destinations` | CreateTelemetryDestinationRequest | TelemetryDestinationCreated | verified | declared TelemetryDestinationCreated |
 | DELETE | `/api/telemetry/destinations/{destination_id}` |  | TelemetryDestinationDeleted | verified | declared TelemetryDestinationDeleted |

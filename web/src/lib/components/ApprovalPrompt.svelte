@@ -27,6 +27,8 @@
   import type { ApprovalView } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
+  import { decisionsInterrupt, watchDelivery } from "../deliveryPolicy.svelte";
+  import { inlineDecisions, shownInlineNow } from "../inlineDecisions.svelte";
   import { humanize } from "../format";
   import { watchLayout } from "../layoutWatch";
   import Icon from "./Icon.svelte";
@@ -57,7 +59,28 @@
     return () => window.removeEventListener("hashchange", follow);
   });
   const onApprovals = $derived(hash.startsWith("#/approvals"));
-  const queue = $derived(pending.filter((item) => !deferred.includes(item.approval_id)));
+  // BUG-317 — a decision the page is already showing inline (Build's *Waiting
+  // on you*) is not repeated in a card over the end of it.
+  // Re-read after the route has rendered: a page that stays mounted is only
+  // hidden or shown once the hash change has been applied.
+  let rendered = $state(0);
+  $effect(() => {
+    void hash;
+    const timer = setTimeout(() => (rendered += 1), 50);
+    return () => clearTimeout(timer);
+  });
+  const queue = $derived.by(() => {
+    void inlineDecisions.version;
+    void rendered;
+    return pending.filter(
+      (item) => !deferred.includes(item.approval_id) && !shownInlineNow(item.approval_id),
+    );
+  });
+  // DEC-21a — during quiet hours a decision waits in the queue, the bell and
+  // the page that raised it; it does not float over whatever is on screen or
+  // raise a desktop alert. Work still waits — muting is not deciding.
+  $effect(() => watchDelivery());
+  const quiet = $derived(!decisionsInterrupt());
   const current = $derived(queue[0] ?? null);
 
   async function poll() {
@@ -91,6 +114,13 @@
   let announced = new Set<string>();
 
   function announce(items: ApprovalView[]) {
+    if (!decisionsInterrupt()) {
+      // Held for quiet hours: recorded as announced so the end of the
+      // interval does not replay them one banner at a time. The bell and the
+      // notices' own summary say what arrived.
+      for (const item of items) announced.add(item.approval_id);
+      return;
+    }
     if (!raikerIsHidden()) {
       // Visible: nothing to announce, but record what the owner can see so
       // hiding the tab afterwards does not alert about it.
@@ -222,7 +252,7 @@
   });
 </script>
 
-{#if current !== null && !onApprovals}
+{#if current !== null && !onApprovals && !quiet}
   <section
     class="approval-prompt"
     aria-label="Approval needed"

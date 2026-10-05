@@ -3,6 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import { applyUiPrefs } from "../prefs.svelte";
+  import { announceDeliveryChanged } from "../deliveryPolicy.svelte";
   import { guardUnload, registerLeaveGuard } from "../leaveGuard";
   import General from "./settings/General.svelte";
   import Notification from "./settings/Notification.svelte";
@@ -80,6 +81,15 @@
     return changed;
   }
 
+  /** Refusals the server words by code, so the page can say which value it could not use. */
+  const SAVE_REFUSALS: Record<string, string> = {
+    invalid_quiet_hours_time: "Quiet hours need a start and an end written as a time of day.",
+    quiet_hours_empty: "Quiet hours cannot start and end at the same time.",
+    invalid_quiet_hours_timezone: "Quiet hours name a time zone Raiker does not recognise.",
+    invalid_quiet_hours_switch: "A quiet-hours switch was not on or off.",
+    invalid_interrupt_switch: "An interrupt switch was not on or off.",
+  };
+
   function save(patch: Record<string, unknown>) {
     settings = { ...settings, ...patch };
     for (const key of Object.keys(patch)) keySection[key] = active;
@@ -132,6 +142,9 @@
       serverSettings = snapshot;
       saveDetail = null;
       applyUiPrefs(snapshot);
+      // DEC-21a — quiet hours are evaluated on the server; tell the dock and
+      // the approval card to re-read them now rather than at their next tick.
+      announceDeliveryChanged();
       recomputeDirty();
       // "All changes saved" is a claim about now, not about the request. If the
       // owner changed something while it was out, the page is dirty again and
@@ -148,8 +161,9 @@
       recomputeDirty();
       saveState = "error";
       const kept = Object.keys(madeDuringSave).length > 0;
+      const worded = e instanceof ApiError && e.reasonCode ? SAVE_REFUSALS[e.reasonCode] : undefined;
       saveDetail =
-        (e instanceof ApiError ? `Couldn't save (${e.status}).` : "Couldn't save.") +
+        (worded ?? (e instanceof ApiError ? `Couldn't save (${e.status}).` : "Couldn't save.")) +
         (kept
           ? " The rejected changes were rolled back; what you changed while it was saving is still unsaved."
           : " Your change was rolled back.");

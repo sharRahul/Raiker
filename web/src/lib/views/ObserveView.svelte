@@ -22,7 +22,7 @@
   import TelemetryExport from "../components/TelemetryExport.svelte";
   import { api, ApiError } from "../api";
   import { digestEvents } from "../auditDigest";
-  import { allClearSentence, attentionItems } from "../observeAttention";
+  import { allClearSentence, attentionItems, RUNTIME_HEALTH_CHANGED } from "../observeAttention";
   import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
@@ -122,6 +122,31 @@
       notifications === null ? null : notifications.filter((n) => !n.read).length,
   });
   const attention = $derived(attentionItems(attentionInputs));
+
+  // BUG-322 — a link to a damaged index's repair (the attention item, the
+  // notice) opens the detail it lives in and brings the repair into view,
+  // instead of leaving the owner to find it behind a closed fold.
+  let address = $state(typeof window !== "undefined" ? window.location.hash : "");
+  $effect(() => {
+    const follow = () => (address = window.location.hash);
+    window.addEventListener("hashchange", follow);
+    return () => window.removeEventListener("hashchange", follow);
+  });
+  const repairOpen = $derived(address.includes("repair=indexes"));
+  // A repair made in the detail below changes what the attention list above
+  // reports; re-read rather than keep saying the index is damaged.
+  $effect(() => {
+    const reread = () => void load();
+    window.addEventListener(RUNTIME_HEALTH_CHANGED, reread);
+    return () => window.removeEventListener(RUNTIME_HEALTH_CHANGED, reread);
+  });
+  $effect(() => {
+    if (!repairOpen || diagnostics === null) return;
+    const timer = setTimeout(() => {
+      document.getElementById("diag-memory-h")?.scrollIntoView({ block: "start" });
+    }, 200);
+    return () => clearTimeout(timer);
+  });
 
   function selectTab(next: string) {
     window.location.hash = `#/observe?tab=${encodeURIComponent(next)}`;
@@ -416,7 +441,7 @@
            a healthy install does not have to scroll past them. What its
            failures mean for the owner is already in the attention list above,
            read from the same records. -->
-      <details class="specialist">
+      <details class="specialist" open={repairOpen} id="runtime-health-detail">
         <summary>
           <span>
             <strong>Runtime health, in detail</strong>

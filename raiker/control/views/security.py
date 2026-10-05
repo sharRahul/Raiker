@@ -40,6 +40,54 @@ class NotificationView(View):
     subject_id: str | None
     read: bool
     created_at: str
+    #: DEC-21a — whether it was put in front of the owner, per channel, decided
+    #: when it was written: ``interrupt``, ``critical_exception``,
+    #: ``quiet_hours`` or ``muted``. ``None`` for a notice older than the
+    #: policy, which interrupted.
+    in_app_presentation: str | None = None
+    desktop_presentation: str | None = None
+    #: When the quiet interval a held notice waited for ends.
+    quiet_until: str | None = None
+    #: When the end-of-interval summary that listed it was acknowledged.
+    summarised_at: str | None = None
+
+
+class QuietHoursState(TypedDict):
+    """The owner's quiet-hours terms and where the clock is now, decided server-side."""
+
+    enabled: bool
+    #: Local wall-clock times, ``HH:MM``.
+    start: str
+    end: str
+    #: The IANA zone the interval is read in.
+    timezone: str
+    #: True when the interval is in force right now.
+    active: bool
+    #: When the current interval ends (UTC), or ``None`` outside one.
+    ends_at: str | None
+    #: When the next interval starts (UTC), or ``None`` when off or active.
+    next_starts_at: str | None
+    critical_in_app: bool
+    critical_desktop: bool
+
+
+class InterruptCategory(TypedDict):
+    category: str
+    label: str
+    interrupts: bool
+
+
+class NotificationDelivery(TypedDict):
+    """The one delivery policy, as every tab and alert reads it."""
+
+    quiet_hours: QuietHoursState
+    #: Whether a decision (an approval) may interrupt right now. Approvals
+    #: cannot be muted outside quiet hours.
+    decisions_interrupt: bool
+    categories: list[InterruptCategory]
+    #: Notices quiet hours held whose interval is over and which still want the
+    #: owner — the end-of-interval summary, offered once.
+    held: list[NotificationView]
 
 
 @dataclass(frozen=True)
@@ -66,6 +114,19 @@ class CheckpointCaptureHealth(TypedDict):
     display_path: str | None
     checked_at: str
     remediation: str
+
+
+class SearchIndexHealth(TypedDict):
+    """One search index as the host's last check found it (BUG-322, DEC-24 step 6)."""
+
+    index_name: str
+    #: What the index is to the owner — "Memory search", "Search by meaning".
+    label: str
+    state: Literal["ok", "damaged"]
+    #: For the vector store, how many vectors could not be read; 1 for a text index.
+    damaged_count: int
+    checked_at: str
+    first_damaged_at: str | None
 
 
 class BackgroundWorkerHealth(TypedDict):
@@ -106,6 +167,9 @@ class DiagnosticsView(View):
     # when it last threw, the exception *class* it threw, and how many times in
     # a row, so a pass that fails every fifteen seconds is visible.
     background_workers: tuple[BackgroundWorkerHealth, ...] = ()
+    # BUG-322 — the host tick's last search-index check, damaged first. Empty
+    # until the first check runs, which is the first tick after start.
+    search_indexes: tuple[SearchIndexHealth, ...] = ()
     # GCR-45 — which file the built-in model registry was actually read from,
     # independent of the working directory the host was launched from.
     model_profile_source: ModelProfileSource = field(

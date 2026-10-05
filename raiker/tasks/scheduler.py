@@ -19,18 +19,20 @@ owner. Nothing is resumed on the strength of what was true when it parked.
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Mapping
+from collections.abc import Coroutine, Mapping
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import NotRequired
+from typing import Any, NotRequired
 
 from typing_extensions import TypedDict
 
 from raiker.app.host import HostControl
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
+    AgentResponse,
     ClientMetadata,
     PromptEnvelope,
     PromptOptions,
@@ -47,6 +49,12 @@ from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+from raiker.tasks.run_limit import (
+    STOP_GRACE_SECONDS,
+    STOP_REASON,
+    effective_minutes,
+    stopped_message,
+)
 from raiker.tasks.schedule import (
     RECURRING_INTERVALS,
     format_instant,
@@ -207,7 +215,7 @@ class TaskScheduler:
             )
         except Exception:  # noqa: BLE001 — a notice must not fail the delivery pass
             return
-        fire_os_notification(title, body)
+        fire_os_notification(title, body, store=self.store, notification_id=notification_id)
         dispatch_notification_hook(
             self.store,
             owner_principal_id=owner,
@@ -471,6 +479,39 @@ class TaskScheduler:
                     )
         return len(tasks)
 
+    async def _within_limit(
+        self,
+        submission: Coroutine[Any, Any, AgentResponse],
+        *,
+        seconds: float,
+        session_id: str,
+        principal_id: str,
+        grace_seconds: float = STOP_GRACE_SECONDS,
+    ) -> tuple[AgentResponse | None, bool]:
+        """Run one governed turn for at most ``seconds``. Returns ``(response, overran)``.
+
+        Overrunning requests a stop at the turn's next safe boundary and waits
+        :data:`STOP_GRACE_SECONDS` for it; a turn that has still not stopped is
+        abandoned rather than awaited for ever. ``overran`` is true either way:
+        the limit, not the turn, ended this run.
+        """
+        running = asyncio.ensure_future(submission)
+        try:
+            return await asyncio.wait_for(asyncio.shield(running), timeout=seconds), False
+        except TimeoutError:
+            pass
+        with suppress(Exception):
+            self.store.request_turn_stop(session_id, principal_id, reason=STOP_REASON)
+        try:
+            await asyncio.wait_for(asyncio.shield(running), timeout=grace_seconds)
+        except TimeoutError:
+            running.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await running
+        except Exception:  # noqa: BLE001 — the limit is the outcome recorded
+            pass
+        return None, True
+
     async def _run_claimed_task(self, task: TaskRecord) -> None:
         """One claimed task's governed cycle, from its owner to its outcome."""
         principal_id = task.session_id.removeprefix("sess_inbox_")
@@ -500,7 +541,7 @@ class TaskScheduler:
         TaskManager(self.store, EventLogWriter(self.store)).mark_task_started(
             task.task_id, trigger="schedule"
         )
-        response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
+        submission = AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
             PromptEnvelope(
                 request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
                 client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
@@ -522,6 +563,17 @@ class TaskScheduler:
                 ),
             )
         )
+        # DEC-12 step 6 — one run is bounded. At the limit the turn is asked to
+        # stop at its next safe boundary, the way the owner's Stop asks.
+        minutes = effective_minutes(task.max_run_minutes)
+        response, overran = await self._within_limit(
+            submission, seconds=minutes * 60, session_id=run_session_id, principal_id=principal_id
+        )
+        if overran:
+            manager = TaskManager(self.store, EventLogWriter(self.store))
+            self._land_outcome(manager, task.task_id, "failed", stopped_message(minutes))
+            return
+        assert response is not None
         manager = TaskManager(self.store, EventLogWriter(self.store))
         # A user may have stopped the task while its governed turn was
         # reaching a safe boundary; `_land_outcome` re-reads the task and

@@ -91,6 +91,7 @@ export const DIAGNOSTICS: Diagnostics = {
   missing_config: [],
   provider_health: [],
   background_workers: [],
+  search_indexes: [],
   model_profile_source: { kind: "packaged", location: "raiker.config/model-profiles.json" },
   scope_note: "Status reflects the local single-user runtime only.",
 };
@@ -228,6 +229,7 @@ export function taskView(over: Partial<TaskView> = {}): TaskView {
     missed_run_policy: null,
     delivery_state: null,
     delivery_detail: null,
+    max_run_minutes: 60,
     // Empty, so `taskPhase` derives the phase from the status a test sets
     // rather than reading a default that disagrees with it.
     phase: "",

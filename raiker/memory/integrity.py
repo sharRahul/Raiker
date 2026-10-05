@@ -42,11 +42,16 @@ class MemoryIntegrityReport:
     #: search through it fails on. Both are repaired by a rebuild, and neither
     #: is a reason to touch the rows the index was built from.
     damaged_text_indexes: tuple[str, ...] = ()
+    #: DEC-24 step 6 — stored vectors that are not an array of their own
+    #: dimensions. Retrieval skips them, so the memories behind them are not
+    #: found by meaning; removing them lets the index action embed them again.
+    damaged_vector_count: int = 0
 
     @property
     def clean(self) -> bool:
         return not any((
             self.damaged_text_indexes,
+            self.damaged_vector_count,
             self.index_engine_mismatch_count,
             self.stale_fts_count,
             self.stale_conversation_index_count,
@@ -163,4 +168,5 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         conversation_index_count=conversation_index_count,
         stale_conversation_index_count=abs(indexable_turn_rows - conversation_index_count),
         damaged_text_indexes=damaged,
+        damaged_vector_count=len(store.damaged_vector_ids()),
     )

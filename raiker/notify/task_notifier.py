@@ -118,7 +118,9 @@ def notify_task_finished(
         return None
     # DEC-12 step 5 — the notice in Raiker is the delivery; the desktop notice
     # the owner configured is a second one, and its failure is said too.
-    desktop = os_notification_outcome(title, body)
+    desktop = os_notification_outcome(
+        title, body, store=store, notification_id=notification_id
+    )
     if desktop == "failed":
         _record_delivery(
             store, task.task_id, "failed",
@@ -175,7 +177,7 @@ def notify_routine_paused(store: SQLiteStore, task: TaskRecord, *, failures: int
         )
     except Exception:  # noqa: BLE001 - a notice must not fail the task
         return None
-    fire_os_notification(title, body)
+    fire_os_notification(title, body, store=store, notification_id=notification_id)
     dispatch_notification_hook(
         store,
         owner_principal_id=owner,

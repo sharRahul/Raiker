@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 
 from raiker.contracts.ids import new_id, utc_now
+from raiker.notify.delivery_policy import PresentationDecision, instant
+from raiker.notify.delivery_policy import decide as decide_presentation
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -152,16 +154,24 @@ class MonitoringStore:
         body: str,
         finding_id: str | None = None,
         subject_id: str | None = None,
+        now: datetime | None = None,
     ) -> str:
         """Persist one owner-facing notification. ``title`` / ``body`` are already
         redacted human-readable copy (never a raw payload or token). Owner-scoped
-        by ``principal_id``; shared across sources (findings + containment)."""
+        by ``principal_id``; shared across sources (findings + containment).
+
+        DEC-21a — whether it may interrupt is decided here, once, by the owner's
+        delivery policy, and stored beside it. The row is written either way:
+        quiet hours suppress presentation, never the record."""
         notification_id = new_id("ntf_")
+        moment = now or datetime.now(UTC)
+        decision = self.notification_presentation_for(principal_id, kind, moment)
         self._execute(
             """INSERT INTO notifications
                (notification_id, principal_id, kind, title, body, finding_id,
-                subject_id, read, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                subject_id, read, created_at, in_app_presentation,
+                desktop_presentation, quiet_until)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
             (
                 notification_id,
                 principal_id,
@@ -170,10 +180,96 @@ class MonitoringStore:
                 body,
                 finding_id,
                 subject_id,
-                utc_now(),
+                instant(moment),
+                decision.in_app,
+                decision.desktop,
+                decision.quiet_until,
             ),
         )
         return notification_id
+
+    def notification_settings(self: SQLiteStore, principal_id: str) -> tuple[dict[str, Any], str]:
+        """The owner's settings and the zone their clock reads in.
+
+        An unreadable settings row reads as no settings — the defaults, which
+        never suppress anything — because a notice must not be lost to a
+        preference nobody can read.
+        """
+        from raiker.runtime.environment import resolve_timezone
+
+        try:
+            row = self.get_user_settings(principal_id)
+            parsed = json.loads(row["settings_json"]) if row is not None else {}
+        except Exception:  # noqa: BLE001 - an unreadable preference never hides a notice
+            parsed = {}
+        settings = parsed if isinstance(parsed, dict) else {}
+        zone, _source = resolve_timezone(settings=settings)
+        return settings, zone
+
+    def notification_presentation_for(
+        self: SQLiteStore, principal_id: str, kind: str, now: datetime
+    ) -> PresentationDecision:
+        settings, zone = self.notification_settings(principal_id)
+        return decide_presentation(settings, kind=kind, now=now, fallback_zone=zone)
+
+    def notification_desktop_presentation(self: SQLiteStore, notification_id: str) -> str | None:
+        """How the desktop channel was decided for one notice (DEC-21a)."""
+        row = self._row(
+            "SELECT desktop_presentation FROM notifications WHERE notification_id = ?",
+            (notification_id,),
+        )
+        return None if row is None else row["desktop_presentation"]
+
+    def held_notifications(
+        self: SQLiteStore, principal_id: str, *, now: datetime | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """Notices quiet hours held whose interval is over, still unread and unsummarised.
+
+        DEC-21a's end-of-interval summary. An approval notice whose approval has
+        been answered since is no longer relevant and is left out: the summary
+        lists what still wants the owner, not a replay of the night.
+        """
+        moment = instant(now or datetime.now(UTC))
+        rows = self._rows(
+            """SELECT n.* FROM notifications n
+               WHERE n.principal_id = ? AND n.read = 0 AND n.summarised_at IS NULL
+                 AND n.in_app_presentation = 'quiet_hours'
+                 AND n.quiet_until IS NOT NULL AND n.quiet_until <= ?
+                 AND NOT (
+                   n.kind IN ('approval_pending', 'critical_approval_pending')
+                   AND n.subject_id IS NOT NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM approvals a
+                     WHERE a.approval_id = n.subject_id AND a.status = 'pending'
+                   )
+                 )
+               ORDER BY n.created_at DESC, n.rowid DESC LIMIT ?""",
+            (principal_id, moment, int(limit)),
+        )
+        return [dict(row) for row in rows]
+
+    def acknowledge_held_notifications(
+        self: SQLiteStore, principal_id: str, notification_ids: list[str]
+    ) -> int:
+        """Mark the summary that listed these as seen. They stay unread.
+
+        Owner-scoped, and only rows quiet hours actually held: an id from
+        another owner, or a notice that interrupted, changes nothing.
+        """
+        if not notification_ids:
+            return 0
+        stamp = utc_now()
+        changed = 0
+        with self.connect() as connection:
+            for notification_id in notification_ids[:500]:
+                cursor = connection.execute(
+                    """UPDATE notifications SET summarised_at = ?
+                       WHERE notification_id = ? AND principal_id = ?
+                         AND in_app_presentation = 'quiet_hours' AND summarised_at IS NULL""",
+                    (stamp, notification_id, principal_id),
+                )
+                changed += cursor.rowcount
+        return changed
 
     def list_notifications(
         self: SQLiteStore, principal_id: str, *, unread_only: bool = False, limit: int = 100

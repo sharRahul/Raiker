@@ -89,7 +89,11 @@ Use **Observability** when you need evidence rather than a summary:
   also docked at the top right, except where the page already says it: an
   approval notice is not shown on **Approvals**, a finished-run notice is not
   shown on **Tasks**, and arriving on either marks that notice read. Nothing is
-  docked on this tab, where every notice is already a row.
+  docked on this tab, where every notice is already a row. On **Chat**, **Build**
+  and **Design** a notice is shown for a few seconds and then folds into the
+  bell, so it never sits over the conversation; point at it to keep it open.
+  Quiet hours and the *What interrupts you* switches decide which notices are
+  docked at all — see [Being told when background work ends](tasks-and-projects.md#being-told-when-background-work-ends).
 
 **Overview** answers the whole of "is this instance in a state I can work in",
 in the order that question is actually asked. What needs you comes first, then
@@ -103,9 +107,7 @@ runtime's own monitors recorded, the memory integrity report and the one repair
 it offers, the background passes the host runs on its own, and any readiness
 check that actually failed, with its reason code and remediation. When one of
 those does have something to say, it is already named in **Needs your
-attention** above — you do not have to open it to find out. (One exception
-today: a damaged search index is named only inside the disclosure —
-[BUG-322](../plans/TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold).)
+attention** above — you do not have to open it to find out.
 
 **A damaged search index is a state with a repair.** The memory integrity report
 asks SQLite to check the three text indexes behind memory, conversation and file
@@ -113,6 +115,21 @@ search. One it reports as damaged — every search through it fails — is named
 with the sentence that matters most: your conversations, memories and files are
 not affected, because an index is rebuilt from them. **Rebuild search indexes**
 recomputes all three and re-runs the check, so *repaired* is a measurement.
+
+You do not have to open the report to find out. The host checks every search
+index on its own — when it starts and every five minutes after — and a damaged
+one is on **Needs your attention** as *Conversation search is damaged*, with
+**Rebuild it** opening this detail with the repair in view. The first time a
+check finds an index damaged you also get one notice saying so; a repair clears
+the item at once.
+
+**Search by meaning has its own repair.** A memory's vector is computed from its
+text, and a vector the disk has mangled — not a list of the size it says it is —
+was simply skipped, so that memory stopped being found by meaning. The report
+now counts them as *Damaged vectors*. **Remove damaged vectors** deletes only
+those vectors; the memories are untouched and wait to be indexed again by
+**Settings → Memory engine** with the embedding model you chose. Raiker does not
+send their text anywhere on its own.
 
 **The support bundle is checked after it is redacted.** Raiker re-reads the
 redacted bundle before it shows it: a secret-named field must read redacted, and

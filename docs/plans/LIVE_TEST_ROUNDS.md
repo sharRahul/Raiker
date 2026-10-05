@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-05 (third) | Targeted | `2026-10-05-quiet-hours-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and proposing a Build shell command, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — the owner's DEC-21a quiet hours (policy, exceptions, summary), DEC-21's per-category switches and test notice, BUG-317/320's dock, BUG-322 and DEC-24 step 6's index and vector damage, and DEC-12 steps 6 and 8. FIXED-776 to FIXED-788 |
 | 2026-10-05 (second) | Targeted | `2026-10-05-readiness-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a local Python MCP sample; a generic webhook channel | Ten more decision-record steps from the release-readiness review — DEC-24 steps 4 and 6, DEC-12 steps 5 and 7, DEC-15 step 12, DEC-01 step 5, DEC-10 step 8, DEC-14 step 9 and DEC-25's last path (FIXED-762 to FIXED-773). Proved live: a real Anthropic answer; **the internal account ID folded away on Account** and **a deletion confirmation counting what goes and what stays**, refusing a mistyped name and deleting on the typed one; **Stop on a parent cancelling its child and grandchild**; a completed task reading **Delivery failed** beside its outcome; **a damaged conversation index named and rebuilt**; **an MCP server that broke while paused staying paused on Resume**, at 390 wide with no overflow; **a webhook sender's third identical message refused as a loop**; the support bundle passing its own check; a gzip body answered **415**; Asia/Kolkata offered; and **a workspace with its key moved aside refusing to mint a new one**, then opening once the key was back. **Two defects found and fixed** — a resume failure printed its code, and the deletion label broke into three rows; the work found every resume through the stop control refusing (FIXED-765); BUG-322 filed |
 | 2026-10-05 | Targeted | `2026-10-05-readiness-decisions-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a routine run by the host on a workspace with no model chosen | Ten decision-record steps from the release-readiness review — DEC-25's provider and slow-sender bounds, DEC-15 step 10 for MCP servers, DEC-09 step 5, DEC-21 (General, Web access), DEC-12 step 6 and DEC-24 step 1 (FIXED-750 to FIXED-759). Proved live: **a routine paused by the host after three failed cycles** with its reason and a notice, and Continue re-arming it; a time zone's UTC offset; **an unsaved Settings edit kept when the owner chose to stay**; a Web access check naming the rule and its list; **an MCP server edited to add a tool and reword another, both held until accepted**, the block at 390 wide with no overflow; a real Anthropic answer through the bounded stream; a slow sender answered **408 after 30 s**; and a quiet background pass reading *not running*. **Two defects found and fixed** — a paused routine printed its last slot as *next* without a reason, and the purpose line was taken from a held tool; one harness defect fixed (the Chat check matched the prompt); BUG-320 and BUG-321 filed |
 | 2026-10-04 | Targeted | `2026-10-04-ollama-readiness-round/` | Ollama served by `scripts/live_ollama_standin.py` on 127.0.0.1:11434 (`llama3.2:3b`, `qwen3:8b` — this host cannot download Ollama); Anthropic (`claude-haiku-4-5-20251001`) answering a Build turn and a Chat turn, the key entered through the Connect dialog | The owner's Ollama decision (FIXED-737 to FIXED-739) and ten items from the release-readiness review: UX-CHAT-01, UX-BUILD-01, UX-MODEL-01, DEC-06 step 1, DEC-07 step 4, the stdio half of DEC-25 and §13.1's workspace metadata. Proved live: a running Ollama **offered with nothing chosen**, the model chosen from what it serves and **Ready at once**, a Chat turn answered by it after a reload, **the service stopped and started under an open Models page with Ready following it and no Check pressed**, Build's boundary equal to the server's answer and naming a hosted model as leaving the machine before a real Anthropic turn, Chat's Continuity menu after a real answer, Design comparing two versions and **going back as a new version**, Models' Runtime tab saving a fallback and its Details dialog, and four work surfaces at 390 wide with no horizontal overflow and **no console error**. **Two defects found and fixed** — the picker's Use buttons all had one name, and the round's own wait read a page that never reloaded; BUG-318 and BUG-319 filed |
@@ -90,6 +91,110 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-05 (third) — Quiet hours the server keeps, a dock that steps aside, and a routine asked before it runs
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`, on a
+workspace reset with `scripts/reset_live_workspace.py`, in a Linux container
+whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: the pre-installed Chromium through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`, its time zone UTC. Specs:
+`web/e2e/round-2026-10-05-quiet-hours-live.spec.ts` (11 scenarios) and
+`web/e2e/round-2026-10-05-quiet-hours-build-live.spec.ts` (1). Harness:
+`scripts/live_quiet_hours_harness.py`, which writes notices through
+`insert_notification` — so each is decided by the owner's saved policy exactly
+as a real one is — and files the damaged vectors and the routine. Captures:
+[`docs/screenshots/2026-10-05-quiet-hours-round/`](../screenshots/2026-10-05-quiet-hours-round).**
+
+FIXED-776 to FIXED-788.
+
+**What it proved.**
+
+1. **A real answer.** Anthropic answered *quiet round answered* in Chat
+   ([01](../screenshots/2026-10-05-quiet-hours-round/01-chat-real-answer.png)).
+2. **The dock steps aside on a work surface.** A notice docked over Chat, then
+   folded into the bell six seconds later with the bell counting it; on Home the
+   same dock stayed until dismissed (FIXED-781,
+   [02](../screenshots/2026-10-05-quiet-hours-round/02-chat-notice-shown.png),
+   [03](../screenshots/2026-10-05-quiet-hours-round/03-chat-notice-folded-into-bell.png)).
+3. **Quiet hours, set by the owner and kept by the server.** Off on a fresh
+   account; set through Settings to an interval around now and saved, the page
+   read *Quiet now, until …* from the server, both exceptions off. **Send a test
+   notice** answered *Sent and held* and nothing docked (FIXED-776, FIXED-780,
+   [04](../screenshots/2026-10-05-quiet-hours-round/04-settings-quiet-hours-on.png),
+   [05](../screenshots/2026-10-05-quiet-hours-round/05-test-notice-held.png)).
+4. **Held, not lost.** An approval notice and a paused-routine notice written
+   inside the interval were stored `quiet_hours`, nothing docked, the bell
+   counted them and the record listed them
+   ([06](../screenshots/2026-10-05-quiet-hours-round/06-record-keeps-held-notices.png)).
+5. **One exception, one channel.** With *Let security alerts through inside
+   Raiker* on, a containment notice was stored `critical_exception` in-app and
+   `quiet_hours` on the desktop, and docked; a paused routine written the same
+   minute stayed held (FIXED-777,
+   [07](../screenshots/2026-10-05-quiet-hours-round/07-critical-exception-through.png)).
+6. **One summary, once.** Three notices written inside an interval that had
+   ended: the dock showed *While quiet hours were on* listing the paused routine
+   and not the approval whose approval no longer existed; **Later** cleared it,
+   and neither a second tab nor a reload offered it again. The store showed the
+   rows summarised and still unread (FIXED-778,
+   [08](../screenshots/2026-10-05-quiet-hours-round/08-quiet-hours-summary.png)).
+7. **A muted kind is recorded, not shown.** Three *What interrupts you* switches
+   and none for decisions; an MCP notice written `muted` was not docked while a
+   finished-task notice the same minute was (FIXED-779,
+   [09](../screenshots/2026-10-05-quiet-hours-round/09-interrupt-categories.png)).
+8. **A damaged index, found by the host.** The conversation index damaged on
+   disk; within the host's five-minute check *Conversation search is damaged*
+   was on *Needs your attention*; **Rebuild it** opened the detail with the repair
+   in view; the rebuild passed, the item was gone, and *Conversation search needs
+   repairing* was in the record (FIXED-783, FIXED-788,
+   [10](../screenshots/2026-10-05-quiet-hours-round/10-attention-damaged-index.png),
+   [11](../screenshots/2026-10-05-quiet-hours-round/11-repair-opened-in-place.png)).
+9. **Damaged vectors.** Two mangled vectors named as *2 stored vectors could not
+   be read*, removed, and both memories intact and waiting to be indexed
+   (FIXED-784,
+   [12](../screenshots/2026-10-05-quiet-hours-round/12-damaged-vectors-named.png),
+   [13](../screenshots/2026-10-05-quiet-hours-round/13-damaged-vectors-removed.png)).
+10. **Will it run?** A daily routine's checks — scheduler, schedule, clock, model,
+    telling you, limits — and its run limit changed to 30 minutes and read back
+    after a reload, at 1440 and 390 wide with no sideways scroll (FIXED-785,
+    FIXED-786,
+    [14](../screenshots/2026-10-05-quiet-hours-round/14-routine-doctor.png),
+    [15](../screenshots/2026-10-05-quiet-hours-round/15-routine-doctor-390.png)).
+11. **Settings → Notifications at 390 wide, dark**, with no sideways scroll
+    ([16](../screenshots/2026-10-05-quiet-hours-round/16-settings-notifications-390-dark.png)).
+12. **Build's decision, once.** A real Build turn's shell command under *Waiting
+    on you* with no floating card over it across two of the card's polls; the
+    same pending decision floated on Home (FIXED-782,
+    [17](../screenshots/2026-10-05-quiet-hours-round/17-build-decision-not-repeated.png),
+    [18](../screenshots/2026-10-05-quiet-hours-round/18-same-decision-floats-elsewhere.png)).
+
+**What it found**, fixed in this change:
+
+* **FIXED-787** — the bell counted only what it saw when the page opened, so the
+  first run of scenario 2 docked a notice the bell did not count.
+* **FIXED-788** — after a repair inside the Overview's detail, the attention item
+  above still said *damaged* until a reload.
+* FIXED-782's first version kept the approval card off **every** page while a
+  Build decision was pending: Build stays mounted, hidden, on other routes, and
+  its mark stayed with it. The card now reads whether the marked element is on
+  screen; scenario 12 passed after that change.
+* The routine doctor printed the model registry's placeholder — *`<model>` has
+  not been checked yet* — on a workspace with no default model. It now says *No
+  model is chosen, for this routine or as your default* and reads **Will not
+  run**, which is what the composer above it says too; capture 14 was retaken.
+* Two harness assumptions, not product defects: a finished-task notice is
+  answered by **Tasks** itself (BUG-309's rule), so the "stays elsewhere" check
+  moved to Home; and Settings renders its controls before the saved values
+  arrive (FIXED-85 keeps an edit made meanwhile), so a scenario that changes
+  saved values first waits for them.
+
+**What it could not prove.** A run reaching its time limit: a Haiku turn does
+not last a minute, so FIXED-786's stop at the limit is test evidence only. The
+desktop channel was proved by the stored decision and the OS-command test, not
+by a desktop notification on this headless host.
 
 ## 2026-10-05 (second) — A key that is not replaced, a stop that reaches delegated work, and a resume that checks
 

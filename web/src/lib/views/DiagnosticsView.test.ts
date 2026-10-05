@@ -106,6 +106,7 @@ describe("DiagnosticsView", () => {
     conversation_index_count: 12,
     stale_conversation_index_count: 0,
     damaged_text_indexes: [] as string[],
+    damaged_vector_count: 0,
   };
 
   it("reports a clean memory store without listing ten zeroes", async () => {
@@ -181,6 +182,34 @@ describe("DiagnosticsView", () => {
       ).toBe(true),
     );
     expect(await screen.findByText(/16 rows indexed, and every search index passes/i)).toBeInTheDocument();
+  });
+
+  // DEC-24 step 6 — a vector that cannot be read was skipped by recall in
+  // silence. Named now, with a repair that removes it so it is indexed again.
+  it("names damaged vectors and removes them without touching the memories", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/security/health": [],
+      "GET /api/memory/integrity": { ...CLEAN_INTEGRITY, clean: false, damaged_vector_count: 2 },
+      "POST /api/memory/vectors/remove-damaged": { ok: true, removed: 2, damaged_vector_count: 0 },
+    });
+    const repaired = vi.fn();
+    window.addEventListener("raiker:runtime-health-changed", repaired);
+    render(DiagnosticsView);
+
+    const notice = await screen.findByTestId("damaged-vectors");
+    expect(notice).toHaveTextContent(/2 stored vectors could not be read/);
+    expect(notice).toHaveTextContent(/memories are not affected/);
+    screen.getByRole("button", { name: "Remove damaged vectors" }).click();
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes("/api/memory/vectors/remove-damaged")),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/Removed 2 damaged vectors/)).toBeInTheDocument();
+    // The attention list above re-reads instead of still calling it damaged.
+    await waitFor(() => expect(repaired).toHaveBeenCalled());
+    window.removeEventListener("raiker:runtime-health-changed", repaired);
   });
 
   it("names a background pass that keeps failing, and how long since it worked", async () => {

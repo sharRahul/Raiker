@@ -91,6 +91,23 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-05 (third round). Ten more decision-record
+> steps closed, starting with the owner's DEC-21a.** Quiet hours are a server
+> policy decided when each notice is written and stored beside it, obeyed by the
+> dock, the desktop alert, the approval card and the OS command ([FIXED-776](FIXED_ITEMS.md#fixed-776--quiet-hours-were-a-promise-nothing-could-keep)); critical
+> exceptions are enumerated, per channel and off by default ([FIXED-777](FIXED_ITEMS.md#fixed-777--nothing-could-break-quiet-hours-and-nothing-said-what-would)); the end of
+> an interval is one summary acknowledged on the server ([FIXED-778](FIXED_ITEMS.md#fixed-778--the-end-of-quiet-hours-would-have-replayed-the-night)). DEC-21's
+> Notifications row: per-category interrupt switches ([FIXED-779](FIXED_ITEMS.md#fixed-779--every-kind-of-notice-interrupted-or-none-did)) and a test notice
+> through the same path ([FIXED-780](FIXED_ITEMS.md#fixed-780--there-was-no-way-to-see-what-a-notice-would-do)). The dock folds into the bell on work surfaces
+> ([FIXED-781](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn), closes BUG-320) and leaves alone a decision Build already shows
+> ([FIXED-782](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other), closes BUG-317). DEC-24 steps 1 and 6: the host checks the search
+> indexes every five minutes and a damaged one is on *Needs your attention*
+> ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold), closes BUG-322); damaged vectors are named and removable ([FIXED-784](FIXED_ITEMS.md#fixed-784--a-damaged-vector-was-skipped-in-silence)).
+> DEC-12 steps 8 and 6: **Will it run?** reads a routine's readiness from records
+> ([FIXED-785](FIXED_ITEMS.md#fixed-785--a-routine-failed-at-0300-for-reasons-already-true-at-1700)) and one run has a time limit ([FIXED-786](FIXED_ITEMS.md#fixed-786--one-run-of-a-routine-had-no-time-limit)). The live round found FIXED-787
+> and FIXED-788. DEC-21b (GitHub.com OAuth), RR-AUTHORITY-01, RR-INSTALL-01,
+> RR-DESIGN-01, RR-VERIFY-01 and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-05 (second round). Ten more decision-record
 > steps closed.** DEC-24 step 6: a missing key file is refused rather than
 > replaced by a key that opens nothing ([FIXED-762](FIXED_ITEMS.md#fixed-762--a-missing-key-file-was-replaced-by-a-new-key-that-could-open-nothing)), and a damaged search index is a
@@ -1788,6 +1805,14 @@ cleanup tests for every supported runtime type.
 > reason and notify the owner; Continue runs it once and re-arms it. No failed
 > run is retried on its own. Per-run tool and cost limits remain.
 >
+> **2026-10-05 (third round).** Step 8 closed as [FIXED-785](FIXED_ITEMS.md#fixed-785--a-routine-failed-at-0300-for-reasons-already-true-at-1700): **Will it run?** on a
+> scheduled task reads the scheduler's pass record, the schedule's terms, the
+> clock, the stored model check, quiet hours and its limits — from records, with
+> nothing sent or started — and says *unknown* rather than fine when it cannot
+> read one. Step 6's maximum runtime closed as [FIXED-786](FIXED_ITEMS.md#fixed-786--one-run-of-a-routine-had-no-time-limit): each run is stopped at a
+> safe boundary at its limit (default 60 minutes, owner-set 1–720) and counts as
+> a cycle that did not complete. Per-run tool and cost limits remain.
+>
 > **2026-10-05 (second round).** Step 7 closed as [FIXED-764](FIXED_ITEMS.md#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running): pause, resume and stop
 > carry down the delegation tree, each child recording the decision it came
 > from. Step 5 closed as [FIXED-766](FIXED_ITEMS.md#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it): a finished background task records
@@ -2333,7 +2358,13 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > holds it, and no longer calls a name that does not resolve "private" ([FIXED-759](FIXED_ITEMS.md#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private)).
 > The owner decisions this section names (quiet-hour overrides, OAuth
 > providers) were accepted by the product owner on 2026-10-05 and are finalised
-> in DEC-21a and DEC-21b below. Implementation and verification remain open.
+> in DEC-21a and DEC-21b below.
+>
+> **2026-10-05 (third round).** DEC-21a is implemented and verified live
+> ([FIXED-776](FIXED_ITEMS.md#fixed-776--quiet-hours-were-a-promise-nothing-could-keep), [FIXED-777](FIXED_ITEMS.md#fixed-777--nothing-could-break-quiet-hours-and-nothing-said-what-would), [FIXED-778](FIXED_ITEMS.md#fixed-778--the-end-of-quiet-hours-would-have-replayed-the-night)). The Notifications row's per-event preferences and
+> "route test and real delivery through the same outbox" closed as [FIXED-779](FIXED_ITEMS.md#fixed-779--every-kind-of-notice-interrupted-or-none-did) and
+> [FIXED-780](FIXED_ITEMS.md#fixed-780--there-was-no-way-to-see-what-a-notice-would-do). DEC-21b (GitHub.com OAuth) remains open: it needs a registered GitHub
+> OAuth application, whose client identity is the owner's to supply.
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2357,6 +2388,12 @@ or verified. Preserve current settings and behavior until the implementation
 and migration contracts below are delivered.
 
 ### DEC-21a — Quiet hours are quiet unless the owner chooses an exception
+
+> **Verified 2026-10-05.** Implemented as [FIXED-776](FIXED_ITEMS.md#fixed-776--quiet-hours-were-a-promise-nothing-could-keep) (policy, stored decision,
+> every alert path), [FIXED-777](FIXED_ITEMS.md#fixed-777--nothing-could-break-quiet-hours-and-nothing-said-what-would) (exceptions) and [FIXED-778](FIXED_ITEMS.md#fixed-778--the-end-of-quiet-hours-would-have-replayed-the-night) (end-of-interval summary),
+> with both DST transitions, the account zone, multiple tabs and a restart
+> covered by tests and the live round. Browser permission and the global
+> switches still take precedence; an exception never overrides them.
 
 **Accepted decision.** Quiet hours are opt-in; do not invent a schedule for
 an existing account. Once enabled, suppress interruptive notification toasts
@@ -2557,6 +2594,13 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > written ([FIXED-762](FIXED_ITEMS.md#fixed-762--a-missing-key-file-was-replaced-by-a-new-key-that-could-open-nothing)); a damaged FTS index is named and rebuilt from its source rows
 > ([FIXED-763](FIXED_ITEMS.md#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it)). Step 4's "redaction failure blocks export" closed as [FIXED-770](FIXED_ITEMS.md#fixed-770--the-support-bundle-trusted-its-own-redaction). Vector
 > index corruption and quarantine of a damaged database file remain.
+>
+> **2026-10-05 (third round).** Vector corruption closed as [FIXED-784](FIXED_ITEMS.md#fixed-784--a-damaged-vector-was-skipped-in-silence): damaged
+> vectors are named and removable, and the memories behind them become *not yet
+> indexed*. The host's own tick now checks every index (step 1's "last
+> successful tick" for the indexes) and a damaged one is on the attention list
+> ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold)). Quarantine of a damaged database file remains: it needs step 5's
+> backup and restore to have anything to restore from.
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.

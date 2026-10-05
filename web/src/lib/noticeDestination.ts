@@ -31,6 +31,8 @@ const DESTINATIONS: Record<string, string> = {
   approval_pending: "#/approvals",
   critical_approval_pending: "#/approvals",
   task_finished: "#/tasks",
+  // BUG-322 — the notice about a damaged index opens its repair.
+  search_index_damaged: "#/observe?tab=overview&repair=indexes",
 };
 
 /** The page a notice of this kind opens. */

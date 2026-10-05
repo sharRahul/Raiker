@@ -36,6 +36,7 @@
   } from "../taskComposer";
   import GuideLink from "../components/GuideLink.svelte";
   import TaskHistory from "../components/TaskHistory.svelte";
+  import RoutineCheck from "../components/RoutineCheck.svelte";
   import { taskDetailHref } from "../taskHistory";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
@@ -79,6 +80,11 @@
     taskId?: string | null;
   } = $props();
   let tasks = $state<TaskView[] | null>(null);
+  /** One task's newer server state, in place, without reloading the board. */
+  function replaceTask(updated: TaskView) {
+    if (tasks === null) return;
+    tasks = tasks.map((item) => (item.task_id === updated.task_id ? updated : item));
+  }
   let loadError = $state<string | null>(null);
   let notice = $state<string | null>(null);
   // BUG-299 — where to look when the runtime could not say what happened. Held
@@ -1176,6 +1182,12 @@
                   <Icon name="activity" size="sm" />
                   History
                 </a>
+                <!-- DEC-12 steps 6 and 8 — will a routine run, and how long
+                     one run may take. Only work with a schedule has a next run
+                     to ask about. -->
+                {#if task.recurrence || task.scheduled_at}
+                  <RoutineCheck {task} onChanged={(updated) => replaceTask(updated)} />
+                {/if}
                 <!-- UX-TASK-05 — the controls this task's phase offers, from the
                      one module every surface asks. Continue for a parked
                      approval is already on the line above, beside its reason. -->

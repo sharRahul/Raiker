@@ -172,6 +172,16 @@ CASES: Cases = {
     ("POST", "/api/tasks/{task_id}/run"): then(
         _task, lambda c, h: f"/api/tasks/{first(c, h, '/api/tasks', 'task_id')}/run"
     ),
+    ("GET", "/api/tasks/{task_id}/doctor"): then(
+        _task, lambda c, h: f"/api/tasks/{first(c, h, '/api/tasks', 'task_id')}/doctor"
+    ),
+    ("PUT", "/api/tasks/{task_id}/run-limit"): then(
+        _task,
+        lambda c, h: (
+            f"/api/tasks/{first(c, h, '/api/tasks', 'task_id')}/run-limit",
+            {"max_run_minutes": 30},
+        ),
+    ),
     ("GET", "/api/turns/{turn_id}"): _turn,
 }
 

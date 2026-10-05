@@ -16,6 +16,10 @@ export type AccountDeletionPreview = {
   kept: string[];
 };
 
+export type AcknowledgeHeldNotificationsRequest = {
+  notification_ids: string[];
+};
+
 export type ActivateRuntimeModeRequest = {
   mode_name: string;
   reason?: string;
@@ -1498,6 +1502,13 @@ export type CriticalApprovalResolved = {
   executes_action: boolean;
 };
 
+/** Damaged vectors removed; the memories behind them are waiting to be indexed again. */
+export type DamagedVectorsRemoved = {
+  ok: boolean;
+  removed: number;
+  damaged_vector_count: number;
+};
+
 export type DecisionProblem = {
   reason_code: string;
   summary: string;
@@ -1563,6 +1574,7 @@ export type DiagnosticsView = {
   missing_config: string[];
   provider_health: ProviderHealthView[];
   background_workers: BackgroundWorkerHealth[];
+  search_indexes: SearchIndexHealth[];
   model_profile_source: ModelProfileSource;
   scope_note: string;
 };
@@ -1575,6 +1587,14 @@ export type DisableCapabilityRequest = {
 export type DisableRuntimeModeRequest = {
   reason?: string;
   as_principal?: string | null;
+};
+
+export type DoctorCheck = {
+  key: string;
+  label: string;
+  state: "ok" | "warn" | "blocked" | "unknown";
+  detail: string;
+  href: string | null;
 };
 
 /** The pair that will run, and why it is that one rather than the selection. */
@@ -1920,6 +1940,10 @@ export type HealthView = {
   text_search_engine?: string;
   text_search_ranking?: "bm25_relevance" | "recency";
   text_search_reason?: string;
+};
+
+export type HeldNotificationsAcknowledged = {
+  acknowledged: number;
 };
 
 export type HfDownloadPreview = {
@@ -2313,6 +2337,12 @@ export type InstanceCreateRequest = {
 export type InstanceCreated = {
   name: string;
   url: string;
+};
+
+export type InterruptCategory = {
+  category: string;
+  label: string;
+  interrupts: boolean;
 };
 
 export type InterruptRequest = {
@@ -2836,6 +2866,7 @@ export type MemoryIntegrity = {
   conversation_index_count: number;
   stale_conversation_index_count: number;
   damaged_text_indexes: string[];
+  damaged_vector_count: number;
 };
 
 export type MemoryPinned = {
@@ -3261,6 +3292,14 @@ export type NextAction = {
   target: "add" | "models" | "runtime" | "check" | "permissions";
 };
 
+/** The one delivery policy, as every tab and alert reads it. */
+export type NotificationDelivery = {
+  quiet_hours: QuietHoursState;
+  decisions_interrupt: boolean;
+  categories: InterruptCategory[];
+  held: NotificationView[];
+};
+
 /**
  * Owner-scoped view of one notification (Phase C). Redacted human-readable copy only;
  * ``finding_id`` / ``subject_id`` link back to what raised it.
@@ -3274,6 +3313,10 @@ export type NotificationView = {
   subject_id: string | null;
   read: boolean;
   created_at: string;
+  in_app_presentation: string | null;
+  desktop_presentation: string | null;
+  quiet_until: string | null;
+  summarised_at: string | null;
 };
 
 /** MEM-04 — one eidetic observation, as the owner reads it. */
@@ -3812,6 +3855,19 @@ export type ProviderWeeklyUsage = {
   subscription?: SubscriptionLimitsView | null;
 };
 
+/** The owner's quiet-hours terms and where the clock is now, decided server-side. */
+export type QuietHoursState = {
+  enabled: boolean;
+  start: string;
+  end: string;
+  timezone: string;
+  active: boolean;
+  ends_at: string | null;
+  next_starts_at: string | null;
+  critical_in_app: boolean;
+  critical_desktop: boolean;
+};
+
 export type ReadCapabilities = {
   capabilities: string[];
   external: string[];
@@ -3993,6 +4049,13 @@ export type RevertImageRequest = {
   to: string;
 };
 
+export type RoutineDoctor = {
+  task_id: string;
+  state: "ok" | "warn" | "blocked" | "unknown";
+  checked_at: string;
+  checks: DoctorCheck[];
+};
+
 export type RuntimeModeActivated = {
   ok: boolean;
   mode_name: string;
@@ -4018,6 +4081,16 @@ export type SaveProjectContextRequest = {
   attachment_ids?: string[];
   memory_enabled?: boolean | null;
   memory_mode?: "inherit" | "enabled" | "disabled" | null;
+};
+
+/** One search index as the host's last check found it (BUG-322, DEC-24 step 6). */
+export type SearchIndexHealth = {
+  index_name: string;
+  label: string;
+  state: "ok" | "damaged";
+  damaged_count: number;
+  checked_at: string;
+  first_damaged_at: string | null;
 };
 
 /**
@@ -4515,6 +4588,7 @@ export type TaskCreateRequest = {
   timezone?: string | null;
   run_until?: string | null;
   missed_runs?: "run_once" | "skip" | null;
+  max_run_minutes?: number | null;
 };
 
 /** One task at its own address, with the attempts behind its status. */
@@ -4549,6 +4623,10 @@ export type TaskResumed = {
   summary?: string;
 };
 
+export type TaskRunLimitRequest = {
+  max_run_minutes?: number | null;
+};
+
 export type TaskView = {
   task_id: string;
   session_id: string;
@@ -4578,6 +4656,7 @@ export type TaskView = {
   missed_run_policy: string | null;
   delivery_state: string | null;
   delivery_detail: string | null;
+  max_run_minutes: number;
   phase: string;
 };
 
@@ -4626,6 +4705,11 @@ export type TelemetryExportRun = {
   destination: string;
   include_content?: boolean;
   cursor_event_id?: string;
+};
+
+/** A test notice, written through the same policy as a real one. */
+export type TestNoticeSent = {
+  notification: NotificationView;
 };
 
 /** Every text index recomputed from the rows that own its text. */
@@ -5348,6 +5432,8 @@ export const contract = {
     request<MemorySettingsView>("/api/memory/settings"),
   rebuildTextIndexes: () =>
     call<TextIndexesRebuilt>("POST", "/api/memory/text-indexes/rebuild"),
+  removeDamagedVectors: () =>
+    call<DamagedVectorsRemoved>("POST", "/api/memory/vectors/remove-damaged"),
   forgetMemory: (memoryId: string) =>
     call<MemoryForgotten>("DELETE", `/api/memory/${encodeURIComponent(memoryId)}`),
   editMemory: (memoryId: string, body: Record<string, unknown>) =>
@@ -5458,6 +5544,12 @@ export const contract = {
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
   listNotifications: (query: { unread_only?: boolean } = {}) =>
     request<NotificationView[]>(withQuery("/api/notifications", query)),
+  notificationDelivery: () =>
+    request<NotificationDelivery>("/api/notifications/delivery"),
+  acknowledgeHeldNotifications: (body: AcknowledgeHeldNotificationsRequest) =>
+    call<HeldNotificationsAcknowledged>("POST", "/api/notifications/held/acknowledge", { body }),
+  sendTestNotice: () =>
+    call<TestNoticeSent>("POST", "/api/notifications/test"),
   markNotificationRead: (notificationId: string) =>
     call<Ok>("POST", `/api/notifications/${encodeURIComponent(notificationId)}/read`),
   pullOllamaModel: (body: OllamaPullRequestBody) =>
@@ -5634,10 +5726,14 @@ export const contract = {
     call<TaskView>("POST", "/api/tasks", { body }),
   getTaskDetail: (taskId: string) =>
     request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
+  taskDoctor: (taskId: string) =>
+    request<RoutineDoctor>(`/api/tasks/${encodeURIComponent(taskId)}/doctor`),
   resumeTask: (taskId: string) =>
     call<TaskResumed>("POST", `/api/tasks/${encodeURIComponent(taskId)}/resume`),
   runTask: (taskId: string) =>
     call<TaskView>("POST", `/api/tasks/${encodeURIComponent(taskId)}/run`),
+  setTaskRunLimit: (taskId: string, body: TaskRunLimitRequest) =>
+    call<TaskView>("PUT", `/api/tasks/${encodeURIComponent(taskId)}/run-limit`, { body }),
   listTelemetryDestinations: () =>
     request<TelemetryDestinationView[]>("/api/telemetry/destinations"),
   createTelemetryDestination: (body: CreateTelemetryDestinationRequest) =>

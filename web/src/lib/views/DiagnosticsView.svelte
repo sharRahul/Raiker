@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { RUNTIME_HEALTH_CHANGED } from "../observeAttention";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
@@ -42,6 +43,7 @@
       ["failed_purge_location_count", "Unfinished purges"],
       ["project_path_inconsistency_count", "Project paths"],
       ["index_engine_mismatch_count", "Index engine"],
+      ["damaged_vector_count", "Damaged vectors"],
     ];
     return labels
       .map(([key, label]) => ({ key, label, count: Number(integrity?.[key] ?? 0) }))
@@ -94,8 +96,37 @@
           ? `Rebuilt — ${rows} rows indexed, and every search index passes its check.`
           : `Rebuilt, but ${result.damaged_text_indexes.length} still fails its check.`;
       await loadIntegrity();
+      announceRepaired();
     } catch (e) {
       integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
+    } finally {
+      integrityBusy = false;
+    }
+  }
+
+  /**
+   * BUG-322 — Observability's attention list sits above this view and reads
+   * the same records. Found live: after a repair here, the item above still
+   * said the index was damaged until the page was reloaded. A repair says so.
+   */
+  function announceRepaired() {
+    window.dispatchEvent(new Event(RUNTIME_HEALTH_CHANGED));
+  }
+
+  /** DEC-24 step 6 — vectors that cannot be read, removed so they are indexed again. */
+  async function removeDamagedVectors() {
+    integrityBusy = true;
+    integrityNotice = null;
+    try {
+      const result = await api.removeDamagedVectors();
+      integrityNotice =
+        result.removed === 0
+          ? "No damaged vectors were found."
+          : `Removed ${result.removed} damaged vector${result.removed === 1 ? "" : "s"}. Those memories are waiting to be indexed again — Settings → Memory engine indexes them with the embedding model you chose.`;
+      await loadIntegrity();
+      announceRepaired();
+    } catch (e) {
+      integrityNotice = e instanceof ApiError ? `Could not remove them (${e.status}).` : "Could not remove them.";
     } finally {
       integrityBusy = false;
     }
@@ -225,6 +256,13 @@
             and files are not affected — a rebuild recomputes the index from them.
           </p>
         {/if}
+        {#if (integrity.damaged_vector_count ?? 0) > 0}
+          <p class="notice notice-warn" role="status" data-testid="damaged-vectors">
+            {integrity.damaged_vector_count} stored vector{integrity.damaged_vector_count === 1 ? "" : "s"} could
+            not be read, so the memories behind {integrity.damaged_vector_count === 1 ? "it are" : "them are"} not
+            found by meaning. The memories are not affected; removing the damaged vectors lets them be indexed again.
+          </p>
+        {/if}
         {#if integrityFindings.length > 0}
           <dl class="kv">
             {#each integrityFindings as finding (finding.key)}
@@ -245,7 +283,18 @@
             >
               Rebuild search indexes
             </button>
-          {:else if integrity.stale_conversation_index_count > 0}
+          {/if}
+          {#if (integrity.damaged_vector_count ?? 0) > 0}
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={integrityBusy}
+              onclick={() => void removeDamagedVectors()}
+            >
+              Remove damaged vectors
+            </button>
+          {/if}
+          {#if damagedIndexes.length === 0 && integrity.stale_conversation_index_count > 0}
             <!-- MEM-09 — the stated repair, offered where the drift is reported.
                  The index is a projection of the turns, so a rebuild recomputes
                  every row and can lose nothing. -->

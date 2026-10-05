@@ -12,6 +12,7 @@ from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
+    AcknowledgeHeldNotificationsRequest,
     ApproveMcpToolsRequest,
     AuthSessionRequest,
     AvailableModelsRequest,
@@ -44,6 +45,7 @@ from raiker.api.schemas import (
     SetSessionProjectRequest,
     SetSessionTagsRequest,
     TaskCreateRequest,
+    TaskRunLimitRequest,
     serialize_dto,
 )
 from raiker.api.session_cookie import issue as issue_session_cookie
@@ -90,6 +92,11 @@ from raiker.api.wire.models import (
     PricingRefreshed,
     WeeklyBudgetSet,
     WeeklyUsage,
+)
+from raiker.api.wire.notifications import (
+    HeldNotificationsAcknowledged,
+    NotificationDelivery,
+    TestNoticeSent,
 )
 from raiker.api.wire.projects import (
     ProjectArchived,
@@ -150,6 +157,7 @@ from raiker.runtime.authority.models import Principal
 from raiker.sessions.transcript import TranscriptManifest
 from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.doctor import RoutineDoctor
 from raiker.tasks.scheduler import TaskResumed
 from raiker.tools.mcp_tools import mcp_agent_access
 
@@ -662,6 +670,52 @@ async def list_notifications(
     return serialize_dto(
         _service(request).list_notifications(auth_data[0].principal_id, unread_only)
     )
+
+
+@router.get("/api/notifications/delivery")
+async def notification_delivery(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-21a — whether notices may interrupt now, and what quiet hours held.
+
+    Every tab, the approval card and the desktop alert read this one answer, so
+    two tabs cannot disagree about whether it is quiet.
+    """
+    answer: NotificationDelivery = _service(request).notification_delivery(
+        auth_data[0].principal_id
+    )
+    return serialize_dto(answer)
+
+
+@router.post("/api/notifications/held/acknowledge")
+async def acknowledge_held_notifications(
+    body: AcknowledgeHeldNotificationsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-21a — the end-of-interval summary was seen; it is not offered again.
+
+    The notices stay unread: seeing that three things arrived is not reading them.
+    """
+    answer: HeldNotificationsAcknowledged = {
+        "acknowledged": _service(request).acknowledge_held_notifications(
+            auth_data[0].principal_id, list(body.notification_ids)
+        )
+    }
+    return serialize_dto(answer)
+
+
+@router.post("/api/notifications/test")
+async def send_test_notice(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-21 — a test notice through the same record and policy as a real one."""
+    answer: TestNoticeSent = {
+        "notification": _service(request).send_test_notice(auth_data[0].principal_id)
+    }
+    return serialize_dto(answer)
 
 
 @router.post("/api/notifications/{notification_id}/read")
@@ -1974,9 +2028,48 @@ async def create_task(
             timezone=body.timezone,
             run_until=body.run_until,
             missed_runs=body.missed_runs,
+            max_run_minutes=body.max_run_minutes,
         )
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return serialize_dto(view)
+
+
+@router.get("/api/tasks/{task_id}/doctor")
+async def task_doctor(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-12 step 8 — whether this routine will be able to run, read from records.
+
+    Nothing is sent to a provider and nothing is started: the answer comes from
+    the scheduler's pass record, the stored model check, the schedule's terms
+    and the owner's delivery policy.
+    """
+    session, principal = auth_data
+    answer: RoutineDoctor | None = _service(request).task_doctor(
+        task_id, user_id=principal.delegated_by_user_id, owner_principal_id=session.principal_id
+    )
+    if answer is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
+    return serialize_dto(answer)
+
+
+@router.put("/api/tasks/{task_id}/run-limit")
+async def set_task_run_limit(
+    task_id: str,
+    body: TaskRunLimitRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-12 step 6 — how long one run of this routine may take."""
+    _session, principal = auth_data
+    view = _service(request).set_task_run_limit(
+        task_id, body.max_run_minutes, user_id=principal.delegated_by_user_id
+    )
+    if view is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
     return serialize_dto(view)
 
 

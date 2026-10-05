@@ -29,6 +29,12 @@
 
 import type { ApprovalView, Diagnostics, SecurityHealth } from "./apiTypes";
 
+/** Raised on `window` when a repair on the Overview changed what it reports. */
+export const RUNTIME_HEALTH_CHANGED = "raiker:runtime-health-changed";
+
+/** Where a damaged search index is repaired: the Overview, with the repair open. */
+export const SEARCH_INDEX_REPAIR = "#/observe?tab=overview&repair=indexes";
+
 /** How loudly one item asks, and in what order the list is read. */
 export type AttentionTone = "containment" | "blocking" | "waiting" | "unknown";
 
@@ -114,6 +120,22 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         detail: "Some governed work will fail closed until they pass.",
         href: "#/observe?tab=overview",
         linkLabel: "See which checks failed",
+      });
+    }
+    // BUG-322 — a damaged search index fails every search through it. The
+    // host checks on its tick and records the answer; reading the record here
+    // is what puts it above the fold instead of inside Diagnostics.
+    for (const index of (inputs.diagnostics.search_indexes ?? []).filter((row) => row.state === "damaged")) {
+      const vectors = index.index_name === "vector_records";
+      items.push({
+        id: `search-index:${index.index_name}`,
+        tone: "blocking",
+        title: `${index.label} is damaged`,
+        detail: vectors
+          ? `${index.damaged_count} stored vector${index.damaged_count === 1 ? "" : "s"} could not be read, so those memories are not found by meaning. Removing them lets them be indexed again; the memories themselves are untouched.`
+          : "Searches through it fail until it is rebuilt. Rebuilding recomputes it from your conversations, memories and files, which are untouched.",
+        href: SEARCH_INDEX_REPAIR,
+        linkLabel: vectors ? "Remove damaged vectors" : "Rebuild it",
       });
     }
     if (inputs.diagnostics.missing_config.length > 0) {

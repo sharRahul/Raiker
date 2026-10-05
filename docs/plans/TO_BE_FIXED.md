@@ -120,12 +120,12 @@ names.
 | [BUG-314](#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window) | Low | Composers / models | Open — Chat, Build and Tasks look the chosen pair up among the quick list, so a model reached by search is judged by the default's readiness and context window until the server checks it |
 | [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) | Medium | Messaging / Telegram | Open — a routed Telegram message runs its turn and the answer stays in Raiker; the page now says so (FIXED-711, FIXED-712), but nothing delivers it |
 | [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in) | Medium | Build / Projects | Open — Build says *Working in <project>*, while its reads, writes and commands are relative to the workspace and the project's own folder is protected |
-| [BUG-317](#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build) | Low | Build / notifications | Open — on Build the *Approval needed* toast sits over the right end of the same decision's card |
+| [BUG-317](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other) | Low | Build / notifications | **Closed 2026-10-05 ([FIXED-782](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other))** — a decision Build shows inline is not floated over it |
 | [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
 | [BUG-319](#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page) | Low | Models / maintainability | Open — UX-MODEL-01 split the tabs and dialogs out; the Add tab's connection lifecycle and sign-in dialog are still the page's own state |
-| [BUG-320](#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat) | Low | Notifications / layout | Open — found by the 2026-10-05 live round; the dock covers Chat's newest prompt |
+| [BUG-320](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn) | Low | Notifications / layout | **Closed 2026-10-05 ([FIXED-781](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn))** — on work surfaces a notice folds into the bell after six seconds |
 | [BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | **Closed 2026-10-05 ([FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones))** — renamed ICU ids map to their current IANA names |
-| [BUG-322](#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold) | Low | Observability / search | Open — found by the 2026-10-05 (second) live round; FIXED-763's notice is inside *Runtime health, in detail*, not in *Needs your attention* |
+| [BUG-322](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold) | Low | Observability / search | **Closed 2026-10-05 ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold))** — the host checks every five minutes and a damaged index is on *Needs your attention* |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2295,8 +2295,9 @@ turn works in is the folder its reads, writes and commands are relative to.
 
 ## BUG-317 — The global approval toast covers the decision it duplicates in Build
 
-**Severity: Low. Area: Build / notifications. Status: Open — raised 2026-10-03
-by the live round.**
+**Severity: Low. Area: Build / notifications. Status: Closed 2026-10-05 as
+[FIXED-782](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other)
+— raised 2026-10-03 by the live round.**
 
 **Observed.** When a Build turn raises an approval, Build shows the decision in
 its own **Waiting on you** card, and the shell's global **Approval needed**
@@ -2352,8 +2353,9 @@ Behaviour unchanged; the two surfaces' tests are the characterization suite.
 
 ## BUG-320 — A notification toast covers the newest prompt in Chat
 
-**Severity: Low. Area: Notifications / layout. Status: Open — found by the
-2026-10-05 live round.**
+**Severity: Low. Area: Notifications / layout. Status: Closed 2026-10-05 as
+[FIXED-781](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn)
+— found by the 2026-10-05 live round.**
 
 **Observed.** The notification dock opens over the top-right of the page and
 stays until dismissed. In Chat it sat over the owner's own prompt bubble — the
@@ -2387,8 +2389,9 @@ against a fixture of both spellings.
 
 ## BUG-322 — A damaged search index is named only under Diagnostics' fold
 
-**Severity: Low. Area: Observability / search. Status: Open — found by the
-2026-10-05 (second) live round.**
+**Severity: Low. Area: Observability / search. Status: Closed 2026-10-05 as
+[FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold)
+— found by the 2026-10-05 (second) live round.**
 
 **Observed.** [FIXED-763](FIXED_ITEMS.md#fixed-763--a-damaged-search-index-failed-every-search-and-nothing-named-it)
 names a damaged text index and offers the rebuild — inside the Overview's

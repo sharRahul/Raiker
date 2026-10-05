@@ -291,6 +291,7 @@ CASES: Cases = {
     ("GET", "/api/memory/integrity"): plain("/api/memory/integrity"),
     ("POST", "/api/memory/conversation-index/rebuild"): plain("/api/memory/conversation-index/rebuild"),
     ("POST", "/api/memory/text-indexes/rebuild"): plain("/api/memory/text-indexes/rebuild"),
+    ("POST", "/api/memory/vectors/remove-damaged"): plain("/api/memory/vectors/remove-damaged"),
     ("GET", "/api/memory/observations"): _observations,
     ("POST", "/api/memory/observations/delete"): _delete_observations,
     ("POST", "/api/memory/gists/{gist_id}/discard"): _gist,

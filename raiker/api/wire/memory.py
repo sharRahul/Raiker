@@ -190,6 +190,8 @@ class MemoryIntegrity(TypedDict):
     stale_conversation_index_count: int
     #: DEC-24 step 6 — the text indexes SQLite reports as damaged.
     damaged_text_indexes: list[str]
+    #: DEC-24 step 6 — stored vectors that cannot be read as their own dimensions.
+    damaged_vector_count: int
 
 
 class ConversationIndexRebuilt(TypedDict):
@@ -203,6 +205,14 @@ class TextIndexesRebuilt(TypedDict):
     ok: bool
     indexed_rows: dict[str, int]
     damaged_text_indexes: list[str]
+
+
+class DamagedVectorsRemoved(TypedDict):
+    """Damaged vectors removed; the memories behind them are waiting to be indexed again."""
+
+    ok: bool
+    removed: int
+    damaged_vector_count: int
 
 
 class ObservationsView(TypedDict):

@@ -902,6 +902,98 @@ class SQLiteStore(
                 )
         return counts
 
+    # ── Vector damage and the index-health record (DEC-24 step 6, BUG-322) ──
+    #
+    # A vector is a projection too: an embedding computed from a memory's or a
+    # file chunk's text. Retrieval already skipped one it could not read, which
+    # kept search working and said nothing — a memory whose vector was damaged
+    # simply stopped being found by meaning. Named here, by the store's own
+    # JSON functions, and removed on request so the ordinary indexing pass
+    # embeds that text again; the rows it was computed from are never touched.
+
+    VECTOR_INDEX = "vector_records"
+
+    def damaged_vector_ids(self) -> list[str]:
+        """Vectors whose stored embedding is not a JSON array of their own dimensions."""
+        rows = self._rows(
+            """SELECT vector_id FROM vector_records
+               WHERE embedding IS NOT NULL AND (
+                 json_valid(embedding) = 0
+                 OR json_type(embedding) != 'array'
+                 OR json_array_length(embedding) != dimensions
+               )
+               ORDER BY vector_id"""
+        )
+        return [str(row["vector_id"]) for row in rows]
+
+    def remove_damaged_vectors(self) -> int:
+        """Delete damaged vectors and what links to them; return how many went.
+
+        The memory or chunk each was computed from is untouched and becomes
+        *not yet indexed* again, which is the state the Memory engine's index
+        action already knows how to finish.
+        """
+        damaged = self.damaged_vector_ids()
+        if not damaged:
+            return 0
+        with self.connect() as connection:
+            for vector_id in damaged:
+                connection.execute(
+                    "DELETE FROM memory_projections WHERE projection_type = 'vector' AND projection_id = ?",
+                    (vector_id,),
+                )
+                connection.execute(
+                    "DELETE FROM managed_file_chunk_vectors WHERE vector_id = ?", (vector_id,)
+                )
+                connection.execute("DELETE FROM vector_records WHERE vector_id = ?", (vector_id,))
+        return len(damaged)
+
+    def check_search_indexes(self) -> list[dict[str, Any]]:
+        """Run the read-only index check and record it. Returns indexes newly damaged.
+
+        Called on the host tick. A newly damaged index is returned once — the
+        tick that first sees it — so the caller can tell the owner once rather
+        than every fifteen seconds.
+        """
+        damaged_text = set(self.damaged_text_indexes())
+        damaged_vectors = len(self.damaged_vector_ids())
+        observed = {table: (1 if table in damaged_text else 0) for table in self.TEXT_INDEX_TABLES}
+        observed[self.VECTOR_INDEX] = damaged_vectors
+        now = utc_now()
+        newly: list[dict[str, Any]] = []
+        with self.connect() as connection:
+            for name, count in observed.items():
+                previous = connection.execute(
+                    "SELECT state, first_damaged_at FROM search_index_health WHERE index_name = ?",
+                    (name,),
+                ).fetchone()
+                state = "damaged" if count else "ok"
+                first = (
+                    None
+                    if state == "ok"
+                    else (previous["first_damaged_at"] if previous is not None and previous["state"] == "damaged" else now)
+                )
+                if state == "damaged" and (previous is None or previous["state"] != "damaged"):
+                    newly.append({"index_name": name, "damaged_count": count})
+                connection.execute(
+                    """INSERT INTO search_index_health
+                       (index_name, state, damaged_count, checked_at, first_damaged_at)
+                       VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(index_name) DO UPDATE SET
+                         state = excluded.state, damaged_count = excluded.damaged_count,
+                         checked_at = excluded.checked_at, first_damaged_at = excluded.first_damaged_at""",
+                    (name, state, count, now, first),
+                )
+        return newly
+
+    def list_search_index_health(self) -> list[dict[str, Any]]:
+        """The last recorded check, damaged first. Empty until the first check runs."""
+        rows = self._rows(
+            """SELECT * FROM search_index_health
+               ORDER BY CASE state WHEN 'damaged' THEN 0 ELSE 1 END, index_name"""
+        )
+        return [dict(row) for row in rows]
+
     @staticmethod
     def _original_owner_from_connection(connection: sqlite3.Connection) -> str | None:
         """The live principal that owns this instance's unattributed data.

@@ -101,6 +101,31 @@ describe("attentionItems", () => {
     expect(titles).toContain("Readiness checks are unmet");
     expect(titles).toContain("2 required settings are unset");
   });
+
+  // BUG-322 — a damaged index was named only inside Diagnostics' fold.
+  it("names a damaged search index above the fold, with the way to its repair", () => {
+    const checked = { checked_at: "2026-10-05T10:00:00Z", first_damaged_at: "2026-10-05T10:00:00Z" };
+    const items = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: {
+        ...HEALTHY_DIAGNOSTICS,
+        search_indexes: [
+          { index_name: "conversation_fts", label: "Conversation search", state: "damaged", damaged_count: 1, ...checked },
+          { index_name: "vector_records", label: "Search by meaning", state: "damaged", damaged_count: 3, ...checked },
+          { index_name: "approved_memory_fts", label: "Memory search", state: "ok", damaged_count: 0, ...checked, first_damaged_at: null },
+        ],
+      },
+    });
+    expect(items.map((item) => item.title)).toEqual([
+      "Conversation search is damaged",
+      "Search by meaning is damaged",
+    ]);
+    expect(items.every((item) => item.tone === "blocking")).toBe(true);
+    expect(items[0].href).toBe("#/observe?tab=overview&repair=indexes");
+    expect(items[0].linkLabel).toBe("Rebuild it");
+    expect(items[1].detail).toMatch(/3 stored vectors could not be read/);
+    expect(items[1].linkLabel).toBe("Remove damaged vectors");
+  });
 });
 
 describe("allClearSentence", () => {

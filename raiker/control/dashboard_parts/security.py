@@ -11,16 +11,25 @@ turns off.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import McpSessionView
 from raiker.control.views.security import (
     CapabilityContainmentView,
     ContainedSubject,
+    NotificationDelivery,
     NotificationView,
     SecurityFindingView,
     SecurityHealthView,
+)
+from raiker.notify.approval_notifier import fire_os_notification
+from raiker.notify.delivery_policy import (
+    MUTABLE_CATEGORIES,
+    QuietHours,
+    instant,
+    interrupts_enabled,
 )
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
@@ -58,18 +67,69 @@ class SecurityService:
     ) -> list[NotificationView]:
         """Owner-scoped notifications, newest first."""
         return [
-            NotificationView(
-                notification_id=str(row["notification_id"]),
-                kind=str(row.get("kind", "")),
-                title=str(row.get("title", "")),
-                body=str(row.get("body", "")),
-                finding_id=row.get("finding_id"),
-                subject_id=row.get("subject_id"),
-                read=bool(row.get("read", 0)),
-                created_at=str(row.get("created_at", "")),
-            )
+            _notification_view(row)
             for row in self.store.list_notifications(principal_id, unread_only=unread_only)
         ]
+
+    def notification_delivery(
+        self: DashboardService, principal_id: str, *, now: datetime | None = None
+    ) -> NotificationDelivery:
+        """DEC-21a — the delivery policy as it stands now, and what it held."""
+        moment = now or datetime.now(UTC)
+        settings, zone = self.store.notification_settings(principal_id)
+        quiet = QuietHours.from_settings(settings, zone)
+        ends = quiet.ends_at(moment)
+        starts = quiet.next_starts_at(moment)
+        return {
+            "quiet_hours": {
+                "enabled": quiet.enabled,
+                "start": quiet.start.strftime("%H:%M"),
+                "end": quiet.end.strftime("%H:%M"),
+                "timezone": quiet.timezone,
+                "active": quiet.active(moment),
+                "ends_at": instant(ends) if ends else None,
+                "next_starts_at": instant(starts) if starts else None,
+                "critical_in_app": quiet.critical_in_app,
+                "critical_desktop": quiet.critical_desktop,
+            },
+            "decisions_interrupt": not quiet.active(moment),
+            "categories": [
+                {
+                    "category": category,
+                    "label": label,
+                    "interrupts": interrupts_enabled(settings, category),
+                }
+                for category, label in MUTABLE_CATEGORIES.items()
+            ],
+            "held": [
+                _notification_view(row)
+                for row in self.store.held_notifications(principal_id, now=moment)
+            ],
+        }
+
+    def acknowledge_held_notifications(
+        self: DashboardService, principal_id: str, notification_ids: list[str]
+    ) -> int:
+        return self.store.acknowledge_held_notifications(principal_id, notification_ids)
+
+    def send_test_notice(self: DashboardService, principal_id: str) -> NotificationView:
+        """DEC-21 — a notice written through exactly the path a real one takes.
+
+        Same table, same policy, same OS command: a test that went around the
+        policy would say alerts work during the quiet hours that hold them.
+        """
+        title = "Test notice"
+        body = "This is the notice you asked for. Real notices are shown the same way."
+        notification_id = self.store.insert_notification(
+            principal_id=principal_id, kind="test_notice", title=title, body=body
+        )
+        fire_os_notification(title, body, store=self.store, notification_id=notification_id)
+        row = next(
+            row
+            for row in self.store.list_notifications(principal_id, limit=50)
+            if row["notification_id"] == notification_id
+        )
+        return _notification_view(row)
 
     def list_security_credentials(self: DashboardService, principal_id: str) -> list[CredentialLifecycleView]:
         return CredentialLifecycle(self.store).list(principal_id)
@@ -202,3 +262,20 @@ class SecurityService:
         """Owner-scoped mark-as-read for one notification."""
         ok = self.store.mark_notification_read(notification_id, principal_id)
         return ControlResult(ok=ok, reason_code=None if ok else "unknown_notification")
+
+
+def _notification_view(row: dict[str, Any]) -> NotificationView:
+    return NotificationView(
+        notification_id=str(row["notification_id"]),
+        kind=str(row.get("kind", "")),
+        title=str(row.get("title", "")),
+        body=str(row.get("body", "")),
+        finding_id=row.get("finding_id"),
+        subject_id=row.get("subject_id"),
+        read=bool(row.get("read", 0)),
+        created_at=str(row.get("created_at", "")),
+        in_app_presentation=row.get("in_app_presentation"),
+        desktop_presentation=row.get("desktop_presentation"),
+        quiet_until=row.get("quiet_until"),
+        summarised_at=row.get("summarised_at"),
+    )

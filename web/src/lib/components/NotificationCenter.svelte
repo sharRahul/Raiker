@@ -23,7 +23,8 @@
    */
   import type { Notification as RaikerNotification } from "../apiTypes";
   import { api, hasToken } from "../api";
-  import { canRaiseDesktopNotice, raiseDesktopNotice } from "../desktopNotice";
+  import { canRaiseDesktopNotice, raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
+  import { delivery, interrupts, localClock, refreshDelivery, watchDelivery } from "../deliveryPolicy.svelte";
   import { watchLayout } from "../layoutWatch";
   import { uiPrefs } from "../prefs.svelte";
   import {
@@ -61,8 +62,59 @@
   const shown = $derived(
     onNoticeRecord(hash)
       ? []
-      : unread.filter((item) => !answeredByPage(item, hash) && !shownByApprovalCard(item)),
+      : unread.filter(
+          (item) =>
+            // DEC-21a — the server decided, when the notice was written,
+            // whether it may interrupt (quiet hours, a muted category). A
+            // held notice is in the bell and the record, never the dock.
+            interrupts(item.in_app_presentation) &&
+            !answeredByPage(item, hash) &&
+            !shownByApprovalCard(item),
+        ),
   );
+
+  /**
+   * DEC-21a — what quiet hours held, offered once as one summary when the
+   * interval is over, rather than replayed toast by toast. The server keeps
+   * the list, and acknowledging it there is what stops another tab — or this
+   * one after a reload — offering it again.
+   */
+  const held = $derived(
+    onNoticeRecord(hash) || delivery.current?.quiet_hours.active ? [] : (delivery.current?.held ?? []),
+  );
+  $effect(() => watchDelivery());
+
+  async function acknowledgeHeld(openRecord: boolean) {
+    const ids = held.map((item) => item.notification_id);
+    if (delivery.current) delivery.current = { ...delivery.current, held: [] };
+    if (openRecord) window.location.hash = NOTICE_RECORD;
+    try {
+      await api.acknowledgeHeldNotifications(ids);
+    } catch {
+      // Not acknowledged: the next read offers the summary again, which is the truth.
+    }
+    void refreshDelivery();
+  }
+
+  /**
+   * BUG-320 — on a work surface the dock covered the conversation: in Chat it
+   * sat over the owner's newest prompt for the whole of a turn. There a notice
+   * is shown for a few seconds and then folds into the bell, which keeps
+   * counting it; pointing at it or focusing it holds it open. Elsewhere it
+   * stays until read, as before.
+   */
+  const WORK_SURFACES = ["#/new-chat", "#/build", "#/design"];
+  const FOLD_AFTER_MS = 6000;
+  const onWorkSurface = $derived(WORK_SURFACES.some((route) => hash.split("?")[0].startsWith(route)));
+  let folded = $state<string[]>([]);
+  let holding = $state(false);
+  const visible = $derived(onWorkSurface ? shown.filter((item) => !folded.includes(item.notification_id)) : shown);
+  $effect(() => {
+    const newest = visible[0];
+    if (!onWorkSurface || newest === undefined || holding) return;
+    const timer = setTimeout(() => (folded = [...folded, newest.notification_id]), FOLD_AFTER_MS);
+    return () => clearTimeout(timer);
+  });
 
   /**
    * A notice the page has answered is read: the owner is looking at its
@@ -82,10 +134,30 @@
     ).then(() => announceNoticesChanged());
   });
 
+  /**
+   * The unread set the last poll saw. Found by this round's live run: the
+   * bell read notifications once on mount and then only when something
+   * announced a change, so a notice that arrived later was docked here and
+   * not counted there — and a notice folded into the bell (BUG-320) folded
+   * into a bell that did not count it. When the unread set changes, this poll
+   * is what announces it.
+   */
+  let unreadKey = "";
+
   async function poll() {
     if (!hasToken()) return;
     try {
       notifications = await api.notifications();
+      const key = notifications
+        .filter((item) => !item.read)
+        .map((item) => item.notification_id)
+        .join(",");
+      if (key !== unreadKey) {
+        // Announced on a change only, so the bell re-reading (which polls
+        // nothing back here) cannot start a loop.
+        unreadKey = key;
+        announceNoticesChanged();
+      }
     } catch {
       // A failed read leaves the strip as it was. The complete record is on
       // Observability → Notifications either way.
@@ -178,7 +250,7 @@
   }
 
   $effect(() => {
-    if (shown.length === 0 || dock === null) return;
+    if (visible.length === 0 || dock === null) return;
     return watchLayout(measure);
   });
 
@@ -191,6 +263,9 @@
     for (const item of unread) {
       if (mirrored.has(item.notification_id)) continue;
       mirrored.add(item.notification_id);
+      // DEC-21a — the desktop channel has its own stored decision: a critical
+      // exception can be on for one channel and off for the other.
+      if (!interrupts(item.desktop_presentation)) continue;
       raiseDesktopNotice({
         title: item.title,
         body: item.body,
@@ -201,14 +276,61 @@
       });
     }
   });
+
+  // The held summary on the desktop, once per set, and only when Raiker is not
+  // the window being looked at — the in-app card covers the visible case.
+  let summarisedOnDesktop = "";
+  $effect(() => {
+    if (held.length === 0 || !canRaiseDesktopNotice() || !raikerIsHidden()) return;
+    const key = held.map((item) => item.notification_id).join(",");
+    if (key === summarisedOnDesktop) return;
+    summarisedOnDesktop = key;
+    raiseDesktopNotice({
+      title: "While quiet hours were on",
+      body: held.length === 1 ? held[0].title : `${held.length} notices are waiting for you.`,
+      tag: "raiker-quiet-summary",
+      route: NOTICE_RECORD,
+    });
+  });
+
+  const heldUntil = $derived(
+    held[0]?.quiet_until && delivery.current
+      ? localClock(held[0].quiet_until, delivery.current.quiet_hours.timezone)
+      : null,
+  );
 </script>
 
-{#if uiPrefs.inApp && shown.length > 0}
-  {@const newest = shown[0]}
+{#if uiPrefs.inApp && held.length > 0}
+  <section class="notifications summary" aria-label="Held during quiet hours" data-testid="quiet-summary">
+    <div class="notice">
+      <strong>While quiet hours were on</strong>
+      <span>
+        {held.length === 1 ? "One notice was held" : `${held.length} notices were held`}{heldUntil
+          ? ` until ${heldUntil}`
+          : ""}, and {held.length === 1 ? "it is" : "they are"} still unread:
+      </span>
+      <ul>
+        {#each held.slice(0, 3) as item (item.notification_id)}
+          <li>{item.title}</li>
+        {/each}
+        {#if held.length > 3}<li>and {held.length - 3} more</li>{/if}
+      </ul>
+    </div>
+    <div class="summary-actions">
+      <button type="button" class="btn btn-sm" onclick={() => void acknowledgeHeld(true)}>Open notices</button>
+      <button type="button" class="btn btn-sm btn-ghost" onclick={() => void acknowledgeHeld(false)}>Later</button>
+    </div>
+  </section>
+{:else if uiPrefs.inApp && visible.length > 0}
+  {@const newest = visible[0]}
   <section
     class="notifications"
     aria-label="Notifications"
     bind:this={dock}
+    onpointerenter={() => (holding = true)}
+    onpointerleave={() => (holding = false)}
+    onfocusin={() => (holding = true)}
+    onfocusout={() => (holding = false)}
     style:transform={drop > 0 ? `translateY(${drop}px)` : undefined}
   >
     <!-- One, not a stack. Three docked cards covered Home's primary actions at
@@ -227,11 +349,11 @@
         onclick={() => void dismiss(newest)}>×</button
       >
     </div>
-    {#if shown.length > 1}
+    {#if visible.length > 1}
       <!-- Inside the card, on its surface: drawn beside it, the link read as
            part of whatever page was underneath (BUG-309 found it across a
            table's Status header). -->
-      <a class="all" href={NOTICE_RECORD}>{shown.length} unread notices</a>
+      <a class="all" href={NOTICE_RECORD}>{visible.length} unread notices</a>
     {/if}
   </section>
 {/if}
@@ -296,4 +418,6 @@
     border-top: 1px solid var(--neutral-border);
   }
   .all:hover { color: var(--text-1); }
+  .summary ul { margin: 0.2rem 0 0; padding-left: 1.1rem; color: var(--text-2); font-size: var(--text-sm); }
+  .summary-actions { display: flex; gap: var(--space-2); padding: 0 0.8rem 0.7rem; }
 </style>

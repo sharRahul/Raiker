@@ -30,8 +30,8 @@ class TaskStore:
         self._execute(
             """
             INSERT OR IGNORE INTO tasks
-            (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json, schedule_timezone, schedule_anchor, schedule_until, missed_run_policy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json, schedule_timezone, schedule_anchor, schedule_until, missed_run_policy, max_run_minutes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task.task_id,
@@ -60,7 +60,17 @@ class TaskStore:
                 task.schedule_anchor,
                 task.schedule_until,
                 task.missed_run_policy,
+                task.max_run_minutes,
             ),
+        )
+
+    def set_task_run_limit(self: SQLiteStore, task_id: str, minutes: int | None) -> bool:
+        """DEC-12 step 6 — set one routine's run limit; ``None`` restores the default."""
+        return bool(
+            self._execute(
+                "UPDATE tasks SET max_run_minutes = ?, updated_at = ? WHERE task_id = ?",
+                (minutes, utc_now(), task_id),
+            )
         )
 
     @staticmethod

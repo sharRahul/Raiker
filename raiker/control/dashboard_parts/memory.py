@@ -1057,9 +1057,31 @@ class MemoryService:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         counts = self.store.rebuild_text_indexes()
+        # BUG-322 — the attention item reads the recorded check; re-run it so
+        # a repair clears it now rather than at the next five-minute check.
+        self.store.check_search_indexes()
         return ControlResult(
             ok=True,
             data={"indexed_rows": counts, "damaged_text_indexes": self.store.damaged_text_indexes()},
+        )
+
+    def remove_damaged_vectors(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        """DEC-24 step 6's repair for damaged vectors.
+
+        A vector is computed from text that is still stored, so removing one
+        that cannot be read loses nothing: the memory or chunk it belonged to
+        becomes *not yet indexed*, which the Memory engine's index action
+        finishes through the owner's chosen embedding provider. Nothing is
+        embedded here — that would send text to a provider without the owner
+        asking.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        removed = self.store.remove_damaged_vectors()
+        self.store.check_search_indexes()
+        return ControlResult(
+            ok=True,
+            data={"removed": removed, "damaged_vector_count": len(self.store.damaged_vector_ids())},
         )
 
     def list_observations(self: DashboardService, acting_principal_id: str | None) -> ControlResult:

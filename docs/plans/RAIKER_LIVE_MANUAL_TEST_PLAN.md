@@ -1114,3 +1114,27 @@ screenshot under `screenshots/not-working/`.
 
 **If a step here was wrong, fix the step.** That is the one edit this document
 wants from a round — not a note about what you saw.
+
+## Decision statement — what qualifies as live proof (2026-10-05)
+
+**Decision — evidence classification.** Record real-provider, local-runtime,
+stand-in, automated-only and blocked results separately. A stand-in can prove
+UI/protocol behavior but cannot close real-provider/runtime acceptance. A
+blocked dependency is neither a passing scenario nor, without additional
+evidence, a product defect.
+
+**Reason and alternatives.** BUG-287/290 retain external-provider evidence gaps;
+BUG-318 records an Ollama stand-in. Treating those as successful real journeys
+would overstate release readiness, while discarding the stand-in observations
+would lose valid evidence about the paths actually exercised.
+
+**Acceptance and recording.** Record the tested commit/build, platform, runtime/
+provider and model, scenario, expected/observed result, limitation and evidence
+path. Prove successful work, refusal/revocation and recovery where the feature
+claims them. Current screenshots belong under `docs/screenshots/`; historical
+paths in old rounds remain historical. Preserve secrets outside committed
+records. No live run was performed by this documentation change.
+References: [round ledger](LIVE_TEST_ROUNDS.md),
+[BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama),
+[current screenshot policy](README.md#documentation-governance),
+[release assurance](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#188-acceptance-and-release-assurance-for-the-removal-plan).

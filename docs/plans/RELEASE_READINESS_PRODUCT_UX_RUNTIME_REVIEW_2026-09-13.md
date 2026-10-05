@@ -3425,3 +3425,43 @@ Avoid giant mixed refactors: first make state canonical and contract-tested, the
 | CI/release | Verify checks on the exact removal implementation commit and release artifact. A documentation PR's checks do not certify application/runtime or installer behavior. |
 
 **Assessment:** Raiker can present substantial feature breadth through fewer, clearer interactions. Prioritize removing misleading state and duplicated concepts, then move advanced controls and consolidate controllers. The current source includes meaningful fixes to earlier findings, but the new completeness, freshness, source-review and continuation gaps still need implementation and live acceptance before claiming a seamless experience.
+
+# 19. Decision-completeness addendum — 2026-10-05
+
+**Evidence revision:** `2898b247c9e02d537c6f61e866ed670578e49b42`.
+This addendum documents missing choices and precedence; it does not implement
+features, approve a release or claim fresh live verification.
+
+**Decision — maintain one decision location per unresolved item.** Detailed
+recommendations for BUG-313 (ranked recall fallback), BUG-315 (separately
+governed channel replies), BUG-316 (filing versus execution root), BUG-226
+(hook authority) and BUG-228 (contributed UI) live in the
+[defect ledger's decision statements](TO_BE_FIXED.md#decision-statements-added-2026-10-05).
+The [proposal ledger](TO_BE_ADDED.md#decision-statements-added-2026-10-05)
+records the expansion and experiment choices. Keep their Recommended/Pending
+status until accepted; this documentation request is not evidence that every
+proposed product policy has already been approved.
+
+**Reason and alternatives.** Repeating detailed choices here would create
+another place that can disagree with the canonical issue. Omitting them would
+leave engineering to invent ranking, outbound authority or filesystem behavior.
+A decision reference links this review's DEC-04/06/14/20/23/24 to those exact
+choices without allocating competing DEC identifiers.
+
+**Decision — preserve accepted owner policy and verified closure.** This
+addendum does not reopen the recorded Stop scope, unset-capability baseline,
+host-network code choice or local-model selection/watch decisions. The
+optimisation review's Stage B closed in FIXED-678/679; it is historical rather
+than a missing planning decision. A correction such as FIXED-740's server-issued
+Build boundary does not by itself close BUG-316's working-folder ambiguity.
+
+**Acceptance and consequence.** Apply section 13.9's lifecycle: record the
+accepting role/date, exact scope, alternatives, source/test anchors, migration
+or explicit no-migration rationale, and negative/recovery evidence before
+marking implementation Verified. Documentation checks validate these links and
+status distinctions only. Public alpha/beta/stable sign-off still requires the
+release gates, not the presence of a decision paragraph.
+References: [plan authority](README.md#decision-recording-policy--2026-10-05),
+[governance decision](GOVERNANCE_ENTRY_PATHS.md#decision-statement--maintain-the-measured-boundary-2026-10-05),
+[FIXED-678](FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy),
+[FIXED-679](FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes).

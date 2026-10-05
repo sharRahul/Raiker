@@ -1192,3 +1192,67 @@ and where did the instruction come from?**
 Without identity (ADD-03) and lineage (ADD-04), security is an illusion. A sandbox
 is only as strong as its ability to verify who is requesting an action. Build
 Tier 0 first, or the rest is decoration on an open door.
+
+## Decision statements added 2026-10-05
+
+**Status:** recommendations for unresolved proposals; existing shipped entries
+and recorded owner decisions keep their status. References below are repository
+contracts at `2898b247c9e02d537c6f61e866ed670578e49b42`, not a new external
+standards or competitor assessment.
+
+### Expansion requires an explicit deployment choice
+**Decision — recommended deferral.** Keep ADD-11 (off-machine gateway), ADD-14
+(TEE), ADD-18 (multiple-principal trust) and ADD-23 (interactive browser) opt-in
+proposals until their scope is accepted. They must not become default release
+requirements or widen current grants as a side effect of parity work.
+
+**Reason and alternatives.** These change remote exposure, supported hardware,
+identity boundaries or third-party interaction. Treating them as ordinary UI
+tasks hides those costs. The alternative of removing them permanently would
+discard useful product options without evidence. Deferral preserves the options
+while requiring a concrete contract: supported deployment, trust boundary,
+credential handling, revocation, recovery and acceptance fixtures.
+
+**Exit criteria.** ADD-11 must distinguish existing inbound channel routing from
+a proposed outbound polling gateway; ADD-14 needs an attested deployment and
+honest non-TEE mode; ADD-18 needs explicit principals and reduced delegation;
+ADD-23 needs bounded browser actions, isolated sessions and reviewed endpoint
+policy. None may import authority from remote content.
+References: entries ADD-11/14/18/23 above,
+[DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen),
+[nested boundaries](../architecture/NESTED_BOUNDARIES_ARCHITECTURE.md).
+
+### One contributed-UI contract, with honest dependency status
+**Decision — recommended.** Adopt ADD-24's MCP Apps direction rather than build
+plugin panels alongside it. The historical BUG-234 protocol-version dependency
+was lifted by FIXED-274, as ADD-24 already records; the remaining feature work
+is per-app authority, sandboxing, validated messages and accessibility. Do not
+interpret the summary's “after BUG-234” as requiring every unrelated MCP
+remainder to close first.
+
+**Reason and acceptance.** One host contract reduces duplicated routing and
+permission logic. An iframe is an isolation boundary, not proof that no
+third-party code executes. Require explicit permitted data and calls, denied
+top-level navigation, revocation behavior and keyboard/screen-reader fallback
+before advertising this capability. Retire obsolete panel declarations through
+an explicit compatibility change, not silently.
+References: [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui),
+[BUG-228](TO_BE_FIXED.md#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract),
+[DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui).
+
+### Experimental autonomy must earn wider use
+**Decision — recommended.** Keep ADD-05/06 self-improvement advisory until
+reviewed activation; keep ADD-16/17 critic/debate work behind measured,
+bounded experiments; preserve ADD-25's staged memory prerequisites. Model
+consensus, a generated skill or a critic score must never grant authority.
+
+**Reason and acceptance.** More model passes add latency/cost and correlated
+errors. Compare against a single-pass baseline with false-positive, missed-threat,
+latency and token-cost measurements. Define cancellation, maximum work and
+content-minimal audit before rollout. For ADD-12, compare isolation mechanisms
+on their actual guarantees; document the kernel and process boundary of each
+candidate rather than assuming every sandbox is a micro-VM. Keep performance
+numbers in the historical proposal unverified for Raiker until measured.
+References: ADD-05/06/12/16/17/25 above,
+[DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui),
+[DEC-24](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#136-dec-24--operational-recovery-budgets-and-diagnostics).

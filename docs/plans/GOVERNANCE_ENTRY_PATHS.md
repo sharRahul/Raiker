@@ -639,3 +639,33 @@ once they are prioritised.
 **It must be updated when a path is added.** A new `route_action` call site, a
 new `AgentGateway` construction, a new local gate check, or a new capability with
 an executor is a change to this document as much as to the code.
+
+## Decision statement — maintain the measured boundary (2026-10-05)
+
+**Decision — retained architecture and recorded owner policy.** Keep the two
+enumerated checkpoints and shared local admission path explicit; do not describe
+them as one universal call stack. A new executor or automated initiator must
+update this inventory and the machine-readable entry registry, with a test of
+the real reachable path. Registering a capability name alone is insufficient.
+
+**Reason and alternatives.** The inventory found both inert switches and a
+second egress implementation. A prose “everything is governed” claim cannot
+detect either. Conversely, routing every read through an acting executor just
+to simplify the diagram would change behavior without establishing a stronger
+contract. Verify the required checks for each path instead.
+
+**Stop/defaults clarification.** Carry forward GEP-02/FIXED-603: Stop targets all
+work in progress, including reads, at safe boundaries. It does not implicitly
+redefine persisted runtime-active state. Carry forward BUG-239/FIXED-544's
+three unset-resolution rules and selective fresh-account baseline; this review
+does not enable more capabilities or overwrite owner settings.
+
+**Acceptance.** New paths must prove owner isolation, effective gate/mode,
+revocation and audit where applicable, and inability to call the executor
+without runtime-issued authority. Test stopping delegated work as well as its
+parent. BUG-315's automatic sender remains a proposed additional entry.
+References: [entry registry](../../raiker/runtime/authority/entry_paths.py),
+[inventory tests](../../tests/test_governance_entry_paths.py),
+[GEP-02](#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths),
+[BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things),
+[BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).

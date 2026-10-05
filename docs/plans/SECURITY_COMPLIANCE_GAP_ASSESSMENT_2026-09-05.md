@@ -1123,3 +1123,29 @@ The second pass therefore changes the security roadmap from a conventional appli
 - adversarial AI assurance.
 
 Until the P0/P1 items have implementation evidence, the correct posture is **strong architecture with material assurance gaps**, not a claim of complete security or regulatory compliance.
+
+## Decision statement — evidence-bound assurance (2026-10-05)
+
+**Decision — retain this assessment as a control-mapping baseline.** A mapped
+framework requirement is not an implemented control, a certification or a
+legal applicability conclusion. Separate technical acceptance evidence from
+the product/deployment decisions and specialist review needed for regulatory
+claims. Preserve the dated external references rather than presenting them as
+newly revalidated sources.
+
+**Reason and alternatives.** A single “compliant” label would combine different
+scopes, jurisdictions and evidence levels. Equally, a later fix must not leave
+the same technical gap appearing unresolved indefinitely: record its closure
+and link the affected control without rewriting the original observation.
+
+**Implementation consequence and acceptance.** For each claimed control, name
+the supported deployment, enforcement point, negative/failure test, limitations
+and evidence revision. Prioritize authority, disclosure, restore and resource
+boundaries; detection or monitoring does not itself authorize an action.
+Owner-authoritative endpoint and execution choices must use the documented
+exceptions rather than a newly inferred blanket restriction. No new compliance
+claim or risk acceptance is made by this edit.
+References: sections 2, 4 and 14 of this assessment;
+[governance inventory](GOVERNANCE_ENTRY_PATHS.md);
+[release cross-cutting decisions](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#132-cross-cutting-decisions-that-must-not-remain-ambiguous);
+[closure evidence](FIXED_ITEMS.md).

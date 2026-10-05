@@ -932,3 +932,28 @@ Checked 2026-09-07:
 
 These references are comparison inputs, not claims that Raiker should reproduce
 another platform's exact UI or permission model.
+
+## Decision statement — historical audit and surviving release gates (2026-10-05)
+
+**Decision — retain evidence precedence.** Keep this audit as the dated baseline;
+its “current-status” wording refers to the named September commit. Later
+verified closures and the release-readiness review govern subsequent status.
+The OPT-01/OPT-02 implementation choice is no longer missing: Stage B ordinary
+JSON response models and generated wrappers closed as FIXED-678/679. Do not
+restore the deleted optimisation review or repeat its former route counts as
+current facts.
+
+**Reason and alternatives.** Rewriting the original audit would erase what its
+priorities were based on; leaving it without a precedence statement encourages
+obsolete work. A closure is specific to its contract: API generation completion
+does not prove installer, authority or live-provider readiness.
+
+**Acceptance and consequence.** Continue to require clean install/update/
+uninstall evidence on supported platforms and current authority-boundary tests
+before release sign-off. Resolve each surviving item against its newer record
+rather than assuming every row in the September table is still open. This is a
+documentation clarification with no runtime or migration change.
+References: [current index](README.md),
+[FIXED-678](FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy),
+[FIXED-679](FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes),
+[release review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md).

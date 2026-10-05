@@ -884,3 +884,34 @@ nesting, priority, and stop; project creation and session assignment; document
 and image attachment upload reaching the model; MCP server create/connect/
 monitor; theme toggle across all views; notification centre; STOP switch;
 and adaptive navigation at 375/768/1024/1440 px with no horizontal overflow.
+
+## Decision statements added 2026-10-05
+
+**Decision — carry forward settled boundaries; keep expansion explicit.**
+Read C2 and C3 by their completed row-level records: connector writes retain
+exact-effect approval, and durable memory remains governed. They are not still
+open owner-policy choices merely because an older pillar summary says so.
+For C10, separate shipped background notifications and inbound routing from
+the unimplemented outbound Telegram reply path in BUG-315. For C12, retain
+DEC-20's single-owner scope until a multi-principal architecture is chosen.
+
+**Reason and alternatives.** Reopening settled choices duplicates work; treating
+notifications, inbound routing and outbound delivery as one boolean can conceal
+an ungoverned send. Multi-user collaboration changes resource isolation and
+cannot be supplied by adding a Share button. The phase-3 readiness flags
+describe that readiness contract, not all later channel implementations.
+
+**B20 clarification — existing owner decision, not a new restriction.**
+Apply FIXED-620: use the sandbox where supported; otherwise expose the separate
+“Code with this machine's network” capability and its Ask-me posture. Preserve
+honest host-isolation wording and do not silently fall back from a specifically
+requested unavailable sandbox. This does not claim that every container
+scenario has live evidence.
+
+**Acceptance and references.** Future work must demonstrate connector effect
+binding, memory scope, channel delivery receipts and the selected execution
+boundary independently. Read [BUG-315/316 decision statements](TO_BE_FIXED.md#decision-statements-added-2026-10-05)
+for the unresolved choices; [DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen)
+for collaboration scope; and
+[FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)
+for the recorded B20 policy. This addendum changes no completion status.

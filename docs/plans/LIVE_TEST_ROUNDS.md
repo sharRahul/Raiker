@@ -3537,3 +3537,21 @@ assistant reply. Screenshots: `208-BUG-69-first-run-model-setup-live.png` throug
 `214-BUG-69-huggingface-download-deploy-live.png`. The Anthropic refusal is an
 expected external account state and proved the new fail-closed execution
 preflight; OpenRouter and Ollama supplied successful execution evidence.
+
+## Documentation decision note — 2026-10-05 (not a live round)
+
+**Decision — evidence preservation.** Earlier rounds remain unchanged. Their
+results apply to their stated build, environment and provider; a later source
+fix or documentation review does not retroactively pass an unrun scenario.
+
+**Reason.** This ledger separates observations from the manual plan's expected
+behavior. Rewriting an old result would erase that distinction. In particular,
+stand-in success does not prove a real provider or Ollama runtime, and a
+provider block does not by itself prove an application failure.
+
+**Recording consequence.** The old introductory screenshot instructions describe
+the historical layout. New evidence uses `docs/screenshots/`, as the current
+[plan index](README.md#documentation-governance) specifies. This note is a
+documentation correction, not a test execution, and adds no passing scenario.
+References: [manual-plan evidence decision](RAIKER_LIVE_MANUAL_TEST_PLAN.md#decision-statement--what-qualifies-as-live-proof-2026-10-05),
+[BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama).

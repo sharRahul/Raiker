@@ -106,3 +106,37 @@ When these disagree with an older topic review's current-status prose, re-verify
 6. **Screenshots:** use only `docs/screenshots/` for current product evidence. `docs/plans/screenshots/` is historical and may intentionally contain obsolete states.
 
 This structure is intended to stop a later fix from requiring edits to half a dozen historical review files just to keep the meaning of “open” consistent.
+
+## Decision recording policy — 2026-10-05
+
+**Decision.** Keep the detailed choice beside its canonical BUG, ADD or topic
+contract. Record status, date/evidence revision, scope, rationale, alternatives,
+consequences, dependencies, acceptance and source references. Distinguish
+**recorded owner decision**, **recommended/pending acceptance**, and **verified
+implementation**. A request to document missing decisions does not retroactively
+turn recommendations into owner sign-off.
+
+**Reason.** A task list states what could change; a decision states why this
+option was chosen and what must remain true. Duplicating full decisions across
+indexes creates conflicting authority. Use links in summaries, preserve dated
+observations, and let verified closures supersede old status.
+
+**Review coverage at `2898b247c9e02d537c6f61e866ed670578e49b42`:**
+
+| Documents | Decision coverage / disposition |
+|---|---|
+| `TO_BE_FIXED.md` | Recall ranking, outbound reply authority, Build location semantics, unsupported hooks and contributed UI. Recommendations do not close defects. |
+| `TO_BE_ADDED.md` | Explicit expansion scope, one MCP Apps direction, measured autonomy experiments and prerequisite interpretation. |
+| `GAP_BUILD_CHAT.md`, `PILLAR_MAP.md` | Settled connector/memory scope, channel distinctions, B20 policy and canonical status precedence. |
+| `GOVERNANCE_ENTRY_PATHS.md` | Measured entry paths, existing Stop/defaults decisions and evidence for new initiators. |
+| Release-readiness review | Section 19 links unresolved choices to existing DEC contracts and preserves sign-off gates. |
+| Deep audit, security/compliance assessment | Historical baseline precedence, completed optimisation scope and evidence-bound assurance. |
+| Manual test plan, `LIVE_TEST_ROUNDS.md`, `screenshots/README.md` | Live versus stand-in evidence, append-only observations and canonical screenshot location. |
+| `FIXED_ITEMS.md` | Reviewed as closure evidence; unchanged because this documentation-only pass fixes no product defect and must not invent a closure. |
+
+**Acceptance.** Existing owner decisions and closure records retain their
+authority; recommendations remain visibly pending. Verify added local links
+against this revision. No source code, runtime setting or schema is changed.
+References: [decision lifecycle](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#139-decision-sign-off-and-definition-of-complete),
+[defect decisions](TO_BE_FIXED.md#decision-statements-added-2026-10-05),
+[proposal decisions](TO_BE_ADDED.md#decision-statements-added-2026-10-05).

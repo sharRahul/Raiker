@@ -2402,3 +2402,128 @@ was taken with the fold opened by hand).
 report's `damaged_text_indexes`, deep-linking to the rebuild, and run the
 integrity check on the host tick (it is read-only and cheap) rather than only
 when Diagnostics opens.
+
+## Decision statements added 2026-10-05
+
+**Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.
+These statements supply missing implementation direction. **Recommended** means
+a proposed choice, not an owner approval or a verified fix. The original BUG
+entries retain their status and acceptance evidence.
+
+### BUG-313 — Bounded recall fallback
+**Decision — recommended; ranking choice pending owner acceptance.** Keep the
+strict lexical query first. On no match, prefer a bounded OR/BM25 candidate
+query with a minimum content-term coverage rule over enumerating progressively
+smaller subsets. Apply existing owner, project, active-revision, suppression and
+retrieval-budget checks before any candidate reaches model context. Do not use
+an unrestricted OR match or silently add a model call to rewrite every query.
+
+**Reason and alternatives.** All-term matching makes answer-format instructions
+part of the factual question. A ranked fallback can recover relevant facts;
+subset enumeration can grow combinatorially and makes query cost harder to
+bound. A permissive OR alone trades missing memories for unrelated disclosure.
+The exact coverage threshold remains a measured choice, not an invented
+production constant.
+
+**Code review.** `MemoryStore.search_approved_memory` already ranks FTS5
+matches with `bm25()` and uses recency on FTS4; this recommendation changes
+candidate matching, not the existence of ranking. Preserve the FTS4 fallback
+and disclose its weaker ordering, or explicitly decide a supported-engine
+change before requiring BM25. `retrieve_hybrid_memory` merges lexical, vector
+and graph evidence and re-reads active approved records: changing lexical
+matching must not bypass those final eligibility checks.
+References: [memory store](../../raiker/storage/stores/memory.py),
+[search-engine posture](../../raiker/storage/sqlite.py).
+
+**Acceptance and consequence.** Compare strict matching and the proposed
+fallback on the tea example, instruction variants, unrelated two-word overlaps,
+stopword-only queries, cross-owner/project records, forgotten records and large
+corpora. Record recall quality, false positives and query cost before choosing
+the threshold. Preserve provenance in the Remembered strip. No data migration
+is intended; an index/schema change would require its own migration decision.
+References: [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about),
+[retrieval service](../../raiker/memory/retrieval.py),
+[existing retrieval hardening tests](../../tests/test_memory_retrieval_hardening.py).
+
+### BUG-315 — Reply delivery is a separate governed effect
+**Decision — recommended; outbound approval policy pending owner acceptance.**
+Prepare a reply to the authenticated, paired conversation, then govern delivery
+as its own outbound action. Receiving a message, running a turn or approving a
+tool in that turn does not approve sending its answer. Use the effective
+capability/decision mode; a narrowly scoped standing grant may permit delivery
+only if the owner explicitly created it. Add the automated delivery entry path
+before enabling the sender.
+
+**Reason and alternatives.** The webhook HTTP response is not a delivered
+Telegram message. Unconditional auto-replies would introduce an authority and
+data-disclosure path that the present entry inventory does not describe.
+Forcing an additional prompt even under an applicable owner grant would also
+misrepresent the existing decision-mode contract.
+
+**Code review.** `TelegramAdapter.outbound` already constructs a token-bound
+`sendMessage` request. The missing part is automatic reply orchestration:
+`_route_inbound_message` returns `response.message`, while `_settle_receipt`
+deliberately withholds delivered status for Telegram. Reuse the adapter through
+governed execution; do not add a direct HTTP send inside the inbound route.
+References: [channel adapters](../../raiker/channels/adapters.py),
+[inbound router and receipts](../../raiker/api/routes_channels.py).
+
+**Acceptance and consequence.** Bind the intent to owner, channel, recipient,
+source event and payload; distinguish queued, awaiting approval, delivered,
+failed and outcome-unknown. Exercise revoked grants, duplicate events,
+restart-before/after-send, provider failure and bot-loop protection. Retry
+automatically only when reconciliation or provider deduplication makes it safe.
+Durable outbox/receipt changes need versioned schema and recovery fixtures.
+References: [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram),
+[DEC-14](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-14--make-messaging-a-guided-durable-channel-service),
+[entry-path registry](../../raiker/runtime/authority/entry_paths.py).
+
+### BUG-316 — Separate filing from execution location
+**Decision — recommended; working-folder policy pending owner acceptance.**
+For the first corrective slice, label the Project as where the conversation is
+filed and show the actual server-resolved repository/workspace as the execution
+location. Do not move commands into a managed Project directory merely to make
+the existing wording true.
+
+**Reason and alternatives.** A wording/projection correction resolves the false
+promise without changing filesystem authority. Making every managed Project a
+working directory changes protected-path handling, command cwd, checkpoints and
+existing task behavior; that is a separate architecture change. FIXED-740 made
+the boundary server-issued but does not itself settle BUG-316's semantics.
+
+**Code review.** `authority_for_project` returns workspace-only authority for
+a managed Project and adds a granted root for an attached Project.
+`PathAuthority._resolve` resolves relative paths against `workspace_root`;
+an additional allowed root does not automatically become command cwd.
+References: [Project root resolver](../../raiker/control/project_roots.py),
+[boundary contract tests](../../tests/test_build_boundary.py).
+
+**Acceptance and consequence.** For a managed Project and an attached repository,
+compare the displayed root with reads, writes and command cwd after selection,
+reload and a slow/out-of-order boundary response. An unavailable boundary must
+say unknown/unavailable. No storage migration is intended for this slice; a
+future Project-root migration must define compatibility and rollback.
+References: [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in),
+[DEC-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-04--make-project-continuity-explicit-and-typed),
+[FIXED-740](FIXED_ITEMS.md#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run),
+[path authority](../../raiker/tools/path_authority.py),
+[turn-boundary tests](../../tests/test_turn_path_authority.py).
+
+### BUG-226 and BUG-228 — Do not create alternate execution contracts
+**Decision — retained deferral for hooks; recommended convergence for UI.**
+Keep `mcp_tool` and `agent` hook types unsupported until each has bounded,
+non-escalating authority, its own resource budget, recursion limits and
+execution-time revalidation. For contributed UI, follow ADD-24's one MCP Apps
+contract instead of implementing a second `panels.json` renderer. BUG-228 may
+eventually close as superseded only when the replacement scope is accepted and
+its obsolete promises are reconciled; it is not implemented by this note.
+
+**Reason and acceptance.** A hook must not call a tool the originating turn
+cannot call. Two contributed-UI models duplicate permission, isolation and
+accessibility work. Test denial/revocation and recursion for hooks, and
+per-app grants, message validation, iframe isolation and keyboard access for UI.
+A sandboxed iframe still runs third-party code; the product must describe its
+boundary accurately rather than claim that no browser code runs.
+References: [hook type contract](../../raiker/hooks/contracts.py),
+[ADD-24](TO_BE_ADDED.md#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui),
+[DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui).

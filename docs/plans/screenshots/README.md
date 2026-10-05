@@ -548,3 +548,22 @@ workspace the day's earlier rounds used.
 | `working/round0904-knowledge-map-dark.png` | FIXED-399 — the same page and the same rules in the dark theme, with all four hard-coded palette blocks removed |
 
 Neither image contains a credential value.
+
+## Decision statement — historical catalogue (2026-10-05)
+
+**Decision — current evidence location.** Treat this directory and its catalogue
+as historical. The “current” labels in the dated descriptions above mean current
+at those captures, not current Raiker. New release evidence belongs under
+`docs/screenshots/`; retain old filenames and descriptions for traceability.
+
+**Reason and alternatives.** Recapturing into two competing catalogues makes
+“latest” ambiguous. Relabelling old PNGs as current would claim a test that never
+ran. Historical missing captures cannot be recreated from their names.
+
+**Acceptance and consequence.** Link new evidence to its actual build, date,
+scenario, viewport and theme; preserve limitations and provider/stand-in
+classification. This documentation change generates no screenshots and proves
+no visual or runtime behavior.
+References: [canonical policy](../README.md#documentation-governance),
+[live evidence decision](../RAIKER_LIVE_MANUAL_TEST_PLAN.md#decision-statement--what-qualifies-as-live-proof-2026-10-05),
+[rounds](../LIVE_TEST_ROUNDS.md).

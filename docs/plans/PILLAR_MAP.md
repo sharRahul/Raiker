@@ -271,3 +271,26 @@ it belongs in exactly one pillar here.
 item is *for*; the backlog says what it *costs* and in what order. Where the two
 orderings differ — as they do above — the difference is the point, and the reason
 is stated in the last column.
+
+## Decision statement — use pillars for dependencies (2026-10-05)
+
+**Decision — documentation authority clarification.** Use this map to explain
+which user outcome an item serves; use current canonical ledger rows and
+verified closure records to decide whether it is open. Preserve the historical
+ordering above. Do not restart closed work or select a new expansion merely
+because an old pillar summary still calls it a blocker.
+
+**Reason and alternatives.** The map deliberately repeats references, not the
+full evidence. Promoting its old counts or policy labels to a separate backlog
+would create competing priorities. In particular, GAP-CHAT C2/C3 already record
+completed governed connector/memory behavior, and ADD-24 records that its
+protocol-version prerequisite was lifted.
+
+**Implementation consequence.** Prioritize current boundary and release-evidence
+gaps by severity, then dependencies and effort. Future collaboration/browser/TEE
+scope stays a proposal; the map cannot approve it. Review the dependent pillar
+when a ledger item closes, but retain the original rationale as history.
+References: [current plan index](README.md),
+[Build/Chat clarification](GAP_BUILD_CHAT.md#decision-statements-added-2026-10-05),
+[proposal decisions](TO_BE_ADDED.md#decision-statements-added-2026-10-05),
+[release sign-off](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#139-decision-sign-off-and-definition-of-complete).

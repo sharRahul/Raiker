@@ -171,6 +171,19 @@ limit per run* (1 to 1,000) stops a run after that many tool calls; left empty,
 a run keeps the runtime's own ceiling. **Will it run?** says both limits —
 *Each run is stopped after 60 minutes or 40 tool calls.*
 
+**And a cost limit.** *Cost limit per run* ($0.01 to $1,000) stops a run once
+what it has spent reaches that amount, priced from the provider's own token
+counts — cached prompt tokens included — at the rate Models → Pricing shows.
+It is checked before each further question to the model, so a run can go over
+by at most the one answer that crossed it, and a stopped run counts as one that
+did not complete. A model with no known price cannot be held to an amount:
+**Will it run?** says so, rather than letting the limit look like protection.
+
+**A task is filed once.** Pressing **Create task** twice, or again after a lost
+connection, files the draft once: the composer sends one key per draft and the
+server returns the first answer for it. Change the draft and save again, and it
+is a new task.
+
 ### One lifecycle, and what each part of it lets you press
 
 Every task is in one of these phases, served by the runtime with the task, and

@@ -17,6 +17,12 @@ configure before your gates mean anything.
 Open **Permissions** to inspect the tools reported by your runtime. The page
 reads top to bottom in the order the questions arrive.
 
+A change is made against what the page shows. If another tab or device changed
+the same permission after this page opened, the change is refused — *This
+permission was changed somewhere else since this page loaded, so nothing was
+changed* — and the page re-reads the current setting, so an old page can never
+quietly undo a newer decision, such as a permission you tightened elsewhere.
+
 **Posture** leads: one sentence saying how many of your permissions are
 available to Raiker and how many are set to act without asking you, with the
 counts beneath it as the page's status filter — **All**, **Available**,

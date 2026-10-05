@@ -1380,6 +1380,13 @@
             "title": "Counts",
             "type": "object"
           },
+          "deletions_applied": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Deletions Applied",
+            "type": "object"
+          },
           "path": {
             "title": "Path",
             "type": "string"
@@ -1389,7 +1396,8 @@
           "backup_id",
           "path",
           "counts",
-          "command"
+          "command",
+          "deletions_applied"
         ],
         "title": "BackupRestored",
         "type": "object"
@@ -1438,9 +1446,17 @@
             "title": "Not Included",
             "type": "array"
           },
+          "opens_here": {
+            "title": "Opens Here",
+            "type": "boolean"
+          },
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "schema_generation": {
+            "title": "Schema Generation",
+            "type": "integer"
           },
           "schema_migrations": {
             "title": "Schema Migrations",
@@ -1484,7 +1500,9 @@
           "not_included",
           "state",
           "verified_at",
-          "detail"
+          "detail",
+          "schema_generation",
+          "opens_here"
         ],
         "title": "BackupView",
         "type": "object"
@@ -7947,6 +7965,17 @@
             ],
             "title": "As Principal"
           },
+          "expected_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected State"
+          },
           "reason": {
             "default": "",
             "title": "Reason",
@@ -8292,6 +8321,10 @@
       "EnvironmentContextView": {
         "description": "The environment bundle a model turn receives, read by Settings.",
         "properties": {
+          "answer_language": {
+            "title": "Answer Language",
+            "type": "string"
+          },
           "day_of_week": {
             "title": "Day Of Week",
             "type": "string"
@@ -8318,10 +8351,6 @@
           },
           "local_time": {
             "title": "Local Time",
-            "type": "string"
-          },
-          "locale": {
-            "title": "Locale",
             "type": "string"
           },
           "location": {
@@ -20230,6 +20259,38 @@
         "title": "RecordThreatModelAckRequest",
         "type": "object"
       },
+      "RecoveryBackupsView": {
+        "description": "BUG-323 — what the lock screen may restore from, read from manifests only.",
+        "properties": {
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupView"
+            },
+            "title": "Backups",
+            "type": "array"
+          },
+          "key_fingerprint": {
+            "title": "Key Fingerprint",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "schema_generation": {
+            "title": "Schema Generation",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "key_fingerprint",
+          "schema_generation",
+          "backups"
+        ],
+        "title": "RecoveryBackupsView",
+        "type": "object"
+      },
       "RecoveryPointView": {
         "properties": {
           "bytes": {
@@ -20256,6 +20317,60 @@
           "bytes"
         ],
         "title": "RecoveryPointView",
+        "type": "object"
+      },
+      "RecoveryRestoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "backup_id": {
+            "title": "Backup Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backup_id"
+        ],
+        "title": "RecoveryRestoreRequest",
+        "type": "object"
+      },
+      "RecoveryRestored": {
+        "description": "A verified backup switched in; the database that would not open is kept aside.",
+        "properties": {
+          "backup_id": {
+            "title": "Backup Id",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "deletions_applied": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Deletions Applied",
+            "type": "object"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "quarantine": {
+            "title": "Quarantine",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "backup_id",
+          "quarantine",
+          "counts",
+          "deletions_applied"
+        ],
+        "title": "RecoveryRestored",
         "type": "object"
       },
       "RegisterRequest": {
@@ -21842,6 +21957,17 @@
             ],
             "title": "As Principal"
           },
+          "expected_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Mode"
+          },
           "reason": {
             "default": "",
             "title": "Reason",
@@ -21874,6 +22000,17 @@
               }
             ],
             "title": "Confirmation Token"
+          },
+          "expected_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected State"
           },
           "reason": {
             "default": "",
@@ -23758,6 +23895,19 @@
       "TaskRunLimitRequest": {
         "additionalProperties": false,
         "properties": {
+          "max_run_cost_usd": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.01,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Run Cost Usd"
+          },
           "max_run_minutes": {
             "anyOf": [
               {
@@ -23853,6 +24003,18 @@
             ],
             "default": null,
             "title": "Delivery State"
+          },
+          "max_run_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Run Cost Usd"
           },
           "max_run_minutes": {
             "default": 60,
@@ -36589,6 +36751,64 @@
         "summary": "List Read Capabilities"
       }
     },
+    "/api/recovery/backups": {
+      "get": {
+        "description": "The backups a locked workspace could be restored from, read from their manifests.",
+        "operationId": "recovery_backups_api_recovery_backups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryBackupsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Recovery Backups"
+      }
+    },
+    "/api/recovery/restore": {
+      "post": {
+        "description": "Verify one backup, quarantine the database that will not open, and switch the copy in.",
+        "operationId": "recovery_restore_api_recovery_restore_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryRestored"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recovery Restore"
+      }
+    },
     "/api/runtime-mode": {
       "get": {
         "operationId": "get_runtime_mode_api_runtime_mode_get",
@@ -39242,7 +39462,26 @@
         "summary": "List Tasks"
       },
       "post": {
+        "description": "Create a task. §13.2 item 6 — ``Idempotency-Key`` makes a resend return the first answer.",
         "operationId": "create_task_api_tasks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

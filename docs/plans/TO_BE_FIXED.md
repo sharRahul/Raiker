@@ -126,7 +126,10 @@ names.
 | [BUG-320](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn) | Low | Notifications / layout | **Closed 2026-10-05 ([FIXED-781](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn))** — on work surfaces a notice folds into the bell after six seconds |
 | [BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | **Closed 2026-10-05 ([FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones))** — renamed ICU ids map to their current IANA names |
 | [BUG-322](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold) | Low | Observability / search | **Closed 2026-10-05 ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold))** — the host checks every five minutes and a damaged index is on *Needs your attention* |
-| [BUG-323](#bug-323--a-locked-workspace-cannot-be-restored-from-its-own-backups) | Medium | Storage / lock screen | Open — backups, verification and restore to a new folder ship (FIXED-789 to FIXED-792), but restore needs a running, unlocked workspace; the lock screen of a damaged database still says only *restore the database from a backup* |
+| [BUG-323](FIXED_ITEMS.md#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups) | Medium | Storage / lock screen | **Closed 2026-10-05 ([FIXED-801](FIXED_ITEMS.md#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups))** — the lock screen lists the backups from their manifests and restores one in place, the unopenable database kept in quarantine; deletions since the backup are reapplied (FIXED-802) and a damaged file is named as damaged rather than as the machine's memory (FIXED-812) |
+| [BUG-324](#bug-324--deleting-a-project-a-task-or-a-picture-is-not-journalled-so-a-restore-brings-it-back) | Low | Storage / restore | Open — FIXED-802 journals forgotten and purged memories and deleted conversations; a project, task or Design picture deleted after a backup still comes back with a restore |
+| [BUG-325](#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause) | Low | Tasks / cost limit | Open — a run's spend is counted per orchestrator, and a run continued after an approval starts counting again |
+| [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2409,8 +2412,10 @@ when Diagnostics opens.
 
 ## BUG-323 — A locked workspace cannot be restored from its own backups
 
-**Severity: Medium. Area: Storage / lock screen. Status: Open — recorded
-2026-10-05 by the (fourth) live round.**
+**Severity: Medium. Area: Storage / lock screen. Status: Closed 2026-10-05 as
+[FIXED-801](FIXED_ITEMS.md#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups)
+(with FIXED-802's deletion journal and FIXED-812's damage diagnosis) —
+recorded 2026-10-05 by the (fourth) live round.**
 
 **Observed.** [FIXED-789](FIXED_ITEMS.md#fixed-789--the-lock-screen-said-to-restore-from-a-backup-raiker-never-made)
 to [FIXED-792](FIXED_ITEMS.md#fixed-792--there-was-no-way-back-from-a-backup-that-did-not-touch-the-workspace)
@@ -2427,6 +2432,58 @@ needed) and offers *Restore this backup*: verify, move the damaged database to
 `.raiker/quarantine/`, put the verified copy in place, reapply deletion
 tombstones recorded after the backup, and restart. Test with a damaged file, a
 backup made with another key, and an interrupted restore.
+
+## BUG-324 — Deleting a project, a task or a picture is not journalled, so a restore brings it back
+
+**Severity: Low. Area: Storage / restore. Status: Open — recorded 2026-10-05 by
+the (fifth) round's work on FIXED-802.**
+
+**Observed.** [FIXED-802](FIXED_ITEMS.md#fixed-802--a-restore-brought-back-what-had-been-deleted-since-the-backup)
+journals three kinds of deletion — a forgotten memory, a purged memory and a
+deleted conversation — and replays them into a restore. A project, a task, an
+attachment or a Design picture deleted after the backup was taken is not
+journalled, so restoring that backup brings it back.
+
+**Proposed fix.** Journal each owner-initiated permanent deletion through the
+store method that performs it (kind, id, owner, time — no content), and replay
+it with journaling off, as FIXED-802 does. A project deletion that removed
+managed files cannot recreate them from a database backup either way; the
+replay only has to keep the row deleted.
+
+---
+
+## BUG-325 — A routine run's spend is counted again from zero after an approval pause
+
+**Severity: Low. Area: Tasks / cost limit. Status: Open — recorded 2026-10-05
+with FIXED-804.**
+
+**Observed.** [FIXED-804](FIXED_ITEMS.md#fixed-804--one-run-of-a-routine-had-no-cost-limit-of-its-own)
+meters a run's spend on the orchestrator that runs the turn. A routine run that
+parks on an approval and is continued is resumed on a new orchestrator: the
+limit rides with the turn, the spend before the pause does not, so a run that
+pauses can spend up to its limit again after each approval.
+
+**Proposed fix.** Seed the meter on resume from the usage ledger's rows for the
+run's thread since the run started (FIXED-810 made those rows include cached
+tokens), so the boundary check sees the whole run.
+
+---
+
+## BUG-326 — Importing the runtime orchestrator first fails on a circular import
+
+**Severity: Low. Area: Maintainability. Status: Open — found 2026-10-05 while
+building FIXED-804; pre-existing.**
+
+**Observed.** `python -c "import raiker.runtime.orchestrator"` fails:
+`raiker.models.connections` imports `runtime.connector_ecosystem`, which imports
+`runtime.executors`, whose image executor imports
+`models.connections.get_model_connection` while that module is half-loaded.
+Every real entry point (the app, the CLI, the tests) happens to import
+something that breaks the cycle first, so nothing ships broken; a new script or
+test that imports the orchestrator first does.
+
+**Proposed fix.** Move the image executor's `get_model_connection` import into
+the function that uses it, and add an import-each-module-alone test.
 
 ## Decision statements added 2026-10-05
 

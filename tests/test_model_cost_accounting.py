@@ -374,3 +374,57 @@ class TestMixedModelPricing:
         ]
         # The unpriced model contributes nothing rather than a zero-cost row.
         assert priced == [Decimal("1")]
+
+
+class TestCachedTokensAreCounted:
+    """The orchestrator records normalised usage; cached tokens used to read as zero.
+
+    Found by the 2026-10-05 (fifth) live round: an Anthropic routine wrote 7,976
+    tokens to the prompt cache on its first call and read them back on each of
+    the next three, and the ledger recorded none of it — so the conversation's
+    cost, and the routine's cost limit, saw a fraction of what was billed.
+    """
+
+    def test_the_normalised_cache_keys_are_recorded(self, store: SQLiteStore) -> None:
+        from raiker.models.contracts import summarize_model_usage
+
+        usage = summarize_model_usage(
+            {"input_tokens": 353, "output_tokens": 66, "cache_creation_input_tokens": 7976}
+        )
+        assert usage["cache_write_tokens"] == 7976
+        ledger = ModelUsageLedger(store)
+        assert ledger.record(
+            owner_principal_id="principal_owner", session_id="sess_c", provider="anthropic",
+            model="claude-haiku-4-5-20251001", usage=usage,
+        )
+        with store.connect() as connection:
+            row = connection.execute(
+                "SELECT cache_write_tokens, cache_read_tokens FROM model_usage_ledger WHERE session_id = 'sess_c'"
+            ).fetchone()
+        assert row[0] == 7976 and row[1] == 0
+
+    def test_the_cost_includes_cached_tokens(self) -> None:
+        from raiker.models.pricing import ModelFacts, ModelPrice
+
+        price = ModelPrice(
+            input_per_mtok=Decimal("1"), output_per_mtok=Decimal("5"), currency="USD", source="config",
+            cache_write_per_mtok=Decimal("1.25"), cache_read_per_mtok=Decimal("0.1"),
+        )
+        facts = ModelFacts(provider="anthropic", model="m", price=price)
+        totals = UsageTotals(input_tokens=1_000_000, cache_write_tokens=1_000_000, cache_read_tokens=1_000_000)
+        assert totals.cost(facts) == Decimal("2.35")
+
+
+def test_a_profiles_stated_cache_rates_are_read() -> None:
+    """The profile states cache rates per model; they were dropped, so cache fell back to input."""
+    from raiker.models.pricing import price_from_config
+
+    price = price_from_config(
+        {"currency": "USD", "models": {"m": {"input": 1.0, "output": 5.0, "cache_write": 1.25, "cache_read": 0.1}}},
+        "m",
+    )
+    assert price is not None
+    assert price.cache_write_per_mtok == Decimal("1.25")
+    assert price.cache_read_per_mtok == Decimal("0.1")
+    # One million tokens read from the cache cost $0.10, not $1.
+    assert price.cost(input_tokens=0, output_tokens=0, cache_read_tokens=1_000_000) == Decimal("0.1")

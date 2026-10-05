@@ -136,10 +136,15 @@ class BackupView(TypedDict):
     key_fingerprint: str
     included: list[str]
     not_included: list[str]
-    #: ``verified``, ``damaged`` or ``unreadable``, as last measured.
+    #: ``verified``, ``damaged``, ``unreadable`` or ``newer`` (a newer Raiker
+    #: made it), as last measured.
     state: str
     verified_at: str | None
     detail: str
+    #: DEC-17 step 8 — the schema generation the copy carries (0: made before
+    #: generations were recorded), and whether this build can open it.
+    schema_generation: int
+    opens_here: bool
 
 
 class BackupsView(TypedDict):
@@ -155,6 +160,8 @@ class BackupRestored(TypedDict):
     path: str
     counts: dict[str, int]
     command: str
+    #: DEC-24 step 5 — deletions recorded after the backup, applied to the copy.
+    deletions_applied: dict[str, int]
 
 
 class SchedulerQueue(TypedDict):

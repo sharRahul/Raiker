@@ -22,6 +22,7 @@ from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import AgentEvent, PolicyDecision, ToolAction
 from raiker.models.session_state import ModelSessionState
+from raiker.storage.deletion_journal import SESSION_DELETE, record_deletion
 from raiker.storage.migrations import TEXT_SEARCH_FTS5
 from raiker.storage.sqlite import _SEARCH_STOPWORDS
 
@@ -394,7 +395,9 @@ class ConversationStore:
             )
         return True
 
-    def delete_session(self: SQLiteStore, session_id: str, user_id: str | None = None) -> bool:
+    def delete_session(
+        self: SQLiteStore, session_id: str, user_id: str | None = None, *, journal: bool = True
+    ) -> bool:
         """Delete one session and its cascaded rows (turns, events index, tool
         actions, policy decisions, checkpoints, tasks). Returns False if the
         session does not exist or is owned by another account. The per-session
@@ -411,6 +414,9 @@ class ConversationStore:
         # above are already the source of truth and are committed).
         with contextlib.suppress(FileNotFoundError):
             (self.paths.events_dir / f"{session_id}.jsonl").unlink()
+        if journal:
+            # DEC-24 step 5 — outside the database, so a restore honours it.
+            record_deletion(self.paths.workspace_root, SESSION_DELETE, session_id, owner)
         return True
 
     @staticmethod
@@ -456,6 +462,7 @@ class ConversationStore:
         for session_id in session_ids:
             with contextlib.suppress(FileNotFoundError):
                 (self.paths.events_dir / f"{session_id}.jsonl").unlink()
+            record_deletion(self.paths.workspace_root, SESSION_DELETE, session_id, user_id)
         return True
 
     def list_turns(self: SQLiteStore, session_id: str, limit: int = 50) -> list[dict[str, Any]]:

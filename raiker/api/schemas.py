@@ -57,6 +57,9 @@ class SetCapabilityStateRequest:
     as_principal: str | None = None
     # Tier-2 step-up: forwarded to the existing activation check; no new authority is granted.
     confirmation_token: str | None = None
+    # §13.2 item 6 — the state the page showed. A save from a page that is out
+    # of date is refused 409 `capability_conflict` instead of overwriting.
+    expected_state: str | None = None
 
 
 @dataclass
@@ -72,12 +75,17 @@ class RecordThreatModelAckRequest:
 class DisableCapabilityRequest:
     reason: str = ""
     as_principal: str | None = None
+    expected_state: str | None = None
 
 
 @dataclass
 class SetCapabilityDecisionModeRequest:
     reason: str = ""
     as_principal: str | None = None
+    # §13.2 item 6 — the mode the page showed. If another tab or device changed
+    # it since, the change is refused 409 `capability_conflict`: a stale page
+    # must not silently loosen (or undo a tightening of) a permission.
+    expected_mode: str | None = None
 
 
 @dataclass
@@ -292,6 +300,9 @@ class TaskRunLimitRequest(StrictModelRequest):
     # The most tool calls one run may make; null removes the routine's own
     # limit. Left out, the stored limit is unchanged.
     max_tool_calls: int | None = Field(default=None, ge=1, le=1000)
+    # The most one run may cost, in US dollars; null removes it, left out
+    # leaves it unchanged.
+    max_run_cost_usd: float | None = Field(default=None, ge=0.01, le=1000)
 
 
 class SetModelSelectionRequest(StrictModelRequest):

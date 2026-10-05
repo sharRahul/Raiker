@@ -341,6 +341,66 @@ def text_search_posture(store: SQLiteStore) -> dict[str, Any]:
     }
 
 
+def _scratch_store_opens() -> bool:
+    """Whether a fresh encrypted store opens and reads in this process right now.
+
+    The discriminator for a ``MemoryError`` on the workspace database: run under
+    the same process-wide memory-security posture, a scratch store that opens
+    proves the platform gave SQLCipher what it needed, so the failure belongs to
+    the workspace file. Written to a temporary directory and removed.
+    """
+    import secrets
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="raiker-probe-") as scratch:
+        connection = None
+        try:
+            connection = sqlite3.connect(str(Path(scratch) / "probe.db"))
+            connection.execute(f"PRAGMA key = \"x'{secrets.token_hex(32)}'\"")
+            connection.execute("CREATE TABLE probe (value INTEGER)")
+            connection.execute("INSERT INTO probe VALUES (1)")
+            connection.commit()
+            return connection.execute("SELECT value FROM probe").fetchone()[0] == 1
+        except (MemoryError, sqlite3.Error):
+            return False
+        finally:
+            if connection is not None:
+                with contextlib.suppress(Exception):
+                    connection.close()
+
+
+#: What SQLite says when the pages of an existing file are not a database it can read.
+_DAMAGE_MESSAGES = ("malformed", "not a database", "file is encrypted", "disk image")
+
+UNREADABLE_DETAIL = (
+    "The workspace database exists but this workspace key does not open it, or "
+    "part of the file is damaged. Raiker has not changed it. Restore the matching "
+    ".raiker/app.key, or restore the database from a backup."
+)
+
+
+def damaged_store_error(store: SQLiteStore, exc: BaseException) -> StoreUnavailableError | None:
+    """``STORE_UNREADABLE`` when ``exc`` is the workspace file failing, else ``None``.
+
+    A ``DatabaseError`` names damage in its message. A ``MemoryError`` is the
+    file's fault only when a scratch encrypted store opens in this same process
+    — then the platform did give SQLCipher its memory. Every cached handle to the
+    file is taken out of use, so nothing reuses one that read a damaged page.
+    """
+    if isinstance(exc, StoreUnavailableError):
+        return None
+    if isinstance(exc, sqlite3.DatabaseError):
+        damaged = any(part in str(exc).lower() for part in _DAMAGE_MESSAGES)
+    elif isinstance(exc, MemoryError):
+        damaged = _scratch_store_opens()
+    else:
+        damaged = False
+    if not damaged:
+        return None
+    invalidate_workspace_connections(store.paths.workspace_root)
+    return StoreUnavailableError(STORE_UNREADABLE, UNREADABLE_DETAIL)
+
+
 def store_health(workspace_root: str | Path) -> dict[str, Any]:
     """Whether the encrypted store can actually be opened and read, right now.
 
@@ -720,6 +780,21 @@ class SQLiteStore(
                 stale.close()
         with contextlib.suppress(MemoryError, sqlite3.Error):
             return self._open_keyed()
+        # BUG-323 — with memory security on, SQLCipher reports a page that
+        # fails to decrypt as out-of-memory. A damaged database, or one made
+        # with another key, then read as "this machine would not give SQLCipher
+        # the memory it needs", and the lock screen blamed the machine for a
+        # file a backup could fix (found by the 2026-10-05 fifth live round).
+        # If a scratch encrypted store opens in this same process, memory is
+        # not what failed: the workspace file is.
+        if _scratch_store_opens():
+            raise StoreUnavailableError(
+                STORE_UNREADABLE,
+                "The workspace database exists but this workspace key does not "
+                "open it: it was made with another key, or the file is damaged. "
+                "Raiker has not changed it. Restore the matching .raiker/app.key, "
+                "or restore the database from a backup.",
+            ) from error
         enabled, _reason = resolve_memory_security(self.paths.workspace_root)
         detail = (
             "This machine would not lock the memory pages SQLCipher holds the "

@@ -307,6 +307,25 @@ def forget_memory(
     return True
 
 
+def tombstone_memory_file(workspace_root: str | Path, memory_id: str, *, deleted_at: str) -> bool:
+    """Turn one memory's Markdown export into the content-free tombstone Forget writes.
+
+    DEC-24 step 5 — used when a restore reapplies a Forget recorded after its
+    backup: the restored export must say forgotten, with no text, exactly as the
+    running workspace's did. Returns False when there is no export to change.
+    """
+    target = internal_io_path(Path(workspace_root).resolve() / ".raiker" / "memory" / f"{memory_id}.md")
+    try:
+        meta, _text = _decode_frontmatter(target.read_text(encoding="utf-8"))
+    except OSError:
+        return False
+    if not meta:
+        return False
+    meta.update({"approval_state": "forgotten", "deleted_at": deleted_at, "updated_at": deleted_at})
+    target.write_text(json.dumps(meta, sort_keys=True) + "\n", encoding="utf-8")
+    return True
+
+
 def set_memory_archived(
     memory_id: str, *, archived: bool, workspace_root: str | Path = ".", store: SQLiteStore | None = None,
     owner_principal_id: str | None = None,

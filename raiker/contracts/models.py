@@ -422,6 +422,9 @@ EVENT_TYPES = {
     # at that boundary. Character counts only — the instruction itself is a user
     # message and lives in the conversation, not in the audit payload.
     "turn_stopped",
+    # DEC-12 step 6 — a routine run reached its own cost limit and was stopped
+    # before the model was asked again.
+    "turn_cost_limit_reached",
     "turn_steered",
     "checkpoint_restore_planned",
     "checkpoint_fork_planned",
@@ -713,6 +716,10 @@ class PromptOptions:
     # by the runtime and never mutates the persisted model selection.
     reasoning_effort: str | None = None
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
+    # DEC-12 step 6 — a routine's own cost limit for this run, in US dollars.
+    # Read at the turn's safe boundary, before each further model call; None is
+    # no cost limit. Only the scheduler sets it.
+    max_cost_usd: float | None = None
     # BUG-70 — a **turn-scoped** capability posture, and deliberately a
     # one-directional one. A control presented as a per-turn posture must never
     # edit the owner's *standing* permissions, which change only through the
@@ -736,6 +743,8 @@ class PromptOptions:
             raise ContractValidationError("invalid_reasoning_effort")
         if self.max_tool_calls < 0:
             raise ContractValidationError("invalid_max_tool_calls")
+        if self.max_cost_usd is not None and not self.max_cost_usd > 0:
+            raise ContractValidationError("invalid_max_cost_usd")
 
 
 @dataclass(frozen=True)
@@ -1115,6 +1124,9 @@ class TaskRecord:
     #: DEC-12 step 6 — the most tool calls one run may make; ``None`` is no
     #: limit of its own beyond the turn's runaway guard.
     max_tool_calls: int | None = None
+    #: DEC-12 step 6 — the most one run may cost, in US dollars, by the
+    #: provider's token counts; ``None`` is no limit of its own.
+    max_run_cost_usd: float | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

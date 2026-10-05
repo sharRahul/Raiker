@@ -25,6 +25,18 @@ What this is, exactly:
   into ``.raiker/restores/<backup id>/`` as a workspace of its own, with a copy
   of the key it needs, and says how to open it. Switching to it is the owner's
   act, taken with Raiker stopped.
+* **Except from the lock screen** (BUG-323). When the database will not open —
+  this key does not open it, or a newer Raiker shaped it — there is no running
+  workspace to protect, and :func:`restore_in_place` is the way back: verify
+  the backup, move the unopenable database and its memory files aside into
+  ``.raiker/quarantine/<time>/`` (nothing is deleted), and switch the verified
+  copy in with one rename.
+* **Deletions are honoured.** Either restore replays the deletions recorded
+  after the backup was taken (``raiker.storage.deletion_journal``), so a
+  memory forgotten or a conversation deleted since does not come back.
+* **Each backup says which builds can open it.** The manifest records the
+  schema generation (DEC-17 step 8); a backup a newer Raiker made is listed and
+  refused here rather than opened as a downgrade.
 """
 
 from __future__ import annotations
@@ -41,6 +53,7 @@ from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 from raiker.auth.app_key import app_key_path, ensure_app_key
 from raiker.contracts.ids import new_id, utc_now
 from raiker.storage.internal_paths import internal_io_path
+from raiker.storage.migrations import SCHEMA_GENERATION
 
 MANIFEST = "manifest.json"
 DATABASE = "raiker.db"
@@ -74,6 +87,10 @@ def restores_dir(workspace_root: Path) -> Path:
     return internal_io_path(Path(workspace_root).resolve() / ".raiker" / "restores")
 
 
+def quarantine_dir(workspace_root: Path) -> Path:
+    return internal_io_path(Path(workspace_root).resolve() / ".raiker" / "quarantine")
+
+
 def _key_hex(workspace_root: Path) -> str:
     return hashlib.sha256(ensure_app_key(Path(workspace_root))).hexdigest()
 
@@ -97,8 +114,8 @@ def _open_copy(path: Path, key_hex: str) -> Any:
     return connection
 
 
-def _inspect(path: Path, key_hex: str) -> tuple[str, list[str], dict[str, int]]:
-    """``(integrity, migration ids, counts)`` read from an encrypted copy."""
+def _inspect(path: Path, key_hex: str) -> tuple[str, list[str], dict[str, int], int]:
+    """``(integrity, migration ids, counts, schema generation)`` read from an encrypted copy."""
     connection = _open_copy(path, key_hex)
     try:
         try:
@@ -114,7 +131,8 @@ def _inspect(path: Path, key_hex: str) -> tuple[str, list[str], dict[str, int]]:
                 counts[table] = int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
             except sqlite3.DatabaseError:
                 counts[table] = -1
-        return integrity, migrations, counts
+        generation = int(connection.execute("PRAGMA user_version").fetchone()[0])
+        return integrity, migrations, counts, generation
     finally:
         connection.close()
 
@@ -137,6 +155,14 @@ class BackupRecord:
     state: str = "verified"
     verified_at: str | None = None
     detail: str = ""
+    #: DEC-17 step 8 — ``PRAGMA user_version`` of the copy; 0 for a backup made
+    #: before generations were written, which every current build can open.
+    schema_generation: int = 0
+
+    @property
+    def opens_here(self) -> bool:
+        """Whether this build can open it without a downgrade."""
+        return self.schema_generation <= SCHEMA_GENERATION
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -154,6 +180,8 @@ class BackupRecord:
             "state": self.state,
             "verified_at": self.verified_at,
             "detail": self.detail,
+            "schema_generation": self.schema_generation,
+            "opens_here": self.opens_here,
         }
 
     @classmethod
@@ -173,6 +201,7 @@ class BackupRecord:
             state=str(data.get("state", "verified")),
             verified_at=data.get("verified_at"),
             detail=str(data.get("detail", "")),
+            schema_generation=int(data.get("schema_generation", 0) or 0),
         )
 
 
@@ -194,12 +223,16 @@ def create_backup(connection: Any, workspace_root: Path, *, reason: str = "owner
         connection.execute(f"ATTACH DATABASE ? AS raiker_backup KEY \"x'{key_hex}'\"", (str(database),))
         try:
             connection.execute("SELECT sqlcipher_export('raiker_backup')")
+            # The export copies schema and rows, not the header's user_version,
+            # which is the schema generation a restore checks (DEC-17 step 8).
+            generation = int(connection.execute("PRAGMA main.user_version").fetchone()[0])
+            connection.execute(f"PRAGMA raiker_backup.user_version = {generation}")
         finally:
             connection.execute("DETACH DATABASE raiker_backup")
         memory = internal_io_path(root / ".raiker" / "memory")
         if memory.is_dir():
             shutil.copytree(memory, target / MEMORY_DIR)
-        integrity, migrations, counts = _inspect(database, key_hex)
+        integrity, migrations, counts, generation = _inspect(database, key_hex)
         if integrity != "ok":
             raise BackupError("backup_damaged", f"The new copy failed its integrity check: {integrity[:200]}")
         record = BackupRecord(
@@ -215,6 +248,7 @@ def create_backup(connection: Any, workspace_root: Path, *, reason: str = "owner
             included=INCLUDED,
             not_included=NOT_INCLUDED,
             verified_at=utc_now(),
+            schema_generation=generation,
         )
         (target / MANIFEST).write_text(json.dumps(record.to_dict(), indent=2), encoding="utf-8")
     except BaseException:
@@ -276,12 +310,17 @@ def verify_backup(workspace_root: Path, backup_id: str) -> BackupRecord:
         state, detail = "unreadable", "This backup was made with another workspace key."
     else:
         try:
-            integrity, _migrations, _counts = _inspect(database, _key_hex(root))
+            integrity, _migrations, _counts, _generation = _inspect(database, _key_hex(root))
         except BackupError as exc:
             state, detail = "unreadable", str(exc)
         else:
             if integrity != "ok":
                 state, detail = "damaged", f"It failed its integrity check: {integrity[:200]}"
+    if state == "verified" and not record.opens_here:
+        state, detail = "newer", (
+            f"A newer Raiker made this backup (schema {record.schema_generation}; this build "
+            f"understands up to {SCHEMA_GENERATION}). Restore it with that Raiker."
+        )
     checked = BackupRecord(**{**record.__dict__, "state": state, "verified_at": utc_now(), "detail": detail})
     (target / MANIFEST).write_text(json.dumps(checked.to_dict(), indent=2), encoding="utf-8")
     return checked
@@ -297,6 +336,21 @@ class RestoredWorkspace:
     path: str
     counts: dict[str, int]
     command: str
+    #: Deletions recorded after the backup and applied to the copy, by kind.
+    deletions_applied: dict[str, int]
+
+
+def _reapply_after(workspace_root: Path, journal_root: Path, created_at: str) -> dict[str, int]:
+    """Open the restored store at ``workspace_root`` and replay ``journal_root``'s later deletions."""
+    from raiker.storage.deletion_journal import read_deletions, reapply_deletions
+    from raiker.storage.sqlite import SQLiteStore, invalidate_workspace_connections
+
+    deletions = read_deletions(journal_root, after=created_at)
+    store = SQLiteStore(workspace_root)
+    try:
+        return reapply_deletions(store, deletions)
+    finally:
+        invalidate_workspace_connections(workspace_root)
 
 
 def restore_backup(workspace_root: Path, backup_id: str) -> RestoredWorkspace:
@@ -320,9 +374,13 @@ def restore_backup(workspace_root: Path, backup_id: str) -> RestoredWorkspace:
         if (source / MEMORY_DIR).is_dir():
             shutil.copytree(source / MEMORY_DIR, runtime / MEMORY_DIR)
         shutil.copy2(app_key_path(root), runtime / "app.key")
-        integrity, _migrations, counts = _inspect(runtime / DATABASE, _key_hex(root))
+        integrity, _migrations, _counts, _generation = _inspect(runtime / DATABASE, _key_hex(root))
         if integrity != "ok":
             raise BackupError("restore_damaged", integrity[:200])
+        # DEC-24 step 5 — the running workspace's later deletions, applied to
+        # the copy before anyone opens it.
+        applied = _reapply_after(destination, root, checked.created_at)
+        _integrity, _migrations, counts, _generation = _inspect(runtime / DATABASE, _key_hex(root))
     except BaseException:
         shutil.rmtree(destination, ignore_errors=True)
         raise
@@ -331,4 +389,91 @@ def restore_backup(workspace_root: Path, backup_id: str) -> RestoredWorkspace:
         path=str(destination),
         counts=counts,
         command=f'raiker-web --workspace "{destination}" --port 8766',
+        deletions_applied=applied,
+    )
+
+
+@dataclass(frozen=True)
+class InPlaceRestore:
+    backup_id: str
+    #: Where the database that would not open, and its memory files, now are.
+    quarantine: str
+    counts: dict[str, int]
+    deletions_applied: dict[str, int]
+
+
+def restore_in_place(workspace_root: Path, backup_id: str) -> InPlaceRestore:
+    """BUG-323 — put a verified backup in place of a database that will not open.
+
+    Only for the lock screen's case, which the caller checks: there is no
+    running workspace to protect, because nothing can open this one. In order:
+
+    1. verify the backup (checksum, this key, integrity) and that this build can
+       open it without a downgrade;
+    2. stage the verified copy beside the database, not over it;
+    3. move the current database (with any ``-wal``/``-shm``) and the memory
+       files into ``.raiker/quarantine/<time>/`` — kept, never deleted;
+    4. switch the staged copy in with one ``os.replace``, so the workspace holds
+       either the old file or the whole new one, never part of either;
+    5. replay the deletions recorded after the backup, then re-check integrity.
+
+    Any failure after step 3 moves the quarantined files back.
+    """
+    import os
+
+    from raiker.storage.sqlite import invalidate_workspace_connections
+
+    root = Path(workspace_root).resolve()
+    checked = verify_backup(root, backup_id)
+    if checked.state != "verified":
+        raise BackupError("backup_not_verified", checked.detail)
+    runtime = internal_io_path(root / ".raiker")
+    live_db = runtime / DATABASE
+    source = backups_dir(root) / backup_id
+    staged = runtime / f"{DATABASE}.restoring"
+    shutil.copy2(source / DATABASE, staged)
+    if _sha256(staged) != checked.sha256:
+        staged.unlink(missing_ok=True)
+        raise BackupError("restore_damaged", "The staged copy does not match the backup's checksum.")
+    invalidate_workspace_connections(root)
+    stamp = utc_now().replace(":", "").replace("-", "").split(".")[0]
+    # Named for when, not for which backup: why.json says which. A backup id
+    # inside a path reads as a token to the response redactor (FIXED-799).
+    held = quarantine_dir(root) / stamp
+    suffix = 1
+    while held.exists():
+        suffix += 1
+        held = quarantine_dir(root) / f"{stamp}-{suffix}"
+    held.mkdir(parents=True, exist_ok=False)
+    moved: list[tuple[Path, Path]] = []
+    try:
+        for name in (DATABASE, f"{DATABASE}-wal", f"{DATABASE}-shm", MEMORY_DIR):
+            current = runtime / name
+            if current.exists():
+                shutil.move(str(current), str(held / name))
+                moved.append((held / name, current))
+        os.replace(staged, live_db)
+        if (source / MEMORY_DIR).is_dir():
+            shutil.copytree(source / MEMORY_DIR, runtime / MEMORY_DIR)
+        applied = _reapply_after(root, root, checked.created_at)
+        integrity, _migrations, counts, _generation = _inspect(live_db, _key_hex(root))
+        if integrity != "ok":
+            raise BackupError("restore_damaged", integrity[:200])
+    except BaseException:
+        invalidate_workspace_connections(root)
+        live_db.unlink(missing_ok=True)
+        shutil.rmtree(runtime / MEMORY_DIR, ignore_errors=True)
+        for kept, original in reversed(moved):
+            shutil.move(str(kept), str(original))
+        staged.unlink(missing_ok=True)
+        raise
+    (held / "why.json").write_text(
+        json.dumps(
+            {"restored_from": backup_id, "at": utc_now(), "moved": [kept.name for kept, _ in moved]},
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return InPlaceRestore(
+        backup_id=backup_id, quarantine=str(held), counts=counts, deletions_applied=applied
     )

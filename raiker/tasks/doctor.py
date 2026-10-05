@@ -24,6 +24,7 @@ from typing_extensions import TypedDict
 from raiker.contracts.models import TaskRecord
 from raiker.notify.delivery_policy import QuietHours
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.cost_limit import cost_limit
 from raiker.tasks.run_limit import effective_minutes, tool_call_budget
 from raiker.tasks.schedule import is_repeating, parse_instant, valid_zone
 
@@ -221,13 +222,50 @@ def _clock(store: SQLiteStore, owner: str) -> tuple[DoctorCheck, str]:
     return _check("clock", label, "ok", f"{zone}."), zone
 
 
-def _limits(task: TaskRecord) -> DoctorCheck:
+def _cost_price_known(store: SQLiteStore, task: TaskRecord, owner: str) -> bool | None:
+    """Whether the routine's model has a price a cost limit can be measured in.
+
+    ``None`` when the model cannot be resolved at all — the model check says why.
+    """
+    from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
+    from raiker.tasks.cost_limit import resolve_price
+
+    try:
+        service = ModelReadinessService(store, probe=ProviderCatalogueProbe(store))
+        profile_id, model = service.resolve_request_target(owner, task.model_profile, task.model)
+        if not model or model.startswith("<"):
+            return None
+        from raiker.models.registry import ModelProfileRegistry
+
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+        provider = str(getattr(profile, "provider", "") or profile_id)
+        raw = (getattr(profile, "raw", {}) or {}).get("pricing")
+        return resolve_price(store, owner, provider, model, raw) is not None
+    except Exception:  # noqa: BLE001 - unreadable is unknown, not fine
+        return None
+
+
+def _limits(task: TaskRecord, store: SQLiteStore | None = None, owner: str = "") -> DoctorCheck:
     minutes = effective_minutes(task.max_run_minutes)
     failed = task.failed_cycles
     calls = tool_call_budget(task.max_tool_calls)
-    detail = f"Each run is stopped after {minutes} minutes" + (
-        f" or {calls} tool calls." if calls is not None else "."
-    )
+    usd = cost_limit(task.max_run_cost_usd)
+    bounds = [f"{minutes} minutes"]
+    if calls is not None:
+        bounds.append(f"{calls} tool calls")
+    if usd is not None:
+        bounds.append(f"${usd:.2f}")
+    detail = "Each run is stopped after " + (
+        bounds[0] if len(bounds) == 1 else ", ".join(bounds[:-1]) + " or " + bounds[-1]
+    ) + "."
+    # DEC-12 step 6 — a dollar limit on a model with no known price measures
+    # nothing. Said, so the owner does not believe it is protecting them.
+    if usd is not None and store is not None and _cost_price_known(store, task, owner) is False:
+        return _check(
+            "limits", "Its limits", "warn",
+            detail + " Its model has no known price, so the cost limit cannot be measured. Set one in Models → Pricing.",
+            "#/models?tab=pricing",
+        )
     if failed:
         return _check(
             "limits", "Its limits", "warn",
@@ -253,7 +291,7 @@ def routine_doctor(
         clock,
         _model(store, task, owner_principal_id),
         _delivery(store, task, owner_principal_id),
-        _limits(task),
+        _limits(task, store, owner_principal_id),
     ]
     worst = min(checks, key=lambda check: _RANK[check["state"]])["state"]
     return {

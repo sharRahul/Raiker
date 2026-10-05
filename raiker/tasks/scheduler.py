@@ -49,6 +49,7 @@ from raiker.notify.approval_notifier import (
 from raiker.runtime.identity.presentation import owner_user_metadata
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.cost_limit import cost_limit
 from raiker.tasks.manager import TaskManager
 from raiker.tasks.run_limit import (
     STOP_GRACE_SECONDS,
@@ -565,6 +566,9 @@ class TaskScheduler:
                     # DEC-12 step 6 — the routine's own tool-call limit, when
                     # it has one; otherwise the turn's runaway guard.
                     max_tool_calls=tool_call_budget(task.max_tool_calls) or DEFAULT_MAX_TOOL_CALLS,
+                    # DEC-12 step 6 — and its own cost limit, read at the turn's
+                    # safe boundary before each further model call.
+                    max_cost_usd=cost_limit(task.max_run_cost_usd),
                 ),
             )
         )

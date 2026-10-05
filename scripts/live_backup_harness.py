@@ -32,7 +32,7 @@ from raiker.tasks.manager import TaskManager
 
 #: The newest migration in this build, removed and re-applied to stand in for
 #: an upgrade: the runner sees one migration this database has not had.
-LATEST = "RAIKER-2093-task-tool-limit"
+LATEST = "RAIKER-2095-task-cost-limit"
 
 
 def _owner(store: SQLiteStore) -> str:

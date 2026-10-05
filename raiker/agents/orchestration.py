@@ -326,7 +326,7 @@ class SubagentRunner:
                     # different "now" than the turn that asked for it, and a
                     # copied parent timestamp would state the wrong one with the
                     # same confidence as the right one.
-                    "environment": environment_context(self._store, owner_id).to_dict(),
+                    "environment": environment_context(self._store, owner_id).model_dict(),
                 },
             )
 

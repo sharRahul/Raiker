@@ -247,6 +247,21 @@ def _backup(ws: Path, client: TestClient, h: dict[str, str]) -> str:
     return str(made.json()["backup_id"])
 
 
+def _locked_with_backup(ws: Path, client: TestClient, h: dict[str, str]) -> str:
+    """BUG-323 — a backup, then a database this key no longer opens."""
+    import os
+
+    from raiker.storage.sqlite import invalidate_workspace_connections
+
+    backup_id = _backup(ws, client, h)
+    invalidate_workspace_connections(ws)
+    database = ws / ".raiker" / "raiker.db"
+    data = bytearray(database.read_bytes())
+    data[16:4096] = os.urandom(4080)
+    database.write_bytes(bytes(data))
+    return backup_id
+
+
 def _no_vault_key(monkeypatch: Any) -> None:
     monkeypatch.delenv("RAIKER_CONNECTOR_VAULT_KEY", raising=False)
 
@@ -306,6 +321,11 @@ CASES: Cases = {
     ("POST", "/api/backups/{backup_id}/verify"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}/verify",
     ("POST", "/api/backups/{backup_id}/restore"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}/restore",
     ("DELETE", "/api/backups/{backup_id}"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}",
+    ("GET", "/api/recovery/backups"): then(_locked_with_backup, lambda c, h: "/api/recovery/backups"),
+    ("POST", "/api/recovery/restore"): lambda ws, c, h: (
+        "/api/recovery/restore",
+        {"backup_id": _locked_with_backup(ws, c, h)},
+    ),
     ("POST", "/api/notifications/held/acknowledge"): _held_acknowledge,
     ("POST", "/api/notifications/test"): plain("/api/notifications/test"),
     ("GET", "/api/security/containment"): plain("/api/security/containment"),

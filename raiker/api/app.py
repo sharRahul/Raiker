@@ -47,6 +47,7 @@ from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
 from raiker.api.routes_project_roots import router as project_roots_router
 from raiker.api.routes_prompts import router as prompts_router
+from raiker.api.routes_recovery import router as recovery_router
 from raiker.api.routes_settings import router as settings_router
 from raiker.api.routes_setup import router as setup_router
 from raiker.api.routes_skills import router as skills_router
@@ -621,6 +622,7 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)
     app.include_router(instances_router)
+    app.include_router(recovery_router)
     app.include_router(vault_router)
     app.include_router(settings_router)
     app.include_router(speech_router)

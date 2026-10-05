@@ -88,8 +88,9 @@
   <label>
     <span>Default weather location</span>
     <small>
-      Used only when you ask about the weather without naming a place. Raiker never
-      works one out from your network address.
+      Used only when you ask about the weather without naming a place: Raiker then sends it
+      to Open-Meteo to look it up. Models are told only that you set one, never the place,
+      and Raiker never works one out from your network address.
     </small>
     <input
       class="settings-input"

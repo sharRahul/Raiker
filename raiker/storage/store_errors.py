@@ -32,6 +32,11 @@ STORE_KEY_MISSING = "store_key_missing"
 #: key, or the file is damaged. Nothing is written over it.
 STORE_UNREADABLE = "store_unreadable"
 
+#: DEC-17 step 8 — the database was shaped by a newer Raiker than this one.
+#: Opening it would be a downgrade the migrations cannot undo, so nothing is
+#: written; the lock screen offers the backups this build can open.
+STORE_SCHEMA_NEWER = "store_schema_newer"
+
 
 class AppKeyMissingError(StoreUnavailableError):
     """Refused to mint an application key over an existing encrypted store."""

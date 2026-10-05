@@ -1,4 +1,50 @@
-// Small display formatters. Pure functions, no side effects.
+// Small display formatters. Pure functions, no side effects beyond the one
+// display locale below.
+
+/**
+ * DEC-21 General — the owner's "Dates and times" format, which every date and
+ * time in the interface is written in.
+ *
+ * The Language setting used to promise "interface text and formatting" and do
+ * neither: nothing read it, every date followed the browser's own locale, and
+ * the interface is written in English. It now does the one thing it says —
+ * dates and times — and `applyUiPrefs` sets it from the settings blob. Unset or
+ * unrecognised, formatting follows the browser, as it always did.
+ */
+export const DISPLAY_LOCALES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "en-GB", label: "English (United Kingdom)" },
+  { value: "en-US", label: "English (United States)" },
+  { value: "hi-IN", label: "हिन्दी (भारत)" },
+  { value: "es-ES", label: "Español (España)" },
+  { value: "fr-FR", label: "Français (France)" },
+  { value: "de-DE", label: "Deutsch (Deutschland)" },
+];
+let displayLocaleValue: string | undefined;
+
+export function setDisplayLocale(value: unknown): void {
+  displayLocaleValue =
+    typeof value === "string" && DISPLAY_LOCALES.some((option) => option.value === value) ? value : undefined;
+}
+
+/** The locale dates and times are written in; undefined means the browser's. */
+export function displayLocale(): string | undefined {
+  return displayLocaleValue;
+}
+
+/** One date and time, in the owner's format: what `Date#toLocaleString` would say. */
+export function localDateTime(at: Date, options?: Intl.DateTimeFormatOptions): string {
+  return at.toLocaleString(displayLocaleValue, options);
+}
+
+/** One date, in the owner's format. */
+export function localDate(at: Date, options?: Intl.DateTimeFormatOptions): string {
+  return at.toLocaleDateString(displayLocaleValue, options);
+}
+
+/** One time of day, in the owner's format. */
+export function localTime(at: Date, options?: Intl.DateTimeFormatOptions): string {
+  return at.toLocaleTimeString(displayLocaleValue, options);
+}
 
 /** Compact relative time ("just now", "4m ago", "2h ago", "3d ago"), else a local date. */
 export function relativeTime(iso: string | null | undefined, now: Date = new Date()): string {
@@ -11,7 +57,7 @@ export function relativeTime(iso: string | null | undefined, now: Date = new Dat
   if (seconds < 3600) return `${Math.max(1, Math.floor(seconds / 60))}m ago`;
   if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 7 * 86_400) return `${Math.floor(seconds / 86_400)}d ago`;
-  return then.toLocaleDateString();
+  return localDate(then);
 }
 
 /**
@@ -44,14 +90,14 @@ export function relativeFuture(iso: string | null | undefined, now: Date = new D
   if (seconds < 3600) return `in ${Math.max(1, Math.floor(seconds / 60))}m`;
   if (seconds < 86_400) return `in ${Math.floor(seconds / 3600)}h`;
   if (seconds < 7 * 86_400) return `in ${Math.floor(seconds / 86_400)}d`;
-  return then.toLocaleDateString();
+  return localDate(then);
 }
 
 /** Full local timestamp for detail rows; falls back to the raw string. */
 export function formatTimestamp(iso: string | null | undefined): string {
   if (!iso) return "—";
   const then = parseTimestamp(iso);
-  return then === null ? iso : then.toLocaleString();
+  return then === null ? iso : localDateTime(then);
 }
 
 /** Group timestamped items by the viewer's local calendar day. */
@@ -77,7 +123,7 @@ function dayLabel(iso: string, now: Date): string {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (key(then) === key(yesterday)) return "Yesterday";
-  return then.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return localDate(then, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
 function parseTimestamp(iso: string): Date | null {

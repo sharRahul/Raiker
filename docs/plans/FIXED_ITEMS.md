@@ -822,6 +822,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-798](#fixed-798--a-screenshot-did-not-say-which-build-took-it) | Low | Evidence | Fixed 2026-10-05 (DEC-19 step 5) |
 | [FIXED-799](#fixed-799--a-restored-folders-path-came-back-as-redacted_secret) | Low | API / storage | Fixed 2026-10-05 — found by the live round |
 | [FIXED-800](#fixed-800--first-run-setups-backup-copied-the-live-database-file) | Low | Setup / storage | Fixed 2026-10-05 — found while building FIXED-789 |
+| [FIXED-801](#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups) | Medium | Storage / lock screen | Fixed 2026-10-05 (BUG-323, DEC-24 steps 5–6) |
+| [FIXED-802](#fixed-802--a-restore-brought-back-what-had-been-deleted-since-the-backup) | Medium | Storage / privacy | Fixed 2026-10-05 (DEC-24 step 5 tombstones) |
+| [FIXED-803](#fixed-803--an-older-raiker-would-open-a-database-a-newer-one-had-shaped) | Medium | Storage / updates | Fixed 2026-10-05 (DEC-17 step 8) |
+| [FIXED-804](#fixed-804--one-run-of-a-routine-had-no-cost-limit-of-its-own) | Low | Tasks / runtime | Fixed 2026-10-05 (DEC-12 step 6) |
+| [FIXED-805](#fixed-805--every-turn-told-the-provider-the-owners-default-weather-location) | Medium | Privacy / runtime context | Fixed 2026-10-05 (DEC-21 General) |
+| [FIXED-806](#fixed-806--the-language-a-model-was-told-was-the-interfaces-and-the-interfaces-did-nothing) | Low | Settings → General / runtime | Fixed 2026-10-05 (DEC-21 General) |
+| [FIXED-807](#fixed-807--dates-ignored-the-date-format-setting-and-country-or-region-changed-nothing) | Low | Settings → General / every page | Fixed 2026-10-05 (DEC-21 General) |
+| [FIXED-808](#fixed-808--a-stale-permissions-tab-could-overwrite-a-newer-decision) | Medium | Permissions | Fixed 2026-10-05 (§13.2 item 6) |
+| [FIXED-809](#fixed-809--a-task-sent-twice-was-filed-twice) | Medium | Tasks / API | Fixed 2026-10-05 (§13.2 item 6) |
+| [FIXED-810](#fixed-810--cached-prompt-tokens-were-recorded-as-zero-and-priced-as-nothing) | Medium | Models / usage and cost | Fixed 2026-10-05 — found by the live round |
+| [FIXED-811](#fixed-811--a-profiles-stated-cache-rates-were-dropped) | Low | Models / pricing | Fixed 2026-10-05 — found by the live round |
+| [FIXED-812](#fixed-812--a-damaged-database-read-as-the-machines-memory-or-as-a-generic-failure) | Medium | Storage / lock screen | Fixed 2026-10-05 — found by the live round |
 
 ---
 
@@ -31169,3 +31181,304 @@ that file in the archive; the snapshot is also listed under Settings → Account
 **Evidence.** `tests/test_setup_backup.py`
 (`test_setup_backup_writes_the_verified_snapshot_and_lists_it`).
 
+
+---
+
+## FIXED-801 — A locked workspace could not be restored from its own backups
+
+**Severity: Medium. Area: Storage / lock screen. Status: Fixed 2026-10-05.
+Closes [BUG-323](TO_BE_FIXED.md#bug-323--a-locked-workspace-cannot-be-restored-from-its-own-backups),
+DEC-24 step 6's quarantine and step 5's atomic switch.**
+
+**Observed.** FIXED-789 to FIXED-792 made, verified and restored backups from
+Settings → Account. A database the key no longer opens stopped at the lock
+screen, which cannot sign anybody in, so it could not reach Account and said
+only "restore the database from a backup".
+
+**Fixed.** Two routes the lock screen calls with no session, because there is
+no store to hold one:
+
+* `GET /api/recovery/backups` lists the workspace's backups **from their
+  manifests** — when, why, size, row counts, the key fingerprint and whether
+  this build can open each one. No database is read.
+* `POST /api/recovery/restore` verifies the chosen backup, stages it beside the
+  database, moves the database that will not open (with any `-wal`/`-shm`) and
+  the memory files into `.raiker/quarantine/<time>/` with a `why.json`, and
+  switches the staged copy in with one `os.replace`. Any failure after the
+  move puts the quarantined files back.
+
+Both answer only while the store will not open **for a reason a backup can
+fix** (`store_unreadable`, `store_schema_newer`; a missing key is not one —
+every backup needs it), only to a loopback peer on a loopback-bound host (the
+`/api/instances` rule), and a restore only as same-origin JSON. A workspace
+that opens gets `409 recovery_not_needed` and nothing about its backups.
+
+The lock screen shows **Restore from a backup** under the error, one
+deliberate **Restore…** → **Restore this backup** per verified backup, and
+says why a backup cannot be used (made by a newer Raiker, made with another
+key, did not verify). After a restore it says where the old database went and
+the sign-in form is live again; the hero line beside it now says what failed
+(the key or the file, or a newer version) rather than blaming the machine.
+
+**Evidence.** `tests/test_lock_screen_recovery.py` (in-place restore, a backup
+that does not verify leaving the workspace as it was, the routes' four
+refusals); `LoginView.test.ts` (*restoring from the lock screen*); contract
+cases for both routes. Live: the 2026-10-05 (fifth) round's lock-screen
+phase, captures 10–12.
+
+---
+
+## FIXED-802 — A restore brought back what had been deleted since the backup
+
+**Severity: Medium. Area: Storage / privacy. Status: Fixed 2026-10-05. DEC-24
+step 5's deletion tombstones; §13.2 item 5.**
+
+**Observed.** A backup is a snapshot. Restoring one — to a new folder from
+Account, or in place from the lock screen — brought back every memory
+forgotten and every conversation deleted after it was taken.
+
+**Fixed.** Each deletion is also appended to `.raiker/deletions.jsonl`, beside
+the database and outside every backup: kind (`memory_forget`, `memory_purge`,
+`session_delete`), id, owner and time — **no content**. The store methods that
+delete write it, so every path is covered. Either restore replays the lines at
+or after the backup's `created_at` into the restored copy through the same
+store methods, with journaling off; a forgotten memory's Markdown export
+becomes the same content-free tombstone Forget writes. Account says *What you
+deleted since the backup was deleted from it too.*
+
+**Evidence.** `tests/test_lock_screen_recovery.py` (journal holds no content;
+forget, purge and session delete since the backup applied to a restore; the
+replay is not journalled into the copy). Live: a conversation deleted after
+the round's backup was absent after the lock-screen restore.
+
+---
+
+## FIXED-803 — An older Raiker would open a database a newer one had shaped
+
+**Severity: Medium. Area: Storage / updates. Status: Fixed 2026-10-05. DEC-17
+step 8's "refuse unsafe downgrade honestly".**
+
+**Observed.** Nothing recorded which build last shaped a database. An older
+build opened newer data, ignored the columns it did not know, overwrote values
+it did not understand, and wrote its own migrations' bookkeeping beside the
+newer ones.
+
+**Fixed.** `SCHEMA_GENERATION` — the migration registry's length, which only
+grows — is written into the database header (`PRAGMA user_version`) at the end
+of every bootstrap and copied into each backup (the export does not carry
+it). A build that finds a larger number refuses before the backup, the
+migrations or any write: `store_schema_newer`, naming both generations. Each
+backup's manifest records its generation and `opens_here`; **Verify** calls a
+newer one *Made by a newer Raiker* and neither restore uses it. The lock
+screen offers the backups this build can open — a newer build's own
+pre-update snapshots are exactly those.
+
+**Evidence.** `tests/test_lock_screen_recovery.py` (header written; newer
+database refused byte-for-byte unchanged with no snapshot; a newer backup not
+restored). Live capture 12, at 390 wide.
+
+---
+
+## FIXED-804 — One run of a routine had no cost limit of its own
+
+**Severity: Low. Area: Tasks / runtime. Status: Fixed 2026-10-05. Closes DEC-12
+step 6's per-run cost limit.**
+
+**Fixed.** `tasks.max_run_cost_usd` (migration RAIKER-2095; $0.01–$1000) is set
+with `PUT /api/tasks/{id}/run-limit` and **Will it run?**'s *Cost limit per
+run*. The scheduler hands it to the turn as `PromptOptions.max_cost_usd`, and
+the limit survives an approval pause (the spend counted before the pause does
+not — [BUG-325](TO_BE_FIXED.md#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause)). Each model response is priced from the
+provider's own token counts with the rate the Models page shows; the turn
+checks its spend at the safe boundary where Stop is read, **before** asking the
+model again, so the overrun is at most the response that crossed it. A
+stopped run is recorded as a cycle that did not complete
+(`turn_cost_limit_reached` in the event catalogue). A model with no known
+price is not counted as free: the doctor says the limit *cannot be measured*
+and links to Models → Pricing.
+
+**Evidence.** `tests/test_model_tool_call_loop.py` (stopped before the next
+call; not stopped inside the limit; an unpriced model recorded as unpriced);
+`tests/test_routine_run_limit_and_doctor.py`; `RoutineCheck.test.ts`. Live:
+a Haiku routine with a $0.01 limit made one model call ($0.0108 by its token
+counts) and was stopped before the second (captures 06–07).
+
+---
+
+## FIXED-805 — Every turn told the provider the owner's default weather location
+
+**Severity: Medium. Area: Privacy / runtime context. Status: Fixed 2026-10-05.
+DEC-21 General's "make weather location opt-in and disclose egress".**
+
+**Observed.** Personalisation said the default weather location is "used only
+when you ask about the weather without naming a place". Every model turn's
+environment block carried `Owner default location: <place>`, so each turn to a
+hosted provider sent it.
+
+**Fixed.** The environment block says only that a default is set and that
+`weather_lookup` uses it when the location is omitted; the place itself goes to
+the weather service on a lookup and nowhere else. Delegated agents and the
+turn's own `environment_context` event get the same model-facing view
+(`EnvironmentContext.model_dict`). The card now says the place is sent to
+Open-Meteo for a lookup and that models are told only that one is set.
+
+**Evidence.** `tests/test_environment_context.py`. Live: a real Anthropic turn's
+recorded environment carried `default_weather_location: set` and no place.
+
+---
+
+## FIXED-806 — The language a model was told was the interface's, and the interface's did nothing
+
+**Severity: Low. Area: Settings → General / runtime. Status: Fixed 2026-10-05.
+DEC-21 General's three locales.**
+
+**Observed.** General's Language card said "interface text and formatting
+only — these do not change what Raiker tells a model". The interface is
+written in English, nothing read the value for formatting, and delegated agents
+were told it as their `locale` (against ENV-DECISION-05's presentation-only
+rule). Nothing let the owner say which language answers should be in.
+
+**Fixed.** Three settings, each doing what it says: **Dates and times**
+(FIXED-807), **Speech language** (unchanged) and **Answer in**
+(`general.answer_language`), the one a model is told — *Owner's answer
+language: French — answer in it, whatever language the message is written in,
+unless the owner asks for another language*. Only values the page offers are
+told; the date format reaches no model.
+
+**Evidence.** `tests/test_environment_context.py` (*TestAnswerLanguage*);
+`General.test.ts`. Live: with **Answer in** French, Haiku answered an English
+prompt in French, and the turn's recorded environment carried
+`answer_language: fr` and no `de-DE`.
+
+---
+
+## FIXED-807 — Dates ignored the date-format setting, and Country or region changed nothing
+
+**Severity: Low. Area: Settings → General / every page. Status: Fixed
+2026-10-05.**
+
+**Fixed.** `format.ts` holds one display locale, set by `applyUiPrefs` from
+`general.language`; `formatTimestamp`, `relativeTime`'s fallback date, the day
+groups and the task, Build, Updates, Git-grant and evidence timestamps all
+write through it (`localDateTime`, `localDate`, `localTime`). Unset, they follow
+the browser as before. The control is renamed **Dates and times**, shows a
+live sample, and the card says Raiker's own text is in English. **Country or
+region** is removed: it had no effect to describe; its stored value is kept.
+
+**Evidence.** `format.test.ts` (*display locale*), `General.test.ts`. Live:
+with Deutsch chosen, General's sample read `05.10.2026, 17:27` and task cards
+read `6.10.2026, 17:44:40` (captures 01, 06).
+
+---
+
+## FIXED-808 — A stale Permissions tab could overwrite a newer decision
+
+**Severity: Medium. Area: Permissions. Status: Fixed 2026-10-05. §13.2 item 6
+for permission changes.**
+
+**Observed.** A tab opened before a permission was tightened elsewhere still
+offered the old value, and a change from it applied over the newer one with
+no sign anything was overwritten — including undoing a tightening.
+
+**Fixed.** Decision-mode and gate changes accept the value the page showed
+(`expected_mode`, `expected_state`); a mismatch is `409 capability_conflict`
+and nothing changes. Permissions sends what it displays on every single, bulk
+and step-up change, and on a conflict closes any dialog, says *This permission
+was changed somewhere else since this page loaded, so nothing was changed*, and
+re-reads the page. Clients that send no expected value behave as before.
+
+**Evidence.** `tests/test_api_decision_modes.py` (three cases);
+`CapabilitiesView.test.ts`. Live: one tab set Shell commands to Never; the
+other, still showing Ask me, was refused and then showed Never (capture 04).
+
+---
+
+## FIXED-809 — A task sent twice was filed twice
+
+**Severity: Medium. Area: Tasks / API. Status: Fixed 2026-10-05. §13.2 item 6's
+owner-scoped, payload-bound idempotency keys.**
+
+**Fixed.** `POST /api/tasks` accepts `Idempotency-Key` (migration RAIKER-2094,
+`idempotency_keys`, kept 24 hours). The same owner, key and body get the first
+answer again; the same key on a changed body is `409 idempotency_key_reused`;
+a key still in flight is `409 idempotency_key_in_progress`; a refused request
+releases its key so the corrected draft can go. The Tasks composer and Build's
+agent form hold one key per draft until the server accepts it, so a double
+click or a resend after a lost response files once.
+
+**Evidence.** `tests/test_idempotency_keys.py`. Live: the same draft sent twice
+returned one task id and the queue held one card; a changed resend was refused
+(capture 05). The round also met the release rule: a draft refused for an
+unchecked model left its key free.
+
+---
+
+## FIXED-810 — Cached prompt tokens were recorded as zero and priced as nothing
+
+**Severity: Medium. Area: Models / usage and cost. Status: Fixed 2026-10-05 —
+found by this round's cost-limited routine.**
+
+**Observed.** An Anthropic routine wrote 7,976 tokens to the prompt cache on
+its first call and read them on each of the next three; the cost limit saw a
+fraction of the bill and let it run four calls.
+
+**Root cause.** The orchestrator records `summarize_model_usage`'s normalised
+keys (`cache_read_tokens`, `cache_write_tokens`), and `ModelUsageLedger.record`
+read only the raw Anthropic spelling — so every cached token in the usage
+ledger was zero — and `UsageTotals.cost` priced input and output only. Every
+conversation and provider cost the Models and Chat pages showed under-stated a
+cached prompt.
+
+**Fixed.** The ledger reads both spellings; `UsageTotals.cost` includes cache
+writes and reads at their own rates; the cost meter reads the normalised keys.
+
+**Evidence.** `tests/test_model_cost_accounting.py`
+(*TestCachedTokensAreCounted*); the orchestrator cost tests use a cached
+response.
+
+---
+
+## FIXED-811 — A profile's stated cache rates were dropped
+
+**Severity: Low. Area: Models / pricing. Status: Fixed 2026-10-05 — found by
+this round.**
+
+**Observed.** After FIXED-810, the routine's spend came to $0.0178 for two
+calls instead of $0.0126.
+
+**Root cause.** `price_from_config` read `input` and `output` and ignored the
+`cache_write` and `cache_read` rates the Anthropic profile states per model
+precisely so nothing has to infer them; cached tokens fell back to the input
+rate — a cache read at ten times its bill.
+
+**Fixed.** Both rates are read. **Evidence.**
+`test_a_profiles_stated_cache_rates_are_read`. Live: the next run's first call
+cost $0.0108 (353 in, 8,119 cache-write, 67 out) and it was stopped there.
+
+---
+
+## FIXED-812 — A damaged database read as the machine's memory, or as a generic failure
+
+**Severity: Medium. Area: Storage / lock screen. Status: Fixed 2026-10-05 —
+found by this round's lock-screen phase.**
+
+**Observed.** The round damaged a database's first pages with the host
+stopped. The lock screen said *This machine would not give SQLCipher the memory
+it needs* — the wrong diagnosis, with no backup offered. Without memory
+security the same file read as `store_open_failed`.
+
+**Root cause.** Once a host had run against it, the damaged file's first page
+still decrypted, so the key check passed and the failure came later in
+bootstrap: *database disk image is malformed*, or — with memory security on —
+the `MemoryError` SQLCipher raises for a page it cannot decrypt, which
+`store_health` labels a memory-lock refusal.
+
+**Fixed.** A `DatabaseError` naming damage, or a `MemoryError` while a scratch
+encrypted store opens in the same process, is `store_unreadable` from
+bootstrap and from the connection's memory retry; every cached handle to the
+file is retired. A real memory refusal — the scratch store failing too — is
+still named as one.
+
+**Evidence.** `tests/test_lock_screen_recovery.py` (both paths, and the
+machine case). Live: the same workspace then read `store_unreadable` and was
+restored from the lock screen (captures 10–11).

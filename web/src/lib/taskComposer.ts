@@ -1,3 +1,4 @@
+import { localDateTime } from "./format";
 /**
  * COMPOSER-10 — planning work reads as an instruction, not as a form.
  *
@@ -90,7 +91,7 @@ export function scheduleSummary(options: {
 function readableTime(value: string): string {
   const at = new Date(value);
   if (Number.isNaN(at.getTime())) return value;
-  return at.toLocaleString(undefined, {
+  return localDateTime(at, {
     weekday: "short",
     day: "numeric",
     month: "short",

@@ -26,6 +26,7 @@ from raiker.storage.migrations import (
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
     PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,
+    SCHEMA_GENERATION,
     Migration,
     SearchMigration,
 )
@@ -34,11 +35,36 @@ if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 
+def schema_generation_of(connection: sqlite3.Connection) -> int:
+    """The ``PRAGMA user_version`` a keyed connection's database carries (0 if never set)."""
+    return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+
 class MigrationRunner:
 
     def bootstrap(self: SQLiteStore) -> None:
+        try:
+            self._bootstrap()
+        except (sqlite3.DatabaseError, MemoryError) as exc:
+            # BUG-323 — a database whose first page still reads but whose later
+            # pages do not fails here, not at the key check: as "database disk
+            # image is malformed", or, with memory security on, as the
+            # MemoryError SQLCipher reports for a page it cannot decrypt. Both
+            # read as a generic failure or as the machine's memory, and neither
+            # offered the backup that fixes it (found by the 2026-10-05 fifth
+            # live round). Named as unreadable when it is the file; nothing
+            # past the failing statement was written.
+            from raiker.storage.sqlite import damaged_store_error
+
+            damaged = damaged_store_error(self, exc)
+            if damaged is None:
+                raise
+            raise damaged from exc
+
+    def _bootstrap(self: SQLiteStore) -> None:
         self.paths.ensure()
         self._migrate_plaintext_database()
+        self._refuse_newer_schema()
         read_before = self._backup_before_upgrade()
         with self.connect() as connection:
             connection.executescript(PHASE_1_SQL)
@@ -82,8 +108,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     )
                 else:
                     getattr(self, step.method)(connection)
+            # DEC-17 step 8 — the header now says this build shaped it.
+            # Never lowered: `_refuse_newer_schema` has already stopped any
+            # build that would.
+            if schema_generation_of(connection) < SCHEMA_GENERATION:
+                connection.execute(f"PRAGMA user_version = {int(SCHEMA_GENERATION)}")
         # The pass is over; anything that asks again asks the table.
         self._applied = None
+
+    def _refuse_newer_schema(self: SQLiteStore) -> None:
+        """DEC-17 step 8 — do not open a database a newer Raiker has shaped.
+
+        Running an older build over newer data is a downgrade the migrations
+        cannot undo: a column it does not know is ignored, a value it does not
+        understand is overwritten, and the next newer start finds both. Refused
+        before the backup, the migrations and every write, with the generation
+        each side has, so the lock screen can say which backups this build can
+        still open (a newer build's own pre-update snapshots are exactly those).
+        """
+        try:
+            if self.db_path.stat().st_size == 0:
+                return
+        except OSError:
+            return
+        found = schema_generation_of(self.connect())
+        if found > SCHEMA_GENERATION:
+            from raiker.storage.sqlite import invalidate_workspace_connections
+            from raiker.storage.store_errors import STORE_SCHEMA_NEWER, StoreUnavailableError
+
+            # The handle that read the header is cached; nothing may reuse it.
+            invalidate_workspace_connections(self.paths.workspace_root)
+            raise StoreUnavailableError(
+                STORE_SCHEMA_NEWER,
+                f"This workspace was last opened by a newer Raiker (schema {found}; this "
+                f"build understands up to {SCHEMA_GENERATION}). Raiker has not changed it. "
+                "Start the newer Raiker again, or restore a backup taken before that update.",
+            )
 
     def _backup_before_upgrade(self: SQLiteStore) -> set[str] | None:
         """DEC-17 step 8 — snapshot a database that is about to be migrated.

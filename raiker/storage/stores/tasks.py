@@ -82,6 +82,15 @@ class TaskStore:
             )
         )
 
+    def set_task_cost_limit(self: SQLiteStore, task_id: str, usd: float | None) -> bool:
+        """DEC-12 step 6 — set one routine's cost limit per run; ``None`` removes it."""
+        return bool(
+            self._execute(
+                "UPDATE tasks SET max_run_cost_usd = ?, updated_at = ? WHERE task_id = ?",
+                (usd, utc_now(), task_id),
+            )
+        )
+
     @staticmethod
     def _task_from_row(row: Any) -> TaskRecord:
         data = dict(row)

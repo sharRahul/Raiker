@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DISPLAY_LOCALES } from "../../format";
   import {
     TIMEZONE_KEY,
     localTimeIn,
@@ -26,6 +27,19 @@
    * The default weather location moved to Personalisation, where the review put
    * it. It is optional, it is a preference about answers rather than about the
    * runtime, and it was the only control on this page that was neither.
+   *
+   * DEC-21 General — three languages, each doing the one thing it says. The
+   * card promised "interface text and formatting" and did neither: the
+   * interface is written in English, nothing read the Language value, and a
+   * Country or region select changed nothing at all. Now:
+   *
+   * - **Dates and times** sets the format every date and time is written in;
+   * - **Speech** is dictation and read-aloud, as before;
+   * - **Answers** is what models are told about the language to answer in —
+   *   the one of the three that reaches a model, said so on the control.
+   *
+   * The region select is gone rather than relabelled: it had no effect to
+   * describe. Its stored value stays readable and untouched.
    */
 
   let { settings, save }: {
@@ -33,8 +47,8 @@
     save: (p: Record<string, unknown>) => void;
   } = $props();
 
-  const language = $derived((settings["general.language"] as string) ?? "en-GB");
-  const region = $derived((settings["general.region"] as string) ?? "GB");
+  const language = $derived((settings["general.language"] as string) ?? "");
+  const answerLanguage = $derived((settings["general.answer_language"] as string) ?? "");
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
   const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
 
@@ -64,6 +78,22 @@
     return () => clearInterval(timer);
   });
   const sample = $derived(localTimeIn(resolved.zone, now));
+  // The chosen date format, shown on its own control so its effect is visible
+  // before anything else on the page re-renders.
+  const formatSample = $derived(
+    now.toLocaleString(language || undefined, { dateStyle: "medium", timeStyle: "short" }),
+  );
+  /** Kept in step with `raiker.runtime.environment.ANSWER_LANGUAGES`. */
+  const ANSWER_LANGUAGES: { value: string; label: string }[] = [
+    { value: "en", label: "English" },
+    { value: "hi", label: "हिन्दी (Hindi)" },
+    { value: "es", label: "Español (Spanish)" },
+    { value: "fr", label: "Français (French)" },
+    { value: "de", label: "Deutsch (German)" },
+    { value: "it", label: "Italiano (Italian)" },
+    { value: "pt", label: "Português (Portuguese)" },
+    { value: "ja", label: "日本語 (Japanese)" },
+  ];
   const offset = $derived(utcOffset(resolved.zone, now));
 </script>
 
@@ -73,9 +103,19 @@
 
 <section class="settings-card" aria-labelledby="language-region">
   <div class="card-heading">
-    <h3 id="language-region">Language and region</h3>
-    <p>Interface text and formatting only. These do not change what Raiker tells a model.</p>
+    <h3 id="language-region">Language</h3>
+    <p>Raiker's own text is in English. These choose how dates read, what speech listens for, and what language answers are in.</p>
   </div>
+  <label>
+    <span>Dates and times</span>
+    <small>How every date and time in Raiker is written. Right now: {formatSample}.</small>
+    <select aria-label="Dates and times" value={language} onchange={(e) => save({ "general.language": e.currentTarget.value })}>
+      <option value="">This browser's format</option>
+      {#each DISPLAY_LOCALES as option (option.value)}
+        <option value={option.value}>{option.label}</option>
+      {/each}
+    </select>
+  </label>
   <label>
     <span>Speech language</span>
     <small>Dictation and read-aloud, in Chat and Build.</small>
@@ -96,26 +136,13 @@
     </select>
   </label>
   <label>
-    <span>Language</span>
-    <select value={language} onchange={(e) => save({ "general.language": e.currentTarget.value })}>
-      <option value="en-GB">English (United Kingdom)</option>
-      <option value="en-US">English (United States)</option>
-      <option value="hi-IN">हिन्दी (भारत)</option>
-      <option value="es-ES">Español (España)</option>
-      <option value="fr-FR">Français (France)</option>
-      <option value="de-DE">Deutsch (Deutschland)</option>
-    </select>
-  </label>
-  <label>
-    <span>Country or region</span>
-    <small>Formatting only. Scheduling is decided under Time and place.</small>
-    <select value={region} onchange={(e) => save({ "general.region": e.currentTarget.value })}>
-      <option value="GB">United Kingdom</option>
-      <option value="US">United States</option>
-      <option value="IN">India</option>
-      <option value="DE">Germany</option>
-      <option value="FR">France</option>
-      <option value="ES">Spain</option>
+    <span>Answer in</span>
+    <small>Every model turn is told this, whatever language you write in. Asking for another language in a message still decides.</small>
+    <select aria-label="Answer in" value={answerLanguage} onchange={(e) => save({ "general.answer_language": e.currentTarget.value })}>
+      <option value="">The language of my message</option>
+      {#each ANSWER_LANGUAGES as option (option.value)}
+        <option value={option.value}>{option.label}</option>
+      {/each}
     </select>
   </label>
 </section>

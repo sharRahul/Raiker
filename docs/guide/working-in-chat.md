@@ -97,6 +97,15 @@ owner's speech language. Raiker stores the normal prompt and its
 `typed`/`dictated`/`mixed` provenance, never microphone audio or a second copy of
 the transcript.
 
+**The language answers come in.** Settings → General → **Answer in** is the one
+language setting every turn is told: with French chosen, Raiker answers in
+French whatever language you type in, unless a message asks for another.
+**Dates and times** only changes how dates are written on screen, and **Speech
+language** only what dictation listens for; neither is told to a model. A
+default weather place, if you set one, is not sent with your turns either — a
+turn is told only that one exists, and the place goes to the weather service
+when you ask about the weather without naming one.
+
 The approval setting controls the interaction, not the runtime's protections:
 
 - **Manually approve** pauses before every otherwise eligible governed action.

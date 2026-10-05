@@ -386,6 +386,10 @@ class RuntimeOrchestrator:
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
         self._sink: list[StreamEvent] | None = None
+        # DEC-12 step 6 — what each turn's model calls have cost so far, for a
+        # routine run that carries a cost limit. Keyed by turn, so a resumed
+        # turn on the same orchestrator keeps counting.
+        self._turn_spend: dict[str, Any] = {}
         # Backlog #16 — deferred tools this turn has actually asked for. Grown
         # by a `tool_search` result and cleared with the turn, so a schema the
         # model fetched stays available for the rest of the turn and costs the
@@ -740,6 +744,7 @@ class RuntimeOrchestrator:
                     "model": envelope.options.model,
                     "reasoning_effort": envelope.options.reasoning_effort,
                     "max_tool_calls": envelope.options.max_tool_calls,
+                    "max_cost_usd": envelope.options.max_cost_usd,
                     # BUG-70 — the turn's own posture rides with it, so a turn
                     # parked in Plan mode resumes in Plan mode rather than
                     # picking up whatever the standing modes say hours later.
@@ -1090,6 +1095,8 @@ class RuntimeOrchestrator:
         principal_id = getattr(self.tool_broker, "principal_id", None)
         if store is None or not principal_id:
             return
+        if request_kind == "turn" and envelope.options.max_cost_usd is not None:
+            self._meter_spend(envelope, store, str(principal_id), provider, model, usage)
         try:
             try:
                 profile_id = self.model_router.registry.resolve(provider, model).profile_id
@@ -1106,6 +1113,40 @@ class RuntimeOrchestrator:
             )
         except Exception:  # noqa: BLE001 - accounting never breaks a completed turn
             return
+
+    def _meter_spend(
+        self,
+        envelope: PromptEnvelope,
+        store: Any,
+        principal_id: str,
+        provider: str,
+        model: str,
+        usage: dict[str, int],
+    ) -> None:
+        """DEC-12 step 6 — add one model response's cost to this turn's spend.
+
+        Priced with the rate the Models page shows. A response that cannot be
+        priced is recorded as unpriced rather than as free.
+        """
+        from raiker.tasks.cost_limit import TurnSpend, resolve_price
+
+        spend = self._turn_spend.setdefault(envelope.turn_id, TurnSpend())
+        try:
+            raw_pricing = None
+            with contextlib.suppress(Exception):
+                profile = self.model_router.registry.resolve(provider, model)
+                raw_pricing = (getattr(profile, "raw", {}) or {}).get("pricing")
+            price = resolve_price(store, principal_id, provider, model, raw_pricing)
+        except Exception:  # noqa: BLE001 - an unreadable price is an unpriced response
+            price = None
+        spend.add(price, model, usage)
+
+    def _cost_limit_reached(self, envelope: PromptEnvelope) -> Any | None:
+        """The turn's spend when it has reached its cost limit, else ``None``."""
+        spend = self._turn_spend.get(envelope.turn_id)
+        if spend is not None and spend.reached(envelope.options.max_cost_usd):
+            return spend
+        return None
 
     def _drain_sink(self) -> list[StreamEvent]:
         drained: list[StreamEvent] = []
@@ -2152,7 +2193,7 @@ class RuntimeOrchestrator:
         # its web capability, its Project or its provider still knows what day
         # it is, because none of those is where the answer comes from.
         environment = self._environment(envelope)
-        self._event(envelope, "environment_context", environment.to_dict())
+        self._event(envelope, "environment_context", environment.model_dict())
         self._state(machine, envelope, "CONTEXT_READY")
         bundle = self.context_gatherer.gather(
             workspace_root=self.workspace_root,
@@ -2814,6 +2855,28 @@ class RuntimeOrchestrator:
                 )
                 status = "stopped"
                 message = answer_so_far() or "Stopped at your request, at a safe boundary."
+                break
+            # DEC-12 step 6 — a routine run's own cost limit, read at the same
+            # boundary as Stop: before the model is asked again, so the
+            # overrun is at most the response that crossed it.
+            spent = self._cost_limit_reached(envelope)
+            if spent is not None:
+                from raiker.tasks.cost_limit import stopped_message as cost_stopped
+
+                limit = float(envelope.options.max_cost_usd or 0)
+                self._state(machine, envelope, "RESPONDING")
+                self._event(
+                    envelope,
+                    "turn_cost_limit_reached",
+                    {
+                        "limit_usd": limit,
+                        "spent_usd": float(spent.total),
+                        "boundary": "before_model_call",
+                        "tool_calls_made": tool_calls_made,
+                    },
+                )
+                status = "failed"
+                message = cost_stopped(limit, spent.total)
                 break
             for pending in self._drain_sink():
                 yield pending

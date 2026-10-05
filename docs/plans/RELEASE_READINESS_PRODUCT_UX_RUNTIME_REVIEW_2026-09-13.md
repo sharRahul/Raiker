@@ -1836,6 +1836,13 @@ cleanup tests for every supported runtime type.
 > [FIXED-797](FIXED_ITEMS.md#fixed-797--one-run-of-a-routine-had-no-tool-call-limit-of-its-own): 1–1000 tool calls, set in **Will it run?** and said by the doctor.
 > Per-run cost limits remain.
 >
+> **2026-10-05 (fifth round).** Step 6 is complete: the per-run cost limit closed
+> as [FIXED-804](FIXED_ITEMS.md#fixed-804--one-run-of-a-routine-had-no-cost-limit-of-its-own) — checked at the turn's safe boundary before each further model
+> call, priced from the provider's own token counts, and said as unmeasurable
+> for a model with no known price. Proving it live found cached prompt tokens
+> recorded as zero and the profile's cache rates dropped
+> ([FIXED-810](FIXED_ITEMS.md#fixed-810--cached-prompt-tokens-were-recorded-as-zero-and-priced-as-nothing), [FIXED-811](FIXED_ITEMS.md#fixed-811--a-profiles-stated-cache-rates-were-dropped)).
+>
 > **2026-10-05 (second round).** Step 7 closed as [FIXED-764](FIXED_ITEMS.md#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running): pause, resume and stop
 > carry down the delegation tree, each child recording the decision it came
 > from. Step 5 closed as [FIXED-766](FIXED_ITEMS.md#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it): a finished background task records
@@ -2076,6 +2083,13 @@ between approval and execution. All must fail before effect.
 > the migration runner changes an existing database it takes a verified
 > snapshot, keeping the last three. Declaring the oldest supported rollback and
 > refusing an unsafe downgrade remain with step 7's staged update.
+>
+> **2026-10-05 (fifth round).** Step 8's unsafe-downgrade refusal closed as
+> [FIXED-803](FIXED_ITEMS.md#fixed-803--an-older-raiker-would-open-a-database-a-newer-one-had-shaped): the database header carries the schema generation of the
+> build that last shaped it; an older build refuses it (`store_schema_newer`)
+> before any write, and each backup says whether this build can open it — the
+> oldest supported rollback is a backup whose generation is not newer. Step 7's
+> staged, atomic update remains.
 
 **Decision:** Supported desktop installers carry or install into an app-owned,
 versioned runtime and only the dependencies needed to run Raiker. Host Python or
@@ -2367,6 +2381,11 @@ symbols and tests rather than relying on line numbers that drift after edits.
    *2026-10-05:* Settings saves carry an expected revision and are refused
    `409 settings_conflict` where another save changed the same key ([FIXED-793](FIXED_ITEMS.md#fixed-793--two-pages-saving-settings-kept-whichever-saved-last));
    other configuration mutations remain.
+   *2026-10-05 (fifth round):* permission decision-mode and gate changes carry
+   the value the page showed and are refused `409 capability_conflict` when it
+   changed ([FIXED-808](FIXED_ITEMS.md#fixed-808--a-stale-permissions-tab-could-overwrite-a-newer-decision)); task creation takes an owner-scoped, payload-bound
+   `Idempotency-Key`, a reused key on changed arguments refused
+   ([FIXED-809](FIXED_ITEMS.md#fixed-809--a-task-sent-twice-was-filed-twice)). MCP, channel and project configuration mutations remain.
 7. **Recovery and effect uncertainty:** A crashed command/message may have
    completed externally before its receipt was saved. Represent
    `outcome_unknown`, reconcile, then obtain an explicit retry decision if
@@ -2405,6 +2424,14 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > delivery timeline closed as [FIXED-794](FIXED_ITEMS.md#fixed-794--a-monitor-that-tripped-every-pass-raised-a-new-notice-every-pass) and [FIXED-795](FIXED_ITEMS.md#fixed-795--the-record-did-not-say-what-happened-to-a-notice). Web access's "stale revision
 > refuses save" closed for every Settings page as [FIXED-793](FIXED_ITEMS.md#fixed-793--two-pages-saving-settings-kept-whichever-saved-last). DEC-21b still waits
 > on the owner's OAuth client ID.
+>
+> **2026-10-05 (fifth round).** The General row closed: a model is told only
+> that a default weather location is set, never the place
+> ([FIXED-805](FIXED_ITEMS.md#fixed-805--every-turn-told-the-provider-the-owners-default-weather-location)); **Answer in** is the one language a model is told, separate
+> from the date format and the speech language ([FIXED-806](FIXED_ITEMS.md#fixed-806--the-language-a-model-was-told-was-the-interfaces-and-the-interfaces-did-nothing)); **Dates and
+> times** now formats every date in the interface, and the Country or region
+> select that changed nothing is gone ([FIXED-807](FIXED_ITEMS.md#fixed-807--dates-ignored-the-date-format-setting-and-country-or-region-changed-nothing)). Personalisation, Git
+> credential (DEC-21b) and Updates rows remain.
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2650,6 +2677,17 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > deletion tombstones after a restore and switching over atomically remain, as
 > does restoring from the lock screen (BUG-323), which step 6's quarantine
 > needs. Step 1's queue age and depth closed for the scheduler ([FIXED-796](FIXED_ITEMS.md#fixed-796--work-stuck-in-the-schedulers-queue-was-nowhere-on-the-overview)).
+>
+> **2026-10-05 (fifth round).** Step 5's deletion tombstones and atomic switch,
+> and step 6's quarantine, closed: deletions are journalled outside the
+> database, content-free, and replayed into any restore
+> ([FIXED-802](FIXED_ITEMS.md#fixed-802--a-restore-brought-back-what-had-been-deleted-since-the-backup)); the lock screen of a workspace that will not open lists its
+> backups from their manifests and restores one in place, the damaged copy moved
+> to `.raiker/quarantine/` and the verified copy switched in with one rename
+> ([FIXED-801](FIXED_ITEMS.md#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups), closing BUG-323). The round found damage past the first page
+> reported as the machine's memory; it is now named as damage
+> ([FIXED-812](FIXED_ITEMS.md#fixed-812--a-damaged-database-read-as-the-machines-memory-or-as-a-generic-failure)). Referenced blobs beyond the memory files (checkpoints,
+> artifacts), steps 2–3 and step 7 remain.
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.

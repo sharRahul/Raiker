@@ -21,6 +21,11 @@
   let limit = $state<number | null>(null);
   let toolLimit = $state<string | null>(null);
   const shownToolLimit = $derived(toolLimit ?? (task.max_tool_calls === null || task.max_tool_calls === undefined ? "" : String(task.max_tool_calls)));
+  // DEC-12 step 6 — the routine's own cost limit per run, in US dollars.
+  let costLimit = $state<string | null>(null);
+  const shownCostLimit = $derived(
+    costLimit ?? (task.max_run_cost_usd === null || task.max_run_cost_usd === undefined ? "" : String(task.max_run_cost_usd)),
+  );
   let limitNotice = $state<string | null>(null);
   const shownLimit = $derived(limit ?? task.max_run_minutes);
 
@@ -70,11 +75,18 @@
       limitNotice = "A tool-call limit is a whole number from 1 to 1000, or empty for none.";
       return;
     }
+    // Empty means no cost limit of the routine's own.
+    const usd = shownCostLimit.trim() === "" ? null : Number(shownCostLimit);
+    if (usd !== null && (!Number.isFinite(usd) || usd < 0.01 || usd > 1000)) {
+      limitNotice = "A cost limit is an amount in US dollars from 0.01 to 1000, or empty for none.";
+      return;
+    }
     try {
-      const updated = await api.setTaskRunLimit(task.task_id, minutes, calls);
-      limitNotice =
-        `Each run now stops after ${updated.max_run_minutes} minutes` +
-        (updated.max_tool_calls ? ` or ${updated.max_tool_calls} tool calls.` : ".");
+      const updated = await api.setTaskRunLimit(task.task_id, minutes, calls, usd);
+      const bounds = [`${updated.max_run_minutes} minutes`];
+      if (updated.max_tool_calls) bounds.push(`${updated.max_tool_calls} tool calls`);
+      if (updated.max_run_cost_usd) bounds.push(`$${updated.max_run_cost_usd.toFixed(2)}`);
+      limitNotice = `Each run now stops after ${bounds.length === 1 ? bounds[0] : `${bounds.slice(0, -1).join(", ")} or ${bounds.at(-1)}`}.`;
       onChanged?.(updated);
       if (report) await check();
     } catch (e) {
@@ -144,6 +156,21 @@
           oninput={(e) => (toolLimit = e.currentTarget.value)}
         />
         <span>tool calls</span>
+      </label>
+      <label>
+        <span>or $</span>
+        <input
+          class="input"
+          type="number"
+          min="0.01"
+          max="1000"
+          step="0.01"
+          placeholder="no limit"
+          value={shownCostLimit}
+          aria-label="Cost limit per run in US dollars"
+          oninput={(e) => (costLimit = e.currentTarget.value)}
+        />
+        <span>by the provider's token counts</span>
       </label>
       <button type="submit" class="btn btn-sm">Save limit</button>
     </form>

@@ -237,13 +237,15 @@
     notice = null;
     const applied: string[] = [];
     const failed: string[] = [];
+    let conflicted = false;
     try {
       for (const cap of [...selectedCaps]) {
         try {
-          await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
+          await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI", shownMode(cap));
           recordConfirmed(cap, mode);
           applied.push(cap);
-        } catch {
+        } catch (e) {
+          if (isConflict(e)) conflicted = true;
           failed.push(cap);
         }
       }
@@ -260,6 +262,8 @@
       // Only what changed leaves the selection, so a refused capability is still
       // selected and can be retried without finding it in the registry again.
       selectedCaps = new Set(failed);
+      // A capability changed elsewhere: show what it is now, not what it was.
+      if (conflicted) await load();
     } finally {
       bulkBusy = false;
     }
@@ -273,6 +277,23 @@
    */
   function modeFor(gate: CapabilityGate): DecisionMode | "unknown" {
     return isDecisionMode(gate.decision_mode) ? gate.decision_mode : "unknown";
+  }
+
+  /**
+   * §13.2 item 6 — what this page shows for a capability, sent with a change so
+   * the server can refuse it (409 `capability_conflict`) when another tab or
+   * device has changed it since. A mode the page cannot read is not claimed.
+   */
+  function shownMode(capability: string): string | undefined {
+    const gate = effective.find((entry) => entry.capability === capability);
+    const mode = gate ? modeFor(gate) : "unknown";
+    return mode === "unknown" ? undefined : mode;
+  }
+  function shownState(capability: string): string | undefined {
+    return effective.find((entry) => entry.capability === capability)?.state;
+  }
+  function isConflict(e: unknown): boolean {
+    return e instanceof ApiError && e.reasonCode === "capability_conflict";
   }
 
   // The pending mutation awaiting step-up confirmation.
@@ -513,7 +534,7 @@
     modeBusyCap = capability;
     notice = null;
     try {
-      await api.setCapabilityDecisionMode(capability, mode, "set via web UI");
+      await api.setCapabilityDecisionMode(capability, mode, "set via web UI", shownMode(capability));
       recordConfirmed(capability, mode);
       notice = {
         kind: "ok",
@@ -525,6 +546,7 @@
         kind: "error",
         text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The change was rejected.",
       };
+      if (isConflict(e)) await load();
     } finally {
       modeBusyCap = null;
     }
@@ -601,6 +623,14 @@
       await load();
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      if (isConflict(e) && explained) {
+        // Nothing the dialog could supply fixes this: the choice was made
+        // against a value that is no longer true. Close it and show today's.
+        pending = null;
+        notice = { kind: "error", text: `${explained.plain} ${explained.remediation}` };
+        await load();
+        return;
+      }
       // Keep the dialog open so the user can supply what the backend says is missing.
       dialogError = explained
         ? `${explained.plain}${explained.remediation ? " " + explained.remediation : ""}`
@@ -622,11 +652,12 @@
         target_state: p.target,
         reason: values.reason,
         confirmation_token: values.confirmationToken ?? undefined,
+        expected_state: shownState(p.capability),
       });
     } else if (p.kind === "disable_cap") {
-      await api.disableCapability(p.capability, values.reason);
+      await api.disableCapability(p.capability, values.reason, shownState(p.capability));
     } else {
-      await api.setCapabilityDecisionMode(p.capability, p.mode, values.reason);
+      await api.setCapabilityDecisionMode(p.capability, p.mode, values.reason, shownMode(p.capability));
     }
   }
 

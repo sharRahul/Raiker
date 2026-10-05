@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**372 operations: 361 verified, 0 eligible, 0 deferred, 11 special.**
+**374 operations: 363 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -297,6 +297,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/prompts` | PromptRequest | AgentResponse | verified | declared AgentResponse |
 | POST | `/api/prompts/stream` | PromptRequest |  | special | special |
 | GET | `/api/read-capabilities` |  | ReadCapabilities | verified | declared ReadCapabilities |
+| GET | `/api/recovery/backups` |  | RecoveryBackupsView | verified | declared by cast |
+| POST | `/api/recovery/restore` | RecoveryRestoreRequest | RecoveryRestored | verified | declared by cast |
 | GET | `/api/runtime-mode` |  | RuntimeModeView | verified | RuntimeControlService.get_runtime_mode |
 | POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest | RuntimeModeActivated | verified | declared RuntimeModeActivated |
 | POST | `/api/runtime-mode/disable` | DisableRuntimeModeRequest | Ok | verified | built as Ok |
@@ -365,7 +367,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/surface-models` |  | SurfaceModels | verified | declared SurfaceModels |
 | PUT | `/api/surface-models` | SurfaceModelDefaultRequest | SurfaceModelSet | verified | declared SurfaceModelSet |
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
-| POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | DashboardService.create_task |
+| POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | _create_task |
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
 | GET | `/api/tasks/{task_id}/doctor` |  | RoutineDoctor | verified | declared RoutineDoctor |
 | POST | `/api/tasks/{task_id}/resume` |  | TaskResumed | verified | declared TaskResumed |

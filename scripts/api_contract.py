@@ -312,6 +312,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/backups"),
         ("POST", "/api/backups/{backup_id}/verify"),
         ("POST", "/api/backups/{backup_id}/restore"),
+        ("GET", "/api/recovery/backups"),
+        ("POST", "/api/recovery/restore"),
         ("DELETE", "/api/backups/{backup_id}"),
         ("GET", "/api/tasks/{task_id}/doctor"),
         ("PUT", "/api/tasks/{task_id}/run-limit"),

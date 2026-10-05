@@ -8,6 +8,8 @@ from typing import Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
+from raiker.control.views.security import BackupView
+
 DecisionMode = Literal["ask", "allow", "auto", "deny"]
 
 
@@ -229,7 +231,7 @@ class EnvironmentContextView(TypedDict):
     utc_offset: str
     display_date: str
     freshness: str
-    locale: NotRequired[str]
+    answer_language: NotRequired[str]
     location: NotRequired[str]
     timezone_error: NotRequired[str]
 
@@ -257,3 +259,26 @@ class HealthView(TypedDict):
     text_search_engine: NotRequired[str]
     text_search_ranking: NotRequired[Literal["bm25_relevance", "recency"]]
     text_search_reason: NotRequired[str]
+
+
+class RecoveryBackupsView(TypedDict):
+    """BUG-323 — what the lock screen may restore from, read from manifests only."""
+
+    #: Why the store will not open: ``store_unreadable`` or ``store_schema_newer``.
+    reason: str
+    #: The fingerprint of this workspace's key, to compare with each backup's.
+    key_fingerprint: str
+    #: The newest schema generation this build can open.
+    schema_generation: int
+    backups: list[BackupView]
+
+
+class RecoveryRestored(TypedDict):
+    """A verified backup switched in; the database that would not open is kept aside."""
+
+    ok: bool
+    backup_id: str
+    #: Where the old database went, relative to the workspace.
+    quarantine: str
+    counts: dict[str, int]
+    deletions_applied: dict[str, int]

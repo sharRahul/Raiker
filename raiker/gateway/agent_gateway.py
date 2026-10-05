@@ -836,6 +836,13 @@ class AgentGateway:
                     else None
                 ),
                 max_tool_calls=int(options_raw.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)),
+                # DEC-12 step 6 — a resumed routine run keeps its cost limit.
+                max_cost_usd=(
+                    float(options_raw["max_cost_usd"])
+                    if isinstance(options_raw.get("max_cost_usd"), (int, float))
+                    and not isinstance(options_raw.get("max_cost_usd"), bool)
+                    else None
+                ),
                 capability_modes=(
                     dict(options_raw["capability_modes"])
                     if isinstance(options_raw.get("capability_modes"), dict)

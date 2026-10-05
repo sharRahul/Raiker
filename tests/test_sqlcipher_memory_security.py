@@ -260,6 +260,10 @@ def test_a_refused_lock_fails_closed_by_name_when_the_owner_demanded_it(
         raise MemoryError("cannot allocate locked pages")
 
     monkeypatch.setattr(SQLiteStore, "_open_keyed", refusing_open)
+    # A platform that refuses locked pages refuses them to every store, not
+    # only the workspace's: without this the real scratch probe opens, and
+    # the refusal reads as a damaged file (FIXED-812).
+    monkeypatch.setattr("raiker.storage.sqlite._scratch_store_opens", lambda: False)
     with pytest.raises(StoreUnavailableError) as raised:
         SQLiteStore(tmp_path)
     assert raised.value.reason == "store_memory_lock_unavailable"
@@ -286,6 +290,10 @@ def test_store_health_reports_the_unopenable_store_rather_than_ok(
         raise MemoryError("cannot allocate locked pages")
 
     monkeypatch.setattr(SQLiteStore, "_open_keyed", refusing_open)
+    # A platform that refuses locked pages refuses them to every store, not
+    # only the workspace's: without this the real scratch probe opens, and
+    # the refusal reads as a damaged file (FIXED-812).
+    monkeypatch.setattr("raiker.storage.sqlite._scratch_store_opens", lambda: False)
     close_cached_connections()
     view = store_health(tmp_path)
     assert view["store"] == "unavailable"

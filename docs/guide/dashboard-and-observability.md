@@ -272,7 +272,7 @@ composer's **Tools** menu:
 | **Search the web** | Finds pages this turn needs |
 | **Read a URL** | Fetches one page as sanitized text |
 | **Extract page content** | Pulls the main text, links, tables, metadata or structured data out of one page |
-| **Check the weather** | Structured conditions and forecast, with the source and how old the reading is. A default place for when you do not name one is optional, under **Settings → Personalisation** |
+| **Check the weather** | Structured conditions and forecast, with the source and how old the reading is. A default place for when you do not name one is optional, under **Settings → Personalisation**; it is sent to the weather service for that lookup, and a model is told only that one is set |
 
 They are listed separately because they fail differently: search needs a
 provider, a URL read needs an address that resolves to the public internet, and

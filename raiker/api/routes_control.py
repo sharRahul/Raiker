@@ -75,6 +75,23 @@ def _deny(result_reason: str | None = None) -> NoReturn:
     raise refusal(status.HTTP_403_FORBIDDEN, result_reason or "denied")
 
 
+#: §13.2 item 6 — a permission change made from a page showing an older value.
+CAPABILITY_CONFLICT = "capability_conflict"
+
+
+def _refuse_if_changed(expected: str | None, current: str | None) -> None:
+    """Refuse a change whose page showed a value the server no longer holds.
+
+    The two writers are the owner's own tabs and devices, and the harm is
+    specific: a tab opened before a permission was tightened elsewhere offers
+    the old value, and saving from it undoes the tightening with no sign that
+    anything was overwritten. An absent ``expected`` keeps older clients — the
+    CLI, scripts — working as before.
+    """
+    if expected is not None and expected != current:
+        raise refusal(status.HTTP_409_CONFLICT, CAPABILITY_CONFLICT)
+
+
 def _set_capability_decision_mode(
     capability: str,
     mode: DecisionMode,
@@ -84,6 +101,9 @@ def _set_capability_decision_mode(
 ) -> CapabilityDecisionModeSet:
     session, _principal = auth_data
     service = _get_service(request)
+    if body.expected_mode is not None:
+        current = service.get_capability_decision_mode(capability, session.principal_id)
+        _refuse_if_changed(body.expected_mode, str(current.data.get("decision_mode", "")))
     result = service.set_capability_decision_mode(
         capability,
         mode,
@@ -262,6 +282,9 @@ async def set_capability_state(
 ) -> dict[str, Any]:
     session, _principal = _auth_data
     service = _get_service(request)
+    if body.expected_state is not None:
+        gate = service.get_capability_gate(capability, session.principal_id)
+        _refuse_if_changed(body.expected_state, gate.state if gate is not None else None)
     result = service.set_capability_state(
         capability,
         body.target_state,
@@ -308,6 +331,9 @@ async def disable_capability(
 ) -> dict[str, Any]:
     session, _principal = _auth_data
     service = _get_service(request)
+    if body.expected_state is not None:
+        gate = service.get_capability_gate(capability, session.principal_id)
+        _refuse_if_changed(body.expected_state, gate.state if gate is not None else None)
     result = service.disable_capability(capability, session.principal_id, body.reason)
     if not result.ok:
         _deny(result.reason_code)

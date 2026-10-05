@@ -169,3 +169,46 @@ class TestAiCannotSetMode:
     def test_set_requires_auth(self, client: TestClient) -> None:
         resp = client.post(f"/api/capability-modes/{_REAL_CAP}/allow", json={})
         assert resp.status_code == 401
+
+
+# §13.2 item 6 — a change made from a page showing an older value is refused,
+# not applied over the newer one.
+
+
+def test_a_change_from_a_page_showing_the_current_mode_applies(client: TestClient, owner_token: str) -> None:
+    current = client.get(f"/api/capability-modes/{_REAL_CAP}", headers=_auth(owner_token)).json()["decision_mode"]
+    changed = client.post(
+        f"/api/capability-modes/{_REAL_CAP}/deny",
+        json={"reason": "tighten", "expected_mode": current},
+        headers=_auth(owner_token),
+    )
+    assert changed.status_code == 200, changed.text
+
+
+def test_a_stale_page_cannot_undo_a_tightening_made_elsewhere(client: TestClient, owner_token: str) -> None:
+    shown = client.get(f"/api/capability-modes/{_REAL_CAP}", headers=_auth(owner_token)).json()["decision_mode"]
+    # Another tab tightens it to Never.
+    assert client.post(
+        f"/api/capability-modes/{_REAL_CAP}/deny", json={"reason": "other tab"}, headers=_auth(owner_token)
+    ).status_code == 200
+    # This tab, still showing the old mode, asks for Ask me.
+    stale = client.post(
+        f"/api/capability-modes/{_REAL_CAP}/ask",
+        json={"reason": "stale tab", "expected_mode": shown},
+        headers=_auth(owner_token),
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["reason_code"] == "capability_conflict"
+    after = client.get(f"/api/capability-modes/{_REAL_CAP}", headers=_auth(owner_token)).json()
+    assert after["decision_mode"] == "deny"
+
+
+def test_a_gate_change_from_a_stale_page_is_refused(client: TestClient, owner_token: str) -> None:
+    gate = client.get(f"/api/capability-gates/{_REAL_CAP}", headers=_auth(owner_token)).json()
+    refused = client.post(
+        f"/api/capability-gates/{_REAL_CAP}/disable",
+        json={"reason": "stale", "expected_state": "not-" + gate["state"]},
+        headers=_auth(owner_token),
+    )
+    assert refused.status_code == 409
+    assert client.get(f"/api/capability-gates/{_REAL_CAP}", headers=_auth(owner_token)).json()["state"] == gate["state"]

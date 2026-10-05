@@ -30,6 +30,7 @@
     verified: "Verified",
     damaged: "Damaged",
     unreadable: "Needs another key",
+    newer: "Made by a newer Raiker",
   };
 
   async function load() {
@@ -119,7 +120,11 @@
   {#if restored}
     <div class="restored" role="status" data-testid="backup-restored">
       <p><strong>Restored to a separate workspace.</strong> Your running workspace was not changed.</p>
-      <p class="sub">It holds {restored.counts.sessions ?? 0} conversations and {restored.counts.approved_memory ?? 0} memories. To use it, stop Raiker and start it on that folder:</p>
+      <p class="sub">
+        It holds {restored.counts.sessions ?? 0} conversations and {restored.counts.approved_memory ?? 0} memories.
+        {#if Object.values(restored.deletions_applied ?? {}).some((n) => n > 0)}What you deleted since the backup was deleted from it too.{/if}
+        To use it, stop Raiker and start it on that folder:
+      </p>
       <code>{restored.command}</code>
     </div>
   {/if}
@@ -162,7 +167,7 @@
   }
   .what { display: grid; gap: 0.1rem; font-size: var(--text-sm); color: var(--text-2); min-width: 0; }
   .what strong { color: var(--text-1); }
-  li[data-state="damaged"] .state, li[data-state="unreadable"] .state { color: var(--danger); }
+  li[data-state="damaged"] .state, li[data-state="unreadable"] .state, li[data-state="newer"] .state { color: var(--danger); }
   li[data-state="verified"] .state { color: var(--ok, var(--text-2)); }
   .restored { border: 1px solid var(--neutral-border); border-radius: var(--r-md); padding: var(--space-3); margin-top: var(--space-2); }
   .restored code, .sub code { overflow-wrap: anywhere; }

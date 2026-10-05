@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localDateTime } from "../../format";
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
   import { api } from "../../api";
@@ -46,14 +47,14 @@
   const builtLabel = $derived(
     update === null || update.installation.built_at === null
       ? "Not recorded"
-      : new Date(update.installation.built_at).toLocaleString(),
+      : localDateTime(new Date(update.installation.built_at)),
   );
   const stale = $derived(update !== null && clientIsStale(update.installation.version));
 
   const checkedLabel = $derived(
     update === null || update.checked_at === null
       ? "Never on this host"
-      : new Date(update.checked_at).toLocaleString(),
+      : localDateTime(new Date(update.checked_at)),
   );
 
   async function load() {

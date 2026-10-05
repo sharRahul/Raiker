@@ -182,6 +182,11 @@ const PREFIX_CODES: Record<string, ReasonCopy> = {
     plain: "Activation is blocked.",
     remediation: "Satisfy the activation requirement first.",
   },
+  // §13.2 item 6 — the page showed a value another tab or device has changed.
+  capability_conflict: {
+    plain: "This permission was changed somewhere else since this page loaded, so nothing was changed.",
+    remediation: "The page now shows the current setting; choose again if you still want to change it.",
+  },
 };
 
 /** Resolve a machine reason_code to plain-English copy, never hiding the raw code. */

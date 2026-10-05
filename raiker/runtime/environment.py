@@ -65,8 +65,28 @@ TIMEZONE_SETTING = "general.timezone"
 DEVICE_TIMEZONE_SETTING = "general.device_timezone"
 
 #: Presentation only (ENV-DECISION-05). Locale decides `7 September 2026` versus
-#: `September 7, 2026`; it decides nothing about scheduling.
+#: `September 7, 2026`; it decides nothing about scheduling — and, since DEC-21
+#: General, nothing a model is told either. The interface reads it; the bundle
+#: does not.
 LOCALE_SETTING = "general.language"
+
+#: DEC-21 General — the language the owner wants answers in, the one language
+#: setting that reaches a model. Separate from the date format above and from
+#: the speech language, which are about the interface and the microphone.
+ANSWER_LANGUAGE_SETTING = "general.answer_language"
+
+#: The answer languages Settings offers, by code. A stored value outside this
+#: map is not told to a model: it was not chosen from what the page offers.
+ANSWER_LANGUAGES: dict[str, str] = {
+    "en": "English",
+    "hi": "Hindi",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ja": "Japanese",
+}
 
 #: The optional broad city/region a weather request falls back to. Deliberately
 #: separate from the timezone: "I schedule in Europe/London" and "when I say
@@ -115,7 +135,9 @@ class EnvironmentContext:
     day_of_week: str
     utc_offset: str
     display_date: str
-    locale: str | None = None
+    #: DEC-21 General — the owner's answer language as a code from
+    #: :data:`ANSWER_LANGUAGES`, or ``None`` to follow each message.
+    answer_language: str | None = None
     location: str | None = None
     freshness: str = "fresh"
     #: Set when the requested zone could not be loaded and UTC was substituted.
@@ -137,12 +159,24 @@ class EnvironmentContext:
             "display_date": self.display_date,
             "freshness": self.freshness,
         }
-        if self.locale:
-            payload["locale"] = self.locale
+        if self.answer_language:
+            payload["answer_language"] = self.answer_language
         if self.location:
             payload["location"] = self.location
         if self.timezone_error:
             payload["timezone_error"] = self.timezone_error
+        return payload
+
+    def model_dict(self) -> dict[str, Any]:
+        """The bundle as a model may see it: :meth:`to_dict` without the place.
+
+        DEC-21 General — the owner's default weather location is for the
+        weather lookup and the Settings page that shows it; a model is told
+        only whether one is set.
+        """
+        payload = self.to_dict()
+        if payload.pop("location", None):
+            payload["default_weather_location"] = "set"
         return payload
 
     def prompt_block(self) -> str:
@@ -164,8 +198,21 @@ class EnvironmentContext:
             f"UTC offset: {self.utc_offset}",
             "Source: Raiker runtime clock",
         ]
+        if self.answer_language:
+            lines.append(
+                f"Owner's answer language: {ANSWER_LANGUAGES[self.answer_language]} — "
+                "answer in it, whatever language the message is written in, unless "
+                "the owner asks for another language"
+            )
         if self.location:
-            lines.append(f"Owner default location: {self.location}")
+            # DEC-21 General — that a default exists, never the place. The
+            # place goes to the weather service when a weather lookup omits
+            # one, and nowhere else: Settings promises it is used only then,
+            # and every turn to a hosted model would otherwise carry it.
+            lines.append(
+                "Owner default weather location: set (weather_lookup uses it when "
+                "location is omitted; the place itself is not shared here)"
+            )
         if self.timezone_error:
             lines.append(
                 f"Note: the configured timezone could not be loaded "
@@ -314,10 +361,15 @@ def environment_context(
         day_of_week=_WEEKDAYS[local.weekday()],
         utc_offset=f"{offset[:3]}:{offset[3:]}" if offset else "+00:00",
         display_date=f"{local.day} {_MONTHS[local.month - 1]} {local.year}",
-        locale=_clean(blob.get(LOCALE_SETTING)),
+        answer_language=_answer_language(blob.get(ANSWER_LANGUAGE_SETTING)),
         location=_clean(blob.get(WEATHER_LOCATION_SETTING)),
         timezone_error=zone_error,
     )
+
+
+def _answer_language(value: Any) -> str | None:
+    """A stored answer language, if it is one Settings offers."""
+    return value if isinstance(value, str) and value in ANSWER_LANGUAGES else None
 
 
 def owner_weather_location(

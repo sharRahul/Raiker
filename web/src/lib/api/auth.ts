@@ -2,7 +2,13 @@
 // adopt or drop the session they answer with (OPT-02).
 import type { InstanceLaunchResult } from "../apiTypes";
 import { contract } from "../generated/apiContract";
-import type { HealthView, IssuedSessionView, LoginResultView } from "../generated/apiContract";
+import type {
+  HealthView,
+  IssuedSessionView,
+  LoginResultView,
+  RecoveryBackupsView,
+  RecoveryRestored,
+} from "../generated/apiContract";
 import { csrfFromCookie, hasToken, setCsrfToken, setToken } from "./core";
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
@@ -27,6 +33,21 @@ export type { HealthView };
  */
 export function health(): Promise<HealthView> {
   return contract.health();
+}
+
+/**
+ * BUG-323 — the lock screen's way back when the store will not open. The
+ * server answers these only while the store is unreadable or was shaped by a
+ * newer Raiker, only to this machine, and the list is manifests only: when
+ * each backup was taken, its size and counts, and whether this build can open
+ * it. Restoring keeps the database that would not open in quarantine.
+ */
+export function recoveryBackups(): Promise<RecoveryBackupsView> {
+  return contract.recoveryBackups();
+}
+
+export function recoveryRestore(backupId: string): Promise<RecoveryRestored> {
+  return contract.recoveryRestore({ backup_id: backupId });
 }
 
 export function createInstance(

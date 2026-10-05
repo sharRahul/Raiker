@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localTime } from "../../format";
   /**
    * REM-SET-GIT — scope before secret.
    *
@@ -212,7 +213,7 @@
           <div>
             <strong>{SCOPE_LABEL[status.grant.scope] ?? status.grant.scope} approved</strong>
             <span class="detail">
-              expires {new Date(status.grant.expires_at).toLocaleTimeString()}
+              expires {localTime(new Date(status.grant.expires_at))}
               {#if status.grant.uses}· used {status.grant.uses}×{/if}
             </span>
           </div>

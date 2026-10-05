@@ -1676,7 +1676,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
                     "type": "string",
                     "description": (
                         "The place to report on, e.g. 'Edinburgh, United Kingdom'. "
-                        "Omit only when the owner has set a default weather location."
+                        "Omit only when the environment says the owner's default "
+                        "weather location is set; the lookup then uses it."
                     ),
                 },
             ),

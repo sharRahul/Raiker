@@ -22,6 +22,8 @@ function backup(partial: Partial<BackupView> = {}): BackupView {
     state: "verified",
     verified_at: "2026-10-05T10:00:00Z",
     detail: "",
+    schema_generation: 197,
+    opens_here: true,
     ...partial,
   };
 }

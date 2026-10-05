@@ -662,3 +662,74 @@ def test_a_turn_declaring_a_table_before_a_tool_call_still_declares_it(
     assert "table" in kinds
     table = next(part for part in response.content_parts if part["type"] == "table")
     assert table["data"]["columns"] == ["City", "Millions"]
+
+
+# DEC-12 step 6 — a routine run's own cost limit, read at the safe boundary.
+
+
+def _priced(monkeypatch: Any, per_mtok: str = "1") -> None:
+    from decimal import Decimal
+
+    from raiker.models.pricing import ModelPrice
+
+    price = ModelPrice(input_per_mtok=Decimal(per_mtok), output_per_mtok=Decimal(per_mtok), currency="USD", source="owner")
+    monkeypatch.setattr("raiker.tasks.cost_limit.resolve_price", lambda *_args, **_kwargs: price)
+
+
+def _costly_tool_round() -> ModelResponse:
+    # Most of it cached, as an Anthropic routine's prompt is: 100k written to
+    # the cache and 900k sent at $1/Mtok — $1 a response. Counting only
+    # `input_tokens` would see a tenth of it (the fifth 2026-10-05 round).
+    return ModelResponse(
+        text="", tool_calls=[_list_dir_call()], finish_reason="tool_calls",
+        usage={"input_tokens": 100_000, "output_tokens": 0, "cache_creation_input_tokens": 900_000},
+    )
+
+
+def test_a_run_over_its_cost_limit_stops_before_asking_the_model_again(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    _priced(monkeypatch)
+    router = FakeRouter([_costly_tool_round()])
+    orchestrator = _orchestrator(tmp_path, router)
+    base = _envelope("keep listing")
+    envelope = PromptEnvelope(**{**base.__dict__, "options": PromptOptions(max_cost_usd=0.5)})
+    response = _handle(orchestrator, envelope)
+    assert response.status == "failed"
+    assert "cost limit of $0.50" in response.message
+    # The response that crossed the limit was answered — its tool ran — and the
+    # model was not asked again: the overrun is that one response.
+    assert router.calls == 1
+    events = _events(orchestrator, envelope.session_id)
+    assert events.count("tool_completed") == 1
+    reached = _event_record(orchestrator, envelope.session_id, "turn_cost_limit_reached")
+    assert reached["payload"]["limit_usd"] == 0.5
+    assert reached["payload"]["spent_usd"] == 1.0
+
+
+def test_a_run_inside_its_cost_limit_is_not_stopped(tmp_path: Path, monkeypatch: Any) -> None:
+    _priced(monkeypatch)
+    router = FakeRouter([
+        _costly_tool_round(),
+        ModelResponse(text="Done.", usage={"input_tokens": 10, "output_tokens": 5}),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    base = _envelope("list once")
+    envelope = PromptEnvelope(**{**base.__dict__, "options": PromptOptions(max_cost_usd=5.0)})
+    response = _handle(orchestrator, envelope)
+    assert response.status == "completed"
+    assert "turn_cost_limit_reached" not in _events(orchestrator, envelope.session_id)
+
+
+def test_an_unpriced_model_is_not_counted_as_free_or_stopped(tmp_path: Path, monkeypatch: Any) -> None:
+    monkeypatch.setattr("raiker.tasks.cost_limit.resolve_price", lambda *_args, **_kwargs: None)
+    router = FakeRouter([
+        _costly_tool_round(),
+        ModelResponse(text="Done."),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    base = _envelope("list once")
+    envelope = PromptEnvelope(**{**base.__dict__, "options": PromptOptions(max_cost_usd=0.01)})
+    assert _handle(orchestrator, envelope).status == "completed"
+    spend = orchestrator._turn_spend[envelope.turn_id]  # noqa: SLF001
+    assert spend.unpriced and spend.total == 0

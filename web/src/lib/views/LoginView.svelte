@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import { auth, createInstance, health, ApiError } from "../api";
+  import type { RecoveryRestored } from "../generated/apiContract";
   import Icon from "../components/Icon.svelte";
   import ThemeToggle from "../components/ThemeToggle.svelte";
+  import LockScreenRecovery from "../components/LockScreenRecovery.svelte";
 
   // The lock screen. Guards the whole dashboard: nothing mounts until a full
   // control session exists AND the runtime bootstrap verifies (App.svelte).
@@ -45,6 +47,19 @@
   // are both driven from this one value instead of contradicting each other.
   let storeState = $state<"ok" | "unavailable" | null>(null);
   let storeDetail = $state<string | null>(null);
+  // BUG-323 — why the store will not open, so the lock screen can offer a
+  // backup when one can fix it: this key does not open the database, or a
+  // newer Raiker shaped it. A missing key is not one — every backup needs it.
+  let storeReason = $state<string | null>(null);
+  const RESTORABLE = new Set(["store_unreadable", "store_schema_newer"]);
+  // Kept here, not in the recovery panel: once the store opens the panel
+  // leaves with the error it belonged to, and the owner still needs to read
+  // where the old database went.
+  let restoredFrom = $state<RecoveryRestored | null>(null);
+  function afterRestore(restored: RecoveryRestored) {
+    restoredFrom = restored;
+    void probeRuntime();
+  }
 
   const isRegister = $derived(mode === "register");
   const isFirstRun = $derived(bootstrapAllowed && mode === "login" && !instanceSetup);
@@ -65,10 +80,15 @@
   // "attention" claims are made here.
   const hero = $derived.by(() => {
     if (storeState === "unavailable") {
-      return {
-        title: "I cannot open my encrypted store.",
-        sub: "Nothing is wrong with your password — the workspace database will not open on this machine.",
-      };
+      // BUG-323 — said for the reason the server gave, so the line beside the
+      // backups does not blame the machine for a file or a newer version.
+      const sub =
+        storeReason === "store_schema_newer"
+          ? "Nothing is wrong with your password — a newer version of Raiker last opened this workspace."
+          : storeReason === "store_unreadable"
+            ? "Nothing is wrong with your password — this workspace key does not open the database, or part of it is damaged."
+            : "Nothing is wrong with your password — the workspace database will not open on this machine.";
+      return { title: "I cannot open my encrypted store.", sub };
     }
     if (runtimeState === "verification_failed" || runtimeReachable === false) {
       return {
@@ -102,10 +122,12 @@
       runtimeReachable = true;
       storeState = view.store === "unavailable" ? "unavailable" : "ok";
       storeDetail = view.store === "unavailable" ? (view.detail ?? null) : null;
+      storeReason = view.store === "unavailable" ? (view.reason ?? null) : null;
     } catch {
       runtimeReachable = false;
       storeState = null;
       storeDetail = null;
+      storeReason = null;
     }
   }
 
@@ -310,6 +332,14 @@
         <p class="error" role="alert" id="store-unavailable" tabindex="-1">
           Raiker's encrypted store could not be opened, so the workspace stays
           locked. {storeDetail ?? "The workspace database will not open on this machine."}
+        </p>
+        {#if storeReason && RESTORABLE.has(storeReason)}
+          <LockScreenRecovery onRestored={afterRestore} />
+        {/if}
+      {:else if restoredFrom}
+        <p class="recovered restored-notice" role="status" data-testid="lock-restored">
+          Restored from a backup — sign in to continue. The database that would not open is kept in
+          <code>{restoredFrom.quarantine}</code>.
         </p>
       {:else if runtimeState === "verification_failed"}
         <p class="error" role="alert" id="runtime-failed" tabindex="-1">
@@ -821,6 +851,8 @@
     color: var(--text-2);
     margin: var(--space-2) 0 0;
   }
+  /* BUG-323 — above the unlock heading, so it needs room below as well. */
+  .restored-notice { margin-bottom: var(--space-4); overflow-wrap: anywhere; }
   .verify {
     display: flex;
     align-items: center;

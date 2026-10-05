@@ -267,6 +267,46 @@ describe("CapabilitiesView", () => {
     expect(registry().queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  // §13.2 item 6 — a change carries the mode the page showed, and a page that
+  // is out of date is told so and shows today's value rather than overwriting.
+  it("sends the mode it showed, and on a conflict shows what is true now", async () => {
+    const changedElsewhere = GATES.map((gate) =>
+      gate.capability === "shell_execution" ? { ...gate, decision_mode: "deny" } : gate,
+    );
+    // This tab loads showing "Ask me"; another tab then sets it to "Never".
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return { ok: true, status: 200, json: async () => GATES } as Response;
+    });
+    vi.stubGlobal("fetch", mock);
+    render(CapabilitiesView, { principal: "prin_owner" });
+    const shellGroup = await waitFor(() => registry().getByRole("group", { name: /shell commands/i }));
+    expect(within(shellGroup).getByRole("button", { name: "Ask me", pressed: true })).toBeInTheDocument();
+    mock.mockClear();
+    // From here the server holds the other tab's value, so this tab's change conflicts.
+    mock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/capability-gates")) {
+        return { ok: true, status: 200, json: async () => changedElsewhere } as Response;
+      }
+      if (url.includes("/api/capability-modes/shell_execution/deny") && init?.method === "POST") {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ detail: { ok: false, reason_code: "capability_conflict" } }),
+        } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+    await fireEvent.click(within(shellGroup).getByRole("button", { name: "Never" }));
+    await waitFor(() => expect(screen.getByText(/changed somewhere else since this page loaded/)).toBeInTheDocument());
+    const sent = mock.mock.calls.find(([u]) => String(u).includes("/capability-modes/shell_execution/deny"));
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ expected_mode: "ask" });
+    // The page re-read the gates after the refusal.
+    expect(mock.mock.calls.some(([u]) => String(u).endsWith("/api/capability-gates"))).toBe(true);
+  });
+
   it("requires the step-up dialog to loosen a mode (allow)", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });

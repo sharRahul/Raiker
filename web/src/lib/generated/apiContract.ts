@@ -275,6 +275,7 @@ export type BackupRestored = {
   path: string;
   counts: Record<string, number>;
   command: string;
+  deletions_applied: Record<string, number>;
 };
 
 /** One encrypted backup of the workspace database (DEC-24 step 5). */
@@ -293,6 +294,8 @@ export type BackupView = {
   state: string;
   verified_at: string | null;
   detail: string;
+  schema_generation: number;
+  opens_here: boolean;
 };
 
 export type BackupsView = {
@@ -1614,6 +1617,7 @@ export type DiagnosticsView = {
 export type DisableCapabilityRequest = {
   reason?: string;
   as_principal?: string | null;
+  expected_state?: string | null;
 };
 
 export type DisableRuntimeModeRequest = {
@@ -1701,7 +1705,7 @@ export type EnvironmentContextView = {
   utc_offset: string;
   display_date: string;
   freshness: string;
-  locale?: string;
+  answer_language?: string;
   location?: string;
   timezone_error?: string;
 };
@@ -3932,11 +3936,32 @@ export type RecordThreatModelAckRequest = {
   as_principal?: string | null;
 };
 
+/** BUG-323 — what the lock screen may restore from, read from manifests only. */
+export type RecoveryBackupsView = {
+  reason: string;
+  key_fingerprint: string;
+  schema_generation: number;
+  backups: BackupView[];
+};
+
 export type RecoveryPointView = {
   version: string;
   path: string;
   files: number;
   bytes: number;
+};
+
+export type RecoveryRestoreRequest = {
+  backup_id: string;
+};
+
+/** A verified backup switched in; the database that would not open is kept aside. */
+export type RecoveryRestored = {
+  ok: boolean;
+  backup_id: string;
+  quarantine: string;
+  counts: Record<string, number>;
+  deletions_applied: Record<string, number>;
 };
 
 export type RegisterRequest = {
@@ -4292,6 +4317,7 @@ export type SessionsDeleted = {
 export type SetCapabilityDecisionModeRequest = {
   reason?: string;
   as_principal?: string | null;
+  expected_mode?: string | null;
 };
 
 export type SetCapabilityStateRequest = {
@@ -4299,6 +4325,7 @@ export type SetCapabilityStateRequest = {
   reason?: string;
   as_principal?: string | null;
   confirmation_token?: string | null;
+  expected_state?: string | null;
 };
 
 export type SetModelAdvisorRequest = {
@@ -4673,6 +4700,7 @@ export type TaskResumed = {
 export type TaskRunLimitRequest = {
   max_run_minutes?: number | null;
   max_tool_calls?: number | null;
+  max_run_cost_usd?: number | null;
 };
 
 export type TaskView = {
@@ -4706,6 +4734,7 @@ export type TaskView = {
   delivery_detail: string | null;
   max_run_minutes: number;
   max_tool_calls: number | null;
+  max_run_cost_usd: number | null;
   phase: string;
 };
 
@@ -5657,6 +5686,10 @@ export const contract = {
     call<AgentResponse>("POST", "/api/prompts", { body }),
   listReadCapabilities: () =>
     request<ReadCapabilities>("/api/read-capabilities"),
+  recoveryBackups: () =>
+    request<RecoveryBackupsView>("/api/recovery/backups"),
+  recoveryRestore: (body: RecoveryRestoreRequest) =>
+    call<RecoveryRestored>("POST", "/api/recovery/restore", { body }),
   getRuntimeMode: () =>
     request<RuntimeModeView>("/api/runtime-mode"),
   activateRuntimeMode: (body: ActivateRuntimeModeRequest) =>
@@ -5781,8 +5814,8 @@ export const contract = {
     call<SurfaceModelSet>("PUT", "/api/surface-models", { body }),
   listTasks: (query: { session_id?: string; task_status?: string; project_id?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", query)),
-  createTask: (body: TaskCreateRequest) =>
-    call<TaskView>("POST", "/api/tasks", { body }),
+  createTask: (body: TaskCreateRequest, idempotencyKey?: string) =>
+    call<TaskView>("POST", "/api/tasks", { body, headers: { "idempotency-key": idempotencyKey } }),
   getTaskDetail: (taskId: string) =>
     request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
   taskDoctor: (taskId: string) =>

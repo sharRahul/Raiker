@@ -230,13 +230,37 @@ Raiker also takes one by itself before an update changes the database, listed as
 *Before an update*, and keeps the last three of those.
 
 - **Verify** re-reads the checksum, the key and the database's integrity, and
-  says *Verified*, *Damaged* (and which check failed) or *Unreadable* (made with
-  a different key).
+  says *Verified*, *Damaged* (and which check failed), *Unreadable* (made with
+  a different key) or *Made by a newer Raiker* (this version cannot open it).
 - **Restore to a new folder** is offered only for a verified backup. It writes
   the copy to `.raiker/restores/` as a workspace of its own and shows the
   command that starts Raiker on it. Your running workspace is not changed; to
   use the restored copy, stop Raiker and start it on that folder.
 - **Remove** deletes the backup.
+
+**Restoring from the lock screen.** When the workspace database will not open —
+this key does not open it, part of the file is damaged, or a newer Raiker last
+opened it — the lock screen shows **Restore from a backup** under the error,
+listing each backup by when it was taken, its size and what it holds. **Restore…
+→ Restore this backup** verifies it, moves the database that will not open into
+`.raiker/quarantine/` (it is kept, not deleted, with a note of why), and puts the
+verified copy in its place in one step; then you sign in as usual. A backup made
+with another key, or by a newer Raiker, is listed with the reason and not
+offered. This works only in a browser on the machine Raiker runs on, and only
+while the database will not open. A missing `app.key` is not something a backup
+can fix — every backup needs that key.
+
+**What you deleted stays deleted.** Forgetting or permanently deleting a memory,
+and deleting a conversation, are also recorded in `.raiker/deletions.jsonl` —
+the kind, the id and the time, never the content. Either restore applies the
+deletions made after the backup was taken, so restoring an older backup does not
+bring back something you removed since.
+
+**An older Raiker will not open newer data.** The database records which
+version of its layout last shaped it. An older Raiker refuses to open a database
+a newer one shaped, and changes nothing, rather than misreading it; the lock
+screen offers the backups that version can open — including the one Raiker took
+by itself before the update.
 
 A backup does not hold checkpoints, build artifacts, the audit log or folders
 you attached to projects. It opens only with this workspace's key,

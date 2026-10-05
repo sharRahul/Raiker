@@ -4157,6 +4157,32 @@ TASK_TOOL_LIMIT_SQL = """
 ALTER TABLE tasks ADD COLUMN max_tool_calls INTEGER;
 """
 
+# §13.2 item 6 — an owner-scoped, payload-bound idempotency key per creating
+# request. `response_json` is NULL while the first request is still running, so
+# a second one with the same key waits its turn rather than creating twice.
+IDEMPOTENCY_KEYS_MIGRATION_ID = "RAIKER-2094-idempotency-keys"
+
+IDEMPOTENCY_KEYS_SQL = """
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  owner_principal_id TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  payload_sha256 TEXT NOT NULL,
+  response_json TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, scope, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_idempotency_keys_created ON idempotency_keys(created_at);
+"""
+
+# DEC-12 step 6 — a routine's own cost limit for one run, in US dollars. NULL
+# means no limit of its own.
+TASK_COST_LIMIT_MIGRATION_ID = "RAIKER-2095-task-cost-limit"
+
+TASK_COST_LIMIT_SQL = """
+ALTER TABLE tasks ADD COLUMN max_run_cost_usd REAL;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4396,6 +4422,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(TASK_RUN_LIMIT_MIGRATION_ID, TASK_RUN_LIMIT_SQL),
     Migration(NOTIFICATION_REPEATS_MIGRATION_ID, NOTIFICATION_REPEATS_SQL),
     Migration(TASK_TOOL_LIMIT_MIGRATION_ID, TASK_TOOL_LIMIT_SQL),
+    Migration(IDEMPOTENCY_KEYS_MIGRATION_ID, IDEMPOTENCY_KEYS_SQL),
+    Migration(TASK_COST_LIMIT_MIGRATION_ID, TASK_COST_LIMIT_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),
@@ -4403,3 +4431,15 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     RunnerStep("_backfill_conversation_fts"),
     RunnerStep("_add_session_and_task_columns"),
 )
+
+#: DEC-17 step 8 — how far along the registry this build is, as one number.
+#:
+#: Written into the database header (``PRAGMA user_version``) at the end of
+#: every bootstrap, so a database says which build last shaped it without a
+#: table read. A build that finds a larger number than its own is older than
+#: the data: the newer build's migrations may have added columns and meanings
+#: this one would misread or overwrite, so the store refuses to open
+#: (``store_schema_newer``) and writes nothing. The registry is append-only —
+#: a released step never moves or goes — which is what makes its length a
+#: generation rather than merely a count.
+SCHEMA_GENERATION = len(MIGRATIONS)

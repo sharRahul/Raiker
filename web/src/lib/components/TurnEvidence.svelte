@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localTime } from "../format";
   /**
    * REM-CHAT-01 — one turn's own evidence, under the turn.
    *
@@ -110,7 +111,7 @@
 
   function moment(timestamp: string): string {
     const parsed = new Date(timestamp);
-    return Number.isNaN(parsed.getTime()) ? timestamp : parsed.toLocaleTimeString();
+    return Number.isNaN(parsed.getTime()) ? timestamp : localTime(parsed);
   }
 </script>
 

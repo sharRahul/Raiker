@@ -1,0 +1,146 @@
+{
+  "01-general-three-languages.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=general",
+    "test": "round-2026-10-05-recovery-live.spec.ts › General names three languages and the date format takes effect",
+    "captured_at": "2026-10-05T17:27:34.847Z"
+  },
+  "02-weather-location-disclosed.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=personalisation",
+    "test": "round-2026-10-05-recovery-live.spec.ts › General names three languages and the date format takes effect",
+    "captured_at": "2026-10-05T17:27:46.226Z"
+  },
+  "03-chat-answers-in-french.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/new-chat?session=sess_3ddd98f3761947df9cff219c9c8b9bd0",
+    "test": "round-2026-10-05-recovery-live.spec.ts › a real Anthropic turn answers in French and is told no place",
+    "captured_at": "2026-10-05T17:28:53.239Z"
+  },
+  "04-permission-stale-tab-refused.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/capabilities",
+    "test": "round-2026-10-05-recovery-live.spec.ts › a stale tab cannot overwrite a permission another tab changed",
+    "captured_at": "2026-10-05T17:29:18.198Z"
+  },
+  "05-task-filed-once.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/tasks",
+    "test": "round-2026-10-05-recovery-live.spec.ts › the same task sent twice is filed once, and a changed resend is refused",
+    "captured_at": "2026-10-05T17:30:58.805Z"
+  },
+  "06-routine-cost-limit-said.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/tasks",
+    "test": "round-2026-10-05-recovery-live.spec.ts › a routine's cost limit is said, and a run that reaches it stops at a safe boundary",
+    "captured_at": "2026-10-05T17:44:44.272Z"
+  },
+  "07-routine-run-outcome.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/tasks",
+    "test": "round-2026-10-05-recovery-live.spec.ts › a routine's cost limit is said, and a run that reaches it stops at a safe boundary",
+    "captured_at": "2026-10-05T17:45:02.376Z"
+  },
+  "08-backup-before-deletion.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-recovery-live.spec.ts › a backup, then a conversation deleted after it",
+    "captured_at": "2026-10-05T17:45:30.621Z"
+  },
+  "09-general-390-dark.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "dark",
+    "route": "#/settings?tab=general",
+    "test": "round-2026-10-05-recovery-live.spec.ts › General at 390 wide in the dark theme, without bleeding",
+    "captured_at": "2026-10-05T17:45:53.822Z"
+  },
+  "10-lock-screen-offers-backups.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/workbench",
+    "test": "round-2026-10-05-lockscreen-live.spec.ts › a damaged workspace is restored from the lock screen, and what was deleted stays deleted",
+    "captured_at": "2026-10-05T17:51:15.376Z"
+  },
+  "11-lock-screen-restored.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/workbench",
+    "test": "round-2026-10-05-lockscreen-live.spec.ts › a damaged workspace is restored from the lock screen, and what was deleted stays deleted",
+    "captured_at": "2026-10-05T17:51:16.276Z"
+  },
+  "12-lock-screen-newer-schema-390.png": {
+    "commit": "1d4d09fa0663d1ddb3e5a27e5cec01cdb5cfb05c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "light",
+    "route": "#/workbench",
+    "test": "round-2026-10-05-lockscreen-live.spec.ts › a database a newer Raiker shaped is refused, and a backup this build can open is offered",
+    "captured_at": "2026-10-05T17:52:29.117Z"
+  }
+}

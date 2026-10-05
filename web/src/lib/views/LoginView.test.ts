@@ -296,3 +296,110 @@ it("says an instance already has its owner instead of blaming the password", asy
 
   expect(await screen.findByRole("alert")).toHaveTextContent(/already has its owner/);
 });
+
+// BUG-323 — a workspace whose database will not open can be restored from the
+// lock screen, because Account (where backups live) needs a sign-in it cannot give.
+describe("LoginView — restoring from the lock screen", () => {
+  const BACKUP = {
+    backup_id: "bkp_one",
+    reason: "owner",
+    created_at: "2026-10-05T10:00:00Z",
+    size_bytes: 2_400_000,
+    sha256: "x",
+    schema_migrations: 190,
+    latest_migration: "RAIKER-2093-task-tool-limit",
+    counts: { sessions: 3, approved_memory: 2 },
+    key_fingerprint: "fp1",
+    included: ["database", "memory_files"],
+    not_included: ["checkpoints"],
+    state: "verified",
+    verified_at: "2026-10-05T10:00:00Z",
+    detail: "",
+    schema_generation: 195,
+    opens_here: true,
+  };
+  const UNREADABLE = {
+    status: "degraded",
+    store: "unavailable",
+    reason: "store_unreadable",
+    detail: "The workspace database exists but this workspace key does not open it.",
+  };
+
+  function sequencedFetch(listing: unknown) {
+    let healthCalls = 0;
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const method = (init?.method ?? "GET").toUpperCase();
+      const answer = (status: number, body: unknown) =>
+        ({ ok: status < 400, status, json: async () => body }) as Response;
+      if (url.endsWith("/api/health")) {
+        healthCalls += 1;
+        return answer(200, healthCalls > 1 && restoredOnce ? { status: "ok", store: "ok", reason: "", detail: "" } : UNREADABLE);
+      }
+      if (url.endsWith("/api/recovery/backups")) return answer(200, listing);
+      if (url.endsWith("/api/recovery/restore") && method === "POST") {
+        restoredOnce = true;
+        return answer(200, {
+          ok: true,
+          backup_id: "bkp_one",
+          quarantine: ".raiker/quarantine/20261005T120000Z",
+          counts: { sessions: 3, approved_memory: 2 },
+          deletions_applied: { memory_forget: 1, memory_purge: 0, session_delete: 0 },
+        });
+      }
+      if (url.endsWith("/api/auth/bootstrap-status")) return answer(200, { can_register: false });
+      return answer(404, { detail: { reason_code: "unrouted" } });
+    });
+    let restoredOnce = false;
+    vi.stubGlobal("fetch", mock);
+    return mock;
+  }
+
+  it("lists the backups, asks once, restores, and lets the owner sign in", async () => {
+    const fetchMock = sequencedFetch({
+      reason: "store_unreadable",
+      key_fingerprint: "fp1",
+      schema_generation: 195,
+      backups: [BACKUP],
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    await waitFor(() => expect(screen.getByTestId("lock-recovery")).toBeInTheDocument());
+    expect(await screen.findByText(/3 conversations · 2 memories/)).toBeInTheDocument();
+    // One deliberate step before anything changes.
+    await fireEvent.click(screen.getByRole("button", { name: "Restore…" }));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/recovery/restore"))).toBe(false);
+    await fireEvent.click(screen.getByRole("button", { name: "Restore this backup" }));
+    const restored = await screen.findByTestId("lock-restored");
+    expect(restored).toHaveTextContent(".raiker/quarantine/20261005T120000Z");
+    // The store opens now: the panel and the error went with it, the form is live.
+    expect(screen.queryByTestId("lock-recovery")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Username")).not.toBeDisabled());
+  });
+
+  it("does not offer a backup a newer Raiker made, or one made with another key", async () => {
+    sequencedFetch({
+      reason: "store_schema_newer",
+      key_fingerprint: "fp1",
+      schema_generation: 195,
+      backups: [
+        { ...BACKUP, backup_id: "bkp_newer", schema_generation: 199, opens_here: false },
+        { ...BACKUP, backup_id: "bkp_other", key_fingerprint: "fp2" },
+      ],
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    expect(await screen.findByText(/Made by a newer Raiker/)).toBeInTheDocument();
+    expect(screen.getByText("Made with another workspace key.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore…" })).not.toBeInTheDocument();
+    expect(screen.getByText(/A newer Raiker last opened this workspace/)).toBeInTheDocument();
+  });
+
+  it("offers nothing when the key itself is missing", async () => {
+    stubFetch({
+      "GET /api/health": { ...UNREADABLE, reason: "store_key_missing" },
+      "GET /api/auth/bootstrap-status": { can_register: false },
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    await waitFor(() => expect(screen.getByText(/I cannot open my encrypted store/)).toBeInTheDocument());
+    expect(screen.queryByTestId("lock-recovery")).not.toBeInTheDocument();
+  });
+});

@@ -92,6 +92,9 @@ class TaskView(View):
     max_run_minutes: int = 60
     # DEC-12 step 6 — the routine's own tool-call limit, or null for none.
     max_tool_calls: int | None = None
+    # DEC-12 step 6 — the routine's own cost limit for one run, in US dollars,
+    # or null for none.
+    max_run_cost_usd: float | None = None
     # UX-TASK-05 — the published lifecycle phase (`raiker/tasks/lifecycle.py`),
     # served rather than re-derived so every surface offers the same actions
     # for the same task.

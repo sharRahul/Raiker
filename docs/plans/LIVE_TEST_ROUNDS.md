@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-05 (fifth) | Targeted | `2026-10-05-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering two Chat turns and running a routine, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — BUG-323 and DEC-24 steps 5–6 (restore from the lock screen, quarantine, deletion journal), DEC-17 step 8 (refuse a newer schema), DEC-12 step 6's cost limit, DEC-21's General row (weather place, answer language, date format) and §13.2 item 6 for permissions and task creation (FIXED-801 to FIXED-809). Proved live: **a real answer in French to an English prompt**, with the turn told `answer_language: fr` and no place; dates written in German; **a stale tab's permission change refused** and the page showing the other tab's Never; **one task for a draft sent twice**; **a $0.01 routine stopped after one model call**; and, across two restarts, **a damaged workspace restored from the lock screen** with the deleted conversation still gone, and **a newer-schema workspace refused and restored** at 390 wide. **Three defects found and fixed** — cached tokens recorded as zero (FIXED-810), cache rates dropped (FIXED-811) and damage past the first page read as the machine's memory (FIXED-812) |
 | 2026-10-05 (fourth) | Targeted | `2026-10-05-backups-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog | Ten more decision-record steps from the release-readiness review — DEC-24 step 5's backups (snapshot, verify, restore to a new folder), DEC-17 step 8's snapshot before a migration, §13.2 item 6 for Settings, DEC-21's deduplication and delivery record, DEC-24 step 1's scheduler queue, DEC-12 step 6's tool-call limit and DEC-19 step 5's screenshot manifest (FIXED-789 to FIXED-798). Proved live: a real Anthropic answer; **Back up now, Verify and Restore to a new folder**, the restored folder opening as its own workspace; **a backup changed on disk reading Damaged with no restore offered**; **an upgrade's own verified snapshot**; **a stale Settings page merged where nobody else changed a key and refused where somebody did**; **one finding raised three times as one notice**; the record saying *held for quiet hours* and *not shown*; **work due while paused named as waiting**; a routine's tool-call limit kept across a reload; Account at 390 wide, dark, with no overflow; and every capture in the manifest. **One defect found and fixed** — the restore's path came back redacted (FIXED-799); BUG-323 filed |
 | 2026-10-05 (third) | Targeted | `2026-10-05-quiet-hours-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and proposing a Build shell command, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — the owner's DEC-21a quiet hours (policy, exceptions, summary), DEC-21's per-category switches and test notice, BUG-317/320's dock, BUG-322 and DEC-24 step 6's index and vector damage, and DEC-12 steps 6 and 8. FIXED-776 to FIXED-788 |
 | 2026-10-05 (second) | Targeted | `2026-10-05-readiness-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a local Python MCP sample; a generic webhook channel | Ten more decision-record steps from the release-readiness review — DEC-24 steps 4 and 6, DEC-12 steps 5 and 7, DEC-15 step 12, DEC-01 step 5, DEC-10 step 8, DEC-14 step 9 and DEC-25's last path (FIXED-762 to FIXED-773). Proved live: a real Anthropic answer; **the internal account ID folded away on Account** and **a deletion confirmation counting what goes and what stays**, refusing a mistyped name and deleting on the typed one; **Stop on a parent cancelling its child and grandchild**; a completed task reading **Delivery failed** beside its outcome; **a damaged conversation index named and rebuilt**; **an MCP server that broke while paused staying paused on Resume**, at 390 wide with no overflow; **a webhook sender's third identical message refused as a loop**; the support bundle passing its own check; a gzip body answered **415**; Asia/Kolkata offered; and **a workspace with its key moved aside refusing to mint a new one**, then opening once the key was back. **Two defects found and fixed** — a resume failure printed its code, and the deletion label broke into three rows; the work found every resume through the stop control refusing (FIXED-765); BUG-322 filed |
@@ -92,6 +93,106 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-05 (fifth) — A workspace restored from its lock screen, a turn told the right language and no place, and a routine that stops at its cost
+
+**Tier: Targeted. Build: `npm run build` from this working tree on `main` at
+`1d4d09f` plus this change, served by `raiker-web` with
+`RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`, on a workspace reset with
+`scripts/reset_live_workspace.py`, in a Linux container whose egress is limited
+to a proxy. Provider: Anthropic `claude-haiku-4-5-20251001`, the key the owner
+supplied entered through the Connect dialog by the spec from the process
+environment — never written to a file. Browser: the pre-installed Chromium
+through `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, its time zone UTC. Specs:
+`web/e2e/round-2026-10-05-recovery-live.spec.ts` (7 scenarios) and
+`web/e2e/round-2026-10-05-lockscreen-live.spec.ts` (2 phases, each started
+with the host stopped and the store put into its state by
+`scripts/live_recovery_harness.py`, then the host started again). Captures, each
+in the folder's `manifest.json`:
+[`docs/screenshots/2026-10-05-recovery-round/`](../screenshots/2026-10-05-recovery-round).**
+
+FIXED-801 to FIXED-812.
+
+**What it proved.**
+
+1. **Three languages, each doing what it says.** General names *Dates and
+   times*, *Speech language* and *Answer in*, says Raiker's own text is in
+   English, and has no Country or region; with Deutsch chosen its sample read
+   `05.10.2026, 17:27` (FIXED-806, FIXED-807,
+   [01](../screenshots/2026-10-05-recovery-round/01-general-three-languages.png)).
+   Personalisation says the weather place goes to Open-Meteo for a lookup and
+   that models are told only that one is set
+   ([02](../screenshots/2026-10-05-recovery-round/02-weather-location-disclosed.png)).
+2. **A real answer in French, and no place.** *Greet me in one short sentence.*
+   was answered in French; the turn's recorded environment carried
+   `answer_language: fr`, `default_weather_location: set`, no `location`, no
+   *Edinburgh* and no `de-DE` (FIXED-805, FIXED-806,
+   [03](../screenshots/2026-10-05-recovery-round/03-chat-answers-in-french.png)).
+3. **A stale tab is told, not obeyed.** One tab set Shell commands to Never;
+   the other, still showing Ask me, pressed Never and was told the permission
+   had changed somewhere else and nothing was changed, then showed Never; from
+   there, Ask me went through (FIXED-808,
+   [04](../screenshots/2026-10-05-recovery-round/04-permission-stale-tab-refused.png)).
+4. **Filed once.** The same draft sent twice with one `Idempotency-Key`
+   returned one task id and the queue held one card; the key on a changed title
+   was refused `idempotency_key_reused` (FIXED-809,
+   [05](../screenshots/2026-10-05-recovery-round/05-task-filed-once.png)).
+5. **A routine stopped by its cost.** **Will it run?** took a $0.01 limit and
+   said *60 minutes or $0.01*; the routine's slot made due, the host ran it, and
+   after one model call — 353 input, 8,119 cache-write and 67 output tokens,
+   $0.0108 — it was stopped before the second, its card reading *reached its
+   cost limit of $0.01* (FIXED-804,
+   [06](../screenshots/2026-10-05-recovery-round/06-routine-cost-limit-said.png),
+   [07](../screenshots/2026-10-05-recovery-round/07-routine-run-outcome.png)).
+6. **A backup, then a deletion.** Account backed up; a conversation was then
+   deleted ([08](../screenshots/2026-10-05-recovery-round/08-backup-before-deletion.png)).
+7. **General at 390 wide, dark,** with no sideways scroll
+   ([09](../screenshots/2026-10-05-recovery-round/09-general-390-dark.png)).
+8. **Restored from the lock screen.** Host stopped, the database's first pages
+   overwritten, host started: the lock screen said the key does not open the
+   database or part of it is damaged, listed the backup (*Taken by you · 2.5 MB ·
+   8 conversations*) with the sign-in form disabled; **Restore… → Restore this
+   backup** said where the old database went and the form came back. The
+   quarantine held the damaged file and its note; the deleted conversation was
+   still gone; the owner signed in (FIXED-801, FIXED-802,
+   [10](../screenshots/2026-10-05-recovery-round/10-lock-screen-offers-backups.png),
+   [11](../screenshots/2026-10-05-recovery-round/11-lock-screen-restored.png)).
+9. **A newer schema, refused and restored.** Host stopped, the header stamped
+   five generations newer, host started: health read `store_schema_newer`
+   naming 202 and 197; at 390 wide the lock screen said a newer Raiker last
+   opened the workspace, offered the backup this build can open, restored it,
+   and the owner signed in (FIXED-803,
+   [12](../screenshots/2026-10-05-recovery-round/12-lock-screen-newer-schema-390.png)).
+
+**What it found**, fixed in this change:
+
+* **FIXED-810** — the first cost-limited run made four calls: the usage ledger
+  and the meter read raw cache keys from normalised usage, so 7,976 cached
+  tokens a call counted as nothing.
+* **FIXED-811** — the next run stopped after two calls at $0.0178 instead of
+  $0.0126: the profile's stated cache rates were dropped. The third run stopped
+  after one, as the arithmetic says it should.
+* **FIXED-812** — the damaged workspace first read as *This machine would not
+  give SQLCipher the memory it needs*, with no backup offered: damage past the
+  first page fails in bootstrap, as SQLCipher's `MemoryError` under memory
+  security. The unit tests had run with memory security off and never met it.
+* The lock screen's line beside the error blamed the machine for a file or a
+  newer version, and the restored notice sat flush against the heading; both
+  fixed before the newer-schema phase.
+* Harness assumptions, not product defects: a task with an instruction needs a
+  checked model (the first attempt was refused `model_not_ready`, and its key
+  was released, as FIXED-809 says); `/run` is for parked work, so the
+  routine's slot was made due instead; German's medium date style is
+  numeric.
+
+Filed rather than fixed: BUG-324 (project, task and picture deletions are not
+yet journalled), BUG-325 (a run's spend restarts after an approval pause) and
+BUG-326 (a pre-existing circular import met while building FIXED-804).
+
+**What it could not prove.** A real disk failure or a key genuinely replaced:
+the damage is bytes written by the harness. A routine whose cost limit is met
+on a model with no known price stays a unit test. Switching a restored *new
+folder* in remains the owner restarting Raiker on it.
 
 ## 2026-10-05 (fourth) — Backups Raiker makes itself, Settings that do not overwrite each other, and a notice counted once
 

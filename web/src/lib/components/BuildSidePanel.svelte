@@ -27,7 +27,8 @@
   // nowhere to send the owner it told to refresh. This is that address.
   import { taskDetailHref } from "../taskHistory";
   import type { ProjectsList, TaskView } from "../apiTypes";
-  import { relativeTime } from "../format";
+  import { localDateTime, relativeTime } from "../format";
+  import { newIdempotencyKey } from "../idempotency";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { scheduleZoneName } from "../taskComposer";
   import { isActiveTask, taskBadge } from "../statusMaps";
@@ -98,6 +99,9 @@
     busyTask = null;
   }
 
+  // §13.2 item 6 — this draft's key, kept until the server accepts it.
+  let draftKey = newIdempotencyKey();
+
   async function createAgent() {
     if (!title.trim() || !instructions.trim()) return;
     creating = true;
@@ -114,11 +118,12 @@
         // daily 09:00 stays 09:00 here across a clock change.
         ...(cadence !== "background" ? { timezone: scheduleZoneName() } : {}),
         ...(agentProjectId ? { project_id: agentProjectId } : projectId ? { project_id: projectId } : {}),
-      });
+      }, draftKey);
+      draftKey = newIdempotencyKey();
       title = "";
       instructions = "";
       notice = firstRunAt && cadence !== "background"
-        ? `Agent scheduled. Its first cycle starts ${new Date(firstRunAt).toLocaleString()}.`
+        ? `Agent scheduled. Its first cycle starts ${localDateTime(new Date(firstRunAt))}.`
         : "Agent scheduled. Its first cycle starts on the next scheduler tick.";
       firstRunAt = "";
       tab = "running";
@@ -141,7 +146,7 @@
 
   function scheduleLine(task: TaskView): string {
     if (task.recurrence) return cadenceLabel(task.recurrence);
-    if (task.scheduled_at) return `Scheduled for ${new Date(task.scheduled_at).toLocaleString()}`;
+    if (task.scheduled_at) return `Scheduled for ${localDateTime(new Date(task.scheduled_at))}`;
     return "Runs on the next tick";
   }
 

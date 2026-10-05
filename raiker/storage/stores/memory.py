@@ -20,6 +20,7 @@ from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SemanticMemoryWriteRecord, VectorRecord
+from raiker.storage.deletion_journal import MEMORY_FORGET, MEMORY_PURGE, record_deletion
 from raiker.storage.migrations import TEXT_SEARCH_FTS5
 
 if TYPE_CHECKING:
@@ -1047,6 +1048,7 @@ class MemoryStore:
         deleted_at: str,
         updated_at: str,
         owner_principal_id: str | None = None,
+        journal: bool = True,
     ) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
@@ -1065,6 +1067,9 @@ class MemoryStore:
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
+        if journal and cursor.rowcount > 0:
+            # DEC-24 step 5 — outside the database, so a restore honours it.
+            record_deletion(self.paths.workspace_root, MEMORY_FORGET, memory_id, owner_principal_id)
         return cursor.rowcount > 0
 
     def set_approved_memory_archived(
@@ -1352,15 +1357,21 @@ class MemoryStore:
         return [dict(row) for row in rows]
 
     def delete_approved_memory(
-        self: SQLiteStore, memory_id: str, *, owner_principal_id: str | None = None
+        self: SQLiteStore,
+        memory_id: str,
+        *,
+        owner_principal_id: str | None = None,
+        journal: bool = True,
     ) -> None:
         with self.connect() as connection:
             connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
-            connection.execute(
+            cursor = connection.execute(
                 "DELETE FROM approved_memory WHERE memory_id = ?"
                 + (" AND owner_principal_id = ?" if owner_principal_id else ""),
                 (memory_id, *([owner_principal_id] if owner_principal_id else [])),
             )
+        if journal and cursor.rowcount > 0:
+            record_deletion(self.paths.workspace_root, MEMORY_PURGE, memory_id, owner_principal_id)
 
     def list_approved_memory(
         self: SQLiteStore,

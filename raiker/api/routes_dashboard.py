@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, Response
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.idempotency import IdempotencyGuard
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AcknowledgeHeldNotificationsRequest,
@@ -131,7 +132,7 @@ from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
 from raiker.control.views.projects import ProjectDeletionPreviewView
 from raiker.control.views.security import AuthSessionView, BackupRestored, BackupsView, BackupView
-from raiker.control.views.tasks import TASK_RECURRENCES
+from raiker.control.views.tasks import TASK_RECURRENCES, TaskView
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.codex_app_server import CodexSubscriptionSessions
 from raiker.models.connections import (
@@ -2051,7 +2052,34 @@ async def create_task(
     body: TaskCreateRequest,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    idempotency_key: str | None = Header(default=None),
 ) -> dict[str, Any]:
+    """Create a task. §13.2 item 6 — ``Idempotency-Key`` makes a resend return the first answer."""
+    session, _principal = auth_data
+    guard = IdempotencyGuard(
+        SQLiteStore(request.app.state.workspace_root),  # type: ignore[attr-defined]
+        session.principal_id,
+        "create_task",
+        idempotency_key,
+    )
+    replayed = guard.begin(body.model_dump())
+    if replayed is not None:
+        # The answer the first request got, as it got it.
+        return serialize_dto(cast(TaskView, replayed))
+    try:
+        view = await _create_task(body, request, auth_data)
+    except BaseException:
+        guard.abandon()
+        raise
+    guard.complete(serialize_dto(view))
+    return serialize_dto(view)
+
+
+async def _create_task(
+    body: TaskCreateRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal],
+) -> TaskView:
     session, principal = auth_data
     title = body.title.strip()
     if not title:
@@ -2110,7 +2138,7 @@ async def create_task(
         )
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
-    return serialize_dto(view)
+    return view
 
 
 @router.get("/api/tasks/{task_id}/doctor")
@@ -2149,6 +2177,8 @@ async def set_task_run_limit(
         user_id=principal.delegated_by_user_id,
         tool_calls=body.max_tool_calls,
         set_tool_calls="max_tool_calls" in body.model_fields_set,
+        cost_usd=body.max_run_cost_usd,
+        set_cost="max_run_cost_usd" in body.model_fields_set,
     )
     if view is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")

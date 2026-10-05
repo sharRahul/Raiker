@@ -121,7 +121,8 @@ def price_from_config(
           "currency": "USD",
           "as_of": "2026-07",
           "unit": "per_million_tokens",
-          "models": {"claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0}}
+          "models": {"claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0,
+                                                   "cache_write": 1.25, "cache_read": 0.1}}
         }
 
     A model absent from ``models`` has no configured price — it is not silently
@@ -148,6 +149,13 @@ def price_from_config(
         currency=str(currency) if isinstance(currency, str) and currency else "USD",
         source="config",
         as_of=str(as_of) if isinstance(as_of, str) and as_of else None,
+        # The profile states cache rates per model ("cache_write", "cache_read")
+        # precisely so nothing has to infer them. Left unread, every cached
+        # token fell back to the plain input rate: a cache read priced at ten
+        # times its bill, a cache write at four-fifths of it (found by the
+        # 2026-10-05 fifth round's cost-limited routine).
+        cache_write_per_mtok=_decimal(entry.get("cache_write")),
+        cache_read_per_mtok=_decimal(entry.get("cache_read")),
     )
 
 

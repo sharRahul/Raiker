@@ -33,7 +33,7 @@ import type {
 // The endpoint catalogue. Transport, sign-in and streaming live under ./api/;
 // what they export is re-exported here, so a caller imports from one place.
 export { ApiError, getToken, hasToken, setCsrfToken, setToken } from "./api/core";
-export { connect, health, createInstance, restoreSession, auth } from "./api/auth";
+export { connect, health, createInstance, recoveryBackups, recoveryRestore, restoreSession, auth } from "./api/auth";
 export type { HealthView, LoginResult } from "./api/auth";
 export { streamPrompt, streamResumeAfterApproval } from "./api/streaming";
 
@@ -942,14 +942,20 @@ export const api = {
   // "refresh to see the run's current state" all point here.
   taskDetail: (taskId: string) => contract.getTaskDetail(taskId),
   taskDoctor: (taskId: string) => contract.taskDoctor(taskId),
-  setTaskRunLimit: (taskId: string, maxRunMinutes: number | null, maxToolCalls?: number | null) =>
-    contract.setTaskRunLimit(
-      taskId,
-      maxToolCalls === undefined
-        ? { max_run_minutes: maxRunMinutes }
-        : { max_run_minutes: maxRunMinutes, max_tool_calls: maxToolCalls },
-    ),
-  createTask: (body: TaskCreateRequest) => contract.createTask(body),
+  setTaskRunLimit: (
+    taskId: string,
+    maxRunMinutes: number | null,
+    maxToolCalls?: number | null,
+    maxRunCostUsd?: number | null,
+  ) =>
+    contract.setTaskRunLimit(taskId, {
+      max_run_minutes: maxRunMinutes,
+      ...(maxToolCalls === undefined ? {} : { max_tool_calls: maxToolCalls }),
+      // DEC-12 step 6 — left out, the stored cost limit is unchanged.
+      ...(maxRunCostUsd === undefined ? {} : { max_run_cost_usd: maxRunCostUsd }),
+    }),
+  // §13.2 item 6 — a draft's own key: resending the same draft files it once.
+  createTask: (body: TaskCreateRequest, idempotencyKey?: string) => contract.createTask(body, idempotencyKey),
   // BUG-64 — creation alone does not execute model-proposed work. This is the
   // owner's separate, explicit intent to make one parked task due now.
   runTask: (taskId: string) => contract.runTask(taskId),
@@ -1004,12 +1010,14 @@ export const api = {
   activateRuntimeMode: (mode_name: string, reason: string) =>
     contract.activateRuntimeMode({ mode_name, reason }),
   disableRuntimeMode: (reason: string) => contract.disableRuntimeMode({ reason }),
+  // §13.2 item 6 — `expected_state` / `expected` is what the page showed; the
+  // server refuses 409 `capability_conflict` when it no longer holds that.
   setCapabilityState: (
     capability: string,
-    body: { target_state: string; reason: string; confirmation_token?: string },
+    body: { target_state: string; reason: string; confirmation_token?: string; expected_state?: string },
   ) => contract.setCapabilityState(capability, body),
-  disableCapability: (capability: string, reason: string) =>
-    contract.disableCapability(capability, { reason }),
+  disableCapability: (capability: string, reason: string, expected?: string) =>
+    contract.disableCapability(capability, expected === undefined ? { reason } : { reason, expected_state: expected }),
   // Record a human threat-model acknowledgement (owner/gate-manager only). This
   // is the in-app equivalent of the operator/CLI ack step and only satisfies the
   // acknowledgement precondition — the capability transition still runs after it.
@@ -1022,5 +1030,6 @@ export const api = {
     capability: string,
     mode: "ask" | "allow" | "auto" | "deny",
     reason: string,
-  ) => SET_DECISION_MODE[mode](capability, { reason }),
+    expected?: string,
+  ) => SET_DECISION_MODE[mode](capability, expected === undefined ? { reason } : { reason, expected_mode: expected }),
 };

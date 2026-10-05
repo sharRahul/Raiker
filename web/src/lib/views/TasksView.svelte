@@ -54,7 +54,8 @@
     TaskDetailView,
     TaskView,
   } from "../apiTypes";
-  import { relativeTime } from "../format";
+  import { localDate, localDateTime, relativeTime } from "../format";
+  import { newIdempotencyKey } from "../idempotency";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
   import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
@@ -367,7 +368,7 @@
 
   function scheduleLabel(task: TaskView) {
     if (!task.scheduled_at) return "Ready when you run it";
-    const when = new Date(task.scheduled_at).toLocaleString();
+    const when = localDateTime(new Date(task.scheduled_at));
     if (task.recurrence === "background") return task.status === "running" ? "Background agent working" : "Background agent ready to start";
     // Backlog #10 — every repeating cadence reads as a routine, so an hourly or
     // weekly one never looks like a one-shot whose next slot is its only one.
@@ -384,7 +385,7 @@
           : `${cadenceLabel(task.recurrence)}, next ${when}`,
       ];
       if (task.schedule_timezone) terms.push(task.schedule_timezone);
-      if (task.schedule_until) terms.push(`until ${new Date(task.schedule_until).toLocaleDateString()}`);
+      if (task.schedule_until) terms.push(`until ${localDate(new Date(task.schedule_until))}`);
       if (task.missed_run_policy === "skip") terms.push("skips missed runs");
       return terms.join(" · ");
     }
@@ -545,6 +546,9 @@
 
 
 
+  // §13.2 item 6 — this draft's key, kept until the server accepts it.
+  let draftKey = newIdempotencyKey();
+
   async function createTask() {
     if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt) || endsBeforeFirst) return;
     creating = true; notice = null; noticeHref = null;
@@ -563,7 +567,8 @@
         ...(workMethod === "build" ? { surface: "build" } : {}),
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
-      });
+      }, draftKey);
+      draftKey = newIdempotencyKey();
       titleOverride = ""; objective = ""; parentTaskId = ""; partOfOther = false; endsOn = ""; missedRuns = "run_once"; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; workMethod = "chat";
       // The model stays chosen: it is a choice about how this owner plans work,
       // not part of the draft just filed, and clearing it left the next task's
@@ -576,6 +581,11 @@
         await refreshModels();
         openModelSetup(activeProfile);
         notice = "The selected model is not ready. Your task draft is preserved.";
+      } else if (error instanceof ApiError && error.reasonCode === "idempotency_key_reused") {
+        // An earlier attempt of this draft was saved before it was edited.
+        draftKey = newIdempotencyKey();
+        notice = "An earlier attempt of this task was already saved — check the queue before saving it again.";
+        await load();
       } else notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task.";
     }
     finally { creating = false; }
@@ -861,7 +871,7 @@
                   <span class="preview-heading">Next {upcoming.length === 1 ? "run" : "runs"}</span>
                   <ol>
                     {#each upcoming as run, index (index)}
-                      <li>{run.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</li>
+                      <li>{localDateTime(run, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</li>
                     {/each}
                   </ol>
                   {#if cadence === "routine"}

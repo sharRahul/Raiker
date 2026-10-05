@@ -234,3 +234,43 @@ def test_a_routine_tool_limit_reaches_the_turn_and_the_doctor(
         if check["key"] == "limits"
     )
     assert "or 25 tool calls" in limits["detail"]
+
+
+def test_a_routine_cost_limit_reaches_the_turn_and_the_doctor(
+    tmp_path: Path, routine: tuple[SQLiteStore, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DEC-12 step 6 — a routine's own cost limit per run."""
+    store, task_id = routine
+    seen: list[object] = []
+
+    async def capture(_self: object, envelope: object) -> SimpleNamespace:
+        seen.append(envelope.options.max_cost_usd)  # type: ignore[attr-defined]
+        return SimpleNamespace(status="completed", message="done")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", capture)
+    store.set_task_cost_limit(task_id, 0.25)
+    asyncio.run(TaskScheduler(tmp_path).run_due())
+    assert seen == [0.25]
+    task = store.load_task(task_id)
+    assert task is not None and task.max_run_cost_usd == 0.25
+    limits = next(
+        check for check in routine_doctor(store, task, owner_principal_id=_OWNER, workspace_root=tmp_path)["checks"]
+        if check["key"] == "limits"
+    )
+    assert "or $0.25" in limits["detail"]
+
+
+def test_the_doctor_says_a_cost_limit_cannot_be_measured_without_a_price(
+    tmp_path: Path, routine: tuple[SQLiteStore, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, task_id = routine
+    store.set_task_cost_limit(task_id, 1.0)
+    monkeypatch.setattr("raiker.tasks.doctor._cost_price_known", lambda *_args: False)
+    task = store.load_task(task_id)
+    assert task is not None
+    limits = next(
+        check for check in routine_doctor(store, task, owner_principal_id=_OWNER, workspace_root=tmp_path)["checks"]
+        if check["key"] == "limits"
+    )
+    assert limits["state"] == "warn"
+    assert "cannot be measured" in limits["detail"]

@@ -45,7 +45,10 @@ class UsageTotals:
         if facts is None or facts.price is None:
             return None
         return facts.price.cost(
-            input_tokens=self.input_tokens, output_tokens=self.output_tokens
+            input_tokens=self.input_tokens,
+            output_tokens=self.output_tokens,
+            cache_write_tokens=self.cache_write_tokens,
+            cache_read_tokens=self.cache_read_tokens,
         )
 
 
@@ -95,8 +98,14 @@ class ModelUsageLedger:
 
         input_tokens = _count("input_tokens")
         output_tokens = _count("output_tokens")
-        cache_read = _count("cache_read_input_tokens")
-        cache_write = _count("cache_creation_input_tokens")
+        # The orchestrator records `summarize_model_usage`'s normalised keys
+        # (`cache_read_tokens` / `cache_write_tokens`); a provider's raw
+        # Anthropic spelling is still accepted. Reading only the raw spelling
+        # recorded every cached token as zero, so a conversation whose prompt was
+        # cached — eight thousand tokens a call on Anthropic — was priced as
+        # though it had never been sent (found by the 2026-10-05 fifth round).
+        cache_read = _count("cache_read_tokens") or _count("cache_read_input_tokens")
+        cache_write = _count("cache_write_tokens") or _count("cache_creation_input_tokens")
         if input_tokens == 0 and output_tokens == 0 and cache_read == 0 and cache_write == 0:
             return False
 

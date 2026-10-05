@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  displayLocale,
   formatTimestamp,
   groupByDay,
   humanize,
@@ -7,6 +8,7 @@ import {
   providerName,
   relativeFuture,
   relativeTime,
+  setDisplayLocale,
   shortId,
 } from "./format";
 
@@ -118,5 +120,27 @@ describe("isRedacted", () => {
     expect(isRedacted("")).toBe(false);
     expect(isRedacted(null)).toBe(false);
     expect(isRedacted(undefined)).toBe(false);
+  });
+});
+
+describe("display locale (DEC-21 General)", () => {
+  afterEach(() => setDisplayLocale(undefined));
+
+  it("writes dates in the owner's chosen format", () => {
+    const at = "2026-10-05T14:30:00Z";
+    setDisplayLocale("en-US");
+    const us = formatTimestamp(at);
+    setDisplayLocale("de-DE");
+    const de = formatTimestamp(at);
+    expect(us).toBe(new Date(at).toLocaleString("en-US"));
+    expect(de).toBe(new Date(at).toLocaleString("de-DE"));
+    expect(us).not.toBe(de);
+  });
+
+  it("ignores a value it does not offer and follows the browser", () => {
+    setDisplayLocale("xx-NOPE");
+    expect(displayLocale()).toBeUndefined();
+    const at = "2026-10-05T14:30:00Z";
+    expect(formatTimestamp(at)).toBe(new Date(at).toLocaleString());
   });
 });

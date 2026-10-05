@@ -669,3 +669,13 @@ References: [entry registry](../../raiker/runtime/authority/entry_paths.py),
 [GEP-02](#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths),
 [BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things),
 [BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).
+
+## Competitive operational-control evidence — 2026-10-05
+
+**Decision.** Preserve this document as the entry-path inventory. Apply CR-06/07/11 in [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) whenever a new path or competitive claim is introduced. More controls or more gate checks are not inherently better than effective owner control.
+
+**What Raiker must demonstrate.** Model, human, scheduled, delegated, channel and extension-originated work retain the correct principal/resource scope through policy, approval, execution and resume. Allowed work completes; denied work produces no effect. Approval binds the reviewed intent and target. Changed policy/credentials are respected on retry. Stop reaches the in-flight work named by its existing contract, including descendants, without being misrepresented as reversal of effects already committed.
+
+**Evidence required.** For each changed/claimed entry path, retain a pinned call-chain reference and executable positive, deny/off, revoked-grant, stale-approval, cancellation and restart cases. Correlate initiator, capability, decision, human authorizer, executor and durable receipt with file hashes or an independent destination log. Check no effect occurred on denial, not merely that the API returned a refusal. Include approvals resumed from another tab/scheduler and extension-produced hostile instructions. Measure stop acknowledgement separately from process/network cessation and record non-cancellable effects.
+
+**Acceptance boundary.** Unit tests and scripted routers prove specified mechanics; real routed trials prove user-entry behavior. Neither proves a competitor has weaker controls. Update this inventory only for actual reachable paths; route newly reproduced defects to TO_BE_FIXED and record implementation closures separately.

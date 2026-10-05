@@ -914,4 +914,19 @@ boundary independently. Read [BUG-315/316 decision statements](TO_BE_FIXED.md#de
 for the unresolved choices; [DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen)
 for collaboration scope; and
 [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)
-for the recorded B20 policy. This addendum changes no completion status.
+for the recorded B20 policy. This addendum changes no completion stat
+## Competitive completion contract — 2026-10-05
+
+**Decision.** Apply [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) to B/C acceptance without changing historical closure status. “Working tool” and “completed user task” are separate claims.
+
+| Area | What Raiker must demonstrate | Evidence required before a competitive claim |
+|---|---|---|
+| Build B1–B8 | Plan → approved execution → feedback → repair → verification continues in one task; delegated outcomes settle | CR-01/08/09: real model trace, exact approvals, all child states, original failing tests and independent final validators; a scripted loop test is supporting evidence only |
+| Build B9–B15 | Read and modify the correct repository with enough context, focused diffs and truthful command results | Task snapshot, resolved execution root, full diff, test/type/build output, exit codes, review findings and no unrelated mutations; include BUG-316's filing-versus-working-location distinction |
+| Build B17/B18/B20 | Stop, recovery and execution boundaries remain understandable and effective | CR-07/11: cancel during work, restart at a declared barrier, verify current authority on resume and check restoration against unrelated owner edits; disclose BUG-194 limitations |
+| Chat C1/C2/C5 | Deliver an openable artifact or confirmed integration action | CR-03/09: artifact opened in its intended consumer, destination receipt/readback and requirement checklist; generated prose alone is not completion |
+| Chat C3/C17/C18 | Recall and continuity survive restart with correct scope and provenance | CR-04: labelled corpus, instruction-heavy prompts, context actually supplied, correction/deletion/expiry exclusions and no cross-owner leakage |
+| Shared experience | User can start, approve, recover and find results without unnecessary re-prompts | CR-10/12: first-time-user observations plus keyboard/responsive/state-transition evidence |
+
+**Acceptance.** Run identical natural-language repository tasks against named Codex, Cursor and Claude Code configurations; use the Claude app only for labelled assistant journeys. Five clean trials per model-driven task/configuration, all failures retained, matched-model and native-product results separated. Do not equate the earlier predetermined edit replays with this requirement. Confirm results through the manual procedure and record them in LIVE_TEST_ROUNDS; no new run is asserted here.
+us.

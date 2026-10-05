@@ -76,6 +76,7 @@ calling a tool had been storing a different answer than it showed.
 
 Start with:
 
+- [`COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md`](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) — current competitive acceptance contract: twelve detailed demonstration/evidence criteria, reviewed source anchors, comparison protocol and claim gates. This is not a parity verdict.
 - [`RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md`](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md) — documentation-only first-release assessment covering Permissions, Chat, Build, Design, Models, the Settings popup and all Settings pages, Tasks, Memory age/management/usage, Messaging, MCP, Projects, owner identity, runtime convergence and transferable external implementation patterns at `main` commit `327610ad0816cb5ce90590e29ef30179b7caa5a5`.
 - [`DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md`](DEEP_CODEBASE_DOCUMENTATION_UI_INSTALLER_AUDIT_2026-09-07.md) — prior codebase/UI/installer/CI/competitive baseline at `main` commit `ea2f48e70bfa7e68685f9865e9face17d820a61c`; the 2026-09-13 release-readiness review above is newer where their status differs.
 - [`TO_BE_FIXED.md`](TO_BE_FIXED.md) — unresolved defect ledger.
@@ -140,3 +141,18 @@ against this revision. No source code, runtime setting or schema is changed.
 References: [decision lifecycle](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#139-decision-sign-off-and-definition-of-complete),
 [defect decisions](TO_BE_FIXED.md#decision-statements-added-2026-10-05),
 [proposal decisions](TO_BE_ADDED.md#decision-statements-added-2026-10-05).
+
+## Competitive demonstration requirements — 2026-10-05
+
+**Decision.** Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) as the shared acceptance contract for competitive claims. OpenClaw/Hermes define the agent-platform comparison; Codex/Cursor/Claude define coding outcomes and experience. The contract contains twelve detailed criteria, source anchors, evidence levels and release/claim gates.
+
+| Plan owner | What Raiker must demonstrate | Evidence required |
+|---|---|---|
+| GAP_BUILD_CHAT / PILLAR_MAP | Useful autonomous work, correct code, accessible deliverables and continuity | CR-01/04/08/09/10; real tasks, independent validators, trace and usable output |
+| TO_BE_FIXED / TO_BE_ADDED | Existing defects close with observed outcomes; optional expansion earns support | Reproduction or extension acceptance evidence; preserve existing BUG/ADD ownership |
+| GOVERNANCE_ENTRY_PATHS / security assessment | Effective owner control across real initiators, scopes and resumes | CR-06/07/11; entry-path traces, denied-effect checks, revocation and failure injection |
+| Release-readiness review | In-scope integrations, models, memory, schedules, recovery and UX work together | All applicable CR criteria mapped to Gates A–H, with explicit blocked/excluded configurations |
+| Manual test plan / LIVE_TEST_ROUNDS | A repeatable procedure and an accurate record of what actually ran | Frozen fixtures, versions, all trials, evidence levels and retained results |
+| screenshots/README | Screenshots support the named interaction and run | Current captures under docs/screenshots, correlated with functional evidence |
+
+**Reason and acceptance.** Source presence is not live proof; live Raiker proof is not a cross-product benchmark. Preserve historical closures and accepted owner decisions. This update leaves FIXED_ITEMS unchanged because it closes no implementation defect. New documentation requirements are accepted scope; the corresponding product outcomes remain evidence-dependent.

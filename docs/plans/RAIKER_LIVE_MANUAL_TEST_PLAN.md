@@ -1138,3 +1138,27 @@ References: [round ledger](LIVE_TEST_ROUNDS.md),
 [BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama),
 [current screenshot policy](README.md#documentation-governance),
 [release assurance](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#188-acceptance-and-release-assurance-for-the-removal-plan).
+
+## 22. Competitive demonstration procedure
+
+Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) for detailed CR-01–CR-12 outcomes and required evidence. This section specifies a targeted comparative run; it does not replace Smoke or Full sweep and records no observations.
+
+1. **Freeze the run.** Name product/interface/version, repository/model revisions, OS/deployment, supported features and matched-model or native-product track. Record permissions, inference/tool locations, time/token/cost limits and allowed retry policy. Select equivalent clean workspaces/test accounts; keep validators outside agent write scope.
+2. **Prepare scenarios.** Cover the following table for every in-scope claim. Retain prompt and fixture hashes, expected effects and independent validators. State unsupported cases before running; do not silently omit them.
+3. **Run through real entry points.** Give the outcome request, not the solution. Observe tool use, approvals, side effects and final artifact. Repeat model-driven tasks five times from clean state per configuration, varying product order. Retain first attempts and retries. Use controlled services for fault injection and separately run real supported integrations.
+4. **Verify independently.** Run held-out behavioral checks, open artifacts, inspect destination receipts and compare final claims with actual outcomes. For security/control cases inspect absence of effects, not just a refusal message. Capture declared widths/themes, keyboard and screen-reader behavior for UX claims.
+5. **Record and review.** Apply evidence level and outcome separately; retain all logs, human interventions, performance/cost observations, failures and exclusions. Put results in LIVE_TEST_ROUNDS and current screenshots in `docs/screenshots/`. Link reproduced failures to TO_BE_FIXED, optional expansion to TO_BE_ADDED; do not mark an unrun case passed.
+
+| Scenario | What Raiker must demonstrate | Required observations/validator |
+|---|---|---|
+| CR-01/08/09: repository bug, feature, refactor and test tasks | Independently inspect, change, test, recover and finish in the correct repository | Original failure, full diff, independent behavior/regression tests, command exits and deliverable checklist |
+| CR-01/03/09: research → artifact → integration | Grounded useful output and confirmed authorised destination effect | Source provenance, opened artifact, recipient/scope/approval and destination readback |
+| CR-02: model/deployment matrix | Actual local, private and hosted supported work with honest fallback | Setup/readiness, real tool turn, routing/egress, disconnect/restart/reconnect; label stand-ins |
+| CR-04: memory lifecycle | Accurate post-restart recall with paraphrases, distractors and scope/lifecycle exclusions | Labelled corpus, retrieval metrics/context/provenance, correction/deletion/expiry and second-owner checks |
+| CR-05: scheduling | Correct due slots, approval resume, missed-run and failure-limit behavior | Both DST transitions, overlapping ticks, host restart, real unattended run and claim/effect/history correlation |
+| CR-06: extension lifecycle | Independent extension works through its declared trust boundary | Install/discover/use/update/review/disable/uninstall, hostile output and unsupported protocol cases |
+| CR-07: operational controls | Allowed work completes, denied work cannot act, Stop reaches active descendants | Exact intent/effect records, revocation on resume, cancellation acknowledgement/cessation and exported audit |
+| CR-11: recovery | Coherent resumption after interrupted provider/tool/process/approval/delivery | Named pre/post-effect barriers, durable-state/file hashes, external send log, no blind replay and honest uncertainty |
+| CR-10/12: first use and polish | Users can start, approve, recover and find results without avoidable friction | At least three first-time evaluators, action/help counts, exact UI configuration, accessibility/state-transition evidence |
+
+**Stop criteria.** Stop the affected scenario if an unauthorised effect or leakage occurs, preserve evidence and file the failure. A budget/timeout exhausted run is recorded according to the predeclared rule, not rerun until green. A blocked environment is not a product failure. Do not issue a competitive conclusion until the reviewer can follow the complete evidence chain.

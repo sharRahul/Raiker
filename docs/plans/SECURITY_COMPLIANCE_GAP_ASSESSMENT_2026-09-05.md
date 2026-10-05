@@ -1149,3 +1149,16 @@ References: sections 2, 4 and 14 of this assessment;
 [governance inventory](GOVERNANCE_ENTRY_PATHS.md);
 [release cross-cutting decisions](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#132-cross-cutting-decisions-that-must-not-remain-ambiguous);
 [closure evidence](FIXED_ITEMS.md).
+
+## Competitive assurance evidence — 2026-10-05
+
+**Decision.** CR-04/06/07/11 in [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) supplement this assessment's invariants with outcome evidence. No new regulatory interpretation or certification claim is made by this addendum. Preserve the existing owner-authoritative posture and approved defaults.
+
+| What Raiker must demonstrate | Evidence required |
+|---|---|
+| INV-01/03: intended actions run only through valid authority, with exact approval fidelity | Positive and denied entry-point trials, changed-target/payload cases, revoked permission on resume and independent effect logs; avoid a test that only checks refusal wording |
+| INV-02/04: retrieved documents, memory and extension output cannot acquire authority or disclose secrets | Seeded hostile instructions and synthetic secret canaries; record model/tool context, attempted effects, redacted egress/destination logs and result validators |
+| INV-05/06: delegation does not increase privilege and dependency failure has the documented safe outcome | Parent/child scope traces, child attempting out-of-scope work, policy/credential/approval-service failure injection and terminal states; verify allowed work can still complete where intended |
+| INV-07: recovery cannot restore revoked or excluded state | Checkpoint/restart/restore with permission revocation, memory deletion and unrelated owner edits; compare durable state and actual subsequent retrieval/execution |
+
+Every required authority, leakage or irreversible-effect violation fails its scenario and needs remediation or an explicit release-scope restriction; success averages cannot erase it. Record attack fixtures and expected outcomes before testing. Competitor differences are comparative observations, not a reason to relax Raiker's accepted invariants, and benchmark results do not establish compliance.

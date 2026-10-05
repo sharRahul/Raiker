@@ -2552,3 +2552,19 @@ boundary accurately rather than claim that no browser code runs.
 References: [hook type contract](../../raiker/hooks/contracts.py),
 [ADD-24](TO_BE_ADDED.md#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui),
 [DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui).
+
+## Competitive evidence attached to existing defects — 2026-10-05
+
+**Decision.** Link competitive consequences to existing defects rather than create duplicate BUGs. [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) supplies the shared thresholds and evidence record. The rows below add acceptance detail; they do not change the current open/closed status above.
+
+| Existing item | What Raiker must demonstrate | Evidence required |
+|---|---|---|
+| BUG-313 | Relevant authorised memory survives instruction-heavy phrasing without broadening recall authority | CR-04: original reproduction plus paraphrases, distractors, another owner/project, expired/deleted records; retrieval IDs, supplied context, labelled relevance scores and a real post-restart answer |
+| BUG-315 | An inbound Telegram request produces an authorised reply to the correct destination or a truthful delivery failure | CR-03: real test-account round trip, exact outbound approval/grant, destination message ID/readback, denied send, timeout, lost ACK and restart behavior; a processed receipt cannot stand in for delivery |
+| BUG-316 | Build's displayed project and effective filesystem/command root have explicit, consistent semantics | CR-08/10: attached and managed project fixtures, actual cwd/resolved paths, confined read/write/command outcomes and UI explanation; no silent widening of granted roots |
+| BUG-194 | Claimed execution modes have observable lifecycle, stop and recovery behavior | CR-01/07/11: actual foreground/interactive/background/remote modes where supported, process and durable-state evidence, cancellation and reattachment after restart; label unsupported modes |
+| BUG-318 | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
+| BUG-323 | An owner can recover through the documented locked-workspace backup path, with key/state limitations explicit | CR-07/11: disposable encrypted workspace, documented prerequisite keys, failure and success recovery, integrity checks and no resurrected forbidden state |
+| BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |
+
+**Closure rule.** Add a reproducible failing case, implementation reference and executed regression result, plus live evidence where the claim concerns a live user/service path. Reuse earlier valid evidence by link and revision; do not relabel a closed defect open merely because comparative testing is missing. Unrun benchmark work is an evidence gap unless a product failure is reproduced.

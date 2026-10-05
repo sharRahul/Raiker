@@ -957,3 +957,11 @@ References: [current index](README.md),
 [FIXED-678](FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy),
 [FIXED-679](FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes),
 [release review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md).
+
+## Competitive baseline qualification — 2026-10-05
+
+**Decision and reason.** Preserve this dated audit as historical analysis. Its competitive recommendations are hypotheses and design references, not measured rankings. The current acceptance contract is [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md); OpenClaw and Hermes Agent are included for agent/platform outcomes, while Codex, Cursor and the named Claude surface are included for coding and experience.
+
+**What Raiker must demonstrate.** A reachable implementation must produce correct completed work under owner control, across its claimed deployment/integration/extension support, with memory, scheduling, recovery and usable interaction. Architecture, file counts, feature names and screenshots cannot establish leadership.
+
+**Evidence required.** For a current claim, cite the current code revision, map it to CR-01–CR-12 as applicable and link an executed end-to-end record. Comparative claims additionally require fixed tasks/validators, named competitor versions, model/configuration disclosure and all results including blocked/unsupported cases. Installer claims require the actual target OS and installed product completing a useful task. Reuse existing live records within their scope; do not treat an old observation as proof on a changed candidate. New defects and closures remain in the canonical ledgers, not a parallel backlog in this audit.

@@ -37,12 +37,12 @@ document that makes the claim checkable rather than asserted.
 
 ## Where each pillar stands
 
-Honest one-line assessments, each backed by the items below it.
+Implementation assessments, each backed by the items below it. **Competitive qualification added 2026-10-05:** historical “no blocker” and completion wording below refers to the recorded implementation scope, not proof of parity. Use [the competitive outcomes](#competitive-outcomes-by-pillar--2026-10-05) and the linked acceptance contract for present competitive claims.
 
 | Pillar | State | The thing in the way |
 |---|---|---|
-| [**P1**](#p1--a-polished-ai-assistant) Assistant | **Class-leading governed recall.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects, local/hosted semantic memory, and managed libraries whose exact file revisions can be recalled by meaning | No blocker. Revision-checked approximate vector lookup now scales recall without reusing an ineligible candidate set |
-| [**P2**](#p2--a-governed-ai-agent) Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches, and as of 2026-08-25 a task cannot report done over work it delegated | GEP-01, GEP-02, GEP-03, GEP-04, BUG-218 and BUG-220 are closed — GEP-02 by the owner's decision on 2026-09-27 that Stop halts all work in progress. What remains is composition — one brief that splits into routed children (backlog #23) — and the owner decision ADD-14/15 |
+| [**P1**](#p1--a-polished-ai-assistant) Assistant | **Governed recall implemented; comparative quality unverified.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects, local/hosted semantic memory, and managed libraries whose exact file revisions can be recalled by meaning | No blocker. Revision-checked approximate vector lookup now scales recall without reusing an ineligible candidate set |
+| [**P2**](#p2--a-governed-ai-agent) Governed agent | **Governance mechanisms implemented; comparative advantage unverified.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are implementation strengths, not evidence that competitors lack controls — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches, and as of 2026-08-25 a task cannot report done over work it delegated | GEP-01, GEP-02, GEP-03, GEP-04, BUG-218 and BUG-220 are closed — GEP-02 by the owner's decision on 2026-09-27 that Stop halts all work in progress. What remains is composition — one brief that splits into routed children (backlog #23) — and the owner decision ADD-14/15 |
 | [**P3**](#p3--a-capable-codingbuild-agent) Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
 | [**P4**](#p4--an-extensible-governed-agent-platform) Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client negotiates the current revision and now conforms to its transport and reads every shape a tool result may carry ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)). What is left is capability rather than conformance: no incremental SSE streaming, no remote OAuth, no `server/discover`, no MCP Apps, no elicitation |
 
@@ -294,3 +294,17 @@ References: [current plan index](README.md),
 [Build/Chat clarification](GAP_BUILD_CHAT.md#decision-statements-added-2026-10-05),
 [proposal decisions](TO_BE_ADDED.md#decision-statements-added-2026-10-05),
 [release sign-off](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#139-decision-sign-off-and-definition-of-complete).
+
+## Competitive outcomes by pillar — 2026-10-05
+
+**Decision and reason.** Treat the state descriptions above as scoped implementation history. Competitive leadership requires [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md); neither “no blocker” in an old row nor closed infrastructure work proves parity. This qualifies unsupported superiority language without withdrawing recorded fixes.
+
+| Pillar | What Raiker must demonstrate | Evidence required |
+|---|---|---|
+| P1 Assistant | Complete research/document work; accurate scoped recall across restart; clear first-run and error journeys | CR-03/04/09/10/12: source-grounded artifact validators, actual recall context/provenance, lifecycle exclusions, user observations and interaction captures |
+| P2 Governed agent | Finish multistep work under declared authority; pause, resume, cancel and recover with truthful state | CR-01/05/07/11: real entry-point traces, approval-to-effect correlations, fault barriers, denied-effect checks and durable terminal records |
+| P3 Coding/build | Independently solve bug, feature, refactor and test tasks in the correct repository and produce a usable handoff | CR-08/09/11: frozen repositories, withheld validators, full diffs, failure-to-green logs, restart/rewind evidence and unrelated-change review |
+| P4 Platform | Install and use supported integrations/extensions, then revoke or update them without alternate authority | CR-03/06/07: independent extension fixtures, destination receipts, trust-change review, disabling/uninstall tests and complete initiator coverage |
+| Model choice | Same supported workflows across declared local/private/hosted configurations | CR-02: support matrix, real tool-using completions, routing/egress records and failures/fallbacks; distinguish cloud-backed Ollama from local inference |
+
+Map work to existing canonical BUG/ADD/DEC records. Prioritise completed work and recovery, then reliable integrations/memory/scheduling and declared model coverage; do not use this order to bypass earlier security or runtime dependencies. Attach evidence levels per scenario, not a single maturity label to the whole pillar.

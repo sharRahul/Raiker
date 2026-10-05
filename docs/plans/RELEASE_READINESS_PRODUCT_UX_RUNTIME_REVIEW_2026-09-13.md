@@ -3658,3 +3658,23 @@ References: [plan authority](README.md#decision-recording-policy--2026-10-05),
 [governance decision](GOVERNANCE_ENTRY_PATHS.md#decision-statement--maintain-the-measured-boundary-2026-10-05),
 [FIXED-678](FIXED_ITEMS.md#fixed-678--most-routes-answers-were-described-nowhere-but-the-clients-copy),
 [FIXED-679](FIXED_ITEMS.md#fixed-679--the-client-still-hand-wrote-the-wrappers-for-routes-openapi-now-describes).
+
+# 20. Competitive demonstration and evidence contract — 2026-10-05
+
+**Decision.** Adopt [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) as the detailed acceptance contract for the owner's two competitor groups. This supplements DEC-06/08/12–19/22–26 and Gates A–H; it does not replace their requirements, reopen verified closures or declare new tests passed. Competitive readiness is scenario-specific evidence, not a feature inventory or a single product percentage.
+
+| Existing release gate | What Raiker must demonstrate | Evidence required |
+|---|---|---|
+| A / B — identity, authority and containment | Correct owner/resource attribution, approved autonomy, effective denial, Stop and delegation boundaries | CR-01/06/07: real-entry positive/negative traces, exact approval intent, effect records, changed-policy resume and no forbidden side effects |
+| C — installation and lifecycle | Claimed installations reach useful work and preserve recoverable state through restart/update | CR-02/11: actual supported OS/deployment installation, model connection, tool task, restart/update and recovery artifacts; simulated installers are insufficient |
+| D — core journeys | Agent independently completes coding and assistant requests, including recovery | CR-01/04/08/09: frozen task fixtures, held-out validators, full diffs/artifacts, model/tool traces and honest completion checklist |
+| E — models and runtimes | Advertised local/private/hosted combinations really perform supported work | CR-02: exact model/provider/runtime support matrix, real tasks, egress/fallback observations and outage/reconnect results |
+| F — messaging and MCP | Correctly authorised destination effects and extension lifecycles, with truthful recovery semantics | CR-03/06: real round trips, destination IDs/readback, scope/revocation, definition-change review and lost-ACK/retry evidence |
+| G — UX, accessibility and evidence | First-time users can start, approve, recover and find outcomes on supported surfaces | CR-10/12: observed user trials, keyboard/screen-reader checks, widths/themes/state coverage, console/network results and current captures |
+| H — operations | Durable schedules, bounded retries, usable audit/diagnostics and coherent recovery | CR-05/07/11: DST/missed-slot/race tests, real host-triggered run, fault barriers, retained history and independently measured effects |
+
+**Evidence admission.** Use planned, implemented, component-verified, end-to-end verified and competitively benchmarked as separate levels. Keep outcomes passed/failed/blocked/not run/unsupported separate. Existing Raiker live rounds remain valid only for their recorded configuration and scope. The earlier 45 component/replay invocations cannot satisfy an autonomous or competitive release claim.
+
+**Release decision.** Before a candidate run, declare supported configurations, in-scope scenarios, owners/reviewers, budgets and thresholds. Require end-to-end evidence for in-scope user promises; document any accepted exception and narrow the claim. Competitive comparisons additionally require named product versions, identical task goals/validators, all trials and disclosed model/configuration differences. Missing competitive evidence prohibits a parity assertion; it does not silently make every competitor feature a release blocker. Existing security and product gates remain authoritative.
+
+**Sign-off record.** For each CR criterion link its owning DEC/BUG/ADD, implementation revision, evidence record, residual gap, reviewer/date and permitted claim. No closure or owner implementation sign-off is created by this documentation amendment. Quiet-hours and Git OAuth decisions already accepted in DEC-21a/b remain unchanged.

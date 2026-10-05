@@ -3750,3 +3750,15 @@ the historical layout. New evidence uses `docs/screenshots/`, as the current
 documentation correction, not a test execution, and adds no passing scenario.
 References: [manual-plan evidence decision](RAIKER_LIVE_MANUAL_TEST_PLAN.md#decision-statement--what-qualifies-as-live-proof-2026-10-05),
 [BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama).
+
+## Competitive evidence recording policy — 2026-10-05 (not a live round)
+
+**Decision.** Keep prior observations unchanged. Apply [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) to future competitive rounds. This documentation amendment does not add a product run, competitor score or closure.
+
+**What Raiker must demonstrate.** Every recorded result must connect a named user outcome to what actually happened: complete, partial, refused, failed, blocked or unsupported. A claimed comparison must identify the exact OpenClaw/Hermes or Codex/Cursor/Claude product surface and configuration; a successful Raiker-only live turn cannot establish comparative parity.
+
+**Evidence required for each future round.** Include CR/scenario IDs, product/commit/model/interface, deployment and inference location, fixture/validator hashes, policy/permissions, budgets, all five model-driven trial outcomes, tool/approval traces, independent artifact/destination checks, human interventions and retained evidence paths. Identify scripted models, fake transports, loopback stand-ins and seeded state explicitly. Report code-level, real-service and human-observation evidence separately; retain all first failures and retries.
+
+Use a per-scenario table with columns: criterion; product/configuration; evidence level; outcome; successful/attempted trials; interventions; artifact/trace; blocker or residual risk. Mark unavailable runtime/credentials as blocked and missing functionality as unsupported. Neither may be silently dropped from the declared coverage. Product defects go to TO_BE_FIXED; verified fixes retain their original closure workflow.
+
+The 2026-10-02 memory, 2026-10-03 Build and 2026-10-05 operational rounds already provide scoped Raiker evidence. Their exact limits still apply. The earlier external component/replay comparison is not a new live round and requires an accessible retained artifact link before admission as release evidence.

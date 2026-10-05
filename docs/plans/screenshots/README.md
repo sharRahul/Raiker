@@ -567,3 +567,11 @@ no visual or runtime behavior.
 References: [canonical policy](../README.md#documentation-governance),
 [live evidence decision](../RAIKER_LIVE_MANUAL_TEST_PLAN.md#decision-statement--what-qualifies-as-live-proof-2026-10-05),
 [rounds](../LIVE_TEST_ROUNDS.md).
+
+## Competitive visual evidence contract — 2026-10-05
+
+**Decision.** This remains a historical catalogue. Current competitive captures belong under `docs/screenshots/` and follow [the shared criteria](../COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md), especially CR-10/12. Do not regenerate or relabel historical captures as current proof.
+
+**What Raiker must demonstrate.** A user can navigate, read progress, approve or refuse, recover and open the result across the claimed surfaces, themes and widths. Loading/empty/error/offline/approval/completion states, keyboard focus and overlays must be usable during actual work.
+
+**Evidence required.** Each new capture set identifies run/scenario, product revision, viewport in CSS pixels, theme, browser and state, with links to the relevant LIVE_TEST_ROUNDS record. Cover 390/768/1440/1920 widths for the declared journeys, light/dark, keyboard and a declared screen-reader/browser combination. Pair images with interaction assertions, accessible names/focus order, console/network results and functional validators. Include first-time-user step logs for ease-of-use claims. Screenshots alone prove neither a successful backend action nor comparative polish.

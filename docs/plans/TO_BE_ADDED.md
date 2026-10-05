@@ -1256,3 +1256,18 @@ numbers in the historical proposal unverified for Raiker until measured.
 References: ADD-05/06/12/16/17/25 above,
 [DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui),
 [DEC-24](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#136-dec-24--operational-recovery-budgets-and-diagnostics).
+
+## Competitive demonstration for proposed capabilities — 2026-10-05
+
+**Decision and reason.** [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) defines the outcomes proposals must support, but competitor presence alone does not turn an optional ADD into a release requirement. Existing owner/deployment decisions remain prerequisites. Reject expansion that cannot name a useful end-to-end task and an independently checkable result.
+
+| Proposal family | What Raiker must demonstrate | Evidence required |
+|---|---|---|
+| Execution, delegation and autonomy (ADD-01–04, ADD-08/09/16/17/20) | More completed work within the same owner authority and resource limits; coherent failure recovery | CR-01/07/11: baseline-versus-proposal task trials, child/parent outcomes, interventions, budgets, authority traces and controlled faults; no claim that critic/debate complexity itself improves quality |
+| Skills, hooks, plugins and MCP (ADD-06/13/21/24) | An external author can contribute useful behavior through the documented trust/lifecycle contract | CR-06: portable fixture, install/update/review/revoke/uninstall traces, output validator and rejected bypass attempts; contributed UI uses existing runtime authority |
+| Off-machine reach and stronger isolation (ADD-11/12/14/15/18) | The specifically chosen deployment works with explicit identity, reach and owner controls | CR-02/03/07: supported deployment matrix, actual boundary measurements, authenticated effect and revocation/Stop behavior; no inference from a local stand-in |
+| Questions and browser work (ADD-22/23) | Ask only for materially missing context; continue and complete the task through actual browser interaction | CR-01/09/10: task trace, user intervention count, destination verification and denied/untrusted-page cases |
+| Memory expansion (ADD-25) | Better useful recall at a stated scale without stale or forbidden candidates | CR-04: frozen corpus, baseline/candidate relevance and latency, lifecycle/scope tests, actual model context and declared embedding backend |
+| Responsive shell (ADD-26) | Reduced friction with consistent, accessible work/approval/recovery states | CR-10/12: observed task completion, keyboard/focus/accessibility checks and screenshots tied to interactions |
+
+Before implementing an accepted proposal, record its owning CR IDs, concrete acceptance fixture, baseline, support scope and reviewer role. Retain the proposed/accepted/implemented distinction. A demonstration can justify narrower support or deferral; absence of an experiment must never be recorded as success.

@@ -39,7 +39,7 @@ class MigrationRunner:
     def bootstrap(self: SQLiteStore) -> None:
         self.paths.ensure()
         self._migrate_plaintext_database()
-        self._backup_before_upgrade()
+        read_before = self._backup_before_upgrade()
         with self.connect() as connection:
             connection.executescript(PHASE_1_SQL)
             connection.executescript("""
@@ -63,10 +63,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # makes it equivalent to asking per migration: an id absent here is
             # applied and then recorded, and `INSERT OR IGNORE` keeps that safe
             # either way.
-            self._applied = {
-                str(row["migration_id"])
-                for row in connection.execute("SELECT migration_id FROM migrations")
-            }
+            # The pre-upgrade check has usually read the table already; nothing
+            # since has written to it but the Phase 1 row just above.
+            self._applied = (
+                read_before | {PHASE_1_MIGRATION_ID}
+                if read_before is not None
+                else {
+                    str(row["migration_id"])
+                    for row in connection.execute("SELECT migration_id FROM migrations")
+                }
+            )
             for step in MIGRATIONS:
                 if isinstance(step, Migration):
                     self._apply_migration(step.id, step.sql, connection)
@@ -79,7 +85,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         # The pass is over; anything that asks again asks the table.
         self._applied = None
 
-    def _backup_before_upgrade(self: SQLiteStore) -> None:
+    def _backup_before_upgrade(self: SQLiteStore) -> set[str] | None:
         """DEC-17 step 8 — snapshot a database that is about to be migrated.
 
         Only an existing database with recorded migrations and at least one it
@@ -89,31 +95,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         kept three deep. A snapshot that cannot be taken stops the upgrade:
         migrating without the copy this step promises would be the irreversible
         change it exists to guard.
+
+        Returns the applied ids it read, so the pass that follows does not read
+        the table a second time (GCR-10), or ``None`` when it read nothing.
         """
         try:
             if self.db_path.stat().st_size == 0:
-                return
+                return None
         except OSError:
-            return
+            return None
         connection = self.connect()
         has_table = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'migrations'"
         ).fetchone()
         if has_table is None:
-            return
+            return None
         applied = {str(row[0]) for row in connection.execute("SELECT migration_id FROM migrations")}
         if len(applied) <= 1:
-            return
+            return applied
         pending = [
             step.id
             for step in MIGRATIONS
             if isinstance(step, (Migration, SearchMigration)) and step.id not in applied
         ]
         if not pending:
-            return
+            return applied
         from raiker.storage.backup import create_backup
 
         create_backup(connection, self.paths.workspace_root, reason="pre_migration")
+        return applied
 
     def _add_early_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
         """Columns added before migrations were recorded by id: vector embeddings, the event hash chain and session ownership."""

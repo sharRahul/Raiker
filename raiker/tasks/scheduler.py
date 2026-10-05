@@ -32,6 +32,7 @@ from typing_extensions import TypedDict
 from raiker.app.host import HostControl
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
+    DEFAULT_MAX_TOOL_CALLS,
     AgentResponse,
     ClientMetadata,
     PromptEnvelope,
@@ -54,6 +55,7 @@ from raiker.tasks.run_limit import (
     STOP_REASON,
     effective_minutes,
     stopped_message,
+    tool_call_budget,
 )
 from raiker.tasks.schedule import (
     RECURRING_INTERVALS,
@@ -560,6 +562,9 @@ class TaskScheduler:
                 options=PromptOptions(
                     model_profile=task.model_profile or "",
                     model=task.model or "",
+                    # DEC-12 step 6 — the routine's own tool-call limit, when
+                    # it has one; otherwise the turn's runaway guard.
+                    max_tool_calls=tool_call_budget(task.max_tool_calls) or DEFAULT_MAX_TOOL_CALLS,
                 ),
             )
         )

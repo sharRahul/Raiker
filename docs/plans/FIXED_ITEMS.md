@@ -810,6 +810,18 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-786](#fixed-786--one-run-of-a-routine-had-no-time-limit) | Medium | Tasks / runtime | Fixed 2026-10-05 (DEC-12 step 6) |
 | [FIXED-787](#fixed-787--the-bell-counted-what-it-saw-when-the-page-opened) | Low | Notifications | Fixed 2026-10-05 — found by the live round |
 | [FIXED-788](#fixed-788--a-repair-on-the-overview-left-the-item-above-it-saying-damaged) | Low | Observability | Fixed 2026-10-05 — found by the live round |
+| [FIXED-789](#fixed-789--the-lock-screen-said-to-restore-from-a-backup-raiker-never-made) | Medium | Storage / Account | Fixed 2026-10-05 (DEC-24 step 5) |
+| [FIXED-790](#fixed-790--an-upgrade-changed-the-database-with-nothing-to-go-back-to) | Medium | Storage / updates | Fixed 2026-10-05 (DEC-17 step 8) |
+| [FIXED-791](#fixed-791--a-backup-could-rot-on-disk-and-still-look-like-a-backup) | Low | Storage | Fixed 2026-10-05 (DEC-24 step 5) |
+| [FIXED-792](#fixed-792--there-was-no-way-back-from-a-backup-that-did-not-touch-the-workspace) | Medium | Storage / Account | Fixed 2026-10-05 (DEC-24 step 5) |
+| [FIXED-793](#fixed-793--two-pages-saving-settings-kept-whichever-saved-last) | Medium | Settings | Fixed 2026-10-05 (§13.2 item 6) |
+| [FIXED-794](#fixed-794--a-monitor-that-tripped-every-pass-raised-a-new-notice-every-pass) | Low | Notifications | Fixed 2026-10-05 (DEC-21 Notifications) |
+| [FIXED-795](#fixed-795--the-record-did-not-say-what-happened-to-a-notice) | Low | Notifications / observability | Fixed 2026-10-05 (DEC-21 Notifications) |
+| [FIXED-796](#fixed-796--work-stuck-in-the-schedulers-queue-was-nowhere-on-the-overview) | Low | Observability / tasks | Fixed 2026-10-05 (DEC-24 step 1) |
+| [FIXED-797](#fixed-797--one-run-of-a-routine-had-no-tool-call-limit-of-its-own) | Low | Tasks / runtime | Fixed 2026-10-05 (DEC-12 step 6) |
+| [FIXED-798](#fixed-798--a-screenshot-did-not-say-which-build-took-it) | Low | Evidence | Fixed 2026-10-05 (DEC-19 step 5) |
+| [FIXED-799](#fixed-799--a-restored-folders-path-came-back-as-redacted_secret) | Low | API / storage | Fixed 2026-10-05 — found by the live round |
+| [FIXED-800](#fixed-800--first-run-setups-backup-copied-the-live-database-file) | Low | Setup / storage | Fixed 2026-10-05 — found while building FIXED-789 |
 
 ---
 
@@ -30934,3 +30946,226 @@ was reloaded: the Overview read its records once.
 re-reads.
 
 **Evidence.** `DiagnosticsView.test.ts`; live round scenario 8.
+
+---
+
+## FIXED-789 — The lock screen said to restore from a backup Raiker never made
+
+**Severity: Medium. Area: Storage / Account. Status: Fixed 2026-10-05. Closes
+DEC-24 step 5's snapshot, manifest and encryption.**
+
+**Observed.** A damaged database's lock screen told the owner to "restore the
+database from a backup", and nothing in Raiker made one.
+
+**Fixed.** **Back up now** in Settings → Account → *Backups* (`POST
+/api/backups`) takes a consistent snapshot through SQLCipher's own
+`sqlcipher_export` into `.raiker/backups/bkp_…/`, encrypted with the
+workspace's key from the first byte — no plaintext staging copy — and copies
+the memory files beside it. `manifest.json` records the SHA-256, size, schema
+migrations and the newest one, row counts, the key's fingerprint (never the
+key), what is included and what is not (checkpoints, build artifacts, the audit
+log, attached folders). The card says all of that and that `.raiker/app.key` is
+needed to open a backup. A backup is listed only after it has been verified.
+
+**Evidence.** `tests/test_workspace_backups.py` (no SQLite header and no stored
+text in the clear; no key file in a backup; the routes need an owner);
+`BackupsCard.test.ts`. Live captures 02 and 12 (1440 wide; 390 wide in the
+dark theme).
+
+---
+
+## FIXED-790 — An upgrade changed the database with nothing to go back to
+
+**Severity: Medium. Area: Storage / updates. Status: Fixed 2026-10-05. Closes
+DEC-17 step 8's backup before an irreversible migration.**
+
+**Fixed.** Before the migration runner applies anything to a database that
+already holds a schema, it takes a verified snapshot (`reason:
+pre_migration`); a fresh workspace and an up-to-date one take none. The last
+three are kept. Account lists them as **Before an update**. The oldest
+supported rollback and refusing an unsafe downgrade remain with DEC-17's staged
+update.
+
+**Evidence.** `test_a_pending_migration_takes_a_snapshot_first_and_keeps_three`,
+`test_a_fresh_workspace_takes_no_pre_migration_snapshot`. Live capture 05: the
+database made one migration behind and reopened, and the snapshot listed as
+verified.
+
+---
+
+## FIXED-791 — A backup could rot on disk and still look like a backup
+
+**Severity: Low. Area: Storage. Status: Fixed 2026-10-05. DEC-24 step 5's
+integrity verification.**
+
+**Fixed.** **Verify** (`POST /api/backups/{id}/verify`) re-reads the file's
+checksum, the key fingerprint and SQLite's integrity check, and writes the
+answer back into the manifest so the list shows what was last measured:
+*Verified*, *Damaged* (with which check failed) or *Unreadable* (made with a
+different key). An id that is not a backup's — `../escape`, `bkp_../../x` —
+reaches nothing.
+
+**Evidence.** `test_verification_notices_a_changed_file`,
+`test_a_backup_made_with_another_key_is_unreadable_not_damaged`,
+`test_an_id_that_is_not_a_backup_reaches_nothing`. Live capture 04: one byte of
+a backup changed on disk reads **Damaged — checksum**, with no restore offered.
+
+---
+
+## FIXED-792 — There was no way back from a backup that did not touch the workspace
+
+**Severity: Medium. Area: Storage / Account. Status: Fixed 2026-10-05. DEC-24
+step 5's restore into a new location.**
+
+**Fixed.** **Restore to a new folder** (`POST /api/backups/{id}/restore`) is
+offered only for a verified backup. It verifies again, writes the copy to
+`.raiker/restores/bkp_…/` as a workspace of its own with the key beside it,
+counts what it holds, and shows the command that starts Raiker on it; the
+running workspace is not changed and a second restore of the same backup is
+refused rather than overwritten. Applying deletion tombstones and switching
+over atomically remain DEC-24 step 5 work.
+
+**Evidence.** `test_restore_writes_a_separate_verified_workspace`,
+`test_a_backup_that_does_not_verify_is_not_restored`. Live capture 03; the
+restored folder was then opened as its own workspace and held the round's
+conversation and owner.
+
+---
+
+## FIXED-793 — Two pages saving Settings kept whichever saved last
+
+**Severity: Medium. Area: Settings. Status: Fixed 2026-10-05. Closes §13.2
+item 6 for Settings.**
+
+**Observed.** Settings were saved whole: a page opened before another tab
+changed a setting wrote its old value back over the newer one.
+
+**Fixed.** `GET /api/settings` returns a `revision`; Save sends it with the
+values the page started from for each key it changed. A stale save is merged
+when nobody else touched those keys — the reply names what was kept
+(`merged_keys`) and the page says so — and refused `409 settings_conflict`
+with the keys when somebody did. The page keeps the owner's edits and offers
+**Show the newer settings (drops these edits)**.
+
+**Evidence.** `tests/test_settings_revision.py`; `SettingsView.test.ts`. Live
+captures 06–07: two pages, one save merged and one refused.
+
+---
+
+## FIXED-794 — A monitor that tripped every pass raised a new notice every pass
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-05. DEC-21
+Notifications' deduplication.**
+
+**Fixed.** The same notice — owner, kind, title, text and subject — raised
+again within ten minutes of the last time, while still unread, is one notice
+with `repeat_count` (migration RAIKER-2092) instead of another row; the repeat
+counts on the bell once and is not alerted again. Test notices are never
+folded.
+
+**Evidence.** `tests/test_notification_quiet_hours.py` (folded; different
+words, a read notice or a notice past the window starts a new one; test notices
+kept). Live
+capture 08: one finding raised three times is one notice that says **raised 2
+more times**.
+
+---
+
+## FIXED-795 — The record did not say what happened to a notice
+
+**Severity: Low. Area: Notifications / Observability. Status: Fixed
+2026-10-05. DEC-21 Notifications' delivery timeline.**
+
+**Fixed.** Observability → Notifications says, under each notice, what its
+stored decision did: **held for quiet hours until 07:00** (or *then
+summarised*), **not shown — this kind is turned off in Notifications**,
+**shown during quiet hours as a security exception**, and **raised N more
+times**.
+
+**Evidence.** `noticePresentation.test.ts`. Live capture 09.
+
+---
+
+## FIXED-796 — Work stuck in the scheduler's queue was nowhere on the Overview
+
+**Severity: Low. Area: Observability / tasks. Status: Fixed 2026-10-05. DEC-24
+step 1's queue age and depth for the scheduler.**
+
+**Fixed.** Diagnostics carries `scheduler_queue`: how many scheduled tasks are
+due, the oldest due time and how long it has waited, and whether the host is
+paused. *Needs your attention* names work overdue by five minutes or more as
+blocking, and work waiting while Raiker is paused as waiting rather than
+missing.
+
+**Evidence.** `tests/test_scheduler_queue_health.py`;
+`observeAttention.test.ts`. Live capture 10: a task due twenty minutes ago
+while paused reads **1 scheduled task is waiting while Raiker is paused**.
+
+---
+
+## FIXED-797 — One run of a routine had no tool-call limit of its own
+
+**Severity: Low. Area: Tasks / runtime. Status: Fixed 2026-10-05. DEC-12 step
+6's per-run tool limit.**
+
+**Fixed.** `tasks.max_tool_calls` (migration RAIKER-2093; 1–1000, unset keeps
+the runtime's ceiling of 10,000) is set with `PUT /api/tasks/{id}/run-limit`
+and **Will it run?**'s *Tool-call limit per run*. The scheduler hands it to the
+run, and the doctor says "… or N tool calls." Per-run cost limits remain.
+
+**Evidence.** `tests/test_routine_run_limit_and_doctor.py`;
+`RoutineCheck.test.ts`. Live capture 11: the limit set to 40, said by the
+doctor and read back after a reload.
+
+---
+
+## FIXED-798 — A screenshot did not say which build took it
+
+**Severity: Low. Area: Evidence. Status: Fixed 2026-10-05. Closes DEC-19 step
+5.**
+
+**Fixed.** Every capture through `web/e2e/capture.ts` is recorded in its
+folder's `manifest.json`: the commit and whether the working tree differed,
+the viewport, the theme, the route, the test that took it and when.
+
+**Evidence.** The round's last scenario checks every capture in
+`docs/screenshots/2026-10-05-backups-round/` has a manifest entry with a
+commit, a viewport and a theme.
+
+---
+
+## FIXED-799 — A restored folder's path came back as `[REDACTED_SECRET]`
+
+**Severity: Low. Area: API / Storage. Status: Fixed 2026-10-05 — found by this
+round's live run.**
+
+**Observed.** The restore answer's path and command read
+`.raiker/restores/[REDACTED_SECRET]`: the response redactor took the backup id
+inside the path for a token.
+
+**Fixed.** The restore route is exempt from response redaction, as the
+owner-only routes that return the owner's own paths already are (BUG-268); its
+answer holds a path and counts, nothing secret.
+
+**Evidence.** `test_the_routes_need_an_owner_and_say_what_they_did` asserts the
+path ends with the backup id and nothing is redacted. Live capture 03.
+
+---
+
+## FIXED-800 — First-run setup's backup copied the live database file
+
+**Severity: Low. Area: Setup / storage. Status: Fixed 2026-10-05 — found while
+building FIXED-789.**
+
+**Observed.** The backup offered at the end of first-run setup zipped
+`.raiker/raiker.db` as it stood on disk and called it verified when the zip
+read back. A database in write-ahead-log mode keeps recent writes beside that
+file, so the copy could miss them, and "verified" checked only the archive.
+
+**Fixed.** The setup backup now takes FIXED-789's verified snapshot and puts
+that file in the archive; the snapshot is also listed under Settings → Account
+→ *Backups*.
+
+**Evidence.** `tests/test_setup_backup.py`
+(`test_setup_backup_writes_the_verified_snapshot_and_lists_it`).
+

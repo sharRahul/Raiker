@@ -1112,6 +1112,9 @@ class TaskRecord:
     #: DEC-12 step 6 — the longest one run may take, in minutes; ``None`` is
     #: the default bound (``raiker.tasks.run_limit``), never "unbounded".
     max_run_minutes: int | None = None
+    #: DEC-12 step 6 — the most tool calls one run may make; ``None`` is no
+    #: limit of its own beyond the turn's runaway guard.
+    max_tool_calls: int | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

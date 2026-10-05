@@ -32,6 +32,9 @@ import type { ApprovalView, Diagnostics, SecurityHealth } from "./apiTypes";
 /** Raised on `window` when a repair on the Overview changed what it reports. */
 export const RUNTIME_HEALTH_CHANGED = "raiker:runtime-health-changed";
 
+/** Due work older than this, on a running host, is a scheduler that is not keeping up. */
+export const SCHEDULER_STUCK_SECONDS = 300;
+
 /** Where a damaged search index is repaired: the Overview, with the repair open. */
 export const SEARCH_INDEX_REPAIR = "#/observe?tab=overview&repair=indexes";
 
@@ -137,6 +140,33 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         href: SEARCH_INDEX_REPAIR,
         linkLabel: vectors ? "Remove damaged vectors" : "Rebuild it",
       });
+    }
+    // DEC-24 step 1 — the scheduler's queue. A running host claims due work
+    // within a tick, so work that has waited five minutes is a scheduler that
+    // is not keeping up; while Raiker is paused, waiting is what was asked for.
+    const queue = inputs.diagnostics.scheduler_queue;
+    if (queue && queue.due > 0) {
+      const count = `${queue.due} scheduled task${queue.due === 1 ? "" : "s"}`;
+      if (queue.host_paused) {
+        items.push({
+          id: "scheduler-paused",
+          tone: "waiting",
+          title: `${count} ${queue.due === 1 ? "is" : "are"} waiting while Raiker is paused`,
+          detail: "Nothing new starts until you resume. Each starts on the scheduler's next pass after that.",
+          href: "#/tasks",
+          linkLabel: "Open Tasks",
+        });
+      } else if ((queue.oldest_wait_seconds ?? 0) >= SCHEDULER_STUCK_SECONDS) {
+        const minutes = Math.floor((queue.oldest_wait_seconds ?? 0) / 60);
+        items.push({
+          id: "scheduler-overdue",
+          tone: "blocking",
+          title: `${count} overdue`,
+          detail: `The oldest was due ${minutes} minute${minutes === 1 ? "" : "s"} ago and has not started. The scheduler checks every fifteen seconds, so it is not keeping up — see Background passes below.`,
+          href: "#/observe?tab=overview&repair=indexes",
+          linkLabel: "See the scheduler's record",
+        });
+      }
     }
     if (inputs.diagnostics.missing_config.length > 0) {
       items.push({

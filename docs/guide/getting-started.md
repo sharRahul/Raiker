@@ -380,6 +380,13 @@ changes**, across all of its sections. If you leave Settings for another page
 with an edit unsaved, Raiker asks first, and staying keeps the edit where it
 was; reloading or closing the tab gets your browser's own *Leave site?* prompt.
 
+Two tabs can have Settings open at once without one undoing the other. A save
+from a page opened before another save is merged when the two changed different
+settings — the page says *One setting changed elsewhere since this page opened
+was kept as it was* — and refused when both changed the same one: *Not saved: a
+setting you changed here was also changed somewhere else*. Your edits stay on
+the page; **Show the newer settings (drops these edits)** loads what was saved.
+
 The layout adapts live: below 1024 px the header menu opens navigation as an
 overlay without changing the workspace width. At 1024 px and wider, the
 256-pixel sidebar shares screen space and reflows the canvas; collapsing it

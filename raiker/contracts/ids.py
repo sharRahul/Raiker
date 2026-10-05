@@ -101,6 +101,8 @@ _PREFIXES = {
     "cred_",
     # Monitored MCP connections (Phase C): an owner-facing notification.
     "ntf_",
+    # DEC-24 step 5 — an encrypted workspace backup.
+    "bkp_",
     # Scoped standing approval grants (Workstream F / F3).
     "grn_",
     # Build workspace repository references: a workspace-contained local folder

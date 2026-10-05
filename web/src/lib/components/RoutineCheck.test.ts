@@ -55,8 +55,24 @@ describe("RoutineCheck", () => {
 
     await fireEvent.input(input, { target: { value: "30" } });
     await fireEvent.click(screen.getByRole("button", { name: "Save limit" }));
-    await waitFor(() => expect(set).toHaveBeenCalledWith("task_1", 30));
+    await waitFor(() => expect(set).toHaveBeenCalledWith("task_1", 30, null));
     expect(await screen.findByText("Each run now stops after 30 minutes.")).toBeInTheDocument();
     expect(changed).toHaveBeenCalled();
+  });
+
+  it("sets a tool-call limit, or none when the field is empty", async () => {
+    setToken("t");
+    vi.spyOn(api, "taskDoctor").mockResolvedValue({ task_id: "task_1", state: "ok", checked_at: "", checks: [] });
+    const set = vi.spyOn(api, "setTaskRunLimit").mockResolvedValue(
+      taskView({ task_id: "task_1", max_run_minutes: 60, max_tool_calls: 40 }),
+    );
+    render(RoutineCheck, { task: taskView({ task_id: "task_1", recurrence: "daily" }) });
+    await fireEvent.click(screen.getByRole("button", { name: "Will it run?" }));
+    const calls = await screen.findByLabelText("Tool-call limit per run");
+    expect(calls).toHaveValue(null);
+    await fireEvent.input(calls, { target: { value: "40" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save limit" }));
+    await waitFor(() => expect(set).toHaveBeenCalledWith("task_1", 60, 40));
+    expect(await screen.findByText("Each run now stops after 60 minutes or 40 tool calls.")).toBeInTheDocument();
   });
 });

@@ -12,11 +12,14 @@ turns off.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import McpSessionView
 from raiker.control.views.security import (
+    BackupsView,
+    BackupView,
     CapabilityContainmentView,
     ContainedSubject,
     NotificationDelivery,
@@ -106,6 +109,63 @@ class SecurityService:
                 for row in self.store.held_notifications(principal_id, now=moment)
             ],
         }
+
+    # ── Backups (DEC-24 step 5) ────────────────────────────────────────────
+
+    def list_backups(self: DashboardService) -> BackupsView:
+        from raiker.storage.backup import key_fingerprint, list_backups
+
+        root = Path(self.store.paths.workspace_root)
+        return {
+            "backups": [cast(BackupView, record.to_dict()) for record in list_backups(root)],
+            "key_fingerprint": key_fingerprint(root),
+        }
+
+    def create_backup(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
+        from raiker.storage.backup import BackupError, create_backup
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            record = create_backup(
+                self.store.connect(), Path(self.store.paths.workspace_root), reason="owner"
+            )
+        except BackupError as exc:
+            return ControlResult(ok=False, reason_code=exc.reason, data={"detail": str(exc)})
+        return ControlResult(ok=True, data=record.to_dict())
+
+    def verify_backup(self: DashboardService, acting_principal_id: str | None, backup_id: str) -> ControlResult:
+        from raiker.storage.backup import BackupError, verify_backup
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            record = verify_backup(Path(self.store.paths.workspace_root), backup_id)
+        except BackupError as exc:
+            return ControlResult(ok=False, reason_code=exc.reason)
+        return ControlResult(ok=True, data=record.to_dict())
+
+    def restore_backup(self: DashboardService, acting_principal_id: str | None, backup_id: str) -> ControlResult:
+        from raiker.storage.backup import BackupError, restore_backup
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            restored = restore_backup(Path(self.store.paths.workspace_root), backup_id)
+        except BackupError as exc:
+            return ControlResult(ok=False, reason_code=exc.reason, data={"detail": str(exc)})
+        return ControlResult(ok=True, data=dict(restored.__dict__))
+
+    def delete_backup(self: DashboardService, acting_principal_id: str | None, backup_id: str) -> ControlResult:
+        from raiker.storage.backup import BackupError, delete_backup
+
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            delete_backup(Path(self.store.paths.workspace_root), backup_id)
+        except BackupError as exc:
+            return ControlResult(ok=False, reason_code=exc.reason)
+        return ControlResult(ok=True)
 
     def acknowledge_held_notifications(
         self: DashboardService, principal_id: str, notification_ids: list[str]
@@ -278,4 +338,6 @@ def _notification_view(row: dict[str, Any]) -> NotificationView:
         desktop_presentation=row.get("desktop_presentation"),
         quiet_until=row.get("quiet_until"),
         summarised_at=row.get("summarised_at"),
+        repeat_count=int(row.get("repeat_count") or 0),
+        last_repeated_at=row.get("last_repeated_at"),
     )

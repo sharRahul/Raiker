@@ -235,6 +235,10 @@ class VaultKeyRequest(StrictRequest):
 
 class SettingsRequest(StrictRequest):
     settings: dict[str, Any]
+    # 13.2 #6 — the revision the page read, and what each key it changed held
+    # then. Omitted by an older client, which keeps the whole-document write.
+    expected_revision: str | None = None
+    base: dict[str, Any] | None = None
 
 
 class ComposerApprovalModeRequest(StrictRequest):
@@ -285,6 +289,9 @@ class TaskCreateRequest(StrictModelRequest):
 class TaskRunLimitRequest(StrictModelRequest):
     # DEC-12 step 6 — null restores the default limit.
     max_run_minutes: int | None = Field(default=None, ge=1, le=720)
+    # The most tool calls one run may make; null removes the routine's own
+    # limit. Left out, the stored limit is unchanged.
+    max_tool_calls: int | None = Field(default=None, ge=1, le=1000)
 
 
 class SetModelSelectionRequest(StrictModelRequest):

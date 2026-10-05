@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import BackupsCard from "../../components/BackupsCard.svelte";
   import { auth, getToken, setToken, ApiError } from "../../api";
   import type { AccountDeletionPreview } from "../../generated/apiContract";
 
@@ -200,6 +201,8 @@
     {/if}
   </details>
 </section>
+
+<BackupsCard />
 
 <section class="card danger-zone">
   <h3>Delete account</h3>

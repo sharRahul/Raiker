@@ -10,6 +10,7 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.backup import BackupError, backups_dir, create_backup
 from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
@@ -49,7 +50,13 @@ def create_local_backup(workspace_root: str | Path, target: str | Path) -> Backu
     probe.unlink()
 
     store = SQLiteStore(root)
-    store.connect().commit()
+    # The database goes in as a verified snapshot (DEC-24 step 5), not the live
+    # file: a copy of the file can miss what is still in its write-ahead log.
+    # The snapshot also stays listed under Settings → Account → Backups.
+    try:
+        snapshot = create_backup(store.connect(), root, reason="owner")
+    except BackupError as exc:
+        raise OSError(exc.reason) from exc
     created_at = utc_now()
     stamp = created_at.replace(":", "-")
     final_path = destination / f"raiker-backup-{stamp}.zip"
@@ -59,7 +66,7 @@ def create_local_backup(workspace_root: str | Path, target: str | Path) -> Backu
     )
     try:
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.write(store.db_path, "raiker.db")
+            archive.write(backups_dir(root) / snapshot.backup_id / "raiker.db", "raiker.db")
             archive.writestr("manifest.enc", manifest)
         with zipfile.ZipFile(temporary) as archive:
             if archive.testzip() is not None:

@@ -17,10 +17,12 @@
  * takes an optional locator, which is scrolled into view first — the cheapest
  * way to be certain the section a capture is named for is in it.
  */
-import { dirname, isAbsolute, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Locator, Page } from "@playwright/test";
+import { test, type Locator, type Page } from "@playwright/test";
 
 /**
  * Where a relative capture path is anchored: this directory, `web/e2e`.
@@ -45,6 +47,69 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 /** A capture path as an absolute one, anchored at `web/e2e` when relative. */
 export function capturePath(path: string): string {
   return isAbsolute(path) ? path : resolve(E2E_DIR, path);
+}
+
+/**
+ * DEC-19 step 5 — every capture says where it came from.
+ *
+ * A screenshot is evidence about one build, one viewport, one theme and one
+ * scenario, and the folder held only the picture. Each capture now records
+ * those beside it in the folder's `manifest.json`: the commit the round ran on
+ * (and whether the working tree differed from it, which a round's own changes
+ * usually make true), the viewport it was taken at, the theme it rendered in,
+ * the route, and the test that took it. Rewritten in place for a retaken file.
+ */
+let commitCache: { commit: string; workingTreeChanged: boolean } | null = null;
+
+function revision(): { commit: string; workingTreeChanged: boolean } {
+  if (commitCache !== null) return commitCache;
+  try {
+    const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: E2E_DIR, encoding: "utf-8" }).trim();
+    const status = execFileSync("git", ["status", "--porcelain", "--", "../../raiker", "../src"], {
+      cwd: E2E_DIR,
+      encoding: "utf-8",
+    }).trim();
+    commitCache = { commit, workingTreeChanged: status.length > 0 };
+  } catch {
+    commitCache = { commit: "unknown", workingTreeChanged: true };
+  }
+  return commitCache;
+}
+
+async function recordCapture(page: Page, capturedTo: string, viewport: { width: number; height: number } | null) {
+  const manifestPath = resolve(dirname(capturedTo), "manifest.json");
+  let manifest: Record<string, unknown> = {};
+  try {
+    if (existsSync(manifestPath)) manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>;
+  } catch {
+    manifest = {};
+  }
+  const theme = await page
+    .evaluate(() => {
+      const explicit = document.documentElement.dataset.theme;
+      if (explicit === "light" || explicit === "dark") return explicit;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    })
+    .catch(() => "unknown");
+  let title: string[];
+  try {
+    title = test.info().titlePath;
+  } catch {
+    // Outside a running test (a script calling the helper): no title to record.
+    title = [];
+  }
+  const { commit, workingTreeChanged } = revision();
+  manifest[basename(capturedTo)] = {
+    commit,
+    working_tree_changed: workingTreeChanged,
+    viewport,
+    theme,
+    route: new URL(page.url()).hash || "/",
+    test: title.join(" › "),
+    captured_at: new Date().toISOString(),
+  };
+  const ordered = Object.fromEntries(Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)));
+  writeFileSync(manifestPath, `${JSON.stringify(ordered, null, 2)}\n`);
 }
 
 /** Beyond this a capture is a wall of pixels nobody reads. */
@@ -102,6 +167,7 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
   const capturedTo = capturePath(path);
   if (viewport === null) {
     await page.screenshot({ path: capturedTo, fullPage: true });
+    await recordCapture(page, capturedTo, null);
     return;
   }
   const needed = Math.min(await contentHeight(page), MAX_CAPTURE_HEIGHT);
@@ -117,6 +183,7 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
   } finally {
     if (height !== viewport.height) await page.setViewportSize(viewport);
   }
+  await recordCapture(page, capturedTo, viewport);
 }
 
 /**
@@ -128,5 +195,7 @@ export async function capture(page: Page, path: string, target?: Locator): Promi
 export async function captureElement(target: Locator, path: string): Promise<void> {
   await target.scrollIntoViewIfNeeded();
   await imagesSettled(target.page());
-  await target.screenshot({ path: capturePath(path) });
+  const capturedTo = capturePath(path);
+  await target.screenshot({ path: capturedTo });
+  await recordCapture(target.page(), capturedTo, target.page().viewportSize());
 }

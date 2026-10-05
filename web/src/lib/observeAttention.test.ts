@@ -12,6 +12,8 @@ const HEALTHY_DIAGNOSTICS = {
   missing_config: [],
   provider_health: [],
   background_workers: [],
+  search_indexes: [],
+  scheduler_queue: { due: 0, oldest_due_at: null, oldest_wait_seconds: null, host_paused: false },
   model_profile_source: { kind: "packaged", location: "raiker" },
   scope_note: "",
 } as unknown as Diagnostics;
@@ -151,5 +153,25 @@ describe("allClearSentence", () => {
         unreadNotifications: null,
       }),
     ).toBe("Nothing could be read, so nothing can be said about it yet.");
+  });
+
+  // DEC-24 step 1 — the scheduler's queue depth and age.
+  it("names overdue scheduled work on a running host, and waiting work while paused", () => {
+    const fresh = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, scheduler_queue: { due: 2, oldest_due_at: "x", oldest_wait_seconds: 20, host_paused: false } },
+    });
+    expect(fresh).toEqual([]);
+    const stuck = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, scheduler_queue: { due: 2, oldest_due_at: "x", oldest_wait_seconds: 900, host_paused: false } },
+    });
+    expect(stuck.map((item) => [item.title, item.tone])).toEqual([["2 scheduled tasks overdue", "blocking"]]);
+    expect(stuck[0].detail).toMatch(/due 15 minutes ago/);
+    const paused = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, scheduler_queue: { due: 1, oldest_due_at: "x", oldest_wait_seconds: 900, host_paused: true } },
+    });
+    expect(paused.map((item) => [item.title, item.tone])).toEqual([["1 scheduled task is waiting while Raiker is paused", "waiting"]]);
   });
 });

@@ -39,6 +39,7 @@ class MigrationRunner:
     def bootstrap(self: SQLiteStore) -> None:
         self.paths.ensure()
         self._migrate_plaintext_database()
+        self._backup_before_upgrade()
         with self.connect() as connection:
             connection.executescript(PHASE_1_SQL)
             connection.executescript("""
@@ -77,6 +78,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     getattr(self, step.method)(connection)
         # The pass is over; anything that asks again asks the table.
         self._applied = None
+
+    def _backup_before_upgrade(self: SQLiteStore) -> None:
+        """DEC-17 step 8 — snapshot a database that is about to be migrated.
+
+        Only an existing database with recorded migrations and at least one it
+        has not had: a fresh workspace has nothing to lose, and a workspace that
+        is up to date is not about to change shape. The snapshot is the same
+        verified, encrypted backup an owner takes (``raiker.storage.backup``),
+        kept three deep. A snapshot that cannot be taken stops the upgrade:
+        migrating without the copy this step promises would be the irreversible
+        change it exists to guard.
+        """
+        try:
+            if self.db_path.stat().st_size == 0:
+                return
+        except OSError:
+            return
+        connection = self.connect()
+        has_table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'migrations'"
+        ).fetchone()
+        if has_table is None:
+            return
+        applied = {str(row[0]) for row in connection.execute("SELECT migration_id FROM migrations")}
+        if len(applied) <= 1:
+            return
+        pending = [
+            step.id
+            for step in MIGRATIONS
+            if isinstance(step, (Migration, SearchMigration)) and step.id not in applied
+        ]
+        if not pending:
+            return
+        from raiker.storage.backup import create_backup
+
+        create_backup(connection, self.paths.workspace_root, reason="pre_migration")
 
     def _add_early_columns(self: SQLiteStore, connection: sqlite3.Connection) -> None:
         """Columns added before migrations were recorded by id: vector embeddings, the event hash chain and session ownership."""

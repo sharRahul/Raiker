@@ -19,6 +19,8 @@
   let error = $state<string | null>(null);
   let busy = $state(false);
   let limit = $state<number | null>(null);
+  let toolLimit = $state<string | null>(null);
+  const shownToolLimit = $derived(toolLimit ?? (task.max_tool_calls === null || task.max_tool_calls === undefined ? "" : String(task.max_tool_calls)));
   let limitNotice = $state<string | null>(null);
   const shownLimit = $derived(limit ?? task.max_run_minutes);
 
@@ -62,9 +64,17 @@
       limitNotice = "A run limit is a whole number of minutes from 1 to 720.";
       return;
     }
+    // Empty means no tool-call limit of the routine's own.
+    const calls = shownToolLimit.trim() === "" ? null : Number(shownToolLimit);
+    if (calls !== null && (!Number.isInteger(calls) || calls < 1 || calls > 1000)) {
+      limitNotice = "A tool-call limit is a whole number from 1 to 1000, or empty for none.";
+      return;
+    }
     try {
-      const updated = await api.setTaskRunLimit(task.task_id, minutes);
-      limitNotice = `Each run now stops after ${updated.max_run_minutes} minutes.`;
+      const updated = await api.setTaskRunLimit(task.task_id, minutes, calls);
+      limitNotice =
+        `Each run now stops after ${updated.max_run_minutes} minutes` +
+        (updated.max_tool_calls ? ` or ${updated.max_tool_calls} tool calls.` : ".");
       onChanged?.(updated);
       if (report) await check();
     } catch (e) {
@@ -119,6 +129,21 @@
           oninput={(e) => (limit = Number(e.currentTarget.value))}
         />
         <span>minutes</span>
+      </label>
+      <label>
+        <span>or</span>
+        <input
+          class="input"
+          type="number"
+          min="1"
+          max="1000"
+          step="1"
+          placeholder="no limit"
+          value={shownToolLimit}
+          aria-label="Tool-call limit per run"
+          oninput={(e) => (toolLimit = e.currentTarget.value)}
+        />
+        <span>tool calls</span>
       </label>
       <button type="submit" class="btn btn-sm">Save limit</button>
     </form>

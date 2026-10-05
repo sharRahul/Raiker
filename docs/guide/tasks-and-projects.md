@@ -166,6 +166,11 @@ asks — a step already under way finishes and is recorded — and the run is
 recorded as stopped by its limit. It counts as a run that did not complete, so a
 routine that always overruns is paused after three, like one that always fails.
 
+**And a tool-call limit, if you want one.** Under **Will it run?**, *Tool-call
+limit per run* (1 to 1,000) stops a run after that many tool calls; left empty,
+a run keeps the runtime's own ceiling. **Will it run?** says both limits —
+*Each run is stopped after 60 minutes or 40 tool calls.*
+
 ### One lifecycle, and what each part of it lets you press
 
 Every task is in one of these phases, served by the runtime with the task, and

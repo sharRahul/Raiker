@@ -4137,6 +4137,26 @@ TASK_RUN_LIMIT_SQL = """
 ALTER TABLE tasks ADD COLUMN max_run_minutes INTEGER;
 """
 
+# DEC-21 Notifications — deduplication. The same unread notice raised again
+# within ten minutes is counted on the first one rather than written again, so
+# a monitor that trips every pass does not bury the record or alert the owner
+# once per pass. `repeat_count` is how many times it was raised again.
+NOTIFICATION_REPEATS_MIGRATION_ID = "RAIKER-2092-notification-repeats"
+
+NOTIFICATION_REPEATS_SQL = """
+ALTER TABLE notifications ADD COLUMN repeat_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE notifications ADD COLUMN last_repeated_at TEXT;
+"""
+
+# DEC-12 step 6 — the most tool calls one run of a routine may make. Null is
+# no limit of its own beyond the turn's runaway guard, which is how every
+# routine ran before this.
+TASK_TOOL_LIMIT_MIGRATION_ID = "RAIKER-2093-task-tool-limit"
+
+TASK_TOOL_LIMIT_SQL = """
+ALTER TABLE tasks ADD COLUMN max_tool_calls INTEGER;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4374,6 +4394,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(NOTIFICATION_PRESENTATION_MIGRATION_ID, NOTIFICATION_PRESENTATION_SQL),
     Migration(SEARCH_INDEX_HEALTH_MIGRATION_ID, SEARCH_INDEX_HEALTH_SQL),
     Migration(TASK_RUN_LIMIT_MIGRATION_ID, TASK_RUN_LIMIT_SQL),
+    Migration(NOTIFICATION_REPEATS_MIGRATION_ID, NOTIFICATION_REPEATS_SQL),
+    Migration(TASK_TOOL_LIMIT_MIGRATION_ID, TASK_TOOL_LIMIT_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

@@ -23,6 +23,8 @@
   import { api, ApiError } from "../api";
   import { digestEvents } from "../auditDigest";
   import { allClearSentence, attentionItems, RUNTIME_HEALTH_CHANGED } from "../observeAttention";
+  import { presentationPhrase, repeatPhrase } from "../noticePresentation";
+  import { delivery, localClock } from "../deliveryPolicy.svelte";
   import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
@@ -503,6 +505,12 @@
             <p class="entry-meta">
               <time title={notification.created_at}>{relativeTime(notification.created_at)}</time>
               · {notification.read ? "read" : "unread"}
+              {#if presentationPhrase(notification, (instant) => localClock(instant, delivery.current?.quiet_hours.timezone ?? "UTC"))}
+                · <span data-testid="notice-presentation">{presentationPhrase(notification, (instant) => localClock(instant, delivery.current?.quiet_hours.timezone ?? "UTC"))}</span>
+              {/if}
+              {#if repeatPhrase(notification)}
+                · <span data-testid="notice-repeats">{repeatPhrase(notification)}</span>
+              {/if}
               <!-- C10 — a notice about background work is only useful if it
                    leads to the work. The card there carries the run's thread. -->
               {#if notification.kind === "task_finished"}

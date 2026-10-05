@@ -24,7 +24,7 @@ from typing_extensions import TypedDict
 from raiker.contracts.models import TaskRecord
 from raiker.notify.delivery_policy import QuietHours
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tasks.run_limit import effective_minutes
+from raiker.tasks.run_limit import effective_minutes, tool_call_budget
 from raiker.tasks.schedule import is_repeating, parse_instant, valid_zone
 
 CheckState = Literal["ok", "warn", "blocked", "unknown"]
@@ -224,7 +224,10 @@ def _clock(store: SQLiteStore, owner: str) -> tuple[DoctorCheck, str]:
 def _limits(task: TaskRecord) -> DoctorCheck:
     minutes = effective_minutes(task.max_run_minutes)
     failed = task.failed_cycles
-    detail = f"Each run is stopped after {minutes} minutes."
+    calls = tool_call_budget(task.max_tool_calls)
+    detail = f"Each run is stopped after {minutes} minutes" + (
+        f" or {calls} tool calls." if calls is not None else "."
+    )
     if failed:
         return _check(
             "limits", "Its limits", "warn",

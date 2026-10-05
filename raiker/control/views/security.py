@@ -50,6 +50,10 @@ class NotificationView(View):
     quiet_until: str | None = None
     #: When the end-of-interval summary that listed it was acknowledged.
     summarised_at: str | None = None
+    #: DEC-21 — how many more times the same notice was raised while unread,
+    #: and when last. Counted here rather than written again.
+    repeat_count: int = 0
+    last_repeated_at: str | None = None
 
 
 class QuietHoursState(TypedDict):
@@ -116,6 +120,54 @@ class CheckpointCaptureHealth(TypedDict):
     remediation: str
 
 
+class BackupView(TypedDict):
+    """One encrypted backup of the workspace database (DEC-24 step 5)."""
+
+    backup_id: str
+    #: ``owner`` (taken on request) or ``pre_migration`` (taken before an upgrade).
+    reason: str
+    created_at: str
+    size_bytes: int
+    sha256: str
+    schema_migrations: int
+    latest_migration: str
+    counts: dict[str, int]
+    #: A one-way label for the workspace key that opens it — never the key.
+    key_fingerprint: str
+    included: list[str]
+    not_included: list[str]
+    #: ``verified``, ``damaged`` or ``unreadable``, as last measured.
+    state: str
+    verified_at: str | None
+    detail: str
+
+
+class BackupsView(TypedDict):
+    backups: list[BackupView]
+    #: The fingerprint of this workspace's key, to compare with each backup's.
+    key_fingerprint: str
+
+
+class BackupRestored(TypedDict):
+    """A verified copy written as a workspace of its own; the running one is untouched."""
+
+    backup_id: str
+    path: str
+    counts: dict[str, int]
+    command: str
+
+
+class SchedulerQueue(TypedDict):
+    """DEC-24 step 1 — due work no pass has claimed, and how long the oldest has waited."""
+
+    due: int
+    oldest_due_at: str | None
+    #: Seconds since the oldest due item's time; null when nothing is due.
+    oldest_wait_seconds: int | None
+    #: True when Raiker is paused, so due work waiting is expected.
+    host_paused: bool
+
+
 class SearchIndexHealth(TypedDict):
     """One search index as the host's last check found it (BUG-322, DEC-24 step 6)."""
 
@@ -170,6 +222,12 @@ class DiagnosticsView(View):
     # BUG-322 — the host tick's last search-index check, damaged first. Empty
     # until the first check runs, which is the first tick after start.
     search_indexes: tuple[SearchIndexHealth, ...] = ()
+    # DEC-24 step 1 — queue depth and age for the scheduler.
+    scheduler_queue: SchedulerQueue = field(
+        default_factory=lambda: SchedulerQueue(
+            due=0, oldest_due_at=None, oldest_wait_seconds=None, host_paused=False
+        )
+    )
     # GCR-45 — which file the built-in model registry was actually read from,
     # independent of the working directory the host was launched from.
     model_profile_source: ModelProfileSource = field(

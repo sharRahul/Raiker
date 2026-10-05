@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-05 (fourth) | Targeted | `2026-10-05-backups-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog | Ten more decision-record steps from the release-readiness review — DEC-24 step 5's backups (snapshot, verify, restore to a new folder), DEC-17 step 8's snapshot before a migration, §13.2 item 6 for Settings, DEC-21's deduplication and delivery record, DEC-24 step 1's scheduler queue, DEC-12 step 6's tool-call limit and DEC-19 step 5's screenshot manifest (FIXED-789 to FIXED-798). Proved live: a real Anthropic answer; **Back up now, Verify and Restore to a new folder**, the restored folder opening as its own workspace; **a backup changed on disk reading Damaged with no restore offered**; **an upgrade's own verified snapshot**; **a stale Settings page merged where nobody else changed a key and refused where somebody did**; **one finding raised three times as one notice**; the record saying *held for quiet hours* and *not shown*; **work due while paused named as waiting**; a routine's tool-call limit kept across a reload; Account at 390 wide, dark, with no overflow; and every capture in the manifest. **One defect found and fixed** — the restore's path came back redacted (FIXED-799); BUG-323 filed |
 | 2026-10-05 (third) | Targeted | `2026-10-05-quiet-hours-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and proposing a Build shell command, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — the owner's DEC-21a quiet hours (policy, exceptions, summary), DEC-21's per-category switches and test notice, BUG-317/320's dock, BUG-322 and DEC-24 step 6's index and vector damage, and DEC-12 steps 6 and 8. FIXED-776 to FIXED-788 |
 | 2026-10-05 (second) | Targeted | `2026-10-05-readiness-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a local Python MCP sample; a generic webhook channel | Ten more decision-record steps from the release-readiness review — DEC-24 steps 4 and 6, DEC-12 steps 5 and 7, DEC-15 step 12, DEC-01 step 5, DEC-10 step 8, DEC-14 step 9 and DEC-25's last path (FIXED-762 to FIXED-773). Proved live: a real Anthropic answer; **the internal account ID folded away on Account** and **a deletion confirmation counting what goes and what stays**, refusing a mistyped name and deleting on the typed one; **Stop on a parent cancelling its child and grandchild**; a completed task reading **Delivery failed** beside its outcome; **a damaged conversation index named and rebuilt**; **an MCP server that broke while paused staying paused on Resume**, at 390 wide with no overflow; **a webhook sender's third identical message refused as a loop**; the support bundle passing its own check; a gzip body answered **415**; Asia/Kolkata offered; and **a workspace with its key moved aside refusing to mint a new one**, then opening once the key was back. **Two defects found and fixed** — a resume failure printed its code, and the deletion label broke into three rows; the work found every resume through the stop control refusing (FIXED-765); BUG-322 filed |
 | 2026-10-05 | Targeted | `2026-10-05-readiness-decisions-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog; a routine run by the host on a workspace with no model chosen | Ten decision-record steps from the release-readiness review — DEC-25's provider and slow-sender bounds, DEC-15 step 10 for MCP servers, DEC-09 step 5, DEC-21 (General, Web access), DEC-12 step 6 and DEC-24 step 1 (FIXED-750 to FIXED-759). Proved live: **a routine paused by the host after three failed cycles** with its reason and a notice, and Continue re-arming it; a time zone's UTC offset; **an unsaved Settings edit kept when the owner chose to stay**; a Web access check naming the rule and its list; **an MCP server edited to add a tool and reword another, both held until accepted**, the block at 390 wide with no overflow; a real Anthropic answer through the bounded stream; a slow sender answered **408 after 30 s**; and a quiet background pass reading *not running*. **Two defects found and fixed** — a paused routine printed its last slot as *next* without a reason, and the purpose line was taken from a held tool; one harness defect fixed (the Chat check matched the prompt); BUG-320 and BUG-321 filed |
@@ -91,6 +92,95 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-05 (fourth) — Backups Raiker makes itself, Settings that do not overwrite each other, and a notice counted once
+
+**Tier: Targeted. Build: `npm run build` from this working tree, served by
+`raiker-web` with `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`, on a
+workspace reset with `scripts/reset_live_workspace.py`, in a Linux container
+whose egress is limited to a proxy. Provider: Anthropic
+`claude-haiku-4-5-20251001`, the key the owner supplied entered through the
+Connect dialog by the spec from the process environment — never written to a
+file. Browser: the pre-installed Chromium through
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE`, its time zone UTC. Spec:
+`web/e2e/round-2026-10-05-backups-live.spec.ts` (11 scenarios, all passing in
+one run on a fresh workspace). Harnesses: `scripts/live_backup_harness.py`,
+which makes the database one migration behind, changes a byte of a backup,
+opens a restored copy, raises one finding repeatedly through
+`insert_notification` and files a task already due; and
+`scripts/live_quiet_hours_harness.py` from the third round. Captures, each
+recorded in the folder's `manifest.json` (FIXED-798):
+[`docs/screenshots/2026-10-05-backups-round/`](../screenshots/2026-10-05-backups-round).**
+
+FIXED-789 to FIXED-799.
+
+**What it proved.**
+
+1. **A real answer.** Anthropic answered *backup round answered* in Chat, so
+   the backups below hold a real conversation
+   ([01](../screenshots/2026-10-05-backups-round/01-chat-real-answer.png)).
+2. **Back up, verify, restore.** On a fresh account the card said *No backups
+   yet*; **Back up now** answered *Backed up and verified — 2.3 MB* and named
+   what is not included and the key file; **Verify** passed; **Restore to a new
+   folder** wrote `.raiker/restores/bkp_…` and said the running workspace was
+   not changed. The harness opened that folder as a workspace of its own and
+   found the conversation and the owner (FIXED-789, FIXED-791, FIXED-792,
+   [02](../screenshots/2026-10-05-backups-round/02-account-backup-verified.png),
+   [03](../screenshots/2026-10-05-backups-round/03-backup-restored-separately.png)).
+3. **A backup that changed on disk.** One byte changed: **Verify** read
+   *Damaged — … checksum*, **Restore to a new folder** was disabled, and
+   **Remove** removed it (FIXED-791,
+   [04](../screenshots/2026-10-05-backups-round/04-backup-damaged-no-restore.png)).
+4. **An upgrade takes its own snapshot.** The database made one migration
+   behind and reopened: Account listed a verified **Before an update** backup
+   (FIXED-790, [05](../screenshots/2026-10-05-backups-round/05-pre-migration-snapshot.png)).
+5. **Two pages, one setting each.** Two tabs open on Notifications: one turned
+   off *Background work finished or paused*; the other, still showing it on,
+   turned off *Extensions and MCP servers* and was told the other change was
+   kept — and it was. Both then set quiet hours' start, 21:00 and 23:00: the
+   second was refused, its 23:00 still on the page, and **Show the newer
+   settings** showed 21:00 (FIXED-793,
+   [06](../screenshots/2026-10-05-backups-round/06-settings-merged-from-stale-page.png),
+   [07](../screenshots/2026-10-05-backups-round/07-settings-conflict-refused.png)).
+6. **Counted, not repeated.** The same finding raised three times was one row
+   in the store with `repeat_count` 2, and the record said *raised 2 more
+   times* (FIXED-794, [08](../screenshots/2026-10-05-backups-round/08-record-repeat-counted.png)).
+7. **The record says what happened.** A paused-routine notice written inside
+   quiet hours read *held for quiet hours until …*; an MCP notice written with
+   that kind turned off read *not shown — this kind is turned off in
+   Notifications* (FIXED-795, [09](../screenshots/2026-10-05-backups-round/09-record-held-and-muted.png)).
+8. **Waiting, not missing.** With the host paused from the top bar, a task due
+   twenty minutes earlier was on *Needs your attention* as *1 scheduled task is
+   waiting while Raiker is paused*; Resume followed (FIXED-796,
+   [10](../screenshots/2026-10-05-backups-round/10-attention-queue-waiting-paused.png)).
+9. **A routine's tool-call limit.** Set to 40 in **Will it run?**, said by the
+   doctor as *60 minutes or 40 tool calls*, and read back after a reload
+   (FIXED-797, [11](../screenshots/2026-10-05-backups-round/11-routine-tool-limit.png)).
+10. **Account's backups at 390 wide, dark**, with no sideways scroll
+    ([12](../screenshots/2026-10-05-backups-round/12-account-backups-390-dark.png)).
+11. **Every capture says where it came from**: the manifest holds each capture
+    with a 40-character commit and the test that took it, and 12's entry says
+    390 wide and dark (FIXED-798).
+
+**What it found**, fixed in this change:
+
+* **FIXED-799** — the restore's answer read `.raiker/restores/[REDACTED_SECRET]`:
+  the response redactor took the backup id in the path for a token.
+* The *Backups* card rendered without the card around it — Account's scoped
+  card style does not reach a child component — and its row actions stretched
+  to the row's height. Fixed before the final run; captures 02–05 and 12 show
+  the card.
+* Harness assumptions, not product defects: two pages agreeing on a switch is
+  not a conflict, so the refused save uses quiet hours' start time, which the
+  two pages set differently; and while the host is running, the harness's own
+  open and the host's next request may both see the pending migration and each
+  take a snapshot, so scenario 4 asks for at least one.
+
+**What it could not prove.** Restoring a workspace whose database is damaged:
+its lock screen cannot reach Account, so it has no restore to offer (BUG-323
+filed). Switching over to a restored copy is still the owner restarting Raiker
+on it. A tool-call limit being reached by a real run: a Haiku
+turn makes no tool calls when asked for three words.
 
 ## 2026-10-05 (third) — Quiet hours the server keeps, a dock that steps aside, and a routine asked before it runs
 

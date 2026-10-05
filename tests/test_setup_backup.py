@@ -31,3 +31,19 @@ def test_setup_backup_is_real_and_marks_state_only_after_success(tmp_path: Path)
     assert state["backup_mode"] == "local"
     assert state["backup_verified_at"]
 
+
+
+def test_setup_backup_writes_the_verified_snapshot_and_lists_it(tmp_path: Path) -> None:
+    from raiker.app.backup import create_local_backup
+    from raiker.storage.backup import backups_dir, list_backups
+    from raiker.storage.sqlite import SQLiteStore
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    SQLiteStore(workspace).create_session("sess_setup_backup", str(workspace))
+    result = create_local_backup(workspace, tmp_path / "out")
+    [snapshot] = list_backups(workspace)
+    assert snapshot.state == "verified" and snapshot.reason == "owner"
+    with zipfile.ZipFile(result.path) as archive:
+        copied = archive.read("raiker.db")
+    assert copied == (backups_dir(workspace) / snapshot.backup_id / "raiker.db").read_bytes()

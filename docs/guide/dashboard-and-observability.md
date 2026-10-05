@@ -94,6 +94,12 @@ Use **Observability** when you need evidence rather than a summary:
   bell, so it never sits over the conversation; point at it to keep it open.
   Quiet hours and the *What interrupts you* switches decide which notices are
   docked at all — see [Being told when background work ends](tasks-and-projects.md#being-told-when-background-work-ends).
+  Each row says what happened to it: *held for quiet hours until 07:00* (or
+  *then summarised*), *not shown — this kind is turned off in Notifications*,
+  or *shown during quiet hours as a security exception*. The same notice raised
+  again within ten minutes while still unread — a monitor tripping on every
+  pass — stays one row that says *raised 2 more times*, counted once by the
+  bell and alerted once.
 
 **Overview** answers the whole of "is this instance in a state I can work in",
 in the order that question is actually asked. What needs you comes first, then
@@ -122,6 +128,12 @@ one is on **Needs your attention** as *Conversation search is damaged*, with
 **Rebuild it** opening this detail with the repair in view. The first time a
 check finds an index damaged you also get one notice saying so; a repair clears
 the item at once.
+
+**Scheduled work that has not started is on the list too.** A scheduled task
+five minutes or more past its time is *N scheduled tasks overdue*, linking to
+**Tasks**. While the host is paused from the top bar the same work reads *N
+scheduled tasks waiting while Raiker is paused* instead — it is waiting for you,
+not lost, and each starts on the scheduler's next pass after you resume.
 
 **Search by meaning has its own repair.** A memory's vector is computed from its
 text, and a vector the disk has mangled — not a list of the size it says it is —

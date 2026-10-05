@@ -43,3 +43,15 @@ def stopped_message(minutes: int) -> str:
         "Anything it finished before then is kept. Raise the limit in the routine's details "
         "if it needs longer."
     )
+
+
+#: The bounds an owner's own tool-call limit must sit within.
+MIN_TOOL_CALLS = 1
+MAX_TOOL_CALLS = 1000
+
+
+def tool_call_budget(stored: int | None) -> int | None:
+    """The tool-call budget a run is given, or ``None`` for the turn's own guard."""
+    if stored is None:
+        return None
+    return max(MIN_TOOL_CALLS, min(MAX_TOOL_CALLS, int(stored)))

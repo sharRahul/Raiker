@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**367 operations: 356 verified, 0 eligible, 0 deferred, 11 special.**
+**372 operations: 361 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -48,6 +48,11 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/auth/sessions` |  | DeviceSessionView[] | verified | built as DeviceSessionView |
 | POST | `/api/auth/sessions/{session_id}/revoke` |  | Ok | verified | built as Ok |
 | GET | `/api/auth/whoami` |  | WhoamiView | verified | built as WhoamiView |
+| GET | `/api/backups` |  | BackupsView | verified | declared BackupsView |
+| POST | `/api/backups` |  | BackupView | verified | declared by cast |
+| DELETE | `/api/backups/{backup_id}` |  | Ok | verified | built as Ok |
+| POST | `/api/backups/{backup_id}/restore` |  | BackupRestored | verified | declared by cast |
+| POST | `/api/backups/{backup_id}/verify` |  | BackupView | verified | declared by cast |
 | GET | `/api/brain` |  | BrainView | verified | DashboardService.brain_view |
 | GET | `/api/brain/settings` |  | BrainPreferences | verified | DashboardService.get_brain_preferences |
 | PUT | `/api/brain/settings` | dict | BrainPreferencesSaved | verified | DashboardService.save_brain_preferences |

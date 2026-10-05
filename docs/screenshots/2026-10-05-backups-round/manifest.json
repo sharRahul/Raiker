@@ -1,0 +1,146 @@
+{
+  "01-chat-real-answer.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/new-chat?session=sess_9f9526baccd84a48972de437bc91abc3",
+    "test": "round-2026-10-05-backups-live.spec.ts › a real Anthropic answer, so there is something to back up",
+    "captured_at": "2026-10-05T13:24:18.518Z"
+  },
+  "02-account-backup-verified.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-backups-live.spec.ts › Back up now, verify it, and restore it to a separate folder",
+    "captured_at": "2026-10-05T13:24:41.893Z"
+  },
+  "03-backup-restored-separately.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-backups-live.spec.ts › Back up now, verify it, and restore it to a separate folder",
+    "captured_at": "2026-10-05T13:24:42.540Z"
+  },
+  "04-backup-damaged-no-restore.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-backups-live.spec.ts › a backup whose file changed is Damaged, offers no restore, and can be removed",
+    "captured_at": "2026-10-05T13:25:07.057Z"
+  },
+  "05-pre-migration-snapshot.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-backups-live.spec.ts › an upgrade takes its own verified snapshot first",
+    "captured_at": "2026-10-05T13:25:30.716Z"
+  },
+  "06-settings-merged-from-stale-page.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=notification",
+    "test": "round-2026-10-05-backups-live.spec.ts › settings saved from a stale page: kept where nobody else changed it, refused where somebody did",
+    "captured_at": "2026-10-05T13:26:05.476Z"
+  },
+  "07-settings-conflict-refused.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=notification",
+    "test": "round-2026-10-05-backups-live.spec.ts › settings saved from a stale page: kept where nobody else changed it, refused where somebody did",
+    "captured_at": "2026-10-05T13:26:10.197Z"
+  },
+  "08-record-repeat-counted.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/observe?tab=notifications",
+    "test": "round-2026-10-05-backups-live.spec.ts › a finding raised three times is one notice, counted",
+    "captured_at": "2026-10-05T13:26:41.007Z"
+  },
+  "09-record-held-and-muted.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/observe?tab=notifications",
+    "test": "round-2026-10-05-backups-live.spec.ts › the record says a notice was held for quiet hours, or not shown because its kind is off",
+    "captured_at": "2026-10-05T13:27:05.926Z"
+  },
+  "10-attention-queue-waiting-paused.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/observe?tab=overview",
+    "test": "round-2026-10-05-backups-live.spec.ts › work due while Raiker is paused is named as waiting, not missing",
+    "captured_at": "2026-10-05T13:27:31.321Z"
+  },
+  "11-routine-tool-limit.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/tasks",
+    "test": "round-2026-10-05-backups-live.spec.ts › a routine's own tool-call limit, said by Will it run? and kept",
+    "captured_at": "2026-10-05T13:27:54.391Z"
+  },
+  "12-account-backups-390-dark.png": {
+    "commit": "e274366e3ea979821c0b0cc3514a90a81369ed5c",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "dark",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-05-backups-live.spec.ts › Account's backups at 390 wide in the dark theme, without bleeding",
+    "captured_at": "2026-10-05T13:28:18.285Z"
+  }
+}

@@ -27,10 +27,17 @@ class SettingsView(TypedDict):
 
     settings: dict[str, Any]
     status: SettingsStatus
+    #: 13.2 #6 — what the stored document was when this was read. A save sends
+    #: it back, so an edit made from a stale read cannot overwrite a newer one.
+    revision: str
 
 
 class SettingsSaved(TypedDict):
     settings: dict[str, Any]
+    revision: str
+    #: Keys another surface had changed since the save's read, kept as they
+    #: were rather than overwritten, because this save did not touch them.
+    merged_keys: list[str]
 
 
 class ComposerApprovalMode(TypedDict):

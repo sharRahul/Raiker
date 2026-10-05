@@ -92,6 +92,7 @@ export const DIAGNOSTICS: Diagnostics = {
   provider_health: [],
   background_workers: [],
   search_indexes: [],
+  scheduler_queue: { due: 0, oldest_due_at: null, oldest_wait_seconds: null, host_paused: false },
   model_profile_source: { kind: "packaged", location: "raiker.config/model-profiles.json" },
   scope_note: "Status reflects the local single-user runtime only.",
 };
@@ -230,6 +231,7 @@ export function taskView(over: Partial<TaskView> = {}): TaskView {
     delivery_state: null,
     delivery_detail: null,
     max_run_minutes: 60,
+    max_tool_calls: null,
     // Empty, so `taskPhase` derives the phase from the status a test sets
     // rather than reading a default that disagrees with it.
     phase: "",

@@ -30,6 +30,8 @@ function notice(partial: Partial<NotificationView> = {}): NotificationView {
     desktop_presentation: "interrupt",
     quiet_until: null,
     summarised_at: null,
+    repeat_count: 0,
+    last_repeated_at: null,
     ...partial,
   };
 }

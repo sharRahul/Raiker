@@ -269,6 +269,37 @@ export type BackgroundWorkerHealth = {
   updated_at: string;
 };
 
+/** A verified copy written as a workspace of its own; the running one is untouched. */
+export type BackupRestored = {
+  backup_id: string;
+  path: string;
+  counts: Record<string, number>;
+  command: string;
+};
+
+/** One encrypted backup of the workspace database (DEC-24 step 5). */
+export type BackupView = {
+  backup_id: string;
+  reason: string;
+  created_at: string;
+  size_bytes: number;
+  sha256: string;
+  schema_migrations: number;
+  latest_migration: string;
+  counts: Record<string, number>;
+  key_fingerprint: string;
+  included: string[];
+  not_included: string[];
+  state: string;
+  verified_at: string | null;
+  detail: string;
+};
+
+export type BackupsView = {
+  backups: BackupView[];
+  key_fingerprint: string;
+};
+
 /** Would this host be reachable, said without fetching it. */
 export type BlocklistProbe = {
   host: string;
@@ -1575,6 +1606,7 @@ export type DiagnosticsView = {
   provider_health: ProviderHealthView[];
   background_workers: BackgroundWorkerHealth[];
   search_indexes: SearchIndexHealth[];
+  scheduler_queue: SchedulerQueue;
   model_profile_source: ModelProfileSource;
   scope_note: string;
 };
@@ -3317,6 +3349,8 @@ export type NotificationView = {
   desktop_presentation: string | null;
   quiet_until: string | null;
   summarised_at: string | null;
+  repeat_count: number;
+  last_repeated_at: string | null;
 };
 
 /** MEM-04 — one eidetic observation, as the owner reads it. */
@@ -4083,6 +4117,14 @@ export type SaveProjectContextRequest = {
   memory_mode?: "inherit" | "enabled" | "disabled" | null;
 };
 
+/** DEC-24 step 1 — due work no pass has claimed, and how long the oldest has waited. */
+export type SchedulerQueue = {
+  due: number;
+  oldest_due_at: string | null;
+  oldest_wait_seconds: number | null;
+  host_paused: boolean;
+};
+
 /** One search index as the host's last check found it (BUG-322, DEC-24 step 6). */
 export type SearchIndexHealth = {
   index_name: string;
@@ -4294,10 +4336,14 @@ export type SetSkillCommandRequest = {
 
 export type SettingsRequest = {
   settings: Record<string, unknown>;
+  expected_revision?: string | null;
+  base?: Record<string, unknown> | null;
 };
 
 export type SettingsSaved = {
   settings: Record<string, unknown>;
+  revision: string;
+  merged_keys: string[];
 };
 
 export type SettingsStatus = {
@@ -4311,6 +4357,7 @@ export type SettingsStatus = {
 export type SettingsView = {
   settings: Record<string, unknown>;
   status: SettingsStatus;
+  revision: string;
 };
 
 export type SetupBackupCreated = {
@@ -4625,6 +4672,7 @@ export type TaskResumed = {
 
 export type TaskRunLimitRequest = {
   max_run_minutes?: number | null;
+  max_tool_calls?: number | null;
 };
 
 export type TaskView = {
@@ -4657,6 +4705,7 @@ export type TaskView = {
   delivery_state: string | null;
   delivery_detail: string | null;
   max_run_minutes: number;
+  max_tool_calls: number | null;
   phase: string;
 };
 
@@ -5116,6 +5165,16 @@ export const contract = {
     call<Ok>("POST", `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`),
   whoami: () =>
     request<WhoamiView>("/api/auth/whoami"),
+  listBackups: () =>
+    request<BackupsView>("/api/backups"),
+  createBackup: () =>
+    call<BackupView>("POST", "/api/backups"),
+  deleteBackup: (backupId: string) =>
+    call<Ok>("DELETE", `/api/backups/${encodeURIComponent(backupId)}`),
+  restoreBackup: (backupId: string) =>
+    call<BackupRestored>("POST", `/api/backups/${encodeURIComponent(backupId)}/restore`),
+  verifyBackup: (backupId: string) =>
+    call<BackupView>("POST", `/api/backups/${encodeURIComponent(backupId)}/verify`),
   getBrain: () =>
     request<BrainView>("/api/brain"),
   getBrainPreferences: () =>

@@ -116,6 +116,26 @@ _REDACTION_EXEMPT_PATHS = frozenset(
 )
 
 
+def _is_backup_restore_request(scope: Scope, path: str) -> bool:
+    """DEC-24 step 5 — where a restored copy was written, and how to open it.
+
+    The answer is the owner's own folder (``.raiker/restores/bkp_<id>``), the
+    counts read from the copy and the command that starts Raiker on it — no file
+    content, no key. The secret redactor reads a backup id inside a path as a
+    token and turned the whole location into ``[REDACTED_SECRET]``, leaving the
+    owner a restore they could not find: the same case as the folder picker
+    (BUG-268), on an owner-authenticated, loopback route.
+    """
+    parts = path.split("/")
+    return (
+        scope.get("method") == "POST"
+        and len(parts) == 5
+        and parts[1:3] == ["api", "backups"]
+        and parts[3].startswith("bkp_")
+        and parts[4] == "restore"
+    )
+
+
 def _is_project_export_request(scope: Scope, path: str) -> bool:
     parts = path.split("/")
     return (
@@ -183,6 +203,7 @@ class RedactionMiddleware:
             or path in _REDACTION_EXEMPT_PATHS
             or _is_project_export_request(scope, path)
             or _is_session_export_request(scope, path)
+            or _is_backup_restore_request(scope, path)
         ):
             await self.app(scope, receive, send)
             return

@@ -1362,6 +1362,154 @@
         "title": "BackgroundWorkerHealth",
         "type": "object"
       },
+      "BackupRestored": {
+        "description": "A verified copy written as a workspace of its own; the running one is untouched.",
+        "properties": {
+          "backup_id": {
+            "title": "Backup Id",
+            "type": "string"
+          },
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backup_id",
+          "path",
+          "counts",
+          "command"
+        ],
+        "title": "BackupRestored",
+        "type": "object"
+      },
+      "BackupView": {
+        "description": "One encrypted backup of the workspace database (DEC-24 step 5).",
+        "properties": {
+          "backup_id": {
+            "title": "Backup Id",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "included": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Included",
+            "type": "array"
+          },
+          "key_fingerprint": {
+            "title": "Key Fingerprint",
+            "type": "string"
+          },
+          "latest_migration": {
+            "title": "Latest Migration",
+            "type": "string"
+          },
+          "not_included": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not Included",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "schema_migrations": {
+            "title": "Schema Migrations",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "backup_id",
+          "reason",
+          "created_at",
+          "size_bytes",
+          "sha256",
+          "schema_migrations",
+          "latest_migration",
+          "counts",
+          "key_fingerprint",
+          "included",
+          "not_included",
+          "state",
+          "verified_at",
+          "detail"
+        ],
+        "title": "BackupView",
+        "type": "object"
+      },
+      "BackupsView": {
+        "properties": {
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupView"
+            },
+            "title": "Backups",
+            "type": "array"
+          },
+          "key_fingerprint": {
+            "title": "Key Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backups",
+          "key_fingerprint"
+        ],
+        "title": "BackupsView",
+        "type": "object"
+      },
       "BlocklistProbe": {
         "description": "Would this host be reachable, said without fetching it.",
         "properties": {
@@ -7753,6 +7901,9 @@
           "runtime_mode": {
             "title": "Runtime Mode",
             "type": "string"
+          },
+          "scheduler_queue": {
+            "$ref": "#/components/schemas/SchedulerQueue"
           },
           "scope_note": {
             "default": "Status reflects the local single-user runtime only.",
@@ -17164,6 +17315,18 @@
             "title": "Kind",
             "type": "string"
           },
+          "last_repeated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Repeated At"
+          },
           "notification_id": {
             "title": "Notification Id",
             "type": "string"
@@ -17183,6 +17346,11 @@
           "read": {
             "title": "Read",
             "type": "boolean"
+          },
+          "repeat_count": {
+            "default": 0,
+            "title": "Repeat Count",
+            "type": "integer"
           },
           "subject_id": {
             "anyOf": [
@@ -20874,6 +21042,49 @@
         "title": "SaveProjectContextRequest",
         "type": "object"
       },
+      "SchedulerQueue": {
+        "description": "DEC-24 step 1 — due work no pass has claimed, and how long the oldest has waited.",
+        "properties": {
+          "due": {
+            "title": "Due",
+            "type": "integer"
+          },
+          "host_paused": {
+            "title": "Host Paused",
+            "type": "boolean"
+          },
+          "oldest_due_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Due At"
+          },
+          "oldest_wait_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Wait Seconds"
+          }
+        },
+        "required": [
+          "due",
+          "oldest_due_at",
+          "oldest_wait_seconds",
+          "host_paused"
+        ],
+        "title": "SchedulerQueue",
+        "type": "object"
+      },
       "SearchIndexHealth": {
         "description": "One search index as the host's last check found it (BUG-322, DEC-24 step 6).",
         "properties": {
@@ -21824,6 +22035,29 @@
       "SettingsRequest": {
         "additionalProperties": false,
         "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -21838,6 +22072,17 @@
       },
       "SettingsSaved": {
         "properties": {
+          "merged_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Merged Keys",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -21845,7 +22090,9 @@
           }
         },
         "required": [
-          "settings"
+          "settings",
+          "revision",
+          "merged_keys"
         ],
         "title": "SettingsSaved",
         "type": "object"
@@ -21886,6 +22133,10 @@
       "SettingsView": {
         "description": "The owner's settings document — their own keys, stored as written — and status.",
         "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -21897,7 +22148,8 @@
         },
         "required": [
           "settings",
-          "status"
+          "status",
+          "revision"
         ],
         "title": "SettingsView",
         "type": "object"
@@ -23518,6 +23770,19 @@
               }
             ],
             "title": "Max Run Minutes"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Calls"
           }
         },
         "title": "TaskRunLimitRequest",
@@ -23593,6 +23858,18 @@
             "default": 60,
             "title": "Max Run Minutes",
             "type": "integer"
+          },
+          "max_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Tool Calls"
           },
           "missed_run_policy": {
             "anyOf": [
@@ -27018,6 +27295,162 @@
           }
         },
         "summary": "Whoami"
+      }
+    },
+    "/api/backups": {
+      "get": {
+        "description": "DEC-24 step 5 — the encrypted backups of this workspace's database, newest first.",
+        "operationId": "list_backups_api_backups_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Backups"
+      },
+      "post": {
+        "description": "Take a consistent, encrypted, verified snapshot now.",
+        "operationId": "create_backup_api_backups_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create Backup"
+      }
+    },
+    "/api/backups/{backup_id}": {
+      "delete": {
+        "description": "Remove one backup. Nothing else is touched.",
+        "operationId": "delete_backup_api_backups__backup_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Backup"
+      }
+    },
+    "/api/backups/{backup_id}/restore": {
+      "post": {
+        "description": "Write a verified copy as a workspace of its own. The running workspace is untouched.",
+        "operationId": "restore_backup_api_backups__backup_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupRestored"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Backup"
+      }
+    },
+    "/api/backups/{backup_id}/verify": {
+      "post": {
+        "description": "Re-read a backup: checksum, the key that opens it, integrity.",
+        "operationId": "verify_backup_api_backups__backup_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify Backup"
       }
     },
     "/api/brain": {

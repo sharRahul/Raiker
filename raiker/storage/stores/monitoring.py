@@ -12,7 +12,7 @@ turns off.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -29,6 +29,12 @@ if TYPE_CHECKING:
 #: watcher at most every two minutes when it is backing off, so five minutes is
 #: several missed cycles of the slowest, never one slow pass.
 BACKGROUND_PASS_STALE_SECONDS = 300
+
+#: DEC-21 — how long an unread notice absorbs the same notice raised again.
+REPEAT_WINDOW_SECONDS = 600
+
+#: Kinds always written anew: a test the owner asked for twice is two tests.
+NEVER_DEDUPLICATED = frozenset({"test_notice"})
 
 
 def _older_than(stamp: str, now: datetime, seconds: int) -> bool:
@@ -163,8 +169,30 @@ class MonitoringStore:
         DEC-21a — whether it may interrupt is decided here, once, by the owner's
         delivery policy, and stored beside it. The row is written either way:
         quiet hours suppress presentation, never the record."""
-        notification_id = new_id("ntf_")
         moment = now or datetime.now(UTC)
+        # DEC-21 — the same notice, still unread, raised again within the
+        # window is a repeat of the first, not a new one: counted there, and
+        # the OS command sees the count and does not alert again.
+        if kind not in NEVER_DEDUPLICATED:
+            since = instant(moment - timedelta(seconds=REPEAT_WINDOW_SECONDS))
+            with self.connect() as connection:
+                existing = connection.execute(
+                    """SELECT notification_id FROM notifications
+                       WHERE principal_id = ? AND kind = ? AND title = ? AND body = ?
+                         AND COALESCE(subject_id, '') = ? AND COALESCE(finding_id, '') = ?
+                         AND read = 0
+                         AND COALESCE(last_repeated_at, created_at) BETWEEN ? AND ?
+                       ORDER BY created_at DESC LIMIT 1""",
+                    (principal_id, kind, title, body, subject_id or "", finding_id or "", since, instant(moment)),
+                ).fetchone()
+                if existing is not None:
+                    connection.execute(
+                        """UPDATE notifications SET repeat_count = repeat_count + 1,
+                           last_repeated_at = ? WHERE notification_id = ?""",
+                        (instant(moment), existing["notification_id"]),
+                    )
+                    return str(existing["notification_id"])
+        notification_id = new_id("ntf_")
         decision = self.notification_presentation_for(principal_id, kind, moment)
         self._execute(
             """INSERT INTO notifications
@@ -213,12 +241,20 @@ class MonitoringStore:
         return decide_presentation(settings, kind=kind, now=now, fallback_zone=zone)
 
     def notification_desktop_presentation(self: SQLiteStore, notification_id: str) -> str | None:
-        """How the desktop channel was decided for one notice (DEC-21a)."""
+        """How the desktop channel was decided for one notice (DEC-21a).
+
+        A notice raised again (DEC-21 deduplication) reads ``muted`` here: its
+        desktop alert, if any, was given the first time.
+        """
         row = self._row(
-            "SELECT desktop_presentation FROM notifications WHERE notification_id = ?",
+            "SELECT desktop_presentation, repeat_count FROM notifications WHERE notification_id = ?",
             (notification_id,),
         )
-        return None if row is None else row["desktop_presentation"]
+        if row is None:
+            return None
+        if int(row["repeat_count"] or 0) > 0:
+            return "muted"
+        return row["desktop_presentation"]
 
     def held_notifications(
         self: SQLiteStore, principal_id: str, *, now: datetime | None = None, limit: int = 100

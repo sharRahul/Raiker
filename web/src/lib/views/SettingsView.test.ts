@@ -20,11 +20,17 @@ function stubApi(options: { failPut?: boolean } = {}) {
       if (options.failPut) {
         return { ok: false, status: 500, json: async () => ({ detail: {} }) } as Response;
       }
-      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      const sent = JSON.parse(String(init?.body)) as { settings: Record<string, unknown> };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ settings: sent.settings, revision: `rev_${putBodies.length}`, merged_keys: [] }),
+      } as Response;
     }
     const bodies: Record<string, unknown> = {
       "/api/settings": {
         settings: {},
+        revision: "rev_0",
         status: { vault: "missing", mfa_enrolled: false, username: "alice" },
       },
       "/api/auth/sessions": [],
@@ -501,5 +507,51 @@ describe("unsaved changes when leaving Settings", () => {
     await editSomething();
     view.unmount();
     expect(mayLeave("#/chat")).toBe(true);
+  });
+});
+
+describe("13.2 #6 — a save from a stale read", () => {
+  it("sends the revision it read and what each changed key held then", async () => {
+    const { putBodies } = stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    await fireEvent.click(await screen.findByLabelText(/unread notices inside Raiker/i));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(putBodies.length).toBe(1));
+    expect(putBodies[0]).toMatchObject({
+      expected_revision: "rev_0",
+      base: { "notification.in_app": null },
+    });
+  });
+
+  it("keeps the owner's edit on a conflict and offers the newer settings", async () => {
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.startsWith("/api/settings") && (init?.method ?? "GET").toUpperCase() === "PUT") {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ detail: { reason_code: "settings_conflict", keys: ["notification.in_app"] } }),
+        } as Response;
+      }
+      if (url.startsWith("/api/settings")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ settings: {}, revision: "rev_0", status: { vault: "missing", mfa_enrolled: false, username: "alice", display_name: "Alice" } }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => [] } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", mock);
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    const toggle = await screen.findByLabelText(/unread notices inside Raiker/i);
+    await fireEvent.click(toggle);
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/also changed somewhere else/);
+    // Not rolled back: the edit is still the owner's.
+    expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: /Show the newer settings/ })).toBeInTheDocument();
   });
 });

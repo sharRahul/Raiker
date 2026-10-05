@@ -205,8 +205,8 @@
   <p class="note">
     <!-- The limit an owner has to know before they rely on deletion. -->
     Forgetting a record removes it from the workspace, not from a backup already written: a backup
-    is a copy of the store as it was when it was made. Re-verify a backup after a deletion you
-    need to be permanent.
+    is a copy of the store as it was when it was made. For a deletion you need to be permanent,
+    remove the backups made before it in <a href="#/settings?tab=account">Account → Backups</a>.
   </p>
 </section>
 

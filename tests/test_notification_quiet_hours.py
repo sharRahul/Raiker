@@ -256,3 +256,54 @@ def test_the_os_command_obeys_the_stored_desktop_decision(
     )
     assert os_notification_outcome("t", "b", store=store, notification_id=held) == "held"
     assert os_notification_outcome("t", "b", store=store, notification_id=shown) == "sent"
+
+
+# ── DEC-21 — deduplication ────────────────────────────────────────────────
+
+
+def test_the_same_unread_notice_raised_again_is_counted_not_written(tmp_path: Path) -> None:
+    from raiker.cli.principal_resolver import bootstrap_owner
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    start = _at("2026-10-05T12:00:00+00:00")
+    first = store.insert_notification(
+        principal_id="principal_owner", kind="security_alert", title="Finding", body="Same.", now=start
+    )
+    again = store.insert_notification(
+        principal_id="principal_owner", kind="security_alert", title="Finding", body="Same.",
+        now=_at("2026-10-05T12:05:00+00:00"),
+    )
+    assert again == first
+    [row] = store.list_notifications("principal_owner")
+    assert row["repeat_count"] == 1
+    # Its desktop alert was given the first time.
+    assert store.notification_desktop_presentation(first) == "muted"
+    # Different words, or after it was read, or after the window, is a new notice.
+    other = store.insert_notification(
+        principal_id="principal_owner", kind="security_alert", title="Finding", body="Different.",
+        now=_at("2026-10-05T12:06:00+00:00"),
+    )
+    later = store.insert_notification(
+        principal_id="principal_owner", kind="security_alert", title="Finding", body="Same.",
+        now=_at("2026-10-05T12:30:00+00:00"),
+    )
+    assert len({first, other, later}) == 3
+    store.mark_notification_read(later, "principal_owner")
+    after_read = store.insert_notification(
+        principal_id="principal_owner", kind="security_alert", title="Finding", body="Same.",
+        now=_at("2026-10-05T12:31:00+00:00"),
+    )
+    assert after_read != later
+
+
+def test_test_notices_are_never_folded_together(tmp_path: Path) -> None:
+    from raiker.cli.principal_resolver import bootstrap_owner
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    ids = {
+        store.insert_notification(principal_id="principal_owner", kind="test_notice", title="Test", body="t")
+        for _ in range(2)
+    }
+    assert len(ids) == 2

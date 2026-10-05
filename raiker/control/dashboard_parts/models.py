@@ -41,6 +41,7 @@ from raiker.control.views.security import (
     DiagnosticsView,
     ModelProfileSource,
     ProviderHealthView,
+    SchedulerQueue,
     SearchIndexHealth,
 )
 from raiker.events.writer import EventLogWriter
@@ -1716,6 +1717,7 @@ class ModelService:
             background_workers=tuple(
                 cast(BackgroundWorkerHealth, row) for row in self.store.list_background_worker_health()
             ),
+            scheduler_queue=self._scheduler_queue(),
             search_indexes=tuple(
                 cast(
                     SearchIndexHealth,
@@ -1749,6 +1751,31 @@ class ModelService:
                 ),
             )
             for p in models.profiles
+        )
+
+    def _scheduler_queue(self: DashboardService) -> SchedulerQueue:
+        from raiker.app.host import HostControl
+
+        now = datetime.now(UTC)
+        queue = self.store.scheduler_queue(now.isoformat().replace("+00:00", "Z"))
+        wait: int | None = None
+        if queue["oldest_due_at"]:
+            try:
+                oldest = datetime.fromisoformat(str(queue["oldest_due_at"]).replace("Z", "+00:00"))
+                if oldest.tzinfo is None:
+                    oldest = oldest.replace(tzinfo=UTC)
+                wait = max(0, int((now - oldest).total_seconds()))
+            except ValueError:
+                wait = None
+        try:
+            paused = HostControl(self.store.paths.workspace_root).is_paused()
+        except Exception:  # noqa: BLE001 - unknown pause state reads as not paused
+            paused = False
+        return SchedulerQueue(
+            due=int(queue["due"]),
+            oldest_due_at=queue["oldest_due_at"],
+            oldest_wait_seconds=wait,
+            host_paused=paused,
         )
 
     @staticmethod

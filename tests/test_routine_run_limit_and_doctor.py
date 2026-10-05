@@ -202,3 +202,35 @@ def test_the_doctor_says_no_model_rather_than_a_placeholder(
     assert "<" not in model["detail"]
     assert model["state"] == "blocked"
     assert model["detail"].startswith("No model is chosen")
+
+
+def test_a_routine_tool_limit_reaches_the_turn_and_the_doctor(
+    tmp_path: Path, routine: tuple[SQLiteStore, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store, task_id = routine
+    seen: list[int] = []
+
+    async def capture(_self: object, envelope: object) -> SimpleNamespace:
+        seen.append(envelope.options.max_tool_calls)  # type: ignore[attr-defined]
+        return SimpleNamespace(status="completed", message="done")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", capture)
+    asyncio.run(TaskScheduler(tmp_path).run_due())
+    from raiker.contracts.models import DEFAULT_MAX_TOOL_CALLS
+
+    assert seen == [DEFAULT_MAX_TOOL_CALLS]  # no limit of its own: the runaway guard
+    store.set_task_tool_limit(task_id, 25)
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE tasks SET scheduled_at = '2020-01-01T09:00:00Z', status = 'queued' WHERE task_id = ?",
+            (task_id,),
+        )
+    asyncio.run(TaskScheduler(tmp_path).run_due())
+    assert seen[-1] == 25
+    task = store.load_task(task_id)
+    assert task is not None
+    limits = next(
+        check for check in routine_doctor(store, task, owner_principal_id=_OWNER, workspace_root=tmp_path)["checks"]
+        if check["key"] == "limits"
+    )
+    assert "or 25 tool calls" in limits["detail"]

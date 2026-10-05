@@ -28,7 +28,7 @@ from raiker.tasks.doctor import RoutineDoctor, routine_doctor
 from raiker.tasks.history import derive_attempts
 from raiker.tasks.lifecycle import task_phase
 from raiker.tasks.manager import TaskManager
-from raiker.tasks.run_limit import effective_minutes
+from raiker.tasks.run_limit import effective_minutes, tool_call_budget
 from raiker.tasks.schedule import schedule_terms
 
 if TYPE_CHECKING:
@@ -312,14 +312,24 @@ class TaskService:
         return self._task_view(task)
 
     def set_task_run_limit(
-        self: DashboardService, task_id: str, minutes: int | None, *, user_id: str | None
+        self: DashboardService,
+        task_id: str,
+        minutes: int | None,
+        *,
+        user_id: str | None,
+        tool_calls: int | None = None,
+        set_tool_calls: bool = False,
     ) -> TaskView | None:
-        """DEC-12 step 6 — change one routine's run limit; ``None`` restores the default."""
+        """DEC-12 step 6 — change one routine's limits; ``None`` restores the default."""
         record = self.store.load_task_for_user(task_id, user_id)
         if record is None:
             return None
         self.store.set_task_run_limit(task_id, minutes)
-        return self._task_view(replace(record, max_run_minutes=minutes))
+        record = replace(record, max_run_minutes=minutes)
+        if set_tool_calls:
+            self.store.set_task_tool_limit(task_id, tool_calls)
+            record = replace(record, max_tool_calls=tool_calls)
+        return self._task_view(record)
 
     def task_doctor(
         self: DashboardService, task_id: str, *, user_id: str | None, owner_principal_id: str
@@ -386,5 +396,6 @@ class TaskService:
             delivery_state=d.get("delivery_state"),
             delivery_detail=d.get("delivery_detail"),
             max_run_minutes=effective_minutes(d.get("max_run_minutes")),
+            max_tool_calls=tool_call_budget(d.get("max_tool_calls")),
             phase=task_phase(str(d.get("status", "")), d.get("scheduled_at")),
         )

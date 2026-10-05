@@ -16,7 +16,7 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.storage.sqlite import SQLiteStore
-from tests.contract_cases.base import Call, Cases, Seed, first, patched, plain
+from tests.contract_cases.base import Call, Cases, Seed, first, patched, plain, then
 from tests.factories import tool_action
 
 OWNER = "principal_owner"
@@ -240,6 +240,13 @@ def _held_acknowledge(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return "/api/notifications/held/acknowledge", {"notification_ids": [notification_id]}
 
 
+def _backup(ws: Path, client: TestClient, h: dict[str, str]) -> str:
+    """DEC-24 step 5 — one owner backup to address."""
+    made = client.post("/api/backups", headers=h)
+    assert made.status_code == 200, made.text
+    return str(made.json()["backup_id"])
+
+
 def _no_vault_key(monkeypatch: Any) -> None:
     monkeypatch.delenv("RAIKER_CONNECTOR_VAULT_KEY", raising=False)
 
@@ -294,6 +301,11 @@ CASES: Cases = {
     ),
     ("POST", "/api/notifications/{notification_id}/read"): _notification_read,
     ("GET", "/api/notifications/delivery"): plain("/api/notifications/delivery"),
+    ("GET", "/api/backups"): then(lambda ws, c, h: _backup(ws, c, h), lambda c, h: "/api/backups"),
+    ("POST", "/api/backups"): plain("/api/backups"),
+    ("POST", "/api/backups/{backup_id}/verify"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}/verify",
+    ("POST", "/api/backups/{backup_id}/restore"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}/restore",
+    ("DELETE", "/api/backups/{backup_id}"): lambda ws, c, h: f"/api/backups/{_backup(ws, c, h)}",
     ("POST", "/api/notifications/held/acknowledge"): _held_acknowledge,
     ("POST", "/api/notifications/test"): plain("/api/notifications/test"),
     ("GET", "/api/security/containment"): plain("/api/security/containment"),

@@ -24,6 +24,8 @@ function notice(kind: string): RaikerNotification {
     desktop_presentation: null,
     quiet_until: null,
     summarised_at: null,
+    repeat_count: 0,
+    last_repeated_at: null,
   };
 }
 

@@ -188,8 +188,9 @@ lists what Raiker writes to the encrypted store — conversations and their turn
 retained working, approved memories, checkpoints, audit events and generated
 images — and links the page that reviews, exports or forgets each one. It also
 states the limit worth knowing before you rely on forgetting: a record removed
-from the workspace is not removed from a backup already written, so re-verify a
-backup after a deletion that has to be permanent.
+from the workspace is not removed from a backup already written, so for a
+deletion that has to be permanent, remove the backups made before it under
+**Settings → Account → Backups**.
 
 **What can leave this machine** is one row per capability that can put your
 content somewhere else — hosted models, image generation, web fetch, channels,
@@ -218,9 +219,36 @@ to speak rather than use one it cannot vouch for. What crosses the boundary
 there would be the *answer text* rather than a recording of you — smaller than
 dictation, and still yours.
 
-Back up or export the instance deliberately: local ownership also means you are
-responsible for preserving its conversations, audit records, configuration, and
-vault material. Run `raiker-app --print-paths` before backup or uninstall.
+### Backups
+
+**Settings → Account → Backups** makes a copy of this workspace's database and
+memory files. **Back up now** takes a consistent snapshot, encrypted with the
+workspace's key from the first byte — no unencrypted copy is ever written — and
+lists it only once it has checked it. Each backup records its checksum, the
+schema it was taken at and how many conversations, tasks and memories it holds.
+Raiker also takes one by itself before an update changes the database, listed as
+*Before an update*, and keeps the last three of those.
+
+- **Verify** re-reads the checksum, the key and the database's integrity, and
+  says *Verified*, *Damaged* (and which check failed) or *Unreadable* (made with
+  a different key).
+- **Restore to a new folder** is offered only for a verified backup. It writes
+  the copy to `.raiker/restores/` as a workspace of its own and shows the
+  command that starts Raiker on it. Your running workspace is not changed; to
+  use the restored copy, stop Raiker and start it on that folder.
+- **Remove** deletes the backup.
+
+A backup does not hold checkpoints, build artifacts, the audit log or folders
+you attached to projects. It opens only with this workspace's key,
+`.raiker/app.key`, which is never written into a backup — keep a copy of that
+file somewhere safe too, or no backup can be read. Backups live in
+`.raiker/backups/`, on the same disk; copy them elsewhere if the disk itself is
+what you are protecting against. The backup offered at the end of first-run
+setup is the same snapshot, also written to a folder you choose.
+
+Local ownership also means you are responsible for preserving the rest of the
+instance — audit records, configuration and vault material. Run
+`raiker-app --print-paths` before an off-machine backup or an uninstall.
 
 ## Deliberately unavailable domains
 

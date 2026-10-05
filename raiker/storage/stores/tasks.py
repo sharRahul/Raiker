@@ -73,6 +73,15 @@ class TaskStore:
             )
         )
 
+    def set_task_tool_limit(self: SQLiteStore, task_id: str, calls: int | None) -> bool:
+        """DEC-12 step 6 — set one routine's tool-call limit; ``None`` removes it."""
+        return bool(
+            self._execute(
+                "UPDATE tasks SET max_tool_calls = ?, updated_at = ? WHERE task_id = ?",
+                (calls, utc_now(), task_id),
+            )
+        )
+
     @staticmethod
     def _task_from_row(row: Any) -> TaskRecord:
         data = dict(row)
@@ -171,6 +180,24 @@ class TaskStore:
                 ).rowcount:
                     claimed.append(self._task_from_row(row))
         return claimed
+
+    def scheduler_queue(self: SQLiteStore, now: str) -> dict[str, Any]:
+        """DEC-24 step 1 — the scheduler's queue: how much is due and how long it has waited.
+
+        ``due`` is queued work whose time has come and that no pass has claimed;
+        ``oldest_due_at`` is the longest-waiting of them. A host that is running
+        claims due work within a tick, so an old entry here is a scheduler that
+        is not keeping up, or not running.
+        """
+        row = self._row(
+            """SELECT COUNT(*) AS due, MIN(scheduled_at) AS oldest FROM tasks
+               WHERE status = 'queued' AND scheduled_at IS NOT NULL AND scheduled_at <= ?""",
+            (now,),
+        )
+        return {
+            "due": int(row["due"]) if row is not None else 0,
+            "oldest_due_at": (row["oldest"] if row is not None else None),
+        }
 
     def schedule_task_now(
         self: SQLiteStore, task_id: str, *, user_id: str | None

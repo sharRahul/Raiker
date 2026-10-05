@@ -126,6 +126,7 @@ names.
 | [BUG-320](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn) | Low | Notifications / layout | **Closed 2026-10-05 ([FIXED-781](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn))** — on work surfaces a notice folds into the bell after six seconds |
 | [BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones) | Low | Settings → General | **Closed 2026-10-05 ([FIXED-773](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones))** — renamed ICU ids map to their current IANA names |
 | [BUG-322](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold) | Low | Observability / search | **Closed 2026-10-05 ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold))** — the host checks every five minutes and a damaged index is on *Needs your attention* |
+| [BUG-323](#bug-323--a-locked-workspace-cannot-be-restored-from-its-own-backups) | Medium | Storage / lock screen | Open — backups, verification and restore to a new folder ship (FIXED-789 to FIXED-792), but restore needs a running, unlocked workspace; the lock screen of a damaged database still says only *restore the database from a backup* |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2405,6 +2406,27 @@ was taken with the fold opened by hand).
 report's `damaged_text_indexes`, deep-linking to the rebuild, and run the
 integrity check on the host tick (it is read-only and cheap) rather than only
 when Diagnostics opens.
+
+## BUG-323 — A locked workspace cannot be restored from its own backups
+
+**Severity: Medium. Area: Storage / lock screen. Status: Open — recorded
+2026-10-05 by the (fourth) live round.**
+
+**Observed.** [FIXED-789](FIXED_ITEMS.md#fixed-789--the-lock-screen-said-to-restore-from-a-backup-raiker-never-made)
+to [FIXED-792](FIXED_ITEMS.md#fixed-792--there-was-no-way-back-from-a-backup-that-did-not-touch-the-workspace)
+make, verify and restore backups from Settings → Account. The case that most
+needs one — a database the key no longer opens (`store_unreadable`) — stops at
+the lock screen, which cannot reach Settings and says only "restore the
+database from a backup". Restore also writes a separate workspace and leaves
+switching to it to the owner; DEC-24 step 5's tombstones and atomic switch and
+step 6's quarantine of the damaged copy are not built.
+
+**Proposed fix.** On `store_unreadable`, the lock screen lists the verified
+backups under `.raiker/backups/` (read from their manifests, no database
+needed) and offers *Restore this backup*: verify, move the damaged database to
+`.raiker/quarantine/`, put the verified copy in place, reapply deletion
+tombstones recorded after the backup, and restart. Test with a damaged file, a
+backup made with another key, and an interrupted restore.
 
 ## Decision statements added 2026-10-05
 

@@ -57,7 +57,14 @@ export const api = {
   composerApprovalMode: () => contract.getComposerApprovalMode(),
   setComposerApprovalMode: (mode: ApprovalMode) =>
     contract.putComposerApprovalMode({ approval_mode: mode }),
-  putSettings: (settings: Record<string, unknown>) => contract.putSettings({ settings }),
+  putSettings: (
+    settings: Record<string, unknown>,
+    expectedRevision: string | null = null,
+    base: Record<string, unknown> | null = null,
+  ) =>
+    contract.putSettings(
+      expectedRevision === null ? { settings } : { settings, expected_revision: expectedRevision, base },
+    ),
   // ── Dictation's runtime (BUG-256) ──
   // Reading contacts nothing. Probing contacts only the address the owner
   // typed. Transcribing sends one clip and gets one transcript back; the audio
@@ -313,6 +320,11 @@ export const api = {
   notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) => contract.markNotificationRead(id),
   notificationDelivery: () => contract.notificationDelivery(),
+  backups: () => contract.listBackups(),
+  createBackup: () => contract.createBackup(),
+  verifyBackup: (backupId: string) => contract.verifyBackup(backupId),
+  restoreBackup: (backupId: string) => contract.restoreBackup(backupId),
+  deleteBackup: (backupId: string) => contract.deleteBackup(backupId),
   acknowledgeHeldNotifications: (notificationIds: string[]) =>
     contract.acknowledgeHeldNotifications({ notification_ids: notificationIds }),
   sendTestNotice: () => contract.sendTestNotice(),
@@ -930,8 +942,13 @@ export const api = {
   // "refresh to see the run's current state" all point here.
   taskDetail: (taskId: string) => contract.getTaskDetail(taskId),
   taskDoctor: (taskId: string) => contract.taskDoctor(taskId),
-  setTaskRunLimit: (taskId: string, maxRunMinutes: number | null) =>
-    contract.setTaskRunLimit(taskId, { max_run_minutes: maxRunMinutes }),
+  setTaskRunLimit: (taskId: string, maxRunMinutes: number | null, maxToolCalls?: number | null) =>
+    contract.setTaskRunLimit(
+      taskId,
+      maxToolCalls === undefined
+        ? { max_run_minutes: maxRunMinutes }
+        : { max_run_minutes: maxRunMinutes, max_tool_calls: maxToolCalls },
+    ),
   createTask: (body: TaskCreateRequest) => contract.createTask(body),
   // BUG-64 — creation alone does not execute model-proposed work. This is the
   // owner's separate, explicit intent to make one parked task due now.

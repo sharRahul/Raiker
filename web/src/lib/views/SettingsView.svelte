@@ -66,6 +66,7 @@
       const unsaved = dirty ? changedFromServer() : {};
       settings = { ...s.settings, ...unsaved };
       serverSettings = { ...s.settings };
+      revision = s.revision;
       status = s.status;
     } catch (e) {
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -133,15 +134,45 @@
    * during the request stays unsaved, stays marked, and is what the next Save
    * sends. On failure only the keys this request carried are rolled back.
    */
+  /**
+   * 13.2 #6 — the revision the page read. A save sends it with what each key it
+   * changed held then; the server merges a stale save whose keys nobody else
+   * touched, and refuses one that would overwrite a newer value of the same key.
+   */
+  let revision: string | null = null;
+  let conflict = $state(false);
+
   async function push() {
     if (saveState === "saving") return;
     const snapshot = { ...settings };
+    const changed = changedFromServer();
+    const base: Record<string, unknown> = {};
+    for (const key of Object.keys(changed)) base[key] = serverSettings[key] ?? null;
+    // A key removed by this edit is a change too.
+    for (const key of Object.keys(serverSettings)) if (!(key in snapshot)) base[key] = serverSettings[key];
     saveState = "saving";
+    conflict = false;
     try {
-      await api.putSettings(snapshot);
-      serverSettings = snapshot;
-      saveDetail = null;
-      applyUiPrefs(snapshot);
+      const answer = await api.putSettings(snapshot, revision, base);
+      // FIXED-455's rule: an answer without the document is read as "what was sent".
+      const saved = {
+        settings: answer && typeof answer.settings === "object" && answer.settings !== null ? answer.settings : snapshot,
+        revision: typeof answer?.revision === "string" ? answer.revision : null,
+        merged_keys: Array.isArray(answer?.merged_keys) ? answer.merged_keys : [],
+      };
+      revision = saved.revision;
+      // The server's document, which may hold another surface's newer keys.
+      const madeDuringSave: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(settings)) {
+        if (JSON.stringify(snapshot[key]) !== JSON.stringify(value)) madeDuringSave[key] = value;
+      }
+      serverSettings = { ...saved.settings };
+      settings = { ...saved.settings, ...madeDuringSave };
+      saveDetail =
+        saved.merged_keys.length > 0
+          ? `Saved. ${saved.merged_keys.length === 1 ? "One setting" : `${saved.merged_keys.length} settings`} changed elsewhere since this page opened ${saved.merged_keys.length === 1 ? "was" : "were"} kept as ${saved.merged_keys.length === 1 ? "it was" : "they were"}.`
+          : null;
+      applyUiPrefs(saved.settings);
       // DEC-21a — quiet hours are evaluated on the server; tell the dock and
       // the approval card to re-read them now rather than at their next tick.
       announceDeliveryChanged();
@@ -151,6 +182,15 @@
       // says so rather than reporting a state it has already left.
       saveState = dirty ? "idle" : "saved";
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "settings_conflict") {
+        // Nothing was written, and nothing is rolled back: the edit is still
+        // the owner's. They choose whether to see the newer values first.
+        conflict = true;
+        saveState = "error";
+        saveDetail =
+          "Not saved: a setting you changed here was also changed somewhere else — another tab or page — since this page opened. Your edits are still here.";
+        return;
+      }
       // Roll back what was rejected. An edit made while the request was out is
       // newer than the server's copy and was never part of the refusal.
       const madeDuringSave: Record<string, unknown> = {};
@@ -168,6 +208,17 @@
           ? " The rejected changes were rolled back; what you changed while it was saving is still unsaved."
           : " Your change was rolled back.");
     }
+  }
+
+  /** After a conflict: read the newer settings, keeping none of this page's edits. */
+  async function showNewer() {
+    conflict = false;
+    dirty = false;
+    keySection = {};
+    dirtySections = [];
+    saveState = "idle";
+    saveDetail = null;
+    await load();
   }
 
   function discard() {
@@ -229,9 +280,12 @@
   {#if saveState === "saving"}
     <p class="notice" role="status">Saving…</p>
   {:else if saveState === "saved"}
-    <p class="notice notice-ok" role="status">All changes saved.</p>
+    <p class="notice notice-ok" role="status">All changes saved.{saveDetail ? ` ${saveDetail.replace(/^Saved\. /, "")}` : ""}</p>
   {:else if saveState === "error"}
     <p class="notice notice-danger" role="alert">{saveDetail}</p>
+    {#if conflict}
+      <button type="button" class="btn btn-ghost btn-sm" onclick={showNewer}>Show the newer settings (drops these edits)</button>
+    {/if}
   {/if}
 </div>
 

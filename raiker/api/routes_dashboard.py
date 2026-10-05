@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -129,7 +130,7 @@ from raiker.api.wire.sessions import (
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
 from raiker.control.views.projects import ProjectDeletionPreviewView
-from raiker.control.views.security import AuthSessionView
+from raiker.control.views.security import AuthSessionView, BackupRestored, BackupsView, BackupView
 from raiker.control.views.tasks import TASK_RECURRENCES
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.codex_app_server import CodexSubscriptionSessions
@@ -670,6 +671,83 @@ async def list_notifications(
     return serialize_dto(
         _service(request).list_notifications(auth_data[0].principal_id, unread_only)
     )
+
+
+@router.get("/api/backups")
+async def list_backups(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-24 step 5 — the encrypted backups of this workspace's database, newest first."""
+    answer: BackupsView = _service(request).list_backups()
+    return serialize_dto(answer)
+
+
+@router.post("/api/backups")
+async def create_backup(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Take a consistent, encrypted, verified snapshot now."""
+    result = await asyncio.to_thread(_service(request).create_backup, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_human" else status.HTTP_409_CONFLICT,
+            result.reason_code,
+        )
+    answer = cast(BackupView, result.data)
+    return serialize_dto(answer)
+
+
+@router.post("/api/backups/{backup_id}/verify")
+async def verify_backup(
+    backup_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Re-read a backup: checksum, the key that opens it, integrity."""
+    result = await asyncio.to_thread(_service(request).verify_backup, auth_data[0].principal_id, backup_id)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_404_NOT_FOUND if result.reason_code == "unknown_backup" else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
+    answer = cast(BackupView, result.data)
+    return serialize_dto(answer)
+
+
+@router.post("/api/backups/{backup_id}/restore")
+async def restore_backup(
+    backup_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Write a verified copy as a workspace of its own. The running workspace is untouched."""
+    result = await asyncio.to_thread(_service(request).restore_backup, auth_data[0].principal_id, backup_id)
+    if not result.ok:
+        code = {
+            "unknown_backup": status.HTTP_404_NOT_FOUND,
+            "not_authorized_human": status.HTTP_403_FORBIDDEN,
+        }.get(result.reason_code or "", status.HTTP_409_CONFLICT)
+        raise refusal(code, result.reason_code)
+    answer = cast(BackupRestored, result.data)
+    return serialize_dto(answer)
+
+
+@router.delete("/api/backups/{backup_id}")
+async def delete_backup(
+    backup_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Remove one backup. Nothing else is touched."""
+    result = _service(request).delete_backup(auth_data[0].principal_id, backup_id)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_404_NOT_FOUND if result.reason_code == "unknown_backup" else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
+    return serialize_dto(Ok())
 
 
 @router.get("/api/notifications/delivery")
@@ -2066,7 +2144,11 @@ async def set_task_run_limit(
     """DEC-12 step 6 — how long one run of this routine may take."""
     _session, principal = auth_data
     view = _service(request).set_task_run_limit(
-        task_id, body.max_run_minutes, user_id=principal.delegated_by_user_id
+        task_id,
+        body.max_run_minutes,
+        user_id=principal.delegated_by_user_id,
+        tool_calls=body.max_tool_calls,
+        set_tool_calls="max_tool_calls" in body.model_fields_set,
     )
     if view is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")

@@ -9,6 +9,7 @@ plus derived read-only status the UI needs (vault state, MFA enrollment).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, cast
@@ -44,6 +45,13 @@ def _load(ws: str | Path, principal_id: str) -> dict[str, Any]:
         return parsed if isinstance(parsed, dict) else {}
     except (ValueError, TypeError):
         return {}
+
+
+def settings_revision(ws: str | Path, principal_id: str) -> str:
+    """A revision of the stored document: its content hash, so it changes iff it does."""
+    row = SQLiteStore(ws).get_user_settings(principal_id)
+    text = "" if row is None else str(row["settings_json"])
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def load_reasoning_retention(ws: str | Path, principal_id: str) -> bool:
@@ -149,6 +157,7 @@ async def get_settings(request: Request) -> dict[str, Any]:
     ws = _ws(request)
     answer: SettingsView = {
         "settings": _load(ws, principal.principal_id),
+        "revision": settings_revision(ws, principal.principal_id),
         "status": {
             "vault": vault_status(ws),
             "mfa_enrolled": AccountService(ws).mfa_enrolled(principal.principal_id),
@@ -188,12 +197,42 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
             detail=notification_refusal,
         )
     stored = _load(ws, principal.principal_id)
+    # 13.2 #6 — a save from a stale read. The page says which keys it changed
+    # and what they held when it read them. If another surface has since
+    # changed one of *those*, this is a real conflict and nothing is written;
+    # otherwise the save applies its own changes on top of what is stored now,
+    # rather than putting back the whole document it read.
+    merged_keys: list[str] = []
+    incoming = dict(body.settings)
+    if (
+        body.expected_revision is not None
+        and body.expected_revision != settings_revision(ws, principal.principal_id)
+    ):
+        base = dict(body.base or {})
+        # A key someone else changed is a conflict only if this save wants it
+        # to be something else again; arriving at the same value is agreement.
+        conflicts = sorted(
+            key
+            for key, value in base.items()
+            if stored.get(key) != value and stored.get(key) != incoming.get(key)
+        )
+        if conflicts:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"reason_code": "settings_conflict", "keys": conflicts},
+            )
+        changed = {key: incoming[key] for key in base if key in incoming}
+        removed = [key for key in base if key not in incoming]
+        merged_keys = sorted(key for key in stored if stored.get(key) != incoming.get(key) and key not in base)
+        incoming = {**stored, **changed}
+        for key in removed:
+            incoming.pop(key, None)
     # BUG-256 — the `voice` section has two editors: the Voice settings section
     # and the speech runtime row on the Models page. This route replaces the
     # whole blob with whatever the page last read, so leaving `voice` in it would
     # let a save here silently revert an address configured on the other surface.
     # `/api/speech/runtime` is its only writer, and it validates the address.
-    settings = dict(body.settings)
+    settings = incoming
     if "voice" in stored:
         settings["voice"] = stored["voice"]
     else:
@@ -202,7 +241,11 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
     SQLiteStore(ws).put_user_settings(
         principal.principal_id, json.dumps(settings), utc_now()
     )
-    answer: SettingsSaved = {"settings": settings}
+    answer: SettingsSaved = {
+        "settings": settings,
+        "revision": settings_revision(ws, principal.principal_id),
+        "merged_keys": [key for key in merged_keys if key != "voice"],
+    }
     return serialize_dto(answer)
 
 

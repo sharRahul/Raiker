@@ -91,6 +91,25 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-05 (fourth round). Ten more decision-record
+> steps closed.** DEC-24 step 5: Raiker makes its own backups — an encrypted
+> snapshot through SQLCipher's export with a manifest of checksum, schema and
+> contents ([FIXED-789](FIXED_ITEMS.md#fixed-789--the-lock-screen-said-to-restore-from-a-backup-raiker-never-made)), verified on demand and named *Damaged* or *Unreadable*
+> when it no longer checks out ([FIXED-791](FIXED_ITEMS.md#fixed-791--a-backup-could-rot-on-disk-and-still-look-like-a-backup)), and restored as a separate workspace
+> without touching the running one ([FIXED-792](FIXED_ITEMS.md#fixed-792--there-was-no-way-back-from-a-backup-that-did-not-touch-the-workspace)). DEC-17 step 8: a database is
+> snapshotted before a migration changes it ([FIXED-790](FIXED_ITEMS.md#fixed-790--an-upgrade-changed-the-database-with-nothing-to-go-back-to)). §13.2 item 6 for
+> Settings: saves carry a revision, merge where nobody else changed a key and are
+> refused with the keys where somebody did ([FIXED-793](FIXED_ITEMS.md#fixed-793--two-pages-saving-settings-kept-whichever-saved-last)). DEC-21 Notifications: a
+> repeated notice is counted, not re-raised ([FIXED-794](FIXED_ITEMS.md#fixed-794--a-monitor-that-tripped-every-pass-raised-a-new-notice-every-pass)), and the record says what
+> happened to each ([FIXED-795](FIXED_ITEMS.md#fixed-795--the-record-did-not-say-what-happened-to-a-notice)). DEC-24 step 1: the scheduler's queue age and depth
+> are on *Needs your attention* ([FIXED-796](FIXED_ITEMS.md#fixed-796--work-stuck-in-the-schedulers-queue-was-nowhere-on-the-overview)). DEC-12 step 6: a routine's own
+> tool-call limit ([FIXED-797](FIXED_ITEMS.md#fixed-797--one-run-of-a-routine-had-no-tool-call-limit-of-its-own)). DEC-19 step 5: every capture has a manifest entry
+> ([FIXED-798](FIXED_ITEMS.md#fixed-798--a-screenshot-did-not-say-which-build-took-it)); first-run setup's backup now uses the same verified
+> snapshot ([FIXED-800](FIXED_ITEMS.md#fixed-800--first-run-setups-backup-copied-the-live-database-file)). The live round found [FIXED-799](FIXED_ITEMS.md#fixed-799--a-restored-folders-path-came-back-as-redacted_secret) and filed BUG-323 (restoring from
+> the lock screen). DEC-21b (GitHub.com OAuth) still needs the owner's
+> registered OAuth application; RR-AUTHORITY-01, RR-INSTALL-01, RR-DESIGN-01,
+> RR-VERIFY-01 and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-05 (third round). Ten more decision-record
 > steps closed, starting with the owner's DEC-21a.** Quiet hours are a server
 > policy decided when each notice is written and stored beside it, obeyed by the
@@ -1813,6 +1832,10 @@ cleanup tests for every supported runtime type.
 > safe boundary at its limit (default 60 minutes, owner-set 1–720) and counts as
 > a cycle that did not complete. Per-run tool and cost limits remain.
 >
+> **2026-10-05 (fourth round).** Step 6's per-run tool limit closed as
+> [FIXED-797](FIXED_ITEMS.md#fixed-797--one-run-of-a-routine-had-no-tool-call-limit-of-its-own): 1–1000 tool calls, set in **Will it run?** and said by the doctor.
+> Per-run cost limits remain.
+>
 > **2026-10-05 (second round).** Step 7 closed as [FIXED-764](FIXED_ITEMS.md#fixed-764--stopping-a-parent-task-left-the-work-it-had-delegated-running): pause, resume and stop
 > carry down the delegation tree, each child recording the decision it came
 > from. Step 5 closed as [FIXED-766](FIXED_ITEMS.md#fixed-766--a-routine-that-worked-but-whose-notice-failed-said-nothing-about-it): a finished background task records
@@ -2049,6 +2072,11 @@ between approval and execution. All must fail before effect.
 
 ## DEC-17 — Make installers own the supported application runtime
 
+> **2026-10-05 (fourth round).** Step 8's backup closed as [FIXED-790](FIXED_ITEMS.md#fixed-790--an-upgrade-changed-the-database-with-nothing-to-go-back-to): before
+> the migration runner changes an existing database it takes a verified
+> snapshot, keeping the last three. Declaring the oldest supported rollback and
+> refusing an unsafe downgrade remain with step 7's staged update.
+
 **Decision:** Supported desktop installers carry or install into an app-owned,
 versioned runtime and only the dependencies needed to run Raiker. Host Python or
 developer tools are not release prerequisites.
@@ -2111,6 +2139,10 @@ keyboard/focus parity, no duplicate API requests, no lost draft/state and a
 documented module ownership map.
 
 ## DEC-19 — Make accessibility and evidence release criteria
+
+> **2026-10-05 (fourth round).** Step 5 closed as [FIXED-798](FIXED_ITEMS.md#fixed-798--a-screenshot-did-not-say-which-build-took-it): `capture.ts`
+> records each capture's commit (and whether the working tree differed), viewport,
+> theme, route and test in its folder's `manifest.json`.
 
 **Decision:** A release candidate is incomplete until populated and failure
 states pass automated and manual accessibility/responsive review. Screenshots
@@ -2332,6 +2364,9 @@ symbols and tests rather than relying on line numbers that drift after edits.
    revision or equivalent optimistic concurrency. Return a conflict instead of
    overwriting newer state. Idempotency keys are owner-scoped and payload-bound;
    a reused key with changed arguments is refused.
+   *2026-10-05:* Settings saves carry an expected revision and are refused
+   `409 settings_conflict` where another save changed the same key ([FIXED-793](FIXED_ITEMS.md#fixed-793--two-pages-saving-settings-kept-whichever-saved-last));
+   other configuration mutations remain.
 7. **Recovery and effect uncertainty:** A crashed command/message may have
    completed externally before its receipt was saved. Represent
    `outcome_unknown`, reconcile, then obtain an explicit retry decision if
@@ -2365,6 +2400,11 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > "route test and real delivery through the same outbox" closed as [FIXED-779](FIXED_ITEMS.md#fixed-779--every-kind-of-notice-interrupted-or-none-did) and
 > [FIXED-780](FIXED_ITEMS.md#fixed-780--there-was-no-way-to-see-what-a-notice-would-do). DEC-21b (GitHub.com OAuth) remains open: it needs a registered GitHub
 > OAuth application, whose client identity is the owner's to supply.
+>
+> **2026-10-05 (fourth round).** The Notifications row's deduplication and
+> delivery timeline closed as [FIXED-794](FIXED_ITEMS.md#fixed-794--a-monitor-that-tripped-every-pass-raised-a-new-notice-every-pass) and [FIXED-795](FIXED_ITEMS.md#fixed-795--the-record-did-not-say-what-happened-to-a-notice). Web access's "stale revision
+> refuses save" closed for every Settings page as [FIXED-793](FIXED_ITEMS.md#fixed-793--two-pages-saving-settings-kept-whichever-saved-last). DEC-21b still waits
+> on the owner's OAuth client ID.
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2601,6 +2641,15 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > successful tick" for the indexes) and a damaged one is on the attention list
 > ([FIXED-783](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold)). Quarantine of a damaged database file remains: it needs step 5's
 > backup and restore to have anything to restore from.
+>
+> **2026-10-05 (fourth round).** Step 5 closed for the snapshot, manifest,
+> encryption, verification and restore into a new location ([FIXED-789](FIXED_ITEMS.md#fixed-789--the-lock-screen-said-to-restore-from-a-backup-raiker-never-made),
+> [FIXED-791](FIXED_ITEMS.md#fixed-791--a-backup-could-rot-on-disk-and-still-look-like-a-backup), [FIXED-792](FIXED_ITEMS.md#fixed-792--there-was-no-way-back-from-a-backup-that-did-not-touch-the-workspace)): the backup is written by `sqlcipher_export` straight into
+> an encrypted file, so there is no plaintext staging, and the key's custody is
+> the workspace's own `.raiker/app.key`, which the page says to keep. Applying
+> deletion tombstones after a restore and switching over atomically remain, as
+> does restoring from the lock screen (BUG-323), which step 6's quarantine
+> needs. Step 1's queue age and depth closed for the scheduler ([FIXED-796](FIXED_ITEMS.md#fixed-796--work-stuck-in-the-schedulers-queue-was-nowhere-on-the-overview)).
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.

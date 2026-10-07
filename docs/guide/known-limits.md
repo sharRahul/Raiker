@@ -180,3 +180,13 @@ browser behavior in the
 [live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md). Screenshots
 are supporting evidence for a dated run, not proof that later builds remain
 unchanged.
+
+## Personal-agent direction and current availability
+
+Raiker is moving towards durable personal goals, opt-in proactive checks and
+verified cross-service work. A dedicated goal coordinator and standing-intent
+monitor remain planned, and web access does not provide interactive browser
+control. Current background work requires the Raiker host to be awake and
+running. Reusable learned workflows are not automatically activated.
+See [current personal-agent use](tasks-and-projects.md#using-raiker-as-a-personal-agent)
+and the [delivery stages](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).

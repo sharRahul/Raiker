@@ -10,6 +10,12 @@ permissions, Chat, Build, tasks, extensions, host management, security,
 limitations, and troubleshooting. These pages are also served inside Raiker
 under **Utilities → Guide**.
 
+Raiker's personal autonomous-agent direction brings these workflows together
+around durable goals and useful verified outcomes. Start with the
+[current personal-agent workflow](guide/tasks-and-projects.md#using-raiker-as-a-personal-agent),
+then the [target architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [staged delivery plan](plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+
 Useful starting points:
 
 - [Getting started](guide/getting-started.md)
@@ -29,6 +35,7 @@ Canonical technical references:
 
 | Question | Document |
 |---|---|
+| How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries? | [Security architecture](architecture/SECURITY_ARCHITECTURE.md) |

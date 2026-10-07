@@ -457,3 +457,68 @@ background-agent run now ends with a user-visible reason (**FIXED-13**), a
 task run no longer appears among the owner's own conversations — those are on
 **Threads**, and task sessions are in Observability → Sessions (**FIXED-15**) —
 and approving a task the agent proposed now creates it (**FIXED-106**).
+
+## Using Raiker as a personal agent
+
+Raiker's personal-agent direction brings your context, goals, tasks and results
+together. Today you can use Chat, memory, projects, scheduled/background tasks
+and supported connectors. A dedicated durable goal coordinator, standing-intent
+monitoring and general browser automation remain planned. This page explains
+current workflows and marks the target clearly.
+
+### Start with an outcome
+
+Tell Raiker what you want to finish, which inputs it should use and what would
+make the result useful. For example: “Compare these three vendor documents,
+make a table with price and support terms, and save a report with source links.”
+Name constraints such as deadline, relevant accounts and whether you want a
+draft or a real external action. Raiker's tools still follow your permissions;
+a goal or attached document does not approve a send or purchase.
+
+Use [Chat](working-in-chat.md) for general work and
+[Build](working-in-build.md) for code. A [project](tasks-and-projects.md)
+groups related work. Current Chat recall is account-wide; putting work in a
+project does not by itself restrict what the conversation can recall.
+
+### Continue work and repeat it
+
+Use **Tasks → Plan work** to run once, start a background agent, schedule one
+run or create a routine. Review its thread to see results and steer future
+cycles. Each cycle remains governed. Raiker must be running on an awake host;
+a schedule is not a cloud service. See [Tasks and projects](tasks-and-projects.md)
+for missed runs, timezone, budgets, delegated work and **Will it run?**.
+
+Use the task controls to pause/continue/stop where offered, and the global STOP
+control to request cancellation across work. A step already underway may finish
+before stopping. Read the actual outcome and committed effects in its thread;
+a lost notice does not mean the task failed or should be repeated.
+
+### Give context deliberately
+
+Set your timezone in Settings and review [Memory](memory.md) for capture,
+recall, corrections, retention and forget/purge. Connect only the services and
+accounts your workflow needs. Review the proposed action's destination and
+arguments when approval is requested. A model may be local, private-network or
+hosted; check where your context will be sent in
+[Connecting a model](connecting-a-model.md).
+
+Quiet hours hold interruptions according to your settings; they do not approve
+work or stop the scheduler. Held decisions remain in the inbox. See
+[Permissions and the runtime](permissions-and-runtime-modes.md).
+
+### What the next personal-agent stages will add
+
+The target is a goal record with explicit success criteria, a durable plan and
+linked tasks that survive restarts; inspectable personal preferences; opt-in
+proactive checks; provider-confirmed effects; and proposed reusable skills from
+verified work. You should see what is progressing, what needs your decision,
+what finished and what remains blocked. These are planned outcomes, not controls
+available in the current interface.
+
+Current web access reads and extracts web content; it cannot click or fill
+forms in an interactive browser. Supported connectors have their own limits,
+and a local reminder or calendar record is not evidence of an external service
+change. Check [Known limits](known-limits.md) before relying on a workflow.
+
+Developers can follow the [architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).

@@ -547,3 +547,13 @@ tests.
 **Design north star in one line:** Raiker should look like what it is — the flight deck
 of a governed agent, where every switch is guarded, every action is recorded, and the
 human is always the pilot in command.
+
+## Personal-agent goal overview target
+
+PAA-07 adds goal references/progress to existing Chat/Build/Tasks/Projects,
+Approvals and Activity rather than a new authority-bearing work mode. Home
+should answer what is progressing, waiting on the owner, completed, failed and
+due next. Goal detail shows success criteria, plan/tasks, usable artifacts,
+verified receipts, named blockers, budgets and pause/resume/stop. Delivery
+failure is distinct from work failure. Planned controls stay hidden until their
+routes and executors exist. See [the target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

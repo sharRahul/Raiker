@@ -1,5 +1,11 @@
 # Raiker plans — current-status index
 
+The [personal autonomous-agent delivery plan](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
+owns accepted PAA-01–PAA-11 work and PA-S01–PA-S08 outcome evidence. It extends
+Raiker's four pillars with durable goals, personal context, bounded proactivity
+and verified work. [The architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+marks current foundations separately from target contracts.
+
 `docs/plans/` contains **current ledgers** and the **topic reviews that still have
 work in them**. Do not assume the newest paragraph inside every old review is the
 current product state.

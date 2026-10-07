@@ -679,3 +679,14 @@ References: [entry registry](../../raiker/runtime/authority/entry_paths.py),
 **Evidence required.** For each changed/claimed entry path, retain a pinned call-chain reference and executable positive, deny/off, revoked-grant, stale-approval, cancellation and restart cases. Correlate initiator, capability, decision, human authorizer, executor and durable receipt with file hashes or an independent destination log. Check no effect occurred on denial, not merely that the API returned a refusal. Include approvals resumed from another tab/scheduler and extension-produced hostile instructions. Measure stop acknowledgement separately from process/network cessation and record non-cancellable effects.
 
 **Acceptance boundary.** Unit tests and scripted routers prove specified mechanics; real routed trials prove user-entry behavior. Neither proves a competitor has weaker controls. Update this inventory only for actual reachable paths; route newly reproduced defects to TO_BE_FIXED and record implementation closures separately.
+
+## Planned personal-agent entry paths — 2026-10-07
+
+PAA-02/04/06/09/10 must extend this enumeration when goal steps, proactive
+triggers, browser actions, learned procedures or host/channel adapters actually
+land. Each path must trace owner/goal/envelope → fresh machine turn → broker →
+policy/RuntimeAuthority → scoped credential/executor → effect receipt/audit.
+Reuse current task/channel paths where applicable; do not assert a new path is
+implemented until reachable code and revoke/deny/Stop tests exist. The
+[target spec](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) introduces no
+additional authority route by itself.

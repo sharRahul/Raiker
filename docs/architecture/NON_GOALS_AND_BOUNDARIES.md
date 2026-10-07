@@ -223,3 +223,16 @@ Before coding, confirm:
 - [ ] Failure modes are specified.
 - [ ] Tests are listed in `docs/architecture/ACCEPTANCE_TESTS_BY_PHASE.md`.
 - [ ] No non-goal is violated.
+
+## Accepted personal-agent direction — 2026-10-07
+
+[ADR-0001](../adr/ADR-0001-personal-autonomous-agent.md) makes bounded personal
+goal coordination, owner-controlled proactivity and reviewed workflow learning
+explicit product goals. This does not remove the boundaries above: no
+unrestricted browser, arbitrary workers, silent hosted egress, self-granted
+authority or unreviewed plugin/skill execution. Phase 1 exclusions remain
+historical phase constraints rather than present product-wide bans.
+
+A future isolated browser is ADD-23; off-machine gateway reach remains ADD-11.
+Neither is activated here. The [target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+defines one-runtime goal coordination and its stage gates.

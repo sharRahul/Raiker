@@ -233,3 +233,13 @@ Tests must prove:
 - artifact metadata includes checksum;
 - cancellation emits events;
 - dashboard can list configured and unconfigured execution profiles.
+
+## Personal-agent host and browser target
+
+A personal goal's lifetime is distinct from its tool environment and inference
+location. Existing local scheduling requires a running host; PAA-10 may qualify
+an explicitly selected always-on private host with authenticated reconnect,
+heartbeat and Stop/revoke evidence. It does not enable hosted multi-user service.
+ADD-23/PAA-06 owns isolated browser sessions and bounded actions; the existing
+web fetcher is not an interactive browser or persistent VM. See
+[the target architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

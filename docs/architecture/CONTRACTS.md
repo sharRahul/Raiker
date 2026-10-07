@@ -37,3 +37,14 @@ owner decides.
 
 A **critical** approval never reaches the relay. It keeps the human-only,
 step-up-verified lifecycle in `RuntimeAuthority.resolve_critical_approval`.
+
+## Proposed personal-goal contracts
+
+The [target contracts](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#proposed-durable-contracts)
+define logical Goal, Goal step, Delegation envelope, Standing intent, Personal
+context reference, Effect receipt and Outcome assessment records. PAA-01/02/08
+must supply concrete versioned schemas, owner-scoped migrations and concurrency
+checks before implementation. Reuse task/session/action/approval IDs by reference.
+Envelope scope intersects current authority and never replaces policy or grants
+human roles. Keep unknown external effects distinct from confirmed results.
+These proposed records are not classes implemented by the current runtime.

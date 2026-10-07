@@ -128,3 +128,15 @@ a new path appears beside the governed ones and nothing breaks.
   [LOCAL_VALIDATION_GATE.md](LOCAL_VALIDATION_GATE.md).
 - **The manual browser round.**
   [`plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md`](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md).
+
+## Personal-agent verification target
+
+Use PA-S01–PA-S08 in the
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) for durable
+goals, personal recall, proactive usefulness, real connector effects, isolated
+browser, reviewed skills, coding and channel continuity. Faults include restart,
+lease races, provider ambiguity, changed approvals, Stop and revoked credentials.
+Record fixtures, validators, version/configuration, actual host/model/service,
+traces, receipts, interventions, limits and outcomes. Separate component tests,
+end-to-end evidence and identical-task competitor tests using existing CR rules.
+No new live or competitive run was performed for the documentation direction.

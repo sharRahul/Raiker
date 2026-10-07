@@ -1162,3 +1162,17 @@ Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_
 | CR-10/12: first use and polish | Users can start, approve, recover and find results without avoidable friction | At least three first-time evaluators, action/help counts, exact UI configuration, accessibility/state-transition evidence |
 
 **Stop criteria.** Stop the affected scenario if an unauthorised effect or leakage occurs, preserve evidence and file the failure. A budget/timeout exhausted run is recorded according to the predeclared rule, not rerun until green. A blocked environment is not a product failure. Do not issue a competitive conclusion until the reviewer can follow the complete evidence chain.
+
+## 23. Personal-agent scenario procedure — planned
+
+Use [PA-S01–PA-S08](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md#scenarios-to-demonstrate)
+when their PAA prerequisites land. Begin from pinned clean fixtures and declared
+owner accounts, host/inference/execution locations, budgets and permissions.
+Exercise the actual user surface, preserve work through approval/restart faults,
+verify effects independently at the destination, and distinguish task, goal,
+artifact and notification outcomes. Test Stop/revocation and uncertain provider
+results before claiming reliable unattended work.
+
+Record every attempt with PAA/CR IDs under the existing round procedure. Follow
+the CR protocol for exact named competitor surfaces; do not count scripted tool
+replays as autonomous tests. These procedures have not been run for this update.

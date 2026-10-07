@@ -135,3 +135,13 @@ not auto-enable.
 a real verifier, memory writes enabled under governance (currently disabled,
 `raiker/memory/readiness.py`), and the skills/extensibility surface
 (`docs/architecture/EXTENSIBILITY_MODEL.md`). Until those exist, this doc is the contract to build against.
+
+## Personal-agent workflow learning
+
+PAA-09 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
+adopts reusable procedural learning inspired by Hermes and Claude skills. It
+begins with an independently verified outcome, proposes a versioned
+instruction-only skill, measures it on fresh fixtures, and requires owner
+review/activation of its dependencies and permission diff. Revocation/rollback
+remain explicit. ADD-05/06/21 retain their own work; this target enables no
+runtime self-improvement, code installation or self-granted permission.

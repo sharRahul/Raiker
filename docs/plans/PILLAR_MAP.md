@@ -19,7 +19,7 @@ fourth is what the other three run on.
 | # | Pillar | What "done" means |
 |---|---|---|
 | [**P1**](#p1--a-polished-ai-assistant) | **A polished AI assistant** | Chat is the surface someone chooses over a hosted assistant for daily work — not because it is governed, but because it is good |
-| [**P2**](#p2--a-governed-ai-agent) | **A governed AI agent** | Every action is policy-aware, observable, auditable, approval-driven, least-privileged, human-governed, recoverable, verifiable and fail-closed — as properties of the runtime, never as a layer around it |
+| [**P2**](#p2--a-governed-ai-agent) | **A governed personal autonomous agent** | Durable goals, personal context, bounded proactive work and verified outcomes; every action is policy-aware, observable, auditable, approval-driven, least-privileged, human-governed, recoverable, verifiable and fail-closed — as properties of the runtime, never as a layer around it |
 | [**P3**](#p3--a-capable-codingbuild-agent) | **A capable coding/build agent** | Build reads a repository, makes the change, runs the tests, reads the failure and iterates to green, in one governed session |
 | [**P4**](#p4--an-extensible-governed-agent-platform) | **An extensible governed agent platform** | Tools, skills, plugins, hooks, channels, MCP and models extend Raiker **without any of them gaining a route around governance** |
 
@@ -308,3 +308,21 @@ References: [current plan index](README.md),
 | Model choice | Same supported workflows across declared local/private/hosted configurations | CR-02: support matrix, real tool-using completions, routing/egress records and failures/fallbacks; distinguish cloud-backed Ollama from local inference |
 
 Map work to existing canonical BUG/ADD/DEC records. Prioritise completed work and recovery, then reliable integrations/memory/scheduling and declared model coverage; do not use this order to bypass earlier security or runtime dependencies. Attach evidence levels per scenario, not a single maturity label to the whole pillar.
+
+## Personal-agent outcomes and dependencies — 2026-10-07
+
+The four pillars now serve the [personal-agent direction](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+New work is tracked in the [PAA plan](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md),
+not silently inserted into older “done” assessments.
+
+| Pillar | Added outcome responsibility | PAA dependencies |
+|---|---|---|
+| P1 Assistant | Relevant inspectable personal context and usable progress/results | PAA-03/07 |
+| P2 Personal autonomous agent | Durable goals, bounded proactivity, safe recovery and independently verified outcomes | PAA-01/02/04/08 |
+| P3 Coding/build agent | Coding is a personal-goal workflow with repository validation and clear handoff | PAA-02/07/08; existing GAP-BUILD |
+| P4 Platform | Confirmed connector effects, isolated browser, channels and reviewed reusable procedures | PAA-05/06/09/10; existing ADD dependencies |
+
+PAA-11 verifies the advertised host/model configurations and competitive claims.
+Work in phase dependency order without bypassing unresolved release defects or
+existing deployment/security decisions. A target acceptance does not supersede
+historical evidence or imply feature completion.

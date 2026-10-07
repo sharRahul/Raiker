@@ -11,6 +11,7 @@ Prefer these when another technical document disagrees:
 
 | Question | Canonical document |
 |---|---|
+| What is the personal-agent target and how does it reuse the runtime? | [Personal autonomous-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | What are the components and governed action flow? | [Architecture](ARCHITECTURE.md) |
 | What is implemented right now? | [Implementation status](IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries and fail-closed controls? | [Security architecture](SECURITY_ARCHITECTURE.md) |
@@ -23,6 +24,11 @@ Prefer these when another technical document disagrees:
 The comparison matrix lives only in
 [Reference platform compatibility](REFERENCE_PLATFORM_COMPATIBILITY.md).
 Historical review passes belong in [Reference review log](REFERENCE_REVIEW_LOG.md).
+
+The personal-agent direction is accepted by
+[ADR-0001](../adr/ADR-0001-personal-autonomous-agent.md). Its
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) owns new PAA
+work; existing implementation status and known limits remain authoritative.
 
 ## Product surfaces
 

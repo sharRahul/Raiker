@@ -534,3 +534,13 @@ Tests must prove:
 - rate limit works;
 - unlink revokes local capability but preserves audit history;
 - enabled interfaces use equal gateway contracts and do not bypass policy.
+
+## Personal-goal continuity target
+
+PAA-10 links a paired channel request and supported result delivery to the same
+owner/goal/task history as the dashboard. Authenticated ingress must preserve
+sender, account, target and request deduplication. External text cannot enable
+gates, broaden scope or approve an unrelated action. Existing channel approval
+limits remain authoritative. Always-on private hosting and new off-machine
+transport require explicit support/evidence; ADD-11 remains its own proposal.
+See [the personal-agent spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

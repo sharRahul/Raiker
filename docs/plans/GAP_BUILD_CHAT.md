@@ -1,7 +1,7 @@
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI
-assistant, a governed AI agent, **a capable coding/build agent**, and an
+assistant, a governed **personal autonomous agent**, **a capable coding/build agent**, and an
 extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
@@ -930,3 +930,18 @@ for the recorded B20 policy. This addendum changes no completion status.
 | Shared experience | User can start, approve, recover and find results without unnecessary re-prompts | CR-10/12: first-time-user observations plus keyboard/responsive/state-transition evidence |
 
 **Acceptance.** Run identical natural-language repository tasks against named Codex, Cursor and Claude Code configurations; use the Claude app only for labelled assistant journeys. Five clean trials per model-driven task/configuration, all failures retained, matched-model and native-product results separated. Do not equate the earlier predetermined edit replays with this requirement. Confirm results through the manual procedure and record them in LIVE_TEST_ROUNDS; no new run is asserted here.
+
+## Personal-agent direction — 2026-10-07
+
+The owner accepted the [personal-agent architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+inspired by Muse.ai, Claude.ai, OpenClaw and Hermes Agent. New durable goals,
+context, proactivity, outcome verification and reviewed learning work is owned
+by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Existing items in
+this ledger keep their status, dependencies and evidence; accepting the target
+does not close a defect or mark an ADD shipped. Browser ADD-23, off-machine
+ADD-11, memory ADD-25 and self-improvement ADD-05/06 retain their own boundaries.
+
+Personal-agent release claims require the relevant PA-S scenarios and existing
+CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
+Git OAuth scope, model choice and coding quality. New observations go to the
+proper defect/evidence ledger; do not duplicate the PAA backlog here.

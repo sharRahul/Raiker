@@ -178,3 +178,10 @@ Both are tracked in
 
 A test keeps this honest rather than a promise: see
 [`../VERIFICATION_PLAN.md`](../architecture/VERIFICATION_PLAN.md).
+
+## Personal-agent target
+
+[Personal autonomous-agent target](personal-autonomous-agent.md) covers proposed
+goal coordination, personal context, proactive triggers, browser/connector
+effects, recovery and learning. It is a design prerequisite and test map, not
+an acknowledgement record for a new gate or a claim that the target is shipped.

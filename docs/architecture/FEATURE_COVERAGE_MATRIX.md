@@ -33,3 +33,13 @@
 
 Strict non-allow blocking, role revoke governed, and capability gate per action
 are enforced. The detailed current posture is [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+
+## Personal-agent coverage boundary
+
+The [target architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) reuses current
+Chat/Build, tasks/routines, memory, models and governed connectors. Dedicated
+goals, standing intents, aggregate goal budgets and workflow-level outcome
+verification are contract_only target design, not shipped feature checkmarks.
+Interactive browser control remains disabled_deferred under ADD-23. PAA-01–11
+in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) define
+what must land and be evidenced before extending this matrix.

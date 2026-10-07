@@ -29,3 +29,14 @@ turn identity only as separate context.
 Executors must validate arguments, keep output safe for audit, and refuse work
 outside their documented scope. The complete visible command surface is in the
 [tool and plugin catalog](RAIKER_TOOL_AND_PLUGIN_CATALOG.md).
+
+## Personal delegation and concrete effects
+
+A future personal-goal envelope is an owner-defined restriction of existing
+permission, never blanket consent. Accounts, destinations, resource paths,
+environment, expiry, version and budget must bind the covered scope. Browser
+clicks and connector calls are classified by resulting effects, not tool names.
+Changed approved arguments require the current governing decision path again;
+revoked authority fails before execution. Existing ask/allow/auto/deny and
+critical actions stay authoritative; Muse defaults are not adopted. PAA-05/06
+and the [target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own new workflows.

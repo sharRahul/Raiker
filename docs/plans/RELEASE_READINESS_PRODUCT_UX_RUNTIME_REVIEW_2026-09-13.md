@@ -3727,3 +3727,21 @@ off-machine features. PA-S01/02/03/04/07 are required for an advertised complete
 personal-agent scope; optional browser/channel/learning claims require their
 additional scenarios. This target does not reopen settled owner decisions,
 activate deployments or convert historical evidence into competitive proof.
+
+## Release verification decision — 2026-10-08
+
+Implementation of PAA items is not sufficient for release. The
+[release acceptance protocol](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) defines
+RR-01–RR-36, independent expected outcomes, certified configuration coverage,
+security/privacy negative cases, five clean model-driven trials, 72-hour soak,
+first-use/accessibility and explicit GO/NO-GO gates. Existing DEC decisions and
+live records retain their scope; no prior result is upgraded to a release pass.
+
+A personal-agent release needs baseline B and personal-agent P scenarios; W/C/L
+are mandatory when browser/channel/learning claims are advertised. Missing,
+blocked, failed or unverified mandatory evidence prevents GO. No open P0/P1,
+false completion, duplicate consequential effect or authority/privacy breach may
+be waived. Define versioned support scope and residual limitations before tests;
+competitor benchmarking is required for parity claims, not basic release.
+Current verdict under the new protocol is NOT ASSESSED until actual candidate
+runs and an independent reviewer complete RR-36.

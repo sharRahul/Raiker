@@ -114,3 +114,32 @@ connector workflows, polling sources/frequency, goal retention defaults,
 budget reservation/unknown-price policy and optional always-on host profiles.
 These are delivery choices, not unanswered permission questions blocking this
 documentation update. No undocumented activation or implied production support.
+
+## Release qualification beyond feature completion — 2026-10-08
+
+[RR-01–RR-36](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) extend PA-S briefs into a
+candidate release protocol. Every implementation needs component tests plus
+real entry-point/outcome proof at the advertised configuration. PAA-11 owns the
+complete candidate scorecard and evidence collection; an independent release
+reviewer owns final GO/NO-GO. All new RR cases start not run, with overall verdict
+NOT ASSESSED. Historical rounds and component statuses remain unchanged.
+
+| PAA ownership | Required release scenarios |
+|---|---|
+| PAA-01/02 durable goals/coordinator | RR-02/03/06/11/12/13/20/21/22/23/26 |
+| PAA-03 personal context | RR-10/13/14/15/16 |
+| PAA-04 proactivity | RR-08/17/18/19/20/22 |
+| PAA-05/08 connector effects and verification | RR-05/07/09/12/14/15/23/24/25/34 |
+| PAA-06 browser | RR-29 plus RR-11–15/21/23/24 |
+| PAA-07 usable progress/results | RR-05/06/21/26/28/33/34 |
+| PAA-09 learning | RR-16/31/32 |
+| PAA-10 channels/private-host continuity | RR-04/17/21/22/30 |
+| PAA-11 release evidence | RR-01–04/10/27/28/33/35/36 and every applicable B+P/W/C/L result |
+
+Core personal-agent release requires baseline B+P cases and the earlier required
+PA-S scenarios. Optional claims require their own cases. Candidate installation,
+upgrade/restore, negative authority/privacy cases, restart/ambiguous effects,
+72-hour soak and first-use checks are mandatory in addition to useful workflow
+completion. Release scope can be honest and narrower than competitors; parity
+claims still require separate CR evidence. The protocol defines thresholds to
+freeze before execution; this update does not run it or declare release readiness.

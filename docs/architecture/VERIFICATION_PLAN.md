@@ -140,3 +140,19 @@ Record fixtures, validators, version/configuration, actual host/model/service,
 traces, receipts, interventions, limits and outcomes. Separate component tests,
 end-to-end evidence and identical-task competitor tests using existing CR rules.
 No new live or competitive run was performed for the documentation direction.
+
+## Release qualification after implementation
+
+Passing repository checks is the component/build gate, not a release verdict.
+[RR-01–RR-36](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) require actual
+candidate installation/upgrade/restore, useful personal/coding work, identity,
+privacy, permissions, scheduling, budgets, Stop, provider ambiguity, concurrency,
+72-hour soak, first use, accessible artifacts and truthful release handoff.
+Browser/channel/learning cases apply to advertised optional features.
+
+Freeze configurations and limits before testing, retain every attempt and
+independent effect/artifact validation, and use the documented repeat/latency/
+resource targets. Release requires all applicable mandatory cases plus PA-S
+acceptance and CI at the final candidate. Unrun or blocked mandatory cases are
+NO-GO; the initial protocol verdict is NOT ASSESSED. Competitive parity remains
+a separate CR benchmark and is not necessary to qualify an honest scoped release.

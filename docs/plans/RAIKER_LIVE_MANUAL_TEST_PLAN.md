@@ -1176,3 +1176,28 @@ results before claiming reliable unattended work.
 Record every attempt with PAA/CR IDs under the existing round procedure. Follow
 the CR protocol for exact named competitor surfaces; do not count scripted tool
 replays as autonomous tests. These procedures have not been run for this update.
+
+## 24. Release qualification run
+
+Execute [RR-01–RR-36](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) against a frozen
+candidate manifest, in addition to the applicable Smoke/Full sweep and PA-S
+procedures. The release scenario document owns fixture setup, steps, independent
+pass results, required evidence, repeats and timing/soak thresholds.
+
+1. Freeze advertised configurations, optional capability claims, artifact/hash,
+   synthetic fixtures, validators, consented test accounts and resource budgets.
+2. Run baseline B plus personal-agent P cases on every applicable certified
+   configuration. Add browser W, channel/remote C and learning L when advertised.
+3. Exercise each positive and negative variant, including effect-timeout barriers,
+   restart, stale approval, denial, account isolation and Stop. Check actual
+   effects and absence of forbidden effects independently, not just UI text.
+4. Retain all model-driven trials, actual provider/host/model details and stand-in
+   boundaries. Complete 72-hour soak and first-use/accessibility gates.
+5. Record one result per RR/variant/attempt/configuration in a linked scorecard
+   and actual run evidence in LIVE_TEST_ROUNDS. File reproduced defects normally.
+6. Re-run changed/affected cases after fixes, reconcile shipped docs and limits,
+   then record reviewer, exact candidate and GO/NO-GO. Mandatory blocked/unrun
+   work prevents GO; implementations and passing CI alone do not qualify release.
+
+These cases are procedures only. This documentation update runs no release
+qualification, changes no existing live-round outcome and activates no feature.

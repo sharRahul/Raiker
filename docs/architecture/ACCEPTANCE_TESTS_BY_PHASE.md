@@ -361,3 +361,23 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 ## Plain terminal client acceptance; Rich/native TUI deferred
 
 Plain terminal acceptance: `raiker` launches the line-oriented client; `raiker --prompt` submits one prompt and exits; `/help` and `/commands` are plain text; slash commands route through `handle_slash_command()`; prompts route through `submit_terminal_prompt()`. Rich/native TUI acceptance is deferred to Phase 8.
+
+## Personal-agent delivery and release acceptance
+
+The [PAA plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) adds staged
+personal-agent work without rewriting historical phase closures. Every new
+phase must add and pass the applicable
+[release scenarios](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md).
+
+| PAA stage | Release acceptance dependencies |
+|---|---|
+| A: contracts and durable goals | RR-02/03/06/13/25/26 plus existing contract/schema/migration tests |
+| B: coordinator, context and recovery | RR-05/06/07/10/11/12/14/15/16/20/21/22/23/24/26 |
+| C: proactivity, connectors and progress | RR-08/09/17/18/19/22/33/34 |
+| D: isolated browser and explicit continuity | RR-29/30 plus identity/permission/egress/recovery cases |
+| E: reviewed learning | RR-31/32 plus memory/privacy/activation/revocation cases |
+| Release candidate for declared scope | All applicable B+P rows, optional W/C/L claims, RR-01–04/27/28/35/36 and required PA-S scenarios |
+
+This mapping is a future acceptance obligation, not a record of tests run.
+Promotion to release requires a complete candidate scorecard and evidence,
+not only implementation completion or five documentation validators passing.

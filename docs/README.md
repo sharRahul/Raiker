@@ -59,6 +59,7 @@ Canonical technical references:
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
 - [Proposed additions](plans/TO_BE_ADDED.md)
+- [Release acceptance scenarios](plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) — candidate scope, RR-01–RR-36, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) and
   [test-round record](plans/LIVE_TEST_ROUNDS.md)
 - [Screenshot evidence](plans/screenshots/README.md)

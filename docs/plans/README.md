@@ -1,5 +1,10 @@
 # Raiker plans — current-status index
 
+The [release acceptance scenarios](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) own
+RR-01–RR-36, candidate/configuration coverage, independent pass criteria,
+reliability targets and the release GO/NO-GO scorecard. Specified scenarios are
+not executed results; current qualification under that protocol is NOT ASSESSED.
+
 The [personal autonomous-agent delivery plan](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
 owns accepted PAA-01–PAA-11 work and PA-S01–PA-S08 outcome evidence. It extends
 Raiker's four pillars with durable goals, personal context, bounded proactivity

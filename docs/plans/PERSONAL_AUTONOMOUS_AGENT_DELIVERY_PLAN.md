@@ -143,3 +143,19 @@ upgrade/restore, negative authority/privacy cases, restart/ambiguous effects,
 completion. Release scope can be honest and narrower than competitors; parity
 claims still require separate CR evidence. The protocol defines thresholds to
 freeze before execution; this update does not run it or declare release readiness.
+
+## PAA-07 UI and UX task decisions — 2026-10-08
+
+PAA-07 is decomposed into
+[UX-01–UX-12](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md), each with a detailed
+reason, accepted decision, alternatives, concrete work, dependencies,
+state/failure rules and acceptance evidence. The
+[UX spec](../architecture/PERSONAL_AGENT_UX_SPEC.md) owns interaction behavior;
+backend PAA contracts remain prerequisites rather than simulated frontend data.
+
+Wave 0 freezes shared state/read models and accessibility. Wave 1 improves intake,
+Home, approvals, result opening and recovery using real current paths. Wave 2
+adds goal detail, context and continuity as their PAA contracts land. Wave 3
+runs observed first-user and release qualification. Existing ADD-26 shell and
+manual Chat/Build work modes remain. UX tasks start planned/not run; no release
+or implementation state is upgraded by accepting their design.

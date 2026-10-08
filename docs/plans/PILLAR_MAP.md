@@ -326,3 +326,14 @@ PAA-11 verifies the advertised host/model configurations and competitive claims.
 Work in phase dependency order without bypassing unresolved release defects or
 existing deployment/security decisions. A target acceptance does not supersede
 historical evidence or imply feature completion.
+
+## Personal-agent usability task ownership — 2026-10-08
+
+[UX-01–UX-12](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) link reasons and decisions
+to implementable experience work. P1 owns understandable intake, personal
+context, progress and usable results (UX-02/03/07/08). P2 owns accurate goal and
+approval/recovery/control views (UX-04/05/06/09). P3 retains coding continuity
+and usable Build results (UX-07/10). P4 supplies shared read models and extension
+availability without new authority (UX-01). UX-11/12 apply accessibility and
+observed usability across all pillars. PAA-07 owns the resulting experience;
+backend dependencies and RR qualification are not bypassed by frontend polish.

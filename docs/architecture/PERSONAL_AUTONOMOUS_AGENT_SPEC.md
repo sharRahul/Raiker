@@ -223,3 +223,15 @@ records, and run identical declared scenarios on exact supported reference
 surfaces before asserting parity. No benchmark was performed for this update.
 Release wording remains “personal-agent direction” until the relevant goal,
 background, integration, memory and recovery scenarios have end-to-end evidence.
+
+## Detailed UI and UX implementation decisions — 2026-10-08
+
+The [UX specification](PERSONAL_AGENT_UX_SPEC.md) and
+[UX-01–UX-12 task plan](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) make the
+user-experience target implementable. They define outcome intake, Home sections,
+goal criteria/tasks, concrete approvals, schedule/host readiness, usable results,
+inspectable personal context, supported recovery, continuity and accessibility.
+PAA-07 retains outcome ownership; PAA-01/02/03/04/05/08/10 supply actual data and
+authority dependencies. No UI infers completion, readiness or allowed actions
+from model prose. Goal controls wait for backend contracts; existing work modes,
+model choice, lifecycle and permission decisions remain.

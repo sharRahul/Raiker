@@ -1,5 +1,11 @@
 # Raiker plans — current-status index
 
+The [personal-agent UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+owns UX-01–UX-12, with detailed reasons, decisions, alternatives, dependencies,
+state/failure behavior and acceptance. It extends existing surfaces under
+[the UX specification](../architecture/PERSONAL_AGENT_UX_SPEC.md); it does not
+mark planned controls implemented or reopen ADD-26's shared shell.
+
 The [release acceptance scenarios](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) own
 RR-01–RR-36, candidate/configuration coverage, independent pass criteria,
 reliability targets and the release GO/NO-GO scorecard. Specified scenarios are

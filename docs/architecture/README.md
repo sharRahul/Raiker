@@ -34,6 +34,7 @@ work; existing implementation status and known limits remain authoritative.
 
 | Topic | Document |
 |---|---|
+| Personal-agent journeys, states, decisions and results | [Personal-agent UX](PERSONAL_AGENT_UX_SPEC.md) and [implementation tasks](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) |
 | Build coding workspace | [Build workspace](BUILD_WORKSPACE_SPEC.md) |
 | Build turn protocol | [Raiker Build process](RAIKER_BUILD_PROCESS.md) |
 | Terminal commands and interactive mode | [Commands and interactive mode](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) |

@@ -35,6 +35,7 @@ Canonical technical references:
 
 | Question | Document |
 |---|---|
+| How should personal-agent UI/UX be implemented? | [UX specification](architecture/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) |
 | How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |

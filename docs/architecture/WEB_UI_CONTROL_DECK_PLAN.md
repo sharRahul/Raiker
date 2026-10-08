@@ -7,6 +7,22 @@
 
 ---
 
+## Personal-agent interaction direction — 2026-10-08
+
+The [personal-agent UX specification](PERSONAL_AGENT_UX_SPEC.md) and
+[UX-01–UX-12 implementation plan](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+now own target intake, Home, goals/tasks, approvals, background readiness,
+results, personal context, recovery and continuity. Each task records a reason,
+decision, alternatives, dependencies, state behavior and acceptance evidence.
+[ADR-0002](../adr/ADR-0002-personal-agent-user-experience.md) explains the choice.
+
+For future implementation, that target supersedes conflicting conceptual screen
+names/interaction flows below; shared shell, tokens, tested logic, existing
+navigation IDs and authority contracts remain. This is not a visual rewrite or
+a claim new goal/profile controls exist. ADD-26's implemented responsive shell
+is reused. Current implementation status and real API/lifecycle contracts govern
+what can be displayed and acted on.
+
 ## 0. Corrections applied to the draft plan
 
 The draft was verified claim-by-claim against the repository. These corrections are

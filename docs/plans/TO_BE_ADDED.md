@@ -1288,3 +1288,14 @@ Personal-agent release claims require the relevant PA-S scenarios and existing
 CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
 Git OAuth scope, model choice and coding quality. New observations go to the
 proper defect/evidence ledger; do not duplicate the PAA backlog here.
+
+## Personal-agent UX delivery — 2026-10-08
+
+The accepted [UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+owns UX-01–UX-12 with per-task reasons, decisions, alternatives, dependencies,
+states and evidence. The [UX spec](../architecture/PERSONAL_AGENT_UX_SPEC.md)
+defines target interactions. This is planned PAA-07 product work, not a new
+claim that the current UI is broken; observed defects retain BUG ownership.
+Reuse implemented ADD-26 shell/components. New goal/context/browser/channel
+controls remain unavailable until their backend contracts/executors exist.
+Close tasks only with observed interaction and independent outcome proof.

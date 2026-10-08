@@ -1201,3 +1201,20 @@ pass results, required evidence, repeats and timing/soak thresholds.
 
 These cases are procedures only. This documentation update runs no release
 qualification, changes no existing live-round outcome and activates no feature.
+
+## 25. Personal-agent UI and UX acceptance procedure
+
+Use [UX-01–UX-12](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) when their supported
+slices land. Record UX/RR IDs, actual contracts/configuration and decision under
+test. Run intake → progress → decision → result → recovery journeys without
+developer shortcuts; compare every displayed state/count/action to authoritative
+records and confirmed effects. Test keyboard/screen-reader, 200% zoom, both themes
+and declared widths, plus reload/back/two-tab/draft continuity.
+
+Exercise loading, empty, stale/offline, pending decision, partial, failed and
+unknown outcome; inspect focus and announcements during updates. Keep account,
+destination/cost/privacy facts visible while technical detail is expandable.
+Three first-time evaluators follow shipped guidance, with all help/interventions
+recorded and no manual repair counted as a pass. Put actual runs in LIVE_TEST_ROUNDS;
+mandatory RR-33/34/36 evidence still controls qualification. No new UX run is
+claimed by adding this procedure.

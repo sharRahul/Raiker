@@ -212,3 +212,24 @@ update defines scenarios; it does not execute them or declare Raiker ready.
 Competitive benchmarking is optional for release and mandatory only for parity
 or superiority claims. A qualified core release may defer W/C/L with explicit
 limits; advertised personal-agent core behavior cannot be omitted to earn GO.
+
+## Personal-agent UX task traceability — 2026-10-08
+
+The [UX task plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) makes usability
+changes implementable with reasons, decisions, alternatives and failure states.
+The following links extend expected evidence, not previously recorded results.
+
+| UX tasks | RR acceptance focus |
+|---|---|
+| UX-01 state/read-model inventory | RR-11/13/26/35: server-authoritative actions, scope, revisions and accurate claims |
+| UX-02/03 intake and Home | RR-01/05/06/10/19/22/26/28/33/34: useful start, accurate progress and findable outcomes |
+| UX-04/05 goals and approvals | RR-06/09/11/12/15/20/21/23/33: concrete criteria/effects, correct scope and safe continuation |
+| UX-06 schedule/readiness | RR-08/17/18/19/20/22/30: truthful availability, host/zone/budget and quiet-hours behavior |
+| UX-07/09 results and recovery | RR-05/07/09/15/22/23/24/25/26/34: opened result, preserved work and no blind replay |
+| UX-08/10 context and continuity | RR-10/12/13/14/15/16/26/30/33: correctable context, privacy and stable linked work |
+| UX-11/12 accessibility/usability | RR-19/21/28/33/34/35/36: usable decisions/Stop/results and independent qualification |
+
+RR-33 must capture whether first-time users understand what an approval changes,
+which account/destination is involved, why work waits and where a result can be
+opened, in addition to actual completion. UX tasks are planned/not run until
+implementation and evidence land; the overall release protocol remains NOT ASSESSED.

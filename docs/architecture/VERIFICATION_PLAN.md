@@ -156,3 +156,14 @@ resource targets. Release requires all applicable mandatory cases plus PA-S
 acceptance and CI at the final candidate. Unrun or blocked mandatory cases are
 NO-GO; the initial protocol verdict is NOT ASSESSED. Competitive parity remains
 a separate CR benchmark and is not necessary to qualify an honest scoped release.
+
+## UI and UX decision verification
+
+[UX-01–UX-12](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) contain per-task
+reason/decision and test obligations. For actual web changes run required lint,
+check, unit, build and mocked interaction suites, relevant API/backend contracts,
+then real served first-user, keyboard/screen-reader and outcome tests. Inspect
+loading/empty/waiting/partial/unknown/offline states, stale updates, cross-surface
+links and draft preservation. Map to RR-01/05/06/09/12/16/19/21/26/28/33/34/36;
+CR-10/12 additionally qualify competitive usability claims. Screenshot/source
+review alone cannot prove completion. This doc update runs no new user study.

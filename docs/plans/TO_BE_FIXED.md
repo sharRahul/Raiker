@@ -1,7 +1,7 @@
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI
-assistant, a governed AI agent, **a capable coding/build agent**, and an
+assistant, a governed **personal autonomous agent**, **a capable coding/build agent**, and an
 extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
@@ -2625,3 +2625,18 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 | BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |
 
 **Closure rule.** Add a reproducible failing case, implementation reference and executed regression result, plus live evidence where the claim concerns a live user/service path. Reuse earlier valid evidence by link and revision; do not relabel a closed defect open merely because comparative testing is missing. Unrun benchmark work is an evidence gap unless a product failure is reproduced.
+
+## Personal-agent direction — 2026-10-07
+
+The owner accepted the [personal-agent architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+inspired by Muse.ai, Claude.ai, OpenClaw and Hermes Agent. New durable goals,
+context, proactivity, outcome verification and reviewed learning work is owned
+by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Existing items in
+this ledger keep their status, dependencies and evidence; accepting the target
+does not close a defect or mark an ADD shipped. Browser ADD-23, off-machine
+ADD-11, memory ADD-25 and self-improvement ADD-05/06 retain their own boundaries.
+
+Personal-agent release claims require the relevant PA-S scenarios and existing
+CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
+Git OAuth scope, model choice and coding quality. New observations go to the
+proper defect/evidence ledger; do not duplicate the PAA backlog here.

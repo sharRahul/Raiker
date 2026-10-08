@@ -128,3 +128,42 @@ a new path appears beside the governed ones and nothing breaks.
   [LOCAL_VALIDATION_GATE.md](LOCAL_VALIDATION_GATE.md).
 - **The manual browser round.**
   [`plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md`](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md).
+
+## Personal-agent verification target
+
+Use PA-S01–PA-S08 in the
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) for durable
+goals, personal recall, proactive usefulness, real connector effects, isolated
+browser, reviewed skills, coding and channel continuity. Faults include restart,
+lease races, provider ambiguity, changed approvals, Stop and revoked credentials.
+Record fixtures, validators, version/configuration, actual host/model/service,
+traces, receipts, interventions, limits and outcomes. Separate component tests,
+end-to-end evidence and identical-task competitor tests using existing CR rules.
+No new live or competitive run was performed for the documentation direction.
+
+## Release qualification after implementation
+
+Passing repository checks is the component/build gate, not a release verdict.
+[RR-01–RR-36](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) require actual
+candidate installation/upgrade/restore, useful personal/coding work, identity,
+privacy, permissions, scheduling, budgets, Stop, provider ambiguity, concurrency,
+72-hour soak, first use, accessible artifacts and truthful release handoff.
+Browser/channel/learning cases apply to advertised optional features.
+
+Freeze configurations and limits before testing, retain every attempt and
+independent effect/artifact validation, and use the documented repeat/latency/
+resource targets. Release requires all applicable mandatory cases plus PA-S
+acceptance and CI at the final candidate. Unrun or blocked mandatory cases are
+NO-GO; the initial protocol verdict is NOT ASSESSED. Competitive parity remains
+a separate CR benchmark and is not necessary to qualify an honest scoped release.
+
+## UI and UX decision verification
+
+[UX-01–UX-12](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) contain per-task
+reason/decision and test obligations. For actual web changes run required lint,
+check, unit, build and mocked interaction suites, relevant API/backend contracts,
+then real served first-user, keyboard/screen-reader and outcome tests. Inspect
+loading/empty/waiting/partial/unknown/offline states, stale updates, cross-surface
+links and draft preservation. Map to RR-01/05/06/09/12/16/19/21/26/28/33/34/36;
+CR-10/12 additionally qualify competitive usability claims. Screenshot/source
+review alone cannot prove completion. This doc update runs no new user study.

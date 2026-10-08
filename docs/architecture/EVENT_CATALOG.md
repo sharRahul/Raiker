@@ -138,3 +138,14 @@ alignment-checked and never emits it.
 tables above cover the ones a person reading the audit log most often needs
 explained. An event type that exists in the registry and not here is documented
 by its emitting call site, not missing from the product.
+
+## Personal-agent event additions are planned
+
+PAA-01/02/04/08 must define registered, versioned goal/step/trigger/effect
+lifecycle events before implementation. Include correlation references to
+owner, goal, plan version, task/run, machine turn, action and receipt, plus
+bounded status/reason/timing/cost metadata. Do not include secrets, private
+reasoning, full personal profiles or connector bodies. Distinguish effect
+confirmation from outcome verification and notification delivery. Proposed
+logical records in the [spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are not current
+event names; this update registers none.

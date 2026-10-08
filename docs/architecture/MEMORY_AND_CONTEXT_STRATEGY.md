@@ -398,3 +398,14 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## Personal-agent context target
+
+PAA-03 adds an inspectable personal profile through existing governed memory
+and explicit settings: owner preferences, timezone, priorities and relevant
+episodes. Owner-stated facts and inferred candidates remain distinct; provenance,
+freshness, sensitivity and scope travel with retrieval. Correction/forget/purge
+must invalidate derived profile and goal-context indexes. Current Chat recall
+is account-wide; project filing is not a retrieval restriction or authority.
+Memory cannot enable a capability or authorise an effect. See
+[personal context](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-context-without-permission-by-memory).

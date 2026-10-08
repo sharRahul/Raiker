@@ -1162,3 +1162,59 @@ Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_
 | CR-10/12: first use and polish | Users can start, approve, recover and find results without avoidable friction | At least three first-time evaluators, action/help counts, exact UI configuration, accessibility/state-transition evidence |
 
 **Stop criteria.** Stop the affected scenario if an unauthorised effect or leakage occurs, preserve evidence and file the failure. A budget/timeout exhausted run is recorded according to the predeclared rule, not rerun until green. A blocked environment is not a product failure. Do not issue a competitive conclusion until the reviewer can follow the complete evidence chain.
+
+## 23. Personal-agent scenario procedure — planned
+
+Use [PA-S01–PA-S08](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md#scenarios-to-demonstrate)
+when their PAA prerequisites land. Begin from pinned clean fixtures and declared
+owner accounts, host/inference/execution locations, budgets and permissions.
+Exercise the actual user surface, preserve work through approval/restart faults,
+verify effects independently at the destination, and distinguish task, goal,
+artifact and notification outcomes. Test Stop/revocation and uncertain provider
+results before claiming reliable unattended work.
+
+Record every attempt with PAA/CR IDs under the existing round procedure. Follow
+the CR protocol for exact named competitor surfaces; do not count scripted tool
+replays as autonomous tests. These procedures have not been run for this update.
+
+## 24. Release qualification run
+
+Execute [RR-01–RR-36](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) against a frozen
+candidate manifest, in addition to the applicable Smoke/Full sweep and PA-S
+procedures. The release scenario document owns fixture setup, steps, independent
+pass results, required evidence, repeats and timing/soak thresholds.
+
+1. Freeze advertised configurations, optional capability claims, artifact/hash,
+   synthetic fixtures, validators, consented test accounts and resource budgets.
+2. Run baseline B plus personal-agent P cases on every applicable certified
+   configuration. Add browser W, channel/remote C and learning L when advertised.
+3. Exercise each positive and negative variant, including effect-timeout barriers,
+   restart, stale approval, denial, account isolation and Stop. Check actual
+   effects and absence of forbidden effects independently, not just UI text.
+4. Retain all model-driven trials, actual provider/host/model details and stand-in
+   boundaries. Complete 72-hour soak and first-use/accessibility gates.
+5. Record one result per RR/variant/attempt/configuration in a linked scorecard
+   and actual run evidence in LIVE_TEST_ROUNDS. File reproduced defects normally.
+6. Re-run changed/affected cases after fixes, reconcile shipped docs and limits,
+   then record reviewer, exact candidate and GO/NO-GO. Mandatory blocked/unrun
+   work prevents GO; implementations and passing CI alone do not qualify release.
+
+These cases are procedures only. This documentation update runs no release
+qualification, changes no existing live-round outcome and activates no feature.
+
+## 25. Personal-agent UI and UX acceptance procedure
+
+Use [UX-01–UX-12](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) when their supported
+slices land. Record UX/RR IDs, actual contracts/configuration and decision under
+test. Run intake → progress → decision → result → recovery journeys without
+developer shortcuts; compare every displayed state/count/action to authoritative
+records and confirmed effects. Test keyboard/screen-reader, 200% zoom, both themes
+and declared widths, plus reload/back/two-tab/draft continuity.
+
+Exercise loading, empty, stale/offline, pending decision, partial, failed and
+unknown outcome; inspect focus and announcements during updates. Keep account,
+destination/cost/privacy facts visible while technical detail is expandable.
+Three first-time evaluators follow shipped guidance, with all help/interventions
+recorded and no manual repair counted as a pass. Put actual runs in LIVE_TEST_ROUNDS;
+mandatory RR-33/34/36 evidence still controls qualification. No new UX run is
+claimed by adding this procedure.

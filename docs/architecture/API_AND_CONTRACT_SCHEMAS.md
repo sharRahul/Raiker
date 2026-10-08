@@ -326,3 +326,13 @@ owner control, not provider quota or billing data.
 metadata is `status`, `created_at`, `source_turn_count`,
 `estimated_input_tokens_before`, `estimated_summary_tokens`, and a safe
 `reason_code`. Summary text is never returned by this status route.
+
+## Personal-goal API target
+
+No goal or standing-intent route is added by the
+[personal-agent direction](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). PAA-01/02/07 must
+specify authenticated owner-scoped create/read/update/control/export/delete
+contracts, optimistic version checks and idempotency before adding routes.
+Publish response models, regenerate OpenAPI/TypeScript/route inventory, and test
+scope, stale updates and replay. Existing task APIs remain the supported path;
+UI controls must not advertise an unimplemented endpoint.

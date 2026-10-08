@@ -186,3 +186,12 @@ Hooks are read-only on purpose. The three configuration files are the owner's ow
 text on disk, and a page that rewrote them would need an authority story of its
 own — so the surface reports what the runtime loaded, including a file it could
 not read, and leaves the editing where the owner already has it.
+
+## Learning reusable personal workflows
+
+PAA-09 builds on existing skills/plugins/MCP without elevating them: a verified
+workflow may propose a versioned instruction-only skill with sources, fixtures,
+validators and a tool/permission diff. Evaluation and owner activation precede
+use; revocation/rollback is independent. Executable scripts remain governed
+tools, not implicit skill authority. ADD-05/06/21 retain implementation ownership.
+See [personal-agent learning](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#user-experience-and-learning).

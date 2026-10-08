@@ -1,5 +1,22 @@
 # Raiker plans — current-status index
 
+The [personal-agent UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+owns UX-01–UX-12, with detailed reasons, decisions, alternatives, dependencies,
+state/failure behavior and acceptance. It extends existing surfaces under
+[the UX specification](../architecture/PERSONAL_AGENT_UX_SPEC.md); it does not
+mark planned controls implemented or reopen ADD-26's shared shell.
+
+The [release acceptance scenarios](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) own
+RR-01–RR-36, candidate/configuration coverage, independent pass criteria,
+reliability targets and the release GO/NO-GO scorecard. Specified scenarios are
+not executed results; current qualification under that protocol is NOT ASSESSED.
+
+The [personal autonomous-agent delivery plan](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
+owns accepted PAA-01–PAA-11 work and PA-S01–PA-S08 outcome evidence. It extends
+Raiker's four pillars with durable goals, personal context, bounded proactivity
+and verified work. [The architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+marks current foundations separately from target contracts.
+
 `docs/plans/` contains **current ledgers** and the **topic reviews that still have
 work in them**. Do not assume the newest paragraph inside every old review is the
 current product state.

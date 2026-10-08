@@ -4,10 +4,11 @@
 
 **Status: accepted documentation direction, 2026-10-05; implementation and competitive validation remain separately evidenced.** The owner requested detailed demonstration and evidence requirements across `docs/plans/**`. This document is the canonical acceptance contract, not a second defect ledger and not a claim that Raiker matches any competitor.
 
-**Decision.** Assess Raiker against two complementary reference groups:
+**Decision.** Assess Raiker against three complementary reference groups (personal-agent scope extended 2026-10-07):
 
 | Reference group | Required dimensions |
 |---|---|
+| Muse.ai, Claude.ai personal-work surface | Durable goals, personal context, proactive work, confirmed cross-service outcomes and usable artifacts (PA-S01–PA-S06/08; CR-01/03/04/05/07/09–12) |
 | OpenClaw, Hermes Agent | Agent autonomy, model/deployment flexibility, integrations, memory, scheduling, extensibility and operational control (CR-01–CR-07) |
 | Codex, Cursor, Claude | Coding quality, completed work, ease of use, recovery and overall polish (CR-08–CR-12) |
 
@@ -148,3 +149,20 @@ No credentials, tokens, private prompts or sensitive destination content belong 
 3. Any claim of competitive parity requires the competitive track, disclosed differences, all trial outcomes and a reviewer-approved conclusion limited to measured tasks. Missing comparative evidence blocks that claim, not automatically all product releases.
 4. File a reproduced defect once in TO_BE_FIXED; link it here or from its owning plan. Optional expansion remains in TO_BE_ADDED. Do not turn every unmeasured dimension into an invented product bug.
 5. Preserve completed implementation and historical evidence. A new validation requirement does not reopen a fixed defect without a reproduction and does not close an existing one by adding documentation.
+
+## Personal-agent qualification — 2026-10-07
+
+[PA-S01–PA-S08](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md#scenarios-to-demonstrate)
+add personal briefing, goal persistence, connector effects, proactive usefulness,
+isolated browser, reusable workflow, coding and channel continuity scenarios.
+Muse.ai and Claude.ai are now explicit personal-work references alongside
+OpenClaw/Hermes; Codex/Cursor/Claude Code retain coding scope. Claude's current
+help pages describe a gradual unified experience and remote scheduling; record
+exact surface/plan/host and distinguish older local schedules.
+
+Use the [reference source index](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md)
+and [design adaptations](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#reference-ideas-and-raiker-adaptations).
+Apply all existing CR evidence rules, five-trial protocol and authority/privacy
+zero-tolerance checks. Run only supported equivalent scopes; file unavailable
+accounts/regions/models/effects as blocked or unsupported. No Muse or new Claude
+comparison has been executed for this documentation update.

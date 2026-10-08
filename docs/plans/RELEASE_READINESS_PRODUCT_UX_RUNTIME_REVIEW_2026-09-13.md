@@ -3716,3 +3716,32 @@ References: [plan authority](README.md#decision-recording-policy--2026-10-05),
 **Release decision.** Before a candidate run, declare supported configurations, in-scope scenarios, owners/reviewers, budgets and thresholds. Require end-to-end evidence for in-scope user promises; document any accepted exception and narrow the claim. Competitive comparisons additionally require named product versions, identical task goals/validators, all trials and disclosed model/configuration differences. Missing competitive evidence prohibits a parity assertion; it does not silently make every competitor feature a release blocker. Existing security and product gates remain authoritative.
 
 **Sign-off record.** For each CR criterion link its owning DEC/BUG/ADD, implementation revision, evidence record, residual gap, reviewer/date and permitted claim. No closure or owner implementation sign-off is created by this documentation amendment. Quiet-hours and Git OAuth decisions already accepted in DEC-21a/b remain unchanged.
+
+## Personal-agent release scope extension — 2026-10-07
+
+The [PAA delivery plan](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) adds staged
+personal-agent acceptance gates; existing DEC decisions and recorded defects
+remain. Release wording must list supported personal workflows and tested
+host/model configurations, and distinguish planned goal, browser, learning and
+off-machine features. PA-S01/02/03/04/07 are required for an advertised complete
+personal-agent scope; optional browser/channel/learning claims require their
+additional scenarios. This target does not reopen settled owner decisions,
+activate deployments or convert historical evidence into competitive proof.
+
+## Release verification decision — 2026-10-08
+
+Implementation of PAA items is not sufficient for release. The
+[release acceptance protocol](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) defines
+RR-01–RR-36, independent expected outcomes, certified configuration coverage,
+security/privacy negative cases, five clean model-driven trials, 72-hour soak,
+first-use/accessibility and explicit GO/NO-GO gates. Existing DEC decisions and
+live records retain their scope; no prior result is upgraded to a release pass.
+
+A personal-agent release needs baseline B and personal-agent P scenarios; W/C/L
+are mandatory when browser/channel/learning claims are advertised. Missing,
+blocked, failed or unverified mandatory evidence prevents GO. No open P0/P1,
+false completion, duplicate consequential effect or authority/privacy breach may
+be waived. Define versioned support scope and residual limitations before tests;
+competitor benchmarking is required for parity claims, not basic release.
+Current verdict under the new protocol is NOT ASSESSED until actual candidate
+runs and an independent reviewer complete RR-36.

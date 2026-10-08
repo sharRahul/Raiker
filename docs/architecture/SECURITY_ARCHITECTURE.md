@@ -80,3 +80,18 @@ Logs are audit records, not tamper-proof evidence. Credentials remain outside
 normal logs and must be supplied through explicit local configuration.
 
 No tamper-proof logging is implemented.
+
+## Personal-agent threat boundary
+
+The [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds long-lived
+goal/intent data around short-lived signed turns. Stale delegation, poisoned
+memory, injected triggers, wrong-account routing, duplicate effects, unbounded
+polling, inherited child authority and silent host/provider changes are target
+threats. Envelope version/expiry/revocation, atomic leases, aggregate budgets,
+source authentication, secret-free effect receipts and execution-time authority
+checks must mitigate them. Models cannot promote a suggestion into a grant.
+See the [target threat model](../threat-models/personal-autonomous-agent.md).
+
+Preserve owner-authoritative monitored security, current capability defaults and
+critical approval lifecycle. New higher-risk adapters require their own threat
+model and current control-plane acknowledgement; this target adds no gate.

@@ -146,3 +146,13 @@ Tests must prove:
 7. state transition events include monotonic `state_sequence`;
 8. client/interface metadata is preserved through the state loop;
 9. terminal path uses the same gateway as test/non-terminal client envelopes.
+
+## Proposed goal lifetime is separate
+
+The [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#goal-lifecycle-and-recovery)
+defines draft, ready, running, waiting, paused, completed, partial, failed,
+stopped and archived goal states. These are proposed goal records, not new turn
+states or runtime modes. Existing task phases remain unchanged until an explicit
+versioned implementation maps them. Completion requires validated mandatory
+criteria and settled mandatory children; waiting names its blocker. A resumed
+goal starts/continues a governed turn with fresh identity and current checks.

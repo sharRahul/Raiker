@@ -1,7 +1,7 @@
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI
-assistant, a governed AI agent, **a capable coding/build agent**, and an
+assistant, a governed **personal autonomous agent**, **a capable coding/build agent**, and an
 extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
@@ -45,8 +45,9 @@ and are compatible with it:
 
 # To be added
 
-**Status: proposals, not defects and not parity gaps.** Nothing in this document
-is broken and nothing here is required for Raiker to be correct. This is the
+**Status: capability proposals and staged personal-agent expansion, not a defect ledger.**
+These entries do not by themselves report broken behavior; accepted personal-agent
+release scope is qualified by the PAA gates below. This is the
 capability roadmap: what Raiker would need to gain autonomous self-improvement,
 advanced coding routines, and multi-platform reach **without** trading away the
 zero-trust architecture it already has.
@@ -68,8 +69,9 @@ executing [the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a
 running `raiker-web`. [`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md) — GAP-BUILD and
 GAP-CHAT — is the itemised distance between what Build and Chat ship today and
 what each is meant to be. **This document is neither.** A gap is a capability a
-class-leading product already has that Raiker lacks; an ADD entry is a capability
-that would put Raiker ahead of the field.
+class-leading product already has that Raiker lacks; an ADD entry is proposed capability expansion whose benefit must be demonstrated.
+Personal-agent delivery work is tracked in the PAA plan rather than inferred
+from competitor feature lists.
 
 | ID | Tier | Area | Status |
 |---|---|---|---|
@@ -1271,3 +1273,29 @@ References: ADD-05/06/12/16/17/25 above,
 | Responsive shell (ADD-26) | Reduced friction with consistent, accessible work/approval/recovery states | CR-10/12: observed task completion, keyboard/focus/accessibility checks and screenshots tied to interactions |
 
 Before implementing an accepted proposal, record its owning CR IDs, concrete acceptance fixture, baseline, support scope and reviewer role. Retain the proposed/accepted/implemented distinction. A demonstration can justify narrower support or deferral; absence of an experiment must never be recorded as success.
+
+## Personal-agent direction — 2026-10-07
+
+The owner accepted the [personal-agent architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+inspired by Muse.ai, Claude.ai, OpenClaw and Hermes Agent. New durable goals,
+context, proactivity, outcome verification and reviewed learning work is owned
+by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Existing items in
+this ledger keep their status, dependencies and evidence; accepting the target
+does not close a defect or mark an ADD shipped. Browser ADD-23, off-machine
+ADD-11, memory ADD-25 and self-improvement ADD-05/06 retain their own boundaries.
+
+Personal-agent release claims require the relevant PA-S scenarios and existing
+CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
+Git OAuth scope, model choice and coding quality. New observations go to the
+proper defect/evidence ledger; do not duplicate the PAA backlog here.
+
+## Personal-agent UX delivery — 2026-10-08
+
+The accepted [UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+owns UX-01–UX-12 with per-task reasons, decisions, alternatives, dependencies,
+states and evidence. The [UX spec](../architecture/PERSONAL_AGENT_UX_SPEC.md)
+defines target interactions. This is planned PAA-07 product work, not a new
+claim that the current UI is broken; observed defects retain BUG ownership.
+Reuse implemented ADD-26 shell/components. New goal/context/browser/channel
+controls remain unavailable until their backend contracts/executors exist.
+Close tasks only with observed interaction and independent outcome proof.

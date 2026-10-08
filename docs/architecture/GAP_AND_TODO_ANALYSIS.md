@@ -75,3 +75,13 @@ represents — a canonical status document that omits capabilities — is the on
 worth watching for.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action remain the baseline.
+
+## Personal-agent expansion backlog
+
+The [PAA delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) owns
+new durable goal, context, proactivity, effect verification, UI and learning
+work. It reuses existing components and preserves all Completed items and
+closed defects. An accepted design is not an implemented goal coordinator or
+competitive qualification. Browser ADD-23, remote gateway ADD-11 and staged
+memory/skills proposals retain their existing dependencies. Update canonical
+status/limits only when the relevant work and evidence land.

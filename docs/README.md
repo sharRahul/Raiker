@@ -10,6 +10,12 @@ permissions, Chat, Build, tasks, extensions, host management, security,
 limitations, and troubleshooting. These pages are also served inside Raiker
 under **Utilities → Guide**.
 
+Raiker's personal autonomous-agent direction brings these workflows together
+around durable goals and useful verified outcomes. Start with the
+[current personal-agent workflow](guide/tasks-and-projects.md#using-raiker-as-a-personal-agent),
+then the [target architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [staged delivery plan](plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+
 Useful starting points:
 
 - [Getting started](guide/getting-started.md)
@@ -29,6 +35,8 @@ Canonical technical references:
 
 | Question | Document |
 |---|---|
+| How should personal-agent UI/UX be implemented? | [UX specification](architecture/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) |
+| How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries? | [Security architecture](architecture/SECURITY_ARCHITECTURE.md) |
@@ -52,6 +60,7 @@ Canonical technical references:
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
 - [Proposed additions](plans/TO_BE_ADDED.md)
+- [Release acceptance scenarios](plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) — candidate scope, RR-01–RR-36, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) and
   [test-round record](plans/LIVE_TEST_ROUNDS.md)
 - [Screenshot evidence](plans/screenshots/README.md)

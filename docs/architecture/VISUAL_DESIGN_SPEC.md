@@ -376,3 +376,15 @@ seven questions above.
 7. Give the page one `GuideLink` and no explanatory prose — see "What a page
    may say". If the page needs to teach something, teach it in `docs/guide/`.
 8. Check it at 375 / 768 / 1024 / 1440 px in both themes before you call it done.
+
+## Personal-agent interaction work — 2026-10-08
+
+[UX-01–UX-12](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) use these existing
+semantic tokens, local fonts and shared components. The
+[personal-agent UX specification](PERSONAL_AGENT_UX_SPEC.md) owns screen purpose,
+state/action behavior and progressive disclosure; this document continues to
+own drawing rules. Improve clarity through layout, hierarchy and useful copy,
+not a new palette or heavy decoration. UX-11 applies keyboard/screen-reader,
+200% zoom, themes, responsive widths and reduced-motion checks to each slice.
+Statuses remain distinguishable by text/icon; loading/unknown/partial are not
+success colours. Visual polish cannot close an untested usability outcome.

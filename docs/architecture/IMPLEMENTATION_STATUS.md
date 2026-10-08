@@ -175,3 +175,23 @@ credential. The advisor model carries its own readiness observation and chip
 five by default — re-confirmed opportunistically in the background while a work
 surface is open, with the invalidation hooks still authoritative over the timer
 (FIXED-169).
+
+## Personal-agent target status — 2026-10-07
+
+The [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) is accepted
+as a target. Existing tasks/routines, governed memory, connectors and Chat/Build
+are foundations; they are not evidence of a complete goal-level personal agent.
+
+| Target slice | Current target status | Implementation/evidence owner |
+|---|---|---|
+| Durable goals, step graph and delegation envelopes | contract_only — documentation design; no new runtime/API implementation claimed | PAA-01/02 |
+| Explicit personal profile derived from governed context | contract_only — current memory remains separately implemented | PAA-03 |
+| Standing-intent monitoring and proactive goal coordination | contract_only — current routines remain separately implemented | PAA-04 |
+| Workflow-level receipts and goal outcome/recovery gates | contract_only — existing connector effects retain their individual scope | PAA-05/08 |
+| Interactive isolated browser | disabled_deferred — current web fetch/extraction is not browser interaction | ADD-23/PAA-06 |
+| Goal overview, reviewed learning and optional host continuity | contract_only — no new UI, automatic skill activation or deployment claimed | PAA-07/09/10 |
+
+All new work remains planned in the
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Its scenario
+status starts at not run; historical live evidence is retained at its original
+scope. No runtime status marker above is upgraded by adopting this direction.

@@ -718,3 +718,16 @@ This run proves the live transcript surface end to end on hosted Anthropic: what
 a turn did, what it thought, and what it refused. It does **not** prove that
 either survives a reload — neither is persisted, which is
 [BUG-215](../plans/FIXED_ITEMS.md#fixed-219--reasoning-was-shown-live-and-then-forgotten-was-bug-215).
+
+## Release candidate qualification
+
+Historical provider rounds above prove their named scenarios/configurations.
+They are not a full release verdict. Use
+[RR-01–RR-36](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) and the
+[manual release procedure](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md#24-release-qualification-run)
+for a candidate: real streamed work, approval/resume/Stop, goal/task lineage,
+source/destination verification, provider failures, reload/concurrent tabs,
+first-use accessibility and artifact opening. Record browser/client/host/model
+separately, plus all interventions and faults. A mocked API/UI pass or a screenshot
+cannot substitute for real-provider completion. Planned personal-agent/browser
+controls remain unrun until their production paths exist.

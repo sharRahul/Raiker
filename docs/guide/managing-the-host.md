@@ -137,6 +137,10 @@ update through Git and rebuild the dashboard.
 The same thing is in the app, at **Settings → Updates**. It names this build's
 provenance, the pinned channel, the last explicit check and any recovery point,
 and — for a signed package on a pinned channel — offers **Update and restart**.
+Each recovery point says whether that build can open this workspace's data. An
+older Raiker refuses a database a newer one has changed, so a point from before
+an update that migrated the database reads *would refuse this workspace's data*:
+roll back to it only with the backup Raiker took before that update.
 
 **Installed build** is the one identity: the release, the commit it was built
 from, and when it was built. Beside it, **This page** names the build of the

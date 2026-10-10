@@ -615,10 +615,15 @@ class SaveProjectContextRequest(StrictRequest):
     # a tri-state override so child folders can inherit their nearest ancestor.
     memory_enabled: bool | None = None
     memory_mode: Literal["inherit", "enabled", "disabled"] | None = None
+    # §13.2 item 6 — the context revision the editor read; 409 `project_conflict`
+    # when it was saved elsewhere since. Omitted by older clients.
+    expected_revision: str | None = None
 
 
 class MoveProjectRequest(StrictRequest):
     parent_id: str | None = None
+    # §13.2 item 6 — the project's placement revision as the tree showed it.
+    expected_revision: str | None = None
 
 
 class SetSessionPinnedRequest(StrictRequest):
@@ -670,6 +675,9 @@ class RenameMcpServerRequest(StrictRequest):
     # and rejects a clash with the caller's other servers.
 
     name: str
+    # §13.2 item 6 — the name the page showed. Renamed elsewhere since, the
+    # answer is 409 `mcp_server_conflict` and nothing changes.
+    expected_name: str | None = None
 
 
 class CreateRemoteMcpServerRequest(StrictRequest):
@@ -694,6 +702,11 @@ class ApproveMcpToolsRequest(StrictRequest):
     # DEC-15 step 10 — the held tools the owner accepts, by name. Only names
     # the server offers and holds are accepted; anything else is ignored.
     tools: list[str]
+    # §13.2 item 6 — the fingerprint of each declaration the page showed. When
+    # a named tool's declaration has changed since, nothing is accepted and the
+    # answer is 409 `mcp_tool_changed`. Older clients that send none accept the
+    # tools as declared now, as before.
+    fingerprints: dict[str, str] | None = None
 
 
 class AcknowledgeHeldNotificationsRequest(StrictRequest):
@@ -791,10 +804,23 @@ class PairChannelRequest(StrictRequest):
 
 class ChannelEnabledRequest(StrictRequest):
     enabled: bool
+    # §13.2 item 6 — the pairing revision the page read; a pairing changed
+    # since is refused 409 `channel_conflict`. Omitted by older clients.
+    expected_revision: str | None = None
+
+
+class ChannelPausedRequest(StrictRequest):
+    """DEC-14 step 10 — pause or resume one paired channel."""
+
+    paused: bool
+    expected_revision: str | None = None
 
 
 class ChannelSendersRequest(StrictRequest):
     senders: list[str]
+    # §13.2 item 6 — the pairing revision the page read; a pairing changed
+    # since is refused 409 `channel_conflict`. Omitted by older clients.
+    expected_revision: str | None = None
 
 
 class ChannelRoutingRequest(StrictRequest):
@@ -804,6 +830,9 @@ class ChannelRoutingRequest(StrictRequest):
     target_session_id: str | None = None
     owner_sender_id: str | None = None
     approval_relay_enabled: bool = False
+    # §13.2 item 6 — the pairing revision the page read; a pairing changed
+    # since is refused 409 `channel_conflict`. Omitted by older clients.
+    expected_revision: str | None = None
 
 
 class ChannelTestDeliveryRequest(StrictRequest):
@@ -820,6 +849,9 @@ class ChannelDestinationRequest(StrictRequest):
     """Bind, or with ``None`` clear, a webhook channel's delivery URL."""
 
     delivery_url: str | None = None
+    # §13.2 item 6 — the pairing revision the page read; a pairing changed
+    # since is refused 409 `channel_conflict`. Omitted by older clients.
+    expected_revision: str | None = None
 
 
 

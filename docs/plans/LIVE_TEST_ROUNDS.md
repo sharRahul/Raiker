@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-10 | Targeted | `2026-10-10-revisions-round/` | **None answered.** The Anthropic key supplied (`sk-ant-usr-…`, identity-linked) was entered through the Connect dialog; Anthropic refuses every call from it without an `anthropic-workspace-id`, which the key alone cannot look up | Thirteen decision-record steps from the release-readiness review — §13.2 item 6 for MCP, channels and projects, DEC-15 step 10's acceptance binding, DEC-14 step 10, DEC-21 (Personalisation, Updates, Git credential), DEC-24 steps 3, 5 and 7 and DEC-17 step 10 (FIXED-813 to FIXED-826). Proved live: the identity-linked key **explained, not called bad**; Compact and Dark **previewed unsaved and put back by Discard**; **a stale Messaging tab's sender list refused** with the newer list kept; **a paused channel keeping a message and starting nothing**; **a stale project editor refused with its text kept**; **an MCP tool reworded after the card was drawn not accepted**, and a stale rename refused; **a backup carrying 1 checkpoint file and 1 upload**; recovery points that can and cannot open this data; the credential's last loan; the recovery matrix; Messaging at 390 wide, dark, with no overflow; and, across a restart, **a routine left running settled and moved to its next slot**. **One defect found and fixed** — that routine had stayed running for ever (FIXED-825) |
 | 2026-10-05 (fifth) | Targeted | `2026-10-05-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering two Chat turns and running a routine, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — BUG-323 and DEC-24 steps 5–6 (restore from the lock screen, quarantine, deletion journal), DEC-17 step 8 (refuse a newer schema), DEC-12 step 6's cost limit, DEC-21's General row (weather place, answer language, date format) and §13.2 item 6 for permissions and task creation (FIXED-801 to FIXED-809). Proved live: **a real answer in French to an English prompt**, with the turn told `answer_language: fr` and no place; dates written in German; **a stale tab's permission change refused** and the page showing the other tab's Never; **one task for a draft sent twice**; **a $0.01 routine stopped after one model call**; and, across two restarts, **a damaged workspace restored from the lock screen** with the deleted conversation still gone, and **a newer-schema workspace refused and restored** at 390 wide. **Three defects found and fixed** — cached tokens recorded as zero (FIXED-810), cache rates dropped (FIXED-811) and damage past the first page read as the machine's memory (FIXED-812) |
 | 2026-10-05 (fourth) | Targeted | `2026-10-05-backups-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog | Ten more decision-record steps from the release-readiness review — DEC-24 step 5's backups (snapshot, verify, restore to a new folder), DEC-17 step 8's snapshot before a migration, §13.2 item 6 for Settings, DEC-21's deduplication and delivery record, DEC-24 step 1's scheduler queue, DEC-12 step 6's tool-call limit and DEC-19 step 5's screenshot manifest (FIXED-789 to FIXED-798). Proved live: a real Anthropic answer; **Back up now, Verify and Restore to a new folder**, the restored folder opening as its own workspace; **a backup changed on disk reading Damaged with no restore offered**; **an upgrade's own verified snapshot**; **a stale Settings page merged where nobody else changed a key and refused where somebody did**; **one finding raised three times as one notice**; the record saying *held for quiet hours* and *not shown*; **work due while paused named as waiting**; a routine's tool-call limit kept across a reload; Account at 390 wide, dark, with no overflow; and every capture in the manifest. **One defect found and fixed** — the restore's path came back redacted (FIXED-799); BUG-323 filed |
 | 2026-10-05 (third) | Targeted | `2026-10-05-quiet-hours-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn and proposing a Build shell command, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — the owner's DEC-21a quiet hours (policy, exceptions, summary), DEC-21's per-category switches and test notice, BUG-317/320's dock, BUG-322 and DEC-24 step 6's index and vector damage, and DEC-12 steps 6 and 8. FIXED-776 to FIXED-788 |
@@ -93,6 +94,48 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-10 — Stale pages that write nothing, a channel that pauses, and a run a restart does not lose
+
+**Tier:** Targeted. **Build:** `main` at `a0510ba` plus this run's working tree.
+**Host:** `raiker-web` on Linux, a workspace reset with
+`scripts/reset_live_workspace.py`, served with `RAIKER_CHANNEL_INBOUND_SECRET`
+set for the round. **Specs:** `web/e2e/round-2026-10-10-revisions-live.spec.ts`
+(phase one) and `web/e2e/round-2026-10-10-restart-live.spec.ts` (after a host
+restart). **Harness:** `scripts/live_revisions_harness.py` — an MCP server's own
+re-enumeration, seeded checkpoint and upload files, two retained builds, one
+credential loan and a routine left `running`; every outcome is the running
+host's.
+
+**Provider.** No model turn ran. The key supplied for the round is
+identity-linked (`sk-ant-usr-`): Anthropic answers every request from it,
+`/v1/models` and `/v1/messages` included, with *This API key is not scoped to a
+workspace … must include the anthropic-workspace-id header*, and the key cannot
+list its workspaces (403). Entered through Connect, Raiker says *This key is
+identity-linked, so it acts inside one workspace. Add the workspace ID … The key
+you pasted is fine* (capture 01) — BUG-272's handling, still correct. A turn
+waits on the workspace ID.
+
+**What it proved** (captures `01`–`14`, each in the folder's `manifest.json`):
+
+| Step | Evidence |
+|---|---|
+| FIXED-818/819 | Compact and Dark applied unsaved, *You have unsaved changes*; Discard removed both and stored no theme (02, 03) |
+| FIXED-815 | Tab B saved senders `ops`; tab A's `oncall, ops` refused *changed somewhere else … nothing was changed*; stored list `ops` (04) |
+| FIXED-817 | **Pause**, then an allowlisted inbound message: `routed: false`, `channel_paused`, receipt *Kept while paused — nothing started* (05); at 390 dark, no overflow (13) |
+| FIXED-816 | Tab B saved *Cite the tide tables*; tab A's save refused, its text kept, the newer instructions stored (06) |
+| FIXED-813/814 | The server reworded `purge` after the card was drawn: Accept refused and the new sentence shown (07); a rename from a stale tab refused (08) |
+| FIXED-821 | Back up now: *1 checkpoint file · 1 upload*; not included: the audit log and attached folders (09) |
+| FIXED-820 | `0.9.2` can open this data; `0.8.0` would refuse it (10) |
+| FIXED-826 | *Last lent just now … to push a branch, under a one-command approval* (11) |
+| FIXED-824 | *If Raiker stops in the middle*, Tasks and routines open (12) |
+| FIXED-825 | A routine claimed `running`; host restarted; it read `queued` for 2026-10-11 07:00, its history saying the run did not finish and was not re-run (14) |
+
+**What it found.** One product defect, fixed in the run: a routine a stopped
+host left `running` never ran again (FIXED-825, found writing the recovery
+matrix and proved by the restart). Two harness corrections: the receiver sorts
+senders, and navigating to the hash a page is already on reloads nothing, so
+the spec reloads. No 5xx in any step.
 
 ## 2026-10-05 (fifth) — A workspace restored from its lock screen, a turn told the right language and no place, and a routine that stops at its cost
 

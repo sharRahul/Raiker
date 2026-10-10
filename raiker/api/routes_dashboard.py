@@ -155,6 +155,7 @@ from raiker.models.readiness import (
     ProviderCatalogueProbe,
 )
 from raiker.models.registry import ModelProfileRegistry
+from raiker.recovery_matrix import RecoveryMatrixView
 from raiker.runtime.authority.models import Principal
 from raiker.sessions.transcript import TranscriptManifest
 from raiker.storage.internal_paths import internal_io_path
@@ -531,12 +532,12 @@ async def rename_mcp_server(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Rename one owner-scoped MCP server profile (human-only)."""
-    answer = cast(
-        McpServerRenamed,
-        _mcp_result(
-            _service(request).rename_mcp_server(auth_data[0].principal_id, server_id, body.name)
-        ),
+    result = _service(request).rename_mcp_server(
+        auth_data[0].principal_id, server_id, body.name, body.expected_name
     )
+    if result.reason_code == "mcp_server_conflict":
+        raise refusal(status.HTTP_409_CONFLICT, "mcp_server_conflict")
+    answer = cast(McpServerRenamed, _mcp_result(result))
     return serialize_dto(answer)
 
 
@@ -544,16 +545,20 @@ async def rename_mcp_server(
 async def delete_mcp_server(
     server_id: str,
     request: Request,
+    expected_name: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Delete one owner-scoped MCP server profile and its generated template
-    file (human-only)."""
-    answer = cast(
-        McpServerDeleted,
-        _mcp_result(
-            _service(request).delete_mcp_server(auth_data[0].principal_id, server_id)
-        ),
+    file (human-only).
+
+    §13.2 item 6 — ``expected_name`` is the server the confirmation named; one
+    renamed since is refused 409 ``mcp_server_conflict`` and kept."""
+    result = _service(request).delete_mcp_server(
+        auth_data[0].principal_id, server_id, expected_name
     )
+    if result.reason_code == "mcp_server_conflict":
+        raise refusal(status.HTTP_409_CONFLICT, "mcp_server_conflict")
+    answer = cast(McpServerDeleted, _mcp_result(result))
     return serialize_dto(answer)
 
 
@@ -626,14 +631,17 @@ async def approve_mcp_tools(
     changed how it declares it, after the owner accepted the server; until it
     is accepted here the model is never offered it and a call to it is refused.
     """
-    answer = cast(
-        McpToolsApproved,
-        _mcp_result(
-            _service(request).approve_mcp_tools(
-                auth_data[0].principal_id, server_id, list(body.tools)[:500]
-            )
-        ),
+    result = _service(request).approve_mcp_tools(
+        auth_data[0].principal_id,
+        server_id,
+        list(body.tools)[:500],
+        dict(list(body.fingerprints.items())[:500]) if body.fingerprints is not None else None,
     )
+    if result.reason_code == "mcp_tool_changed":
+        # Nothing was accepted: the page showed a declaration the server has
+        # since replaced. The client re-reads the card and shows what it says now.
+        raise refusal(status.HTTP_409_CONFLICT, "mcp_tool_changed")
+    answer = cast(McpToolsApproved, _mcp_result(result))
     return serialize_dto(answer)
 
 
@@ -1857,9 +1865,15 @@ async def save_project_context(
         memory_enabled=body.memory_enabled,
         memory_mode=body.memory_mode,
         acting_principal_id=auth_data[0].principal_id,
+        expected_revision=body.expected_revision,
     )
     if not result.ok:
-        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+        raise refusal(
+            status.HTTP_409_CONFLICT
+            if result.reason_code == "project_conflict"
+            else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
     answer: ProjectContextSaved = cast(ProjectContextSaved, {"ok": True, **result.data})
     return serialize_dto(answer)
 
@@ -1915,6 +1929,7 @@ _PROJECT_CONFLICTS = frozenset(
         "project_move_into_descendant",
         "project_move_into_archived",
         "project_parent_archived",
+        "project_conflict",
     }
 )
 
@@ -1942,7 +1957,9 @@ async def move_project(
     project itself, any of its descendants (a cycle) and an archived folder as
     a destination, each by name.
     """
-    result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
+    result = _service(request).move_project(
+        project_id, body.parent_id, auth_data[0].principal_id, body.expected_revision
+    )
     if not result.ok:
         raise refusal(_project_refusal_status(result.reason_code), result.reason_code)
     answer: ProjectMoved = {
@@ -2838,6 +2855,17 @@ async def get_diagnostics(
 ) -> dict[str, Any]:
     _session, principal = _auth_data
     return serialize_dto(_service(request).get_diagnostics(principal.principal_id))
+
+
+@router.get("/api/diagnostics/recovery")
+async def get_recovery_matrix(
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-24 step 3 — how each subsystem recovers. Static, content-free."""
+    from raiker.recovery_matrix import recovery_matrix_view
+
+    answer: RecoveryMatrixView = {"rows": recovery_matrix_view()}
+    return serialize_dto(answer)
 
 
 # ── Web workbench read models (plan phases 3 and 4) ───────────────────────────

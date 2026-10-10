@@ -1,0 +1,170 @@
+{
+  "01-anthropic-key-needs-workspace.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/models?tab=add",
+    "test": "round-2026-10-10-revisions-live.spec.ts › an identity-linked Anthropic key entered through Models is explained, not called bad",
+    "captured_at": "2026-10-10T09:34:39.355Z"
+  },
+  "02-appearance-previewed.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "dark",
+    "route": "#/settings?tab=personalisation",
+    "test": "round-2026-10-10-revisions-live.spec.ts › appearance previews before it is kept and Discard puts it back",
+    "captured_at": "2026-10-10T09:35:02.776Z"
+  },
+  "03-appearance-discarded.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=personalisation",
+    "test": "round-2026-10-10-revisions-live.spec.ts › appearance previews before it is kept and Discard puts it back",
+    "captured_at": "2026-10-10T09:35:03.023Z"
+  },
+  "04-channel-stale-tab-refused.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/messaging",
+    "test": "round-2026-10-10-revisions-live.spec.ts › a stale Messaging tab cannot undo a sender removed in another, and Pause keeps what arrives",
+    "captured_at": "2026-10-10T09:35:31.007Z"
+  },
+  "05-channel-paused-kept.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/messaging",
+    "test": "round-2026-10-10-revisions-live.spec.ts › a stale Messaging tab cannot undo a sender removed in another, and Pause keeps what arrives",
+    "captured_at": "2026-10-10T09:35:34.224Z"
+  },
+  "06-project-stale-editor-refused.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/projects",
+    "test": "round-2026-10-10-revisions-live.spec.ts › a stale project editor keeps its text and saves nothing over newer instructions",
+    "captured_at": "2026-10-10T09:36:00.342Z"
+  },
+  "07-mcp-tool-changed-not-accepted.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/extensions?tab=mcp",
+    "test": "round-2026-10-10-revisions-live.spec.ts › an MCP tool is accepted only as the owner read it, and a stale rename is refused",
+    "captured_at": "2026-10-10T09:37:23.426Z"
+  },
+  "08-mcp-stale-rename-refused.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/extensions?tab=mcp",
+    "test": "round-2026-10-10-revisions-live.spec.ts › an MCP tool is accepted only as the owner read it, and a stale rename is refused",
+    "captured_at": "2026-10-10T09:37:27.427Z"
+  },
+  "09-backup-carries-files.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=account",
+    "test": "round-2026-10-10-revisions-live.spec.ts › a backup carries the checkpoint files and uploads its rows point at",
+    "captured_at": "2026-10-10T09:37:52.551Z"
+  },
+  "10-updates-recovery-compatibility.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=updates",
+    "test": "round-2026-10-10-revisions-live.spec.ts › Updates says which recovery point can open this workspace's data",
+    "captured_at": "2026-10-10T09:38:16.118Z"
+  },
+  "11-git-credential-last-lent.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/settings?tab=git-credential",
+    "test": "round-2026-10-10-revisions-live.spec.ts › the Git credential says when it was last lent and for what",
+    "captured_at": "2026-10-10T09:42:59.350Z"
+  },
+  "12-diagnostics-recovery-matrix.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/observe",
+    "test": "round-2026-10-10-revisions-live.spec.ts › Diagnostics says what each kind of work does after a restart; a run is left interrupted",
+    "captured_at": "2026-10-10T09:46:01.353Z"
+  },
+  "13-messaging-390-dark.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "dark",
+    "route": "#/messaging",
+    "test": "round-2026-10-10-revisions-live.spec.ts › Messaging at phone width in dark reads Paused without bleeding sideways",
+    "captured_at": "2026-10-10T09:46:24.985Z"
+  },
+  "14-interrupted-run-settled.png": {
+    "commit": "a0510baa7c67816fa44a70751504f3f8dadfa596",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/tasks?task=task_938cdd6cf8db465aa0523e567f7f7394",
+    "test": "round-2026-10-10-restart-live.spec.ts › a routine a stopped host left running is settled at the next start",
+    "captured_at": "2026-10-10T09:48:10.747Z"
+  }
+}

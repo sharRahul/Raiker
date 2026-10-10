@@ -111,6 +111,14 @@ class ExternalChannelExecutor:
                 summary="Channel delivery denied: connector is not paired/enabled.",
             )
 
+        if bool(pairing.get("paused")):
+            # DEC-14 step 10 — a paused channel is contained: nothing is sent
+            # to it, a test included, until the owner resumes it.
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="channel_paused",
+                summary="Channel delivery held: the owner paused this channel.",
+            )
         channel_type = str(pairing.get("channel_type") or "webhooks")
         delivered_at = utc_now()
 
@@ -200,6 +208,12 @@ class ChannelApprovalRelayExecutor:
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code="channel_not_paired_or_disabled",
                 summary="Approval relay denied: connector is not paired/enabled.",
+            )
+        if bool(pairing.get("paused")):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="channel_paused",
+                summary="Approval relay held: the owner paused this channel.",
             )
         if not bool(pairing.get("approval_relay_enabled")) or not str(
             pairing.get("owner_sender_id") or ""

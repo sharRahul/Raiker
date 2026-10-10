@@ -23,6 +23,11 @@ from raiker.control.project_migration import _default_root_label
 from raiker.control.project_paths import MANAGED_PROJECT_ROOT as _MANAGED_PROJECT_ROOT
 from raiker.control.project_paths import contained_project_root as _contained_project_root
 from raiker.control.project_paths import project_root_parts as _project_root_parts
+from raiker.control.project_revision import (
+    PROJECT_CONFLICT,
+    context_revision,
+    placement_revision,
+)
 from raiker.control.project_roots import resolve_project_root
 from raiker.control.views.projects import (
     ProjectAttachmentView,
@@ -77,6 +82,7 @@ class ProjectService:
         row["session_count"] = len(sessions)
         row["last_activity_at"] = max((s.updated_at for s in sessions if s.updated_at), default=None)
         context = self.store.load_project_context(project_id)
+        context["revision"] = context_revision(context)
         return ProjectDetailView(
             project=self._project_view(row, active),
             sessions=sessions,
@@ -370,6 +376,7 @@ class ProjectService:
         memory_enabled: bool | None = None,
         memory_mode: str | None = None,
         acting_principal_id: str | None,
+        expected_revision: str | None = None,
     ) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -378,6 +385,11 @@ class ProjectService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        # §13.2 item 6 — a stale editor must not save old instructions over new ones.
+        if expected_revision is not None and (
+            context_revision(self.store.load_project_context(project_id)) != expected_revision
+        ):
+            return ControlResult(ok=False, reason_code=PROJECT_CONFLICT)
         cleaned = instructions.strip()
         if len(cleaned) > 4000:
             return ControlResult(ok=False, reason_code="project_instructions_too_long")
@@ -401,6 +413,7 @@ class ProjectService:
             owner_principal_id=principal.principal_id,
         )
         context = self.store.load_project_context(project_id)
+        context["revision"] = context_revision(context)
         return ControlResult(
             ok=True,
             data=context,
@@ -450,7 +463,11 @@ class ProjectService:
         return ControlResult(ok=True, data={"project_id": project_id, "archived": False})
 
     def move_project(
-        self: DashboardService, project_id: str, new_parent_id: str | None, acting_principal_id: str | None
+        self: DashboardService,
+        project_id: str,
+        new_parent_id: str | None,
+        acting_principal_id: str | None,
+        expected_revision: str | None = None,
     ) -> ControlResult:
         """Move a project to a new parent (human-only).
 
@@ -464,8 +481,12 @@ class ProjectService:
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         user_id = principal.delegated_by_user_id
-        if self.store.load_project(project_id, user_id) is None:
+        current = self.store.load_project(project_id, user_id)
+        if current is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        # §13.2 item 6 — moved, renamed or archived elsewhere since the tree was read.
+        if expected_revision is not None and placement_revision(current) != expected_revision:
+            return ControlResult(ok=False, reason_code=PROJECT_CONFLICT)
         if new_parent_id is not None:
             if new_parent_id == project_id:
                 return ControlResult(ok=False, reason_code="project_move_into_itself")
@@ -556,4 +577,5 @@ class ProjectService:
             root_kind="attached" if row.get("root_kind") == "attached" else "managed",
             root_label=str(row.get("root_label") or "") or _default_root_label(row),
             last_activity_at=row.get("last_activity_at") or None,
+            revision=placement_revision(row),
         )

@@ -91,6 +91,25 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-10. Thirteen more decision-record steps
+> closed.** §13.2 item 6 is complete for the configuration it named: an MCP tool
+> is accepted only as the owner read it ([FIXED-813](FIXED_ITEMS.md#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it)), and stale MCP renames
+> ([FIXED-814](FIXED_ITEMS.md#fixed-814--a-stale-tab-could-rename-or-delete-an-mcp-server-it-no-longer-described)), channel changes ([FIXED-815](FIXED_ITEMS.md#fixed-815--a-stale-messaging-tab-could-re-admit-a-sender-removed-in-another)) and project saves and moves
+> ([FIXED-816](FIXED_ITEMS.md#fixed-816--a-stale-project-editor-saved-old-instructions-over-new-ones)) are refused with nothing written. DEC-14 step 10: **Pause** keeps a
+> channel's messages and starts and sends nothing ([FIXED-817](FIXED_ITEMS.md#fixed-817--a-channel-could-only-be-on-or-off-there-was-no-way-to-contain-it-and-keep-its-evidence)). DEC-21:
+> Personalisation previews and Discard restores ([FIXED-818](FIXED_ITEMS.md#fixed-818--personalisation-changed-the-shell-only-after-save-and-discard-left-the-theme-changed)), refuses values no page
+> applies and says looks are not behaviour ([FIXED-819](FIXED_ITEMS.md#fixed-819--an-appearance-value-no-page-offers-was-stored-and-nothing-said-looks-are-not-behaviour)); Updates says which
+> recovery point can open this data ([FIXED-820](FIXED_ITEMS.md#fixed-820--updates-listed-recovery-points-without-saying-whether-they-could-open-this-data)); the Git credential says when it
+> was last lent ([FIXED-826](FIXED_ITEMS.md#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used)). DEC-24 step 5: backups carry the checkpoint files and
+> uploads their rows point at ([FIXED-821](FIXED_ITEMS.md#fixed-821--a-backups-rows-pointed-at-checkpoint-files-and-uploads-it-did-not-hold)); step 3: a recovery matrix held to the
+> code ([FIXED-824](FIXED_ITEMS.md#fixed-824--what-happens-if-raiker-stops-in-the-middle-had-no-answer-in-one-place)), which found a routine a stopped host left running never ran
+> again ([FIXED-825](FIXED_ITEMS.md#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again)); step 7 and DEC-17 step 10: a signed provenance record and SBOM
+> beside each release ([FIXED-822](FIXED_ITEMS.md#fixed-822--a-release-published-no-sbom-and-nothing-bound-its-artifacts-to-their-inputs)) and a credential scan on every change
+> ([FIXED-823](FIXED_ITEMS.md#fixed-823--nothing-failed-a-change-that-committed-a-credential)). The round's identity-linked Anthropic key needs its workspace ID, so
+> no model turn ran; DEC-21b (GitHub.com OAuth), RR-AUTHORITY-01,
+> RR-INSTALL-01, RR-DESIGN-01, RR-VERIFY-01 and the decision records' other steps
+> remain open.
+>
 > **Implementation status, 2026-10-05 (fourth round). Ten more decision-record
 > steps closed.** DEC-24 step 5: Raiker makes its own backups — an encrypted
 > snapshot through SQLCipher's export with a manifest of checksum, schema and
@@ -1926,6 +1945,10 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-10.** Step 10 closed as [FIXED-817](FIXED_ITEMS.md#fixed-817--a-channel-could-only-be-on-or-off-there-was-no-way-to-contain-it-and-keep-its-evidence): **Pause** keeps receiving and
+> recording a channel's messages with their receipts, starts no work, and refuses
+> delivery, tests and the approval relay until **Resume**.
+>
 > **2026-10-05.** Step 9 closed for the generic webhook as [FIXED-771](FIXED_ITEMS.md#fixed-771--two-automated-parties-on-a-webhook-could-answer-each-other-until-the-rate-limit): an inbound
 > message that echoes one of Raiker's recent replies, or repeats itself a third
 > time in ten minutes, is refused before routing with a receipt. Telegram
@@ -1979,6 +2002,10 @@ delivery retry/dead letter, pause and secret-redaction tests.
 > listed as *New* or *Changed* with the server's own sentence until the owner
 > accepts it ([FIXED-753](FIXED_ITEMS.md#fixed-753--an-mcp-server-could-grow-new-tools-and-the-model-was-offered-them-on-the-next-turn), [FIXED-754](FIXED_ITEMS.md#fixed-754--an-mcp-tool-could-keep-its-name-and-change-what-it-told-the-model)). Catalogue and plugin digests (the rest of step 10)
 > remain.
+>
+> **2026-10-10.** Step 10's acceptance is bound to what the owner read: a held
+> tool is accepted only while its declaration matches the fingerprint the card
+> showed ([FIXED-813](FIXED_ITEMS.md#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it)). Catalogue and plugin digests remain.
 >
 > **2026-10-05 (second round).** Step 12's "Resume re-runs readiness, integrity
 > and policy checks" closed as [FIXED-767](FIXED_ITEMS.md#fixed-767--resuming-an-mcp-server-restored-its-old-trust-without-checking-it): a resumed server passes the connection
@@ -2090,6 +2117,12 @@ between approval and execution. All must fail before effect.
 > before any write, and each backup says whether this build can open it — the
 > oldest supported rollback is a backup whose generation is not newer. Step 7's
 > staged, atomic update remains.
+>
+> **2026-10-10.** Step 10 closed for the SBOM, checksums and provenance
+> ([FIXED-822](FIXED_ITEMS.md#fixed-822--a-release-published-no-sbom-and-nothing-bound-its-artifacts-to-their-inputs)): each release publishes its SPDX SBOM, `SHA256SUMS` and a provenance
+> record signed with the release key binding every artifact to the commit, the
+> lock and the SBOM, and `raiker-release verify` checks them. A release records
+> the schema generation it opens, which Updates reads ([FIXED-820](FIXED_ITEMS.md#fixed-820--updates-listed-recovery-points-without-saying-whether-they-could-open-this-data)). Step 7 remains.
 
 **Decision:** Supported desktop installers carry or install into an app-owned,
 versioned runtime and only the dependencies needed to run Raiker. Host Python or
@@ -2386,6 +2419,11 @@ symbols and tests rather than relying on line numbers that drift after edits.
    changed ([FIXED-808](FIXED_ITEMS.md#fixed-808--a-stale-permissions-tab-could-overwrite-a-newer-decision)); task creation takes an owner-scoped, payload-bound
    `Idempotency-Key`, a reused key on changed arguments refused
    ([FIXED-809](FIXED_ITEMS.md#fixed-809--a-task-sent-twice-was-filed-twice)). MCP, channel and project configuration mutations remain.
+   *2026-10-10:* they no longer do — MCP tool acceptance carries the declaration
+   fingerprint the page showed ([FIXED-813](FIXED_ITEMS.md#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it)), MCP rename/delete the name
+   ([FIXED-814](FIXED_ITEMS.md#fixed-814--a-stale-tab-could-rename-or-delete-an-mcp-server-it-no-longer-described)), every channel change the pairing revision ([FIXED-815](FIXED_ITEMS.md#fixed-815--a-stale-messaging-tab-could-re-admit-a-sender-removed-in-another)) and project
+   context and moves their revisions ([FIXED-816](FIXED_ITEMS.md#fixed-816--a-stale-project-editor-saved-old-instructions-over-new-ones)); each is a `409` with nothing
+   written.
 7. **Recovery and effect uncertainty:** A crashed command/message may have
    completed externally before its receipt was saved. Represent
    `outcome_unknown`, reconcile, then obtain an explicit retry decision if
@@ -2432,6 +2470,14 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > times** now formats every date in the interface, and the Country or region
 > select that changed nothing is gone ([FIXED-807](FIXED_ITEMS.md#fixed-807--dates-ignored-the-date-format-setting-and-country-or-region-changed-nothing)). Personalisation, Git
 > credential (DEC-21b) and Updates rows remain.
+>
+> **2026-10-10.** The Personalisation row closed: appearance is a reversible
+> preview with Save and Discard, theme included ([FIXED-818](FIXED_ITEMS.md#fixed-818--personalisation-changed-the-shell-only-after-save-and-discard-left-the-theme-changed)), unknown values are
+> refused and read as the default, and the page says looks never change the
+> agent ([FIXED-819](FIXED_ITEMS.md#fixed-819--an-appearance-value-no-page-offers-was-stored-and-nothing-said-looks-are-not-behaviour)). The Updates row's schema compatibility closed ([FIXED-820](FIXED_ITEMS.md#fixed-820--updates-listed-recovery-points-without-saying-whether-they-could-open-this-data));
+> download size, notes and the staged update stay with DEC-17 step 7. The Git
+> credential row's "last use" closed ([FIXED-826](FIXED_ITEMS.md#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used)); OAuth (DEC-21b) still waits on
+> the owner's registered application.
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2688,6 +2734,14 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > reported as the machine's memory; it is now named as damage
 > ([FIXED-812](FIXED_ITEMS.md#fixed-812--a-damaged-database-read-as-the-machines-memory-or-as-a-generic-failure)). Referenced blobs beyond the memory files (checkpoints,
 > artifacts), steps 2–3 and step 7 remain.
+>
+> **2026-10-10.** Step 5's referenced blobs closed: checkpoint objects and
+> uploads are copied, digested, verified and restored with the database
+> ([FIXED-821](FIXED_ITEMS.md#fixed-821--a-backups-rows-pointed-at-checkpoint-files-and-uploads-it-did-not-hold)). Step 3 closed as a recovery matrix held to the code and shown in
+> Observability ([FIXED-824](FIXED_ITEMS.md#fixed-824--what-happens-if-raiker-stops-in-the-middle-had-no-answer-in-one-place)); writing it found and fixed a routine left `running`
+> for ever by a stopped host ([FIXED-825](FIXED_ITEMS.md#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again)). Step 7 closed for the SBOM bound to
+> artifact digests ([FIXED-822](FIXED_ITEMS.md#fixed-822--a-release-published-no-sbom-and-nothing-bound-its-artifacts-to-their-inputs)) and a credential gate with owned, expiring
+> exceptions ([FIXED-823](FIXED_ITEMS.md#fixed-823--nothing-failed-a-change-that-committed-a-credential)); SAST and container scanning remain. Step 2 remains.
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.

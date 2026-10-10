@@ -98,6 +98,11 @@ class RecoveryPointView(TypedDict):
     path: str
     files: int
     bytes: int
+    #: DEC-21 Updates — the database generation that build can open; ``None``
+    #: when it recorded none.
+    schema_generation: int | None
+    #: Whether that build could open this workspace's database: ``None`` unknown.
+    opens_this_workspace: bool | None
 
 
 class ReleaseSigning(TypedDict):
@@ -162,6 +167,8 @@ class UpdateStatusView(TypedDict):
     checked_at: str | None
     targets: list[ReleaseTargetView]
     last_check: LastUpdateCheck | None
+    #: DEC-21 Updates — this workspace's database generation, ``None`` if unread.
+    workspace_schema_generation: int | None
 
 
 class UpdateCheckResult(UpdateStatusView):

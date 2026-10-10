@@ -373,7 +373,11 @@ says so immediately rather than asking you to confirm a stop that would reach
 nothing.
 
 The theme is a preference rather than a shell control, and lives in
-**Settings → Personalisation**.
+**Settings → Personalisation**. Theme, density and typeface show as soon as you
+choose them and are kept when you press **Save changes**; **Discard changes**,
+or leaving with them unsaved, puts back what you had. The theme is kept on this
+device. None of them changes Raiker's instructions, personality or what it may
+do.
 
 Settings keeps your edits until you press **Save changes** or **Discard
 changes**, across all of its sections. If you leave Settings for another page

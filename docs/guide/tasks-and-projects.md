@@ -95,6 +95,13 @@ filed somewhere — the next cycle runs in that same conversation and reads it, 
 replying is how you steer a routine without editing its instructions. Routine
 threads also appear on **Threads** beside your own conversations.
 
+**A run Raiker was stopped in the middle of is not lost or repeated.** If the
+host stops while a task is running, the next start settles that run as one that
+did not finish — its history says so — and does not run it again on its own,
+because what it did before stopping is not known. A routine moves to its next
+slot as after any failed cycle; read its conversation, then **Run now** if you
+want it again.
+
 Use the attachment panel to add a workspace path, image, or document. The same
 governed attachment payload used by Chat and Build is stored with the task and
 delivered when its scheduler turn starts. Attached files appear on the task card
@@ -295,7 +302,10 @@ long column:
 
 It opens on **Overview**, and the counts there say whether a section holds
 anything before you open it. An edit to the instructions is kept while you move
-between sections, and the other sections say so until you save it. Pictures made
+between sections, and the other sections say so until you save it. If the
+project's context was saved from another tab after this page opened it, **Save
+context** saves nothing and says so, keeping your text — reopen the project to
+see the newer version first. A move from a stale tree is refused the same way. Pictures made
 with no project chosen stand alone and are not shown under any project.
 
 Click any of those images to open **that** picture in Design, with the canvas

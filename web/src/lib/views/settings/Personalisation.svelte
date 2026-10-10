@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "../../components/Icon.svelte";
   import { WEATHER_LOCATION_KEY } from "../../environment";
-  import { applyTheme, loadThemeChoice, saveThemeChoice, type ThemeChoice } from "../../theme";
+  import type { ThemeChoice } from "../../theme";
 
   /*
    * REM-SET-APPEARANCE / REM-SET-GENERAL — the page an owner changes in a
@@ -19,23 +19,40 @@
    * every turn is told.
    */
 
-  let { settings, save }: { settings: Record<string, unknown>; save: (p: Record<string, unknown>) => void } =
-    $props();
+  /*
+   * DEC-21 Personalisation — every choice here is a preview until Save. Theme is
+   * held by Settings beside the rest of the draft (it is kept on this device,
+   * not the account), so Discard puts all three back together.
+   */
+  let {
+    settings,
+    save,
+    theme,
+    chooseTheme,
+  }: {
+    settings: Record<string, unknown>;
+    save: (p: Record<string, unknown>) => void;
+    theme: ThemeChoice;
+    chooseTheme: (value: ThemeChoice) => void;
+  } = $props();
 
-  let theme = $state<ThemeChoice>(loadThemeChoice());
   const THEME_OPTIONS: { value: ThemeChoice; label: string }[] = [
     { value: "light", label: "Light" },
     { value: "dark", label: "Dark" },
     { value: "system", label: "System" },
   ];
-  function chooseTheme(value: ThemeChoice) {
-    theme = value;
-    applyTheme(value);
-    saveThemeChoice(value);
-  }
-
-  const spacing = $derived((settings["personalisation.spacing"] as string) ?? "comfortable");
-  const font = $derived((settings["personalisation.font"] as string) ?? "sans");
+  // A stored value this build does not offer reads as the default, which is
+  // also what the shell applies for it.
+  const spacing = $derived(
+    ["compact", "comfortable", "spacious"].includes(settings["personalisation.spacing"] as string)
+      ? (settings["personalisation.spacing"] as string)
+      : "comfortable",
+  );
+  const font = $derived(
+    ["sans", "system", "mono"].includes(settings["personalisation.font"] as string)
+      ? (settings["personalisation.font"] as string)
+      : "sans",
+  );
   const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
   /** Open when the owner has tuned either of them, so a non-default is never hidden. */
   const tuned = $derived(spacing !== "comfortable" || font !== "sans");
@@ -62,10 +79,16 @@
 <header class="section-heading">
   <h2>Personalisation</h2>
   <p>Choose how Raiker looks and how much information fits on screen.</p>
+  <!-- DEC-21 Personalisation — said where the choice is made, because
+       "personalisation" reads as if it might shape the assistant too. -->
+  <p class="note">
+    Each choice shows at once and is kept when you save; Discard puts back what you had.
+    These change only how Raiker looks — never its instructions, its personality or what it may do.
+  </p>
 </header>
 
 <section class="settings-card">
-  <div class="card-heading"><h3>Theme</h3><p>Choose a light or dark appearance, or follow your device.</p></div>
+  <div class="card-heading"><h3>Theme</h3><p>Choose a light or dark appearance, or follow your device. Theme is kept on this device.</p></div>
   <div class="row" role="radiogroup" aria-label="Theme">
     {#each THEME_OPTIONS as option (option.value)}
       <button
@@ -146,6 +169,7 @@
   .section-heading { margin-bottom:var(--space-4); }
   .section-heading h2,.card-heading h3 { margin:0; }
   .section-heading p,.card-heading p { color:var(--text-2); margin:.3rem 0 0; }
+  .section-heading .note { font-size: var(--text-sm); color: var(--text-3); }
   .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--card-pad-y) var(--card-pad-x); margin-bottom:var(--space-4); }
   .row {
     display: flex;

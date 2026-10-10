@@ -59,6 +59,7 @@ const projects = {
       root_kind: "managed" as const,
       root_label: "composer",
       last_activity_at: null,
+      revision: "rev-1",
     },
   ],
 };

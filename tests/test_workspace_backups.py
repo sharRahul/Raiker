@@ -157,3 +157,54 @@ def test_the_routes_need_an_owner_and_say_what_they_did(tmp_path: Path, monkeypa
     assert client.post(f"/api/backups/{backup_id}/restore", headers=headers).status_code == 409
     assert client.delete(f"/api/backups/{backup_id}", headers=headers).status_code == 200
     assert client.post("/api/backups/bkp_missing/verify", headers=headers).status_code == 404
+
+
+def _seed_referenced_files(root: Path) -> tuple[Path, Path]:
+    objects = root / ".raiker" / "checkpoints" / "objects" / "ab"
+    objects.mkdir(parents=True, exist_ok=True)
+    blob = objects / ("ab" + "0" * 62)
+    blob.write_bytes(b"pre-image of a file a checkpoint can put back")
+    upload = root / ".raiker" / "artifacts" / "knowledge" / "notes.md"
+    upload.parent.mkdir(parents=True, exist_ok=True)
+    upload.write_text("# Notes\n", encoding="utf-8")
+    return blob, upload
+
+
+def test_a_backup_carries_the_files_its_rows_point_at(tmp_path: Path) -> None:
+    """DEC-24 step 5 — checkpoint pre-images and uploads travel with the database."""
+    store = _store_with_data(tmp_path)
+    blob, upload = _seed_referenced_files(tmp_path)
+    record = create_backup(store.connect(), tmp_path)
+    assert {"checkpoints", "artifacts"} <= set(record.included)
+    assert "checkpoints" not in record.not_included
+    assert record.trees["checkpoints"]["files"] == 1
+    assert record.trees["artifacts"]["files"] == 1
+    assert record.trees["checkpoints"]["bytes"] == blob.stat().st_size
+
+    restored = Path(restore_backup(tmp_path, record.backup_id).path)
+    assert (restored / ".raiker" / blob.relative_to(tmp_path / ".raiker")).read_bytes() == blob.read_bytes()
+    assert (restored / ".raiker" / upload.relative_to(tmp_path / ".raiker")).read_text() == "# Notes\n"
+
+
+def test_verification_notices_a_changed_checkpoint_file(tmp_path: Path) -> None:
+    store = _store_with_data(tmp_path)
+    blob, _upload = _seed_referenced_files(tmp_path)
+    record = create_backup(store.connect(), tmp_path)
+    copied = backups_dir(tmp_path) / record.backup_id / blob.relative_to(tmp_path / ".raiker")
+    copied.write_bytes(b"tampered")
+    checked = verify_backup(tmp_path, record.backup_id)
+    assert checked.state == "damaged"
+    assert "checkpoint files" in checked.detail
+
+
+def test_an_in_place_restore_adds_back_lost_files_and_replaces_none(tmp_path: Path) -> None:
+    from raiker.storage.backup import restore_in_place
+
+    store = _store_with_data(tmp_path)
+    blob, upload = _seed_referenced_files(tmp_path)
+    record = create_backup(store.connect(), tmp_path)
+    blob.unlink()
+    upload.write_text("# Notes, edited since\n", encoding="utf-8")
+    restore_in_place(tmp_path, record.backup_id)
+    assert blob.read_bytes() == b"pre-image of a file a checkpoint can put back"
+    assert upload.read_text() == "# Notes, edited since\n"

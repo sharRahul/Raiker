@@ -318,6 +318,9 @@ class RecoveryPoint:
     path: Path
     files: int
     bytes: int
+    #: DEC-21 Updates — the database generation that build can open, from its
+    #: own ``installation.json``; ``None`` for a build that did not record one.
+    schema_generation: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -325,7 +328,20 @@ class RecoveryPoint:
             "path": str(self.path),
             "files": self.files,
             "bytes": self.bytes,
+            "schema_generation": self.schema_generation,
         }
+
+
+def _recorded_generation(point: Path) -> int | None:
+    """The ``schema_generation`` a retained build recorded about itself, if any."""
+    for candidate in (point / "installation.json", *sorted(point.glob("*/installation.json"))):
+        try:
+            value = json.loads(candidate.read_text(encoding="utf-8")).get("schema_generation")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if isinstance(value, int) and value >= 0:
+            return value
+    return None
 
 
 def recovery_points(recovery_root: str | Path) -> list[RecoveryPoint]:
@@ -350,6 +366,7 @@ def recovery_points(recovery_root: str | Path) -> list[RecoveryPoint]:
                 path=candidate,
                 files=len(files),
                 bytes=sum(path.stat().st_size for path in files),
+                schema_generation=_recorded_generation(candidate),
             )
         )
 

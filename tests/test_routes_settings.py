@@ -205,3 +205,18 @@ def test_config_change_hook_cannot_prevent_owner_turning_hooks_off(
         "hooks": {"disabled": True},
         "personalisation": {"theme": "dark"},
     }
+
+
+def test_an_appearance_value_no_page_can_apply_is_refused(client: TestClient) -> None:
+    """DEC-21 Personalisation — only the densities and typefaces a page offers are stored."""
+    token = _token(client, "alice")
+    for key, value in (("personalisation.spacing", "cramped"), ("personalisation.font", "comic")):
+        bad = client.put("/api/settings", json={"settings": {key: value}}, headers=_h(token))
+        assert bad.status_code == 422, bad.text
+        assert bad.json()["detail"] == "invalid_personalisation_value"
+    good = client.put(
+        "/api/settings",
+        json={"settings": {"personalisation.spacing": "compact", "personalisation.font": "mono"}},
+        headers=_h(token),
+    )
+    assert good.status_code == 200, good.text

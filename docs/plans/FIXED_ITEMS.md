@@ -834,6 +834,20 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-810](#fixed-810--cached-prompt-tokens-were-recorded-as-zero-and-priced-as-nothing) | Medium | Models / usage and cost | Fixed 2026-10-05 — found by the live round |
 | [FIXED-811](#fixed-811--a-profiles-stated-cache-rates-were-dropped) | Low | Models / pricing | Fixed 2026-10-05 — found by the live round |
 | [FIXED-812](#fixed-812--a-damaged-database-read-as-the-machines-memory-or-as-a-generic-failure) | Medium | Storage / lock screen | Fixed 2026-10-05 — found by the live round |
+| [FIXED-813](#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it) | High | MCP / authority | Fixed 2026-10-10 |
+| [FIXED-814](#fixed-814--a-stale-tab-could-rename-or-delete-an-mcp-server-it-no-longer-described) | Low | MCP | Fixed 2026-10-10 |
+| [FIXED-815](#fixed-815--a-stale-messaging-tab-could-re-admit-a-sender-removed-in-another) | Medium | Messaging | Fixed 2026-10-10 |
+| [FIXED-816](#fixed-816--a-stale-project-editor-saved-old-instructions-over-new-ones) | Medium | Projects | Fixed 2026-10-10 |
+| [FIXED-817](#fixed-817--a-channel-could-only-be-on-or-off-there-was-no-way-to-contain-it-and-keep-its-evidence) | Medium | Messaging | Fixed 2026-10-10 |
+| [FIXED-818](#fixed-818--personalisation-changed-the-shell-only-after-save-and-discard-left-the-theme-changed) | Low | Settings / Personalisation | Fixed 2026-10-10 |
+| [FIXED-819](#fixed-819--an-appearance-value-no-page-offers-was-stored-and-nothing-said-looks-are-not-behaviour) | Low | Settings / Personalisation | Fixed 2026-10-10 |
+| [FIXED-820](#fixed-820--updates-listed-recovery-points-without-saying-whether-they-could-open-this-data) | Medium | Updates | Fixed 2026-10-10 |
+| [FIXED-821](#fixed-821--a-backups-rows-pointed-at-checkpoint-files-and-uploads-it-did-not-hold) | Medium | Storage / backups | Fixed 2026-10-10 |
+| [FIXED-822](#fixed-822--a-release-published-no-sbom-and-nothing-bound-its-artifacts-to-their-inputs) | Medium | Release / supply chain | Fixed 2026-10-10 |
+| [FIXED-823](#fixed-823--nothing-failed-a-change-that-committed-a-credential) | Medium | CI / supply chain | Fixed 2026-10-10 |
+| [FIXED-824](#fixed-824--what-happens-if-raiker-stops-in-the-middle-had-no-answer-in-one-place) | Low | Operations | Fixed 2026-10-10 |
+| [FIXED-825](#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again) | High | Tasks / scheduler | Fixed 2026-10-10 — found writing the recovery matrix |
+| [FIXED-826](#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used) | Low | Settings / Git credential | Fixed 2026-10-10 |
 
 ---
 
@@ -31482,3 +31496,298 @@ still named as one.
 **Evidence.** `tests/test_lock_screen_recovery.py` (both paths, and the
 machine case). Live: the same workspace then read `store_unreadable` and was
 restored from the lock screen (captures 10–11).
+
+---
+
+## FIXED-813 — An MCP tool was accepted as the server declared it at the click, not as the owner read it
+
+**Severity: High. Area: MCP / authority. Status: Fixed 2026-10-10. §13.2 item 6
+and DEC-15 step 10.**
+
+**Observed.** Accepting a held tool sent only its name; the server accepted it
+"as declared now". A server re-lists its tools on every session, so a tool
+reworded between the card rendering and the click — *Delete one draft* becoming
+*Delete every note you have* — was accepted in words nobody read.
+
+**Fixed.** Each held tool carries the fingerprint of the declaration the card
+shows (`PendingTool.fingerprint`), and Accept sends it back
+(`ApproveMcpToolsRequest.fingerprints`). When any named tool no longer matches,
+nothing is accepted: `409 mcp_tool_changed`. The page re-reads the card, shows
+the server's new sentence and says *changed how it describes that tool since
+this page showed it, so nothing was accepted*. Clients that send no fingerprint
+behave as before.
+
+**Evidence.** `tests/test_mcp_tool_review.py::test_acceptance_is_of_the_declaration_the_owner_read`;
+`McpView.test.ts` (2). Live: capture
+[07](../screenshots/2026-10-10-revisions-round/07-mcp-tool-changed-not-accepted.png).
+
+---
+
+## FIXED-814 — A stale tab could rename or delete an MCP server it no longer described
+
+**Severity: Low. Area: MCP. Status: Fixed 2026-10-10. §13.2 item 6 for MCP
+configuration.**
+
+**Fixed.** Rename sends `expected_name` and Delete `?expected_name=` — the name
+the page showed. A server renamed elsewhere since is refused
+`409 mcp_server_conflict` in the same statement that would have written, and
+the page re-reads and says so. With this and FIXED-813, MCP's part of §13.2
+item 6 is closed.
+
+**Evidence.** `tests/test_mcp_runtime.py::test_api_rename_and_delete_carry_the_name_the_page_showed`;
+`McpView.test.ts`. Live: capture
+[08](../screenshots/2026-10-10-revisions-round/08-mcp-stale-rename-refused.png).
+
+---
+
+## FIXED-815 — A stale Messaging tab could re-admit a sender removed in another
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-10. §13.2 item 6 for
+channel configuration.**
+
+**Observed.** Enable, senders, routing, destination and unpair saved whatever
+the page held. A tab opened before a sender was removed saved the old allowlist
+back — the one list the receiver enforces — and said nothing.
+
+**Fixed.** Each pairing carries a revision (`raiker/channels/revision.py`, a
+digest of its owner-decided fields) on its profile; every change sends it as
+`expected_revision`, and a pairing changed since is `409 channel_conflict` with
+nothing written. Each answer carries the new revision. Messaging says *This
+channel was changed somewhere else since this page loaded, so nothing was
+changed* and shows the current settings.
+
+**Evidence.** `tests/test_channel_owner_surface.py` (service and route);
+`MessagingView.test.ts`. Live: two tabs — one removed `oncall`, the other's
+save of `oncall, ops` was refused and the stored list stayed `ops` (capture
+[04](../screenshots/2026-10-10-revisions-round/04-channel-stale-tab-refused.png)).
+
+---
+
+## FIXED-816 — A stale project editor saved old instructions over new ones
+
+**Severity: Medium. Area: Projects. Status: Fixed 2026-10-10. §13.2 item 6 for
+project configuration.**
+
+**Fixed.** A project's context (instructions, shared files, memory) carries a
+revision, and so does its placement (name, parent, archived)
+(`raiker/control/project_revision.py`). Save context and Move send the one the
+page read; a project changed since is `409 project_conflict`. The editor keeps
+the owner's text and says it was not saved; the move dialog explains the
+refusal. With FIXED-814 and FIXED-815, §13.2 item 6's MCP, channel and project
+mutations are all revision-checked.
+
+**Evidence.** `tests/test_projects.py::test_a_stale_editor_cannot_save_or_move_over_newer_state`;
+`ProjectsView.test.ts`. Live: capture
+[06](../screenshots/2026-10-10-revisions-round/06-project-stale-editor-refused.png) —
+the newer *Cite the tide tables* stayed stored.
+
+---
+
+## FIXED-817 — A channel could only be on or off; there was no way to contain it and keep its evidence
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-10. DEC-14 step 10.**
+
+**Observed.** Turning a channel off refuses messages outright, so containing a
+channel that was misbehaving lost what arrived while it was contained.
+
+**Fixed.** **Pause** (`PUT /api/channels/pairings/{id}/paused`, migration
+RAIKER-2096) is a third state. An allowlisted message is still checked
+(allowlist, budget, loop guard) and recorded — receipt and redacted preview,
+`held: channel_paused` — but no route runs: no turn, no interrupt, no reply.
+Delivery, test deliveries and the approval relay are refused `channel_paused`.
+Messaging labels it **Paused** and offers **Resume**; the receipt reads *Kept
+while paused — nothing started*. `channel_paused`/`channel_resumed` are audit
+events.
+
+**Evidence.** `tests/test_channel_owner_surface.py::test_a_paused_channel_keeps_what_arrives_and_starts_and_sends_nothing`;
+`MessagingView.test.ts` (2). Live: captures
+[05](../screenshots/2026-10-10-revisions-round/05-channel-paused-kept.png) and
+[13](../screenshots/2026-10-10-revisions-round/13-messaging-390-dark.png) (390, dark).
+
+---
+
+## FIXED-818 — Personalisation changed the shell only after Save, and Discard left the theme changed
+
+**Severity: Low. Area: Settings / Personalisation. Status: Fixed 2026-10-10.
+DEC-21 Personalisation row.**
+
+**Observed.** Density and typeface took effect only once saved, so the owner
+chose blind; theme took effect and was stored on the first click, outside the
+page's Save and Discard.
+
+**Fixed.** Density and typeface follow the draft as it changes
+(`applyAppearance`); Discard, or leaving Settings with the edit unsaved, puts
+the confirmed appearance back. Theme joins the same draft — previewed when
+chosen, remembered on this device only when saved, restored by Discard — and
+the page says theme is kept on this device. Notification and date preferences
+still wait for Save.
+
+**Evidence.** `SettingsView.test.ts` (3), `Personalisation.test.ts`. Live:
+captures [02](../screenshots/2026-10-10-revisions-round/02-appearance-previewed.png)
+(Compact and Dark previewed, unsaved) and
+[03](../screenshots/2026-10-10-revisions-round/03-appearance-discarded.png).
+
+---
+
+## FIXED-819 — An appearance value no page offers was stored, and nothing said looks are not behaviour
+
+**Severity: Low. Area: Settings / Personalisation. Status: Fixed 2026-10-10.
+DEC-21 Personalisation row.**
+
+**Fixed.** `PUT /api/settings` refuses a density or typeface no page applies
+(`422 invalid_personalisation_value`), and the page reads one already stored as
+the default. The page states that these choices change only how Raiker looks —
+never its instructions, its personality or what it may do.
+
+**Evidence.** `tests/test_routes_settings.py::test_an_appearance_value_no_page_can_apply_is_refused`;
+`Personalisation.test.ts` (2).
+
+---
+
+## FIXED-820 — Updates listed recovery points without saying whether they could open this data
+
+**Severity: Medium. Area: Updates. Status: Fixed 2026-10-10. DEC-21 Updates
+row's schema compatibility.**
+
+**Observed.** A recovery point was a version number. An older build refuses a
+database a newer one shaped (FIXED-803), so rolling back past a migration left
+the workspace locked — and the page offering the point said nothing.
+
+**Fixed.** A release records the schema generation it opens in
+`installation.json`; each recovery point reports it, and `GET /api/host/update`
+adds this workspace's generation and, per point, `opens_this_workspace`
+(true / false / unknown for a build that recorded none). Updates says *can open
+this workspace's data*, *would refuse … roll back only with a backup taken
+before that update*, or *not known*, and the offered-update text says the
+database is backed up before it migrates.
+
+**Evidence.** `tests/test_api_updates.py` (2); `Updates.test.ts`. Live: capture
+[10](../screenshots/2026-10-10-revisions-round/10-updates-recovery-compatibility.png).
+
+---
+
+## FIXED-821 — A backup's rows pointed at checkpoint files and uploads it did not hold
+
+**Severity: Medium. Area: Storage / backups. Status: Fixed 2026-10-10. DEC-24
+step 5's "referenced blobs".**
+
+**Observed.** Backups held the database and memory files; checkpoint
+pre-images (`.raiker/checkpoints`) and knowledge uploads (`.raiker/artifacts`)
+were listed as not included, so a restored workspace offered checkpoints and
+sources it could not deliver.
+
+**Fixed.** Both trees are copied with every backup (regular files only), and
+the manifest records each one's file count, size and a digest over every file,
+which **Verify** recomputes — a changed file is *Damaged*. A restore into a new
+folder carries them; the lock screen's in-place restore adds back only files
+the workspace lost and replaces none (checkpoint objects are named by their own
+hash; an upload present is newer). Only the database is encrypted; the page
+says the files are copied as the workspace keeps them. Not included now: the
+audit log and attached folders.
+
+**Evidence.** `tests/test_workspace_backups.py` (3); `BackupsCard.test.ts`.
+Live: capture [09](../screenshots/2026-10-10-revisions-round/09-backup-carries-files.png)
+(*1 checkpoint file · 1 upload*).
+
+---
+
+## FIXED-822 — A release published no SBOM and nothing bound its artifacts to their inputs
+
+**Severity: Medium. Area: Release / supply chain. Status: Fixed 2026-10-10.
+DEC-17 step 10, DEC-24 step 7 (SBOM bound to artifact digests), CI-03, REL-03.**
+
+**Observed.** Licensing generated an SPDX SBOM and discarded it; a release
+published artifacts and a signed channel index, and nothing tied an installer
+to the commit, the dependency lock or an SBOM.
+
+**Fixed.** `raiker-release provenance` writes `SHA256SUMS` and
+`release-provenance.json` — version, channel, source commit, workflow run, the
+SHA-256 of `uv.lock`, of the SBOM and of every artifact — signed with the
+release key (`.sig`). `raiker-release verify` checks the signature and every
+digest whenever the record is present. The release workflow's channel job
+generates `raiker-<version>.spdx.json`, binds it, and publishes all of it
+beside the installers; Licensing keeps its SBOM as a run artifact. This is a
+signed binding, not SLSA attestation.
+
+**Evidence.** `tests/test_release_pipeline.py::test_a_release_carries_a_signed_provenance_record_and_checksums`
+(a swapped SBOM is refused); `tests/test_release_workflow.py`. The release
+workflow is manual and was not run in this round.
+
+---
+
+## FIXED-823 — Nothing failed a change that committed a credential
+
+**Severity: Medium. Area: CI / supply chain. Status: Fixed 2026-10-10. DEC-24
+step 7's secret gate, CI-02.**
+
+**Fixed.** `scripts/scan_secrets.py`, run by CI's Python job, scans every
+tracked file for published credential formats (Anthropic, OpenAI, GitHub, AWS,
+Slack, Google, Stripe live keys, private-key headers) and reports each finding
+by file, line, rule and a fingerprint — never the value. A deliberate fixture is
+excused in `.github/secret-scan-exceptions.json` with an owner, a reason and an
+expiry; an expired or unused exception fails like the finding. The 30 existing
+test fixtures (all fake) are listed, expiring 2027-04-10.
+
+**Evidence.** `tests/test_scan_secrets.py` (5), including the repository
+passing its own scan.
+
+---
+
+## FIXED-824 — "What happens if Raiker stops in the middle?" had no answer in one place
+
+**Severity: Low. Area: Operations. Status: Fixed 2026-10-10. DEC-24 step 3.**
+
+**Fixed.** `raiker/recovery_matrix.py` states, per subsystem — tasks,
+approval continuations, background commands, model operations, channels,
+notices, indexes, the database, updates, MCP servers — its source of truth, how
+work is claimed, what a restart does, what happens to an effect whose result is
+unknown, what is cleaned up and what is left to the owner. Each row names the
+functions that do it, and a test resolves every one, so a row cannot outlive its
+code. `GET /api/diagnostics/recovery` serves it and Observability's *Runtime
+health, in detail* shows it as *If Raiker stops in the middle*. Writing it found
+FIXED-825.
+
+**Evidence.** `tests/test_recovery_matrix.py` (23); `DiagnosticsView.test.ts`
+(2). Live: capture [12](../screenshots/2026-10-10-revisions-round/12-diagnostics-recovery-matrix.png).
+
+---
+
+## FIXED-825 — A routine a stopped host left running never ran again
+
+**Severity: High. Area: Tasks / scheduler. Status: Fixed 2026-10-10 — found
+writing DEC-24 step 3's recovery matrix.**
+
+**Observed.** A scheduled run is claimed `queued → running` and awaited in the
+host process. A host stopped mid-run left the row `running` with nothing
+advancing it, and only `queued` work is ever claimed — so a routine in that
+state never ran again, and its card went on saying it was running.
+
+**Fixed.** At start, before the first tick, `TaskScheduler.settle_interrupted_runs`
+settles every task left `running` or `continuing` as a run that did not
+complete — *Raiker stopped while this run was in progress … It was not run
+again on its own* — never retried, since what it did is unknown. A routine
+moves to its next slot as any failed cycle does (and counts towards the
+three-failure pause); one being cancelled is cancelled.
+
+**Evidence.** `tests/test_task_scheduler.py::test_a_run_the_host_stopped_in_the_middle_of_is_settled_not_left_running`.
+Live: a routine left `running`, the host restarted, and it read `queued` for
+2026-10-11 07:00 with the statement in its history (capture
+[14](../screenshots/2026-10-10-revisions-round/14-interrupted-run-settled.png)).
+
+---
+
+## FIXED-826 — The Git credential said how long an approval lasts and never when it was used
+
+**Severity: Low. Area: Settings / Git credential. Status: Fixed 2026-10-10.
+DEC-21 Git credential row's "show expiry and last use".**
+
+**Fixed.** Each loan records when and for what (`last_used_at`,
+`last_operation`; migration RAIKER-2097; the push executor lends with
+`operation="push"`). The status carries the most recent loan under any grant,
+so it outlives the one-command approval it was lent under, and the page says
+*Last lent … to push a branch, under a one-command approval* or *Never lent to a
+git command yet*.
+
+**Evidence.** `tests/test_git_credential_grant.py::test_the_status_says_when_the_credential_was_last_lent`;
+`GitCredential.test.ts` (2). Live: capture
+[11](../screenshots/2026-10-10-revisions-round/11-git-credential-last-lent.png).

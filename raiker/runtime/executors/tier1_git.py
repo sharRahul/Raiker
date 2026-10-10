@@ -220,7 +220,7 @@ class GitPushExecutor:
             # path is the legacy environment credential.
             return None, lambda: None
         broker = GitCredentialBroker(self._store, principal.principal_id)
-        loan = broker.lend(session_id=action.arguments.get("session_id"))
+        loan = broker.lend(session_id=action.arguments.get("session_id"), operation="push")
         try:
             environment = loan.__enter__()
         except GitCredentialError as exc:

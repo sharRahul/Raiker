@@ -187,6 +187,22 @@ const PREFIX_CODES: Record<string, ReasonCopy> = {
     plain: "This permission was changed somewhere else since this page loaded, so nothing was changed.",
     remediation: "The page now shows the current setting; choose again if you still want to change it.",
   },
+  project_conflict: {
+    plain: "This project was changed somewhere else since the page loaded, so nothing was changed.",
+    remediation: "Close this and reopen the project to see where it is now.",
+  },
+  channel_conflict: {
+    plain: "This channel was changed somewhere else since the page loaded, so nothing was changed.",
+    remediation: "The page now shows its current settings; change it again if you still want to.",
+  },
+  mcp_server_conflict: {
+    plain: "This MCP server was renamed somewhere else since the page loaded, so nothing was changed.",
+    remediation: "The page now shows its current name; try again if you still want the change.",
+  },
+  mcp_tool_changed: {
+    plain: "The server changed how it describes this tool since the page showed it, so nothing was accepted.",
+    remediation: "Read what the server says now, then accept again if you still want it offered.",
+  },
 };
 
 /** Resolve a machine reason_code to plain-English copy, never hiding the raw code. */

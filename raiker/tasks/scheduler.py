@@ -341,6 +341,35 @@ class TaskScheduler:
             self._land_outcome(manager, task_id, response.status, response.message)
         return resumed
 
+    def settle_interrupted_runs(self) -> list[str]:
+        """Settle every run a host restart took the worker of (DEC-24 step 3).
+
+        A run lives in this process: the scheduler claims a task (``queued`` →
+        ``running``) and awaits its turn. A host that stopped mid-run left the
+        row ``running`` with nothing advancing it — and because only ``queued``
+        work is ever claimed, a routine in that state never ran again and said
+        nothing. Called once at start, before the first tick, so no run of this
+        process can be one of them.
+
+        Each is settled as a run that did not complete and **is not retried**:
+        what it did before the host stopped is unknown, and an uncertain
+        external effect is never replayed on its own. A routine moves to its
+        next slot the way any failed cycle does (and counts towards pausing);
+        a task an owner was already cancelling is cancelled.
+        """
+        manager = TaskManager(self.store, EventLogWriter(self.store))
+        settled: list[str] = []
+        for status in ("running", "continuing", "cancelling"):
+            for task in self.store.list_tasks(status=status):
+                if status == "cancelling":
+                    manager.cancel_task(
+                        task.task_id, "Cancelled: Raiker stopped while this was being cancelled."
+                    )
+                else:
+                    self._land_outcome(manager, task.task_id, "failed", INTERRUPTED_BY_RESTART)
+                settled.append(task.task_id)
+        return settled
+
     def _land_outcome(
         self, manager: TaskManager, task_id: str, status: str, message: str
     ) -> None:
@@ -614,6 +643,13 @@ RUN_OUTCOMES: dict[str, tuple[str, str]] = {
 #: paused and the owner told. Three is "this is not a one-off": a provider blip
 #: or a host that woke offline fails once, a broken routine fails every time.
 ROUTINE_FAILURE_LIMIT = 3
+
+#: DEC-24 step 3 — what a run the host stopped in the middle of says.
+INTERRUPTED_BY_RESTART = (
+    "Raiker stopped while this run was in progress, so it did not finish. It was not "
+    "run again on its own, because what it did before stopping is not known — check "
+    "its conversation before running it again."
+)
 
 #: What a skipped slot says, on the card and in the routine's history.
 MISSED_RUN_SKIPPED = (

@@ -145,6 +145,7 @@ CASES: Cases = {
         with_turn(""), lambda c, h: "/api/checkpoints/" + first(c, h, "/api/checkpoints", "checkpoint_id")
     ),
     ("GET", "/api/diagnostics"): plain("/api/diagnostics"),
+    ("GET", "/api/diagnostics/recovery"): plain("/api/diagnostics/recovery"),
     ("GET", "/api/mcp/servers/{server_id}/findings"): _mcp_finding,
     ("GET", "/api/memory/settings"): plain("/api/memory/settings"),
     ("GET", "/api/notifications"): then(_finding, lambda c, h: "/api/notifications"),

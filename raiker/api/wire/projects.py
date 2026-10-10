@@ -61,6 +61,7 @@ class ProjectContextSaved(TypedDict):
     attachment_ids: list[str]
     memory_enabled: bool
     memory_mode: Literal["inherit", "enabled", "disabled"]
+    revision: str
 
 
 class ProjectDeleted(TypedDict):

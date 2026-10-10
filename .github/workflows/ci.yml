@@ -96,6 +96,12 @@ jobs:
       - name: Run the SQLCipher posture tests without the job-wide override
         run: |
           python -m pytest tests/test_sqlcipher_memory_security.py tests/test_memory_sqlcipher.py -vv
+      # DEC-24 step 7 / CI-02 — a committed credential fails the change. Only
+      # published key formats are matched; a deliberate fixture is excused in
+      # .github/secret-scan-exceptions.json with an owner, reason and expiry.
+      - name: Scan for committed credentials
+        run: |
+          python scripts/scan_secrets.py
       - name: Run ruff
         run: |
           python -m ruff check .

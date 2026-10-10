@@ -33,6 +33,15 @@ separate facts, and the page shows them separately:
   and whether that host is on the egress allowlist. Changing it forgets the last
   test. Telegram has no address to set: it delivers to your own chat.
 - **Senders** edits the allowlist after pairing.
+- **Pause** (on a channel that is on) contains it without losing anything: a
+  message from an allowed sender is still received and recorded — its receipt
+  reads *Kept while paused — nothing started* — but it starts no work, and
+  nothing is delivered to or relayed through the channel, tests included, until
+  **Resume**. **Turn off** refuses messages instead.
+- Every change on this page applies only to the channel as the page shows it.
+  If another tab changed it since this page loaded — removed a sender, say —
+  nothing is changed, the page says so and shows the current settings, so a
+  stale page cannot put an old allowlist back.
 - **Unpair** deletes the link. Both the outbound executor and the inbound
   receiver read that record, so unpairing is what actually stops the channel.
 - **Routing** chooses `record_only`, a normal owner turn, a tool-free side

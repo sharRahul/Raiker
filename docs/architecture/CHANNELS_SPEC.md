@@ -535,6 +535,20 @@ Tests must prove:
 - unlink revokes local capability but preserves audit history;
 - enabled interfaces use equal gateway contracts and do not bypass policy.
 
+## Pause and configuration revisions (2026-10-10)
+
+A paired, enabled channel can be **paused** (DEC-14 step 10, migration
+RAIKER-2096). The receiver still authenticates, applies the sender allowlist,
+the per-sender budget and the loop guard, and records an allowed message's
+receipt (`channel_paused`, no failure) and redacted preview — but runs no
+route. Outbound delivery, test delivery and the approval relay are refused
+`channel_paused`. Paused is distinct from off, which refuses messages outright.
+
+Every owner change to a pairing — enabled, paused, senders, routing,
+destination, unpair — may carry `expected_revision`, a digest of the pairing's
+owner-decided fields (`raiker/channels/revision.py`). A pairing changed since is
+`409 channel_conflict` with nothing written (§13.2 item 6).
+
 ## Personal-goal continuity target
 
 PAA-10 links a paired channel request and supported result delivery to the same

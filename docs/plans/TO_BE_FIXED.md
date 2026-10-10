@@ -130,6 +130,7 @@ names.
 | [BUG-324](#bug-324--deleting-a-project-a-task-or-a-picture-is-not-journalled-so-a-restore-brings-it-back) | Low | Storage / restore | Open — FIXED-802 journals forgotten and purged memories and deleted conversations; a project, task or Design picture deleted after a backup still comes back with a restore |
 | [BUG-325](#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause) | Low | Tasks / cost limit | Open — a run's spend is counted per orchestrator, and a run continued after an approval starts counting again |
 | [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
+| [BUG-327](#bug-327--the-2026-10-10-rounds-changes-were-proved-without-a-model-turn) | Low | Live evidence | Open — the round's identity-linked Anthropic key needs its workspace ID, so FIXED-813 to FIXED-826 have no real-provider turn behind them |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2484,6 +2485,26 @@ test that imports the orchestrator first does.
 
 **Proposed fix.** Move the image executor's `get_model_connection` import into
 the function that uses it, and add an import-each-module-alone test.
+
+## BUG-327 — The 2026-10-10 round's changes were proved without a model turn
+
+**Severity: Low. Area: Live evidence. Status: Open — found 2026-10-10.**
+
+**Observed.** The Anthropic key supplied for the round is identity-linked
+(`sk-ant-usr-`). Anthropic refuses every request from it without an
+`anthropic-workspace-id` header, and the key cannot list its workspaces
+(`/v1/organizations/workspaces` answers 403), so no workspace ID could be found.
+Raiker explained this correctly in the Connect dialog (BUG-272's handling), but
+no model answered anything in the round.
+
+**Effect.** FIXED-813 to FIXED-826 are proved by tests and by the live host
+without a model: none of them changes what a model is sent, but the round has
+no real-provider turn confirming that a turn still runs end to end on this
+build.
+
+**Proposed fix.** Re-run `web/e2e/round-2026-10-10-revisions-live.spec.ts` with
+the key's workspace ID entered beside it (Models → Anthropic → workspace ID), or
+with a workspace-scoped key, and add one Chat turn.
 
 ## Decision statements added 2026-10-05
 

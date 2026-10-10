@@ -22,18 +22,31 @@ class ChannelEnabledSet(TypedDict):
     ok: bool
     pairing_id: str
     enabled: bool
+    #: §13.2 item 6 — the pairing's revision after this change.
+    revision: NotRequired[str]
+
+
+class ChannelPausedSet(TypedDict):
+    """DEC-14 step 10 — paused keeps receiving and recording; it starts and sends nothing."""
+
+    ok: bool
+    pairing_id: str
+    paused: bool
+    revision: NotRequired[str]
 
 
 class ChannelSendersSet(TypedDict):
     ok: bool
     pairing_id: str
     sender_count: int
+    revision: NotRequired[str]
 
 
 class ChannelRoutingSet(TypedDict):
     ok: bool
     pairing_id: str
     routing_mode: ChannelRoutingMode
+    revision: NotRequired[str]
 
 
 class ChannelUnpaired(TypedDict):
@@ -82,6 +95,7 @@ class ChannelDestinationSet(TypedDict):
     ok: bool
     pairing_id: str
     has_destination: bool
+    revision: NotRequired[str]
 
 
 class ChannelUpdateIgnored(TypedDict):

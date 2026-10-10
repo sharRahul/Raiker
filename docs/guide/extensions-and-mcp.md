@@ -231,9 +231,13 @@ the way you accepted it.
   reworded description is a different promise to the model.
 - A held tool is not offered to the model, and a call to it is refused, from
   every path. The server's card lists each held tool with the server's own
-  sentence about it, and **Accept** (or **Accept all**) takes it as it reads
-  now; if it changes again, it is held again. Each acceptance is recorded in the
+  sentence about it, and **Accept** (or **Accept all**) takes it as the card
+  shows it. If the server rewords it between the card appearing and your click,
+  nothing is accepted and the card shows what it says now; if it changes after
+  you accept, it is held again. Each acceptance is recorded in the
   audit log by tool name.
+- **Rename** and **Delete** act only on the server as this page shows it: if
+  another tab renamed it meanwhile, nothing changes and the page says so.
 - **Test** says how many it held, and the notification centre tells you once
   when a reconnect holds something new. The card's purpose line only ever
   quotes a tool you have accepted.

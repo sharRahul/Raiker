@@ -40,6 +40,7 @@ from typing import Any, Literal
 from typing_extensions import TypedDict
 
 __all__ = [
+    "McpToolChanged",
     "PendingTool",
     "approved_tool_names",
     "decode_approved",
@@ -55,6 +56,17 @@ class PendingTool(TypedDict):
     name: str
     change: Literal["new", "changed"]
     description: str
+    #: The declaration this card shows. Accepting sends it back, so what is
+    #: accepted is what was read — not whatever the server says by then.
+    fingerprint: str
+
+
+class McpToolChanged(Exception):
+    """A tool's declaration is no longer the one the owner was shown."""
+
+    def __init__(self, names: list[str]) -> None:
+        super().__init__(", ".join(names))
+        self.names = names
 
 
 def _declaration_map(tool_schemas: Iterable[Any] | None) -> dict[str, Mapping[str, Any]]:
@@ -143,6 +155,7 @@ def pending_tools(row: Mapping[str, Any]) -> list[PendingTool]:
                 name=name,
                 change="changed" if name in approved else "new",
                 description=str((declared.get(name) or {}).get("description") or ""),
+                fingerprint=mark,
             )
         )
     return sorted(held, key=lambda tool: (tool["change"] != "new", tool["name"]))

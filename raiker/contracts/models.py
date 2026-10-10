@@ -475,6 +475,8 @@ EVENT_TYPES = {
     "channel_message_received",
     "channel_message_routed",
     "channel_routing_changed",
+    "channel_paused",
+    "channel_resumed",
     "channel_message_rejected",
     "approval_relay_requested",
     "approval_relay_approved",

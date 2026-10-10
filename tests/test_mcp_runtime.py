@@ -473,6 +473,30 @@ def test_api_rename_mcp_server(tmp_path: Path) -> None:
     assert client.get("/api/mcp/servers").json()[0]["name"] == "renamed-echo"
 
 
+def test_api_rename_and_delete_carry_the_name_the_page_showed(tmp_path: Path) -> None:
+    """§13.2 item 6 — a tab still showing the old name cannot rename or delete over a newer one."""
+    _ws, client = _mgmt_client(tmp_path, "mgmt_rename_stale")
+    client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    server_id = client.get("/api/mcp/servers").json()[0]["server_id"]
+    first = client.put(
+        f"/api/mcp/servers/{server_id}", json={"name": "notes", "expected_name": "echo"}
+    )
+    assert first.status_code == 200, first.text
+
+    stale = client.put(
+        f"/api/mcp/servers/{server_id}", json={"name": "scratch", "expected_name": "echo"}
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["detail"]["reason_code"] == "mcp_server_conflict"
+    stale_delete = client.delete(f"/api/mcp/servers/{server_id}?expected_name=echo")
+    assert stale_delete.status_code == 409, stale_delete.text
+    assert client.get("/api/mcp/servers").json()[0]["name"] == "notes"
+
+    current = client.delete(f"/api/mcp/servers/{server_id}?expected_name=notes")
+    assert current.status_code == 200, current.text
+    assert client.get("/api/mcp/servers").json() == []
+
+
 def test_api_rename_rejects_empty_name(tmp_path: Path) -> None:
     _ws, client = _mgmt_client(tmp_path, "mgmt_rename_bad")
     client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})

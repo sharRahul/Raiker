@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { localTime } from "../../format";
+  import { localDateTime, localTime, relativeTime } from "../../format";
   /**
    * REM-SET-GIT — scope before secret.
    *
@@ -240,6 +240,18 @@
           <p class="state">Store a token above before approving anything.</p>
         {/if}
       {/if}
+      <!-- DEC-21 Git credential — when it was last lent, and for what. Expiry
+           says how long an approval lasts; this says whether one was used. -->
+      <p class="state" data-testid="git-last-use">
+        {#if status.last_used}
+          Last lent {relativeTime(status.last_used.at)}
+          (<span title={status.last_used.at}>{localDateTime(new Date(status.last_used.at))}</span>)
+          {status.last_used.operation === "push" ? "to push a branch" : "for a git command"},
+          under {status.last_used.scope === "session" ? "a session approval" : "a one-command approval"}.
+        {:else}
+          Never lent to a git command yet.
+        {/if}
+      </p>
     </div>
   {/if}
 </section>

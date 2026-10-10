@@ -674,3 +674,133 @@ def test_an_echo_of_raikers_own_reply_and_a_third_repeat_are_refused(
         for row in service.store.list_channel_receipts(WEBHOOKS, limit=20)
     }
     assert {"loop_echo", "loop_repeated"} <= reasons
+
+
+def test_a_change_made_against_an_older_revision_is_refused(workspace: Path, owner: str) -> None:
+    """§13.2 item 6 — a stale tab cannot re-admit a sender the owner removed elsewhere."""
+    service = DashboardService(workspace)
+    paired = service.pair_channel(owner, WEBHOOKS, "Ops", ["ops", "oncall"])
+    assert paired.ok, paired.reason_code
+    pairing_id = paired.data["pairing_id"]
+    read_by_both_tabs = _profile(service, owner)["revision"]
+    assert read_by_both_tabs
+
+    first = service.set_channel_senders(owner, pairing_id, ["ops"], read_by_both_tabs)
+    assert first.ok, first.reason_code
+    assert first.data["revision"] != read_by_both_tabs
+
+    stale = service.set_channel_senders(owner, pairing_id, ["ops", "oncall"], read_by_both_tabs)
+    assert not stale.ok and stale.reason_code == "channel_conflict"
+    assert _profile(service, owner)["senders"] == ["ops"]
+    for refused in (
+        service.set_channel_enabled(owner, pairing_id, True, read_by_both_tabs),
+        service.set_channel_routing(
+            owner, pairing_id, routing_mode="record_only", target_session_id=None,
+            owner_sender_id="ops", approval_relay_enabled=False,
+            expected_revision=read_by_both_tabs,
+        ),
+        service.set_channel_destination(
+            owner, pairing_id, "https://hooks.example.com/x", read_by_both_tabs
+        ),
+        service.unpair_channel(owner, pairing_id, read_by_both_tabs),
+    ):
+        assert refused.reason_code == "channel_conflict"
+    assert _profile(service, owner)["linked"] is True
+
+    # The current revision works, and a client that sends none behaves as before.
+    current = _profile(service, owner)["revision"]
+    assert service.set_channel_enabled(owner, pairing_id, True, current).ok
+    assert service.set_channel_enabled(owner, pairing_id, False).ok
+
+
+def test_the_route_answers_a_stale_change_with_409(workspace: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+
+    client = TestClient(create_app(workspace))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    pairing_id = client.post(
+        "/api/channels/pairings",
+        json={"connector_id": WEBHOOKS, "display_name": "Ops", "senders": ["ops"]},
+    ).json()["pairing_id"]
+    answer = client.put(
+        f"/api/channels/pairings/{pairing_id}/enabled",
+        json={"enabled": True, "expected_revision": "not-the-current-one"},
+    )
+    assert answer.status_code == 409, answer.text
+    assert answer.json()["detail"]["reason_code"] == "channel_conflict"
+    gone = client.delete(f"/api/channels/pairings/{pairing_id}?expected_revision=stale")
+    assert gone.status_code == 409
+
+
+def test_a_paused_channel_keeps_what_arrives_and_starts_and_sends_nothing(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DEC-14 step 10 — Pause contains a channel without losing its evidence."""
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.storage.sqlite import SQLiteStore
+
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret-inbound")
+    client = TestClient(create_app(workspace))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    pairing_id = client.post(
+        "/api/channels/pairings",
+        json={"connector_id": WEBHOOKS, "display_name": "Ops", "senders": ["ops"]},
+    ).json()["pairing_id"]
+    enabled = client.put(f"/api/channels/pairings/{pairing_id}/enabled", json={"enabled": True})
+    assert enabled.status_code == 200, enabled.text
+    paused = client.put(f"/api/channels/pairings/{pairing_id}/paused", json={"paused": True})
+    assert paused.status_code == 200, paused.text
+    assert paused.json()["paused"] is True
+
+    inbound = client.post(
+        f"/api/channels/{WEBHOOKS}/inbound",
+        json={"sender_id": "ops", "text": "deploy the thing"},
+        headers={"X-Raiker-Channel-Secret": "s3cret-inbound"},
+    )
+    assert inbound.status_code == 200, inbound.text
+    body = inbound.json()
+    assert body["routed"] is False and body["reason_code"] == "channel_paused"
+
+    store = SQLiteStore(workspace)
+    profile = next(
+        row for row in client.get("/api/channels").json()["profiles"]
+        if row["connector_id"] == WEBHOOKS
+    )
+    assert profile["paused"] is True and profile["enabled"] is True
+    assert profile["receipts"][0]["reason_code"] == "channel_paused"
+    assert profile["receipts"][0]["failed_at"] is None
+    received = store.list_event_index(session_id="channels", event_type="channel_message_received")
+    assert received, "the message is kept as evidence"
+
+    # Nothing is delivered through a paused channel, a test included.
+    from raiker.runtime.authority.models import Principal
+    from raiker.runtime.executors.channels import ExternalChannelExecutor
+    from tests.factories import governed_action
+
+    pairing = store.get_channel_pairing(pairing_id)
+    assert pairing is not None
+    owner_row = store.get_principal(str(pairing["paired_by"]))
+    assert owner_row is not None
+    held = ExternalChannelExecutor(workspace, store).execute(
+        governed_action(
+            "external_channel_runtime",
+            principal_id=owner_row["principal_id"],
+            risk_level="medium",
+            arguments={"connector_id": WEBHOOKS, "text": "hello"},
+        ),
+        Principal(**owner_row),
+    )
+    assert not held.ok and held.reason_code == "channel_paused"
+
+    resumed = client.put(
+        f"/api/channels/pairings/{pairing_id}/paused",
+        json={"paused": False, "expected_revision": profile["revision"]},
+    )
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["paused"] is False

@@ -199,10 +199,19 @@
     savingContext = true;
     contextError = null;
     try {
-      await api.saveProjectContext(detail.project.project_id, detail.context);
-      // Saved is the new baseline, so the section stops saying it is unsaved.
+      const saved = await api.saveProjectContext(detail.project.project_id, detail.context);
+      // Saved is the new baseline, so the section stops saying it is unsaved —
+      // and its revision is what the next save is checked against.
+      if (typeof saved?.revision === "string") detail.context.revision = saved.revision;
       contextBaseline = detail.context.instructions ?? "";
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "project_conflict") {
+        // §13.2 item 6 — nothing was written, and the owner's text is kept.
+        contextError =
+          "Not saved: this project's context was changed somewhere else since this page opened it. " +
+          "Your text is still here — reopen the project to see the newer version before saving.";
+        return;
+      }
       contextError = e instanceof ApiError ? `Could not save context (${e.status}).` : "Could not save context.";
     } finally {
       savingContext = false;

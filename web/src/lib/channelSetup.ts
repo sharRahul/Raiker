@@ -40,6 +40,7 @@ export function testReason(code: string | null | undefined): string {
   if (value === "disabled_by_capability_gate")
     return "the channel capability is off in Permissions";
   if (value === "channel_destination_missing") return "no delivery URL is set";
+  if (value === "channel_paused") return "the channel is paused — resume it to deliver";
   if (value === "telegram_bot_token_missing") return "RAIKER_TELEGRAM_BOT_TOKEN is not set";
   if (value === "telegram_chat_id_missing") return "no owner sender is chosen to deliver to";
   if (value.startsWith("egress_denied")) return "the host is not on the channel egress allowlist";
@@ -254,6 +255,8 @@ export function receiptConversationHref(receipt: Receipt): string | null {
 /** Where a receipt stopped, when it stopped short. */
 export function receiptOutcome(receipt: Receipt): string {
   if (receipt.failed_at) return `Failed: ${testReason(receipt.reason_code)}`;
+  // DEC-14 step 10 — kept while the channel was paused, never acted on.
+  if (receipt.reason_code === "channel_paused") return "Kept while paused — nothing started";
   if (receipt.kind === "test_delivery") return receipt.delivered_at ? "Delivered" : "Sent";
   if (receipt.delivered_at) return "Answered and returned to the caller";
   if (receipt.processed_at) return "Processed — no reply sent over the channel";

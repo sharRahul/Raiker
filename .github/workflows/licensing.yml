@@ -28,6 +28,16 @@ jobs:
         run: npm --prefix web ci
       - name: Validate licences and generate SPDX SBOM
         run: python scripts/licensing_check.py --sbom artifacts/licensing/raiker.spdx.json
+      # CI-03 — the SBOM is kept with the run that produced it rather than
+      # discarded; a release carries its own, bound to its artifacts.
+      - name: Keep the SBOM with this run
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sbom-spdx
+          path: artifacts/licensing/raiker.spdx.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Build and validate distributions
         run: |
           python -m build

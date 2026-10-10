@@ -179,6 +179,7 @@ class InstanceRuntime:
         recovery sweep that throws must not stop the host from booting.
         """
         from raiker.models.local_operations import ModelOperationService
+        from raiker.tasks.scheduler import TaskScheduler
 
         try:
             recovered = ModelOperationService(SQLiteStore(self.workspace_root)).recover_abandoned()
@@ -186,6 +187,14 @@ class InstanceRuntime:
                 _LOG.info("recovered %d model operation(s) abandoned by a host restart", recovered)
         except Exception as exc:  # noqa: BLE001 — boot must not depend on this
             _LOG.warning("model-operation recovery failed: %s", type(exc).__name__)
+        # DEC-24 step 3 — a task run is the same kind of row: its worker was
+        # this process, so one left running is settled, never resumed blind.
+        try:
+            interrupted = TaskScheduler(self.workspace_root).settle_interrupted_runs()
+            if interrupted:
+                _LOG.info("settled %d task run(s) interrupted by a host restart", len(interrupted))
+        except Exception as exc:  # noqa: BLE001 — boot must not depend on this
+            _LOG.warning("task-run recovery failed: %s", type(exc).__name__)
 
     # ── lifecycle ───────────────────────────────────────────────────────────
 

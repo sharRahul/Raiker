@@ -14,9 +14,17 @@ What this is, exactly:
   one read transaction. Nothing is ever written in plaintext, and the copy is
   opened and checked before it is called a backup.
 * **The memory files beside it.** Approved memories are also kept as Markdown
-  under ``.raiker/memory``; they are copied with the database. Checkpoints,
-  artifacts, the event log and attached folders are **not** included, and the
-  manifest says so rather than implying a whole workspace.
+  under ``.raiker/memory``; they are copied with the database.
+* **The files the database points at.** A checkpoint row names the
+  content-addressed pre-images under ``.raiker/checkpoints``, and a knowledge
+  upload names its file under ``.raiker/artifacts``; a restored database whose
+  rows point at nothing would offer restores and sources it cannot deliver
+  (DEC-24 step 5, "referenced blobs"). Both trees are copied, and the manifest
+  records each one's file count, size and a digest over every file, which
+  verification recomputes. They are copied as the workspace keeps them —
+  only the database is encrypted. The event log and attached folders are
+  **not** included, and the manifest says so rather than implying a whole
+  workspace.
 * **Key custody, stated.** The backup opens with this workspace's
   ``.raiker/app.key`` and nothing else. The manifest records a fingerprint of
   that key so a restore can say which key it needs; the key itself is never
@@ -25,6 +33,10 @@ What this is, exactly:
   into ``.raiker/restores/<backup id>/`` as a workspace of its own, with a copy
   of the key it needs, and says how to open it. Switching to it is the owner's
   act, taken with Raiker stopped.
+* **Referenced files are added back, never replaced.** Either restore copies a
+  checkpoint or upload file only where none of that name exists: checkpoint
+  objects are named by their own hash, so an existing one is the same bytes,
+  and an upload already there is newer than the backup.
 * **Except from the lock screen** (BUG-323). When the database will not open —
   this key does not open it, or a newer Raiker shaped it — there is no running
   workspace to protect, and :func:`restore_in_place` is the way back: verify
@@ -41,6 +53,7 @@ What this is, exactly:
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import shutil
@@ -63,9 +76,12 @@ MEMORY_DIR = "memory"
 #: Owner backups are kept until the owner removes them.
 PRE_MIGRATION_KEEP = 3
 
+#: The file trees under ``.raiker/`` the database's rows point at, copied with it.
+FILE_TREES = ("checkpoints", "artifacts")
+
 #: What a backup holds and does not, said in the manifest and on the page.
-INCLUDED = ("database", "memory_files")
-NOT_INCLUDED = ("checkpoints", "artifacts", "event_log", "attached_folders")
+INCLUDED = ("database", "memory_files", *FILE_TREES)
+NOT_INCLUDED = ("event_log", "attached_folders")
 
 #: Tables counted into the manifest, so a restored copy can be compared.
 COUNTED_TABLES = ("sessions", "turns", "tasks", "approved_memory", "projects", "notifications")
@@ -106,6 +122,49 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _tree_summary(path: Path) -> dict[str, Any]:
+    """``{files, bytes, sha256}`` of every file under ``path``, by relative name.
+
+    The digest covers each file's name and content hash in a fixed order, so a
+    file changed, added or removed after the backup was made is detected.
+    """
+    digest = hashlib.sha256()
+    files = 0
+    size = 0
+    if path.is_dir():
+        for entry in sorted(p for p in path.rglob("*") if p.is_file() and not p.is_symlink()):
+            relative = entry.relative_to(path).as_posix()
+            digest.update(relative.encode("utf-8") + b"\0" + _sha256(entry).encode("ascii") + b"\n")
+            files += 1
+            size += entry.stat().st_size
+    return {"files": files, "bytes": size, "sha256": digest.hexdigest()}
+
+
+def _copy_tree(source: Path, destination: Path) -> None:
+    """Copy regular files only — a link inside a workspace tree is not followed."""
+    for entry in sorted(source.rglob("*")):
+        if entry.is_symlink() or not entry.is_file():
+            continue
+        target = destination / entry.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(entry, target)
+
+
+def _add_missing(source: Path, destination: Path) -> int:
+    """Copy into ``destination`` only the files it does not already have."""
+    added = 0
+    for entry in sorted(source.rglob("*")):
+        if entry.is_symlink() or not entry.is_file():
+            continue
+        target = destination / entry.relative_to(source)
+        if target.exists():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(entry, target)
+        added += 1
+    return added
 
 
 def _open_copy(path: Path, key_hex: str) -> Any:
@@ -158,6 +217,9 @@ class BackupRecord:
     #: DEC-17 step 8 — ``PRAGMA user_version`` of the copy; 0 for a backup made
     #: before generations were written, which every current build can open.
     schema_generation: int = 0
+    #: DEC-24 step 5 — each copied file tree's ``{files, bytes, sha256}``; empty
+    #: for a backup made before trees were copied.
+    trees: dict[str, dict[str, Any]] = dataclasses.field(default_factory=dict)
 
     @property
     def opens_here(self) -> bool:
@@ -182,6 +244,7 @@ class BackupRecord:
             "detail": self.detail,
             "schema_generation": self.schema_generation,
             "opens_here": self.opens_here,
+            "trees": {name: dict(summary) for name, summary in self.trees.items()},
         }
 
     @classmethod
@@ -202,6 +265,15 @@ class BackupRecord:
             verified_at=data.get("verified_at"),
             detail=str(data.get("detail", "")),
             schema_generation=int(data.get("schema_generation", 0) or 0),
+            trees={
+                str(name): {
+                    "files": int(summary.get("files", 0)),
+                    "bytes": int(summary.get("bytes", 0)),
+                    "sha256": str(summary.get("sha256", "")),
+                }
+                for name, summary in dict(data.get("trees", {})).items()
+                if isinstance(summary, dict)
+            },
         )
 
 
@@ -232,6 +304,12 @@ def create_backup(connection: Any, workspace_root: Path, *, reason: str = "owner
         memory = internal_io_path(root / ".raiker" / "memory")
         if memory.is_dir():
             shutil.copytree(memory, target / MEMORY_DIR)
+        trees: dict[str, dict[str, Any]] = {}
+        for name in FILE_TREES:
+            live = internal_io_path(root / ".raiker" / name)
+            if live.is_dir():
+                _copy_tree(live, target / name)
+            trees[name] = _tree_summary(target / name)
         integrity, migrations, counts, generation = _inspect(database, key_hex)
         if integrity != "ok":
             raise BackupError("backup_damaged", f"The new copy failed its integrity check: {integrity[:200]}")
@@ -249,6 +327,7 @@ def create_backup(connection: Any, workspace_root: Path, *, reason: str = "owner
             not_included=NOT_INCLUDED,
             verified_at=utc_now(),
             schema_generation=generation,
+            trees=trees,
         )
         (target / MANIFEST).write_text(json.dumps(record.to_dict(), indent=2), encoding="utf-8")
     except BaseException:
@@ -316,6 +395,14 @@ def verify_backup(workspace_root: Path, backup_id: str) -> BackupRecord:
         else:
             if integrity != "ok":
                 state, detail = "damaged", f"It failed its integrity check: {integrity[:200]}"
+    if state == "verified":
+        for name, summary in record.trees.items():
+            if _tree_summary(target / name)["sha256"] != summary.get("sha256"):
+                label = "checkpoint files" if name == "checkpoints" else "uploaded files"
+                state, detail = "damaged", (
+                    f"The {label} copied into this backup no longer match what was copied."
+                )
+                break
     if state == "verified" and not record.opens_here:
         state, detail = "newer", (
             f"A newer Raiker made this backup (schema {record.schema_generation}; this build "
@@ -373,6 +460,9 @@ def restore_backup(workspace_root: Path, backup_id: str) -> RestoredWorkspace:
         shutil.copy2(source / DATABASE, runtime / DATABASE)
         if (source / MEMORY_DIR).is_dir():
             shutil.copytree(source / MEMORY_DIR, runtime / MEMORY_DIR)
+        for name in FILE_TREES:
+            if (source / name).is_dir():
+                _copy_tree(source / name, runtime / name)
         shutil.copy2(app_key_path(root), runtime / "app.key")
         integrity, _migrations, _counts, _generation = _inspect(runtime / DATABASE, _key_hex(root))
         if integrity != "ok":
@@ -455,6 +545,11 @@ def restore_in_place(workspace_root: Path, backup_id: str) -> InPlaceRestore:
         os.replace(staged, live_db)
         if (source / MEMORY_DIR).is_dir():
             shutil.copytree(source / MEMORY_DIR, runtime / MEMORY_DIR)
+        # The trees were never unreadable, so they are not quarantined: what the
+        # backup has and the workspace lost is added back, and nothing is replaced.
+        for name in FILE_TREES:
+            if (source / name).is_dir():
+                _add_missing(source / name, runtime / name)
         applied = _reapply_after(root, root, checked.created_at)
         integrity, _migrations, counts, _generation = _inspect(live_db, _key_hex(root))
         if integrity != "ok":

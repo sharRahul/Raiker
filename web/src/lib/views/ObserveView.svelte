@@ -447,7 +447,7 @@
         <summary>
           <span>
             <strong>Runtime health, in detail</strong>
-            <small>Failed readiness checks, health transitions and memory integrity.</small>
+            <small>Failed readiness checks, health transitions, memory integrity and what a restart does to each kind of work.</small>
           </span>
           <Icon name="chevron-down" size="md" />
         </summary>

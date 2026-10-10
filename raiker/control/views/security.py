@@ -120,6 +120,12 @@ class CheckpointCaptureHealth(TypedDict):
     remediation: str
 
 
+class BackupTreeView(TypedDict):
+    files: int
+    bytes: int
+    sha256: str
+
+
 class BackupView(TypedDict):
     """One encrypted backup of the workspace database (DEC-24 step 5)."""
 
@@ -145,6 +151,9 @@ class BackupView(TypedDict):
     #: generations were recorded), and whether this build can open it.
     schema_generation: int
     opens_here: bool
+    #: DEC-24 step 5 — each file tree copied with the database (``checkpoints``,
+    #: ``artifacts``): how many files, how large, and the digest verify checks.
+    trees: dict[str, BackupTreeView]
 
 
 class BackupsView(TypedDict):

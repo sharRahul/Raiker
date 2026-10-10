@@ -183,6 +183,20 @@ def test_a_one_shot_grant_is_spent_by_its_use(broker: GitCredentialBroker) -> No
     assert broker.active_grant() is None
 
 
+def test_the_status_says_when_the_credential_was_last_lent(broker: GitCredentialBroker) -> None:
+    """DEC-21 Git credential — last use outlives the one-shot grant it was lent under."""
+    broker.store_token(TOKEN)
+    assert broker.status()["last_used"] is None
+    broker.grant("once")
+    with broker.lend(operation="push"):
+        pass
+    last = broker.status()["last_used"]
+    assert last is not None
+    assert last["operation"] == "push" and last["scope"] == "once"
+    assert last["at"]
+    assert broker.active_grant() is None
+
+
 def test_a_session_grant_survives_a_use(broker: GitCredentialBroker) -> None:
     broker.store_token(TOKEN)
     broker.grant("session")

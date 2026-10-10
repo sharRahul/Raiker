@@ -159,3 +159,35 @@ def test_a_host_that_never_checked_is_not_reported_as_up_to_date(tmp_path: Path)
     assert status.checked_at is None
     # And it says which of the two it is, rather than sounding like the other.
     assert "unknown" in status.message
+
+
+def test_each_recovery_point_says_whether_it_can_open_this_workspace(
+    client: TestClient, workspace: Path
+) -> None:
+    """DEC-21 Updates — an older build refuses data a newer one shaped, so say which is which."""
+    import json
+
+    from raiker.app.installation import recovery_root
+    from raiker.storage.migrations import SCHEMA_GENERATION
+
+    root = recovery_root(workspace)
+    for version, generation in (("2.0.0", SCHEMA_GENERATION), ("1.0.0", SCHEMA_GENERATION - 5)):
+        (root / version).mkdir(parents=True)
+        (root / version / "installation.json").write_text(
+            json.dumps({"version": version, "schema_generation": generation})
+        )
+    (root / "0.9.0").mkdir()
+    (root / "0.9.0" / "version.txt").write_text("0.9.0\n")
+
+    body = client.get("/api/host/update", headers=_headers(client)).json()
+    assert body["workspace_schema_generation"] == SCHEMA_GENERATION
+    opens = {point["version"]: point["opens_this_workspace"] for point in body["recovery_points"]}
+    assert opens == {"2.0.0": True, "1.0.0": False, "0.9.0": None}
+
+
+def test_a_release_records_the_schema_generation_it_opens() -> None:
+    from raiker.app.release import TARGETS, installation_record
+    from raiker.storage.migrations import SCHEMA_GENERATION
+
+    record = installation_record(version="1.0.0", target=TARGETS[0], channel="stable", signed=False)
+    assert record["schema_generation"] == SCHEMA_GENERATION

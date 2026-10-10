@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**374 operations: 363 verified, 0 eligible, 0 deferred, 11 special.**
+**376 operations: 365 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -81,6 +81,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | DELETE | `/api/channels/pairings/{pairing_id}` |  | ChannelUnpaired | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/destination` | ChannelDestinationRequest | ChannelDestinationSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/enabled` | ChannelEnabledRequest | ChannelEnabledSet | verified | declared by cast |
+| PUT | `/api/channels/pairings/{pairing_id}/paused` | ChannelPausedRequest | ChannelPausedSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/routing` | ChannelRoutingRequest | ChannelRoutingSet | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/senders` | ChannelSendersRequest | ChannelSendersSet | verified | declared by cast |
 | POST | `/api/channels/{connector_id}/approval-response` | ChannelApprovalResponse | ApprovalRelayAnswered | verified | declared ApprovalRelayAnswered |
@@ -121,6 +122,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/credential-deltas/{run_id}/discard` | dict | CredentialDeltaDiscarded | verified | declared CredentialDeltaDiscarded |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  | DiagnosticsExport | verified | WebReadModels.diagnostics_export |
+| GET | `/api/diagnostics/recovery` |  | RecoveryMatrixView | verified | declared RecoveryMatrixView |
 | GET | `/api/environment` |  | EnvironmentContextView | verified | declared by cast |
 | GET | `/api/events` |  | EventView[] | verified | DashboardService.list_events |
 | GET | `/api/execution-environments` |  | ExecutionEnvironmentsView | verified | DashboardService.execution_environments |

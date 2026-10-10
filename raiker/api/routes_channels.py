@@ -18,6 +18,7 @@ from raiker.api.schemas import (
     ChannelApprovalResponse,
     ChannelDestinationRequest,
     ChannelEnabledRequest,
+    ChannelPausedRequest,
     ChannelRoutingRequest,
     ChannelSendersRequest,
     ChannelTestDeliveryRequest,
@@ -32,6 +33,7 @@ from raiker.api.wire.channels import (
     ChannelEnabledSet,
     ChannelInboundAccepted,
     ChannelPaired,
+    ChannelPausedSet,
     ChannelRoutingSet,
     ChannelSendersSet,
     ChannelTestDelivered,
@@ -40,6 +42,7 @@ from raiker.api.wire.channels import (
     InboundRoute,
 )
 from raiker.channels.adapters import adapter_for
+from raiker.channels.revision import CHANNEL_CONFLICT
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
@@ -211,6 +214,10 @@ def _channel_result(result: Any) -> dict[str, Any]:
     if result.ok:
         return {"ok": True, **result.data}
     reason = result.reason_code or ""
+    if reason == CHANNEL_CONFLICT:
+        # §13.2 item 6 — another tab changed this pairing since the page read
+        # it. Nothing was written; the page re-reads and the owner decides again.
+        raise refusal(status.HTTP_409_CONFLICT, reason)
     if (
         reason.startswith("unknown_connector")
         or reason.startswith("unknown_channel_pairing")
@@ -275,7 +282,28 @@ async def set_channel_enabled(
     answer = cast(
         ChannelEnabledSet,
         _channel_result(
-            _service(request).set_channel_enabled(auth_data[0].principal_id, pairing_id, body.enabled)
+            _service(request).set_channel_enabled(
+                auth_data[0].principal_id, pairing_id, body.enabled, body.expected_revision
+            )
+        ),
+    )
+    return serialize_dto(answer)
+
+
+@router.put("/api/channels/pairings/{pairing_id}/paused")
+async def set_channel_paused(
+    pairing_id: str,
+    body: ChannelPausedRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-14 step 10 — hold a channel: messages are kept, no work starts, nothing is sent."""
+    answer = cast(
+        ChannelPausedSet,
+        _channel_result(
+            _service(request).set_channel_paused(
+                auth_data[0].principal_id, pairing_id, body.paused, body.expected_revision
+            )
         ),
     )
     return serialize_dto(answer)
@@ -293,7 +321,10 @@ async def set_channel_senders(
         ChannelSendersSet,
         _channel_result(
             _service(request).set_channel_senders(
-                auth_data[0].principal_id, pairing_id, list(body.senders or [])
+                auth_data[0].principal_id,
+                pairing_id,
+                list(body.senders or []),
+                body.expected_revision,
             )
         ),
     )
@@ -317,6 +348,7 @@ async def set_channel_routing(
                 target_session_id=body.target_session_id,
                 owner_sender_id=body.owner_sender_id,
                 approval_relay_enabled=body.approval_relay_enabled,
+                expected_revision=body.expected_revision,
             )
         ),
     )
@@ -335,7 +367,7 @@ async def set_channel_destination(
         ChannelDestinationSet,
         _channel_result(
             _service(request).set_channel_destination(
-                auth_data[0].principal_id, pairing_id, body.delivery_url
+                auth_data[0].principal_id, pairing_id, body.delivery_url, body.expected_revision
             )
         ),
     )
@@ -346,12 +378,15 @@ async def set_channel_destination(
 async def unpair_channel(
     pairing_id: str,
     request: Request,
+    expected_revision: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     answer = cast(
         ChannelUnpaired,
         _channel_result(
-            _service(request).unpair_channel(auth_data[0].principal_id, pairing_id)
+            _service(request).unpair_channel(
+                auth_data[0].principal_id, pairing_id, expected_revision
+            )
         ),
     )
     return serialize_dto(answer)
@@ -591,6 +626,46 @@ async def _handle_inbound(
             },
         )
 
+    if bool(pairing.get("paused")):
+        # DEC-14 step 10 — the owner has contained this channel. The message is
+        # kept as evidence (its receipt and a redacted preview), but no route
+        # runs: no turn starts, no interrupt lands, nothing is replied. It is
+        # answered as accepted, so a sender's retry logic does not resend what
+        # was already recorded.
+        _receipt(
+            {"accepted_at": utc_now()},
+            role="owner" if is_owner else "allowed",
+            reason="channel_paused",
+        )
+        writer.append(make_event(
+            session_id="channels",
+            turn_id=None,
+            event_type="channel_message_received",
+            actor="channel_receiver",
+            payload={
+                "channel_message_id": channel_message_id,
+                "connector_id": connector_id,
+                "channel_type": channel_type,
+                "sender_id": sender_id,
+                "trust_level": "owner" if is_owner else "untrusted",
+                "quarantined": True,
+                "instructions_inert": True,
+                "preview": preview,
+                "conversation_scope": conversation_scope,
+                "held": "channel_paused",
+            },
+        ))
+        held = cast(ChannelInboundAccepted, {
+            "ok": True,
+            "channel_message_id": channel_message_id,
+            "trust_level": "owner" if is_owner else "untrusted",
+            "quarantined": True,
+            "routed": False,
+            "routing_mode": str(pairing.get("routing_mode") or "record_only"),
+            "reason_code": "channel_paused",
+        })
+        return held
+
     # Allowlisted sender, within budget: content stays structurally untrusted.
     # The stored owner route — never a field in this request — decides whether
     # anything else happens.
@@ -699,6 +774,9 @@ async def receive_approval_response(
     pairing = _enabled_pairing(store, connector_id)
     if pairing is None or not bool(pairing.get("approval_relay_enabled")):
         raise refusal(403, "channel_approval_relay_not_enabled")
+    if bool(pairing.get("paused")):
+        # DEC-14 step 10 — a paused channel decides nothing on the owner's behalf.
+        raise refusal(409, "channel_paused")
     owner_sender = str(pairing.get("owner_sender_id") or "")
     if not owner_sender or not hmac.compare_digest(body.sender_id, owner_sender):
         raise refusal(403, "channel_owner_sender_required")

@@ -451,6 +451,63 @@ describe("saving while the owner is still editing", () => {
 // DEC-09 step 5 — leaving Settings with an edit that was never saved asks
 // first; moving between its own sections does not, and nothing asks once the
 // edit is saved or discarded.
+// DEC-21 Personalisation — a choice previews before it is kept, and Discard or
+// leaving puts back what the account actually holds.
+describe("appearance is a reversible preview", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.spacing;
+    delete document.documentElement.dataset.theme;
+    window.localStorage.removeItem("raiker.theme");
+  });
+
+  it("shows a density before it is saved and puts it back on Discard", async () => {
+    const { putBodies } = stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+    const group = await screen.findByRole("radiogroup", { name: "Density" });
+    await fireEvent.click(within(group).getByRole("radio", { name: /Compact/ }));
+
+    await waitFor(() => expect(document.documentElement.dataset.spacing).toBe("compact"));
+    expect(putBodies).toHaveLength(0);
+
+    await fireEvent.click(screen.getByRole("button", { name: /discard/i }));
+    await waitFor(() => expect(document.documentElement.dataset.spacing).toBeUndefined());
+  });
+
+  it("previews a theme, keeps it only on Save, and restores it on Discard", async () => {
+    const { putBodies } = stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+    await fireEvent.click(await screen.findByRole("radio", { name: /Dark/ }));
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(window.localStorage.getItem("raiker.theme")).toBeNull();
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: /discard/i }));
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+
+    await fireEvent.click(screen.getByRole("radio", { name: /Dark/ }));
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    expect(window.localStorage.getItem("raiker.theme")).toBe("dark");
+    // The theme is this device's: nothing about it went to the account.
+    expect(putBodies).toHaveLength(0);
+  });
+
+  it("restores the kept appearance when Settings is left with a preview unsaved", async () => {
+    stubApi();
+    vi.stubGlobal("confirm", () => true);
+    const view = render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+    const group = await screen.findByRole("radiogroup", { name: "Density" });
+    await fireEvent.click(within(group).getByRole("radio", { name: /Spacious/ }));
+    await waitFor(() => expect(document.documentElement.dataset.spacing).toBe("spacious"));
+
+    view.unmount();
+    expect(document.documentElement.dataset.spacing).toBeUndefined();
+  });
+});
+
 describe("unsaved changes when leaving Settings", () => {
   async function editSomething() {
     await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));

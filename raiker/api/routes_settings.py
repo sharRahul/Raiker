@@ -31,6 +31,13 @@ from raiker.notify.delivery_policy import validate as validate_notification_sett
 from raiker.runtime.identity.presentation import resolve_presentation_identity
 from raiker.storage.sqlite import SQLiteStore
 
+#: DEC-21 Personalisation — the appearance values a page can apply. Visual only:
+#: none of them reaches a prompt, an instruction or an authority decision.
+PERSONALISATION_VALUES: dict[str, frozenset[str]] = {
+    "personalisation.spacing": frozenset({"compact", "comfortable", "spacious"}),
+    "personalisation.font": frozenset({"sans", "system", "mono"}),
+}
+
 router = APIRouter()
 
 SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk"}
@@ -187,6 +194,17 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="invalid_speech_language",
         )
+    # DEC-21 Personalisation — appearance is stored per account and applied by
+    # every page that loads. A value no page knows would be stored, read back
+    # as the default on one surface and as nothing on another, so it is refused
+    # here and the page keeps the confirmed appearance.
+    for key, allowed in PERSONALISATION_VALUES.items():
+        value = body.settings.get(key)
+        if value is not None and value not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="invalid_personalisation_value",
+            )
     # DEC-21a — quiet hours and interrupt preferences are policy the server
     # evaluates on every notice, so a value it cannot evaluate is refused here
     # rather than stored and silently read as the default.

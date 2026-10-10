@@ -475,6 +475,25 @@ jobs:
             --version "${{ inputs.version }}" \
             --channel "${{ inputs.channel }}" \
             --dir dist
+      # DEC-17 step 10 / DEC-24 step 7 — the SBOM is published beside the
+      # artifacts and bound to them, the commit and the lock in a provenance
+      # record signed with the release key. `verify` below checks it.
+      # The SBOM reads web/package-lock.json and the installed Python
+      # distributions, so it needs no node_modules.
+      - name: Generate the SBOM for this release
+        run: python scripts/licensing_check.py --sbom "dist/raiker-${{ inputs.version }}.spdx.json"
+      - name: Bind the artifacts, commit, lock and SBOM in signed provenance
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          raiker-release provenance \
+            --version "${{ inputs.version }}" \
+            --channel "${{ inputs.channel }}" \
+            --dir dist \
+            --commit "${{ github.sha }}" \
+            --sbom "dist/raiker-${{ inputs.version }}.spdx.json" \
+            --lock uv.lock \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
       # The same verification an installed Raiker performs, run here, so a
       # release that its own updater would refuse never leaves this workflow.
       - name: Verify the release the way the product will
@@ -533,6 +552,11 @@ jobs:
               raiker-app update --channel-url <index url> --channel-key <key>
 
           The key is published beside the artifacts as `release-public-key.txt`.
+
+          `raiker-<version>.spdx.json` is the SPDX SBOM of this release, and
+          `release-provenance.json` (signed as `.sig` with the same key) binds every
+          artifact's SHA-256 to the source commit, the dependency lock and that SBOM.
+          `SHA256SUMS` lists every published file.
           NOTES
           gh release create "v${{ inputs.version }}" dist/* \
             --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md

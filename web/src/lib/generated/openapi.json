@@ -847,6 +847,20 @@
       "ApproveMcpToolsRequest": {
         "additionalProperties": false,
         "properties": {
+          "fingerprints": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fingerprints"
+          },
           "tools": {
             "items": {
               "type": "string"
@@ -1402,6 +1416,29 @@
         "title": "BackupRestored",
         "type": "object"
       },
+      "BackupTreeView": {
+        "properties": {
+          "bytes": {
+            "title": "Bytes",
+            "type": "integer"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "files",
+          "bytes",
+          "sha256"
+        ],
+        "title": "BackupTreeView",
+        "type": "object"
+      },
       "BackupView": {
         "description": "One encrypted backup of the workspace database (DEC-24 step 5).",
         "properties": {
@@ -1474,6 +1511,13 @@
             "title": "State",
             "type": "string"
           },
+          "trees": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/BackupTreeView"
+            },
+            "title": "Trees",
+            "type": "object"
+          },
           "verified_at": {
             "anyOf": [
               {
@@ -1502,7 +1546,8 @@
           "verified_at",
           "detail",
           "schema_generation",
-          "opens_here"
+          "opens_here",
+          "trees"
         ],
         "title": "BackupView",
         "type": "object"
@@ -2927,6 +2972,17 @@
               }
             ],
             "title": "Delivery Url"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           }
         },
         "title": "ChannelDestinationRequest",
@@ -2946,6 +3002,10 @@
           "pairing_id": {
             "title": "Pairing Id",
             "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
           }
         },
         "required": [
@@ -2962,6 +3022,17 @@
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           }
         },
         "required": [
@@ -2982,6 +3053,10 @@
           },
           "pairing_id": {
             "title": "Pairing Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
             "type": "string"
           }
         },
@@ -3165,6 +3240,60 @@
         "title": "ChannelPaired",
         "type": "object"
       },
+      "ChannelPausedRequest": {
+        "additionalProperties": false,
+        "description": "DEC-14 step 10 — pause or resume one paired channel.",
+        "properties": {
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paused"
+        ],
+        "title": "ChannelPausedRequest",
+        "type": "object"
+      },
+      "ChannelPausedSet": {
+        "description": "DEC-14 step 10 — paused keeps receiving and recording; it starts and sends nothing.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pairing_id": {
+            "title": "Pairing Id",
+            "type": "string"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pairing_id",
+          "paused"
+        ],
+        "title": "ChannelPausedSet",
+        "type": "object"
+      },
       "ChannelProfile": {
         "description": "One connector profile, and each separate fact about it (BUG-225).",
         "properties": {
@@ -3253,6 +3382,21 @@
             ],
             "title": "Pairing Id"
           },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At"
+          },
           "receipts": {
             "items": {
               "$ref": "#/components/schemas/ChannelReceipt"
@@ -3271,6 +3415,17 @@
           "requires_sender_allowlist": {
             "title": "Requires Sender Allowlist",
             "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
           },
           "route_scope": {
             "$ref": "#/components/schemas/ChannelRouteScope"
@@ -3347,7 +3502,10 @@
           "requires_network",
           "linked",
           "enabled",
+          "paused",
+          "paused_at",
           "pairing_id",
+          "revision",
           "display_label",
           "sender_count",
           "senders",
@@ -3620,6 +3778,17 @@
             "title": "Approval Relay Enabled",
             "type": "boolean"
           },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
           "owner_sender_id": {
             "anyOf": [
               {
@@ -3669,6 +3838,10 @@
             "title": "Pairing Id",
             "type": "string"
           },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          },
           "routing_mode": {
             "enum": [
               "record_only",
@@ -3691,6 +3864,17 @@
       "ChannelSendersRequest": {
         "additionalProperties": false,
         "properties": {
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
           "senders": {
             "items": {
               "type": "string"
@@ -3713,6 +3897,10 @@
           },
           "pairing_id": {
             "title": "Pairing Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
             "type": "string"
           },
           "sender_count": {
@@ -9517,6 +9705,37 @@
         "title": "GitCredentialGrant",
         "type": "object"
       },
+      "GitCredentialLastUse": {
+        "description": "DEC-21 Git credential — when the credential was last lent, and for what.",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "operation",
+          "scope"
+        ],
+        "title": "GitCredentialLastUse",
+        "type": "object"
+      },
       "GitCredentialStatus": {
         "description": "What a surface needs to render the control. Never the token.\n\n``credential_*`` rather than ``token_*``: the API redactor masks any key\ncontaining \"token\", which is the right blunt instrument to keep.",
         "properties": {
@@ -9556,6 +9775,16 @@
             "title": "Hosts",
             "type": "array"
           },
+          "last_used": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitCredentialLastUse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "operations": {
             "items": {
               "type": "string"
@@ -9575,6 +9804,7 @@
           "credential_configured",
           "credential_source",
           "grant",
+          "last_used",
           "scopes",
           "grant_seconds",
           "hosts",
@@ -17077,6 +17307,17 @@
       "MoveProjectRequest": {
         "additionalProperties": false,
         "properties": {
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
           "parent_id": {
             "anyOf": [
               {
@@ -18129,6 +18370,10 @@
             "title": "Description",
             "type": "string"
           },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -18137,7 +18382,8 @@
         "required": [
           "name",
           "change",
-          "description"
+          "description",
+          "fingerprint"
         ],
         "title": "PendingTool",
         "type": "object"
@@ -18834,13 +19080,18 @@
             ],
             "title": "Memory Mode",
             "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
           }
         },
         "required": [
           "instructions",
           "attachment_ids",
           "memory_enabled",
-          "memory_mode"
+          "memory_mode",
+          "revision"
         ],
         "title": "ProjectContext",
         "type": "object"
@@ -18874,6 +19125,10 @@
           "ok": {
             "title": "Ok",
             "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
           }
         },
         "required": [
@@ -18881,7 +19136,8 @@
           "instructions",
           "attachment_ids",
           "memory_enabled",
-          "memory_mode"
+          "memory_mode",
+          "revision"
         ],
         "title": "ProjectContextSaved",
         "type": "object"
@@ -19510,6 +19766,11 @@
           },
           "project_id": {
             "title": "Project Id",
+            "type": "string"
+          },
+          "revision": {
+            "default": "",
+            "title": "Revision",
             "type": "string"
           },
           "root_kind": {
@@ -20291,6 +20552,22 @@
         "title": "RecoveryBackupsView",
         "type": "object"
       },
+      "RecoveryMatrixView": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryRowView"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "title": "RecoveryMatrixView",
+        "type": "object"
+      },
       "RecoveryPointView": {
         "properties": {
           "bytes": {
@@ -20301,9 +20578,31 @@
             "title": "Files",
             "type": "integer"
           },
+          "opens_this_workspace": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opens This Workspace"
+          },
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "schema_generation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Generation"
           },
           "version": {
             "title": "Version",
@@ -20314,7 +20613,9 @@
           "version",
           "path",
           "files",
-          "bytes"
+          "bytes",
+          "schema_generation",
+          "opens_this_workspace"
         ],
         "title": "RecoveryPointView",
         "type": "object"
@@ -20371,6 +20672,62 @@
           "deletions_applied"
         ],
         "title": "RecoveryRestored",
+        "type": "object"
+      },
+      "RecoveryRowView": {
+        "properties": {
+          "after_restart": {
+            "title": "After Restart",
+            "type": "string"
+          },
+          "anchors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
+          "claim": {
+            "title": "Claim",
+            "type": "string"
+          },
+          "cleanup": {
+            "title": "Cleanup",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "owner_action": {
+            "title": "Owner Action",
+            "type": "string"
+          },
+          "source_of_truth": {
+            "title": "Source Of Truth",
+            "type": "string"
+          },
+          "subsystem": {
+            "title": "Subsystem",
+            "type": "string"
+          },
+          "uncertain_effects": {
+            "title": "Uncertain Effects",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subsystem",
+          "label",
+          "source_of_truth",
+          "claim",
+          "after_restart",
+          "uncertain_effects",
+          "cleanup",
+          "owner_action",
+          "anchors"
+        ],
+        "title": "RecoveryRowView",
         "type": "object"
       },
       "RegisterRequest": {
@@ -20582,6 +20939,17 @@
       "RenameMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
+          "expected_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Name"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -21120,6 +21488,17 @@
             },
             "title": "Attachment Ids",
             "type": "array"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
           },
           "instructions": {
             "default": "",
@@ -25339,6 +25718,17 @@
           "version": {
             "title": "Version",
             "type": "string"
+          },
+          "workspace_schema_generation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Schema Generation"
           }
         },
         "required": [
@@ -25351,6 +25741,7 @@
           "checked_at",
           "targets",
           "last_check",
+          "workspace_schema_generation",
           "ok",
           "updating"
         ],
@@ -25460,6 +25851,17 @@
             },
             "title": "Targets",
             "type": "array"
+          },
+          "workspace_schema_generation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Schema Generation"
           }
         },
         "required": [
@@ -25472,6 +25874,7 @@
           "checked_at",
           "targets",
           "last_check",
+          "workspace_schema_generation",
           "ok"
         ],
         "title": "UpdateCheckResult",
@@ -25667,6 +26070,17 @@
             },
             "title": "Targets",
             "type": "array"
+          },
+          "workspace_schema_generation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Schema Generation"
           }
         },
         "required": [
@@ -25678,7 +26092,8 @@
           "recovery_points",
           "checked_at",
           "targets",
-          "last_check"
+          "last_check",
+          "workspace_schema_generation"
         ],
         "title": "UpdateStatusView",
         "type": "object"
@@ -28577,6 +28992,22 @@
               "title": "Pairing Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "expected_revision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Expected Revision"
+            }
           }
         ],
         "responses": {
@@ -28701,6 +29132,56 @@
           }
         },
         "summary": "Set Channel Enabled"
+      }
+    },
+    "/api/channels/pairings/{pairing_id}/paused": {
+      "put": {
+        "description": "DEC-14 step 10 — hold a channel: messages are kept, no work starts, nothing is sent.",
+        "operationId": "set_channel_paused_api_channels_pairings__pairing_id__paused_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pairing_id",
+            "required": true,
+            "schema": {
+              "title": "Pairing Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelPausedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelPausedSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Channel Paused"
       }
     },
     "/api/channels/pairings/{pairing_id}/routing": {
@@ -30420,6 +30901,25 @@
           }
         },
         "summary": "Get Diagnostics Export"
+      }
+    },
+    "/api/diagnostics/recovery": {
+      "get": {
+        "description": "DEC-24 step 3 — how each subsystem recovers. Static, content-free.",
+        "operationId": "get_recovery_matrix_api_diagnostics_recovery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryMatrixView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Recovery Matrix"
       }
     },
     "/api/environment": {
@@ -32233,7 +32733,7 @@
     },
     "/api/mcp/servers/{server_id}": {
       "delete": {
-        "description": "Delete one owner-scoped MCP server profile and its generated template\nfile (human-only).",
+        "description": "Delete one owner-scoped MCP server profile and its generated template\nfile (human-only).\n\n§13.2 item 6 — ``expected_name`` is the server the confirmation named; one\nrenamed since is refused 409 ``mcp_server_conflict`` and kept.",
         "operationId": "delete_mcp_server_api_mcp_servers__server_id__delete",
         "parameters": [
           {
@@ -32243,6 +32743,22 @@
             "schema": {
               "title": "Server Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expected_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Expected Name"
             }
           }
         ],

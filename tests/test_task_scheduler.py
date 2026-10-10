@@ -486,3 +486,40 @@ def test_a_background_pass_that_stopped_reporting_is_stale_not_ok(tmp_path: Path
     # A failing pass is still reported as failing, and comes first.
     assert by_name["telemetry_delivery"]["state"] == "failing"
     assert [row["state"] for row in rows] == ["failing", "stale"]
+
+
+def test_a_run_the_host_stopped_in_the_middle_of_is_settled_not_left_running(
+    tmp_path: Path,
+) -> None:
+    """DEC-24 step 3 — a restart leaves no task `running` with nothing advancing it.
+
+    Only `queued` work is ever claimed, so a routine left `running` by a stopped
+    host used to stay that way and never run again. It is settled at start as a
+    run that did not complete, never retried, and a routine moves to its next slot.
+    """
+    from raiker.tasks.scheduler import INTERRUPTED_BY_RESTART
+
+    store = SQLiteStore(tmp_path)
+    store.create_session("sess_inbox_principal_owner", str(tmp_path))
+    manager = TaskManager(store, EventLogWriter(store))
+    one_off = manager.create_task(
+        session_id="sess_inbox_principal_owner", title="Once", objective="Once",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+    routine = manager.create_task(
+        session_id="sess_inbox_principal_owner", title="Daily", objective="Daily",
+        scheduled_at="2020-01-01T09:00:00Z", recurrence="daily",
+    )
+    claimed = store.claim_due_tasks("2020-01-02T00:00:00Z")
+    assert {task.task_id for task in claimed} == {one_off.task_id, routine.task_id}
+
+    settled = TaskScheduler(tmp_path).settle_interrupted_runs()
+    assert set(settled) == {one_off.task_id, routine.task_id}
+    once = store.load_task(one_off.task_id)
+    assert once is not None and once.status == "failed"
+    assert once.summary == INTERRUPTED_BY_RESTART
+    daily = store.load_task(routine.task_id)
+    assert daily is not None and daily.status == "queued"
+    assert daily.scheduled_at is not None and daily.scheduled_at > "2020-01-02T00:00:00Z"
+    # Nothing is left for a second pass.
+    assert TaskScheduler(tmp_path).settle_interrupted_runs() == []

@@ -284,16 +284,22 @@ export const api = {
   channels: () => contract.listChannels(),
   pairChannel: (connector_id: string, display_name: string, senders: string[]) =>
     contract.pairChannel({ connector_id, display_name, senders }),
-  setChannelEnabled: (pairingId: string, enabled: boolean) =>
-    contract.setChannelEnabled(pairingId, { enabled }),
-  setChannelSenders: (pairingId: string, senders: string[]) =>
-    contract.setChannelSenders(pairingId, { senders }),
-  unpairChannel: (pairingId: string) => contract.unpairChannel(pairingId),
+  // §13.2 item 6 — every channel change carries the pairing revision the page
+  // read; one changed elsewhere since is refused 409 `channel_conflict`.
+  setChannelEnabled: (pairingId: string, enabled: boolean, revision?: string | null) =>
+    contract.setChannelEnabled(pairingId, { enabled, expected_revision: revision ?? null }),
+  // DEC-14 step 10 — paused keeps receiving and recording; it starts and sends nothing.
+  setChannelPaused: (pairingId: string, paused: boolean, revision?: string | null) =>
+    contract.setChannelPaused(pairingId, { paused, expected_revision: revision ?? null }),
+  setChannelSenders: (pairingId: string, senders: string[], revision?: string | null) =>
+    contract.setChannelSenders(pairingId, { senders, expected_revision: revision ?? null }),
+  unpairChannel: (pairingId: string, revision?: string | null) =>
+    contract.unpairChannel(pairingId, revision ? { expected_revision: revision } : {}),
   // UX-MSG-04 — a test names no destination; it goes where the channel delivers.
   deliverChannelTest: (connector_id: string, text: string) =>
     contract.deliverChannelTest({ connector_id, text }),
-  setChannelDestination: (pairingId: string, delivery_url: string | null) =>
-    contract.setChannelDestination(pairingId, { delivery_url }),
+  setChannelDestination: (pairingId: string, delivery_url: string | null, revision?: string | null) =>
+    contract.setChannelDestination(pairingId, { delivery_url, expected_revision: revision ?? null }),
   mcpServers: () => contract.listMcpServers(),
   // BUG-221 — servers installed plugins *offer*. An offer is a description, not
   // a connection: adding one posts to the ordinary create routes above, so the
@@ -304,8 +310,12 @@ export const api = {
   mcpAgentAccess: () => contract.getMcpAgentAccess(),
   createMcpServer: (name: string, template: string) => contract.createMcpServer({ name, template }),
   connectMcpServer: (serverId: string) => contract.connectMcpServer(serverId),
-  renameMcpServer: (serverId: string, name: string) => contract.renameMcpServer(serverId, { name }),
-  deleteMcpServer: (serverId: string) => contract.deleteMcpServer(serverId),
+  // §13.2 item 6 — `expectedName` is the name the page showed; a profile
+  // renamed elsewhere since is refused 409 `mcp_server_conflict`.
+  renameMcpServer: (serverId: string, name: string, expectedName?: string) =>
+    contract.renameMcpServer(serverId, expectedName === undefined ? { name } : { name, expected_name: expectedName }),
+  deleteMcpServer: (serverId: string, expectedName?: string) =>
+    contract.deleteMcpServer(serverId, expectedName === undefined ? {} : { expected_name: expectedName }),
   createRemoteMcpServer: (
     name: string,
     endpoint_url: string,
@@ -315,12 +325,16 @@ export const api = {
   mcpFindings: (serverId: string) => contract.listMcpFindings(serverId),
   pauseMcpServer: (serverId: string) => contract.pauseMcpServer(serverId),
   resumeMcpServer: (serverId: string) => contract.resumeMcpServer(serverId),
-  approveMcpTools: (serverId: string, tools: string[]) =>
-    contract.approveMcpTools(serverId, { tools }),
+  // §13.2 item 6 — `shown` is each declaration's fingerprint as the page
+  // rendered it; a tool reworded since is refused 409 `mcp_tool_changed`.
+  approveMcpTools: (serverId: string, tools: string[], shown?: Record<string, string>) =>
+    contract.approveMcpTools(serverId, shown ? { tools, fingerprints: shown } : { tools }),
   notifications: () => contract.listNotifications(),
   markNotificationRead: (id: string) => contract.markNotificationRead(id),
   notificationDelivery: () => contract.notificationDelivery(),
   backups: () => contract.listBackups(),
+  // DEC-24 step 3 — how each subsystem recovers; static and content-free.
+  recoveryMatrix: () => contract.getRecoveryMatrix(),
   createBackup: () => contract.createBackup(),
   verifyBackup: (backupId: string) => contract.verifyBackup(backupId),
   restoreBackup: (backupId: string) => contract.restoreBackup(backupId),
@@ -649,7 +663,8 @@ export const api = {
       owner_sender_id: string | null;
       approval_relay_enabled: boolean;
     },
-  ) => contract.setChannelRouting(pairingId, settings),
+    revision?: string | null,
+  ) => contract.setChannelRouting(pairingId, { ...settings, expected_revision: revision ?? null }),
   setSkillCommand: (id: string, command_trigger: string | null) =>
     contract.setSkillCommand(id, { command_trigger }),
   downloadSkill: (id: string) =>
@@ -900,11 +915,20 @@ export const api = {
   selectProject: (project_id: string | null) => contract.selectProject({ project_id }),
   deleteProject: (id: string, confirmed = false) =>
     contract.deleteProject(id, confirmed ? id : undefined),
+  // §13.2 item 6 — the editor's context carries the revision it was read at;
+  // one saved elsewhere since is refused 409 `project_conflict`.
   saveProjectContext: (id: string, context: ProjectContext) =>
-    contract.saveProjectContext(id, context),
+    contract.saveProjectContext(id, {
+      instructions: context.instructions,
+      attachment_ids: context.attachment_ids,
+      memory_enabled: context.memory_enabled,
+      memory_mode: context.memory_mode,
+      expected_revision: context.revision || null,
+    }),
   // Nested projects/folders: tree, move, archive
   projectTree: () => contract.listProjectTree(),
-  moveProject: (id: string, parent_id: string | null) => contract.moveProject(id, { parent_id }),
+  moveProject: (id: string, parent_id: string | null, revision?: string) =>
+    contract.moveProject(id, { parent_id, expected_revision: revision || null }),
   archiveProject: (id: string) => contract.archiveProject(id),
   // UX-PROJ-05 — undo an archive: the project and what was archived with it.
   restoreProject: (id: string) => contract.restoreProject(id),

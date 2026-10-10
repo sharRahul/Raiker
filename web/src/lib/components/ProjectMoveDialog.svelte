@@ -57,7 +57,7 @@
     busy = true;
     error = null;
     try {
-      await api.moveProject(project.project_id, chosen === "" ? null : chosen);
+      await api.moveProject(project.project_id, chosen === "" ? null : chosen, project.revision);
       onmoved();
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;

@@ -315,3 +315,40 @@ describe("DiagnosticsView", () => {
     expect(screen.getByText("/srv/raiker/model-profiles.json")).toBeInTheDocument();
   });
 });
+
+// DEC-24 step 3 — the recovery rules, beside the health they explain.
+describe("DiagnosticsView — if Raiker stops in the middle", () => {
+  it("lists each kind of work and what a restart does to it", async () => {
+    stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/diagnostics/recovery": {
+        rows: [
+          {
+            subsystem: "scheduled_tasks",
+            label: "Tasks and routines",
+            source_of_truth: "The task's row.",
+            claim: "Claimed once.",
+            after_restart: "Settled as a run that did not complete.",
+            uncertain_effects: "Never run again on its own.",
+            cleanup: "Paused after three failures.",
+            owner_action: "Run now.",
+            anchors: ["raiker.tasks.scheduler:TaskScheduler.settle_interrupted_runs"],
+          },
+        ],
+      },
+    });
+    render(DiagnosticsView);
+    const card = await screen.findByTestId("recovery-matrix");
+    await waitFor(() => expect(card).toHaveTextContent("Tasks and routines"));
+    expect(card).toHaveTextContent("Never run again on its own.");
+    // Code anchors are for the test that holds the rows, not for the owner.
+    expect(card).not.toHaveTextContent("settle_interrupted_runs");
+  });
+
+  it("says the rules could not be read rather than hiding the card", async () => {
+    stubFetch({ "GET /api/diagnostics": DIAGNOSTICS });
+    render(DiagnosticsView);
+    const card = await screen.findByTestId("recovery-matrix");
+    await waitFor(() => expect(card).toHaveTextContent("could not be read"));
+  });
+});

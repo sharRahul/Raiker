@@ -280,14 +280,29 @@
     busy = server.server_id;
     error = null;
     notice = null;
+    // §13.2 item 6 — accept the declarations this card shows, not whatever the
+    // server says by the time the request lands. A server re-lists its tools on
+    // every session, so the words can change between reading and clicking.
+    const shown: Record<string, string> = {};
+    for (const held of server.pending_tools) {
+      if (tools.includes(held.name)) shown[held.name] = held.fingerprint;
+    }
     try {
-      const result = await api.approveMcpTools(server.server_id, tools);
+      const result = await api.approveMcpTools(server.server_id, tools, shown);
       const count = result.approved.length;
       notice =
         `${server.name}: accepted ${count} ${count === 1 ? "tool" : "tools"}` +
         (result.pending.length ? ` · ${result.pending.length} still held.` : ".");
       await load();
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "mcp_tool_changed") {
+        // Re-read first: `load` clears the page's error, and this one must stay.
+        await load();
+        error =
+          `${server.name} changed how it describes ${tools.length === 1 ? "that tool" : "one of those tools"} ` +
+          "since this page showed it, so nothing was accepted. Read what it says now before accepting.";
+        return;
+      }
       error = `${server.name}: ${reason(e)}`;
     } finally {
       busy = null;
@@ -311,10 +326,16 @@
     busy = server.server_id;
     error = null;
     try {
-      await api.renameMcpServer(server.server_id, renameValue.trim());
+      await api.renameMcpServer(server.server_id, renameValue.trim(), server.name);
       renamingId = null;
       await load();
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "mcp_server_conflict") {
+        renamingId = null;
+        await load();
+        error = `“${server.name}” was renamed somewhere else since this page loaded, so nothing was changed.`;
+        return;
+      }
       error = reason(e);
     } finally {
       busy = null;
@@ -328,10 +349,15 @@
     error = null;
     notice = null;
     try {
-      await api.deleteMcpServer(server.server_id);
+      await api.deleteMcpServer(server.server_id, server.name);
       notice = `Deleted “${server.name}”.`;
       await load();
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "mcp_server_conflict") {
+        await load();
+        error = `“${server.name}” was renamed somewhere else since this page loaded, so it was not deleted. Check which server it is now.`;
+        return;
+      }
       error = reason(e);
     } finally {
       busy = null;

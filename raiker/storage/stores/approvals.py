@@ -127,16 +127,31 @@ class ApprovalStore:
             return None
         return grant
 
-    def consume_git_credential_grant(self: SQLiteStore, grant_id: str) -> None:
-        """Count a use, and close a one-shot grant behind it."""
+    def consume_git_credential_grant(
+        self: SQLiteStore, grant_id: str, operation: str | None = None
+    ) -> None:
+        """Count a use, record when and for what, and close a one-shot grant behind it."""
+        now = utc_now()
         self._execute(
             """UPDATE git_credential_grants
                SET uses = uses + 1,
                    consumed_at = COALESCE(consumed_at, ?),
+                   last_used_at = ?,
+                   last_operation = COALESCE(?, last_operation),
                    status = CASE WHEN scope = 'once' THEN 'consumed' ELSE status END
                WHERE grant_id = ?""",
-            (utc_now(), grant_id),
+            (now, now, operation, grant_id),
         )
+
+    def last_git_credential_use(self: SQLiteStore, principal_id: str) -> dict[str, Any] | None:
+        """DEC-21 Git credential — the most recent loan under any grant, active or not."""
+        row = self._row(
+            """SELECT last_used_at, last_operation, scope FROM git_credential_grants
+               WHERE owner_principal_id = ? AND last_used_at IS NOT NULL
+               ORDER BY last_used_at DESC LIMIT 1""",
+            (principal_id,),
+        )
+        return dict(row) if row is not None else None
 
     def revoke_git_credential_grants(self: SQLiteStore, principal_id: str) -> int:
         return self._execute(

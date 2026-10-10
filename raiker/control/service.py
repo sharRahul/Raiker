@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from raiker.channels.revision import CHANNEL_CONFLICT, pairing_revision
+from raiker.channels.revision import is_stale as channel_is_stale
 from raiker.cli.principal_resolver import (
     check_acting_principal_available,
     check_owner_bootstrapped,
@@ -753,9 +755,18 @@ class RuntimeControlService:
         )
 
     def rename_mcp_server(
-        self, acting_principal_id: str | None, server_id: str, name: str
+        self,
+        acting_principal_id: str | None,
+        server_id: str,
+        name: str,
+        expected_name: str | None = None,
     ) -> ControlResult:
-        """Owner-scoped, human-only rename of one server profile."""
+        """Owner-scoped, human-only rename of one server profile.
+
+        §13.2 item 6 — ``expected_name`` is the name the page showed. When the
+        profile has been renamed since, nothing changes and the answer is
+        ``mcp_server_conflict`` rather than one tab silently undoing another.
+        """
         from raiker.runtime.executors.mcp import _normalize_server_name
 
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
@@ -766,14 +777,22 @@ class RuntimeControlService:
         normalized = _normalize_server_name(name)
         if normalized is None:
             return ControlResult(ok=False, reason_code="mcp_invalid_server_name")
-        if self._store.get_mcp_server(server_id, principal.principal_id) is None:
+        current = self._store.get_mcp_server(server_id, principal.principal_id)
+        if current is None:
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
-        if not self._store.rename_mcp_server(server_id, principal.principal_id, normalized):
+        if expected_name is not None and current.get("name") != expected_name:
+            return ControlResult(ok=False, reason_code="mcp_server_conflict")
+        if not self._store.rename_mcp_server(
+            server_id, principal.principal_id, normalized, expected_name
+        ):
+            renamed = (self._store.get_mcp_server(server_id, principal.principal_id) or {}).get("name")
+            if expected_name is not None and renamed != expected_name:
+                return ControlResult(ok=False, reason_code="mcp_server_conflict")
             return ControlResult(ok=False, reason_code="mcp_name_taken")
         return ControlResult(ok=True, data={"server_id": server_id, "name": normalized})
 
     def delete_mcp_server(
-        self, acting_principal_id: str | None, server_id: str
+        self, acting_principal_id: str | None, server_id: str, expected_name: str | None = None
     ) -> ControlResult:
         """Owner-scoped, human-only delete of one server profile. Also removes
         the generated template file when it lives inside the workspace MCP
@@ -786,7 +805,12 @@ class RuntimeControlService:
         server = self._store.get_mcp_server(server_id, principal.principal_id)
         if server is None:
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
-        if not self._store.delete_mcp_server(server_id, principal.principal_id):
+        # The confirmation named a server; delete it only while it is still that one.
+        if expected_name is not None and server.get("name") != expected_name:
+            return ControlResult(ok=False, reason_code="mcp_server_conflict")
+        if not self._store.delete_mcp_server(server_id, principal.principal_id, expected_name):
+            if expected_name is not None and self._store.get_mcp_server(server_id, principal.principal_id):
+                return ControlResult(ok=False, reason_code="mcp_server_conflict")
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
         self._remove_generated_mcp_file(server)
         return ControlResult(ok=True, data={"server_id": server_id})
@@ -874,7 +898,11 @@ class RuntimeControlService:
         )
 
     def set_channel_enabled(
-        self, acting_principal_id: str | None, pairing_id: str, enabled: bool
+        self,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        enabled: bool,
+        expected_revision: str | None = None,
     ) -> ControlResult:
         """Turn one paired channel on or off. The second of the three facts."""
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
@@ -882,8 +910,11 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self._store.get_channel_pairing(pairing_id) is None:
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None:
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
         if not self._store.set_channel_pairing_enabled(pairing_id, enabled):
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
         self._writer.append(
@@ -895,10 +926,58 @@ class RuntimeControlService:
                 payload={"pairing_id": pairing_id, "enabled": enabled},
             )
         )
-        return ControlResult(ok=True, data={"pairing_id": pairing_id, "enabled": enabled})
+        return ControlResult(
+            ok=True,
+            data={"pairing_id": pairing_id, "enabled": enabled, **self._channel_revision(pairing_id)},
+        )
+
+    def set_channel_paused(
+        self,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        paused: bool,
+        expected_revision: str | None = None,
+    ) -> ControlResult:
+        """DEC-14 step 10 — contain one channel without losing what it receives.
+
+        Paused is a third state beside on and off. An allowlisted message is
+        still received, checked and recorded with its receipt — the evidence an
+        owner needs to decide what to do next — but it starts no work, and
+        nothing is delivered to the channel or relayed through it, until the
+        owner resumes. Off refuses messages outright; paused keeps them.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None:
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
+        if not self._store.set_channel_pairing_paused(pairing_id, paused):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_paused" if paused else "channel_resumed",
+                actor="control_service",
+                payload={"pairing_id": pairing_id, "paused": paused},
+            )
+        )
+        return ControlResult(
+            ok=True,
+            data={"pairing_id": pairing_id, "paused": paused, **self._channel_revision(pairing_id)},
+        )
 
     def set_channel_senders(
-        self, acting_principal_id: str | None, pairing_id: str, senders: list[str]
+        self,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        senders: list[str],
+        expected_revision: str | None = None,
     ) -> ControlResult:
         """Replace one pairing's sender allowlist. The third fact, and the one the
         inbound receiver actually enforces."""
@@ -909,8 +988,12 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self._store.get_channel_pairing(pairing_id) is None:
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None:
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        # A stale allowlist saved back would re-admit a sender removed elsewhere.
+        if channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
         cleaned = sorted({str(entry).strip() for entry in senders if str(entry).strip()})
         if not self._store.set_channel_pairing_allowlist(pairing_id, _json.dumps(cleaned)):
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
@@ -925,7 +1008,14 @@ class RuntimeControlService:
                 payload={"pairing_id": pairing_id, "sender_count": len(cleaned)},
             )
         )
-        return ControlResult(ok=True, data={"pairing_id": pairing_id, "sender_count": len(cleaned)})
+        return ControlResult(
+            ok=True,
+            data={
+                "pairing_id": pairing_id,
+                "sender_count": len(cleaned),
+                **self._channel_revision(pairing_id),
+            },
+        )
 
     def set_channel_routing(
         self,
@@ -936,6 +1026,7 @@ class RuntimeControlService:
         target_session_id: str | None,
         owner_sender_id: str | None,
         approval_relay_enabled: bool,
+        expected_revision: str | None = None,
     ) -> ControlResult:
         """Store the route the owner chose; the message may never choose it."""
         import json as _json
@@ -948,6 +1039,8 @@ class RuntimeControlService:
         pairing = self._store.get_channel_pairing(pairing_id)
         if pairing is None:
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
         if routing_mode not in {"record_only", "new_turn", "side_question", "interrupt"}:
             return ControlResult(ok=False, reason_code="channel_routing_mode_invalid")
         target = (target_session_id or "").strip() or None
@@ -995,9 +1088,18 @@ class RuntimeControlService:
                 },
             )
         )
-        return ControlResult(ok=True, data={"pairing_id": pairing_id, "routing_mode": routing_mode})
+        return ControlResult(
+            ok=True,
+            data={
+                "pairing_id": pairing_id,
+                "routing_mode": routing_mode,
+                **self._channel_revision(pairing_id),
+            },
+        )
 
-    def unpair_channel(self, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
+    def unpair_channel(
+        self, acting_principal_id: str | None, pairing_id: str, expected_revision: str | None = None
+    ) -> ControlResult:
         """Remove the pairing. Both executors and the inbound receiver read this
         table, so deleting the row is what actually stops the channel."""
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
@@ -1006,6 +1108,8 @@ class RuntimeControlService:
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is not None and channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
         if pairing is None or not self._store.delete_channel_pairing(pairing_id):
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
         self._writer.append(
@@ -1024,7 +1128,11 @@ class RuntimeControlService:
         return ControlResult(ok=True, data={"pairing_id": pairing_id, "removed": True})
 
     def set_channel_destination(
-        self, acting_principal_id: str | None, pairing_id: str, delivery_url: str | None
+        self,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        delivery_url: str | None,
+        expected_revision: str | None = None,
     ) -> ControlResult:
         """UX-MSG-04 — bind where this channel delivers.
 
@@ -1051,6 +1159,8 @@ class RuntimeControlService:
         pairing = self._store.get_channel_pairing(pairing_id)
         if pairing is None:
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if channel_is_stale(pairing, expected_revision):
+            return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
         if str(pairing.get("channel_type") or "") != "webhooks":
             return ControlResult(ok=False, reason_code="channel_destination_not_configurable")
         url = (delivery_url or "").strip() or None
@@ -1078,8 +1188,18 @@ class RuntimeControlService:
             )
         )
         return ControlResult(
-            ok=True, data={"pairing_id": pairing_id, "has_destination": url is not None}
+            ok=True,
+            data={
+                "pairing_id": pairing_id,
+                "has_destination": url is not None,
+                **self._channel_revision(pairing_id),
+            },
         )
+
+    def _channel_revision(self, pairing_id: str) -> dict[str, str]:
+        """§13.2 item 6 — the revision after a change, so the page can make the next one."""
+        row = self._store.get_channel_pairing(pairing_id)
+        return {"revision": pairing_revision(row)} if row is not None else {}
 
     def deliver_channel_test(
         self, acting_principal_id: str | None, connector_id: str, text: str
@@ -1566,7 +1686,11 @@ class RuntimeControlService:
         )
 
     def approve_mcp_tools(
-        self, acting_principal_id: str | None, server_id: str, tools: list[str]
+        self,
+        acting_principal_id: str | None,
+        server_id: str,
+        tools: list[str],
+        shown: dict[str, str] | None = None,
     ) -> ControlResult:
         """Accept tools a server holds for review, as it declares them now (DEC-15 step 10).
 
@@ -1581,7 +1705,16 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        accepted = self._store.approve_mcp_tools(server_id, principal.principal_id, tools)
+        from raiker.tools.mcp_review import McpToolChanged
+
+        try:
+            accepted = self._store.approve_mcp_tools(
+                server_id, principal.principal_id, tools, shown
+            )
+        except McpToolChanged as changed:
+            return ControlResult(
+                ok=False, reason_code="mcp_tool_changed", data={"tools": changed.names}
+            )
         if accepted is None:
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
         if accepted:

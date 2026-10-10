@@ -111,6 +111,14 @@ class GitCredentialGrant(TypedDict):
     uses: int
 
 
+class GitCredentialLastUse(TypedDict):
+    """DEC-21 Git credential — when the credential was last lent, and for what."""
+
+    at: str
+    operation: str | None
+    scope: str
+
+
 class GitCredentialStatus(TypedDict):
     """What a surface needs to render the control. Never the token.
 
@@ -121,6 +129,8 @@ class GitCredentialStatus(TypedDict):
     credential_configured: bool
     credential_source: str
     grant: GitCredentialGrant | None
+    #: The most recent loan under any grant, or ``None`` if it was never lent.
+    last_used: GitCredentialLastUse | None
     scopes: list[str]
     grant_seconds: dict[str, int]
     hosts: list[str]
@@ -281,6 +291,7 @@ class GitCredentialBroker:
             "credential_configured": self.token_configured(),
             "credential_source": self.token_source(),
             "grant": grant.as_dict() if grant else None,
+            "last_used": self._last_use(),
             "scopes": sorted(GRANT_SCOPES),
             "grant_seconds": dict(GRANT_SECONDS),
             # The boundary the credential is issued inside, said by the runtime
@@ -292,9 +303,21 @@ class GitCredentialBroker:
             "checked_at": utc_now(),
         }
 
+    def _last_use(self) -> GitCredentialLastUse | None:
+        row = self._store.last_git_credential_use(self._principal_id)
+        if row is None:
+            return None
+        return {
+            "at": str(row["last_used_at"]),
+            "operation": row.get("last_operation"),
+            "scope": str(row.get("scope") or ""),
+        }
+
     # ── lending ──────────────────────────────────────────────────────────
     @contextlib.contextmanager
-    def lend(self, *, session_id: str | None = None) -> Iterator[dict[str, str]]:
+    def lend(
+        self, *, session_id: str | None = None, operation: str | None = None
+    ) -> Iterator[dict[str, str]]:
         """Yield the environment additions one git command may run with.
 
         A context manager because the loan has to end. On the way in the token is
@@ -332,5 +355,5 @@ class GitCredentialBroker:
                 environment[f"GIT_CONFIG_VALUE_{index}"] = value
             yield environment
         finally:
-            self._store.consume_git_credential_grant(grant.grant_id)
+            self._store.consume_git_credential_grant(grant.grant_id, operation)
             forget_secret(token)

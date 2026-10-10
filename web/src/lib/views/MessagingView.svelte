@@ -47,6 +47,9 @@
   let routeRelay = $state(false);
 
   const CHANNEL_REASONS: Record<string, string> = {
+    // §13.2 item 6 — another tab changed this channel since this page read it.
+    channel_conflict:
+      "This channel was changed somewhere else since this page loaded, so nothing was changed. It now shows the current settings.",
     disabled_by_capability_gate:
       "The external channel capability is turned off. Turn it on in Permissions to deliver anything.",
     channel_already_paired: "That connector is already paired.",
@@ -153,7 +156,7 @@
   function saveDestination(profile: ChannelProfile) {
     void runChannelAction(
       `destination:${profile.connector_id}`,
-      () => api.setChannelDestination(profile.pairing_id ?? "", destinationUrl.trim() || null),
+      () => api.setChannelDestination(profile.pairing_id ?? "", destinationUrl.trim() || null, profile.revision),
       destinationUrl.trim()
         ? `${profile.display_name} delivers there now. Send a test to check it.`
         : `${profile.display_name} has no delivery address now.`,
@@ -172,7 +175,7 @@
       .filter(Boolean);
     void runChannelAction(
       `senders:${profile.connector_id}`,
-      () => api.setChannelSenders(profile.pairing_id ?? "", senders),
+      () => api.setChannelSenders(profile.pairing_id ?? "", senders, profile.revision),
       `${profile.display_name} accepts ${senders.length} sender${senders.length === 1 ? "" : "s"}.`,
     ).then(() => (sendersFor = null));
   }
@@ -237,7 +240,7 @@
         target_session_id: routeTarget.trim() || null,
         owner_sender_id: routeOwner.trim() || null,
         approval_relay_enabled: routeRelay,
-      }),
+      }, profile.revision),
       routeMode === "record_only"
         ? `${profile.display_name} records inbound messages without starting work.`
         : `${profile.display_name} now routes ${routeMode.replace("_", " ")}.`,
@@ -278,7 +281,13 @@
           <div class="channel-head">
             <strong>{profile.display_label ?? profile.display_name}</strong>
             <span class="hook-tag" class:hook-tag-dead={!profile.linked}>
-              {profile.linked ? (profile.enabled ? "On" : "Linked, off") : "Not linked"}
+              {profile.linked
+                ? profile.enabled
+                  ? profile.paused
+                    ? "Paused"
+                    : "On"
+                  : "Linked, off"
+                : "Not linked"}
             </span>
             {#if profile.requires_sender_allowlist && profile.linked}
               <span class="hook-tag" class:hook-tag-dead={profile.sender_count === 0}>
@@ -368,12 +377,29 @@
                 onclick={() =>
                   void runChannelAction(
                     `enable:${profile.pairing_id}`,
-                    () => api.setChannelEnabled(profile.pairing_id ?? "", !profile.enabled),
+                    () => api.setChannelEnabled(profile.pairing_id ?? "", !profile.enabled, profile.revision),
                     profile.enabled
                       ? `${profile.display_name} is off.`
                       : `${profile.display_name} is on.`,
                   )}
               >{profile.enabled ? "Turn off" : "Turn on"}</button>
+              <!-- DEC-14 step 10 — contain without losing anything: paused keeps
+                   receiving and recording, and starts and sends nothing. -->
+              {#if profile.enabled}
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  disabled={channelBusy !== null}
+                  onclick={() =>
+                    void runChannelAction(
+                      `pause:${profile.pairing_id}`,
+                      () => api.setChannelPaused(profile.pairing_id ?? "", !profile.paused, profile.revision),
+                      profile.paused
+                        ? `${profile.display_name} is acting on messages again.`
+                        : `${profile.display_name} is paused. Messages are kept; nothing starts and nothing is sent.`,
+                    )}
+                >{profile.paused ? "Resume" : "Pause"}</button>
+              {/if}
               {#if profile.destination.kind !== "none"}
                 <button
                   type="button"
@@ -415,7 +441,7 @@
                 onclick={() =>
                   void runChannelAction(
                     `unpair:${profile.pairing_id}`,
-                    () => api.unpairChannel(profile.pairing_id ?? ""),
+                    () => api.unpairChannel(profile.pairing_id ?? "", profile.revision),
                     `${profile.display_name} is unpaired. Nothing can reach it now.`,
                   )}
               >Unpair</button>

@@ -11,6 +11,7 @@
     MemoryIntegrity,
     SecurityHealth,
   } from "../apiTypes";
+  import type { RecoveryRowView } from "../generated/apiContract";
   import { humanize, relativeTime } from "../format";
 
   let diag = $state<Diagnostics | null>(null);
@@ -188,7 +189,26 @@
     return map[key] ?? humanize(key);
   }
 
+  /**
+   * DEC-24 step 3 — what happens if Raiker stops in the middle of each kind of
+   * work. The same rows the code is tested against; read once, beside the
+   * health it explains. A failed read says so rather than hiding the card.
+   */
+  let recovery = $state<RecoveryRowView[] | null>(null);
+  let recoveryError = $state(false);
+  async function loadRecovery() {
+    try {
+      const answer = await api.recoveryMatrix();
+      if (!answer || !Array.isArray(answer.rows)) throw new Error("unexpected_shape");
+      recovery = answer.rows;
+      recoveryError = false;
+    } catch {
+      recoveryError = true;
+    }
+  }
+
   onMount(load);
+  onMount(loadRecovery);
 </script>
 
 <div class="head-row">
@@ -394,6 +414,33 @@
       {/if}
     </section>
 
+    <section class="card recovery" aria-labelledby="diag-recovery-h" data-testid="recovery-matrix">
+      <h2 id="diag-recovery-h">If Raiker stops in the middle</h2>
+      <p class="sub">
+        What each kind of work does after a restart, and what is left to you. Work whose result is
+        not known is never run again on its own.
+      </p>
+      {#if recoveryError}
+        <p class="sub">The recovery rules could not be read.</p>
+      {:else if recovery === null}
+        <p class="sub">Reading…</p>
+      {:else}
+        {#each recovery as row (row.subsystem)}
+          <details>
+            <summary>{row.label}</summary>
+            <dl class="recovery-terms">
+              <dt>Kept in</dt><dd>{row.source_of_truth}</dd>
+              <dt>Taken by</dt><dd>{row.claim}</dd>
+              <dt>After a restart</dt><dd>{row.after_restart}</dd>
+              <dt>Result not known</dt><dd>{row.uncertain_effects}</dd>
+              <dt>Cleaned up</dt><dd>{row.cleanup}</dd>
+              <dt>What you do</dt><dd>{row.owner_action}</dd>
+            </dl>
+          </details>
+        {/each}
+      {/if}
+    </section>
+
     <!--
       Only the readiness checks that FAILED, and only because a failure carries a
       remediation the tiles above cannot fit. The passing ones were a tick list
@@ -474,6 +521,13 @@
     font-size: var(--text-xs);
     white-space: nowrap;
   }
+  .recovery details { border-top: 1px solid var(--border); padding: 0.4rem 0; }
+  .recovery summary { cursor: pointer; font-weight: 600; font-size: var(--text-sm); }
+  .recovery summary:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  .recovery-terms { display: grid; grid-template-columns: minmax(7rem, auto) 1fr; gap: 0.25rem 0.75rem; margin: 0.4rem 0 0; font-size: var(--text-sm); }
+  .recovery-terms dt { color: var(--text-3); }
+  .recovery-terms dd { margin: 0; overflow-wrap: anywhere; }
+  @media (max-width: 480px) { .recovery-terms { grid-template-columns: 1fr; } .recovery-terms dd { margin-bottom: 0.3rem; } }
   .card-actions {
     display: flex;
     flex-wrap: wrap;

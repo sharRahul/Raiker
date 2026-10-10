@@ -20,12 +20,23 @@
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
   let restored = $state<BackupRestored | null>(null);
 
+  // DEC-24 step 5 — what a current backup leaves out. Checkpoint pre-images and
+  // uploaded files are copied with the database, because its rows point at them.
   const NOT_INCLUDED: Record<string, string> = {
-    checkpoints: "checkpoints",
-    artifacts: "build artifacts",
     event_log: "the audit log",
     attached_folders: "folders you attached to projects",
   };
+
+  /** "12 checkpoint files · 3 uploads", or nothing for a backup that copied none. */
+  function filesLabel(backup: BackupView): string {
+    const trees = backup.trees ?? {};
+    const parts: string[] = [];
+    const checkpoints = trees.checkpoints?.files ?? 0;
+    const uploads = trees.artifacts?.files ?? 0;
+    if (checkpoints) parts.push(`${checkpoints} checkpoint file${checkpoints === 1 ? "" : "s"}`);
+    if (uploads) parts.push(`${uploads} upload${uploads === 1 ? "" : "s"}`);
+    return parts.length ? ` · ${parts.join(" · ")}` : "";
+  }
   const STATE: Record<string, string> = {
     verified: "Verified",
     damaged: "Damaged",
@@ -103,8 +114,9 @@
   <div class="card-heading">
     <h3 id="backups-heading">Backups</h3>
     <p>
-      A copy of this workspace's database and memory files, encrypted with this workspace's key and checked before
-      it is listed. Raiker also takes one before an update changes the database, and keeps the last three.
+      A copy of this workspace's database, memory files, checkpoints and uploaded files, checked before it is
+      listed. The database is encrypted with this workspace's key; the files are copied as the workspace keeps
+      them. Raiker also takes one before an update changes the database, and keeps the last three.
     </p>
   </div>
   <p class="sub">
@@ -139,7 +151,7 @@
           <div class="what">
             <strong>{reasonLabel(backup)}</strong>
             <span title={backup.created_at}>{relativeTime(backup.created_at)}</span>
-            <span>{size(backup.size_bytes)} · {backup.counts.sessions ?? 0} conversations · {backup.counts.approved_memory ?? 0} memories</span>
+            <span>{size(backup.size_bytes)} · {backup.counts.sessions ?? 0} conversations · {backup.counts.approved_memory ?? 0} memories{filesLabel(backup)}</span>
             <span class="state" data-testid="backup-state">{STATE[backup.state] ?? backup.state}{backup.detail ? ` — ${backup.detail}` : ""}</span>
           </div>
           <div class="row-actions">

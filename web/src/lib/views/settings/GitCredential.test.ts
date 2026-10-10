@@ -10,10 +10,11 @@ import { describe, expect, it } from "vitest";
 import GitCredential from "./GitCredential.svelte";
 import { stubFetch } from "../../test-helpers";
 
-const STATUS = {
+const STATUS: Record<string, unknown> = {
   credential_configured: false,
   credential_source: "none",
   grant: null,
+  last_used: null,
   scopes: ["once", "session"],
   grant_seconds: { once: 300, session: 3600 },
   hosts: ["github.com", "www.github.com"],
@@ -21,7 +22,7 @@ const STATUS = {
   checked_at: "2026-09-20T10:00:00Z",
 };
 
-function mount(overrides: Partial<typeof STATUS> = {}) {
+function mount(overrides: Record<string, unknown> = {}) {
   stubFetch({ "GET /api/git-credential": { ...STATUS, ...overrides } });
   return render(GitCredential);
 }
@@ -68,5 +69,20 @@ describe("Settings → Git credential", () => {
       expect(screen.getByRole("button", { name: /Approve Once/ })).toBeDisabled(),
     );
     expect(screen.getByText(/Store a token above before approving anything/)).toBeInTheDocument();
+  });
+
+  // DEC-21 Git credential — the page says when the credential was last lent.
+  it("says when the credential was last lent and for what", async () => {
+    mount({
+      credential_configured: true,
+      last_used: { at: "2026-10-10T08:00:00Z", operation: "push", scope: "once" },
+    });
+    const line = await screen.findByTestId("git-last-use");
+    expect(line).toHaveTextContent(/Last lent .* to push a branch, under a one-command approval/);
+  });
+
+  it("says plainly when it was never lent", async () => {
+    mount();
+    expect(await screen.findByTestId("git-last-use")).toHaveTextContent("Never lent to a git command yet.");
   });
 });

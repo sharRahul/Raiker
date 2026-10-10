@@ -404,3 +404,49 @@ def test_recording_the_inputs_does_not_break_reproducibility(
         for index in (1, 2)
     ]
     assert built[0] == built[1]
+
+
+def test_a_release_carries_a_signed_provenance_record_and_checksums(
+    tmp_path: Path,
+    source_root: Path,
+    web_assets: Path,
+    wheel_dir: Path,
+    signing_key: bytes,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """DEC-17 step 10 — artifacts bound by digest to the commit, the lock and the SBOM."""
+    import json
+
+    monkeypatch.setenv("RAIKER_RELEASE_SIGNING_KEY", signing_key.hex())
+    out = tmp_path / "dist"
+    for target in TARGETS:
+        assert main([
+            "build", "--version", "1.2.3", "--target", target.target_id, "--out", str(out),
+            "--source-root", str(source_root), "--web-assets", str(web_assets),
+            "--wheel-dir", str(wheel_dir), "--signed",
+        ]) == 0
+    assert main(["channel", "--version", "1.2.3", "--dir", str(out)]) == 0
+    sbom = out / "raiker-1.2.3.spdx.json"
+    sbom.write_text(json.dumps({"spdxVersion": "SPDX-2.3", "packages": []}))
+    lock = tmp_path / "uv.lock"
+    lock.write_text("version = 1\n")
+    assert main([
+        "provenance", "--version", "1.2.3", "--dir", str(out), "--commit", "abc123",
+        "--sbom", str(sbom), "--lock", str(lock), "--run-url", "https://example.test/run/1",
+    ]) == 0
+    record = json.loads((out / "release-provenance.json").read_bytes())
+    assert record["source_commit"] == "abc123"
+    assert record["sbom"]["name"] == sbom.name
+    assert {entry["name"] for entry in record["artifacts"]} >= {
+        artifact_name("1.2.3", target.target_id, signed=True) for target in TARGETS
+    }
+    sums = (out / "SHA256SUMS").read_text().splitlines()
+    assert any(line.endswith("  release-provenance.json") for line in sums)
+    capsys.readouterr()
+    assert main(["verify", "--dir", str(out)]) == 0
+    assert "verified provenance" in capsys.readouterr().out
+
+    # A swapped SBOM is a refusal, not a warning.
+    sbom.write_text("{}")
+    assert main(["verify", "--dir", str(out)]) == 2

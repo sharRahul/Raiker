@@ -28,6 +28,7 @@ function status(partial: Partial<UpdateStatusView> = {}): UpdateStatusView {
     checked_at: null,
     targets: [],
     last_check: null,
+    workspace_schema_generation: 199,
     ...partial,
   };
 }
@@ -63,7 +64,9 @@ const signedPackage = status({
     signed: true,
     released_at: "2026-09-01T00:00:00Z",
   },
-  recovery_points: [{ version: "1.0.0", path: "C:\\recovery", files: 12, bytes: 4096 }],
+  recovery_points: [
+    { version: "1.0.0", path: "C:\\recovery", files: 12, bytes: 4096, schema_generation: null, opens_this_workspace: null },
+  ],
 });
 
 it("offers no apply path for a source checkout, and does not check on mount", async () => {
@@ -86,7 +89,8 @@ it("names the version, channel and recovery point a signed package would use", a
   // Installed version and the recovery point it would leave behind, plus the
   // channel the release is verified against: the three facts the confirmation
   // is about.
-  expect(screen.getAllByText("1.0.0", { selector: "dd" })).toHaveLength(2);
+  expect(screen.getAllByText("1.0.0", { selector: "dd" })).toHaveLength(1);
+  expect(screen.getByText("1.0.0", { selector: "strong" })).toBeInTheDocument();
   expect(screen.getByText("stable", { selector: "dd" })).toBeInTheDocument();
   // REM-SET-UPDATES — "ready to install" claimed a download and a verification
   // that a channel *check* has not done. What the check establishes is that the
@@ -162,4 +166,23 @@ it("stays quiet about a mismatch this build cannot have", async () => {
 
   await screen.findByText("Installed build", { selector: "dt" });
   expect(screen.queryByText(/older build than the one now running/)).toBeNull();
+});
+
+// DEC-21 Updates — each recovery point says whether that build can open this data.
+it("says which recovery point can open this workspace's data and which would refuse it", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue(
+    status({
+      recovery_points: [
+        { version: "1.2.0", path: "/r/1.2.0", files: 10, bytes: 100, schema_generation: 199, opens_this_workspace: true },
+        { version: "1.1.0", path: "/r/1.1.0", files: 10, bytes: 100, schema_generation: 190, opens_this_workspace: false },
+        { version: "1.0.0", path: "/r/1.0.0", files: 10, bytes: 100, schema_generation: null, opens_this_workspace: null },
+      ],
+    }),
+  );
+  render(Updates);
+  const points = await screen.findByTestId("recovery-points");
+  const rows = Array.from(points.querySelectorAll("li")).map((row) => row.textContent ?? "");
+  expect(rows[0]).toMatch(/1\.2\.0 — can open this workspace's data/);
+  expect(rows[1]).toMatch(/1\.1\.0 — would refuse this workspace's data/);
+  expect(rows[2]).toMatch(/1\.0\.0 — not known whether/);
 });

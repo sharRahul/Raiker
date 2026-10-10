@@ -115,7 +115,31 @@
         </dd>
       </div>
       <div><dt>Channel</dt><dd>{update.channel ? update.channel.channel : "Not configured"}</dd></div>
-      {#if update.recovery_points.length}<div><dt>Recovery</dt><dd>{update.recovery_points.map((point) => point.version).join(", ")}</dd></div>{/if}
+      {#if update.recovery_points.length}
+        <!-- DEC-21 Updates — a rollback is only as good as whether that build can
+             open this workspace's data. An older build refuses a database a newer
+             one shaped, so each point says which it is, or that it is not known. -->
+        <div>
+          <dt>Recovery</dt>
+          <dd>
+            <ul class="points" data-testid="recovery-points">
+              {#each update.recovery_points as point (point.path)}
+                <li>
+                  <strong>{point.version}</strong> —
+                  {#if point.opens_this_workspace === true}
+                    can open this workspace's data
+                  {:else if point.opens_this_workspace === false}
+                    would refuse this workspace's data, which a newer Raiker has changed; roll back only
+                    with a backup taken before that update
+                  {:else}
+                    not known whether it can open this workspace's data
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </dd>
+        </div>
+      {/if}
       <!-- The licence was permanent prose at the foot of the
            navigation rail. It is a fact about the installation, read once, and
            this is where the rest of the facts about the installation are. -->
@@ -145,7 +169,8 @@
       <p class="description">
         Version {update.available.version} is offered on the channel. Nothing has been downloaded
         yet: Raiker verifies the release metadata and the bundle's signature during the update,
-        and replaces files only if both verify.
+        and replaces files only if both verify. If the new version changes the database, Raiker
+        backs it up first; after that, this version can be rolled back to only with that backup.
       </p>
       <button class="btn btn-primary" type="button" disabled={busy !== null} onclick={() => void apply()}>
         <Icon name="refresh" size="sm" /> {busy === "applying" ? "Starting update…" : confirm ? "Confirm update and restart" : "Update and restart"}
@@ -157,3 +182,7 @@
   </button>
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>
+
+<style>
+  .points { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
+</style>

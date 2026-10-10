@@ -56,9 +56,38 @@ class ApplyUpdateRequest(StrictRequest):
     confirm: bool = False
 
 
+def _workspace_generation(workspace: str | Path) -> int | None:
+    """The schema generation this workspace's database carries, or ``None`` unread.
+
+    A local header read (DEC-17 step 8). ``None`` is unknown — a store that
+    will not open — never "compatible".
+    """
+    try:
+        from raiker.storage.sqlite import SQLiteStore
+        from raiker.storage.stores.migration_runner import schema_generation_of
+
+        return schema_generation_of(SQLiteStore(Path(workspace)).connect())
+    except Exception:  # noqa: BLE001 - unknown is the honest answer to any failure
+        return None
+
+
 def _view(payload: dict[str, Any], workspace: str | Path) -> dict[str, Any]:
+    """DEC-21 Updates — each recovery point says whether it could open this data.
+
+    A build refuses a database a newer build shaped (``store_schema_newer``), so
+    rolling back past a migration leaves the workspace locked until a backup
+    from before that update is restored. Said per point: ``True`` it opens this
+    data, ``False`` it would refuse it, ``None`` it is not known.
+    """
     payload["targets"] = [release_target(target) for target in TARGETS]
     payload["last_check"] = read_last_check(workspace)
+    generation = _workspace_generation(workspace)
+    payload["workspace_schema_generation"] = generation
+    for point in payload.get("recovery_points", []):
+        recorded = point.get("schema_generation")
+        point["opens_this_workspace"] = (
+            None if recorded is None or generation is None else recorded >= generation
+        )
     return payload
 
 

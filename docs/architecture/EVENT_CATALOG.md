@@ -66,6 +66,8 @@ human authorizer, runtime authority, or other literal actor.
 | `skill_command_changed` | The owner added, changed, or removed a slash handle for an installed skill; the handle carries no authority |
 | `skills_indexed` | A turn advertised the owner's active skills to the model (count and names only — bodies are loaded on demand by `skill_load`) |
 | `channel_routing_changed` | The owner replaced a pairing's stored inbound route, target, owner identity, or relay choice |
+| `channel_paused` | The owner paused a channel (DEC-14 step 10): messages are still received and recorded, no work starts, nothing is delivered or relayed |
+| `channel_resumed` | The owner resumed a paused channel |
 | `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |
 | `brain_source_folder_revoked` | That access was withdrawn; every source indexed under the folder is removed with it |

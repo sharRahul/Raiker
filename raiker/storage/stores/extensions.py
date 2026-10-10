@@ -12,7 +12,7 @@ turns off.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -25,7 +25,12 @@ from raiker.contracts.models import (
     PluginInstallRecord,
     SkillCandidate,
 )
-from raiker.tools.mcp_review import decode_approved, fingerprints, settle_approved
+from raiker.tools.mcp_review import (
+    McpToolChanged,
+    decode_approved,
+    fingerprints,
+    settle_approved,
+)
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -191,13 +196,24 @@ class ExtensionStore:
             return cursor.rowcount > 0
 
     def approve_mcp_tools(
-        self: SQLiteStore, server_id: str, principal_id: str, names: Sequence[str]
+        self: SQLiteStore,
+        server_id: str,
+        principal_id: str,
+        names: Sequence[str],
+        shown: Mapping[str, str] | None = None,
     ) -> list[str] | None:
         """Accept ``names`` as this server declares them now (DEC-15 step 10).
 
         Owner-scoped. Returns the names that were held and are now accepted —
         a name the server does not offer, or one already accepted as it is, is
         not in the answer — or ``None`` when the profile is not the caller's.
+
+        ``shown`` is the fingerprint of each declaration the owner read
+        (§13.2 item 6). A server re-enumerates on every session, so the text
+        can change between the card rendering and the click; accepting "as
+        declared now" would then accept words nobody read. When any named tool
+        no longer matches what was shown, nothing is accepted and
+        :class:`McpToolChanged` names those tools.
         """
         with self.connect() as connection:
             row = connection.execute(
@@ -208,6 +224,12 @@ class ExtensionStore:
             if row is None:
                 return None
             current = fingerprints(_json_list(row["tools"]), _json_list(row["tool_schemas"]))
+            if shown is not None:
+                moved = sorted(
+                    name for name in set(names) if name in shown and current.get(name) != shown[name]
+                )
+                if moved:
+                    raise McpToolChanged(moved)
             approved = decode_approved(row["approved_tools"])
             record = dict(current if approved is None else approved)
             accepted = sorted(
@@ -221,10 +243,20 @@ class ExtensionStore:
             )
             return accepted
 
-    def rename_mcp_server(self: SQLiteStore, server_id: str, principal_id: str, name: str) -> bool:
+    def rename_mcp_server(
+        self: SQLiteStore,
+        server_id: str,
+        principal_id: str,
+        name: str,
+        expected_name: str | None = None,
+    ) -> bool:
         """Owner-scoped rename of one MCP server profile. Returns False if the
         row is missing / owned by another principal, or if the new name is
-        already taken by another of the caller's servers (unique per owner)."""
+        already taken by another of the caller's servers (unique per owner).
+
+        With ``expected_name`` the rename applies only while the profile still
+        has the name the page showed, in the same statement that writes it.
+        """
         with self.connect() as connection:
             clash = connection.execute(
                 "SELECT 1 FROM mcp_servers WHERE principal_id = ? AND name = ? AND server_id != ?",
@@ -232,19 +264,24 @@ class ExtensionStore:
             ).fetchone()
             if clash is not None:
                 return False
+            guard, params = ("", ()) if expected_name is None else (" AND name = ?", (expected_name,))
             cursor = connection.execute(
-                "UPDATE mcp_servers SET name = ? WHERE server_id = ? AND principal_id = ?",
-                (name, server_id, principal_id),
+                "UPDATE mcp_servers SET name = ? WHERE server_id = ? AND principal_id = ?" + guard,
+                (name, server_id, principal_id, *params),
             )
             return cursor.rowcount > 0
 
-    def delete_mcp_server(self: SQLiteStore, server_id: str, principal_id: str) -> bool:
+    def delete_mcp_server(
+        self: SQLiteStore, server_id: str, principal_id: str, expected_name: str | None = None
+    ) -> bool:
         """Owner-scoped delete of one MCP server profile. Returns False if the
-        row is missing or owned by another principal (isolation)."""
+        row is missing or owned by another principal (isolation), or — with
+        ``expected_name`` — no longer has the name the confirmation named."""
+        guard, params = ("", ()) if expected_name is None else (" AND name = ?", (expected_name,))
         with self.connect() as connection:
             cursor = connection.execute(
-                "DELETE FROM mcp_servers WHERE server_id = ? AND principal_id = ?",
-                (server_id, principal_id),
+                "DELETE FROM mcp_servers WHERE server_id = ? AND principal_id = ?" + guard,
+                (server_id, principal_id, *params),
             )
             return cursor.rowcount > 0
 
@@ -753,6 +790,15 @@ class ExtensionStore:
             cursor = connection.execute(
                 "UPDATE channel_pairings SET enabled = ? WHERE pairing_id = ?",
                 (1 if enabled else 0, pairing_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_channel_pairing_paused(self: SQLiteStore, pairing_id: str, paused: bool) -> bool:
+        """DEC-14 step 10 — pause or resume one pairing; its allowlist and route stay."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE channel_pairings SET paused = ?, paused_at = ? WHERE pairing_id = ?",
+                (1 if paused else 0, utc_now() if paused else None, pairing_id),
             )
             return cursor.rowcount > 0
 

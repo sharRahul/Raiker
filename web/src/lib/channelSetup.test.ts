@@ -14,6 +14,9 @@ import {
 
 function profile(overrides: Partial<ChannelProfile> = {}): ChannelProfile {
   return {
+    paused: false,
+    paused_at: null,
+    revision: null,
     connector_id: "channel.webhooks",
     channel_type: "webhooks",
     display_name: "Webhooks",

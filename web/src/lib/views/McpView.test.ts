@@ -314,10 +314,27 @@ describe("McpView", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
-        expect.stringContaining("/api/mcp/servers/mcp_1"),
+        expect.stringContaining("/api/mcp/servers/mcp_1?expected_name=echo-server"),
         expect.objectContaining({ method: "DELETE" }),
       ),
     );
+  });
+
+  // §13.2 item 6 — the confirmation named a server another tab has renamed.
+  it("keeps a server renamed elsewhere and says why it was not deleted", async () => {
+    vi.stubGlobal("confirm", () => true);
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "DELETE /api/mcp/servers/mcp_1": { __status: 409, detail: { reason_code: "mcp_server_conflict" } },
+    });
+    render(McpView);
+    await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(
+      await screen.findByText(/was renamed somewhere else since this page loaded, so it was not deleted/),
+    ).toBeInTheDocument();
   });
 
   // REM-SET-NOTIFY — the notification strip moved to the shell, where the
@@ -609,8 +626,8 @@ describe("McpView — tools held for review", () => {
     tools: ["echo", "workspace_ping", "purge"],
     tool_count: 3,
     pending_tools: [
-      { name: "purge", change: "new", description: "Delete every note." },
-      { name: "echo", change: "changed", description: "Send the text to a remote host." },
+      { name: "purge", change: "new", description: "Delete every note.", fingerprint: "f-purge" },
+      { name: "echo", change: "changed", description: "Send the text to a remote host.", fingerprint: "f-echo" },
     ],
   });
 
@@ -644,12 +661,36 @@ describe("McpView — tools held for review", () => {
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
         expect.stringContaining("/api/mcp/servers/mcp_1/tools/approve"),
-        expect.objectContaining({ method: "POST", body: JSON.stringify({ tools: ["purge"] }) }),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ tools: ["purge"], fingerprints: { purge: "f-purge" } }),
+        }),
       ),
     );
     await waitFor(() =>
       expect(screen.getByText(/accepted 1 tool · 1 still held/)).toBeInTheDocument(),
     );
+  });
+
+  // §13.2 item 6 — the server reworded the tool after the card was drawn.
+  it("accepts nothing and says so when the tool changed since the page showed it", async () => {
+    const mock = stubFetch({
+      "GET /api/mcp/servers": [held],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "POST /api/mcp/servers/mcp_1/tools/approve": {
+        __status: 409, detail: { reason_code: "mcp_tool_changed" },
+      },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Accept purge" }));
+    expect(
+      await screen.findByText(/changed how it describes that tool since this page showed it, so nothing was accepted/),
+    ).toBeInTheDocument();
+    const reads = mock.mock.calls.filter(([url, init]) =>
+      String(url).includes("/api/mcp/servers") && !String(url).includes("/tools") && (init?.method ?? "GET") === "GET",
+    );
+    expect(reads.length).toBeGreaterThan(1);
   });
 
   it("offers Accept all only when more than one is held", async () => {

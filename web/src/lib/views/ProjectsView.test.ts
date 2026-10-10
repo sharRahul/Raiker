@@ -22,6 +22,7 @@ afterEach(() => {
 
 function project(partial: Partial<ProjectView>): ProjectView {
   return {
+    revision: "rev-1",
     project_id: "proj_1",
     name: "Alpha",
     root_subpath: "projects/alpha",
@@ -426,6 +427,28 @@ describe("ProjectsView context home", () => {
 
     await openSection("Overview");
     expect(screen.getByLabelText("Project instructions")).toHaveValue("Prefer short answers.");
+  });
+
+  // §13.2 item 6 — the save carries the revision the editor read; a refusal
+  // because another tab saved first keeps the owner's text and says why.
+  it("keeps the text and says so when the context was saved elsewhere first", async () => {
+    await openDetail(
+      routes({
+        "GET /api/projects/proj_1": { ...DETAIL, context: { ...DETAIL.context, revision: "ctx-a" } },
+        "PUT /api/projects/proj_1/context": { __status: 409, detail: { reason_code: "project_conflict" } },
+      }),
+    );
+    const instructions = await screen.findByLabelText("Project instructions");
+    await fireEvent.input(instructions, { target: { value: "Prefer short answers." } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save context" }));
+    expect(
+      await screen.findByText(/changed somewhere else since this page opened it/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Project instructions")).toHaveValue("Prefer short answers.");
+    const put = (globalThis.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.find(
+      ([url, init]) => String(url).includes("/context") && init?.method === "PUT",
+    );
+    expect(JSON.parse(String(put?.[1].body))).toMatchObject({ expected_revision: "ctx-a" });
   });
 
   it("says nothing about unsaved changes when nothing was changed", async () => {

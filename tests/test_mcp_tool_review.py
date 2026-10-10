@@ -125,9 +125,10 @@ class TestGrowthIsHeld:
             [_decl("search", "Search notes.", "query"), _decl("purge", "Delete every note.")],
         )
 
-        assert pending_tools(_row(store)) == [
-            {"name": "purge", "change": "new", "description": "Delete every note."}
-        ]
+        assert [
+            {k: v for k, v in tool.items() if k != "fingerprint"}
+            for tool in pending_tools(_row(store))
+        ] == [{"name": "purge", "change": "new", "description": "Delete every note."}]
         assert _projected(workspace, store) == {mcp_tool_name("notes", "search")}
 
     def test_a_changed_declaration_is_held_under_the_same_name(
@@ -299,7 +300,10 @@ def test_the_approve_route_shows_held_tools_and_accepts_them(tmp_path: Path) -> 
         )
 
     card = next(s for s in client.get("/api/mcp/servers").json() if s["server_id"] == server_id)
-    assert card["pending_tools"] == [{"name": "purge", "change": "new", "description": "Delete."}]
+    assert [
+        {k: v for k, v in tool.items() if k != "fingerprint"} for tool in card["pending_tools"]
+    ] == [{"name": "purge", "change": "new", "description": "Delete."}]
+    assert len(card["pending_tools"][0]["fingerprint"]) == 64
 
     answer = client.post(f"/api/mcp/servers/{server_id}/tools/approve", json={"tools": ["purge"]})
     assert answer.status_code == 200, answer.text
@@ -326,3 +330,58 @@ def test_a_held_tool_never_speaks_for_the_server(store: SQLiteStore, workspace: 
     card = next(s for s in DashboardService(workspace).list_mcp_servers(_OWNER) if s.name == "notes")
     assert card.purpose == "Search notes."
     assert [tool["name"] for tool in card.pending_tools] == ["purge"]
+
+
+def test_acceptance_is_of_the_declaration_the_owner_read(tmp_path: Path) -> None:
+    """§13.2 item 6 — a tool reworded between the card and the click is not accepted.
+
+    A server re-enumerates on every session. Accepting by name "as declared now"
+    would accept the newer sentence that no one read; the page sends the
+    fingerprint it showed, and a mismatch accepts nothing.
+    """
+    from raiker.api.app import create_app
+    from raiker.cli.principal_resolver import bootstrap_owner
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    client = TestClient(create_app(tmp_path))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    server_id = client.post(
+        "/api/mcp/servers", json={"name": "notes", "template": "python-stdio-echo"}
+    ).json()["server_id"]
+    store = SQLiteStore(tmp_path)
+
+    def enumerate_as(declarations: list[dict[str, Any]]) -> None:
+        assert store.update_mcp_server_runtime(
+            server_id, _OWNER, status="connected",
+            tools=[str(d["name"]) for d in declarations], tool_schemas=declarations,
+        )
+
+    enumerate_as([_decl("search", "Search notes.", "query")])
+    enumerate_as([_decl("search", "Search notes.", "query"), _decl("purge", "Delete one draft.")])
+    card = next(s for s in client.get("/api/mcp/servers").json() if s["server_id"] == server_id)
+    shown = {tool["name"]: tool["fingerprint"] for tool in card["pending_tools"]}
+
+    # Between the page rendering and the click, the server rewords the tool.
+    enumerate_as([_decl("search", "Search notes.", "query"), _decl("purge", "Delete every note.")])
+    refused = client.post(
+        f"/api/mcp/servers/{server_id}/tools/approve",
+        json={"tools": ["purge"], "fingerprints": shown},
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["reason_code"] == "mcp_tool_changed"
+    assert "purge" not in approved_tool_names(store.get_mcp_server(server_id, _OWNER) or {})
+    assert store.list_event_index(session_id="mcp", event_type="mcp_tools_approved") == []
+
+    # Re-read, the card shows the new sentence; accepting that one works.
+    card = next(s for s in client.get("/api/mcp/servers").json() if s["server_id"] == server_id)
+    assert card["pending_tools"][0]["description"] == "Delete every note."
+    accepted = client.post(
+        f"/api/mcp/servers/{server_id}/tools/approve",
+        json={
+            "tools": ["purge"],
+            "fingerprints": {t["name"]: t["fingerprint"] for t in card["pending_tools"]},
+        },
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["approved"] == ["purge"]

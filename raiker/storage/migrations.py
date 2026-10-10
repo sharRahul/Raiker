@@ -4183,6 +4183,26 @@ TASK_COST_LIMIT_SQL = """
 ALTER TABLE tasks ADD COLUMN max_run_cost_usd REAL;
 """
 
+# DEC-14 step 10 — a paired channel the owner has paused. Paused is not off: an
+# allowlisted message is still received and recorded with its receipt, but it
+# starts no work, and nothing is delivered to or relayed through the channel.
+CHANNEL_PAUSE_MIGRATION_ID = "RAIKER-2096-channel-pause"
+
+CHANNEL_PAUSE_SQL = """
+ALTER TABLE channel_pairings ADD COLUMN paused INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE channel_pairings ADD COLUMN paused_at TEXT;
+"""
+
+# DEC-21 Git credential — when the credential was last lent and for what, so
+# the page can say "last used" rather than only how many times. ``consumed_at``
+# is the *first* use and stays that.
+GIT_CREDENTIAL_LAST_USE_MIGRATION_ID = "RAIKER-2097-git-credential-last-use"
+
+GIT_CREDENTIAL_LAST_USE_SQL = """
+ALTER TABLE git_credential_grants ADD COLUMN last_used_at TEXT;
+ALTER TABLE git_credential_grants ADD COLUMN last_operation TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4424,6 +4444,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(TASK_TOOL_LIMIT_MIGRATION_ID, TASK_TOOL_LIMIT_SQL),
     Migration(IDEMPOTENCY_KEYS_MIGRATION_ID, IDEMPOTENCY_KEYS_SQL),
     Migration(TASK_COST_LIMIT_MIGRATION_ID, TASK_COST_LIMIT_SQL),
+    Migration(CHANNEL_PAUSE_MIGRATION_ID, CHANNEL_PAUSE_SQL),
+    Migration(GIT_CREDENTIAL_LAST_USE_MIGRATION_ID, GIT_CREDENTIAL_LAST_USE_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

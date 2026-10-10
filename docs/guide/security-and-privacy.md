@@ -221,17 +221,21 @@ dictation, and still yours.
 
 ### Backups
 
-**Settings → Account → Backups** makes a copy of this workspace's database and
-memory files. **Back up now** takes a consistent snapshot, encrypted with the
-workspace's key from the first byte — no unencrypted copy is ever written — and
-lists it only once it has checked it. Each backup records its checksum, the
+**Settings → Account → Backups** makes a copy of this workspace's database,
+memory files, checkpoint files and uploaded files. **Back up now** takes a
+consistent snapshot of the database, encrypted with the workspace's key from the
+first byte — no unencrypted copy is ever written — copies the files the
+database's rows point at as the workspace keeps them, and lists the backup only
+once it has checked it. The audit log and folders you attached to projects are
+not included, and the card says so. Each backup records its checksum, the
 schema it was taken at and how many conversations, tasks and memories it holds.
 Raiker also takes one by itself before an update changes the database, listed as
 *Before an update*, and keeps the last three of those.
 
-- **Verify** re-reads the checksum, the key and the database's integrity, and
-  says *Verified*, *Damaged* (and which check failed), *Unreadable* (made with
-  a different key) or *Made by a newer Raiker* (this version cannot open it).
+- **Verify** re-reads the checksum, the key, the database's integrity and every
+  copied checkpoint and upload file, and says *Verified*, *Damaged* (and which
+  check failed), *Unreadable* (made with a different key) or *Made by a newer
+  Raiker* (this version cannot open it).
 - **Restore to a new folder** is offered only for a verified backup. It writes
   the copy to `.raiker/restores/` as a workspace of its own and shows the
   command that starts Raiker on it. Your running workspace is not changed; to

@@ -416,12 +416,55 @@ class TestProjectsApi:
         )
         assert saved.status_code == 200, saved.text
         detail = client.get(f"/api/projects/{pid}", headers=headers).json()
+        revision = detail["context"].pop("revision")
         assert detail["context"] == {
             "instructions": "Keep changes focused.",
             "attachment_ids": [],
             "memory_enabled": True,
             "memory_mode": "enabled",
         }
+        assert revision == saved.json()["revision"]
+
+    def test_a_stale_editor_cannot_save_or_move_over_newer_state(self, client: TestClient) -> None:
+        """§13.2 item 6 — two tabs on one project; the older one is refused, nothing written."""
+        headers = self._headers(client)
+        pid = client.post("/api/projects", json={"name": "Alpha"}, headers=headers).json()["project_id"]
+        other = client.post("/api/projects", json={"name": "Beta"}, headers=headers).json()["project_id"]
+        read = client.get(f"/api/projects/{pid}", headers=headers).json()
+        context_seen = read["context"]["revision"]
+        placement_seen = read["project"]["revision"]
+
+        newer = client.put(
+            f"/api/projects/{pid}/context",
+            json={"instructions": "New rules.", "attachment_ids": [], "expected_revision": context_seen},
+            headers=headers,
+        )
+        assert newer.status_code == 200, newer.text
+        stale = client.put(
+            f"/api/projects/{pid}/context",
+            json={"instructions": "Old rules.", "attachment_ids": [], "expected_revision": context_seen},
+            headers=headers,
+        )
+        assert stale.status_code == 409, stale.text
+        assert stale.json()["detail"]["reason_code"] == "project_conflict"
+        assert (
+            client.get(f"/api/projects/{pid}", headers=headers).json()["context"]["instructions"]
+            == "New rules."
+        )
+
+        moved = client.put(
+            f"/api/projects/{pid}/move",
+            json={"parent_id": other, "expected_revision": placement_seen},
+            headers=headers,
+        )
+        assert moved.status_code == 200, moved.text
+        undo_from_stale_tab = client.put(
+            f"/api/projects/{pid}/move",
+            json={"parent_id": None, "expected_revision": placement_seen},
+            headers=headers,
+        )
+        assert undo_from_stale_tab.status_code == 409, undo_from_stale_tab.text
+        assert client.get(f"/api/projects/{pid}", headers=headers).json()["project"]["parent_id"] == other
 
     def test_authenticated_human_can_confirm_project_deletion(
         self, client: TestClient, workspace: Path

@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from raiker.channels.revision import pairing_revision
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
     ChannelDestination,
@@ -192,14 +193,23 @@ class ExtensionService:
         return self.control.connect_mcp_server(acting_principal_id, server_id)
 
     def rename_mcp_server(
-        self: DashboardService, acting_principal_id: str | None, server_id: str, name: str
+        self: DashboardService,
+        acting_principal_id: str | None,
+        server_id: str,
+        name: str,
+        expected_name: str | None = None,
     ) -> ControlResult:
         """Owner-scoped, human-only rename of one MCP server profile."""
-        return self.control.rename_mcp_server(acting_principal_id, server_id, name)
+        return self.control.rename_mcp_server(acting_principal_id, server_id, name, expected_name)
 
-    def delete_mcp_server(self: DashboardService, acting_principal_id: str | None, server_id: str) -> ControlResult:
+    def delete_mcp_server(
+        self: DashboardService,
+        acting_principal_id: str | None,
+        server_id: str,
+        expected_name: str | None = None,
+    ) -> ControlResult:
         """Owner-scoped, human-only delete of one MCP server profile."""
-        return self.control.delete_mcp_server(acting_principal_id, server_id)
+        return self.control.delete_mcp_server(acting_principal_id, server_id, expected_name)
 
     def pause_mcp_server(
         self: DashboardService, acting_principal_id: str | None, server_id: str, reason: str | None = None
@@ -218,10 +228,14 @@ class ExtensionService:
         return self.control.kill_mcp_server(acting_principal_id, server_id, reason)
 
     def approve_mcp_tools(
-        self: DashboardService, acting_principal_id: str | None, server_id: str, tools: list[str]
+        self: DashboardService,
+        acting_principal_id: str | None,
+        server_id: str,
+        tools: list[str],
+        shown: dict[str, str] | None = None,
     ) -> ControlResult:
         """Owner-scoped, human-only acceptance of held tools (DEC-15 step 10; delegates)."""
-        return self.control.approve_mcp_tools(acting_principal_id, server_id, tools)
+        return self.control.approve_mcp_tools(acting_principal_id, server_id, tools, shown)
 
     #: Event types the dispatcher writes, newest-first, for the hooks surface.
     _HOOK_EVENT_TYPES = (
@@ -583,7 +597,10 @@ class ExtensionService:
                     "requires_network": profile.requires_network,
                     "linked": pairing is not None,
                     "enabled": bool(pairing.get("enabled")) if pairing else False,
+                    "paused": bool(pairing.get("paused")) if pairing else False,
+                    "paused_at": pairing.get("paused_at") if pairing else None,
                     "pairing_id": pairing.get("pairing_id") if pairing else None,
+                    "revision": pairing_revision(pairing) if pairing else None,
                     "display_label": pairing.get("display_name") if pairing else None,
                     "sender_count": len(senders),
                     # The owner's own contact list, sent only to the owner: the
@@ -665,27 +682,61 @@ class ExtensionService:
         )
 
     def set_channel_enabled(
-        self: DashboardService, acting_principal_id: str | None, pairing_id: str, enabled: bool
+        self: DashboardService,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        enabled: bool,
+        expected_revision: str | None = None,
     ) -> ControlResult:
-        return self.control.set_channel_enabled(acting_principal_id, pairing_id, enabled)
+        return self.control.set_channel_enabled(
+            acting_principal_id, pairing_id, enabled, expected_revision
+        )
+
+    def set_channel_paused(
+        self: DashboardService,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        paused: bool,
+        expected_revision: str | None = None,
+    ) -> ControlResult:
+        return self.control.set_channel_paused(
+            acting_principal_id, pairing_id, paused, expected_revision
+        )
 
     def set_channel_senders(
-        self: DashboardService, acting_principal_id: str | None, pairing_id: str, senders: list[str]
+        self: DashboardService,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        senders: list[str],
+        expected_revision: str | None = None,
     ) -> ControlResult:
-        return self.control.set_channel_senders(acting_principal_id, pairing_id, senders)
+        return self.control.set_channel_senders(
+            acting_principal_id, pairing_id, senders, expected_revision
+        )
 
     def set_channel_routing(
         self: DashboardService, acting_principal_id: str | None, pairing_id: str, **settings: Any
     ) -> ControlResult:
         return self.control.set_channel_routing(acting_principal_id, pairing_id, **settings)
 
-    def unpair_channel(self: DashboardService, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
-        return self.control.unpair_channel(acting_principal_id, pairing_id)
+    def unpair_channel(
+        self: DashboardService,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        expected_revision: str | None = None,
+    ) -> ControlResult:
+        return self.control.unpair_channel(acting_principal_id, pairing_id, expected_revision)
 
     def set_channel_destination(
-        self: DashboardService, acting_principal_id: str | None, pairing_id: str, delivery_url: str | None
+        self: DashboardService,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        delivery_url: str | None,
+        expected_revision: str | None = None,
     ) -> ControlResult:
-        return self.control.set_channel_destination(acting_principal_id, pairing_id, delivery_url)
+        return self.control.set_channel_destination(
+            acting_principal_id, pairing_id, delivery_url, expected_revision
+        )
 
     def deliver_channel_test(
         self: DashboardService, acting_principal_id: str | None, connector_id: str, text: str

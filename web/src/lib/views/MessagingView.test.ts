@@ -149,6 +149,99 @@ describe("MessagingView", () => {
     expect(within(profiles).getByRole("button", { name: "Unpair" })).toBeInTheDocument();
   });
 
+  // §13.2 item 6 — a change carries the revision this page read, and a refusal
+  // because another tab changed the channel re-reads it and says so.
+  it("turning a channel on sends the revision it read and explains a conflict", async () => {
+    const linked = {
+      ...channelsView().profiles[0],
+      linked: true,
+      enabled: false,
+      pairing_id: "chp_1",
+      revision: "rev-a",
+      display_label: "Webhooks",
+      sender_count: 1,
+      senders: ["ops"],
+    };
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({ profiles: [linked] }),
+      "PUT /api/channels/pairings/chp_1/enabled": {
+        __status: 409, detail: { reason_code: "channel_conflict" },
+      },
+    });
+    render(MessagingView);
+    await screen.findByText("Webhooks");
+    const profiles = screen.getByTestId("channel-profiles");
+    await fireEvent.click(within(profiles).getByRole("button", { name: "Turn on" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/channels/pairings/chp_1/enabled"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ enabled: true, expected_revision: "rev-a" }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/changed somewhere else since this page loaded, so nothing was changed/),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  // DEC-14 step 10 — Pause is offered on a channel that is on, and says what it keeps.
+  it("pauses an enabled channel and labels it Paused, not On", async () => {
+    const on = {
+      ...channelsView().profiles[0],
+      linked: true,
+      enabled: true,
+      paused: false,
+      paused_at: null,
+      pairing_id: "chp_1",
+      revision: "rev-a",
+      display_label: "Webhooks",
+      sender_count: 1,
+      senders: ["ops"],
+    };
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({ profiles: [on] }),
+      "PUT /api/channels/pairings/chp_1/paused": { ok: true, pairing_id: "chp_1", paused: true, revision: "rev-b" },
+    });
+    render(MessagingView);
+    await screen.findByText("Webhooks");
+    const profiles = screen.getByTestId("channel-profiles");
+    await fireEvent.click(within(profiles).getByRole("button", { name: "Pause" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/channels/pairings/chp_1/paused"),
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ paused: true, expected_revision: "rev-a" }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/is paused\. Messages are kept; nothing starts and nothing is sent/)).toBeInTheDocument(),
+    );
+  });
+
+  it("a paused channel reads as Paused and offers Resume", async () => {
+    stubFetch({
+      "GET /api/channels": channelsView({
+        profiles: [{
+          ...channelsView().profiles[0],
+          linked: true, enabled: true, paused: true, paused_at: "2026-10-10T08:00:00Z",
+          pairing_id: "chp_1", revision: "rev-a", display_label: "Webhooks", sender_count: 1, senders: ["ops"],
+        }],
+      }),
+    });
+    render(MessagingView);
+    await screen.findByText("Webhooks");
+    const profiles = screen.getByTestId("channel-profiles");
+    const row = within(profiles).getByText("Webhooks").closest("li");
+    expect(row).toHaveTextContent("Paused");
+    expect(within(profiles).getByRole("button", { name: "Resume" })).toBeInTheDocument();
+  });
+
   it("a test delivery names no address: it goes where the channel delivers", async () => {
     const fetchMock = stubFetch({
       "GET /api/channels": channelsView({

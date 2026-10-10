@@ -176,6 +176,7 @@ export type ApprovalView = {
 
 export type ApproveMcpToolsRequest = {
   tools: string[];
+  fingerprints?: Record<string, string> | null;
 };
 
 /** A folder of the owner's to put behind a project, and whether Raiker may write to it. */
@@ -278,6 +279,12 @@ export type BackupRestored = {
   deletions_applied: Record<string, number>;
 };
 
+export type BackupTreeView = {
+  files: number;
+  bytes: number;
+  sha256: string;
+};
+
 /** One encrypted backup of the workspace database (DEC-24 step 5). */
 export type BackupView = {
   backup_id: string;
@@ -296,6 +303,7 @@ export type BackupView = {
   detail: string;
   schema_generation: number;
   opens_here: boolean;
+  trees: Record<string, BackupTreeView>;
 };
 
 export type BackupsView = {
@@ -606,6 +614,7 @@ export type ChannelDestination = {
 /** Bind, or with ``None`` clear, a webhook channel's delivery URL. */
 export type ChannelDestinationRequest = {
   delivery_url?: string | null;
+  expected_revision?: string | null;
 };
 
 /** A webhook channel's destination bound or cleared — whether, never where. */
@@ -613,16 +622,19 @@ export type ChannelDestinationSet = {
   ok: boolean;
   pairing_id: string;
   has_destination: boolean;
+  revision?: string;
 };
 
 export type ChannelEnabledRequest = {
   enabled: boolean;
+  expected_revision?: string | null;
 };
 
 export type ChannelEnabledSet = {
   ok: boolean;
   pairing_id: string;
   enabled: boolean;
+  revision?: string;
 };
 
 /** One environment variable a channel transport declares that it needs. */
@@ -665,6 +677,20 @@ export type ChannelPaired = {
   enabled: boolean;
 };
 
+/** DEC-14 step 10 — pause or resume one paired channel. */
+export type ChannelPausedRequest = {
+  paused: boolean;
+  expected_revision?: string | null;
+};
+
+/** DEC-14 step 10 — paused keeps receiving and recording; it starts and sends nothing. */
+export type ChannelPausedSet = {
+  ok: boolean;
+  pairing_id: string;
+  paused: boolean;
+  revision?: string;
+};
+
 /** One connector profile, and each separate fact about it (BUG-225). */
 export type ChannelProfile = {
   connector_id: string;
@@ -678,7 +704,10 @@ export type ChannelProfile = {
   requires_network: boolean;
   linked: boolean;
   enabled: boolean;
+  paused: boolean;
+  paused_at: string | null;
   pairing_id: string | null;
+  revision: string | null;
   display_label: string | null;
   sender_count: number;
   senders: string[];
@@ -733,22 +762,26 @@ export type ChannelRoutingRequest = {
   target_session_id?: string | null;
   owner_sender_id?: string | null;
   approval_relay_enabled?: boolean;
+  expected_revision?: string | null;
 };
 
 export type ChannelRoutingSet = {
   ok: boolean;
   pairing_id: string;
   routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
+  revision?: string;
 };
 
 export type ChannelSendersRequest = {
   senders: string[];
+  expected_revision?: string | null;
 };
 
 export type ChannelSendersSet = {
   ok: boolean;
   pairing_id: string;
   sender_count: number;
+  revision?: string;
 };
 
 /** One governed test delivery: sizes and status, never the text sent. */
@@ -1906,11 +1939,19 @@ export type GitCredentialGrant = {
   uses: number;
 };
 
+/** DEC-21 Git credential — when the credential was last lent, and for what. */
+export type GitCredentialLastUse = {
+  at: string;
+  operation: string | null;
+  scope: string;
+};
+
 /** What a surface needs to render the control. Never the token. */
 export type GitCredentialStatus = {
   credential_configured: boolean;
   credential_source: string;
   grant: GitCredentialGrant | null;
+  last_used: GitCredentialLastUse | null;
   scopes: string[];
   grant_seconds: Record<string, number>;
   hosts: string[];
@@ -3300,6 +3341,7 @@ export type ModelsView = {
 
 export type MoveProjectRequest = {
   parent_id?: string | null;
+  expected_revision?: string | null;
 };
 
 export type NativeUsageMetricView = {
@@ -3516,6 +3558,7 @@ export type PendingTool = {
   name: string;
   change: "new" | "changed";
   description: string;
+  fingerprint: string;
 };
 
 /** BUG-308 — where this plugin's own code would run on this machine. */
@@ -3660,6 +3703,7 @@ export type ProjectContext = {
   attachment_ids: string[];
   memory_enabled: boolean;
   memory_mode: "inherit" | "enabled" | "disabled";
+  revision: string;
 };
 
 export type ProjectContextSaved = {
@@ -3668,6 +3712,7 @@ export type ProjectContextSaved = {
   attachment_ids: string[];
   memory_enabled: boolean;
   memory_mode: "inherit" | "enabled" | "disabled";
+  revision: string;
 };
 
 /** A new project; an attached one also names its root and the grant behind it. */
@@ -3806,6 +3851,7 @@ export type ProjectView = {
   root_kind: "managed" | "attached";
   root_label: string;
   last_activity_at: string | null;
+  revision: string;
 };
 
 export type ProjectsListView = {
@@ -3944,11 +3990,17 @@ export type RecoveryBackupsView = {
   backups: BackupView[];
 };
 
+export type RecoveryMatrixView = {
+  rows: RecoveryRowView[];
+};
+
 export type RecoveryPointView = {
   version: string;
   path: string;
   files: number;
   bytes: number;
+  schema_generation: number | null;
+  opens_this_workspace: boolean | null;
 };
 
 export type RecoveryRestoreRequest = {
@@ -3962,6 +4014,18 @@ export type RecoveryRestored = {
   quarantine: string;
   counts: Record<string, number>;
   deletions_applied: Record<string, number>;
+};
+
+export type RecoveryRowView = {
+  subsystem: string;
+  label: string;
+  source_of_truth: string;
+  claim: string;
+  after_restart: string;
+  uncertain_effects: string;
+  cleanup: string;
+  owner_action: string;
+  anchors: string[];
 };
 
 export type RegisterRequest = {
@@ -4015,6 +4079,7 @@ export type RemoteMcpServerCreated = {
 
 export type RenameMcpServerRequest = {
   name: string;
+  expected_name?: string | null;
 };
 
 export type RenameSessionRequest = {
@@ -4140,6 +4205,7 @@ export type SaveProjectContextRequest = {
   attachment_ids?: string[];
   memory_enabled?: boolean | null;
   memory_mode?: "inherit" | "enabled" | "disabled" | null;
+  expected_revision?: string | null;
 };
 
 /** DEC-24 step 1 — due work no pass has claimed, and how long the oldest has waited. */
@@ -4957,6 +5023,7 @@ export type UpdateApplyResult = {
   checked_at: string | null;
   targets: ReleaseTargetView[];
   last_check: LastUpdateCheck | null;
+  workspace_schema_generation: number | null;
   ok: boolean;
   updating: boolean;
   version?: string;
@@ -4979,6 +5046,7 @@ export type UpdateCheckResult = {
   checked_at: string | null;
   targets: ReleaseTargetView[];
   last_check: LastUpdateCheck | null;
+  workspace_schema_generation: number | null;
   ok: boolean;
 };
 
@@ -5010,6 +5078,7 @@ export type UpdateStatusView = {
   checked_at: string | null;
   targets: ReleaseTargetView[];
   last_check: LastUpdateCheck | null;
+  workspace_schema_generation: number | null;
 };
 
 /** An image or document uploaded through ``POST /api/attachments``. */
@@ -5254,12 +5323,14 @@ export const contract = {
     call<ChannelTestDelivered>("POST", "/api/channels/deliver-test", { body }),
   pairChannel: (body: PairChannelRequest) =>
     call<ChannelPaired>("POST", "/api/channels/pairings", { body }),
-  unpairChannel: (pairingId: string) =>
-    call<ChannelUnpaired>("DELETE", `/api/channels/pairings/${encodeURIComponent(pairingId)}`),
+  unpairChannel: (pairingId: string, query: { expected_revision?: string } = {}) =>
+    call<ChannelUnpaired>("DELETE", withQuery(`/api/channels/pairings/${encodeURIComponent(pairingId)}`, query)),
   setChannelDestination: (pairingId: string, body: ChannelDestinationRequest) =>
     call<ChannelDestinationSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/destination`, { body }),
   setChannelEnabled: (pairingId: string, body: ChannelEnabledRequest) =>
     call<ChannelEnabledSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/enabled`, { body }),
+  setChannelPaused: (pairingId: string, body: ChannelPausedRequest) =>
+    call<ChannelPausedSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/paused`, { body }),
   setChannelRouting: (pairingId: string, body: ChannelRoutingRequest) =>
     call<ChannelRoutingSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/routing`, { body }),
   setChannelSenders: (pairingId: string, body: ChannelSendersRequest) =>
@@ -5340,6 +5411,8 @@ export const contract = {
     request<DiagnosticsView>("/api/diagnostics"),
   getDiagnosticsExport: () =>
     request<DiagnosticsExport>("/api/diagnostics/export"),
+  getRecoveryMatrix: () =>
+    request<RecoveryMatrixView>("/api/diagnostics/recovery"),
   getEnvironment: () =>
     request<EnvironmentContextView>("/api/environment"),
   listEvents: (query: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
@@ -5444,8 +5517,8 @@ export const contract = {
     call<McpServerCreated>("POST", "/api/mcp/servers", { body }),
   createRemoteMcpServer: (body: CreateRemoteMcpServerRequest) =>
     call<RemoteMcpServerCreated>("POST", "/api/mcp/servers/remote", { body }),
-  deleteMcpServer: (serverId: string) =>
-    call<McpServerDeleted>("DELETE", `/api/mcp/servers/${encodeURIComponent(serverId)}`),
+  deleteMcpServer: (serverId: string, query: { expected_name?: string } = {}) =>
+    call<McpServerDeleted>("DELETE", withQuery(`/api/mcp/servers/${encodeURIComponent(serverId)}`, query)),
   renameMcpServer: (serverId: string, body: RenameMcpServerRequest) =>
     call<McpServerRenamed>("PUT", `/api/mcp/servers/${encodeURIComponent(serverId)}`, { body }),
   connectMcpServer: (serverId: string) =>

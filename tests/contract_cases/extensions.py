@@ -519,6 +519,7 @@ CASES: Cases = {
         {"connector_id": "channel.webhooks", "display_name": "Contract", "senders": ["alice"]},
     ),
     ("PUT", "/api/channels/pairings/{pairing_id}/enabled"): _on_pairing("/enabled", {"enabled": False}),
+    ("PUT", "/api/channels/pairings/{pairing_id}/paused"): _on_pairing("/paused", {"paused": True}),
     ("PUT", "/api/channels/pairings/{pairing_id}/senders"): _on_pairing("/senders", {"senders": ["alice", "bob"]}),
     ("PUT", "/api/channels/pairings/{pairing_id}/routing"): _on_pairing(
         "/routing", {"routing_mode": "record_only", "owner_sender_id": "alice"}

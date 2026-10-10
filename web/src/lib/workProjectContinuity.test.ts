@@ -35,6 +35,7 @@ const projects = {
       root_kind: "managed" as const,
       root_label: "alpha",
       last_activity_at: null,
+      revision: "rev-1",
     },
   ],
 };

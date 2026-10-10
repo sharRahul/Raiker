@@ -36,6 +36,9 @@ class ProjectView(View):
     # updates, or null for a project nothing has run in. "Recently active" is
     # this, never the account-level selection above.
     last_activity_at: str | None = None
+    # §13.2 item 6 — name, parent and archived state as one revision; a move
+    # sends it back and is refused when another tab changed any of them.
+    revision: str = ""
 
 
 @dataclass(frozen=True)
@@ -103,6 +106,8 @@ class ProjectContext(TypedDict):
     attachment_ids: list[str]
     memory_enabled: bool
     memory_mode: Literal["inherit", "enabled", "disabled"]
+    #: §13.2 item 6 — saving sends this back; a context changed since is refused.
+    revision: str
 
 
 @dataclass(frozen=True)

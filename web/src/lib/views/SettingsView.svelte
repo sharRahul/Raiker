@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { applyTheme, loadThemeChoice, saveThemeChoice, type ThemeChoice } from "../theme";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import { applyUiPrefs } from "../prefs.svelte";
+  import { applyAppearance, applyUiPrefs } from "../prefs.svelte";
   import { announceDeliveryChanged } from "../deliveryPolicy.svelte";
   import { guardUnload, registerLeaveGuard } from "../leaveGuard";
   import General from "./settings/General.svelte";
@@ -51,6 +52,39 @@
    */
   let keySection: Record<string, string> = {};
 
+  /*
+   * DEC-21 Personalisation — appearance is a reversible preview.
+   *
+   * Density and typeface follow the draft as it changes, so the owner sees a
+   * choice before keeping it; Discard, or leaving with the edit unsaved, puts
+   * the confirmed appearance back. Theme is kept on this device rather than on
+   * the account, and joins the same Save and Discard: chosen, it previews;
+   * saved, it is remembered here.
+   */
+  const initialTheme = loadThemeChoice();
+  let confirmedTheme = $state<ThemeChoice>(initialTheme);
+  let themeDraft = $state<ThemeChoice>(initialTheme);
+  const themeDirty = $derived(themeDraft !== confirmedTheme);
+  /** Anything this page would lose by leaving: a server key or the theme. */
+  const unsaved = $derived(dirty || themeDirty);
+  const markedSections = $derived(
+    themeDirty && !dirtySections.includes("personalisation")
+      ? [...dirtySections, "personalisation"]
+      : dirtySections,
+  );
+
+  function chooseTheme(value: ThemeChoice) {
+    themeDraft = value;
+    applyTheme(value);
+    saveState = "idle";
+  }
+
+  /** Set once the settings have been read; until then there is no draft to preview. */
+  let loaded = $state(false);
+  $effect(() => {
+    if (loaded) applyAppearance(settings);
+  });
+
   async function load() {
     loadError = null;
     try {
@@ -68,6 +102,7 @@
       serverSettings = { ...s.settings };
       revision = s.revision;
       status = s.status;
+      loaded = true;
     } catch (e) {
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
@@ -89,6 +124,7 @@
     invalid_quiet_hours_timezone: "Quiet hours name a time zone Raiker does not recognise.",
     invalid_quiet_hours_switch: "A quiet-hours switch was not on or off.",
     invalid_interrupt_switch: "An interrupt switch was not on or off.",
+    invalid_personalisation_value: "That density or typeface is not one Raiker offers, so the appearance you had is kept.",
   };
 
   function save(patch: Record<string, unknown>) {
@@ -146,6 +182,14 @@
     if (saveState === "saving") return;
     const snapshot = { ...settings };
     const changed = changedFromServer();
+    if (Object.keys(changed).length === 0 && Object.keys(serverSettings).every((key) => key in snapshot)) {
+      // Only the theme changed: it is this device's, so nothing goes to the server.
+      saveThemeChoice(themeDraft);
+      confirmedTheme = themeDraft;
+      saveState = "saved";
+      saveDetail = null;
+      return;
+    }
     const base: Record<string, unknown> = {};
     for (const key of Object.keys(changed)) base[key] = serverSettings[key] ?? null;
     // A key removed by this edit is a change too.
@@ -173,6 +217,12 @@
           ? `Saved. ${saved.merged_keys.length === 1 ? "One setting" : `${saved.merged_keys.length} settings`} changed elsewhere since this page opened ${saved.merged_keys.length === 1 ? "was" : "were"} kept as ${saved.merged_keys.length === 1 ? "it was" : "they were"}.`
           : null;
       applyUiPrefs(saved.settings);
+      // The draft may still hold edits made during the save; keep previewing it.
+      applyAppearance(settings);
+      if (themeDirty) {
+        saveThemeChoice(themeDraft);
+        confirmedTheme = themeDraft;
+      }
       // DEC-21a — quiet hours are evaluated on the server; tell the dock and
       // the approval card to re-read them now rather than at their next tick.
       announceDeliveryChanged();
@@ -223,6 +273,8 @@
 
   function discard() {
     settings = { ...serverSettings };
+    themeDraft = confirmedTheme;
+    applyTheme(confirmedTheme);
     keySection = {};
     dirty = false;
     dirtySections = [];
@@ -251,13 +303,17 @@
   onMount(() => {
     void load();
     const unguard = registerLeaveGuard((nextHash) => {
-      if (!dirty || !leavingSettings(nextHash)) return true;
+      if (!unsaved || !leavingSettings(nextHash)) return true;
       return window.confirm(UNSAVED_PROMPT);
     });
-    const unguardUnload = guardUnload(() => dirty);
+    const unguardUnload = guardUnload(() => unsaved);
     return () => {
       unguard();
       unguardUnload();
+      // Left with a previewed appearance unsaved: the rest of Raiker shows
+      // what is actually kept, not what was being tried.
+      applyAppearance(serverSettings);
+      applyTheme(confirmedTheme);
     };
   });
 </script>
@@ -306,7 +362,7 @@
             aria-current={active === section.id ? "page" : undefined}
             onclick={() => selectSection(section.id)}
           >
-            <Icon name={section.icon} size="md" /><span>{section.label}</span>{#if dirtySections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
+            <Icon name={section.icon} size="md" /><span>{section.label}</span>{#if markedSections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
           </button>
         {/each}
       </div>
@@ -319,7 +375,7 @@
     {:else if active === "notification"}
       <Notification {settings} {save} />
     {:else if active === "personalisation"}
-      <Personalisation {settings} {save} />
+      <Personalisation {settings} {save} theme={themeDraft} {chooseTheme} />
     {:else if active === "security"}
       <SecurityLogin />
     {:else if active === "privacy"}
@@ -337,7 +393,7 @@
     {:else}
       <Runtime {principal} {settings} {save} />
     {/if}
-    {#if dirty}
+    {#if unsaved}
       <div class="save-bar" role="region" aria-label="Unsaved settings changes" data-dock-clear>
         <strong>You have unsaved changes</strong>
         <div><button class="btn btn-ghost" type="button" onclick={discard} disabled={saveState === "saving"}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push} disabled={saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save changes"}</button></div>

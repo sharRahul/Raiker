@@ -17,13 +17,17 @@ function backup(partial: Partial<BackupView> = {}): BackupView {
     latest_migration: "RAIKER-2091-task-run-limit",
     counts: { sessions: 4, approved_memory: 2 },
     key_fingerprint: "f".repeat(16),
-    included: ["database", "memory_files"],
-    not_included: ["checkpoints", "artifacts", "event_log", "attached_folders"],
+    included: ["database", "memory_files", "checkpoints", "artifacts"],
+    not_included: ["event_log", "attached_folders"],
     state: "verified",
     verified_at: "2026-10-05T10:00:00Z",
     detail: "",
     schema_generation: 197,
     opens_here: true,
+    trees: {
+      checkpoints: { files: 12, bytes: 4096, sha256: "c".repeat(64) },
+      artifacts: { files: 1, bytes: 512, sha256: "d".repeat(64) },
+    },
     ...partial,
   };
 }
@@ -39,9 +43,11 @@ describe("BackupsCard", () => {
     stubFetch({ "GET /api/backups": { backups: [backup(), backup({ backup_id: "bkp_2", reason: "pre_migration", state: "damaged", detail: "It no longer matches its checksum." })], key_fingerprint: "f".repeat(16) } });
     render(BackupsCard);
     const card = await screen.findByTestId("backups-card");
-    expect(card).toHaveTextContent("Not included: checkpoints, build artifacts, the audit log, folders you attached to projects");
+    expect(card).toHaveTextContent("Not included: the audit log, folders you attached to projects");
     expect(card).toHaveTextContent(".raiker/app.key");
     expect(await screen.findByText("Before an update")).toBeInTheDocument();
+    // DEC-24 step 5 — the files the database points at travel with it, and say so.
+    expect(card).toHaveTextContent("12 checkpoint files · 1 upload");
     const states = screen.getAllByTestId("backup-state").map((node) => node.textContent);
     expect(states[0]).toBe("Verified");
     expect(states[1]).toMatch(/^Damaged — It no longer matches/);

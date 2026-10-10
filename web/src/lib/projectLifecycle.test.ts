@@ -10,6 +10,7 @@ import {
 
 function project(partial: Partial<ProjectView>): ProjectView {
   return {
+    revision: "rev-1",
     project_id: "p",
     name: "P",
     root_subpath: "",

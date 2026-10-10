@@ -110,8 +110,15 @@ configuration is missing, each linking to the page where you change it.
 **Runtime health, in detail** is the specialist view, and it is a disclosure
 because on a healthy install it has nothing to say: the health transitions the
 runtime's own monitors recorded, the memory integrity report and the one repair
-it offers, the background passes the host runs on its own, and any readiness
-check that actually failed, with its reason code and remediation. When one of
+it offers, the background passes the host runs on its own, any readiness
+check that actually failed, with its reason code and remediation, and **If
+Raiker stops in the middle** — for each kind of work (tasks and routines,
+approvals, background commands, model downloads, channels, notices, indexes,
+the database, updates and MCP servers) where it is kept, what a restart does to
+it, what happens when its result is not known, and what is left to you. Work
+whose result is not known is never run again on its own: a routine the host
+stopped in the middle of is settled at the next start as a run that did not
+finish and moved to its next slot. When one of
 those does have something to say, it is already named in **Needs your
 attention** above — you do not have to open it to find out.
 
@@ -319,7 +326,9 @@ another forge, or a redirect that sends git somewhere unexpected, is answered
 without it. Raiker deliberately does not use this machine's own credential
 manager: a keychain answers for whichever account signed in last, which Raiker
 cannot name for you, cannot scope, and cannot withdraw. A fine-grained token
-scoped to the repositories you want is the supported method.
+scoped to the repositories you want is the supported method. Under the approval
+controls it says when the credential was last lent and for what — *Last lent …
+to push a branch, under a one-command approval* — or that it has never been.
 
 ## Voice
 

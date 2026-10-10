@@ -510,7 +510,13 @@ class ChannelProfile(TypedDict):
     linked: bool
     #: Is that pairing switched on. Linked is not enabled.
     enabled: bool
+    #: DEC-14 step 10 — on, but held: messages are recorded, nothing starts or is sent.
+    paused: bool
+    paused_at: str | None
     pairing_id: str | None
+    #: §13.2 item 6 — the pairing's configuration revision; every change sends
+    #: it back, and one made against an older revision is refused.
+    revision: str | None
     display_label: str | None
     sender_count: int
     #: The owner's own allowlist, returned to the owner so routing can name one.

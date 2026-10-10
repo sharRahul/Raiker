@@ -848,6 +848,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-824](#fixed-824--what-happens-if-raiker-stops-in-the-middle-had-no-answer-in-one-place) | Low | Operations | Fixed 2026-10-10 |
 | [FIXED-825](#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again) | High | Tasks / scheduler | Fixed 2026-10-10 — found writing the recovery matrix |
 | [FIXED-826](#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used) | Low | Settings / Git credential | Fixed 2026-10-10 |
+| [FIXED-827](#fixed-827--two-newly-published-advisories-failed-every-web-ui-run) | Low | Supply chain | Fixed 2026-10-10 — found by CI |
 
 ---
 
@@ -31791,3 +31792,22 @@ git command yet*.
 **Evidence.** `tests/test_git_credential_grant.py::test_the_status_says_when_the_credential_was_last_lent`;
 `GitCredential.test.ts` (2). Live: capture
 [11](../screenshots/2026-10-10-revisions-round/11-git-credential-last-lent.png).
+
+---
+
+## FIXED-827 — Two newly published advisories failed every Web UI run
+
+**Severity: Low. Area: Supply chain. Status: Fixed 2026-10-10 — found by CI on
+this run's push; not caused by its diff.**
+
+**Observed.** The Web UI workflow's `npm audit --audit-level=moderate` gate
+(FIXED-611) failed on advisories published since the last green run:
+`source-map-js` 1.2.1 (GHSA-68fv-2mgg-jv7q, high) and `postcss-selector-parser`
+7.1.5 (GHSA-rj75-hqrm-r3gf, moderate), both reached only through the lint
+toolchain (`eslint-plugin-svelte`).
+
+**Fixed.** `npm audit fix` moved the lockfile to `source-map-js` 1.2.2 and
+`postcss-selector-parser` 7.1.6; no manifest range changed.
+
+**Evidence.** `npm audit` reports 0 vulnerabilities; lint, check, the 2,169
+unit tests, the build and the licensing check pass on the new lockfile.

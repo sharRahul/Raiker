@@ -469,6 +469,12 @@ class AvailableModelsRequest(StrictRequest):
     models: list[str]
 
 
+class SpendLimitRequest(StrictRequest):
+    """DEC-24 step 2 — the owner's 24-hour spending limit in US dollars; null clears it."""
+
+    limit_usd: float | None = None
+
+
 class ModelWeeklyBudgetRequest(StrictRequest):
     """Owner-defined advisory budget; null clears it."""
 

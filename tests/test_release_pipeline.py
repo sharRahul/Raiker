@@ -205,6 +205,36 @@ def test_the_channel_index_is_signed_and_names_one_artifact_per_target(
     for target_id, entry in index["artifacts"].items():
         assert entry["artifact"].endswith(f"{target_id}.zip")
         assert entry["signed"] is True
+        # DEC-21 Updates: the size the Updates page shows and the download is
+        # bounded by is the artifact's real size, under the index signature.
+        assert entry["size"] == (out / entry["artifact"]).stat().st_size
+    assert "notes" not in index
+
+
+def test_the_channel_index_carries_bounded_release_notes(
+    tmp_path: Path, source_root: Path, web_assets: Path, wheel_dir: Path, signing_key: bytes
+) -> None:
+    from raiker.app.update import MAX_RELEASE_NOTES_CHARS
+
+    out = tmp_path / "out"
+    artifact = _build(
+        out, source_root, web_assets, wheel_dir,
+        target=TARGETS[0].target_id, signed=True, private_key=signing_key,
+    )
+    index_path, signature_path = build_channel_index(
+        out_dir=out, version="1.2.3", channel="stable", artifacts=[artifact],
+        private_key=signing_key, notes="  Fixes stale routines.\n",
+    )
+    assert signature_path is not None
+    index = read_channel_index(
+        index_path.read_bytes(), signature_path.read_bytes(), public_key_of(signing_key)
+    )
+    assert index["notes"] == "Fixes stale routines."
+    with pytest.raises(ReleaseError, match="release_notes_too_long"):
+        build_channel_index(
+            out_dir=out, version="1.2.3", channel="stable", artifacts=[artifact],
+            private_key=signing_key, notes="x" * (MAX_RELEASE_NOTES_CHARS + 1),
+        )
 
 
 def test_a_channel_index_cannot_be_built_from_unsignable_artifacts(

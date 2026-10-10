@@ -32,6 +32,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from typing_extensions import TypedDict
+
 
 @dataclass(frozen=True)
 class OutboundRequest:
@@ -69,8 +71,39 @@ class InboundMessage:
     from_bot: bool = False
 
 
+class ChannelCapabilities(TypedDict):
+    """DEC-14 step 1 — what one channel type can carry, declared by its adapter.
+
+    Declared rather than discovered so the Messaging page can say what a channel
+    will and will not do before it is set up, and so the executor can refuse a
+    reply the platform would reject instead of finding out from a failed send.
+    Every rich feature is ``False`` on purpose: a Raiker channel is a governed
+    text relay, and each of those would need its own governance answer before it
+    could ship (see the module docstring).
+    """
+
+    #: Where a message can come from: one-to-one chats, group chats, and threads
+    #: inside either.
+    direct_messages: bool
+    group_chats: bool
+    threads: bool
+    #: Rich features this build does not carry on this channel.
+    streaming: bool
+    media: bool
+    reactions: bool
+    edits_and_deletes: bool
+    buttons: bool
+    typing_indicator: bool
+    #: The longest reply, in characters, this channel accepts. A longer one is
+    #: refused with this number rather than cut short or sent to fail.
+    max_text_chars: int
+    #: How the channel authenticates, in words.
+    authentication: str
+
+
 class ChannelAdapter(Protocol):
     channel_type: str
+    capabilities: ChannelCapabilities
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
@@ -87,8 +120,25 @@ class ChannelAdapter(Protocol):
 TELEGRAM_HOST = "api.telegram.org"
 
 
+#: Telegram's own limit on one ``sendMessage`` text.
+TELEGRAM_MAX_TEXT_CHARS = 4096
+
+
 class TelegramAdapter:
     channel_type = "telegram"
+    capabilities: ChannelCapabilities = {
+        "direct_messages": True,
+        "group_chats": True,
+        "threads": False,
+        "streaming": False,
+        "media": False,
+        "reactions": False,
+        "edits_and_deletes": False,
+        "buttons": False,
+        "typing_indicator": False,
+        "max_text_chars": TELEGRAM_MAX_TEXT_CHARS,
+        "authentication": "A bot token held in this host's environment",
+    }
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
@@ -151,10 +201,29 @@ class TelegramAdapter:
 # ── The reference webhook ─────────────────────────────────────────────────────
 
 
+#: The longest reply Raiker sends to an owner's webhook. The receiver is the
+#: owner's own, so this is Raiker's bound rather than a platform's: one delivery
+#: stays a message, not a document.
+WEBHOOK_MAX_TEXT_CHARS = 32_000
+
+
 class WebhookAdapter:
     """Raiker's own shape, signed by Raiker because the receiver is the owner's."""
 
     channel_type = "webhooks"
+    capabilities: ChannelCapabilities = {
+        "direct_messages": False,
+        "group_chats": False,
+        "threads": False,
+        "streaming": False,
+        "media": False,
+        "reactions": False,
+        "edits_and_deletes": False,
+        "buttons": False,
+        "typing_indicator": False,
+        "max_text_chars": WEBHOOK_MAX_TEXT_CHARS,
+        "authentication": "An HMAC signature on each delivery, when the outbound secret is set",
+    }
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
@@ -199,6 +268,12 @@ def adapter_for(channel_type: str) -> ChannelAdapter | None:
     """The adapter for a channel type, or ``None`` if this build has no wire
     format for it — which is a refusal with a name, not a hopeful attempt."""
     return _ADAPTERS.get(channel_type)
+
+
+def channel_capabilities(channel_type: str) -> ChannelCapabilities | None:
+    """What a channel type can carry, or ``None`` when this build has no adapter for it."""
+    adapter = _ADAPTERS.get(channel_type)
+    return dict(adapter.capabilities) if adapter is not None else None  # type: ignore[return-value]
 
 
 def adapter_channel_types() -> tuple[str, ...]:

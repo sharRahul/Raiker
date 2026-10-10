@@ -112,6 +112,14 @@ sender by role (you, an allowed sender, a sender who is not allowed), never by
 id, holds no message text, and links to the conversation a routed message
 became. The last 200 per channel are kept, and unpairing keeps them.
 
+**What this channel carries** is on every card, before setup: where a message
+can come from, the longest reply the channel accepts, how it authenticates, and
+what it does not carry. A Raiker channel is a governed text relay — threads,
+streamed replies, pictures and files, reactions, edits, buttons and typing
+indicators are not carried on any channel today. Telegram accepts replies up to
+4,096 characters and the webhook up to 32,000; a longer reply is refused with
+that limit before anything is sent, never cut short.
+
 ## What a channel needs from your environment
 
 Each channel declares the environment variables it needs, and the page shows

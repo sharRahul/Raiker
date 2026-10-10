@@ -118,7 +118,9 @@ _PROPOSAL_TEMPLATES: dict[str, dict[str, object]] = {
 
 
 def _proposal_id(finding_id: str, action_type: str) -> str:
-    digest = hashlib.sha1(f"{finding_id}:{action_type}".encode()).hexdigest()[:16]
+    digest = hashlib.sha1(
+        f"{finding_id}:{action_type}".encode(), usedforsecurity=False
+    ).hexdigest()[:16]
     return f"rap_{digest}"
 
 

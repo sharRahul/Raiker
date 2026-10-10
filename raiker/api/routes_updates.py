@@ -43,6 +43,7 @@ from raiker.app.installation import (
     read_last_check,
     record_check,
     update_status,
+    workspace_schema_generation,
 )
 from raiker.app.release import TARGETS
 from raiker.app.update_handoff import start_update_handoff
@@ -56,21 +57,6 @@ class ApplyUpdateRequest(StrictRequest):
     confirm: bool = False
 
 
-def _workspace_generation(workspace: str | Path) -> int | None:
-    """The schema generation this workspace's database carries, or ``None`` unread.
-
-    A local header read (DEC-17 step 8). ``None`` is unknown — a store that
-    will not open — never "compatible".
-    """
-    try:
-        from raiker.storage.sqlite import SQLiteStore
-        from raiker.storage.stores.migration_runner import schema_generation_of
-
-        return schema_generation_of(SQLiteStore(Path(workspace)).connect())
-    except Exception:  # noqa: BLE001 - unknown is the honest answer to any failure
-        return None
-
-
 def _view(payload: dict[str, Any], workspace: str | Path) -> dict[str, Any]:
     """DEC-21 Updates — each recovery point says whether it could open this data.
 
@@ -81,7 +67,7 @@ def _view(payload: dict[str, Any], workspace: str | Path) -> dict[str, Any]:
     """
     payload["targets"] = [release_target(target) for target in TARGETS]
     payload["last_check"] = read_last_check(workspace)
-    generation = _workspace_generation(workspace)
+    generation = workspace_schema_generation(workspace)
     payload["workspace_schema_generation"] = generation
     for point in payload.get("recovery_points", []):
         recorded = point.get("schema_generation")

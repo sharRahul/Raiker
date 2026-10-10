@@ -849,6 +849,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-825](#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again) | High | Tasks / scheduler | Fixed 2026-10-10 — found writing the recovery matrix |
 | [FIXED-826](#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used) | Low | Settings / Git credential | Fixed 2026-10-10 |
 | [FIXED-827](#fixed-827--two-newly-published-advisories-failed-every-web-ui-run) | Low | Supply chain | Fixed 2026-10-10 — found by CI |
+| [FIXED-828](#fixed-828--an-update-could-start-on-a-disk-it-would-fill) | Medium | Updates / installer | Fixed 2026-10-10 |
+| [FIXED-829](#fixed-829--a-swapped-installation-was-never-checked-before-the-old-one-was-thrown-away) | Medium | Updates / installer | Fixed 2026-10-10 |
+| [FIXED-830](#fixed-830--a-failed-update-left-a-recovery-copy-that-refused-the-next-attempt) | Medium | Updates / installer | Fixed 2026-10-10 — found writing FIXED-829 |
+| [FIXED-831](#fixed-831--an-update-could-install-a-build-that-would-refuse-the-workspaces-data) | Medium | Updates / installer | Fixed 2026-10-10 |
+| [FIXED-832](#fixed-832--updates-offered-a-release-without-saying-how-large-it-was-or-what-it-changed) | Low | Settings / Updates | Fixed 2026-10-10 |
+| [FIXED-833](#fixed-833--a-worker-whose-run-was-settled-under-it-could-still-write-its-outcome) | Medium | Tasks / scheduler | Fixed 2026-10-10 |
+| [FIXED-834](#fixed-834--a-plugin-update-that-asked-for-more-was-installed-like-the-first-install) | Medium | Extensions / plugins | Fixed 2026-10-10 |
+| [FIXED-835](#fixed-835--no-static-analysis-for-security-ran-on-any-change) | Medium | CI / supply chain | Fixed 2026-10-10 |
+| [FIXED-836](#fixed-836--a-utf-16-document-part-could-carry-the-dtd-the-attachment-check-refuses) | Medium | Attachments | Fixed 2026-10-10 — found triaging FIXED-835 |
+| [FIXED-837](#fixed-837--nothing-checked-the-container-definitions-raiker-builds) | Low | CI / containers | Fixed 2026-10-10 |
+| [FIXED-838](#fixed-838--messaging-could-not-say-what-a-channel-carries-before-it-was-set-up) | Low | Messaging | Fixed 2026-10-10 |
+| [FIXED-839](#fixed-839--a-reply-longer-than-the-channel-accepts-was-sent-to-fail) | Low | Messaging | Fixed 2026-10-10 |
+| [FIXED-840](#fixed-840--nothing-bounded-what-the-owners-models-spent-in-total) | Medium | Models / runtime | Fixed 2026-10-10 |
+| [FIXED-841](#fixed-841--a-streamed-openrouter-turn-recorded-no-usage-so-every-cost-limit-read-it-as-free) | High | Models / providers | Fixed 2026-10-10 — found by the live round |
+| [FIXED-842](#fixed-842--a-disk-running-out-of-space-was-nowhere-on-the-health-surfaces) | Low | Observability | Fixed 2026-10-10 |
+| [FIXED-843](#fixed-843--the-2026-10-10-changes-had-no-real-provider-turn-behind-them-was-bug-327) | Low | Live evidence | Closed 2026-10-10 (was BUG-327) |
 
 ---
 
@@ -31811,3 +31827,349 @@ toolchain (`eslint-plugin-svelte`).
 
 **Evidence.** `npm audit` reports 0 vulnerabilities; lint, check, the 2,169
 unit tests, the build and the licensing check pass on the new lockfile.
+
+
+---
+
+## FIXED-828 — An update could start on a disk it would fill
+
+**Severity: Medium. Area: Updates / installer. Status: Fixed 2026-10-10.
+DEC-17 step 7's "check free space".**
+
+**Observed.** `apply_signed_update` extracted the bundle beside the
+installation and copied the running version to its recovery point without
+asking whether the volume could hold both. A full disk part-way through left a
+half-written staging tree, and a disk filled by an update is a host that cannot
+write its own database afterwards.
+
+**Fixed.** Before the first write the update adds what the archive unpacks to
+and what the recovery copy needs, per volume, plus 64 MiB of headroom, and is
+refused `update_insufficient_space` when the volume cannot hold it. zipfile
+stops an entry at its declared size and fails its CRC if the data runs on, so an
+archive that lies about its sizes cannot outgrow the check.
+
+**Evidence.** `tests/test_signed_updates.py::test_an_update_the_disk_cannot_hold_is_refused_before_the_first_write`,
+`::test_the_space_check_counts_the_staged_tree_and_the_recovery_copy`,
+`::test_an_entry_that_unpacks_larger_than_it_declared_is_refused`.
+
+---
+
+## FIXED-829 — A swapped installation was never checked before the old one was thrown away
+
+**Severity: Medium. Area: Updates / installer. Status: Fixed 2026-10-10.
+DEC-17 step 7's "health-check and roll back on failure".**
+
+**Observed.** The final step of an update was two renames, after which the
+previous tree was deleted. Nothing read the live path to confirm it was the
+release the signed manifest named, so a bundle whose contents disagreed with its
+manifest was installed and discovered at the next start.
+
+**Fixed.** After the swap `installed_tree_healthy` reads the live
+`version.txt` (and `installation.json` where the build wrote one) against the
+manifest's version. A tree that fails — or a check that raises — is moved out,
+the previous version renamed back, and the update refused
+`update_health_check_failed`; `raiker-app update` says the previous version was
+put back. A rollback that itself cannot complete is
+`update_health_check_failed_rollback_incomplete`, and the command names the
+`--rollback` that restores the retained copy.
+
+**Evidence.** `tests/test_signed_updates.py::test_a_swapped_tree_that_fails_its_health_check_is_rolled_back`,
+`::test_a_check_that_raises_counts_as_failed`,
+`::test_the_default_check_reads_the_version_the_manifest_named`.
+
+---
+
+## FIXED-830 — A failed update left a recovery copy that refused the next attempt
+
+**Severity: Medium. Area: Updates / installer. Status: Fixed 2026-10-10 —
+found writing FIXED-829.**
+
+**Observed.** The running version is copied to `recovery/<version>` before a
+migration runs. When the migration (or the swap) failed, the copy stayed, and
+the owner's next attempt was refused `recovery_point_already_exists` — an
+update that failed once could never be retried without deleting a directory by
+hand.
+
+**Fixed.** A recovery copy made for an update that did not happen is removed
+with the staging tree on every failure path: preparation, the swap and the
+health check.
+
+**Evidence.** `tests/test_signed_updates.py::test_a_failed_migration_leaves_no_recovery_copy_to_block_a_retry`;
+the health-check test above installs the same bundle on its second attempt.
+
+---
+
+## FIXED-831 — An update could install a build that would refuse the workspace's data
+
+**Severity: Medium. Area: Updates / installer. Status: Fixed 2026-10-10.
+DEC-17 step 7's "check compatibility".**
+
+**Observed.** A build refuses a database a newer build shaped
+(`store_schema_newer`, FIXED-803), and each release records the schema
+generation it opens (FIXED-820). The updater read neither, so a release built
+before the workspace's last migration was installed and then refused the data
+at start.
+
+**Fixed.** `download_and_apply` reads the workspace's generation
+(`workspace_schema_generation`, shared with the Updates page) and
+`apply_signed_update` compares it with the staged build's recorded generation
+before anything moves: an older one is refused `update_schema_incompatible`.
+A build that records none, or a database that could not be read, is not
+refused for it — unknown is not incompatible.
+
+**Evidence.** `tests/test_signed_updates.py::test_a_release_that_cannot_open_this_workspace_is_refused_before_anything_moves`
+and `::test_a_release_that_opens_it_or_an_unknown_reading_is_not_refused` (3).
+
+---
+
+## FIXED-832 — Updates offered a release without saying how large it was or what it changed
+
+**Severity: Low. Area: Settings / Updates. Status: Fixed 2026-10-10. DEC-21
+Updates row's "download size … notes".**
+
+**Fixed.** The signed channel index carries each artifact's `size` and the
+release's `notes` (at most 4,000 characters, from the release workflow's new
+`notes` input, passed through the environment so the text cannot become shell).
+Settings → Updates shows *Download size* and *What this release changes*, or
+says a release published before either was recorded does not state them. The
+size is also the most a download reads: the updater fetches no more than the
+signed index says, instead of the 512 MiB ceiling. An index with a malformed
+size or note, or a field it does not know, is refused.
+
+**Evidence.** `tests/test_signed_updates.py` (size/notes parse, refusals,
+bounded download), `tests/test_release_pipeline.py::test_the_channel_index_carries_bounded_release_notes`;
+`Updates.test.ts` (2).
+
+---
+
+## FIXED-833 — A worker whose run was settled under it could still write its outcome
+
+**Severity: Medium. Area: Tasks / scheduler. Status: Fixed 2026-10-10. DEC-12
+step 4's fencing token; §13.2 item 7's "fence stale workers".**
+
+**Observed.** A scheduled run's claim was a status change and nothing else.
+When a host settled a run it believed abandoned (FIXED-825) while another host
+on the same workspace was still on it, both wrote the outcome — the second
+overwriting the first, and a routine possibly re-armed twice.
+
+**Fixed.** Each claim takes the next `claim_generation` (migration
+RAIKER-2098), and the worker holds the generation it was claimed at. Settling
+is one compare-and-swap (`fence_task_claim`): whoever moves the generation on
+settles, and a worker whose claim was taken records nothing and logs that it
+did not. Restart settlement and a skipped missed slot take the claim the same
+way.
+
+**Evidence.** `tests/test_task_scheduler.py` (5): each claim takes the next
+generation; only the current holder settles; a worker whose run was settled
+under it records nothing; the holder lands its outcome; a settle that lost the
+race leaves the run to its worker.
+
+---
+
+## FIXED-834 — A plugin update that asked for more was installed like the first install
+
+**Severity: Medium. Area: Extensions / plugins. Status: Fixed 2026-10-10.
+DEC-15 step 10's "updates show a permission diff and require review when
+authority grows".**
+
+**Observed.** Installing a new version of an installed plugin wrote a new
+install record with whatever permissions the manifest asked for. The plan the
+owner read listed the permissions, not what had changed, so a version that grew
+its authority looked the same as one that did not.
+
+**Fixed.** `/plugin-plan` reads an update against the installed version —
+`updates_installed_version`, `permissions_added`, `permissions_removed` — and
+says when it asks for more. The install executor refuses such an update
+`plugin_permissions_grew_unreviewed`, naming what it adds, unless the owner
+accepted **exactly** the permission set the manifest now asks for
+(`--install --accept-permissions`); a manifest changed between the plan and the
+install asks again. An update that asks for the same or less installs as
+before; every install's result carries the diff.
+
+**Evidence.** `tests/test_phase_4_plugin_install_runtime.py` (3): held until the
+exact set is accepted (a different set refused); a narrower update installs
+without a second question; the plan reads the update against what is installed.
+
+---
+
+## FIXED-835 — No static analysis for security ran on any change
+
+**Severity: Medium. Area: CI / supply chain. Status: Fixed 2026-10-10. DEC-24
+step 7's "SAST gate with triage owner, exceptions, expiry".**
+
+**Fixed.** `scripts/scan_sast.py` runs ruff's Bandit rules (`S`) over
+`raiker`, `apps` and `scripts` on every change, in CI beside the credential
+scan. Style-only rules (`assert`, `try/except/pass`, "a subprocess was
+started") are not gated. Each of the 112 current findings — SQL composed from
+in-code fragments with every value bound, constants that name environment
+variables, sandbox-only paths, a capability flag named `shell` — was read and
+is an entry in `.github/sast-exceptions.json` with an owner, a reason and an
+expiry. An expired or unused entry fails the check; the fingerprint is the rule
+and the flagged source, so moving code keeps a review and changing it asks
+again. Two SHA-1 uses that are not security hashes are now marked
+`usedforsecurity=False` rather than excepted. Triage found FIXED-836.
+
+**Evidence.** `tests/test_scan_sast.py` (8); `python scripts/scan_sast.py`
+passes with ruff 0.15.17 and 0.17.0 alike.
+
+---
+
+## FIXED-836 — A UTF-16 document part could carry the DTD the attachment check refuses
+
+**Severity: Medium. Area: Attachments. Status: Fixed 2026-10-10 — found triaging
+FIXED-835's XML findings.**
+
+**Observed.** A `.docx`/`.xlsx` part is refused when it carries `<!DOCTYPE`,
+the only way to declare the entities behind a billion-laughs expansion. The
+check was a UTF-8 byte scan, and the parser also reads UTF-16 parts, where the
+same declaration is two bytes a character: a UTF-16 part with a DTD passed the
+check and reached the parser.
+
+**Fixed.** The declaration is looked for in UTF-8, UTF-16LE and UTF-16BE.
+
+**Evidence.** `tests/test_document_attachments.py::test_a_utf16_docx_with_doctype_fails_closed`
+(3 encodings) — all three failed before the change.
+
+---
+
+## FIXED-837 — Nothing checked the container definitions Raiker builds
+
+**Severity: Low. Area: CI / containers. Status: Fixed 2026-10-10. DEC-24 step
+7's container half, for the definitions.**
+
+**Fixed.** `scripts/scan_containers.py`, in CI, reads every tracked
+`Containerfile`/`Dockerfile` without a network or an engine and fails a base
+image not pinned by `@sha256` digest, a final stage that never leaves root,
+`ADD` from a URL, a download piped into a shell, or a credential-shaped
+`ENV`/`ARG` with a value baked in. The sandbox and egress-proxy definitions pass.
+Scanning the built images for vulnerabilities remains open (TO_BE_FIXED
+[BUG-329](TO_BE_FIXED.md#bug-329--built-container-images-are-not-scanned-for-vulnerabilities)).
+
+**Evidence.** `tests/test_scan_containers.py` (8), including the repository's
+own definitions.
+
+---
+
+## FIXED-838 — Messaging could not say what a channel carries before it was set up
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-10. DEC-14 step 1's
+adapter capabilities.**
+
+**Fixed.** Each channel adapter declares what it carries — direct messages,
+group chats, threads, streaming, media, reactions, edits, buttons, typing, its
+longest reply and how it authenticates — and `GET /api/channels` returns it per
+profile. Messaging shows *What this channel carries* on every card, before
+setup: Telegram is plain text up to 4,096 characters from direct messages and
+group chats; the webhook is plain text up to 32,000 from one caller; neither
+claims a rich feature it does not carry.
+
+**Evidence.** `tests/test_phase_4_channels.py` (capabilities declared and
+listed); `MessagingView.test.ts` (2). Live: captures
+[04](../screenshots/2026-10-10-spend-limit-round/04-messaging-channel-carries.png)
+and, at 390 wide and dark with no overflow,
+[05](../screenshots/2026-10-10-spend-limit-round/05-messaging-carries-390-dark.png).
+
+---
+
+## FIXED-839 — A reply longer than the channel accepts was sent to fail
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-10. DEC-14 step 1's
+"maximum payloads".**
+
+**Observed.** A reply over Telegram's 4,096 characters was posted and failed at
+the platform with nothing saying why.
+
+**Fixed.** The channel executor refuses a reply over the adapter's limit
+`channel_message_too_long`, naming its length and the limit, before anything is
+sent. It is never cut short: that would deliver a different message than the
+one approved.
+
+**Evidence.** `tests/test_phase_4_channels.py::test_a_reply_longer_than_the_channel_accepts_is_refused_with_the_limit_and_not_sent`.
+
+---
+
+## FIXED-840 — Nothing bounded what the owner's models spent in total
+
+**Severity: Medium. Area: Models / runtime. Status: Fixed 2026-10-10. DEC-24
+step 2's budget across foreground turns, tasks and children.**
+
+**Observed.** A routine run had its own cost limit (FIXED-804), and each
+provider an advisory weekly token budget nothing read. A dozen routines each
+inside their limits, a long Build session and the work they delegated could
+together spend whatever the providers would bill.
+
+**Fixed.** One owner-wide spending limit for the last 24 hours (migration
+RAIKER-2099; `GET`/`PUT /api/models/spend-limit`), shown and set on Models →
+Usage with what the window has spent. It is read at every turn's safe boundary
+before each model call — the boundary Stop and a run's own limit use — from the
+usage ledger every surface writes, priced at read time with the rate Models
+shows. A turn that starts over it stops before its first model call; one that
+crosses it stops before its next, so the overrun is the responses in flight.
+Usage on a model with no known price is named, not counted as free. The weekly
+token budgets stay advisory and say so by contrast.
+
+**Evidence.** `tests/test_model_tool_call_loop.py` (5): stopped before the next
+call with `turn_spend_limit_reached`; a turn started over the limit never asks
+the model; no limit stops nothing; the window counts priced usage and names
+unpriced models; bounds. `ProviderUsagePanel.test.ts` (3). Live, real OpenRouter
+GPT-4o Mini turns: $0.0014 of $0.01 (capture
+[01](../screenshots/2026-10-10-spend-limit-round/01-spend-limit-set.png)); at
+$0.0101 the next turn stopped with the limit named and the spend unchanged
+([02](../screenshots/2026-10-10-spend-limit-round/02-turn-stopped-by-spend-limit.png),
+[03](../screenshots/2026-10-10-spend-limit-round/03-spend-limit-reached.png));
+cleared, the next turn answered.
+
+---
+
+## FIXED-841 — A streamed OpenRouter turn recorded no usage, so every cost limit read it as free
+
+**Severity: High. Area: Models / providers. Status: Fixed 2026-10-10 — found by
+the live round for FIXED-840.**
+
+**Observed.** A real OpenRouter turn answered and the usage ledger stayed
+empty: Usage showed zero tokens and the spending window $0.0000. Two causes.
+OpenRouter streams were never asked for usage (`stream_options` was sent only
+to OpenAI and Ollama), and a usage block that arrives on the same chunk as the
+last choice — OpenRouter's shape — was discarded, because usage was read only
+from a chunk with no choices.
+
+**Effect.** Every OpenRouter turn was invisible to the per-run cost limit
+(FIXED-804), the new owner-wide limit, Models → Usage and the per-turn token
+count.
+
+**Fixed.** OpenRouter streams ask for usage, and a usage block is kept wherever
+it appears; the consumer keeps the last, so a server repeating cumulative usage
+counts once.
+
+**Evidence.** `tests/test_model_provider_contract_regressions.py::test_a_usage_block_on_the_last_choice_chunk_is_kept`,
+`::test_openrouter_streams_ask_for_usage`. Live: after the fix the same turn
+recorded $0.0014 and the limit above was reached by real spend.
+
+---
+
+## FIXED-842 — A disk running out of space was nowhere on the health surfaces
+
+**Severity: Low. Area: Observability. Status: Fixed 2026-10-10. DEC-24 step
+1's "resource pressure".**
+
+**Fixed.** The diagnostics read carries `storage_space` — free and total bytes
+on the volume holding the workspace, and `ok`, `low` (under 2 GB or 5%),
+`critical` (under 512 MB or 2%) or `unknown` when the volume cannot be read —
+read from the operating system when the page asks. *Needs your attention*
+names a low disk as waiting and a critical one as blocking, with what fails
+first: saving conversations, backups and an update's staging (FIXED-828).
+
+**Evidence.** `tests/test_storage_space_health.py` (7), `observeAttention.test.ts`.
+Live: the round's host read `ok` with 349 GB free.
+
+---
+
+## FIXED-843 — The 2026-10-10 changes had no real-provider turn behind them (was BUG-327)
+
+**Severity: Low. Area: Live evidence. Status: Closed 2026-10-10.**
+
+**Closed by.** This run's round ran nine real OpenRouter GPT-4o Mini turns
+through Chat on a build carrying FIXED-813 to FIXED-842, each answered end to
+end, and proved FIXED-840 and FIXED-841 with real spend. The Anthropic key
+supplied is identity-linked again and still needs its workspace ID; OpenAI was
+connected through the same dialog.

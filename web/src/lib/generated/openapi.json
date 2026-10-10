@@ -2910,6 +2910,70 @@
         "title": "ChannelApprovalResponse",
         "type": "object"
       },
+      "ChannelCapabilities": {
+        "description": "DEC-14 step 1 — what one channel type can carry, declared by its adapter.\n\nDeclared rather than discovered so the Messaging page can say what a channel\nwill and will not do before it is set up, and so the executor can refuse a\nreply the platform would reject instead of finding out from a failed send.\nEvery rich feature is ``False`` on purpose: a Raiker channel is a governed\ntext relay, and each of those would need its own governance answer before it\ncould ship (see the module docstring).",
+        "properties": {
+          "authentication": {
+            "title": "Authentication",
+            "type": "string"
+          },
+          "buttons": {
+            "title": "Buttons",
+            "type": "boolean"
+          },
+          "direct_messages": {
+            "title": "Direct Messages",
+            "type": "boolean"
+          },
+          "edits_and_deletes": {
+            "title": "Edits And Deletes",
+            "type": "boolean"
+          },
+          "group_chats": {
+            "title": "Group Chats",
+            "type": "boolean"
+          },
+          "max_text_chars": {
+            "title": "Max Text Chars",
+            "type": "integer"
+          },
+          "media": {
+            "title": "Media",
+            "type": "boolean"
+          },
+          "reactions": {
+            "title": "Reactions",
+            "type": "boolean"
+          },
+          "streaming": {
+            "title": "Streaming",
+            "type": "boolean"
+          },
+          "threads": {
+            "title": "Threads",
+            "type": "boolean"
+          },
+          "typing_indicator": {
+            "title": "Typing Indicator",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "direct_messages",
+          "group_chats",
+          "threads",
+          "streaming",
+          "media",
+          "reactions",
+          "edits_and_deletes",
+          "buttons",
+          "typing_indicator",
+          "max_text_chars",
+          "authentication"
+        ],
+        "title": "ChannelCapabilities",
+        "type": "object"
+      },
       "ChannelDestination": {
         "description": "UX-MSG-04 — where this channel delivers, bound on the pairing.\n\n``url`` for the reference webhook (the owner sets it), ``owner_chat`` for\nTelegram (the bound owner sender's chat), ``none`` for a transport this\nbuild cannot deliver over. ``host`` is the bound URL's host only — a path\ncan carry a token and is never returned.",
         "properties": {
@@ -3305,6 +3369,16 @@
             "title": "Auth Method",
             "type": "string"
           },
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelCapabilities"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "channel_type": {
             "title": "Channel Type",
             "type": "string"
@@ -3521,7 +3595,8 @@
           "destination",
           "last_test",
           "route_scope",
-          "receipts"
+          "receipts",
+          "capabilities"
         ],
         "title": "ChannelProfile",
         "type": "object"
@@ -4018,6 +4093,18 @@
             "title": "Manifest",
             "type": "string"
           },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          },
           "released_at": {
             "title": "Released At",
             "type": "string"
@@ -4033,6 +4120,18 @@
           "signed": {
             "title": "Signed",
             "type": "boolean"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Size"
           },
           "target": {
             "title": "Target",
@@ -8123,6 +8222,9 @@
             },
             "title": "Search Indexes",
             "type": "array"
+          },
+          "storage_space": {
+            "$ref": "#/components/schemas/StorageSpace"
           },
           "summary": {
             "additionalProperties": true,
@@ -23380,6 +23482,80 @@
         "title": "SpeechRuntimeView",
         "type": "object"
       },
+      "SpendLimitRequest": {
+        "additionalProperties": false,
+        "description": "DEC-24 step 2 — the owner's 24-hour spending limit in US dollars; null clears it.",
+        "properties": {
+          "limit_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usd"
+          }
+        },
+        "title": "SpendLimitRequest",
+        "type": "object"
+      },
+      "SpendLimitView": {
+        "description": "DEC-24 step 2 — the owner's one spending limit and what the window has spent.",
+        "properties": {
+          "limit_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Usd"
+          },
+          "max_usd": {
+            "title": "Max Usd",
+            "type": "number"
+          },
+          "min_usd": {
+            "title": "Min Usd",
+            "type": "number"
+          },
+          "reached": {
+            "title": "Reached",
+            "type": "boolean"
+          },
+          "spent_usd": {
+            "title": "Spent Usd",
+            "type": "string"
+          },
+          "unpriced_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced Models",
+            "type": "array"
+          },
+          "window": {
+            "const": "rolling_24_hours",
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window",
+          "limit_usd",
+          "spent_usd",
+          "unpriced_models",
+          "reached",
+          "min_usd",
+          "max_usd"
+        ],
+        "title": "SpendLimitView",
+        "type": "object"
+      },
       "StandingGrantCreated": {
         "properties": {
           "grant": {
@@ -23607,6 +23783,50 @@
           }
         },
         "title": "StopHostRequest",
+        "type": "object"
+      },
+      "StorageSpace": {
+        "description": "DEC-24 step 1 — room left on the volume that holds this workspace.\n\nRead when the page asks, from the operating system; nothing is written. A\nfull disk is the pressure that fails everything at once — the database, a\nbackup, an update's staging — so it is named before it arrives.",
+        "properties": {
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "low",
+              "critical",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          }
+        },
+        "required": [
+          "state",
+          "free_bytes",
+          "total_bytes"
+        ],
+        "title": "StorageSpace",
         "type": "object"
       },
       "StoreConnector": {
@@ -35816,6 +36036,62 @@
           }
         },
         "summary": "Refresh Model Pricing"
+      }
+    },
+    "/api/models/spend-limit": {
+      "get": {
+        "description": "DEC-24 step 2 — the owner's one spending limit and the last 24 hours' spend.",
+        "operationId": "get_spend_limit_api_models_spend_limit_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendLimitView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Spend Limit"
+      },
+      "put": {
+        "description": "Set or clear the owner's 24-hour spending limit across every model and surface.",
+        "operationId": "set_spend_limit_api_models_spend_limit_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendLimitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendLimitView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Spend Limit"
       }
     },
     "/api/models/weekly-usage": {

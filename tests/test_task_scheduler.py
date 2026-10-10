@@ -523,3 +523,69 @@ def test_a_run_the_host_stopped_in_the_middle_of_is_settled_not_left_running(
     assert daily.scheduled_at is not None and daily.scheduled_at > "2020-01-02T00:00:00Z"
     # Nothing is left for a second pass.
     assert TaskScheduler(tmp_path).settle_interrupted_runs() == []
+
+
+# ── DEC-12 step 4: a claim is fenced ─────────────────────────────────────────
+
+
+def _claimed_one_off(tmp_path: Path) -> tuple[SQLiteStore, TaskManager, str, int]:
+    store = SQLiteStore(tmp_path)
+    store.create_session("sess_inbox_principal_owner", str(tmp_path))
+    manager = TaskManager(store, EventLogWriter(store))
+    task = manager.create_task(
+        session_id="sess_inbox_principal_owner", title="Once", objective="Once",
+        scheduled_at="2020-01-01T09:00:00Z",
+    )
+    (claimed,) = store.claim_due_tasks("2020-01-02T00:00:00Z")
+    assert claimed.status == "running"
+    return store, manager, task.task_id, claimed.claim_generation
+
+
+def test_each_claim_takes_the_next_generation_and_returns_the_claimed_row(tmp_path: Path) -> None:
+    store, _manager, task_id, generation = _claimed_one_off(tmp_path)
+    assert generation == 1
+    loaded = store.load_task(task_id)
+    assert loaded is not None and loaded.claim_generation == 1
+
+
+def test_only_the_holder_of_the_current_claim_may_settle(tmp_path: Path) -> None:
+    store, _manager, task_id, generation = _claimed_one_off(tmp_path)
+    assert store.fence_task_claim(task_id, generation) is True
+    # The same claim cannot be taken twice, and an older one never.
+    assert store.fence_task_claim(task_id, generation) is False
+    assert store.fence_task_claim(task_id, generation - 1) is False
+
+
+def test_a_worker_whose_run_was_settled_under_it_records_nothing(tmp_path: Path) -> None:
+    """Another host on the workspace settles the run at start while this worker is on it."""
+    from raiker.tasks.scheduler import INTERRUPTED_BY_RESTART
+
+    store, manager, task_id, generation = _claimed_one_off(tmp_path)
+    scheduler = TaskScheduler(tmp_path)
+    assert scheduler.settle_interrupted_runs() == [task_id]
+
+    # The worker that was in fact still running finishes and tries to land.
+    scheduler._land_outcome(manager, task_id, "completed", "All done.", claim=generation)
+    task = store.load_task(task_id)
+    assert task is not None
+    assert task.status == "failed"
+    assert task.summary == INTERRUPTED_BY_RESTART
+
+
+def test_the_holder_of_the_claim_lands_its_outcome(tmp_path: Path) -> None:
+    store, manager, task_id, generation = _claimed_one_off(tmp_path)
+    TaskScheduler(tmp_path)._land_outcome(manager, task_id, "completed", "All done.", claim=generation)
+    task = store.load_task(task_id)
+    assert task is not None and task.status == "completed" and task.summary == "All done."
+    # And a restart afterwards has nothing of it to settle.
+    assert TaskScheduler(tmp_path).settle_interrupted_runs() == []
+
+
+def test_a_settle_that_lost_the_claim_leaves_the_run_to_its_worker(tmp_path: Path) -> None:
+    store, manager, task_id, generation = _claimed_one_off(tmp_path)
+    scheduler = TaskScheduler(tmp_path)
+    # The worker settles first, between the restart pass reading the row and acting.
+    stale = store.load_task(task_id)
+    assert stale is not None
+    scheduler._land_outcome(manager, task_id, "completed", "All done.", claim=generation)
+    assert store.fence_task_claim(task_id, stale.claim_generation) is False

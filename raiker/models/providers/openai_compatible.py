@@ -431,7 +431,9 @@ class AsyncOpenAICompatibleProvider:
             # valid tool call fail with HTTP 400. llama.cpp's explicit switch is
             # the only OpenAI-compatible hint used here.
             payload["cache_prompt"] = True
-        if stream and self.provider in {"openai", "ollama"}:
+        # Without usage on a stream the ledger records nothing for the turn, and
+        # every cost limit reads it as free. OpenRouter accepts OpenAI's switch.
+        if stream and self.provider in {"openai", "ollama", "openrouter"}:
             payload["stream_options"] = {"include_usage": True}
         reasoning = request.reasoning
         if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:
@@ -515,8 +517,14 @@ class AsyncOpenAICompatibleProvider:
                     _raise_in_band_error(decoded.get("error"))
                     usage = decoded.get("usage")
                     choices = decoded.get("choices")
-                    if isinstance(usage, dict) and (not isinstance(choices, list) or not choices):
+                    # Some servers (OpenRouter) put the usage block on the same
+                    # chunk as the last choice rather than on a chunk of its own;
+                    # dropping it there left the turn with no recorded usage.
+                    # The consumer keeps the last block it sees, so a server
+                    # that repeats cumulative usage on every chunk counts once.
+                    if isinstance(usage, dict):
                         yield ModelStreamEvent(event_type="usage", metadata={"usage": usage})
+                    if isinstance(usage, dict) and (not isinstance(choices, list) or not choices):
                         continue
                     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
                         continue

@@ -134,6 +134,21 @@ class ExternalChannelExecutor:
                 reason_code=f"channel_transport_unsupported:{channel_type}",
                 summary=f"Channel delivery denied: no wire format for '{channel_type}'.",
             )
+        # DEC-14 step 1 — a reply longer than the channel accepts is refused
+        # with the channel's limit, before anything is sent. Cutting it short
+        # would deliver a different message than the one approved; sending it
+        # would fail at the platform with nothing said about why.
+        limit = adapter.capabilities["max_text_chars"]
+        if len(text) > limit:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="channel_message_too_long",
+                summary=(
+                    f"Channel delivery refused: the reply is {len(text)} characters and "
+                    f"this channel accepts at most {limit}. Shorten it and send again."
+                ),
+                artifacts={"text_chars": len(text), "max_text_chars": limit},
+            )
         built = adapter.outbound(
             connector_id=connector_id,
             pairing=pairing,

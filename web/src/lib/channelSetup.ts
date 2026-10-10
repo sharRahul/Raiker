@@ -263,3 +263,43 @@ export function receiptOutcome(receipt: Receipt): string {
   if (receipt.queued_at) return "Waiting — queued for work";
   return "Recorded — the route starts nothing";
 }
+
+type Capabilities = NonNullable<ChannelProfile["capabilities"]>;
+
+/** The rich features a channel adapter can declare, in the owner's words. */
+const RICH_FEATURES: [keyof Capabilities, string][] = [
+  ["threads", "threads"],
+  ["streaming", "streamed replies"],
+  ["media", "pictures and files"],
+  ["reactions", "reactions"],
+  ["edits_and_deletes", "edits and deletes"],
+  ["buttons", "buttons"],
+  ["typing_indicator", "typing indicators"],
+];
+
+/**
+ * DEC-14 step 1 — what a channel can carry, as the adapter declares it.
+ *
+ * Read before the channel is set up, so an owner learns that a Telegram reply
+ * is plain text of at most 4,096 characters from this page rather than from a
+ * failed send. A longer reply is refused with that number; nothing is cut.
+ */
+export function channelCapabilityFacts(caps: Capabilities): { label: string; value: string }[] {
+  const where = [
+    caps.direct_messages ? "direct messages" : null,
+    caps.group_chats ? "group chats" : null,
+  ].filter((part): part is string => part !== null);
+  const carried = RICH_FEATURES.filter(([key]) => caps[key] === true).map(([, words]) => words);
+  const notCarried = RICH_FEATURES.filter(([key]) => caps[key] !== true).map(([, words]) => words);
+  return [
+    { label: "Carries", value: `Plain text, up to ${caps.max_text_chars.toLocaleString("en-US")} characters a reply` },
+    { label: "From", value: where.length ? `${where.join(" and ")}`.replace(/^./, (c) => c.toUpperCase()) : "One caller posting to Raiker" },
+    ...(carried.length ? [{ label: "Also", value: carried.join(", ") }] : []),
+    { label: "Not carried", value: notCarried.length ? notCarried.join(", ") : "Nothing — every feature is carried" },
+    { label: "Sign-in", value: caps.authentication },
+    {
+      label: "Too long",
+      value: "A longer reply is refused with this limit and nothing is sent; it is never cut short.",
+    },
+  ];
+}

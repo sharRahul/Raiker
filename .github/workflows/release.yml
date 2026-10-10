@@ -37,6 +37,10 @@ on:
         description: "Create a draft GitHub release from the signed artifacts"
         default: false
         type: boolean
+      notes:
+        description: "What this release changes (at most 4000 characters); signed into the channel index and shown in Settings, Updates"
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -464,6 +468,9 @@ jobs:
       - name: Build and sign the channel index
         env:
           RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+          # DEC-21 Updates — passed through the environment, never spliced into
+          # the script, so the owner's text cannot become shell.
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
           if [ -z "$RAIKER_RELEASE_SIGNING_KEY" ]; then
             echo "refused: RAIKER_RELEASE_SIGNING_KEY is not configured, so the" >&2
@@ -474,7 +481,8 @@ jobs:
           raiker-release channel \
             --version "${{ inputs.version }}" \
             --channel "${{ inputs.channel }}" \
-            --dir dist
+            --dir dist \
+            --notes "$RELEASE_NOTES"
       # DEC-17 step 10 / DEC-24 step 7 — the SBOM is published beside the
       # artifacts and bound to them, the commit and the lock in a provenance
       # record signed with the release key. `verify` below checks it.

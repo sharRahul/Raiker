@@ -603,6 +603,21 @@ export type ChannelApprovalResponse = {
   reason?: string;
 };
 
+/** DEC-14 step 1 — what one channel type can carry, declared by its adapter. */
+export type ChannelCapabilities = {
+  direct_messages: boolean;
+  group_chats: boolean;
+  threads: boolean;
+  streaming: boolean;
+  media: boolean;
+  reactions: boolean;
+  edits_and_deletes: boolean;
+  buttons: boolean;
+  typing_indicator: boolean;
+  max_text_chars: number;
+  authentication: string;
+};
+
 /** UX-MSG-04 — where this channel delivers, bound on the pairing. */
 export type ChannelDestination = {
   kind: "url" | "owner_chat" | "none";
@@ -724,6 +739,7 @@ export type ChannelProfile = {
   last_test: ChannelLastTest | null;
   route_scope: ChannelRouteScope;
   receipts: ChannelReceipt[];
+  capabilities: ChannelCapabilities | null;
 };
 
 /** UX-MSG-06 — one message or test, each stage its own fact. */
@@ -818,6 +834,8 @@ export type ChannelUpdate = {
   signature: string;
   signed: boolean;
   released_at: string;
+  size: number | null;
+  notes: string | null;
 };
 
 /** A transport update that is not a message: acknowledged so it is not retried. */
@@ -1643,6 +1661,7 @@ export type DiagnosticsView = {
   background_workers: BackgroundWorkerHealth[];
   search_indexes: SearchIndexHealth[];
   scheduler_queue: SchedulerQueue;
+  storage_space: StorageSpace;
   model_profile_source: ModelProfileSource;
   scope_note: string;
 };
@@ -4590,6 +4609,22 @@ export type SpeechRuntimeView = {
   effective: "local" | "browser";
 };
 
+/** DEC-24 step 2 — the owner's 24-hour spending limit in US dollars; null clears it. */
+export type SpendLimitRequest = {
+  limit_usd?: number | null;
+};
+
+/** DEC-24 step 2 — the owner's one spending limit and what the window has spent. */
+export type SpendLimitView = {
+  window: "rolling_24_hours";
+  limit_usd: number | null;
+  spent_usd: string;
+  unpriced_models: string[];
+  reached: boolean;
+  min_usd: number;
+  max_usd: number;
+};
+
 export type StandingGrantCreated = {
   ok: boolean;
   grant: StandingGrantView;
@@ -4640,6 +4675,13 @@ export type StopFailure = {
 
 export type StopHostRequest = {
   confirm?: boolean;
+};
+
+/** DEC-24 step 1 — room left on the volume that holds this workspace. */
+export type StorageSpace = {
+  state: "ok" | "low" | "critical" | "unknown";
+  free_bytes: number | null;
+  total_bytes: number | null;
 };
 
 /** One catalogue connector, as this owner has it. Never a credential value. */
@@ -5689,6 +5731,10 @@ export const contract = {
     request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>
     call<PricingRefreshed>("POST", "/api/models/pricing/refresh"),
+  getSpendLimit: () =>
+    request<SpendLimitView>("/api/models/spend-limit"),
+  setSpendLimit: (body: SpendLimitRequest) =>
+    call<SpendLimitView>("PUT", "/api/models/spend-limit", { body }),
   getWeeklyModelUsage: (query: { refresh_native?: boolean } = {}) =>
     request<WeeklyUsage>(withQuery("/api/models/weekly-usage", query)),
   setAvailableModels: (profileId: string, body: AvailableModelsRequest) =>

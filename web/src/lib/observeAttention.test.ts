@@ -14,6 +14,7 @@ const HEALTHY_DIAGNOSTICS = {
   background_workers: [],
   search_indexes: [],
   scheduler_queue: { due: 0, oldest_due_at: null, oldest_wait_seconds: null, host_paused: false },
+  storage_space: { state: "ok", free_bytes: 500 * 1024 ** 3, total_bytes: 1000 * 1024 ** 3 },
   model_profile_source: { kind: "packaged", location: "raiker" },
   scope_note: "",
 } as unknown as Diagnostics;
@@ -173,5 +174,24 @@ describe("allClearSentence", () => {
       diagnostics: { ...HEALTHY_DIAGNOSTICS, scheduler_queue: { due: 1, oldest_due_at: "x", oldest_wait_seconds: 900, host_paused: true } },
     });
     expect(paused.map((item) => [item.title, item.tone])).toEqual([["1 scheduled task is waiting while Raiker is paused", "waiting"]]);
+  });
+
+  // DEC-24 step 1 — resource pressure on the workspace's volume.
+  it("names low and critical disk space, and says nothing when there is room or no reading", () => {
+    const low = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, storage_space: { state: "low", free_bytes: 1.5 * 1024 ** 3, total_bytes: 100 * 1024 ** 3 } },
+    });
+    expect(low.map((item) => [item.title, item.tone])).toEqual([["Little disk space left — 1.5 GB free", "waiting"]]);
+    const critical = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, storage_space: { state: "critical", free_bytes: 300 * 1024 ** 2, total_bytes: 100 * 1024 ** 3 } },
+    });
+    expect(critical.map((item) => [item.title, item.tone])).toEqual([["Almost no disk space left — 300.0 MB free", "blocking"]]);
+    const unknown = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, storage_space: { state: "unknown", free_bytes: null, total_bytes: null } },
+    });
+    expect(unknown).toEqual([]);
   });
 });

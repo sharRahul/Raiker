@@ -78,6 +78,40 @@ describe("MessagingView", () => {
     ...overrides,
   });
 
+  // DEC-14 step 1 — what a channel carries is read before it is set up.
+  it("says what a channel carries and its reply limit, before setup", async () => {
+    const view = channelsView();
+    (view.profiles[0] as Record<string, unknown>).capabilities = {
+      direct_messages: true,
+      group_chats: true,
+      threads: false,
+      streaming: false,
+      media: false,
+      reactions: false,
+      edits_and_deletes: false,
+      buttons: false,
+      typing_indicator: false,
+      max_text_chars: 4096,
+      authentication: "A bot token held in this host's environment",
+    };
+    stubFetch({ "GET /api/channels": view });
+    render(MessagingView);
+    const block = await screen.findByTestId("channel-capabilities");
+    expect(within(block).getByText(/What this channel carries · text up to 4,096 characters/)).toBeInTheDocument();
+    expect(within(block).getByText("Direct messages and group chats")).toBeInTheDocument();
+    expect(within(block).getByText(/threads, streamed replies, pictures and files/)).toBeInTheDocument();
+    expect(within(block).getByText(/never cut short/)).toBeInTheDocument();
+  });
+
+  it("says nothing about carrying for a channel type this build has no adapter for", async () => {
+    const view = channelsView();
+    (view.profiles[0] as Record<string, unknown>).capabilities = null;
+    stubFetch({ "GET /api/channels": view });
+    render(MessagingView);
+    await screen.findByText("Webhooks");
+    expect(screen.queryByTestId("channel-capabilities")).toBeNull();
+  });
+
   it("states what a channel message is, in the owner's words", async () => {
     stubFetch({ "GET /api/channels": channelsView() });
     render(MessagingView);

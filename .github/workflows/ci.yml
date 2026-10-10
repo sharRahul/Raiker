@@ -102,6 +102,17 @@ jobs:
       - name: Scan for committed credentials
         run: |
           python scripts/scan_secrets.py
+      # DEC-24 step 7 — static analysis for security (ruff's Bandit rules). A
+      # finding passes only under a reviewed entry in
+      # .github/sast-exceptions.json with an owner, reason and expiry.
+      - name: Static security analysis
+        run: |
+          python scripts/scan_sast.py
+      # DEC-24 step 7 — the container definitions Raiker builds stay digest-
+      # pinned, non-root and free of build-time fetches and baked credentials.
+      - name: Container definition checks
+        run: |
+          python scripts/scan_containers.py
       - name: Run ruff
         run: |
           python -m ruff check .

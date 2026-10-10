@@ -47,7 +47,10 @@ Use **Observability** when you need evidence rather than a summary:
   wrong, most urgent first, with a link to where you act on each. When there is
   nothing it says so, and names what it checked: an all-clear covers what was
   read, never what could not be. A read that failed says *unknown* in that same
-  list rather than counting as healthy.
+  list rather than counting as healthy. A disk with little space left where the
+  workspace lives is on it too — waiting under 2 GB or 5% free, blocking under
+  512 MB or 2% — because a full disk stops conversations, backups and updates
+  from being saved all at once.
 - **Sessions** is the evidence inspector: every conversation with the runtime,
   its turns, and the governed events behind each turn. Opening a turn offers
   **Open in the conversation**, which lands on that exchange, and a session

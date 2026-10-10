@@ -246,10 +246,17 @@ def _read_ooxml_entry(
     if len(xml_bytes) > limit:
         raise AttachmentValidationError(too_large_reason)
     # XML mandates uppercase ``DOCTYPE``; an exact byte scan is cheap over the
-    # bounded buffer and blocks internal-entity (billion-laughs) expansion.
-    if b"<!DOCTYPE" in xml_bytes:
+    # bounded buffer and blocks internal-entity (billion-laughs) expansion. The
+    # parser also reads UTF-16 parts (an OOXML part may be either), where the
+    # same declaration is two bytes a character and a UTF-8 scan never sees it,
+    # so it is looked for in every encoding the parser would accept.
+    if any(marker in xml_bytes for marker in _DOCTYPE_MARKERS):
         raise AttachmentValidationError("content_does_not_match_media_type")
     return xml_bytes
+
+
+#: ``<!DOCTYPE`` as the XML parser would read it in UTF-8, UTF-16LE and UTF-16BE.
+_DOCTYPE_MARKERS = tuple("<!DOCTYPE".encode(codec) for codec in ("utf-8", "utf-16-le", "utf-16-be"))
 
 
 def _read_docx_document_xml(data: bytes) -> bytes:

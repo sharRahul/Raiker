@@ -155,6 +155,25 @@ stop, verifies the release again, swaps the installation atomically, and
 restarts the registered service. A source checkout says so and offers no apply
 path. The host-status panel links here rather than repeating a command line.
 
+An offered release says how large its download is and what it changes, both
+from the signed channel index; a release published before either was recorded
+says it does not state them. The download reads no more than the size the index
+signed.
+
+Applying refuses, before it changes anything:
+
+- **not enough space** (`update_insufficient_space`) — the volume must hold the
+  unpacked release and a copy of the running version, with room to spare;
+- **a release that could not open this workspace's data**
+  (`update_schema_incompatible`) — one built before the database's last
+  migration would refuse it at start.
+
+After the swap, the installed files are checked against the version the signed
+release named. If they do not match, the previous version is put back and the
+update is refused (`update_health_check_failed`); in the rare case the swap
+back cannot complete, the command names the `--rollback` that restores it. A
+failed attempt leaves nothing behind that would refuse the next one.
+
 ## Uninstall
 
 Start with a preview:

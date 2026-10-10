@@ -1,0 +1,901 @@
+{
+  "_comment": "DEC-24 step 7 — static-analysis findings that were read and are not defects. Each names an owner, a reason and an expiry; an expired or unused entry fails scripts/scan_sast.py. Renew by re-reading the code.",
+  "exceptions": [
+    {
+      "path": "raiker/api/sessions.py",
+      "rule": "S608",
+      "fingerprint": "17227917c4bc5a88",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/approval_previews.py",
+      "rule": "S105",
+      "fingerprint": "3890016867fc1cd2",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/context/gatherer.py",
+      "rule": "S608",
+      "fingerprint": "d9d3ed9a24af6334",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/context/redaction.py",
+      "rule": "S105",
+      "fingerprint": "01be31d671292b3c",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/context/redaction.py",
+      "rule": "S105",
+      "fingerprint": "2b16e21807555af7",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/backends/container.py",
+      "rule": "S604",
+      "fingerprint": "f25712f53e9f6c91",
+      "owner": "Raiker maintainers",
+      "reason": "A capability flag named shell on a dataclass, not a subprocess call",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/backends/container.py",
+      "rule": "S108",
+      "fingerprint": "a0beaffb57190a0f",
+      "owner": "Raiker maintainers",
+      "reason": "A path inside the sandbox or container (tmpfs mount, or the sandboxed process's TMPDIR), not a host temporary file Raiker creates",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/egress_proxy.py",
+      "rule": "S104",
+      "fingerprint": "0cd6d8e7f2d98f11",
+      "owner": "Raiker maintainers",
+      "reason": "Not a listening socket on the host: an address classified as local, or the egress proxy's bind inside its own container network",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/store.py",
+      "rule": "S608",
+      "fingerprint": "11d6c00e2671a11f",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/store.py",
+      "rule": "S608",
+      "fingerprint": "e2fe4069ccc25136",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/execution/commands/store.py",
+      "rule": "S608",
+      "fingerprint": "10cd0ceeddf76366",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/knowledge/watcher.py",
+      "rule": "S105",
+      "fingerprint": "80d0fcb99cfcddb1",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/memory/eidetic.py",
+      "rule": "S608",
+      "fingerprint": "3f6b3a6ccb99a5eb",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/memory/eidetic.py",
+      "rule": "S608",
+      "fingerprint": "790df2f79009877b",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/memory/integrity.py",
+      "rule": "S608",
+      "fingerprint": "644330025885d4ec",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/memory/policy.py",
+      "rule": "S105",
+      "fingerprint": "1ee44d6f40312b17",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/models/conversion.py",
+      "rule": "S108",
+      "fingerprint": "057be5cbc26fd7d1",
+      "owner": "Raiker maintainers",
+      "reason": "A path inside the sandbox or container (tmpfs mount, or the sandboxed process's TMPDIR), not a host temporary file Raiker creates",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/models/endpoint_policy.py",
+      "rule": "S104",
+      "fingerprint": "86a1f7afa06d9307",
+      "owner": "Raiker maintainers",
+      "reason": "Not a listening socket on the host: an address classified as local, or the egress proxy's bind inside its own container network",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/models/endpoint_policy.py",
+      "rule": "S104",
+      "fingerprint": "24ade411e462772b",
+      "owner": "Raiker maintainers",
+      "reason": "Not a listening socket on the host: an address classified as local, or the egress proxy's bind inside its own container network",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/models/providers/llama_cpp_server.py",
+      "rule": "S104",
+      "fingerprint": "86a1f7afa06d9307",
+      "owner": "Raiker maintainers",
+      "reason": "Not a listening socket on the host: an address classified as local, or the egress proxy's bind inside its own container network",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/attachments.py",
+      "rule": "S314",
+      "fingerprint": "6a0718d4e8cbf7f0",
+      "owner": "Raiker maintainers",
+      "reason": "Bounded OOXML part whose <!DOCTYPE> is refused in every encoding the parser reads before parsing; the stdlib parser resolves no external entities",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/attachments.py",
+      "rule": "S314",
+      "fingerprint": "5ada45bbc1a4b1ea",
+      "owner": "Raiker maintainers",
+      "reason": "Bounded OOXML part whose <!DOCTYPE> is refused in every encoding the parser reads before parsing; the stdlib parser resolves no external entities",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/attachments.py",
+      "rule": "S314",
+      "fingerprint": "540166eed3ed7de1",
+      "owner": "Raiker maintainers",
+      "reason": "Bounded OOXML part whose <!DOCTYPE> is refused in every encoding the parser reads before parsing; the stdlib parser resolves no external entities",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/command_policy.py",
+      "rule": "S108",
+      "fingerprint": "2772fc8ae162c679",
+      "owner": "Raiker maintainers",
+      "reason": "A path inside the sandbox or container (tmpfs mount, or the sandboxed process's TMPDIR), not a host temporary file Raiker creates",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/connectors.py",
+      "rule": "S105",
+      "fingerprint": "0a8d02b5090c39d5",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/connectors.py",
+      "rule": "S105",
+      "fingerprint": "a79c528453267d8f",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/connectors.py",
+      "rule": "S105",
+      "fingerprint": "25ea2c39ea1c757d",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/connectors.py",
+      "rule": "S105",
+      "fingerprint": "97ea2dcc8e23c90e",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/git_credential.py",
+      "rule": "S105",
+      "fingerprint": "23673ecd3693d303",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/runtime/git_credential.py",
+      "rule": "S105",
+      "fingerprint": "14faef0a4d89aafe",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/skills/builtin/algorithm-creator/scripts/oracle_check.py",
+      "rule": "S311",
+      "fingerprint": "f46e72ae80cb6750",
+      "owner": "Raiker maintainers",
+      "reason": "Bundled skill's test oracle draws test inputs, not secrets",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/backup.py",
+      "rule": "S608",
+      "fingerprint": "bcc8576bf1edc34d",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/sqlite.py",
+      "rule": "S608",
+      "fingerprint": "ddab06d8c6147278",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/sqlite.py",
+      "rule": "S608",
+      "fingerprint": "fcd312d998b47b54",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "feec2f04f14dff85",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "3d1765ebb03cadcf",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "7ed377ec55153e6a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "edad929f7d09e549",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "edad929f7d09e549",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "85ba9a6a7b0fe4ee",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/accounts.py",
+      "rule": "S608",
+      "fingerprint": "db813c43b3003bb0",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/approvals.py",
+      "rule": "S608",
+      "fingerprint": "1f068486efd22cda",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/approvals.py",
+      "rule": "S608",
+      "fingerprint": "a3da10c029fb0ff4",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/approvals.py",
+      "rule": "S608",
+      "fingerprint": "173504ff9b998021",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/approvals.py",
+      "rule": "S608",
+      "fingerprint": "e575f2863b907ef7",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/attachments.py",
+      "rule": "S608",
+      "fingerprint": "fcc5944f8ba1c307",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/attachments.py",
+      "rule": "S608",
+      "fingerprint": "967744cdcd71eda7",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/attachments.py",
+      "rule": "S608",
+      "fingerprint": "4994a337d66e320d",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/attachments.py",
+      "rule": "S608",
+      "fingerprint": "6412ffc9b8177fb5",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/attachments.py",
+      "rule": "S608",
+      "fingerprint": "f7eae6596a238535",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "c19aa837c802bc87",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "dcfd511018de2613",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "dc952069d8f6977a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "0dfdc6a28482beca",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "2931a7c9c71addd0",
+      "owner": "Raiker maintainers",
+      "reason": "SQL names a table or column taken from a fixed in-code tuple or from SQLite's own catalogue; never from input, and every value is bound",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "ca0932e87ab691b2",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "57fbeb00012b9f19",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "5c8028948aa6750d",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "38e64707a2a788f8",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "89ec74a922304f5b",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "cb609f73e7db9d60",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "6c6f7df1b1ad8926",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "258bb0caf4da9f1a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/conversations.py",
+      "rule": "S608",
+      "fingerprint": "c0e1365f0f59f634",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/extensions.py",
+      "rule": "S608",
+      "fingerprint": "8dc6d7ffc7bea61e",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/extensions.py",
+      "rule": "S608",
+      "fingerprint": "61c40e61fff9d7f6",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/governance.py",
+      "rule": "S608",
+      "fingerprint": "111d310dd7dd2591",
+      "owner": "Raiker maintainers",
+      "reason": "SET clause built from internal keyword or allow-listed column names; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/knowledge.py",
+      "rule": "S608",
+      "fingerprint": "a62898606ce5d655",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/knowledge.py",
+      "rule": "S608",
+      "fingerprint": "80d6de878b3f31e9",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "ea25dadb4479a777",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "fa6e6ea3651b9e32",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "3daf8872132c2fba",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "a69ea63a47909d97",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "c2240e18b7020dea",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "699b62bffa279d85",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "90399a924a737f12",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "ddcfabd1bdca6fee",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "e86a0b202eab9714",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "e47f4a7e093398b1",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "9a744e100b98dd1e",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "cf462a5c3a941055",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "ae49169abadb67c7",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "867b605f80f1546a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/memory.py",
+      "rule": "S608",
+      "fingerprint": "8150c501716f8581",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/models.py",
+      "rule": "S608",
+      "fingerprint": "8e06489fa0ea7815",
+      "owner": "Raiker maintainers",
+      "reason": "SET clause built from internal keyword or allow-listed column names; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/monitoring.py",
+      "rule": "S608",
+      "fingerprint": "a310899ebac581f5",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/monitoring.py",
+      "rule": "S608",
+      "fingerprint": "13406df2dad766f6",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "8b023746c2d27380",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "5e2c7203048bfe97",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "a90f10902e16c818",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "ee1af92ad300fa8a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "c3c911f9436d6296",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "08ce538b8a4caeb9",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "1a584ab0b93ca90a",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "06dcbf6d31885e25",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "ca20cae41c4e12e9",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "9abb48595f1ee72d",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "b09fff3333b37468",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "46c87463a33e4e2e",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "a90f10902e16c818",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "ee1af92ad300fa8a",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "f60bb889c81c6735",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "6f21fb32d59a32b3",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "35b5b74edd8b2861",
+      "owner": "Raiker maintainers",
+      "reason": "SQL composed from in-code fragments: '?' placeholder lists or a fixed sub-select; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/projects.py",
+      "rule": "S608",
+      "fingerprint": "36d2f3b282f45db2",
+      "owner": "Raiker maintainers",
+      "reason": "SQL concatenated from fixed in-code string fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/records.py",
+      "rule": "S608",
+      "fingerprint": "4321ea17e7e8154a",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/tasks.py",
+      "rule": "S608",
+      "fingerprint": "a7ecd8b677274a48",
+      "owner": "Raiker maintainers",
+      "reason": "WHERE/ORDER BY assembled from fixed in-code fragments; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/tasks.py",
+      "rule": "S608",
+      "fingerprint": "ed9e56f6fda112c9",
+      "owner": "Raiker maintainers",
+      "reason": "SET clause built from internal keyword or allow-listed column names; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/storage/stores/tasks.py",
+      "rule": "S608",
+      "fingerprint": "8eea3af20fc63bf5",
+      "owner": "Raiker maintainers",
+      "reason": "SET clause built from internal keyword or allow-listed column names; every value is bound as a parameter",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/tasks/doctor.py",
+      "rule": "S105",
+      "fingerprint": "44f881b2a6d96f35",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/tools/git.py",
+      "rule": "S105",
+      "fingerprint": "0ff02ad63c2bb226",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    },
+    {
+      "path": "raiker/tools/git.py",
+      "rule": "S105",
+      "fingerprint": "0b7977b6720c84e5",
+      "owner": "Raiker maintainers",
+      "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
+      "expires": "2027-04-10"
+    }
+  ]
+}

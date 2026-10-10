@@ -733,3 +733,93 @@ def test_an_unpriced_model_is_not_counted_as_free_or_stopped(tmp_path: Path, mon
     assert _handle(orchestrator, envelope).status == "completed"
     spend = orchestrator._turn_spend[envelope.turn_id]  # noqa: SLF001
     assert spend.unpriced and spend.total == 0
+
+
+# DEC-24 step 2 — the owner's one spending limit, across every turn.
+
+
+def _owner_limit(orchestrator: Any, limit: float | None) -> None:
+    from raiker.runtime.spend_limit import set_owner_limit
+
+    broker = orchestrator.tool_broker
+    set_owner_limit(broker.store, str(broker.principal_id), limit)
+
+
+def test_the_owner_wide_limit_stops_a_turn_before_its_next_model_call(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    _priced(monkeypatch)
+    router = FakeRouter([_costly_tool_round()])
+    orchestrator = _orchestrator(tmp_path, router)
+    _owner_limit(orchestrator, 0.5)
+    envelope = _envelope("keep listing")
+    response = _handle(orchestrator, envelope)
+    assert response.status == "failed"
+    assert "spending limit of $0.50 for the last 24 hours" in response.message
+    assert router.calls == 1
+    reached = _event_record(orchestrator, envelope.session_id, "turn_spend_limit_reached")
+    assert reached["payload"]["limit_usd"] == 0.5
+    assert reached["payload"]["spent_usd"] == 1.0
+    assert reached["payload"]["window_hours"] == 24
+
+
+def test_a_turn_started_over_the_limit_never_asks_the_model(tmp_path: Path, monkeypatch: Any) -> None:
+    _priced(monkeypatch)
+    router = FakeRouter([_costly_tool_round(), ModelResponse(text="never asked")])
+    orchestrator = _orchestrator(tmp_path, router)
+    _owner_limit(orchestrator, 0.5)
+    _handle(orchestrator, _envelope("first"))
+    assert router.calls == 1
+    # Another turn — any surface, any session — counts against the same window.
+    second = _handle(orchestrator, _envelope("second"))
+    assert second.status == "failed"
+    assert router.calls == 1
+
+
+def test_without_a_limit_spend_stops_nothing(tmp_path: Path, monkeypatch: Any) -> None:
+    _priced(monkeypatch)
+    router = FakeRouter([
+        _costly_tool_round(),
+        ModelResponse(text="Done.", usage={"input_tokens": 10, "output_tokens": 5}),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    _owner_limit(orchestrator, None)
+    assert _handle(orchestrator, _envelope("list once")).status == "completed"
+
+
+def test_the_window_names_unpriced_models_and_counts_only_priced_ones(tmp_path: Path) -> None:
+    from decimal import Decimal
+
+    from raiker.runtime.model_facts_store import ModelFactsStore
+    from raiker.runtime.model_usage import ModelUsageLedger
+    from raiker.runtime.spend_limit import spend_in_window
+    from raiker.storage.sqlite import SQLiteStore
+
+    store = SQLiteStore(tmp_path)
+    ledger = ModelUsageLedger(store)
+    ModelFactsStore(store).set_owner_price(
+        "principal_owner", "anthropic", "priced-model",
+        input_per_mtok=Decimal("2"), output_per_mtok=Decimal("2"),
+    )
+    for model in ("priced-model", "mystery-model"):
+        ledger.record(
+            owner_principal_id="principal_owner", session_id="sess_x", provider="anthropic",
+            model=model, usage={"input_tokens": 500_000, "output_tokens": 0},
+        )
+    # Outside the window: recorded two days ago.
+    ledger.record(
+        owner_principal_id="principal_owner", session_id="sess_x", provider="anthropic",
+        model="priced-model", usage={"input_tokens": 9_000_000, "output_tokens": 0},
+        recorded_at="2000-01-01T00:00:00Z",
+    )
+    spend = spend_in_window(store, "principal_owner")
+    assert spend.total == Decimal("1")
+    assert spend.unpriced == ["mystery-model"]
+
+
+def test_a_limit_outside_its_bounds_is_not_a_limit() -> None:
+    from raiker.runtime.spend_limit import valid_limit
+
+    assert valid_limit(5) == 5.0
+    for bad in (0, 0.001, 10_000.01, True, "5", None):
+        assert valid_limit(bad) is None

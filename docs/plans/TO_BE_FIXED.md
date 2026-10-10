@@ -130,7 +130,9 @@ names.
 | [BUG-324](#bug-324--deleting-a-project-a-task-or-a-picture-is-not-journalled-so-a-restore-brings-it-back) | Low | Storage / restore | Open — FIXED-802 journals forgotten and purged memories and deleted conversations; a project, task or Design picture deleted after a backup still comes back with a restore |
 | [BUG-325](#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause) | Low | Tasks / cost limit | Open — a run's spend is counted per orchestrator, and a run continued after an approval starts counting again |
 | [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
-| [BUG-327](#bug-327--the-2026-10-10-rounds-changes-were-proved-without-a-model-turn) | Low | Live evidence | Open — the round's identity-linked Anthropic key needs its workspace ID, so FIXED-813 to FIXED-826 have no real-provider turn behind them |
+| [BUG-328](#bug-328--a-hugging-face-repository-name-is-shown-as-redacted_secret) | Low | Models / redaction | Open — a public repository id matched the high-entropy redactor |
+| [BUG-329](#bug-329--built-container-images-are-not-scanned-for-vulnerabilities) | Low | CI / containers | Open — the image half of DEC-24 step 7 after FIXED-837 |
+| [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open — CRLF fixtures, a `\\?\` path prefix and a receipt race; not caused by a code change |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2486,25 +2488,70 @@ test that imports the orchestrator first does.
 **Proposed fix.** Move the image executor's `get_model_connection` import into
 the function that uses it, and add an import-each-module-alone test.
 
-## BUG-327 — The 2026-10-10 round's changes were proved without a model turn
+## BUG-328 — A Hugging Face repository name is shown as `[REDACTED_SECRET]`
 
-**Severity: Low. Area: Live evidence. Status: Open — found 2026-10-10.**
+**Severity: Low. Area: Models / redaction. Status: Open — found 2026-10-10.**
 
-**Observed.** The Anthropic key supplied for the round is identity-linked
-(`sk-ant-usr-`). Anthropic refuses every request from it without an
-`anthropic-workspace-id` header, and the key cannot list its workspaces
-(`/v1/organizations/workspaces` answers 403), so no workspace ID could be found.
-Raiker explained this correctly in the Connect dialog (BUG-272's handling), but
-no model answered anything in the round.
+**Observed.** In Models → Add model, the trending Hugging Face list showed one
+repository (5,134,275 downloads, 1,124 likes) as `[REDACTED_SECRET]` instead of
+its name. A public repository id is not a secret; the response redactor's
+high-entropy fallback matched it.
 
-**Effect.** FIXED-813 to FIXED-826 are proved by tests and by the live host
-without a model: none of them changes what a model is sent, but the round has
-no real-provider turn confirming that a turn still runs end to end on this
-build.
+**Effect.** The owner cannot see, search for or choose that repository from the
+list; nothing leaks.
 
-**Proposed fix.** Re-run `web/e2e/round-2026-10-10-revisions-live.spec.ts` with
-the key's workspace ID entered beside it (Models → Anthropic → workspace ID), or
-with a workspace-scoped key, and add one Chat turn.
+**Proposed fix.** Exempt Hugging Face repository ids (`owner/name`, the hub's
+own character set) from the high-entropy fallback on the Hugging Face routes,
+as model names already are (`raiker/context/redaction.py`), with a regression
+test using the id the hub returned.
+
+## BUG-329 — Built container images are not scanned for vulnerabilities
+
+**Severity: Low. Area: CI / containers. Status: Open — the remainder of DEC-24
+step 7 after FIXED-837.**
+
+**Observed.** FIXED-837 checks the container *definitions* (digest pins,
+non-root, no build-time fetches or baked credentials). The *images* built from
+them — the sandbox and the egress proxy — are not scanned for known
+vulnerabilities in their base layers and packages.
+
+**Proposed fix.** Add an image scan on the pinned bases with a scanner pinned
+by digest and checksum (DEC-17 step 5 forbids a mutable download), gating on
+fixable high/critical findings with a reviewed, expiring exception file in the
+shape of `.github/sast-exceptions.json`. Choose the scanner deliberately: a
+scanner's own release channel is supply-chain input.
+
+## BUG-330 — Five tests fail on Windows and pass on Linux CI
+
+**Severity: Low. Area: Tests / Windows. Status: Open — found 2026-10-10 running
+the full suite on Windows 11; the same five fail at `38c9da5` without this
+run's change.**
+
+**Observed.**
+
+- `tests/test_mcp_stdio_bounds.py` (2): the stand-in MCP server writes `
+`
+  on Windows and the tests compare against `
+`.
+- `tests/test_project_lifecycle.py::TestDeletion::test_preview_counts_what_the_delete_removes`:
+  the fixture's `write_text("hello
+")` writes seven bytes on Windows, so the
+  folder is 17 bytes, not 16.
+- `tests/test_workspace_backups.py::test_the_routes_need_an_owner_and_say_what_they_did`:
+  the restore path comes back with the `\\?\` long-path prefix and Windows
+  separators, and the assertion expects `/`.
+- `tests/test_background_execution.py::test_a_lapsed_lease_is_reclaimed_with_an_honest_receipt_not_left_running`:
+  the reclaim writes a receipt that is already final (`command_receipt_immutable`).
+
+**Effect.** The suite is not green on the platform the desktop build ships for;
+CI runs Linux only, so nothing flags it. The first three are fixture
+assumptions; the fourth needs a look, because a receipt race is product
+behaviour.
+
+**Proposed fix.** Write fixtures with `newline="
+"` / bytes, compare paths
+through `Path`, and trace the lease reclaim's double write on Windows. Consider
+a Windows job for the Python suite.
 
 ## Decision statements added 2026-10-05
 

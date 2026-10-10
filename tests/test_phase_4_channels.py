@@ -761,12 +761,14 @@ def test_the_adapter_table_owns_the_wire_format_and_nothing_else() -> None:
     # gate, no allowlist, no pairing, no audit surface on it.
     adapter = adapter_for("telegram")
     assert adapter is not None
-    assert {"outbound", "parse_inbound", "channel_type"} <= set(dir(adapter))
+    assert {"outbound", "parse_inbound", "channel_type", "capabilities"} <= set(dir(adapter))
+    # DEC-14 step 1 — `capabilities` is a declaration the page reads and the
+    # executor bounds a reply by; it widens nothing.
     assert not [
         name
         for name in dir(adapter)
         if not name.startswith("_")
-        and name not in {"outbound", "parse_inbound", "channel_type"}
+        and name not in {"outbound", "parse_inbound", "channel_type", "capabilities"}
     ]
 
 
@@ -791,3 +793,58 @@ def test_a_connector_declares_the_environment_it_needs(
     assert needs["RAIKER_CHANNEL_INBOUND_SECRET"]["present"] is False
     # The value never rides this path, set or unset.
     assert "supersecret" not in json.dumps(view)
+
+
+# ── DEC-14 step 1: what a channel can carry ──────────────────────────────────
+
+
+def test_every_adapter_declares_what_it_carries_and_its_reply_limit() -> None:
+    from raiker.channels.adapters import adapter_channel_types, channel_capabilities
+
+    for channel_type in adapter_channel_types():
+        caps = channel_capabilities(channel_type)
+        assert caps is not None, channel_type
+        assert caps["max_text_chars"] > 0
+        assert caps["authentication"]
+        # A governed text relay: no rich feature is claimed that nothing carries.
+        for feature in ("streaming", "media", "reactions", "edits_and_deletes", "buttons", "typing_indicator"):
+            assert caps[feature] is False, (channel_type, feature)
+    telegram = channel_capabilities("telegram")
+    assert telegram is not None and telegram["max_text_chars"] == 4096
+    assert telegram["direct_messages"] and telegram["group_chats"]
+    assert channel_capabilities("carrier_pigeon") is None
+
+
+def test_a_reply_longer_than_the_channel_accepts_is_refused_with_the_limit_and_not_sent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    _telegram_pairing(ws)
+    monkeypatch.setenv("RAIKER_TELEGRAM_BOT_TOKEN", "123:abc")
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "api.telegram.org")
+    sent: list[object] = []
+    monkeypatch.setattr("raiker.runtime.executors.channels.post_url", lambda *a, **k: sent.append(a), raising=False)
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _action("external_channel_runtime", principal.principal_id,
+                connector_id="channel.telegram", chat_id="4242", text="x" * 4097),
+        principal,
+    )
+    assert result.error == "channel_message_too_long"
+    assert result.artifacts["max_text_chars"] == 4096
+    assert result.artifacts["text_chars"] == 4097
+    assert sent == []
+
+
+def test_the_channel_list_says_what_each_channel_carries(tmp_path: Path) -> None:
+    from raiker.control.dashboard import DashboardService
+
+    ws = _ws(tmp_path)
+    _enable(ws, "external_channel_runtime")
+    view = DashboardService(ws).list_channels("principal_owner")
+    by_type = {p["channel_type"]: p for p in view["profiles"]}
+    telegram, webhooks = by_type["telegram"]["capabilities"], by_type["webhooks"]["capabilities"]
+    assert telegram is not None and webhooks is not None
+    assert telegram["max_text_chars"] == 4096
+    assert webhooks["max_text_chars"] > 4096

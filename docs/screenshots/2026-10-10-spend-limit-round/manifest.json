@@ -1,0 +1,62 @@
+{
+  "01-spend-limit-set.png": {
+    "commit": "38c9da5a4f4225b551899d20e135af6ec4081bd6",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/models?tab=usage",
+    "test": "manual Playwright round 2026-10-10 (spend limit) \u203a FIXED-840 \u2014 a $0.01 limit set after one real OpenRouter turn ($0.0014)",
+    "captured_at": "2026-10-10T16:13:00Z"
+  },
+  "02-turn-stopped-by-spend-limit.png": {
+    "commit": "38c9da5a4f4225b551899d20e135af6ec4081bd6",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/new-chat",
+    "test": "manual Playwright round 2026-10-10 (spend limit) \u203a FIXED-840 \u2014 at $0.0101 the next turn stops before any model call",
+    "captured_at": "2026-10-10T16:13:00Z"
+  },
+  "03-spend-limit-reached.png": {
+    "commit": "38c9da5a4f4225b551899d20e135af6ec4081bd6",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/models?tab=usage",
+    "test": "manual Playwright round 2026-10-10 (spend limit) \u203a FIXED-840 \u2014 Usage says the limit is reached and model calls are stopped",
+    "captured_at": "2026-10-10T16:13:00Z"
+  },
+  "04-messaging-channel-carries.png": {
+    "commit": "38c9da5a4f4225b551899d20e135af6ec4081bd6",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "theme": "light",
+    "route": "#/messaging",
+    "test": "manual Playwright round 2026-10-10 (spend limit) \u203a FIXED-838 \u2014 what each channel carries, before setup",
+    "captured_at": "2026-10-10T16:13:00Z"
+  },
+  "05-messaging-carries-390-dark.png": {
+    "commit": "38c9da5a4f4225b551899d20e135af6ec4081bd6",
+    "working_tree_changed": true,
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "theme": "dark",
+    "route": "#/messaging",
+    "test": "manual Playwright round 2026-10-10 (spend limit) \u203a FIXED-838 \u2014 the same at 390 wide, dark, no horizontal overflow",
+    "captured_at": "2026-10-10T16:13:00Z"
+  }
+}

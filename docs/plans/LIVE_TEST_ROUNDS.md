@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-10 (second) | Targeted | `2026-10-10-spend-limit-round/` | **OpenRouter** `openai/gpt-4o-mini`, nine turns answered through Chat; OpenAI and the identity-linked Anthropic key connected through Connect, not exercised | Thirteen decision-record steps — DEC-17 step 7 (space, health check, compatibility), DEC-21 Updates (size, notes), DEC-12 step 4 (fencing), DEC-15 step 10 (plugin growth), DEC-24 steps 1, 2 and 7 (disk pressure, owner-wide spending limit, SAST and container gates), DEC-14 step 1 (capabilities, reply limit) as FIXED-828 to FIXED-842. Proved live: **a $0.01 limit reached by real spend stopped the next turn before any model call**, and clearing it let the next answer; **what each channel carries** at 1440 and at 390 dark with no overflow; storage space `ok`. **One defect found and fixed** — OpenRouter turns recorded no usage (FIXED-841); one filed (BUG-328) |
 | 2026-10-10 | Targeted | `2026-10-10-revisions-round/` | **None answered.** The Anthropic key supplied (`sk-ant-usr-…`, identity-linked) was entered through the Connect dialog; Anthropic refuses every call from it without an `anthropic-workspace-id`, which the key alone cannot look up | Thirteen decision-record steps from the release-readiness review — §13.2 item 6 for MCP, channels and projects, DEC-15 step 10's acceptance binding, DEC-14 step 10, DEC-21 (Personalisation, Updates, Git credential), DEC-24 steps 3, 5 and 7 and DEC-17 step 10 (FIXED-813 to FIXED-826). Proved live: the identity-linked key **explained, not called bad**; Compact and Dark **previewed unsaved and put back by Discard**; **a stale Messaging tab's sender list refused** with the newer list kept; **a paused channel keeping a message and starting nothing**; **a stale project editor refused with its text kept**; **an MCP tool reworded after the card was drawn not accepted**, and a stale rename refused; **a backup carrying 1 checkpoint file and 1 upload**; recovery points that can and cannot open this data; the credential's last loan; the recovery matrix; Messaging at 390 wide, dark, with no overflow; and, across a restart, **a routine left running settled and moved to its next slot**. **One defect found and fixed** — that routine had stayed running for ever (FIXED-825) |
 | 2026-10-05 (fifth) | Targeted | `2026-10-05-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering two Chat turns and running a routine, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — BUG-323 and DEC-24 steps 5–6 (restore from the lock screen, quarantine, deletion journal), DEC-17 step 8 (refuse a newer schema), DEC-12 step 6's cost limit, DEC-21's General row (weather place, answer language, date format) and §13.2 item 6 for permissions and task creation (FIXED-801 to FIXED-809). Proved live: **a real answer in French to an English prompt**, with the turn told `answer_language: fr` and no place; dates written in German; **a stale tab's permission change refused** and the page showing the other tab's Never; **one task for a draft sent twice**; **a $0.01 routine stopped after one model call**; and, across two restarts, **a damaged workspace restored from the lock screen** with the deleted conversation still gone, and **a newer-schema workspace refused and restored** at 390 wide. **Three defects found and fixed** — cached tokens recorded as zero (FIXED-810), cache rates dropped (FIXED-811) and damage past the first page read as the machine's memory (FIXED-812) |
 | 2026-10-05 (fourth) | Targeted | `2026-10-05-backups-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering a Chat turn, the key entered through the Connect dialog | Ten more decision-record steps from the release-readiness review — DEC-24 step 5's backups (snapshot, verify, restore to a new folder), DEC-17 step 8's snapshot before a migration, §13.2 item 6 for Settings, DEC-21's deduplication and delivery record, DEC-24 step 1's scheduler queue, DEC-12 step 6's tool-call limit and DEC-19 step 5's screenshot manifest (FIXED-789 to FIXED-798). Proved live: a real Anthropic answer; **Back up now, Verify and Restore to a new folder**, the restored folder opening as its own workspace; **a backup changed on disk reading Damaged with no restore offered**; **an upgrade's own verified snapshot**; **a stale Settings page merged where nobody else changed a key and refused where somebody did**; **one finding raised three times as one notice**; the record saying *held for quiet hours* and *not shown*; **work due while paused named as waiting**; a routine's tool-call limit kept across a reload; Account at 390 wide, dark, with no overflow; and every capture in the manifest. **One defect found and fixed** — the restore's path came back redacted (FIXED-799); BUG-323 filed |
@@ -94,6 +95,37 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-10 (second) — A spending limit reached by real spend, and channels that say what they carry
+
+**Tier:** Targeted. **Build:** `main` at `38c9da5` plus this run's working tree.
+**Host:** `raiker-web` on Windows 11, a workspace reset with
+`scripts/reset_live_workspace.py`, driven by the Playwright browser tools.
+
+**Providers.** OpenRouter, OpenAI and Anthropic keys were entered through each
+provider's Connect dialog only, and appear in no capture, source or log
+committed. OpenRouter `openai/gpt-4o-mini` was selected as the global model and
+answered nine Chat turns. The Anthropic key is identity-linked (`sk-ant-usr-`)
+and still needs its workspace ID (BUG-272's handling); OpenAI was connected and
+not exercised.
+
+**What it proved** (captures `01`–`05`, each in the folder's `manifest.json`):
+
+| Step | Evidence |
+|---|---|
+| FIXED-841 | The first OpenRouter turn answered and Usage recorded nothing: the ledger was empty and the window read $0.0000. Fixed in the run; after a restart the same kind of turn recorded $0.0014 |
+| FIXED-840 | A $0.01 limit set on Models → Usage: *$0.0014 spent of $0.01* (01). Six more turns reached $0.0101; the next turn answered *Stopped at a safe boundary: your spending limit of $0.01 for the last 24 hours is reached …* and the spend stayed $0.0101 — no model call (02); Usage said *Reached — model calls are stopped* (03). Cleared, the next turn answered *Resumed.* |
+| FIXED-838 | *What this channel carries* on both cards before setup: the webhook 32,000 characters from one caller, Telegram 4,096 from direct messages and group chats, nothing rich claimed (04); at 390 wide and dark with no horizontal overflow (05) |
+| FIXED-842 | `GET /api/diagnostics` read `storage_space: ok`, about 349 GB free |
+
+**What it found.** One product defect, fixed in the run (FIXED-841). One filed:
+a Hugging Face repository in Models' trending list rendered as
+`[REDACTED_SECRET]` (BUG-328). A raw `fetch` from the console to clear the
+limit was refused 403 for want of the CSRF header — the protection working; the
+UI cleared it. Two connection-refused console errors belong to the restart
+window. FIXED-828 to FIXED-837 and FIXED-839 are proved by their tests; their
+paths (an update apply, a second host, a plugin update, CI) are not reachable
+from a browser round.
 
 ## 2026-10-10 — Stale pages that write nothing, a channel that pauses, and a run a restart does not lose
 

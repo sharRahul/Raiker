@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
 
@@ -46,6 +47,7 @@ from raiker.api.schemas import (
     SetSessionPinnedRequest,
     SetSessionProjectRequest,
     SetSessionTagsRequest,
+    SpendLimitRequest,
     TaskCreateRequest,
     TaskRunLimitRequest,
     serialize_dto,
@@ -92,6 +94,7 @@ from raiker.api.wire.models import (
     ModelSelectionSet,
     PriceSet,
     PricingRefreshed,
+    SpendLimitView,
     WeeklyBudgetSet,
     WeeklyUsage,
 )
@@ -2282,6 +2285,74 @@ async def get_weekly_model_usage(
         refresh_native=refresh_native,
     )
     answer: WeeklyUsage = {"window": "rolling_7_days", "providers": [row.to_dict() for row in rows]}
+    return serialize_dto(answer)
+
+
+def _spend_limit_view(store: SQLiteStore, principal_id: str) -> SpendLimitView:
+    from raiker.models.registry import ModelProfileRegistry
+    from raiker.runtime.spend_limit import (
+        MAX_LIMIT_USD,
+        MIN_LIMIT_USD,
+        owner_limit,
+        reached,
+        spend_in_window,
+    )
+
+    try:
+        registry: ModelProfileRegistry | None = ModelProfileRegistry.load()
+    except Exception:  # noqa: BLE001 - no registry is no configured prices
+        registry = None
+
+    def configured_pricing(provider: str, model: str) -> Any:
+        if registry is None:
+            return None
+        profile = registry.resolve(provider, model)
+        return (getattr(profile, "raw", {}) or {}).get("pricing")
+
+    limit = owner_limit(store, principal_id)
+    spend = spend_in_window(store, principal_id, raw_pricing=configured_pricing)
+    return {
+        "window": "rolling_24_hours",
+        "limit_usd": limit,
+        "spent_usd": str(spend.total.quantize(Decimal("0.0001"))),
+        "unpriced_models": spend.unpriced,
+        "reached": reached(limit, spend),
+        "min_usd": MIN_LIMIT_USD,
+        "max_usd": MAX_LIMIT_USD,
+    }
+
+
+@router.get("/api/models/spend-limit")
+async def get_spend_limit(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-24 step 2 — the owner's one spending limit and the last 24 hours' spend."""
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    answer = _spend_limit_view(store, session.principal_id)
+    return serialize_dto(answer)
+
+
+@router.put("/api/models/spend-limit")
+async def set_spend_limit(
+    body: SpendLimitRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set or clear the owner's 24-hour spending limit across every model and surface."""
+    from raiker.runtime.spend_limit import set_owner_limit, valid_limit
+
+    session, _principal = auth_data
+    limit = None if body.limit_usd is None else valid_limit(body.limit_usd)
+    if body.limit_usd is not None and limit is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"reason_code": "spend_limit_out_of_range"},
+        )
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    set_owner_limit(store, session.principal_id, limit)
+    answer = _spend_limit_view(store, session.principal_id)
     return serialize_dto(answer)
 
 

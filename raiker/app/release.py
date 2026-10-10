@@ -42,6 +42,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from raiker.app.build_tools import tools_for
+from raiker.app.update import MAX_RELEASE_NOTES_CHARS
 from raiker.contracts.views import View
 
 RELEASE_SCHEMA = 1
@@ -496,15 +497,25 @@ def build_channel_index(
     artifacts: Iterable[ReleaseArtifact],
     private_key: bytes | None = None,
     released_at: str | None = None,
+    notes: str | None = None,
 ) -> tuple[Path, Path | None]:
     """The index an installed Raiker reads to learn an update exists.
 
-    One entry per target, each naming the artifact, its digest, and the
-    per-artifact manifest and signature the updater will verify before it
+    One entry per target, each naming the artifact, its digest, its size, and
+    the per-artifact manifest and signature the updater will verify before it
     changes anything. The index is itself signed, so a swapped entry is a
     signature failure rather than a download.
+
+    DEC-21 Updates: ``size`` is what the owner will download and ``notes`` what
+    the release changes, both read by Settings → Updates before anything is
+    fetched. Both sit under the index signature, so neither can be altered on
+    the way.
     """
     _validate_version(version)
+    if notes is not None:
+        notes = notes.strip()
+        if len(notes) > MAX_RELEASE_NOTES_CHARS:
+            raise ReleaseError("release_notes_too_long")
     destination = Path(out_dir)
     destination.mkdir(parents=True, exist_ok=True)
     entries: dict[str, Any] = {}
@@ -521,10 +532,11 @@ def build_channel_index(
             "manifest": artifact.manifest_path.name,
             "signature": artifact.signature_path.name,
             "signed": artifact.signed,
+            "size": artifact.path.stat().st_size,
         }
     if not entries:
         raise ReleaseError("release_channel_empty")
-    index = {
+    index: dict[str, Any] = {
         "schema": RELEASE_SCHEMA,
         "kind": "channel",
         "channel": channel,
@@ -532,6 +544,8 @@ def build_channel_index(
         "released_at": released_at or _reproducible_timestamp(),
         "artifacts": entries,
     }
+    if notes:
+        index["notes"] = notes
     index_path = destination / f"{channel}.json"
     index_bytes = _canonical(index)
     index_path.write_bytes(index_bytes)
@@ -712,6 +726,11 @@ def build_parser() -> argparse.ArgumentParser:
     index.add_argument("--version", required=True)
     index.add_argument("--channel", default="stable")
     index.add_argument("--dir", required=True, help="Directory holding every target's artifacts.")
+    index.add_argument(
+        "--notes",
+        default="",
+        help="What this release changes, shown in Settings -> Updates before it is applied.",
+    )
 
     provenance = sub.add_parser(
         "provenance", help="Write SHA256SUMS and the signed provenance record for a release."
@@ -821,6 +840,7 @@ def _run(args: argparse.Namespace) -> int:
             channel=args.channel,
             artifacts=artifacts,
             private_key=_key_from_env("RAIKER_RELEASE_SIGNING_KEY"),
+            notes=args.notes or None,
         )
         print(
             json.dumps(

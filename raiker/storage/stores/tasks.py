@@ -183,12 +183,37 @@ class TaskStore:
             ).fetchall()
             claimed: list[TaskRecord] = []
             for row in rows:
+                # DEC-12 step 4 — each claim takes the next generation, and the
+                # record returned is the claimed row, so the worker holds the
+                # generation it must settle at.
                 if connection.execute(
-                    "UPDATE tasks SET status = 'running', current_step = ?, updated_at = ? WHERE task_id = ? AND status = 'queued'",
+                    "UPDATE tasks SET status = 'running', current_step = ?, updated_at = ?, "
+                    "claim_generation = claim_generation + 1 "
+                    "WHERE task_id = ? AND status = 'queued'",
                     ("Starting scheduled run", now, row["task_id"]),
                 ).rowcount:
-                    claimed.append(self._task_from_row(row))
+                    current = connection.execute(
+                        "SELECT * FROM tasks WHERE task_id = ?", (row["task_id"],)
+                    ).fetchone()
+                    claimed.append(self._task_from_row(current))
         return claimed
+
+    def fence_task_claim(self: SQLiteStore, task_id: str, generation: int) -> bool:
+        """Take the right to settle a run claimed at ``generation`` (DEC-12 step 4).
+
+        One compare-and-swap: the generation moves on only if it is still the one
+        the caller holds. ``True`` means the caller now settles the run and
+        anyone else holding that claim does not; ``False`` means the claim was
+        already taken — another host settled the run, or claimed it again — and
+        the caller must write nothing.
+        """
+        return bool(
+            self._execute(
+                "UPDATE tasks SET claim_generation = claim_generation + 1 "
+                "WHERE task_id = ? AND claim_generation = ?",
+                (task_id, generation),
+            )
+        )
 
     def scheduler_queue(self: SQLiteStore, now: str) -> dict[str, Any]:
         """DEC-24 step 1 — the scheduler's queue: how much is due and how long it has waited.

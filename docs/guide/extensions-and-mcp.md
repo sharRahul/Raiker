@@ -646,6 +646,16 @@ Allowing a plugin's code names *which bytes* as well as which plugin:
 entrypoint is hashed again immediately before it runs. A plugin with no pin, or a
 file that changed since you pinned it, does not run.
 
+### Updating a plugin
+
+`/plugin-plan <manifest>` reads a new version against the installed one:
+`updates_installed_version`, `permissions_added` and `permissions_removed`. A
+version that asks for the same or less installs with `--install` as before. One
+that asks for **more** is held — *Install held: this update asks for …* — until
+you run it again with `--install --accept-permissions`, which accepts exactly
+the permissions the plan listed. If the manifest changes between the plan you
+read and the install, it is held again.
+
 ### A plugin's skills
 
 A plugin that asks for `skill:contribute` may ship `SKILL.md` documents. They go

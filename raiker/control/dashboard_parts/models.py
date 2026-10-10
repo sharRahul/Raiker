@@ -43,6 +43,7 @@ from raiker.control.views.security import (
     ProviderHealthView,
     SchedulerQueue,
     SearchIndexHealth,
+    StorageSpace,
 )
 from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
@@ -1718,6 +1719,7 @@ class ModelService:
                 cast(BackgroundWorkerHealth, row) for row in self.store.list_background_worker_health()
             ),
             scheduler_queue=self._scheduler_queue(),
+            storage_space=storage_space(self.store.paths.workspace_root),
             search_indexes=tuple(
                 cast(
                     SearchIndexHealth,
@@ -1794,3 +1796,31 @@ class ModelService:
         if models.current_profile_id is None:
             gaps.append("No model profile is selected.")
         return tuple(gaps)
+
+
+#: DEC-24 step 1 — below these, free space on the workspace's volume is named on
+#: *Needs your attention*. Absolute and relative together: a large volume can be
+#: 4% free and fine, a small one 20% free and nearly full.
+STORAGE_LOW_BYTES = 2 * 1024**3
+STORAGE_CRITICAL_BYTES = 512 * 1024**2
+STORAGE_LOW_FRACTION = 0.05
+STORAGE_CRITICAL_FRACTION = 0.02
+
+
+def storage_space(workspace_root: Any) -> StorageSpace:
+    """Free space where the workspace lives, as the operating system reports it."""
+    import shutil
+
+    try:
+        usage = shutil.disk_usage(workspace_root)
+    except OSError:
+        return StorageSpace(state="unknown", free_bytes=None, total_bytes=None)
+    fraction = usage.free / usage.total if usage.total else 0.0
+    state: Literal["ok", "low", "critical"]
+    if usage.free < STORAGE_CRITICAL_BYTES or fraction < STORAGE_CRITICAL_FRACTION:
+        state = "critical"
+    elif usage.free < STORAGE_LOW_BYTES or fraction < STORAGE_LOW_FRACTION:
+        state = "low"
+    else:
+        state = "ok"
+    return StorageSpace(state=state, free_bytes=usage.free, total_bytes=usage.total)

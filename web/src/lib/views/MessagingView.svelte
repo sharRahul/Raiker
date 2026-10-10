@@ -26,6 +26,7 @@
     receiptStages,
     receiptTitle,
     routeScopeFacts,
+    channelCapabilityFacts,
   } from "../channelSetup";
   import { relativeTime } from "../format";
 
@@ -329,6 +330,20 @@
                 </li>
               {/each}
             </ul>
+          {/if}
+
+          <!-- DEC-14 step 1 — what this channel can carry, declared by its
+               adapter, read before setup rather than learned from a failed send. -->
+          {#if profile.capabilities}
+            <details class="route-scope" data-testid="channel-capabilities">
+              <summary>What this channel carries · text up to {profile.capabilities.max_text_chars.toLocaleString("en-US")} characters</summary>
+              <dl>
+                {#each channelCapabilityFacts(profile.capabilities) as fact (fact.label)}
+                  <dt>{fact.label}</dt>
+                  <dd>{fact.value}</dd>
+                {/each}
+              </dl>
+            </details>
           {/if}
 
           {#if profile.linked}

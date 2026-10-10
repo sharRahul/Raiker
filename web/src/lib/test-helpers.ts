@@ -93,6 +93,7 @@ export const DIAGNOSTICS: Diagnostics = {
   background_workers: [],
   search_indexes: [],
   scheduler_queue: { due: 0, oldest_due_at: null, oldest_wait_seconds: null, host_paused: false },
+  storage_space: { state: "ok", free_bytes: 500 * 1024 ** 3, total_bytes: 1000 * 1024 ** 3 },
   model_profile_source: { kind: "packaged", location: "raiker.config/model-profiles.json" },
   scope_note: "Status reflects the local single-user runtime only.",
 };

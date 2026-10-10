@@ -17,6 +17,7 @@ function profile(overrides: Partial<ChannelProfile> = {}): ChannelProfile {
     paused: false,
     paused_at: null,
     revision: null,
+    capabilities: null,
     connector_id: "channel.webhooks",
     channel_type: "webhooks",
     display_name: "Webhooks",

@@ -63,6 +63,8 @@ const signedPackage = status({
     signature: "https://releases.example/raiker-2.0.0.json.sig",
     signed: true,
     released_at: "2026-09-01T00:00:00Z",
+    size: null,
+    notes: null,
   },
   recovery_points: [
     { version: "1.0.0", path: "C:\\recovery", files: 12, bytes: 4096, schema_generation: null, opens_this_workspace: null },
@@ -185,4 +187,30 @@ it("says which recovery point can open this workspace's data and which would ref
   expect(rows[0]).toMatch(/1\.2\.0 — can open this workspace's data/);
   expect(rows[1]).toMatch(/1\.1\.0 — would refuse this workspace's data/);
   expect(rows[2]).toMatch(/1\.0\.0 — not known whether/);
+});
+
+// ── DEC-21 Updates: size and notes ──────────────────────────────────────────
+
+it("says what an offered release will download and what it changes", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue({
+    ...signedPackage,
+    available: {
+      ...signedPackage.available!,
+      size: 52 * 1024 * 1024,
+      notes: "Fixes the routine that a stopped host left running.",
+    },
+  });
+  render(Updates);
+
+  expect(await screen.findByText("52.0 MB", { selector: "dd" })).toBeInTheDocument();
+  expect(screen.getByText("What this release changes")).toBeInTheDocument();
+  expect(screen.getByText(/Fixes the routine that a stopped host left running/)).toBeInTheDocument();
+});
+
+it("says a release that recorded neither does not state them, rather than guessing", async () => {
+  vi.spyOn(api, "hostUpdate").mockResolvedValue(signedPackage);
+  render(Updates);
+
+  expect(await screen.findByText("Not stated by this release", { selector: "dd" })).toBeInTheDocument();
+  expect(screen.getByText("This release does not say what it changes.")).toBeInTheDocument();
 });

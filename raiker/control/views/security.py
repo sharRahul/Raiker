@@ -184,6 +184,20 @@ class SchedulerQueue(TypedDict):
     host_paused: bool
 
 
+class StorageSpace(TypedDict):
+    """DEC-24 step 1 — room left on the volume that holds this workspace.
+
+    Read when the page asks, from the operating system; nothing is written. A
+    full disk is the pressure that fails everything at once — the database, a
+    backup, an update's staging — so it is named before it arrives.
+    """
+
+    #: ``ok``, ``low`` or ``critical``; ``unknown`` when the volume could not be read.
+    state: Literal["ok", "low", "critical", "unknown"]
+    free_bytes: int | None
+    total_bytes: int | None
+
+
 class SearchIndexHealth(TypedDict):
     """One search index as the host's last check found it (BUG-322, DEC-24 step 6)."""
 
@@ -243,6 +257,10 @@ class DiagnosticsView(View):
         default_factory=lambda: SchedulerQueue(
             due=0, oldest_due_at=None, oldest_wait_seconds=None, host_paused=False
         )
+    )
+    # DEC-24 step 1 — resource pressure: free space where the workspace lives.
+    storage_space: StorageSpace = field(
+        default_factory=lambda: StorageSpace(state="unknown", free_bytes=None, total_bytes=None)
     )
     # GCR-45 — which file the built-in model registry was actually read from,
     # independent of the working directory the host was launched from.

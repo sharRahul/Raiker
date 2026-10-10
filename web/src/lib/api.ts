@@ -142,6 +142,8 @@ export const api = {
     contract.getWeeklyModelUsage(refreshNative ? { refresh_native: true } : {}),
   setWeeklyModelBudget: (profileId: string, tokenBudget: number | null) =>
     contract.setWeeklyModelBudget(profileId, { token_budget: tokenBudget }),
+  spendLimit: () => contract.getSpendLimit(),
+  setSpendLimit: (limitUsd: number | null) => contract.setSpendLimit({ limit_usd: limitUsd }),
   modelReadiness: () => contract.listModelReadiness(),
   checkModelReadiness: (profile_id: string, model: string) =>
     contract.checkModelReadiness({ profile_id, model }),

@@ -58,6 +58,55 @@ class PluginRegistrationPlan(View):
     signature: SignatureVerification | None = None
 
 
+@dataclass(frozen=True)
+class PluginPermissionDiff(View):
+    """What installing a manifest changes about a plugin already installed (DEC-15 step 10).
+
+    ``previous_version`` is ``None`` for a first install, where every permission
+    is new by definition and the plan itself is the review. For an update,
+    ``added`` is the authority the new version asks for that the installed one
+    did not have: when it is not empty the update grows the plugin's authority,
+    and the install executor refuses it unless the owner accepted exactly the
+    permission set they were shown.
+    """
+
+    previous_version: str | None
+    added: list[str] = field(default_factory=list)
+    removed: list[str] = field(default_factory=list)
+
+    @property
+    def authority_grows(self) -> bool:
+        return self.previous_version is not None and bool(self.added)
+
+
+def installed_plugin_permissions(store: Any, plugin_id: str) -> tuple[str, list[str]] | None:
+    """The installed version of ``plugin_id`` and its permissions, or ``None``."""
+    import json
+
+    for record in store.list_plugin_install_records(status="installed"):
+        if record.get("plugin_id") != plugin_id:
+            continue
+        try:
+            permissions = json.loads(str(record.get("permissions_json") or "[]"))
+        except ValueError:
+            permissions = []
+        clean = [p for p in permissions if isinstance(p, str)] if isinstance(permissions, list) else []
+        return str(record.get("version") or ""), clean
+    return None
+
+
+def plugin_permission_diff(store: Any, plugin_id: str, permissions: list[str]) -> PluginPermissionDiff:
+    installed = installed_plugin_permissions(store, plugin_id)
+    if installed is None:
+        return PluginPermissionDiff(previous_version=None)
+    version, before = installed
+    return PluginPermissionDiff(
+        previous_version=version,
+        added=sorted(set(permissions) - set(before)),
+        removed=sorted(set(before) - set(permissions)),
+    )
+
+
 def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan:
     validation: PluginManifestValidation = validate_plugin_manifest(manifest)
     trust_level_value = manifest.get("trust_level", "untrusted")

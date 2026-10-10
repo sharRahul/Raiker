@@ -601,7 +601,11 @@ class RuntimeControlService:
         )
 
     def install_plugin(
-        self, acting_principal_id: str | None, manifest_path: str
+        self,
+        acting_principal_id: str | None,
+        manifest_path: str,
+        *,
+        accepted_permissions: list[str] | None = None,
     ) -> ControlResult:
         """Governed install of a validated local plugin manifest (GEP-04).
 
@@ -629,12 +633,25 @@ class RuntimeControlService:
             principal_id=principal.principal_id,
             action_type="plugin_install",
             tool_or_service_name="plugin_install",
-            arguments={"manifest_path": manifest_path},
+            arguments={
+                "manifest_path": manifest_path,
+                # DEC-15 step 10 — the permission set the owner accepted for an
+                # update that grows authority; absent for anything else.
+                **(
+                    {"accepted_permissions": sorted(accepted_permissions)}
+                    if accepted_permissions is not None
+                    else {}
+                ),
+            },
             risk_level=RiskLevelValue.HIGH,
         )
         result = self._authority.route_action(action, principal)
         mapped = self._mcp_action_result(result)
         if not mapped.ok:
+            if result.artifacts:
+                return ControlResult(
+                    ok=False, reason_code=mapped.reason_code, data=dict(result.artifacts)
+                )
             return mapped
         return ControlResult(ok=True, data=dict(result.artifacts or {}))
 

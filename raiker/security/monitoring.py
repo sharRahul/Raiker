@@ -66,7 +66,9 @@ class SecurityMonitor:
         allowlist = self._breach_allowlist()
         if not enabled or HIBP_HOST not in allowlist or not password:
             return None
-        digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+        # The range API is defined over SHA-1; this is its k-anonymity prefix,
+        # not a stored password hash.
+        digest = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()
         prefix, suffix = digest[:5], digest[5:]
         response = self._http_get(f"https://{HIBP_HOST}/range/{prefix}")
         count = next(

@@ -5,6 +5,7 @@
   import { api } from "../../api";
   import type { UpdateStatusView } from "../../apiTypes";
   import { clientBuild, clientIsStale, describeBuild } from "../../buildIdentity";
+  import { formatBytes } from "../../projectLifecycle";
 
   let update = $state<UpdateStatusView | null>(null);
   let busy = $state<"checking" | "applying" | null>(null);
@@ -172,6 +173,21 @@
         and replaces files only if both verify. If the new version changes the database, Raiker
         backs it up first; after that, this version can be rolled back to only with that backup.
       </p>
+      <!-- DEC-21 Updates — what the update costs and what it changes, both read
+           from the signed channel index before anything is fetched. A release
+           published before either was recorded says so instead of guessing. -->
+      <dl>
+        <div>
+          <dt>Download size</dt>
+          <dd>{update.available.size == null ? "Not stated by this release" : formatBytes(update.available.size)}</dd>
+        </div>
+      </dl>
+      {#if update.available.notes}
+        <h4 class="notes-heading">What this release changes</h4>
+        <p class="release-notes">{update.available.notes}</p>
+      {:else}
+        <p class="description">This release does not say what it changes.</p>
+      {/if}
       <button class="btn btn-primary" type="button" disabled={busy !== null} onclick={() => void apply()}>
         <Icon name="refresh" size="sm" /> {busy === "applying" ? "Starting update…" : confirm ? "Confirm update and restart" : "Update and restart"}
       </button>
@@ -185,4 +201,6 @@
 
 <style>
   .points { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
+  .notes-heading { margin: 0.5rem 0 0.2rem; font-size: var(--text-sm); }
+  .release-notes { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12rem; overflow-y: auto; }
 </style>

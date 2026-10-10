@@ -4203,6 +4203,30 @@ ALTER TABLE git_credential_grants ADD COLUMN last_used_at TEXT;
 ALTER TABLE git_credential_grants ADD COLUMN last_operation TEXT;
 """
 
+# DEC-12 step 4 / §13.2 item 7 — a claim on a task run is fenced. Each claim
+# takes the next generation, and settling a run first swaps the generation it
+# was claimed at for the next one: whoever swaps first settles, and a worker
+# whose claim was taken from it — a host that settled a run it believed
+# abandoned, while another host's worker was still on it — writes nothing.
+TASK_CLAIM_GENERATION_MIGRATION_ID = "RAIKER-2098-task-claim-generation"
+
+TASK_CLAIM_GENERATION_SQL = """
+ALTER TABLE tasks ADD COLUMN claim_generation INTEGER NOT NULL DEFAULT 0;
+"""
+
+# DEC-24 step 2 — the owner's one spending limit across every model and
+# surface, read at each turn's safe boundary (``raiker.runtime.spend_limit``).
+# Kept as text so the stored amount is exactly the one the owner typed.
+OWNER_SPEND_LIMIT_MIGRATION_ID = "RAIKER-2099-owner-spend-limit"
+
+OWNER_SPEND_LIMIT_SQL = """
+CREATE TABLE IF NOT EXISTS owner_spend_limits (
+  owner_principal_id TEXT PRIMARY KEY,
+  daily_limit_usd TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4446,6 +4470,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(TASK_COST_LIMIT_MIGRATION_ID, TASK_COST_LIMIT_SQL),
     Migration(CHANNEL_PAUSE_MIGRATION_ID, CHANNEL_PAUSE_SQL),
     Migration(GIT_CREDENTIAL_LAST_USE_MIGRATION_ID, GIT_CREDENTIAL_LAST_USE_SQL),
+    Migration(TASK_CLAIM_GENERATION_MIGRATION_ID, TASK_CLAIM_GENERATION_SQL),
+    Migration(OWNER_SPEND_LIMIT_MIGRATION_ID, OWNER_SPEND_LIMIT_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

@@ -415,6 +415,25 @@ provider data** makes the external checks explicit. An optional owner weekly
 token budget is advisory Raiker control, not a provider subscription limit and
 not a promise about billing or reset dates.
 
+### Spending limit
+
+The one limit Raiker **enforces** is at the top of Usage: a dollar amount for
+the last 24 hours, across every model and everything that uses one — Chat,
+Build, Design, routines and the work they delegate. **Set a limit** (from $0.01
+to $10,000); leave it empty for none.
+
+It is checked before every model call. When the window's spend reaches it, a
+running turn stops at its next safe boundary with *your spending limit … is
+reached*, and new work stops before its first model call, until the window has
+room again or you raise or clear the limit. A response already in flight when
+the limit was crossed still finishes, so the overrun is at most what was in
+flight.
+
+Spend is the providers' own token counts priced with the rates Models shows.
+A model with no known price is not counted and is named under the limit, so you
+know the limit is not protecting you there; set its price on Models to include
+it. A routine can also carry its own per-run limit on **Will it run?**.
+
 ## One instance, one default
 
 Each connection belongs only to this Raiker instance: a key entered here is

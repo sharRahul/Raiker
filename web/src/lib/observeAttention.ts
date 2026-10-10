@@ -28,6 +28,7 @@
  */
 
 import type { ApprovalView, Diagnostics, SecurityHealth } from "./apiTypes";
+import { formatBytes } from "./projectLifecycle";
 
 /** Raised on `window` when a repair on the Overview changed what it reports. */
 export const RUNTIME_HEALTH_CHANGED = "raiker:runtime-health-changed";
@@ -167,6 +168,23 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
           linkLabel: "See the scheduler's record",
         });
       }
+    }
+    // DEC-24 step 1 — resource pressure. A full disk fails the database, a
+    // backup and an update's staging all at once, so it is named while there
+    // is still room to act. The host reads the volume when this page asks.
+    const space = inputs.diagnostics.storage_space;
+    if (space && (space.state === "low" || space.state === "critical") && space.free_bytes !== null) {
+      const critical = space.state === "critical";
+      items.push({
+        id: "storage-space",
+        tone: critical ? "blocking" : "waiting",
+        title: `${critical ? "Almost no" : "Little"} disk space left — ${formatBytes(space.free_bytes)} free`,
+        detail: critical
+          ? "Raiker may soon be unable to save conversations, take backups or stage an update. Free space on the drive that holds this workspace."
+          : "Raiker needs room to save conversations, take backups and stage updates. Free some space on the drive that holds this workspace before it runs out.",
+        href: "#/observe?tab=overview",
+        linkLabel: "See runtime health",
+      });
     }
     if (inputs.diagnostics.missing_config.length > 0) {
       items.push({

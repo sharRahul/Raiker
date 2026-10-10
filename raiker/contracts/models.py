@@ -425,6 +425,7 @@ EVENT_TYPES = {
     # DEC-12 step 6 — a routine run reached its own cost limit and was stopped
     # before the model was asked again.
     "turn_cost_limit_reached",
+    "turn_spend_limit_reached",
     "turn_steered",
     "checkpoint_restore_planned",
     "checkpoint_fork_planned",
@@ -1129,6 +1130,11 @@ class TaskRecord:
     #: DEC-12 step 6 — the most one run may cost, in US dollars, by the
     #: provider's token counts; ``None`` is no limit of its own.
     max_run_cost_usd: float | None = None
+    #: DEC-12 step 4 — the generation of the claim this run holds. Each claim
+    #: takes the next one, and a run may settle only by swapping the generation
+    #: it was claimed at for the next (``SQLiteStore.fence_task_claim``), so a
+    #: worker whose claim was taken from it settles nothing.
+    claim_generation: int = 0
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

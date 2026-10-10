@@ -30,6 +30,7 @@ from raiker.app.installation import (
     read_channel_config,
     recovery_root,
     update_status,
+    workspace_schema_generation,
 )
 from raiker.app.update import UpdateError, UpdateResult, apply_signed_update
 
@@ -131,8 +132,16 @@ def download_and_apply(
     offered = status.available
     with TemporaryDirectory(prefix="raiker-update-") as staging:
         directory = Path(staging)
+        # The signed index says how large the artifact is; nothing larger is
+        # read. The digest check would refuse a padded artifact anyway, but only
+        # after it had been written to disk.
+        artifact_limit = MAX_ARTIFACT_BYTES
+        if offered.size is not None:
+            if offered.size > MAX_ARTIFACT_BYTES:
+                raise UpdateError("artifact_too_large")
+            artifact_limit = offered.size
         downloads = {
-            offered.artifact: MAX_ARTIFACT_BYTES,
+            offered.artifact: artifact_limit,
             offered.manifest: MAX_METADATA_BYTES,
             offered.signature: MAX_METADATA_BYTES,
         }
@@ -145,4 +154,5 @@ def download_and_apply(
             public_key=config.public_key,
             install_root=install_root,
             recovery_root=recovery_root(workspace_root),
+            workspace_generation=workspace_schema_generation(workspace_root),
         )

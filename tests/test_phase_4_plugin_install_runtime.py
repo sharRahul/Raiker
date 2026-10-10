@@ -179,3 +179,75 @@ def test_plugin_install_rejects_paths_outside_workspace(tmp_path: Path) -> None:
     )
     assert result.ok is False
     assert result.reason_code == "outside_workspace:manifest_path"
+
+
+# ── DEC-15 step 10: an update that grows authority waits for the owner ───────
+
+
+def _install(ws: Path, manifest: dict[str, Any], name: str, **extra: object) -> Any:
+    _write_manifest(ws, manifest, name)
+    authority, principal = _authority(ws)
+    return authority.route_action(
+        _action(principal.principal_id, manifest_path=name, **extra), principal
+    )
+
+
+def test_an_update_asking_for_more_is_held_until_the_exact_set_is_accepted(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    first = _install(ws, _manifest(), "v1.json")
+    assert first.message == "executed"
+    assert first.artifacts["previous_version"] is None
+
+    grown = _manifest({"version": "1.1.0", "permissions": ["tool:read_file", "tool:list_directory", "tool:grep"]})
+    held = _install(ws, grown, "v2.json")
+    assert held.error == "plugin_permissions_grew_unreviewed"
+    assert held.artifacts["permissions_added"] == ["tool:grep"]
+    assert held.artifacts["previous_version"] == "1.0.0"
+    assert [r["version"] for r in SQLiteStore(ws).list_plugin_install_records()] == ["1.0.0"]
+
+    # Accepting a different set than the manifest asks for is not accepting it.
+    wrong = _install(ws, grown, "v2.json", accepted_permissions=["tool:read_file", "tool:grep"])
+    assert wrong.error == "plugin_permissions_grew_unreviewed"
+
+    accepted = _install(
+        ws, grown, "v2.json",
+        accepted_permissions=["tool:grep", "tool:list_directory", "tool:read_file"],
+    )
+    assert accepted.message == "executed"
+    assert accepted.artifacts["permissions_added"] == ["tool:grep"]
+    assert accepted.artifacts["previous_version"] == "1.0.0"
+
+
+def test_an_update_that_asks_for_less_or_the_same_installs_without_a_second_question(
+    tmp_path: Path,
+) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    assert _install(ws, _manifest(), "v1.json").message == "executed"
+    narrower = _manifest({"version": "1.0.1", "permissions": ["tool:read_file"]})
+    result = _install(ws, narrower, "v2.json")
+    assert result.message == "executed"
+    assert result.artifacts["permissions_removed"] == ["tool:list_directory"]
+    assert result.artifacts["permissions_added"] == []
+
+
+def test_the_plan_reads_an_update_against_what_is_installed(tmp_path: Path) -> None:
+    from raiker.cli.commands import handle_plugin_plan
+
+    ws = _ws(tmp_path)
+    _enable(ws)
+    assert _install(ws, _manifest(), "v1.json").message == "executed"
+    grown = _manifest({"version": "1.1.0", "permissions": ["tool:read_file", "tool:list_directory", "tool:grep"]})
+    path = _write_manifest(ws, grown, "v2.json")
+
+    shown = handle_plugin_plan(f"/plugin-plan {path}", workspace_root=ws)
+    assert "updates_installed_version: 1.0.0" in shown
+    assert "permissions_added: tool:grep" in shown
+    assert "--accept-permissions" in shown
+
+    held = handle_plugin_plan(f"/plugin-plan {path} --install", workspace_root=ws)
+    assert "Install held: this update asks for tool:grep" in held
+
+    installed = handle_plugin_plan(f"/plugin-plan {path} --install --accept-permissions", workspace_root=ws)
+    assert "Installed:" in installed

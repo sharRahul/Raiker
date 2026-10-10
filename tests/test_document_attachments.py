@@ -172,6 +172,22 @@ class TestDocumentValidation:
         with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
             validate_document(DOCX_MEDIA_TYPE, buf.getvalue())
 
+    @pytest.mark.parametrize("codec", ["utf-16", "utf-16-le", "utf-16-be"])
+    def test_a_utf16_docx_with_doctype_fails_closed(self, codec: str) -> None:
+        # The parser reads UTF-16 parts too, where `<!DOCTYPE` is two bytes a
+        # character and a UTF-8 byte scan never matches it.
+        doc_xml = (
+            f'<?xml version="1.0" encoding="{codec.upper()[:6]}"?>'
+            '<!DOCTYPE w:document [<!ENTITY a "boom">]>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p><w:r><w:t>&a;</w:t></w:r></w:p></w:body></w:document>"
+        ).encode(codec)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr("word/document.xml", doc_xml)
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(DOCX_MEDIA_TYPE, buf.getvalue())
+
     def test_docx_zip_bomb_fails_closed(self) -> None:
         # A small archive whose document.xml inflates past the decompressed cap
         # must be rejected instead of buffered whole (memory-exhaustion DoS).

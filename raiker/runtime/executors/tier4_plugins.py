@@ -195,7 +195,7 @@ class PluginInstallExecutor:
         self._store = store
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        from raiker.plugins.policy import plan_plugin_registration
+        from raiker.plugins.policy import plan_plugin_registration, plugin_permission_diff
         from raiker.plugins.registry import record_plugin_install
 
         manifest_arg = action.arguments.get("manifest_path")
@@ -241,6 +241,34 @@ class PluginInstallExecutor:
         if plan.plugin_id is None:
             return self._failed(action.action_id, "manifest_missing_plugin_id")
 
+        # DEC-15 step 10 — an update that asks for more than the installed
+        # version had is held until the owner accepts exactly the permission
+        # set they were shown. Bound to the set, not to a yes: a manifest edited
+        # between the plan the owner read and this install asks again.
+        diff = plugin_permission_diff(self._store, plan.plugin_id, plan.permissions)
+        if diff.authority_grows:
+            accepted = action.arguments.get("accepted_permissions")
+            if not isinstance(accepted, list) or sorted(
+                str(p) for p in accepted
+            ) != sorted(plan.permissions):
+                return ExecutionResult(
+                    ok=False,
+                    capability=self.capability,
+                    action_id=action.action_id,
+                    reason_code="plugin_permissions_grew_unreviewed",
+                    summary=(
+                        "This update asks for permissions the installed version did not "
+                        "have; review them and accept exactly this set to install it."
+                    ),
+                    artifacts={
+                        "plugin_id": plan.plugin_id,
+                        "previous_version": diff.previous_version,
+                        "permissions_added": diff.added,
+                        "permissions_removed": diff.removed,
+                        "execution_enabled": False,
+                    },
+                )
+
         supply_chain = raw_manifest.get("supply_chain")
         supply_chain_dict = supply_chain if isinstance(supply_chain, dict) else {}
         checksum = supply_chain_dict.get("checksum")
@@ -273,6 +301,9 @@ class PluginInstallExecutor:
                 "version": record.version,
                 "trust_level": plan.trust_level,
                 "permission_count": len(plan.permissions),
+                "previous_version": diff.previous_version,
+                "permissions_added": diff.added,
+                "permissions_removed": diff.removed,
                 "execution_enabled": False,
             },
         )

@@ -7,6 +7,7 @@ from typing import Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
+from raiker.channels.adapters import ChannelCapabilities
 from raiker.contracts.views import View
 from raiker.tools.mcp_review import PendingTool
 
@@ -536,6 +537,9 @@ class ChannelProfile(TypedDict):
     route_scope: ChannelRouteScope
     #: The most recent first; at most five.
     receipts: list[ChannelReceipt]
+    #: DEC-14 step 1 — what this channel can carry; ``None`` when this build has
+    #: no adapter for its type.
+    capabilities: ChannelCapabilities | None
 
 
 class ChannelsOutbound(TypedDict):

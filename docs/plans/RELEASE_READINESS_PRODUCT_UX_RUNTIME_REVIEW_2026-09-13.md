@@ -91,6 +91,22 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-10 (second round). Thirteen more
+> decision-record steps closed.** DEC-17 step 7's staged update now refuses a
+> disk it would fill ([FIXED-828](FIXED_ITEMS.md#fixed-828--an-update-could-start-on-a-disk-it-would-fill)), checks the swapped tree and rolls back on
+> failure ([FIXED-829](FIXED_ITEMS.md#fixed-829--a-swapped-installation-was-never-checked-before-the-old-one-was-thrown-away)) and refuses a build that could not open the workspace's
+> data ([FIXED-831](FIXED_ITEMS.md#fixed-831--an-update-could-install-a-build-that-would-refuse-the-workspaces-data)); a failed attempt no longer blocks the next ([FIXED-830](FIXED_ITEMS.md#fixed-830--a-failed-update-left-a-recovery-copy-that-refused-the-next-attempt)). DEC-21
+> Updates: download size and release notes from the signed index ([FIXED-832](FIXED_ITEMS.md#fixed-832--updates-offered-a-release-without-saying-how-large-it-was-or-what-it-changed)).
+> DEC-12 step 4: a claim is fenced ([FIXED-833](FIXED_ITEMS.md#fixed-833--a-worker-whose-run-was-settled-under-it-could-still-write-its-outcome)). DEC-15 step 10: a plugin update
+> that grows its authority waits for the owner ([FIXED-834](FIXED_ITEMS.md#fixed-834--a-plugin-update-that-asked-for-more-was-installed-like-the-first-install)). DEC-24 step 2: one
+> owner-wide spending limit, enforced ([FIXED-840](FIXED_ITEMS.md#fixed-840--nothing-bounded-what-the-owners-models-spent-in-total)); step 1: disk pressure
+> ([FIXED-842](FIXED_ITEMS.md#fixed-842--a-disk-running-out-of-space-was-nowhere-on-the-health-surfaces)); step 7: a SAST gate ([FIXED-835](FIXED_ITEMS.md#fixed-835--no-static-analysis-for-security-ran-on-any-change)) and container-definition checks
+> ([FIXED-837](FIXED_ITEMS.md#fixed-837--nothing-checked-the-container-definitions-raiker-builds)). DEC-14 step 1: channel capabilities ([FIXED-838](FIXED_ITEMS.md#fixed-838--messaging-could-not-say-what-a-channel-carries-before-it-was-set-up)) and the reply
+> limit ([FIXED-839](FIXED_ITEMS.md#fixed-839--a-reply-longer-than-the-channel-accepts-was-sent-to-fail)). The work found a UTF-16 DTD bypass ([FIXED-836](FIXED_ITEMS.md#fixed-836--a-utf-16-document-part-could-carry-the-dtd-the-attachment-check-refuses)), and the live
+> round — real OpenRouter turns — found OpenRouter turns recording no usage
+> ([FIXED-841](FIXED_ITEMS.md#fixed-841--a-streamed-openrouter-turn-recorded-no-usage-so-every-cost-limit-read-it-as-free)). DEC-21b (GitHub.com OAuth), RR-AUTHORITY-01, RR-INSTALL-01,
+> RR-DESIGN-01, RR-VERIFY-01 and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-10. Thirteen more decision-record steps
 > closed.** §13.2 item 6 is complete for the configuration it named: an MCP tool
 > is accepted only as the owner read it ([FIXED-813](FIXED_ITEMS.md#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it)), and stale MCP renames
@@ -1838,6 +1854,11 @@ cleanup tests for every supported runtime type.
 
 ## DEC-12 — Define Tasks as a durable scheduler and run history
 
+> **2026-10-10 (second round).** Step 4's fencing token closed as [FIXED-833](FIXED_ITEMS.md#fixed-833--a-worker-whose-run-was-settled-under-it-could-still-write-its-outcome):
+> each claim takes the next generation and a run settles only by swapping it, so
+> a worker whose run was settled under it writes nothing. A heartbeat and a
+> persisted effect intent before execution remain.
+>
 > **2026-10-05.** Step 6's "visible incident after exhaustion" closed for
 > routines as [FIXED-757](FIXED_ITEMS.md#fixed-757--a-routine-that-failed-every-cycle-failed-every-morning-for-as-long-as-nobody-looked): three failed cycles in a row pause the routine with its
 > reason and notify the owner; Continue runs it once and re-arms it. No failed
@@ -1945,6 +1966,11 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-10 (second round).** Step 1 closed as [FIXED-838](FIXED_ITEMS.md#fixed-838--messaging-could-not-say-what-a-channel-carries-before-it-was-set-up) and [FIXED-839](FIXED_ITEMS.md#fixed-839--a-reply-longer-than-the-channel-accepts-was-sent-to-fail): each
+> adapter declares what it carries and its longest reply, Messaging shows it
+> before setup, and a longer reply is refused with the limit rather than sent to
+> fail.
+>
 > **2026-10-10.** Step 10 closed as [FIXED-817](FIXED_ITEMS.md#fixed-817--a-channel-could-only-be-on-or-off-there-was-no-way-to-contain-it-and-keep-its-evidence): **Pause** keeps receiving and
 > recording a channel's messages with their receipts, starts no work, and refuses
 > delivery, tests and the approval relay until **Resume**.
@@ -2006,6 +2032,13 @@ delivery retry/dead letter, pause and secret-redaction tests.
 > **2026-10-10.** Step 10's acceptance is bound to what the owner read: a held
 > tool is accepted only while its declaration matches the fingerprint the card
 > showed ([FIXED-813](FIXED_ITEMS.md#fixed-813--an-mcp-tool-was-accepted-as-the-server-declared-it-at-the-click-not-as-the-owner-read-it)). Catalogue and plugin digests remain.
+>
+> **2026-10-10 (second round).** Step 10 holds for plugins: an install record
+> already carried the verified checksum, signature, source and commit, and an
+> update that asks for more than the installed version is refused until the
+> owner accepts exactly the new permission set ([FIXED-834](FIXED_ITEMS.md#fixed-834--a-plugin-update-that-asked-for-more-was-installed-like-the-first-install)). Raiker has no MCP
+> catalogue to record digests for; a plugin-offered server is added through the
+> ordinary governed path.
 >
 > **2026-10-05 (second round).** Step 12's "Resume re-runs readiness, integrity
 > and policy checks" closed as [FIXED-767](FIXED_ITEMS.md#fixed-767--resuming-an-mcp-server-restored-its-old-trust-without-checking-it): a resumed server passes the connection
@@ -2123,6 +2156,14 @@ between approval and execution. All must fail before effect.
 > record signed with the release key binding every artifact to the commit, the
 > lock and the SBOM, and `raiker-release verify` checks them. A release records
 > the schema generation it opens, which Updates reads ([FIXED-820](FIXED_ITEMS.md#fixed-820--updates-listed-recovery-points-without-saying-whether-they-could-open-this-data)). Step 7 remains.
+>
+> **2026-10-10 (second round).** Step 7 closed: the update already verified
+> signature and digest, staged off to the side, took a recovery copy and swapped
+> by rename; it now checks free space first ([FIXED-828](FIXED_ITEMS.md#fixed-828--an-update-could-start-on-a-disk-it-would-fill)), refuses a build that
+> could not open the workspace's data ([FIXED-831](FIXED_ITEMS.md#fixed-831--an-update-could-install-a-build-that-would-refuse-the-workspaces-data)), and health-checks the live
+> tree after the swap, rolling back on failure ([FIXED-829](FIXED_ITEMS.md#fixed-829--a-swapped-installation-was-never-checked-before-the-old-one-was-thrown-away)). A failed attempt no
+> longer leaves a recovery copy that refuses the next ([FIXED-830](FIXED_ITEMS.md#fixed-830--a-failed-update-left-a-recovery-copy-that-refused-the-next-attempt)). Stopping the
+> host safely is the existing hand-off (`update_handoff`).
 
 **Decision:** Supported desktop installers carry or install into an app-owned,
 versioned runtime and only the dependencies needed to run Raiker. Host Python or
@@ -2429,6 +2470,8 @@ symbols and tests rather than relying on line numbers that drift after edits.
    `outcome_unknown`, reconcile, then obtain an explicit retry decision if
    deduplication is unavailable. Fence stale workers and distinguish execution
    retry from notification retry. Do not promise general exactly-once delivery.
+   *2026-10-10 (second round):* scheduled runs are fenced — a worker whose
+   claim was taken settles nothing ([FIXED-833](FIXED_ITEMS.md#fixed-833--a-worker-whose-run-was-settled-under-it-could-still-write-its-outcome)).
 8. **Installer scope:** Base install supplies only Raiker's required runtime.
    Docker, Git, speech models, ffmpeg, GPU stacks, browsers and model weights are
    optional feature dependencies unless the release manifest proves otherwise.
@@ -2478,6 +2521,10 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > download size, notes and the staged update stay with DEC-17 step 7. The Git
 > credential row's "last use" closed ([FIXED-826](FIXED_ITEMS.md#fixed-826--the-git-credential-said-how-long-an-approval-lasts-and-never-when-it-was-used)); OAuth (DEC-21b) still waits on
 > the owner's registered application.
+>
+> **2026-10-10 (second round).** The Updates row closed: download size and
+> release notes from the signed index ([FIXED-832](FIXED_ITEMS.md#fixed-832--updates-offered-a-release-without-saying-how-large-it-was-or-what-it-changed)) and DEC-17 step 7's staged
+> update ([FIXED-828](FIXED_ITEMS.md#fixed-828--an-update-could-start-on-a-disk-it-would-fill), [FIXED-829](FIXED_ITEMS.md#fixed-829--a-swapped-installation-was-never-checked-before-the-old-one-was-thrown-away), [FIXED-831](FIXED_ITEMS.md#fixed-831--an-update-could-install-a-build-that-would-refuse-the-workspaces-data)).
 
 **Decision:** Retain the existing sections and keys where possible; add backed,
 testable behavior before adding controls. This supplements DEC-09..11 and covers
@@ -2742,6 +2789,14 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > for ever by a stopped host ([FIXED-825](FIXED_ITEMS.md#fixed-825--a-routine-a-stopped-host-left-running-never-ran-again)). Step 7 closed for the SBOM bound to
 > artifact digests ([FIXED-822](FIXED_ITEMS.md#fixed-822--a-release-published-no-sbom-and-nothing-bound-its-artifacts-to-their-inputs)) and a credential gate with owned, expiring
 > exceptions ([FIXED-823](FIXED_ITEMS.md#fixed-823--nothing-failed-a-change-that-committed-a-credential)); SAST and container scanning remain. Step 2 remains.
+>
+> **2026-10-10 (second round).** Step 2 closed as [FIXED-840](FIXED_ITEMS.md#fixed-840--nothing-bounded-what-the-owners-models-spent-in-total): one owner-wide
+> spending limit over a rolling 24 hours, read from the usage ledger every
+> surface writes at each turn's safe boundary, settled spend only, unpriced
+> models named; proving it live found [FIXED-841](FIXED_ITEMS.md#fixed-841--a-streamed-openrouter-turn-recorded-no-usage-so-every-cost-limit-read-it-as-free). Step 1's resource pressure
+> closed for disk as [FIXED-842](FIXED_ITEMS.md#fixed-842--a-disk-running-out-of-space-was-nowhere-on-the-health-surfaces). Step 7's SAST gate closed as [FIXED-835](FIXED_ITEMS.md#fixed-835--no-static-analysis-for-security-ran-on-any-change) (triage
+> found [FIXED-836](FIXED_ITEMS.md#fixed-836--a-utf-16-document-part-could-carry-the-dtd-the-attachment-check-refuses)) and the container definitions as [FIXED-837](FIXED_ITEMS.md#fixed-837--nothing-checked-the-container-definitions-raiker-builds); scanning the built
+> images remains ([BUG-329](TO_BE_FIXED.md#bug-329--built-container-images-are-not-scanned-for-vulnerabilities)).
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.

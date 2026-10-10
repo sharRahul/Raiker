@@ -1141,6 +1141,33 @@ class RuntimeOrchestrator:
             price = None
         spend.add(price, model, usage)
 
+    def _spend_limit_reached(self) -> tuple[float, Any] | None:
+        """DEC-24 step 2 — ``(limit, spent)`` when the owner's 24-hour limit is reached.
+
+        Read from the usage ledger every surface writes, so foreground turns,
+        routines and delegated work count against the same number. A limit that
+        cannot be read is no limit for this boundary rather than a failed turn:
+        the same storage would be needed to record the turn at all.
+        """
+        from raiker.runtime.spend_limit import owner_limit, reached, spend_in_window
+
+        store = getattr(self.tool_broker, "store", None)
+        principal_id = getattr(self.tool_broker, "principal_id", None)
+        if store is None or not principal_id:
+            return None
+        try:
+            limit = owner_limit(store, str(principal_id))
+            if limit is None:
+                return None
+            spend = spend_in_window(store, str(principal_id), raw_pricing=self._configured_pricing)
+        except Exception:  # noqa: BLE001 - see the docstring
+            return None
+        return (limit, spend.total) if reached(limit, spend) else None
+
+    def _configured_pricing(self, provider: str, model: str) -> Any:
+        profile = self.model_router.registry.resolve(provider, model)
+        return (getattr(profile, "raw", {}) or {}).get("pricing")
+
     def _cost_limit_reached(self, envelope: PromptEnvelope) -> Any | None:
         """The turn's spend when it has reached its cost limit, else ``None``."""
         spend = self._turn_spend.get(envelope.turn_id)
@@ -2877,6 +2904,28 @@ class RuntimeOrchestrator:
                 )
                 status = "failed"
                 message = cost_stopped(limit, spent.total)
+                break
+            # DEC-24 step 2 — the owner's one limit across every model and
+            # surface, read at the same boundary.
+            owner_spend = self._spend_limit_reached()
+            if owner_spend is not None:
+                from raiker.runtime.spend_limit import stopped_message as spend_stopped
+
+                owner_limit_usd, owner_spent = owner_spend
+                self._state(machine, envelope, "RESPONDING")
+                self._event(
+                    envelope,
+                    "turn_spend_limit_reached",
+                    {
+                        "limit_usd": owner_limit_usd,
+                        "spent_usd": float(owner_spent),
+                        "window_hours": 24,
+                        "boundary": "before_model_call",
+                        "tool_calls_made": tool_calls_made,
+                    },
+                )
+                status = "failed"
+                message = spend_stopped(owner_limit_usd, owner_spent)
                 break
             for pending in self._drain_sink():
                 yield pending

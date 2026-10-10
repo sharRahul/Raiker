@@ -243,6 +243,22 @@ class WeeklyUsage(TypedDict):
     providers: list[ProviderWeeklyUsage]
 
 
+class SpendLimitView(TypedDict):
+    """DEC-24 step 2 — the owner's one spending limit and what the window has spent."""
+
+    window: Literal["rolling_24_hours"]
+    #: ``None`` when no limit is set.
+    limit_usd: float | None
+    #: By the providers' token counts, priced at read time; a decimal string.
+    spent_usd: str
+    #: Models used in the window with no known price; their spend is not counted.
+    unpriced_models: list[str]
+    #: True when new model calls are being stopped at their next safe boundary.
+    reached: bool
+    min_usd: float
+    max_usd: float
+
+
 class WeeklyBudgetSet(TypedDict):
     ok: bool
     profile_id: str

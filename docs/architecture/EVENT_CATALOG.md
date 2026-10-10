@@ -38,6 +38,7 @@ human authorizer, runtime authority, or other literal actor.
 | `model_tool_calls_queued` | Tool calls held behind an approval boundary rather than dropped, with proposed/queued counts and the parked call's place in its batch. The calls are parked with the turn and drained one decision at a time on resume |
 | `turn_stopped` | A turn the owner ended early was honoured at a safe boundary — the reason, the boundary it stopped at, and how many tool calls it had made |
 | `turn_cost_limit_reached` | A routine run reached its own cost limit (DEC-12 step 6) and was stopped before the model was asked again — the limit, the spend by the provider's token counts, the boundary and how many tool calls it had made |
+| `turn_spend_limit_reached` | The owner's 24-hour spending limit across every model and surface was reached (DEC-24 step 2) and the turn was stopped before the model was asked again — the limit, the window's spend by the providers' token counts, the window, the boundary and how many tool calls it had made |
 | `turn_steered` | The owner's own instruction entered a running turn at a safe boundary (character count only; the instruction itself is a user message in the conversation) |
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |

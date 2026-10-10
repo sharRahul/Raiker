@@ -658,7 +658,27 @@ def _command_update(workspace: Path, args: argparse.Namespace) -> int:
         )
     except UpdateError as error:
         print(f"[raiker] Update refused: {error}", file=sys.stderr)
-        print("[raiker] Nothing about this installation was changed.", file=sys.stderr)
+        if str(error) == "update_health_check_failed_rollback_incomplete":
+            print(
+                "[raiker] The new version failed its check and could not be swapped back "
+                f"out. Restore the previous version with: raiker-app update --rollback "
+                f"{install.version}",
+                file=sys.stderr,
+            )
+        elif str(error) == "update_schema_incompatible":
+            print(
+                "[raiker] That release cannot open this workspace's data, which a newer "
+                "Raiker has already changed. Nothing about this installation was changed.",
+                file=sys.stderr,
+            )
+        elif str(error) == "update_health_check_failed":
+            print(
+                "[raiker] The new version failed its check after install and the previous "
+                "version was put back.",
+                file=sys.stderr,
+            )
+        else:
+            print("[raiker] Nothing about this installation was changed.", file=sys.stderr)
         return 2
     print(f"[raiker] Installed {result.version}. Previous version kept at {result.recovery_point}.")
     print("[raiker] Restart the host to run it: raiker-app quit && raiker-app")

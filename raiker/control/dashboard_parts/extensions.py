@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from raiker.channels.adapters import channel_capabilities
 from raiker.channels.revision import pairing_revision
 from raiker.control.dtos import ControlResult
 from raiker.control.views.extensions import (
@@ -633,6 +634,7 @@ class ExtensionService:
                     ]
                     if pairing is not None
                     else [],
+                    "capabilities": channel_capabilities(profile.channel_type),
                 }
             )
         return {

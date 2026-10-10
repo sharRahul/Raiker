@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api } from "../../api";
-  import type { ProviderWeeklyUsage, ProviderWeeklyUsageView } from "../../apiTypes";
+  import type { ProviderWeeklyUsage, ProviderWeeklyUsageView, SpendLimitView } from "../../apiTypes";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   import SubscriptionLimitStrip from "../../components/SubscriptionLimitStrip.svelte";
   import { providerName } from "../../format";
@@ -14,7 +14,55 @@
   let budgetDraft = $state("");
   let savingBudget = $state(false);
 
-  onMount(() => void load(false));
+  // DEC-24 step 2 — the one limit that is enforced: every model, every surface,
+  // the last 24 hours. The weekly token budgets below stay advisory.
+  let spend = $state<SpendLimitView | null>(null);
+  let limitDraft = $state("");
+  let editingLimit = $state(false);
+  let savingLimit = $state(false);
+  let limitError = $state<string | null>(null);
+
+  onMount(() => {
+    void load(false);
+    void loadSpend();
+  });
+
+  async function loadSpend() {
+    try {
+      spend = await api.spendLimit();
+    } catch {
+      limitError = "Raiker could not read the spending limit.";
+    }
+  }
+
+  function editLimit() {
+    limitDraft = spend?.limit_usd?.toString() ?? "";
+    limitError = null;
+    editingLimit = true;
+  }
+
+  async function saveLimit() {
+    const trimmed = limitDraft.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && (!Number.isFinite(next) || next < (spend?.min_usd ?? 0.01) || next > (spend?.max_usd ?? 10000))) {
+      limitError = `Enter an amount from $${spend?.min_usd ?? 0.01} to $${(spend?.max_usd ?? 10000).toLocaleString("en-US")}, or leave it empty for no limit.`;
+      return;
+    }
+    savingLimit = true;
+    limitError = null;
+    try {
+      spend = await api.setSpendLimit(next);
+      editingLimit = false;
+    } catch {
+      limitError = "Raiker could not save the spending limit.";
+    } finally {
+      savingLimit = false;
+    }
+  }
+
+  function dollars(value: string | number): string {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(Number(value));
+  }
 
   async function load(refreshNative: boolean) {
     error = null;
@@ -104,6 +152,46 @@
       {refreshing ? "Checking providers…" : "Refresh provider data"}
     </button>
   </div>
+
+  <section class="spend-limit" aria-labelledby="spend-limit-title" data-testid="spend-limit">
+    <div class="spend-copy">
+      <h3 id="spend-limit-title">Spending limit · every model, last 24 hours</h3>
+      <p>
+        Checked before every model call in Chat, Build, Design, routines and the work they
+        delegate. When it is reached, running work stops at its next safe boundary and new work
+        does not start until the window has room or you raise the limit.
+      </p>
+      {#if spend}
+        <p class="spend-now">
+          <strong>{dollars(spend.spent_usd)}</strong> spent
+          {#if spend.limit_usd !== null}of <strong>{dollars(spend.limit_usd)}</strong>{/if}
+          {#if spend.reached}<span class="hook-tag hook-tag-dead">Reached — model calls are stopped</span>{/if}
+        </p>
+        {#if spend.unpriced_models.length > 0}
+          <p class="quiet">
+            Not counted, because their price is unknown: {spend.unpriced_models.join(", ")}.
+            Set a price on Models to include them.
+          </p>
+        {/if}
+      {/if}
+    </div>
+    <div class="spend-actions">
+      {#if editingLimit}
+        <label>
+          <span class="sr-only">Spending limit in US dollars for the last 24 hours</span>
+          <input class="input" inputmode="decimal" placeholder="e.g. 5.00" bind:value={limitDraft} />
+        </label>
+        <button type="button" class="btn btn-primary btn-sm" onclick={() => void saveLimit()} disabled={savingLimit}>Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingLimit = false)}>Cancel</button>
+      {:else}
+        <span class="limit-value">{spend?.limit_usd != null ? dollars(spend.limit_usd) : "No limit"}</span>
+        <button type="button" class="btn btn-soft btn-sm" onclick={editLimit} disabled={spend === null}>
+          {spend?.limit_usd != null ? "Change" : "Set a limit"}
+        </button>
+      {/if}
+    </div>
+    {#if limitError}<p class="usage-error" role="alert">{limitError}</p>{/if}
+  </section>
 
   {#if error}<p class="usage-error" role="alert">{error}</p>{/if}
   {#if loading}
@@ -220,6 +308,14 @@
 
 <style>
   .usage-panel { margin-bottom: var(--space-5); }
+  .spend-limit { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin: var(--space-3) 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+  .spend-copy { flex: 1 1 320px; min-width: 0; }
+  .spend-copy h3 { margin: 0 0 var(--space-1); font-size: var(--text-sm); }
+  .spend-copy p { margin: 0 0 var(--space-1); font-size: var(--text-xs); color: var(--text-3); }
+  .spend-copy .spend-now { color: var(--text-2); font-size: var(--text-sm); display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+  .spend-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .spend-actions .input { width: 8rem; }
+  .limit-value { font-size: var(--text-sm); color: var(--text-1); }
   .ids { padding: 0 var(--space-3) var(--space-3); font-size: var(--text-2xs); color: var(--text-3); }
   .ids summary { cursor: pointer; }
   .ids dl { display: flex; gap: var(--space-2); margin: var(--space-1) 0 0; }

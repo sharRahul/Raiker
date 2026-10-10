@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**376 operations: 365 verified, 0 eligible, 0 deferred, 11 special.**
+**378 operations: 367 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -262,6 +262,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/models/chatgpt-codex/status` |  | CodexStatus | verified | declared CodexStatus |
 | GET | `/api/models/pricing` |  | ModelPricingView | verified | DashboardService.list_model_pricing |
 | POST | `/api/models/pricing/refresh` |  | PricingRefreshed | verified | declared by cast |
+| GET | `/api/models/spend-limit` |  | SpendLimitView | verified | _spend_limit_view |
+| PUT | `/api/models/spend-limit` | SpendLimitRequest | SpendLimitView | verified | _spend_limit_view |
 | GET | `/api/models/weekly-usage` |  | WeeklyUsage | verified | declared WeeklyUsage |
 | PUT | `/api/models/{profile_id}/available-models` | AvailableModelsRequest | AvailableModelsSet | verified | declared AvailableModelsSet |
 | PUT | `/api/models/{profile_id}/capacity` | dict | CapacitySet | verified | declared CapacitySet |

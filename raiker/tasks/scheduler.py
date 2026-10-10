@@ -361,6 +361,11 @@ class TaskScheduler:
         settled: list[str] = []
         for status in ("running", "continuing", "cancelling"):
             for task in self.store.list_tasks(status=status):
+                # DEC-12 step 4 — settling takes the claim, so a worker that is
+                # in fact still on this run (another host on the same
+                # workspace) settles nothing when it finishes.
+                if not self.store.fence_task_claim(task.task_id, task.claim_generation):
+                    continue
                 if status == "cancelling":
                     manager.cancel_task(
                         task.task_id, "Cancelled: Raiker stopped while this was being cancelled."
@@ -371,11 +376,31 @@ class TaskScheduler:
         return settled
 
     def _land_outcome(
-        self, manager: TaskManager, task_id: str, status: str, message: str
+        self,
+        manager: TaskManager,
+        task_id: str,
+        status: str,
+        message: str,
+        *,
+        claim: int | None = None,
     ) -> None:
-        """Record one governed turn's result on the task it belongs to."""
+        """Record one governed turn's result on the task it belongs to.
+
+        ``claim`` is the generation a scheduled run was claimed at (DEC-12 step
+        4). The result lands only if this worker still holds that claim; one
+        whose claim was taken — the run was settled, or claimed again, while it
+        was working — records nothing and says so in the log, because its
+        outcome would overwrite the state somebody else decided.
+        """
         task = self.store.load_task(task_id)
         if task is None or task.status == "cancelled":
+            return
+        if claim is not None and not self.store.fence_task_claim(task_id, claim):
+            _LOG.warning(
+                "scheduled task %s finished a run whose claim was taken; "
+                "its outcome was not recorded",
+                task_id,
+            )
             return
         outcome, summary = run_outcome(status, message)
         if is_repeating(task.recurrence) and task.scheduled_at:
@@ -464,6 +489,9 @@ class TaskScheduler:
             or not missed(task.scheduled_at, datetime.now(UTC))
         ):
             return False
+        # Settling the slot is settling the claim (DEC-12 step 4).
+        if not self.store.fence_task_claim(task.task_id, task.claim_generation):
+            return True
         self._rearm(
             TaskManager(self.store, EventLogWriter(self.store)),
             task,
@@ -508,6 +536,7 @@ class TaskScheduler:
                         "failed",
                         "This run stopped unexpectedly "
                         f"({type(exc).__name__}). You can run it again.",
+                        claim=task.claim_generation,
                     )
         return len(tasks)
 
@@ -609,7 +638,10 @@ class TaskScheduler:
         )
         if overran:
             manager = TaskManager(self.store, EventLogWriter(self.store))
-            self._land_outcome(manager, task.task_id, "failed", stopped_message(minutes))
+            self._land_outcome(
+                manager, task.task_id, "failed", stopped_message(minutes),
+                claim=task.claim_generation,
+            )
             return
         assert response is not None
         manager = TaskManager(self.store, EventLogWriter(self.store))
@@ -619,7 +651,10 @@ class TaskScheduler:
         # slot whatever one cycle did, so the summary says which it was —
         # otherwise a cycle that never ran reads exactly like one that
         # succeeded.
-        self._land_outcome(manager, task.task_id, response.status, response.message)
+        self._land_outcome(
+            manager, task.task_id, response.status, response.message,
+            claim=task.claim_generation,
+        )
 
 
 # How a governed turn's terminal status lands on the task the scheduler ran, and

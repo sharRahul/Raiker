@@ -135,3 +135,57 @@ describe("ProviderUsagePanel", () => {
     expect(screen.getByText("No API cost — local runtime.")).toBeInTheDocument();
   });
 });
+
+// DEC-24 step 2 — the one enforced limit: every model, the last 24 hours.
+describe("ProviderUsagePanel spending limit", () => {
+  const spend = (overrides: Record<string, unknown> = {}) => ({
+    window: "rolling_24_hours",
+    limit_usd: null,
+    spent_usd: "0.4200",
+    unpriced_models: [],
+    reached: false,
+    min_usd: 0.01,
+    max_usd: 10000,
+    ...overrides,
+  });
+
+  it("says what the last 24 hours spent and that no limit is set", async () => {
+    stubFetch({ "GET /api/models/weekly-usage": weekly, "GET /api/models/spend-limit": spend() });
+    render(ProviderUsagePanel);
+    const block = await screen.findByTestId("spend-limit");
+    await waitFor(() => expect(block).toHaveTextContent("$0.42 spent"));
+    expect(block).toHaveTextContent("No limit");
+    expect(block).toHaveTextContent(/Checked before every model call/);
+  });
+
+  it("names a reached limit and the models it could not count", async () => {
+    stubFetch({
+      "GET /api/models/weekly-usage": weekly,
+      "GET /api/models/spend-limit": spend({ limit_usd: 0.4, reached: true, unpriced_models: ["mystery"] }),
+    });
+    render(ProviderUsagePanel);
+    expect(await screen.findByText("Reached — model calls are stopped")).toBeInTheDocument();
+    expect(screen.getByText(/Not counted, because their price is unknown: mystery/)).toBeInTheDocument();
+  });
+
+  it("saves a limit, and refuses one outside its bounds without asking the server", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/models/weekly-usage": weekly,
+      "GET /api/models/spend-limit": spend(),
+      "PUT /api/models/spend-limit": spend({ limit_usd: 5 }),
+    });
+    render(ProviderUsagePanel);
+    await fireEvent.click(await screen.findByRole("button", { name: "Set a limit" }));
+    const input = screen.getByLabelText("Spending limit in US dollars for the last 24 hours");
+    await fireEvent.input(input, { target: { value: "0" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/Enter an amount from \$0.01/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(false);
+
+    await fireEvent.input(input, { target: { value: "5" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByTestId("spend-limit")).toHaveTextContent("$5.00"));
+    const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
+    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({ limit_usd: 5 });
+  });
+});

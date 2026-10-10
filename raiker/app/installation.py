@@ -460,3 +460,20 @@ def artifact_url(config: ChannelConfig, name: str) -> str:
     if not resolved.startswith(base):
         raise UpdateError("channel_artifact_name_invalid")
     return resolved
+
+
+def workspace_schema_generation(workspace: str | Path) -> int | None:
+    """The schema generation this workspace's database carries, or ``None`` unread.
+
+    A local header read (DEC-17 step 8). ``None`` is unknown — a store that
+    will not open — never "compatible". Shared by the Updates page, which says
+    which recovery point can open this data, and the updater, which refuses a
+    release that could not (DEC-17 step 7).
+    """
+    try:
+        from raiker.storage.sqlite import SQLiteStore
+        from raiker.storage.stores.migration_runner import schema_generation_of
+
+        return schema_generation_of(SQLiteStore(Path(workspace)).connect())
+    except Exception:  # noqa: BLE001 - unknown is the honest answer to any failure
+        return None

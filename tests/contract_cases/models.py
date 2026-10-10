@@ -364,6 +364,8 @@ CASES: Cases = {
     ("GET", "/api/models"): plain("/api/models"),
     ("GET", "/api/models/weekly-usage"): plain("/api/models/weekly-usage"),
     ("PUT", "/api/models/{profile_id}/weekly-budget"): _budget,
+    ("GET", "/api/models/spend-limit"): plain("/api/models/spend-limit"),
+    ("PUT", "/api/models/spend-limit"): plain("/api/models/spend-limit", {"limit_usd": 12.5}),
     ("GET", "/api/models/chatgpt-codex/status"): patched(plain("/api/models/chatgpt-codex/status"), _fake_codex),
     ("POST", "/api/models/chatgpt-codex/connection"): patched(
         plain("/api/models/chatgpt-codex/connection"), _fake_codex

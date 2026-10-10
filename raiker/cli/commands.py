@@ -568,9 +568,10 @@ def handle_plugins(*, workspace_root: str | Path = ".") -> str:
 def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command, posix=False)
     if len(parts) < 2:
-        return "Usage: /plugin-plan <manifest_path> [--install]"
+        return "Usage: /plugin-plan <manifest_path> [--install [--accept-permissions]]"
     path = Path(parts[1].strip("\"'"))
     install_flag = "--install" in parts
+    accept_flag = "--accept-permissions" in parts
     try:
         manifest = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -609,18 +610,50 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
     ]
     if contributions.get("refused"):
         lines.append(f"contributions_refused: {','.join(contributions['refused'])}")
+    # DEC-15 step 10 — an update is read against what is installed, so growth
+    # in authority is the first thing the owner sees rather than a list to diff
+    # by eye.
+    diff = None
+    if plan["plugin_id"]:
+        from raiker.plugins.policy import plugin_permission_diff
+
+        diff = plugin_permission_diff(
+            SQLiteStore(workspace_root), str(plan["plugin_id"]), list(plan["permissions"])
+        )
+        if diff.previous_version is not None:
+            lines.append(f"updates_installed_version: {diff.previous_version}")
+            lines.append(f"permissions_added: {','.join(diff.added) or 'none'}")
+            lines.append(f"permissions_removed: {','.join(diff.removed) or 'none'}")
+            if diff.authority_grows:
+                lines.append(
+                    "This update asks for more than the installed version. Installing it "
+                    "needs --install --accept-permissions, which accepts exactly the "
+                    "permissions listed above."
+                )
     if install_flag and plan["status"] != "denied":
         # GEP-04 — the install is a governed action, never a direct
         # `record_plugin_install`, which would skip the `plugin_install` gate and
         # let the terminal install what the owner holds off on Capabilities.
         from raiker.control.service import RuntimeControlService
 
-        result = RuntimeControlService(workspace_root).install_plugin(None, str(path))
+        result = RuntimeControlService(workspace_root).install_plugin(
+            None,
+            str(path),
+            accepted_permissions=(
+                list(plan["permissions"]) if accept_flag and diff is not None and diff.authority_grows else None
+            ),
+        )
         if not result.ok:
             if result.reason_code == "disabled_by_capability_gate":
                 lines.append(
                     "Install denied: the Plugin install capability is off. Turn on "
                     "**Plugin install** in Capabilities and run this again."
+                )
+            elif result.reason_code == "plugin_permissions_grew_unreviewed":
+                lines.append(
+                    "Install held: this update asks for "
+                    + ", ".join(result.data.get("permissions_added", []) or ["new permissions"])
+                    + ". Review them above and run again with --accept-permissions."
                 )
             else:
                 lines.append(f"Install denied: {result.reason_code}")

@@ -220,6 +220,7 @@ import type {
   WebBlocklist,
   WebBlocklistRule,
   WeeklyUsage,
+  SpendLimitView,
   WorkInFlight,
   WorkThreadFacet,
   WorkThreadPage,
@@ -392,6 +393,9 @@ export type SubscriptionLimits = SubscriptionLimitsView;
 export type { ProviderWeeklyUsage };
 
 export type ProviderWeeklyUsageView = WeeklyUsage;
+
+/** DEC-24 step 2 — the owner's one spending limit across every model and surface. */
+export type { SpendLimitView };
 
 /** Read-only status of one governed service connector (web-app task 4). Every
  * field derives from stored/config state — the view never reaches the network

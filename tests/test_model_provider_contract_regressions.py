@@ -440,3 +440,30 @@ def test_health_answers_every_provider_state_it_can_classify() -> None:
             assert health.available is False
             assert health.enabled_for_runtime is False
             assert health.detail == expected, (status, body, provider.provider)
+
+
+def test_a_usage_block_on_the_last_choice_chunk_is_kept() -> None:
+    """OpenRouter sends usage on the chunk carrying the finish, not on its own.
+
+    Dropping it there left the turn with no recorded usage, so every cost limit
+    read an OpenRouter turn as free (2026-10-10 live round).
+    """
+    body = (
+        'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n'
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}],'
+        '"usage":{"prompt_tokens":120,"completion_tokens":7,"total_tokens":127}}\n\n'
+        "data: [DONE]\n\n"
+    )
+    provider = openai_provider(lambda _: httpx.Response(200, text=body), provider="openrouter")
+    events = run(collect(provider.stream_chat(request())))
+    usage = [event.metadata["usage"] for event in events if event.event_type == "usage"]
+    assert usage == [{"prompt_tokens": 120, "completion_tokens": 7, "total_tokens": 127}]
+    assert [event.finish_reason for event in events if event.event_type == "finish"] == ["stop"]
+    run(provider.aclose())
+
+
+def test_openrouter_streams_ask_for_usage() -> None:
+    provider = openai_provider(lambda _: httpx.Response(200, json={}), provider="openrouter")
+    payload = provider._payload(request(), stream=True)
+    assert payload["stream_options"] == {"include_usage": True}
+    run(provider.aclose())

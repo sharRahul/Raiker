@@ -158,7 +158,7 @@
     // "is this browser still signed in?" has an answer, and only the server can
     // give it.
     void api.restoreSession().then((principalId) => {
-      if (principalId !== null) onAuthenticated(principalId);
+      if (principalId !== null) onAuthenticated();
     });
     desktopNavigationOpen = localStorage.getItem("raiker.navigation.desktop") !== "false";
     const navigationQuery = typeof window.matchMedia === "function"
@@ -230,7 +230,7 @@
   });
 
   // Called by the lock screen once a full control session exists.
-  function onAuthenticated(_principalId: string) {
+  function onAuthenticated() {
     principal = "you";
     authState = "verifying";
     void api

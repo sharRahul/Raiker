@@ -901,6 +901,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-877](#fixed-877--a-retry-proposed-its-sentence-as-a-second-identical-memory) | Low | Memory | Fixed 2026-10-11 — found by the live round |
 | [FIXED-878](#fixed-878--the-mcp-secrets-box-closed-under-the-field-being-typed-into) | Low | MCP / interface | Fixed 2026-10-11 — found by the live round |
 | [FIXED-879](#fixed-879--the-mcp-card-and-the-runtime-card-printed-raw-iso-times) | Low | Interface / dates | Fixed 2026-10-11 — found by the live round |
+| [FIXED-880](#fixed-880--the-web-client-did-not-load-over-plain-http-to-a-lan-address) | High | Interface / start-up | Fixed 2026-10-11 — found by the Web UI workflow |
 
 ---
 
@@ -32785,3 +32786,22 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 **Fixed.** Both go through `formatTimestamp`, the owner's date format.
 
 **Evidence.** `McpView.test.ts`, `Runtime.test.ts`; live at 390 wide ([10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)).
+
+## FIXED-880 — The web client did not load over plain http to a LAN address
+
+**Severity: High. Area: Interface / start-up. Status: Fixed 2026-10-11 — found by the Web UI workflow.**
+
+**Observed.** After FIXED-875 numbered every stop and steer, the tab named
+itself with `crypto.randomUUID()` as `api.ts` loaded. Browsers offer
+`randomUUID` only in a secure context — https, or `localhost` — so opening
+Raiker at `http://192.168.x.x:8765` threw before anything was drawn and the
+page stayed blank. The mocked end-to-end suite, served from
+`http://raiker.test`, failed sixteen tests at the sign-in screen for the same
+reason; the live round, on `127.0.0.1`, could not see it.
+
+**Fixed.** The tab's name is eight bytes from `crypto.getRandomValues`, which
+every context has, in the same `web-` and sixteen hex digits form.
+
+**Evidence.** `controlSequence.test.ts` loads the client with no `randomUUID`
+and fails without the fix; the mocked end-to-end suite passes.
+

@@ -47,8 +47,14 @@ const SET_DECISION_MODE = {
   deny: contract.denyCapability,
 } as const;
 
-/** This tab's name for itself when it sends a control command (DEC-22). */
-const CONTROL_CLIENT_ID = `web-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+/**
+ * This tab's name for itself when it sends a control command (DEC-22).
+ * `getRandomValues`, not `randomUUID`: the latter exists only in a secure
+ * context, and Raiker is also opened over plain http on a LAN address.
+ */
+const CONTROL_CLIENT_ID = `web-${Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) =>
+  byte.toString(16).padStart(2, "0"),
+).join("")}`;
 let controlSequence = 0;
 
 /** The next number in this tab's count of control commands. */

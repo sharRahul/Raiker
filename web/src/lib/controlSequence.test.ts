@@ -24,4 +24,11 @@ describe("control command sequence", () => {
     expect(body.client_id).toMatch(/^web-/);
     expect(Number.isInteger(body.client_sequence)).toBe(true);
   });
+
+  it("loads where randomUUID does not exist, as on plain http to a LAN address", async () => {
+    vi.resetModules();
+    vi.stubGlobal("crypto", { getRandomValues: crypto.getRandomValues.bind(crypto) });
+    const fresh = await import("./api");
+    expect(fresh.nextControlSequence().client_id).toMatch(/^web-[0-9a-f]{16}$/);
+  });
 });

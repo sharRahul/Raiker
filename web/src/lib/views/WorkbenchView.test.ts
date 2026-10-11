@@ -93,6 +93,8 @@ function routes(overrides: Record<string, unknown> = {}) {
     // issues from it. The default is now a readiness check that actually
     // answers, and the failure is a case of its own below.
     "GET /api/diagnostics": DIAGNOSTICS,
+    // DEC-02 — the server's attention feed, read whole and empty by default.
+    "GET /api/attention": { items: [], unknown: [] },
     "GET /api/projects": {
       projects: [
         {
@@ -358,6 +360,48 @@ describe("WorkbenchView", () => {
     expect(within(rail).queryByText("Blocked work")).toBeNull();
     // And the run is still on the board, with its Stop control.
     expect(await screen.findByText("Running now")).toBeInTheDocument();
+  });
+
+  // DEC-02 — what has no tile of its own comes from the server's feed.
+  it("lists what else waits on the owner from the server's feed", async () => {
+    stubFetch(routes({
+      "GET /api/attention": {
+        items: [
+          {
+            id: "memory:proposals", severity: "waiting", title: "2 proposed memories to review",
+            reason: "Raiker does not recall a proposal until you approve it.",
+            origin_kind: "memory_proposals", origin_id: null, href: "#/memory?tab=suggestions",
+            action_label: "Review proposals", since: "2026-10-11T09:00:00Z",
+          },
+          {
+            id: "approvals:pending", severity: "blocking", title: "duplicate of the tile",
+            reason: "", origin_kind: "approvals", origin_id: null, href: "#/approvals",
+            action_label: "Review approvals", since: null,
+          },
+        ],
+        unknown: [],
+      },
+    }));
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    const feed = await within(rail).findByRole("list", { name: "Also waiting on you" });
+    expect(within(feed).getByText("2 proposed memories to review")).toBeInTheDocument();
+    expect(within(feed).getByRole("link", { name: "Review proposals" })).toHaveAttribute(
+      "href", "#/memory?tab=suggestions",
+    );
+    // Approvals keep their own tile; the feed does not repeat them.
+    expect(within(feed).queryByText("duplicate of the tile")).toBeNull();
+    expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
+  });
+
+  it("does not call an unread subsystem clear", async () => {
+    stubFetch(routes({ "GET /api/attention": { items: [], unknown: ["messaging"] } }));
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText(/could not read messaging/)).toBeInTheDocument();
+    expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
   });
 
   it("brings a tile back the moment work is actually blocked", async () => {

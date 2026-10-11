@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatTimestamp } from "../format";
   import { onMount } from "svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
@@ -364,6 +365,57 @@
     }
   }
 
+  // DEC-15 step 2 — a secret one local server is given, held in the vault and
+  // started with that server only. The page sends a value and only ever reads
+  // names back.
+  let secretName = $state<Record<string, string>>({});
+  // Whether each server's secrets box is open, once the owner has opened or
+  // closed it, so typing into it never recomputes it closed.
+  let secretsOpen = $state<Record<string, boolean>>({});
+  let secretValue = $state<Record<string, string>>({});
+
+  async function giveSecret(server: McpServer) {
+    const name = (secretName[server.server_id] ?? "").trim();
+    const value = secretValue[server.server_id] ?? "";
+    if (!name || !value) return;
+    busy = server.server_id;
+    error = null;
+    notice = null;
+    try {
+      await api.setMcpServerSecret(server.server_id, name, value);
+      secretName = { ...secretName, [server.server_id]: "" };
+      secretValue = { ...secretValue, [server.server_id]: "" };
+      notice = `${server.name} is started with ${name} from now on. No other server is given it.`;
+      await load();
+    } catch (e) {
+      const code = e instanceof ApiError ? e.reasonCode : null;
+      error =
+        code === "mcp_secret_name_invalid"
+          ? "A variable name is capital letters, digits and underscores, starting with a letter."
+          : code === "mcp_secret_name_reserved"
+            ? `${name} is set by Raiker for every server, so it cannot be a secret.`
+            : reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function takeSecret(server: McpServer, name: string) {
+    if (!confirm(`Take ${name} away from “${server.name}”? Its next start goes without it.`)) return;
+    busy = server.server_id;
+    error = null;
+    notice = null;
+    try {
+      await api.removeMcpServerSecret(server.server_id, name);
+      notice = `${name} was removed from ${server.name}.`;
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
   async function contain(server: McpServer) {
     busy = server.server_id;
     error = null;
@@ -585,7 +637,7 @@
           {#if s.transport === "http"}
             <div><dt>Destination</dt><dd>{networkClassLabel(s.endpoint_url)}</dd></div>
           {/if}
-          <div><dt>Last connected</dt><dd>{s.last_connected_at ?? "Never"}</dd></div>
+          <div><dt>Last connected</dt><dd>{s.last_connected_at ? formatTimestamp(s.last_connected_at) : "Never"}</dd></div>
           <!-- BUG-234 — which revision of the Model Context Protocol this
                server agreed to. Nothing said it before, so "why will this
                server not connect" had no answer on the page. -->
@@ -600,10 +652,67 @@
           <details class="scope" open={!s.last_connected_at}>
             <summary>What it can reach</summary>
             <dl>
-              {#each scopeLines(s.scope) as line (line.label)}
+              {#each scopeLines(s.scope, s.vault_env ?? []) as line (line.label)}
                 <div class:caution={line.caution}><dt>{line.label}</dt><dd>{line.value}</dd></div>
               {/each}
             </dl>
+          </details>
+        {/if}
+        <!-- DEC-15 step 2 — secrets from the vault for this server only. -->
+        {#if s.transport !== "http"}
+          <details
+            class="scope vault-env"
+            open={secretsOpen[s.server_id] ?? (s.vault_env ?? []).length > 0}
+            ontoggle={(event) => (secretsOpen = { ...secretsOpen, [s.server_id]: event.currentTarget.open })}
+          >
+            <summary>Secrets for this server ({(s.vault_env ?? []).length})</summary>
+            <p class="muted">
+              Kept in the encrypted vault and given to this server when Raiker starts it — no other
+              server, and never shown again. Raiker replaces each one in what the server writes back.
+            </p>
+            {#if (s.vault_env ?? []).length}
+              <ul class="vault-names">
+                {#each s.vault_env ?? [] as name (name)}
+                  <li>
+                    <code>{name}</code>
+                    <button
+                      class="btn btn-sm"
+                      type="button"
+                      onclick={() => takeSecret(s, name)}
+                      disabled={busy === s.server_id}
+                      aria-label={`Remove ${name} from ${s.name}`}
+                    >Remove</button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            <form
+              class="vault-form"
+              onsubmit={(event) => { event.preventDefault(); void giveSecret(s); }}
+            >
+              <label>Variable name
+                <input
+                  value={secretName[s.server_id] ?? ""}
+                  oninput={(event) => (secretName = { ...secretName, [s.server_id]: event.currentTarget.value })}
+                  placeholder="WEATHER_API_KEY"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <label>Value
+                <input
+                  type="password"
+                  value={secretValue[s.server_id] ?? ""}
+                  oninput={(event) => (secretValue = { ...secretValue, [s.server_id]: event.currentTarget.value })}
+                  autocomplete="new-password"
+                />
+              </label>
+              <button
+                class="btn btn-sm"
+                type="submit"
+                disabled={busy === s.server_id || !(secretName[s.server_id] ?? "").trim() || !(secretValue[s.server_id] ?? "")}
+              >Give to this server</button>
+            </form>
           </details>
         {/if}
         <div class="tools">
@@ -862,4 +971,8 @@
   @media (max-width: 40rem) {
     .offer-list > li { flex-direction: column; align-items: stretch; }
   }
+  .vault-names { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: 0.3rem; }
+  .vault-names li { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .vault-form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-end; }
+  .vault-form label { display: grid; gap: 0.2rem; font-size: var(--text-sm); min-width: 0; flex: 1 1 12rem; }
 </style>

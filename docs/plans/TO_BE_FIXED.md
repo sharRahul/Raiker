@@ -132,6 +132,8 @@ names.
 | [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
 | [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open — CRLF fixtures, a `\\?\` path prefix and a receipt race; not caused by a code change |
 | [BUG-331](#bug-331--setups-model-step-waits-on-every-providers-check-before-it-shows-anything) | Low | First run / Models | Open — found 2026-10-11; about five seconds of *Preparing your setup…* on a reload |
+| [BUG-332](#bug-332--setup-calls-an-identity-linked-anthropic-key-connected-and-offers-models-it-cannot-list) | Low | First run / Models | Open — found 2026-10-11; the key is stored, the workspace ID is missing, and the recommendation says *choose one of its models* |
+| [BUG-333](#bug-333--a-stopped-openai-compatible-stream-records-no-usage) | Low | Models / usage | Open — found 2026-10-11 closing FIXED-872; those providers report usage only when the stream ends |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2543,6 +2545,50 @@ lost and the step is correct once it appears.
 provider rows as `/api/models` answers, with each row's own loading state;
 measure where `/api/models` spends the time (local runtime probes, catalogue
 reads) before deciding whether any of it belongs in the background.
+
+## BUG-332 — Setup calls an identity-linked Anthropic key connected and offers models it cannot list
+
+**Severity: Low. Area: First run / Models. Status: Open — found 2026-10-11 in
+the live round.**
+
+**Observed.** With the identity-linked `sk-ant-usr-…` key entered through
+setup's Anthropic field, the model step's recommendation read *Anthropic is
+connected — Choose one of its models as your default*. **Choose a model** opened
+the Anthropic row, which correctly said the key needs its workspace ID before
+it can act; no model could be chosen. The row explains the key correctly, as
+the 2026-10-10 round also found; only the recommendation disagrees.
+
+**Effect.** The first thing the step recommends cannot be done. The owner has
+to read the row below to learn why.
+
+**Proposed fix.** Derive the recommendation from the connection's readiness,
+not from a stored key: a connection whose last check is
+`anthropic_workspace_required` recommends *Add the workspace ID* with the
+field focused, and offers another provider beside it.
+
+**Owner input needed for the live check.** The workspace ID for the supplied
+key, so a round can prove an Anthropic turn end to end.
+
+## BUG-333 — A stopped OpenAI-compatible stream records no usage
+
+**Severity: Low. Area: Models / usage. Status: Open — found 2026-10-11 closing
+FIXED-872.**
+
+**Observed.** FIXED-872 records what a provider had counted when the owner
+stops a streamed turn. Anthropic says the input cost as the stream opens.
+OpenAI, OpenRouter and Ollama report usage only in the final chunk
+(`stream_options.include_usage`), so a turn stopped before it is still recorded
+as nothing.
+
+**Effect.** Every spending limit under-counts a stopped turn on those providers
+by the prompt it was sent and the part of the answer it produced.
+
+**Proposed fix.** On a stopped stream with no provider count, record the input
+as an *estimate* from the request (marked as such in the ledger so it is never
+read as settled), and reconcile it if the provider's usage endpoint later
+reports the call. Requires an `estimated` column and a decision on whether
+estimated spend counts against the owner-wide limit (DEC-24 step 2 says to
+separate estimated from settled usage).
 
 ## Decision statements added 2026-10-05
 

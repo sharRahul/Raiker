@@ -208,11 +208,15 @@ def post_url(
     headers: dict[str, str] | None = None,
     max_bytes: int = 64_000,
     timeout: float = 10.0,
+    keep_body: bool = False,
 ) -> dict:
     """POST ``payload`` to ``url`` only if its host matches ``egress_allowlist``.
 
     An empty/absent allowlist denies all egress (fail closed). Returns
-    response-size metadata only — never the response body. ``headers`` are sent
+    response-size metadata only — never the response body — unless the caller
+    asks for it with ``keep_body``, in which case the bounded bytes come back
+    under ``body`` for the caller to read one field from and drop (a channel
+    reads the provider's message id; DEC-14 step 7). ``headers`` are sent
     verbatim and never returned or logged, so a signature or an owner token can
     be attached without either leaking into the result.
     """
@@ -240,7 +244,12 @@ def post_url(
             status_code = resp.status if hasattr(resp, "status") else 200
     except Exception as exc:
         raise SandboxError(f"delivery_failed:{type(exc).__name__}") from None
-    return {"status": status_code, "sent_bytes": len(payload), "response_bytes": len(data[:max_bytes])}
+    answer: dict = {
+        "status": status_code, "sent_bytes": len(payload), "response_bytes": len(data[:max_bytes]),
+    }
+    if keep_body:
+        answer["body"] = bytes(data[:max_bytes])
+    return answer
 
 
 def post_json(

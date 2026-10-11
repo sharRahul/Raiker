@@ -31,6 +31,7 @@ from raiker.api.schemas import (
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.channels import (
     ApprovalRelayAnswered,
+    ChannelDeliveryReviewed,
     ChannelDestinationSet,
     ChannelEnabledSet,
     ChannelInboundAccepted,
@@ -465,6 +466,26 @@ async def unpair_channel(
     return serialize_dto(answer)
 
 
+@router.post("/api/channels/deliveries/{receipt_id}/reviewed")
+async def mark_channel_delivery_reviewed(
+    receipt_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-14 step 7 — take a failed or unknown delivery off the review list.
+
+    Nothing is sent: a delivery that may already have arrived is the owner's to
+    follow up, not Raiker's to repeat.
+    """
+    result = _service(request).mark_channel_delivery_reviewed(
+        auth_data[0].principal_id, receipt_id
+    )
+    if not result.ok:
+        raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
+    answer = cast(ChannelDeliveryReviewed, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
 @router.post("/api/channels/deliver-test")
 async def deliver_channel_test(
     body: ChannelTestDeliveryRequest,
@@ -505,6 +526,50 @@ def _require_channel_secret(presented: str | None) -> None:
         raise refusal(status.HTTP_401_UNAUTHORIZED, "invalid_channel_secret")
 
 
+#: DEC-14 step 5 — how far a signed message's timestamp may be from this
+#: host's clock, either way, before it is refused as a replay or a forgery.
+INBOUND_SIGNATURE_WINDOW_SECONDS = 300
+_SIGNATURE = re.compile(r"^sha256=[0-9a-f]{64}$")
+
+
+def inbound_signature_required() -> bool:
+    """The owner asked for every webhook message to be signed."""
+    return os.environ.get("RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+def _verify_inbound_signature(timestamp: str | None, signature: str, raw: bytes) -> str:
+    """DEC-14 step 5 — verify a signed webhook message; return its replay key.
+
+    ``X-Raiker-Signature: sha256=<hex>`` is HMAC-SHA256 over
+    ``<X-Raiker-Timestamp>.<raw body>`` keyed by the inbound secret, which a
+    signed sender never has to put on the wire. The timestamp must be within
+    five minutes of this host's clock, and the signature is then claimed once
+    like a provider event id, so the same signed message sent again is a
+    repeat, never a second message.
+    """
+    secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
+    if not secret:
+        raise refusal(status.HTTP_503_SERVICE_UNAVAILABLE, "channel_inbound_disabled")
+    if not _SIGNATURE.fullmatch(signature) or not (timestamp or "").isdigit():
+        raise refusal(status.HTTP_401_UNAUTHORIZED, "channel_signature_invalid")
+    expected = hmac.new(
+        secret.encode("utf-8"), f"{timestamp}.".encode() + raw, hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(signature, f"sha256={expected}"):
+        raise refusal(status.HTTP_401_UNAUTHORIZED, "channel_signature_invalid")
+    if abs(time.time() - int(timestamp or "0")) > INBOUND_SIGNATURE_WINDOW_SECONDS:
+        raise refusal(status.HTTP_401_UNAUTHORIZED, "channel_signature_expired")
+    return f"sig:{expected[:48]}"
+
+
+async def _signed_bytes(request: Request) -> bytes:
+    """The exact bytes a signature covers — the body as it arrived, already
+    read and bounded by the ingress limit before the JSON was parsed."""
+    return await request.body()
+
+
 @router.post("/api/channels/{connector_id}/inbound")
 async def receive_inbound(
     connector_id: str,
@@ -512,15 +577,32 @@ async def receive_inbound(
     request: Request,
     x_raiker_channel_secret: str | None = Header(default=None),
     idempotency_key: str | None = Header(default=None),
+    x_raiker_timestamp: str | None = Header(default=None),
+    x_raiker_signature: str | None = Header(default=None),
 ) -> dict[str, Any]:
     """One message on the reference webhook.
 
     DEC-14 step 4 — a caller that may re-send sends ``Idempotency-Key``; a
     repeat of a message already accepted under it is answered with the first
     message's receipt and runs nothing.
+
+    DEC-14 step 5 — a caller may sign instead of presenting the secret:
+    ``X-Raiker-Timestamp`` and ``X-Raiker-Signature``, verified before routing,
+    within five minutes, once. With
+    ``RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE`` set, an unsigned message is
+    refused.
     """
-    _require_channel_secret(x_raiker_channel_secret)
     event_key: str | None = None
+    if x_raiker_signature is not None:
+        event_key = _verify_inbound_signature(
+            x_raiker_timestamp, x_raiker_signature, await _signed_bytes(request)
+        )
+    elif inbound_signature_required():
+        if not os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip():
+            raise refusal(status.HTTP_503_SERVICE_UNAVAILABLE, "channel_inbound_disabled")
+        raise refusal(status.HTTP_401_UNAUTHORIZED, "channel_signature_required")
+    else:
+        _require_channel_secret(x_raiker_channel_secret)
     if idempotency_key is not None:
         if not _EVENT_KEY.fullmatch(idempotency_key):
             raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "idempotency_key_invalid")

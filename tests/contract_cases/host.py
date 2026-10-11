@@ -150,6 +150,11 @@ def _enable_environment(_ws: Path, client: TestClient, h: dict[str, str]) -> Cal
     return f"/api/execution-environments/{_ssh_profile(client, h)}/enabled", {"enabled": False}
 
 
+def _remove_environment(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """DEC-11 step 6 — removing a configured environment nothing depends on."""
+    return f"/api/execution-environments/{_ssh_profile(client, h)}"
+
+
 def _reset(_ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     """The default container is the boundary that persists across a session's commands."""
     return "/api/execution-environments/container_default/reset", {
@@ -266,6 +271,7 @@ CASES: Cases = {
     ("POST", "/api/execution-environments/{profile_id}/probe"): patched(_probe, _measured),
     ("PUT", "/api/execution-environments/{profile_id}/enabled"): patched(_enable_environment, _measured),
     ("POST", "/api/execution-environments/{profile_id}/reset"): patched(_reset, _measured),
+    ("DELETE", "/api/execution-environments/{profile_id}"): patched(_remove_environment, _measured),
     ("POST", "/api/prompts"): plain("/api/prompts", {"text": "hello", "surface": "chat"}),
     ("POST", "/api/interrupts"): _interrupt,
     ("POST", "/api/stop-all"): _stop_all,

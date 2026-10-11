@@ -100,6 +100,9 @@ class TurnView(View):
     # was, and two implementations of it would eventually disagree. Empty for
     # every answer that declared nothing, which is nearly all of them.
     content_parts: tuple[ContentPartView, ...] = ()
+    # DEC-22 step 3 — the earlier turn of this conversation this one asked
+    # again, when it was a Retry. The source turn is kept as it was.
+    retry_of_turn_id: str | None = None
 
 
 @dataclass(frozen=True)

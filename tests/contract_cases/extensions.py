@@ -160,6 +160,21 @@ def _mcp_server(client: TestClient, h: dict[str, str]) -> str:
     return str(created.json()["server_id"])
 
 
+def _mcp_secret(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """DEC-15 step 2 — a server holding one secret, to list or remove."""
+    server_id = _mcp_server(client, h)
+    given = client.put(
+        f"/api/mcp/servers/{server_id}/secrets/WEATHER_KEY", json={"value": "contract-value"}, headers=h
+    )
+    assert given.status_code == 200, given.text
+    return f"/api/mcp/servers/{server_id}/secrets/WEATHER_KEY"
+
+
+def _mcp_secrets(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    path = _mcp_secret(ws, client, h)
+    return str(path).rsplit("/", 1)[0]
+
+
 def _on_mcp(suffix: str, body: Any = None) -> Seed:
     def seed(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
         path = f"/api/mcp/servers/{_mcp_server(client, h)}{suffix}"
@@ -339,6 +354,19 @@ def _channels(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/channels"
 
 
+def _failed_delivery(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    """DEC-14 step 7 — a delivery the destination refused, waiting for review."""
+    from raiker.storage.sqlite import SQLiteStore
+
+    SQLiteStore(ws).insert_channel_receipt(
+        receipt_id="act_contract", connector_id="channel.webhook", pairing_id=None,
+        direction="outbound", kind="message",
+        stages={"queued_at": utc_now(), "failed_at": utc_now()},
+        reason_code="delivery_failed:URLError",
+    )
+    return "/api/channels/deliveries/act_contract/reviewed"
+
+
 def _on_pairing(suffix: str, body: Any = None) -> Seed:
     def seed(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
         path = f"/api/channels/pairings/{_channel_pairing(ws)}{suffix}"
@@ -486,6 +514,11 @@ CASES: Cases = {
     ("PUT", "/api/mcp/servers/{server_id}"): _on_mcp("", {"name": "echo-two"}),
     ("DELETE", "/api/mcp/servers/{server_id}"): _on_mcp(""),
     ("POST", "/api/mcp/servers/{server_id}/connect"): _on_mcp("/connect"),
+    ("GET", "/api/mcp/servers/{server_id}/secrets"): _mcp_secrets,
+    ("PUT", "/api/mcp/servers/{server_id}/secrets/{name}"): _on_mcp(
+        "/secrets/WEATHER_KEY", {"value": "contract-value"}
+    ),
+    ("DELETE", "/api/mcp/servers/{server_id}/secrets/{name}"): _mcp_secret,
     ("POST", "/api/mcp/servers/{server_id}/pause"): _on_mcp("/pause", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/kill"): _on_mcp("/kill", {"reason": "contract"}),
     ("POST", "/api/mcp/servers/{server_id}/resume"): _on_mcp("/resume"),
@@ -529,6 +562,7 @@ CASES: Cases = {
     ),
     ("DELETE", "/api/channels/pairings/{pairing_id}"): _on_pairing(""),
     ("POST", "/api/channels/deliver-test"): patched(_deliver_test, _fake_channel_host),
+    ("POST", "/api/channels/deliveries/{receipt_id}/reviewed"): _failed_delivery,
     ("POST", "/api/channels/{connector_id}/inbound"): patched(_inbound, _inbound_secret),
     ("POST", "/api/channels/{connector_id}/telegram"): patched(_telegram, _inbound_secret),
     ("POST", "/api/channels/{connector_id}/approval-response"): patched(_approval_response, _inbound_secret),

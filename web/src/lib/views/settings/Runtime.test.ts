@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type { ExecutionEnvironmentsView } from "../../apiTypes";
 import Runtime from "./Runtime.svelte";
 
@@ -345,6 +345,81 @@ describe("Runtime turning a target off", () => {
     const card = within((await screen.findByText("Repository review")).closest("article")!);
     expect(card.getByText(/Off — nothing runs here/)).toBeInTheDocument();
     expect(card.getByRole("button", { name: "Turn on" })).toBeInTheDocument();
+  });
+});
+
+// Found by the 2026-10-11 live round: the runtime card printed a raw ISO time.
+describe("Runtime last changed", () => {
+  it("says when the runtime last changed as a local time, not an ISO string", async () => {
+    stubRuntime();
+    render(Runtime);
+    await screen.findByText("Repository review");
+    expect(screen.queryByText("2026-08-08T18:00:00Z")).toBeNull();
+  });
+});
+
+// DEC-11 step 6 — removing a target nothing depends on, or naming where work goes.
+describe("Runtime removing a target", () => {
+  it("removes a target that is not the default with no replacement", async () => {
+    stubRuntime();
+    const remove = vi.spyOn(api, "removeExecutionEnvironment").mockResolvedValue({
+      ok: true, profile_id: "container-review", removed: true, name: "Repository review",
+      selected_profile_id: null,
+    });
+    const asked: string[] = [];
+    vi.stubGlobal("confirm", (text: string) => { asked.push(text); return true; });
+    render(Runtime);
+
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    expect(localCard.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    await fireEvent.click(card.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("container-review", null));
+    expect(asked[0]).toMatch(/commands that ran here stay in the record/);
+    expect(await screen.findByText("Repository review was removed.")).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("names where work will run when the default is removed, and sends that choice", async () => {
+    stubRuntime();
+    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
+      ...view,
+      selected_profile_id: "container-review",
+      environments: [
+        { ...view.environments[0], selected: false },
+        { ...view.environments[1], selected: true, available: true, status: "ready" },
+      ],
+    });
+    const remove = vi.spyOn(api, "removeExecutionEnvironment").mockResolvedValue({
+      ok: true, profile_id: "container-review", removed: true, name: "Repository review",
+      selected_profile_id: "local_native",
+    });
+    const asked: string[] = [];
+    vi.stubGlobal("confirm", (text: string) => { asked.push(text); return true; });
+    render(Runtime);
+
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    await fireEvent.click(card.getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => expect(remove).toHaveBeenCalledWith("container-review", "local_native"));
+    expect(asked[0]).toMatch(/from now on it runs on Local workspace/);
+    vi.unstubAllGlobals();
+  });
+
+  it("says to turn it off first when commands still run there", async () => {
+    stubRuntime();
+    vi.spyOn(api, "removeExecutionEnvironment").mockRejectedValue(
+      new ApiError(409, "execution_environment_in_use", "conflict"),
+    );
+    vi.stubGlobal("confirm", () => true);
+    render(Runtime);
+
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    await fireEvent.click(card.getByRole("button", { name: "Remove" }));
+
+    expect(await screen.findByText(/still has commands running\. Turn it off first/)).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });
 

@@ -831,6 +831,7 @@ class SessionService:
             reasoning=row.get("reasoning_text"),
             tool_rows=self._turn_tool_rows(str(row["session_id"]), str(row.get("turn_id") or "")),
             content_parts=_stored_content_parts(row.get("summary")),
+            retry_of_turn_id=row.get("retry_of_turn_id"),
         )
 
     #: How a stored action's status reads as a transcript row. `proposed` is a

@@ -127,6 +127,16 @@ class MemoryService:
             )
             for e in entries
         ]
+        # DEC-13 step 3 — the review order, as named reasons the page can say.
+        from dataclasses import asdict, replace
+
+        from raiker.memory.review_priority import review_reasons
+
+        def _reviewed(view: MemoryControlView) -> MemoryControlView:
+            priority, reasons = review_reasons(asdict(view))
+            return replace(view, review_priority=priority, review_reasons=reasons)
+
+        views = [_reviewed(view) for view in views]
         if acting_principal_id:
             self.store.record_memory_lifecycle_event(
                 "workspace_memory_control",

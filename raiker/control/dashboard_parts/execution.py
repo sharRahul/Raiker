@@ -604,6 +604,76 @@ class ExecutionService:
             data={"profile_id": profile_id, "enabled": enabled, "stopped_runs": stopped},
         )
 
+    def remove_execution_environment(
+        self: DashboardService,
+        profile_id: str,
+        owner_principal_id: str,
+        *,
+        move_to: str | None = None,
+    ) -> ControlResult:
+        """Remove a configured environment (DEC-11 step 6).
+
+        "Deletion requires no active references or an explicit migration
+        choice." Two things can depend on a profile:
+
+        * **Commands still running there.** Removing the settings under them
+          would leave work nobody can name or stop from the page, so the answer
+          is ``execution_environment_in_use`` with the count — turning it off
+          stops them first.
+        * **It is where work runs by default.** Removing it would leave the
+          owner's choice pointing at nothing; the answer is
+          ``execution_environment_selected`` unless the owner names where work
+          should run instead, which is checked as a selection would be and made
+          before anything is removed.
+
+        What ran there — command records and cloud cost — stays as evidence.
+        """
+        existing = self.store.load_remote_execution_profile(
+            profile_id, owner_principal_id=owner_principal_id
+        )
+        if existing is None:
+            return ControlResult(ok=False, reason_code="unknown_execution_environment")
+        from raiker.execution.commands.models import TERMINAL_COMMAND_STATES
+        from raiker.execution.commands.service import CommandService
+
+        service = CommandService.for_workspace(self.workspace_root)
+        running = sum(
+            1
+            for run in service.store.list_runs(owner_principal_id, limit=500)
+            if run.profile_id == profile_id and run.state not in TERMINAL_COMMAND_STATES
+        )
+        if running:
+            return ControlResult(
+                ok=False,
+                reason_code="execution_environment_in_use",
+                data={"running_commands": running},
+            )
+        selected = self.store.selected_execution_environment(owner_principal_id) == profile_id
+        moved_to: str | None = None
+        if selected:
+            target = (move_to or "").strip()
+            if not target:
+                return ControlResult(ok=False, reason_code="execution_environment_selected")
+            if target == profile_id:
+                return ControlResult(ok=False, reason_code="execution_environment_move_to_itself")
+            chosen = self.select_execution_environment(target, owner_principal_id)
+            if not chosen.ok:
+                return chosen
+            moved_to = target
+        if not self.store.delete_remote_execution_profile(
+            profile_id, owner_principal_id=owner_principal_id
+        ):
+            return ControlResult(ok=False, reason_code="unknown_execution_environment")
+        return ControlResult(
+            ok=True,
+            data={
+                "profile_id": profile_id,
+                "removed": True,
+                "name": str(existing.get("name") or ""),
+                "selected_profile_id": moved_to,
+            },
+        )
+
     def reset_execution_environment(
         self: DashboardService, profile_id: str, session_id: str, *, recreate: bool, owner_principal_id: str
     ) -> ControlResult:

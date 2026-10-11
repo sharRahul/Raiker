@@ -135,14 +135,25 @@ RECOVERY_MATRIX: tuple[RecoveryRow, ...] = (
         label="Messaging channels",
         source_of_truth="Each message's receipt and audit event, written before any route runs.",
         claim="A message is handled inside the request that delivered it.",
-        after_restart="A message whose request did not finish was not acknowledged, so the sender may send it again.",
+        after_restart=(
+            "A message whose request did not finish was not acknowledged, so the sender may send "
+            "it again. A delivery Raiker was sending when it stopped is settled at start as "
+            "outcome unknown and put on the channel's review list."
+        ),
         uncertain_effects=(
-            "A resend is a new message; an echo of Raiker's own reply or a third repeat is refused "
-            "before routing. A failed notice is recorded as Delivery failed, not re-sent."
+            "A resend of the same provider event gets the first receipt and runs nothing; an echo "
+            "of Raiker's own reply or a third repeat is refused before routing. A delivery that "
+            "failed or whose outcome is unknown is never sent again on its own; a webhook "
+            "delivery carries its receipt id as Idempotency-Key for a receiver that deduplicates."
         ),
         cleanup="Pause keeps receiving and recording, and starts and sends nothing.",
-        owner_action="Pause or turn off the channel; read its receipts.",
+        owner_action=(
+            "Pause or turn off the channel; read its receipts; mark a failed delivery reviewed "
+            "once it is followed up."
+        ),
         anchors=(
+            "raiker.storage.sqlite:SQLiteStore.settle_unsettled_outbound_receipts",
+            "raiker.storage.sqlite:SQLiteStore.mark_channel_receipt_reviewed",
             "raiker.api.routes_channels:_loop_reason",
             "raiker.control.service:RuntimeControlService.set_channel_paused",
             "raiker.storage.sqlite:SQLiteStore.record_task_delivery",

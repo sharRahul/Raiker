@@ -751,8 +751,17 @@ class McpConnectorExecutor:
         reason = self._validate_command(command)
         if reason is not None:
             return self._fail(action.action_id, reason)
+        # DEC-15 step 2 — the secrets the owner gave this server, and only
+        # this server, added to its constructed environment.
+        from raiker.runtime.mcp_secrets import secret_env
+
+        secrets = secret_env(
+            self._store, principal_id, self._resolve_server_id(action, principal_id, command)
+        )
         try:
-            responses, bytes_in, bytes_out = self._run_session(command, requests, timeout, ctx)
+            responses, bytes_in, bytes_out = self._run_session(
+                command, requests, timeout, ctx, secrets=secrets
+            )
         except SandboxError as exc:
             self._observe_failure(action, principal_id, ctx)
             return self._fail(action.action_id, str(exc))
@@ -1252,8 +1261,14 @@ class McpConnectorExecutor:
         requests: list[dict[str, Any]],
         timeout: float,
         ctx: _SessionCtx | None = None,
+        *,
+        secrets: dict[str, str] | None = None,
     ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded, non-interactive JSON-RPC stdio session.
+
+        ``secrets`` are this server's own (DEC-15 step 2): added to its
+        environment, and replaced in what it writes back before anything reads
+        it, so a server that echoes its token hands nobody the token.
 
         All requests are written up front; stdin is then closed so the local
         server drains, responds, and exits. Responses are matched back by id.
@@ -1271,7 +1286,7 @@ class McpConnectorExecutor:
                 # SEC-MCP-01 — constructed, never inherited. Omitting `env`
                 # hands the child every variable Raiker was started with,
                 # provider keys included.
-                env=mcp_stdio_env(),
+                env={**mcp_stdio_env(), **(secrets or {})},
                 timeout=timeout,
             )
         except FileNotFoundError:
@@ -1284,6 +1299,10 @@ class McpConnectorExecutor:
             raise SandboxError("mcp_session_timeout")
         bytes_in = len(session.stdout)
         stdout = session.stdout.decode("utf-8", errors="replace")
+        if secrets:
+            from raiker.runtime.mcp_secrets import redact_values
+
+            stdout = redact_values(stdout, tuple(secrets.values()))
 
         responses: dict[Any, dict[str, Any]] = {}
         for line in stdout.splitlines():

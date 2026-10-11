@@ -125,6 +125,8 @@
     // how much there was, which stays true whether it was kept or not.
     retainedReasoning?: string | null;
     reasoningChars?: number;
+    // DEC-22 step 3 — the earlier turn this one asked again, when it was a Retry.
+    retryOf?: string | null;
   }
 
 
@@ -760,7 +762,7 @@
     return turn.response?.message ?? "";
   }
 
-  async function submit() {
+  async function submit(retryOf: string | null = null) {
     if (voiceControl?.active()) {
       voiceControl.done();
       promptEl?.focus();
@@ -787,6 +789,7 @@
         response: null,
         streaming: true,
         error: null,
+        retryOf,
       },
     ];
     // Mutate the $state-proxied instance, not the raw literal: raw-object writes
@@ -810,6 +813,7 @@
           input_mode: inputMode,
           surface: "chat",
           session_id: sessionId ?? undefined,
+          ...(retryOf !== null && sessionId !== null ? { retry_of_turn_id: retryOf } : {}),
           model_profile: modelProfile || undefined,
           model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
@@ -1102,12 +1106,20 @@
    * that is the owner's decision, so it is put to them, with what would be
    * repeated named rather than implied.
    */
-  function retryPrompt(text: string, rows: ToolCallRow[] = []) {
+  function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
     if (streaming || text.trim() === "") return;
     const consequence = retryConsequence(rows);
     if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
     draft.text = text;
-    void submit();
+    // DEC-22 step 3 — the new turn names the one it asks again, so the record
+    // says these are one request tried twice rather than two requests.
+    void submit(sourceTurnId);
+  }
+
+  /** Bring the turn a Retry asked again into view. */
+  function showRetrySource(turnId: string) {
+    const target = document.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`);
+    if (target instanceof HTMLElement) target.scrollIntoView({ block: "center" });
   }
 
   // UX-CHAT-01 — branch, rewind and summarise: the Continuity actions, owned
@@ -1640,7 +1652,7 @@
               text={turn.prompt}
               disabled={streaming}
               onedit={editPrompt}
-              onretry={(text: string) => retryPrompt(text, toolRows)}
+              onretry={(text: string) => retryPrompt(text, toolRows, turn.response?.turn_id ?? null)}
               onbranch={turn.response?.turn_id
                 ? () => void continuity.branchFromTurn(turn.response?.turn_id ?? "")
                 : undefined}
@@ -1654,6 +1666,16 @@
                 : undefined}
               rewinding={continuity.rewindingTurn === turn.response?.turn_id}
             />
+          {/if}
+          {#if turn.retryOf}
+            <!-- DEC-22 step 3 — a Retry is a new attempt linked to its source;
+                 the earlier turn is kept exactly as it was. -->
+            <p class="retry-of">
+              Retry of
+              <button type="button" class="retry-link" onclick={() => showRetrySource(turn.retryOf ?? "")}
+                >an earlier turn</button>
+              — that turn is kept as it was.
+            </p>
           {/if}
           <!-- BUG-208 slice F — nothing is appended to the owner's message. A
                label that names an actor and an act may only describe an act
@@ -2565,6 +2587,11 @@
   }
   @media (prefers-reduced-motion: reduce) {
     :global(.turn.turn-anchored) { transition: none; }
+  }
+  .retry-of { margin: 0.2rem 0 0; font-size: var(--text-xs); color: var(--text-3); text-align: right; }
+  .retry-link {
+    border: 0; background: none; padding: 0; font: inherit; color: var(--accent);
+    text-decoration: underline; cursor: pointer;
   }
 </style>
 

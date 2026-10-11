@@ -702,6 +702,62 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).not.toHaveBeenCalled();
   });
 
+  // DEC-22 step 3 — a Retry names the turn it asks again, and a reopened
+  // conversation says which turn a retry was of.
+  it("sends a retry linked to its source turn and shows the link on reload", async () => {
+    vi.stubGlobal("confirm", () => true);
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/sessions/sess_retry": {
+        session: {
+          session_id: "sess_retry",
+          title: "Prior chat",
+          status: "open",
+          created_at: "2026-10-11T10:00:00Z",
+          updated_at: "2026-10-11T10:00:10Z",
+          turn_count: 2,
+        },
+        turns: [
+          {
+            turn_id: "turn_1",
+            session_id: "sess_retry",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "summarise the log",
+            created_at: "2026-10-11T10:00:00Z",
+            completed_at: "2026-10-11T10:00:10Z",
+            summary: "First answer.",
+            retry_of_turn_id: null,
+          },
+          {
+            turn_id: "turn_2",
+            session_id: "sess_retry",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "summarise the log",
+            created_at: "2026-10-11T10:01:00Z",
+            completed_at: "2026-10-11T10:01:10Z",
+            summary: "Second answer.",
+            retry_of_turn_id: "turn_1",
+          },
+        ],
+      },
+    });
+
+    render(ChatView, { props: { sessionId: "sess_retry" } });
+    await waitFor(() => expect(screen.getByText("Second answer.")).toBeInTheDocument());
+    expect(screen.getAllByText(/that turn is kept as it was/)).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "an earlier turn" })).toBeInTheDocument();
+
+    await fireEvent.click(screen.getAllByRole("button", { name: "Send this message again" })[0]);
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      text: "summarise the log",
+      session_id: "sess_retry",
+      retry_of_turn_id: "turn_1",
+    });
+  });
+
   it("shows a route-level loading state while persisted history is fetched", async () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<never>(() => {})));
     render(ChatView, { props: { sessionId: "sess_hist" } });

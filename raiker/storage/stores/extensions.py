@@ -934,6 +934,9 @@ class ExtensionStore:
         "reply_queued_at",
         "delivered_at",
         "failed_at",
+        # DEC-14 step 7 — settled at the next start for a delivery the host
+        # stopped in the middle of: it may or may not have arrived.
+        "outcome_unknown_at",
     )
     #: Rows kept per connector. Receipts are a recent-activity ledger; the
     #: audit log is the permanent record.
@@ -990,10 +993,14 @@ class ExtensionStore:
         stages: dict[str, str],
         session_id: str | None = None,
         reason_code: str | None = None,
+        provider_message_id: str | None = None,
     ) -> bool:
         """Record later stages. A stage already written keeps its first time."""
         sets: list[str] = []
         params: list[Any] = []
+        if provider_message_id is not None:
+            sets.append("provider_message_id = ?")
+            params.append(provider_message_id)
         for stage, at in stages.items():
             if stage not in self.CHANNEL_RECEIPT_STAGES:
                 continue
@@ -1062,6 +1069,61 @@ class ExtensionStore:
                WHERE connector_id = ? AND event_key = ? AND receipt_id = ?""",
             (connector_id, event_key, receipt_id),
         )
+
+    def settle_unsettled_outbound_receipts(self: SQLiteStore) -> int:
+        """DEC-14 step 7 / 13.2 item 7 — deliveries a stopped host left queued.
+
+        A delivery is sent inside the process that queued its receipt, so a row
+        that is queued and neither delivered nor failed when the host starts was
+        cut off mid-send. It may have reached the platform before the process
+        went, so it is settled as *outcome unknown* — for the owner to review —
+        and is never sent again on its own. Returns how many were settled.
+        """
+        return self._execute(
+            """UPDATE channel_receipts
+                  SET outcome_unknown_at = ?, reason_code = 'delivery_outcome_unknown'
+                WHERE direction = 'outbound' AND queued_at IS NOT NULL
+                  AND delivered_at IS NULL AND failed_at IS NULL
+                  AND outcome_unknown_at IS NULL""",
+            (utc_now(),),
+        )
+
+    def list_channel_deliveries_to_review(
+        self: SQLiteStore, connector_id: str | None = None, *, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """DEC-14 step 7 — the dead-letter list: outbound deliveries that did not
+        arrive, or may not have, and that the owner has not marked reviewed."""
+        sql = (
+            "SELECT * FROM channel_receipts WHERE direction = 'outbound' "
+            "AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL) "
+            "AND reviewed_at IS NULL"
+        )
+        params: list[Any] = []
+        if connector_id is not None:
+            sql += " AND connector_id = ?"
+            params.append(connector_id)
+        sql += " ORDER BY created_at DESC, rowid DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 200)))
+        return [dict(row) for row in self._rows(sql, tuple(params))]
+
+    def mark_channel_receipt_reviewed(self: SQLiteStore, receipt_id: str) -> bool:
+        """The owner has looked at a failed or unknown delivery. What happened to
+        it is unchanged; only its place on the review list is. Idempotent."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT reviewed_at FROM channel_receipts
+                    WHERE receipt_id = ? AND direction = 'outbound'
+                      AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL)""",
+                (receipt_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            if row["reviewed_at"] is None:
+                connection.execute(
+                    "UPDATE channel_receipts SET reviewed_at = ? WHERE receipt_id = ?",
+                    (utc_now(), receipt_id),
+                )
+            return True
 
     def load_channel_receipt(self: SQLiteStore, receipt_id: str) -> dict[str, Any] | None:
         rows = self._rows("SELECT * FROM channel_receipts WHERE receipt_id = ?", (receipt_id,))

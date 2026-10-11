@@ -227,6 +227,8 @@
     // retained, are different statements.
     retainedReasoning?: string | null;
     reasoningChars?: number;
+    // DEC-22 step 3 — the earlier turn this one asked again, when it was a Retry.
+    retryOf?: string | null;
   }
 
   // BUG-35 — Build carries files too. Same store, same limits, same governed
@@ -1298,12 +1300,18 @@
    * files, run commands and push, so a Retry offered as though the first
    * attempt had done nothing is the most expensive version of that mistake.
    */
-  function retryPrompt(text: string, rows: ToolCallRow[] = []) {
+  function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
     if (streaming || text.trim() === "") return;
     const consequence = retryConsequence(rows);
     if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
     draft.text = text;
-    void submit();
+    // DEC-22 step 3 — linked to the turn it asks again, as in Chat.
+    void submit(sourceTurnId);
+  }
+
+  function showRetrySource(turnId: string) {
+    const target = document.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`);
+    if (target instanceof HTMLElement) target.scrollIntoView({ block: "center" });
   }
 
   async function stopRunningTurn() {
@@ -1383,7 +1391,7 @@
     return wire.length > 0 ? wire : undefined;
   }
 
-  async function submit() {
+  async function submit(retryOf: string | null = null) {
     if (voiceControl?.active()) {
       voiceControl.done();
       promptEl?.focus();
@@ -1409,7 +1417,7 @@
       ...turns,
       {
         id: nextId++, prompt: sent, mode: sentMode, attachments: sentAttachments,
-        events: [], response: null, streaming: true, error: null,
+        events: [], response: null, streaming: true, error: null, retryOf,
       },
     ];
     const turn = turns[turns.length - 1];
@@ -1433,6 +1441,7 @@
           // merely what to display.
           project_id: projectId,
           session_id: sessionId ?? undefined,
+          ...(retryOf !== null && sessionId !== null ? { retry_of_turn_id: retryOf } : {}),
           model_profile: modelProfile || undefined,
           model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
@@ -2041,6 +2050,15 @@
               <span class="mode-tag">{buildMode(turn.mode).label}</span>
               <p class="bubble-text">{turn.prompt}</p>
             </div>
+            {#if turn.retryOf}
+              <!-- DEC-22 step 3 — a Retry is a new attempt linked to its source. -->
+              <p class="retry-of">
+                Retry of
+                <button type="button" class="retry-link" onclick={() => showRetrySource(turn.retryOf ?? "")}
+                  >an earlier turn</button>
+                — that turn is kept as it was.
+              </p>
+            {/if}
             <!-- C14/B19 — the same actions Chat carries. A retried prompt is a
                  new turn under the current mode, never a replay of the governed
                  actions the first one took.
@@ -2055,7 +2073,7 @@
                 text={turn.prompt}
                 disabled={streaming}
                 onedit={editPrompt}
-                onretry={(text: string) => retryPrompt(text, toolRows)}
+                onretry={(text: string) => retryPrompt(text, toolRows, turn.response?.turn_id ?? null)}
                 onrewind={turn.response?.turn_id
                   ? () => void rewindFromTurn(turn.response?.turn_id ?? "")
                   : undefined}
@@ -3195,5 +3213,10 @@
     }
     :global(.composer-build .mode-trigger > span),
     :global(.composer-build .mode-trigger > svg:last-child) { display: none; }
+  }
+  .retry-of { margin: 0.2rem 0 0; font-size: var(--text-xs); color: var(--text-3); text-align: right; }
+  .retry-link {
+    border: 0; background: none; padding: 0; font: inherit; color: var(--accent);
+    text-decoration: underline; cursor: pointer;
   }
 </style>

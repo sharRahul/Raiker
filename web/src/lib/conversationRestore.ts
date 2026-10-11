@@ -36,6 +36,8 @@ export interface RestoredTurnCore {
   resumeNote: null;
   retainedReasoning: string | null;
   reasoningChars: number;
+  // DEC-22 step 3 — the turn this one asked again, when it was a Retry.
+  retryOf: string | null;
 }
 
 export function restoredTurnCore(
@@ -99,6 +101,7 @@ export function restoredTurnCore(
     resumeNote: null,
     retainedReasoning: turn.reasoning ?? null,
     reasoningChars: turn.reasoning_chars ?? 0,
+    retryOf: turn.retry_of_turn_id ?? null,
   };
 }
 

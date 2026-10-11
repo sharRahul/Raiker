@@ -203,6 +203,36 @@ describe("receipts", () => {
       "Failed: the destination answered 500",
     );
   });
+
+  // DEC-14 step 7 — the platform's id, the unknown outcome and the review advice.
+  it("names the platform's id, an unknown outcome and what to do about each", async () => {
+    const { reviewAdvice } = await import("./channelSetup");
+    const outbound = {
+      ...base,
+      direction: "outbound" as const,
+      sender_role: null,
+      conversation_scope: null,
+      routing_mode: null,
+      received_at: null,
+      accepted_at: null,
+      queued_at: "t",
+    };
+    expect(receiptOutcome({ ...outbound, delivered_at: "t", provider_message_id: "512" })).toBe(
+      "Delivered · the channel's id for it is 512",
+    );
+    const unknown = {
+      ...outbound,
+      outcome_unknown_at: "t",
+      reason_code: "delivery_outcome_unknown",
+    };
+    expect(receiptStages(unknown)).toEqual(["queued", "outcome unknown"]);
+    expect(receiptOutcome(unknown)).toMatch(/Outcome unknown .* It was not sent again\./);
+    expect(reviewAdvice(unknown)).toMatch(/may already be there/);
+    expect(reviewAdvice({ ...outbound, failed_at: "t" })).toMatch(/can send it again/);
+    expect(reviewAdvice({ ...outbound, kind: "test_delivery" as const, failed_at: "t" })).toMatch(
+      /send another test/,
+    );
+  });
 });
 
 describe("the loop guard's refusals", () => {

@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**379 operations: 368 verified, 0 eligible, 0 deferred, 11 special.**
+**385 operations: 374 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -28,6 +28,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/approvals/{approval_id}/resume` |  | AgentResponse | verified | AgentGateway.aresume_after_approval |
 | POST | `/api/approvals/{approval_id}/resume/stream` |  |  | special | special |
 | POST | `/api/attachments` | UploadAttachmentRequest | UploadedAttachment | verified | declared UploadedAttachment |
+| GET | `/api/attention` |  | AttentionFeedView | verified | declared AttentionFeedView |
 | POST | `/api/audit/export` |  | AuditExportResult | verified | declared by cast |
 | GET | `/api/audit/exports` |  | AuditExportView[] | verified | declared AuditExportView[] |
 | GET | `/api/audit/exports/{export_id}/download` |  |  | special | special |
@@ -77,6 +78,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/capability-modes/{capability}/deny` | SetCapabilityDecisionModeRequest | CapabilityDecisionModeSet | verified | _set_capability_decision_mode |
 | GET | `/api/channels` |  | ChannelsView | verified | declared ChannelsView |
 | POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest | ChannelTestDelivered | verified | declared by cast |
+| POST | `/api/channels/deliveries/{receipt_id}/reviewed` |  | ChannelDeliveryReviewed | verified | declared by cast |
 | POST | `/api/channels/pairings` | PairChannelRequest | ChannelPaired | verified | declared by cast |
 | DELETE | `/api/channels/pairings/{pairing_id}` |  | ChannelUnpaired | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/destination` | ChannelDestinationRequest | ChannelDestinationSet | verified | declared by cast |
@@ -128,6 +130,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/execution-environments` |  | ExecutionEnvironmentsView | verified | DashboardService.execution_environments |
 | PUT | `/api/execution-environments/configure` | dict | ExecutionEnvironmentConfigured | verified | declared by cast |
 | PUT | `/api/execution-environments/selection` | dict | ExecutionEnvironmentSelected | verified | declared by cast |
+| DELETE | `/api/execution-environments/{profile_id}` |  | ExecutionEnvironmentRemoved | verified | declared by cast |
 | PUT | `/api/execution-environments/{profile_id}/enabled` | dict | ExecutionEnvironmentEnabled | verified | declared by cast |
 | POST | `/api/execution-environments/{profile_id}/probe` |  | ExecutionEnvironmentProbed | verified | declared ExecutionEnvironmentProbed |
 | POST | `/api/execution-environments/{profile_id}/reset` | dict | ExecutionEnvironmentReset | verified | declared by cast |
@@ -184,6 +187,9 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/mcp/servers/{server_id}/kill` |  | McpContainment | verified | declared by cast |
 | POST | `/api/mcp/servers/{server_id}/pause` |  | McpContainment | verified | declared by cast |
 | POST | `/api/mcp/servers/{server_id}/resume` |  | McpResumed | verified | declared by cast |
+| GET | `/api/mcp/servers/{server_id}/secrets` |  | McpServerSecrets | verified | declared by cast |
+| DELETE | `/api/mcp/servers/{server_id}/secrets/{name}` |  | McpServerSecrets | verified | declared by cast |
+| PUT | `/api/mcp/servers/{server_id}/secrets/{name}` | McpServerSecretRequest | McpServerSecrets | verified | declared by cast |
 | GET | `/api/mcp/servers/{server_id}/sessions` |  | McpSessionView[] | verified | DashboardService.list_mcp_sessions |
 | POST | `/api/mcp/servers/{server_id}/tools/approve` | ApproveMcpToolsRequest | McpToolsApproved | verified | declared by cast |
 | GET | `/api/memory` |  | MemoryControlView[] | verified | DashboardService.list_memories |

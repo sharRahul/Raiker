@@ -885,6 +885,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-861](#fixed-861--a-hugging-face-repository-name-was-shown-as-redacted_secret-was-bug-328) | Low | Models / redaction | Fixed 2026-10-11 (was BUG-328) |
 | [FIXED-862](#fixed-862--a-hugging-face-access-token-matched-no-redaction-pattern) | Medium | Redaction / secrets | Fixed 2026-10-11 — found fixing FIXED-861 |
 | [FIXED-863](#fixed-863--the-sandbox-images-buildkit-frontend-was-an-unpinned-tag) | Low | CI / containers | Fixed 2026-10-11 — found fixing FIXED-848 |
+| [FIXED-864](#fixed-864--a-local-mcp-server-could-only-be-given-a-secret-by-giving-it-to-every-local-server) | Medium | MCP / secrets | Fixed 2026-10-11 |
+| [FIXED-865](#fixed-865--a-configured-runtime-could-be-turned-off-but-never-removed) | Low | Runtime / Settings | Fixed 2026-10-11 |
+| [FIXED-866](#fixed-866--a-delivered-message-had-no-reference-to-what-the-platform-accepted) | Low | Messaging | Fixed 2026-10-11 |
+| [FIXED-867](#fixed-867--a-delivery-that-failed-was-a-line-in-recent-activity-and-nothing-asked-anyone-to-look) | Medium | Messaging | Fixed 2026-10-11 |
+| [FIXED-868](#fixed-868--a-delivery-a-stopped-host-was-in-the-middle-of-stayed-queued-for-ever) | Medium | Messaging / recovery | Fixed 2026-10-11 |
+| [FIXED-869](#fixed-869--a-webhook-delivery-carried-nothing-a-receiver-could-deduplicate-by) | Low | Messaging | Fixed 2026-10-11 |
+| [FIXED-870](#fixed-870--a-memory-the-owner-forgot-could-be-proposed-or-written-straight-back) | Medium | Memory | Fixed 2026-10-11 |
+| [FIXED-871](#fixed-871--a-retry-was-a-new-turn-that-nothing-linked-to-the-one-it-repeated) | Low | Chat / Build | Fixed 2026-10-11 |
+| [FIXED-872](#fixed-872--a-streamed-answer-the-owner-stopped-was-billed-and-counted-as-free) | Medium | Models / usage | Fixed 2026-10-11 |
+| [FIXED-873](#fixed-873--homes-attention-rail-could-see-three-subsystems-and-nothing-else-that-waited-on-the-owner) | Medium | Home / navigation | Fixed 2026-10-11 |
+| [FIXED-874](#fixed-874--nothing-said-which-memories-most-needed-the-owners-look-or-why) | Low | Memory | Fixed 2026-10-11 |
+| [FIXED-875](#fixed-875--a-late-stop-or-steer-was-applied-as-though-it-were-the-newest) | Low | Chat / Build | Fixed 2026-10-11 |
+| [FIXED-876](#fixed-876--a-webhook-message-carried-its-secret-on-the-wire-and-could-be-replayed-for-ever) | Medium | Messaging / security | Fixed 2026-10-11 |
+| [FIXED-877](#fixed-877--a-retry-proposed-its-sentence-as-a-second-identical-memory) | Low | Memory | Fixed 2026-10-11 — found by the live round |
+| [FIXED-878](#fixed-878--the-mcp-secrets-box-closed-under-the-field-being-typed-into) | Low | MCP / interface | Fixed 2026-10-11 — found by the live round |
+| [FIXED-879](#fixed-879--the-mcp-card-and-the-runtime-card-printed-raw-iso-times) | Low | Interface / dates | Fixed 2026-10-11 — found by the live round |
 
 ---
 
@@ -32577,3 +32593,195 @@ runs to parse the file — the same unreviewed code an unpinned base would be.
 `# syntax=` directive without one (`frontend_not_pinned`).
 
 **Evidence.** `tests/test_scan_containers.py`.
+
+---
+
+## FIXED-864 — A local MCP server could only be given a secret by giving it to every local server
+
+**Severity: Medium. Area: MCP / secrets. Status: Fixed 2026-10-11. DEC-15 step 2: "replace inline secrets with purpose-bound secret handles; deliver only declared values to that server process and redact before persistence/model exposure".**
+
+**Observed.** The one way to hand a local server a credential was `RAIKER_MCP_ENV_ALLOWLIST`: a name there is passed from Raiker's own environment to *every* local MCP server, so a weather server's key was in the environment of all of them, and the value had to live in the environment Raiker was started with.
+
+**Fixed.** `raiker/runtime/mcp_secrets.py`. A secret is a variable name the owner gives one local server, its value in the encrypted connector vault under that server's id (`mcp_server_env:<server_id>`). `_run_session` adds it to that server's constructed environment and no other, and replaces each value in what the server writes back before anything reads it. Names that the launcher sets (`PATH`, `HOME`, …) or that configure the boundary are refused (`mcp_secret_name_reserved`); a remote server is refused (`mcp_secret_local_only`); removing the server removes its secrets. `GET/PUT/DELETE /api/mcp/servers/{id}/secrets[/{name}]` return names only, and the server list carries them as `vault_env` (a key the response redactor does not mistake for a secret). Extensions → MCP has **Secrets for this server** with a password field, and *What it can reach* names them as this server's only. Events `mcp_server_secret_set` / `_removed` carry the name, never the value.
+
+**Evidence.** `tests/test_mcp_server_secrets.py` (7 — a real local server sees its own secret and another server does not; a server that echoes its token hands back `[REDACTED_SECRET]`), three contract cases, `McpView.test.ts`. Live: `WEATHER_API_KEY` given to the generated `weather` sample through the page, Test connected with 2 tools, the value nowhere on the page ([06](../screenshots/2026-10-11-review-steps-round/06-mcp-server-secret.png)); at 390 wide, dark ([10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)).
+
+---
+
+## FIXED-865 — A configured runtime could be turned off but never removed
+
+**Severity: Low. Area: Runtime / Settings. Status: Fixed 2026-10-11. DEC-11 step 6: "deletion requires no active references or an explicit migration choice".**
+
+**Observed.** FIXED-857 added Turn off; a target the owner was done with stayed on Settings → Runtime for good, and nothing said what removing one would need.
+
+**Fixed.** `DELETE /api/execution-environments/{profile_id}`. Refused `409 execution_environment_in_use` with the count while commands run there (turning it off stops them first); refused `execution_environment_selected` when it is where work runs by default unless `move_to` names a ready replacement, which is selected before anything is removed. Only the profile row goes; command runs and cloud cost stay as evidence. Runtime has **Remove** on configured targets; for the default one the confirm names where work will run instead.
+
+**Evidence.** `tests/test_execution_environment_remove.py` (5), a contract case, `Runtime.test.ts` (3). Live: an SSH target added through the form and removed — *Build host was removed.* ([05](../screenshots/2026-10-11-review-steps-round/05-runtime-target-removed.png)).
+
+---
+
+## FIXED-866 — A delivered message had no reference to what the platform accepted
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 7: "update attempts, provider IDs, delivered/failed state".**
+
+**Observed.** A receipt said *delivered* and nothing tied it to the message on the platform: Telegram answers with a `message_id`, a receiver may answer with its own id, and both were read and dropped.
+
+**Fixed.** Each adapter reads one id out of the platform's answer (`provider_message_id`: Telegram's `result.message_id`, a webhook's `id` or `message_id`), short and plain or nothing; the rest of the body is dropped where it is read (`post_url(..., keep_body=True)`). The receipt keeps it (migration RAIKER-2103) and Messaging says *Delivered · the channel's id for it is …*.
+
+**Evidence.** `tests/test_channel_delivery_review.py`, `channelSetup.test.ts`. Live: a test to a local receiver read *Delivered · the channel's id for it is rcv-0001* ([03](../screenshots/2026-10-11-review-steps-round/03-delivery-id-and-review-list.png)).
+
+---
+
+## FIXED-867 — A delivery that failed was a line in recent activity and nothing asked anyone to look
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 7: "dead-letter review independently from task status".**
+
+**Observed.** A failed delivery was one of the last five receipts on its channel and scrolled away with the next message; nothing collected what had not arrived or let the owner say they had dealt with it.
+
+**Fixed.** Each channel lists **Deliveries to review** — outbound receipts that failed or whose outcome is unknown and are not yet reviewed — with the reason and what to do about it (fix it and resend from whatever asked, or check the channel before resending). **Mark reviewed** (`POST /api/channels/deliveries/{receipt_id}/reviewed`, event `channel_delivery_reviewed`) takes one off the list and changes nothing else; nothing is ever sent again on its own. The list is also an item on Home's attention feed (FIXED-873).
+
+**Evidence.** `tests/test_channel_delivery_review.py` (6), a contract case, `MessagingView.test.ts`. Live: a test refused by the closed capability on the list, then marked reviewed — off the list, still *failed* in the record, gone from Home ([03](../screenshots/2026-10-11-review-steps-round/03-delivery-id-and-review-list.png), [04](../screenshots/2026-10-11-review-steps-round/04-delivery-marked-reviewed.png)); at 390 wide, dark ([09](../screenshots/2026-10-11-review-steps-round/09-messaging-review-390-dark.png)).
+
+---
+
+## FIXED-868 — A delivery a stopped host was in the middle of stayed queued for ever
+
+**Severity: Medium. Area: Messaging / recovery. Status: Fixed 2026-10-11. §13.2 item 7: "represent outcome_unknown, reconcile, then obtain an explicit retry decision".**
+
+**Observed.** The receipt is written *queued* before send (FIXED-855) and settled in the same process. A host stopped between the two left it *queued* — *Sending* on the page — with nothing ever settling it, though it may well have arrived.
+
+**Fixed.** At start, beside the task-run settlement, `settle_unsettled_outbound_receipts` marks every outbound receipt still queued as `outcome_unknown_at` with `delivery_outcome_unknown`. It is put on the channel's review list as *Outcome unknown — Raiker stopped while sending it. It was not sent again.* The recovery matrix's channel row says so.
+
+**Evidence.** `tests/test_channel_delivery_review.py` (2), `test_recovery_matrix`. Live: a receipt seeded *queued* with the host down read *Outcome unknown* after the restart, and the receiver had still been sent one delivery in all ([08](../screenshots/2026-10-11-review-steps-round/08-outcome-unknown-after-restart.png)).
+
+---
+
+## FIXED-869 — A webhook delivery carried nothing a receiver could deduplicate by
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-11. DEC-12 step 4: "reuse its idempotency key where the destination supports it".**
+
+**Observed.** A webhook delivery had no stable identity, so a copy a proxy or a deliberate resend produced was a second message to the receiver.
+
+**Fixed.** A webhook delivery carries its receipt id as `Idempotency-Key` and in the signed body as `delivery_id`. Telegram's Bot API takes no such key, which is why an unknown outcome is reviewed rather than resent (FIXED-868).
+
+**Evidence.** `tests/test_channel_delivery_review.py`. Live: the receiver logged `Idempotency-Key: act_ace021…`, the receipt's own id.
+
+---
+
+## FIXED-870 — A memory the owner forgot could be proposed or written straight back
+
+**Severity: Medium. Area: Memory. Status: Fixed 2026-10-11. §13.2 item 4: "Forget … records a suppression tombstone so the same source does not silently re-create it".**
+
+**Observed.** Forget kept a content-free tombstone with the record's checksum and nothing compared new writes against it: the next turn that said the same sentence was proposed again, and the memory tool could write it back outright.
+
+**Fixed.** `memory_text_forgotten` compares a sentence's checksum with the owner's forgotten records. A completed turn's proposals skip it (counted as `suppressed` on `memory_relationship_extraction_completed`), and the memory tool refuses it (`memory_forgotten_by_owner`). The owner adding it again on Memory is the explicit restore, and lifts the suppression. Forget's confirmation now says so.
+
+**Evidence.** `tests/test_memory_forget_suppression.py` (6). Live: *Rahul prefers tea* approved, forgotten from the card's **More**, then sent in a new conversation — `/api/memory/proposals` stayed empty and Home showed no proposal.
+
+---
+
+## FIXED-871 — A Retry was a new turn that nothing linked to the one it repeated
+
+**Severity: Low. Area: Chat / Build. Status: Fixed 2026-10-11. DEC-22 step 3: "retry creates a new attempt linked to its source".**
+
+**Observed.** **Retry** sent the same words as an unrelated turn; a reopened conversation showed two requests where there had been one asked twice.
+
+**Fixed.** Chat and Build send `retry_of_turn_id`; the server checks it is a turn of the same conversation before anything is bound or written (`422 retry_source_not_in_session`) and records the link in `turn_retries` (migration RAIKER-2104). Every read of the conversation carries it, and the retry says *Retry of an earlier turn — that turn is kept as it was*, linking back.
+
+**Evidence.** `tests/test_turn_retry_link.py` (5), `ChatView.test.ts`. Live: a Retry of a stand-in answer, still labelled after a reload ([01](../screenshots/2026-10-11-review-steps-round/01-retry-linked-to-its-source.png)).
+
+---
+
+## FIXED-872 — A streamed answer the owner stopped was billed and counted as free
+
+**Severity: Medium. Area: Models / usage. Status: Fixed 2026-10-11. DEC-24 step 2: "account for cancelled calls that a provider still bills".**
+
+**Observed.** Stopping a streamed turn returned before the usage ledger was written, and Anthropic's input count arrived only with the closing event, so a stopped turn — whose input and partial output the provider bills — read as nothing to every spending limit.
+
+**Fixed.** Anthropic's stream passes on the input usage as soon as `message_start` reports it; the closing event supersedes it. A stopped stream, or one that fails mid-way, records whatever the provider had counted. A provider that reports usage only at the end has said nothing yet, and nothing is invented for it (BUG-333).
+
+**Evidence.** `tests/test_stopped_stream_usage.py` (2; the first fails without the fix), `test_prompt_cache_metrics.py`. Not reachable live this round: the identity-linked Anthropic key could not be used (BUG-332) and the stand-in speaks the OpenAI-compatible stream.
+
+---
+
+## FIXED-873 — Home's attention rail could see three subsystems and nothing else that waited on the owner
+
+**Severity: Medium. Area: Home / navigation. Status: Fixed 2026-10-11. DEC-02 steps 2, 4 and 5: a server-backed Needs-attention feed with stable ids, severity, reason, origin, action and time, resolved only by the authoritative subsystem.**
+
+**Observed.** Home assembled *Needs your attention* in the browser from approvals, readiness and blocked tasks. A proposed memory, a delivery to review, an MCP tool held for review or a containment signal waited on its own page.
+
+**Fixed.** `GET /api/attention` (`raiker/control/dashboard_parts/attention.py`) reads each subsystem's own record on every call — security signals, approvals, blocked tasks, memory proposals, deliveries to review, held MCP tools — and returns items by reference (id, severity, title, reason, origin, the one action, since), containment first. An item disappears when its subsystem says it is resolved; a subsystem that cannot be read is listed in `unknown`, never counted as clear. Home renders the items its tiles do not already cover and withholds the all-clear while anything is unread.
+
+**Evidence.** `tests/test_attention_feed.py` (5), a contract case, `WorkbenchView.test.ts` (2). Live: *2 proposed memories to review* and *1 delivery on a channel needs a look* on Home, the delivery gone once marked reviewed ([02](../screenshots/2026-10-11-review-steps-round/02-home-attention-feed.png)).
+
+---
+
+## FIXED-874 — Nothing said which memories most needed the owner's look, or why
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-11. DEC-13 step 3: "review priority from retention, sensitivity, use, verification, conflict, provenance and pin — not one opaque score".**
+
+**Observed.** Retention (FIXED-689) counted records one policy at a time; nothing ordered the set by what most needed review or said why a record was there.
+
+**Fixed.** `raiker/memory/review_priority.py` names each factor — expired or expiring, personal or unclassified sensitivity, written by Raiker and never edited, low confidence, replaced another, stale or never recalled — with a fixed weight; the priority is their sum, and a pin lowers it by one without exempting anything. Each memory carries `review_priority` and `review_reasons`. Memory → Overview leads with **Worth reviewing first** (reasons in words), the list filter **Worth reviewing** and the sort **Worth reviewing first**.
+
+**Evidence.** `tests/test_memory_review_priority.py` (6), `memoryLifecycle.test.ts`, `MemoryView.test.ts`. Live: an approved proposal listed with *Sensitivity not classified* ([07](../screenshots/2026-10-11-review-steps-round/07-memory-worth-reviewing.png)).
+
+---
+
+## FIXED-875 — A late stop or steer was applied as though it were the newest
+
+**Severity: Low. Area: Chat / Build. Status: Fixed 2026-10-11. DEC-22 steps 1–2: "serialize control decisions per session and reject stale commands".**
+
+**Observed.** `/api/interrupts` applied stop and steer in arrival order, so a steer delayed behind a later stop — or a retransmission of one already applied — was applied again as new.
+
+**Fixed.** A command may carry `client_id` and `client_sequence`; the server keeps each client's last number per conversation (migration RAIKER-2105, one write transaction). An older one is refused `409 control_command_stale` with nothing applied; the same command under the same number is answered `duplicate: true` and applied once; half a pair is `422`. The web client numbers every stop and steer per tab. A client that sends neither is ordered by arrival, as before.
+
+**Evidence.** `tests/test_control_command_sequence.py` (9), `controlSequence.test.ts`. Live, from the signed-in page: stop #2 applied, steer #1 refused 409, steer #3 queued, steer #3 again answered as a duplicate.
+
+---
+
+## FIXED-876 — A webhook message carried its secret on the wire and could be replayed for ever
+
+**Severity: Medium. Area: Messaging / security. Status: Fixed 2026-10-11. DEC-14 step 5: "verify signature, timestamp/nonce, account and pairing before routing".**
+
+**Observed.** The reference webhook took the shared inbound secret in a header: every message carried it, and anyone who saw one request could replay it indefinitely.
+
+**Fixed.** A sender may sign instead: `X-Raiker-Timestamp` and `X-Raiker-Signature: sha256=<HMAC of "<timestamp>.<body>">`, keyed by the inbound secret, which then never travels. Checked before routing; refused `channel_signature_invalid` or, beyond five minutes either way, `channel_signature_expired`; the signature is then claimed once like a provider event id, so a replay is a repeat. `RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE` refuses an unsigned message (`channel_signature_required`). Messaging's posture lists **Signed messages · Accepted / Required**.
+
+**Evidence.** `tests/test_channel_inbound_signature.py` (9), `MessagingView.test.ts`. Live, against the running host: signed → 200; the same bytes again → the first message's id with `duplicate_event`; an altered body and a wrong key → 401 `channel_signature_invalid`; ten minutes old → 401 `channel_signature_expired`.
+
+---
+
+## FIXED-877 — A Retry proposed its sentence as a second, identical memory
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-11 — found by the live round.**
+
+**Observed.** After a Retry of *Rahul prefers tea*, Memory listed two identical proposals, one decision asked twice.
+
+**Fixed.** A completed turn's proposal is skipped when the owner already has an undecided proposal with the same words (counted as already present).
+
+**Evidence.** `tests/test_memory_forget_suppression.py::test_the_same_words_waiting_for_a_decision_are_proposed_once`.
+
+---
+
+## FIXED-878 — The MCP secrets box closed under the field being typed into
+
+**Severity: Low. Area: MCP / interface. Status: Fixed 2026-10-11 — found by the live round.**
+
+**Observed.** Typing a variable name into **Secrets for this server** closed the box on the first keystroke: its `open` was recomputed from the secret count on every render.
+
+**Fixed.** The box remembers the owner's own open or close per server and starts open only when the server has secrets.
+
+**Evidence.** `McpView.test.ts`; the live round's second attempt.
+
+---
+
+## FIXED-879 — The MCP card and the runtime card printed raw ISO times
+
+**Severity: Low. Area: Interface / dates. Status: Fixed 2026-10-11 — found by the live round.**
+
+**Observed.** *Last connected 2026-10-11T18:23:54Z* on an MCP card and *Last changed 2026-10-11T22:16:44Z* on Settings → Runtime, where FIXED-807 formats every other date.
+
+**Fixed.** Both go through `formatTimestamp`, the owner's date format.
+
+**Evidence.** `McpView.test.ts`, `Runtime.test.ts`; live at 390 wide ([10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)).

@@ -557,6 +557,7 @@ class AgentGateway:
                             "proposed": summary.proposed,
                             "skipped": summary.skipped,
                             "already_present": summary.already_present,
+                            "suppressed": summary.suppressed,
                         },
                         client=prompt_envelope.client,
                     )

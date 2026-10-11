@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -831,7 +832,99 @@ class RuntimeControlService:
                 return ControlResult(ok=False, reason_code="mcp_server_conflict")
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
         self._remove_generated_mcp_file(server)
+        # DEC-15 step 2 — a server's secrets go with it.
+        from raiker.runtime.mcp_secrets import remove_all
+
+        with suppress(Exception):
+            remove_all(self._store, principal.principal_id, server_id)
         return ControlResult(ok=True, data={"server_id": server_id})
+
+    def _local_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> tuple[str | None, dict[str, Any] | None, str | None]:
+        """The owner and one of their *local* servers, or the refusal."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return None, None, err or "principal_not_resolved"
+        if principal.principal_type != PrincipalType.HUMAN:
+            return None, None, "not_authorized_human"
+        server = self._store.get_mcp_server(server_id, principal.principal_id)
+        if server is None:
+            return None, None, f"unknown_mcp_server:{server_id}"
+        if str(server.get("transport") or "stdio") != "stdio":
+            # A remote server's credential is its token reference; it starts no
+            # process here to hand an environment to.
+            return None, None, "mcp_secret_local_only"
+        return principal.principal_id, server, None
+
+    def mcp_server_secrets(self, acting_principal_id: str | None, server_id: str) -> ControlResult:
+        """DEC-15 step 2 — the names one local server is given. Never values."""
+        from raiker.runtime.mcp_secrets import secret_names, secrets_updated_at
+
+        owner, _server, reason = self._local_mcp_server(acting_principal_id, server_id)
+        if owner is None:
+            return ControlResult(ok=False, reason_code=reason)
+        return ControlResult(
+            ok=True,
+            data={
+                "server_id": server_id,
+                "names": secret_names(self._store, owner, server_id),
+                "updated_at": secrets_updated_at(self._store, owner, server_id),
+            },
+        )
+
+    def set_mcp_server_secret(
+        self, acting_principal_id: str | None, server_id: str, name: str, value: str
+    ) -> ControlResult:
+        """DEC-15 step 2 — give one local server a secret, held in the vault."""
+        from raiker.runtime.mcp_secrets import secret_names, set_secret
+
+        owner, _server, reason = self._local_mcp_server(acting_principal_id, server_id)
+        if owner is None:
+            return ControlResult(ok=False, reason_code=reason)
+        try:
+            refused = set_secret(self._store, owner, server_id, name, value)
+        except ValueError as exc:  # the vault could not be written
+            return ControlResult(ok=False, reason_code=str(exc))
+        if refused:
+            return ControlResult(ok=False, reason_code=refused)
+        self._writer.append(
+            make_event(
+                session_id="mcp",
+                turn_id=None,
+                event_type="mcp_server_secret_set",
+                actor="control_service",
+                # The name, never the value.
+                payload={"server_id": server_id, "name": name},
+            )
+        )
+        return ControlResult(
+            ok=True, data={"server_id": server_id, "names": secret_names(self._store, owner, server_id)}
+        )
+
+    def remove_mcp_server_secret(
+        self, acting_principal_id: str | None, server_id: str, name: str
+    ) -> ControlResult:
+        """DEC-15 step 2 — take one secret away; the next start goes without it."""
+        from raiker.runtime.mcp_secrets import remove_secret, secret_names
+
+        owner, _server, reason = self._local_mcp_server(acting_principal_id, server_id)
+        if owner is None:
+            return ControlResult(ok=False, reason_code=reason)
+        if not remove_secret(self._store, owner, server_id, name):
+            return ControlResult(ok=False, reason_code="unknown_mcp_secret")
+        self._writer.append(
+            make_event(
+                session_id="mcp",
+                turn_id=None,
+                event_type="mcp_server_secret_removed",
+                actor="control_service",
+                payload={"server_id": server_id, "name": name},
+            )
+        )
+        return ControlResult(
+            ok=True, data={"server_id": server_id, "names": secret_names(self._store, owner, server_id)}
+        )
 
     # ── Channels: pairing, enablement and a governed test delivery ──────────
     #
@@ -994,6 +1087,40 @@ class RuntimeControlService:
         return ControlResult(
             ok=True,
             data={"pairing_id": pairing_id, "paused": paused, **self._channel_revision(pairing_id)},
+        )
+
+    def mark_channel_delivery_reviewed(
+        self, acting_principal_id: str | None, receipt_id: str
+    ) -> ControlResult:
+        """DEC-14 step 7 — the owner has looked at a delivery that did not arrive.
+
+        Takes it off the review list and changes nothing else: the receipt still
+        says it failed, or that its outcome is unknown, and nothing is sent.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if not self._store.mark_channel_receipt_reviewed(receipt_id):
+            return ControlResult(ok=False, reason_code="unknown_channel_delivery")
+        receipt = self._store.load_channel_receipt(receipt_id) or {}
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_delivery_reviewed",
+                actor="control_service",
+                payload={
+                    "receipt_id": receipt_id,
+                    "connector_id": receipt.get("connector_id"),
+                    "reason_code": receipt.get("reason_code"),
+                },
+            )
+        )
+        return ControlResult(
+            ok=True,
+            data={"receipt_id": receipt_id, "reviewed_at": str(receipt.get("reviewed_at") or "")},
         )
 
     def set_channel_senders(

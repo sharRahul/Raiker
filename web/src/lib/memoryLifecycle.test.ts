@@ -45,6 +45,8 @@ function memory(overrides: Partial<MemoryControlView> = {}): MemoryControlView {
     last_recalled_session_id: null,
     last_recalled_turn_id: null,
     last_recalled_origin: null,
+    review_priority: 0,
+    review_reasons: [],
     ...overrides,
   };
 }
@@ -139,5 +141,25 @@ describe("LIFECYCLE_VERBS (UX-MEM-02)", () => {
     expect(LIFECYCLE_VERBS.forget.reversible).toBe(false);
     expect(LIFECYCLE_VERBS.purge.reversible).toBe(false);
     expect(LIFECYCLE_VERBS.purge.label).toBe("Delete permanently");
+  });
+});
+
+// DEC-13 step 3 — the server's reasons, said in the owner's words and in order.
+describe("worth reviewing", () => {
+  it("orders by the server's priority and names each reason", async () => {
+    const { worthReviewing, reviewReasonLabel, matchesFilter } = await import("./memoryLifecycle");
+    const base = {
+      memory_id: "m", text: "t", scope: "project", sensitivity: "project", memory_type: "project",
+      created_at: "2026-10-01T00:00:00Z", tags: [], source: "user", provenance: {}, confidence: 1,
+      trust_score: 1, retention: "until_forget", approval_state: "approved", pinned: false,
+      review_priority: 0, review_reasons: [],
+    } as unknown as Parameters<typeof matchesFilter>[0];
+    const low = { ...base, memory_id: "low", review_priority: 1, review_reasons: ["never_recalled"] };
+    const high = { ...base, memory_id: "high", review_priority: 7, review_reasons: ["expires_soon", "personal"] };
+    expect(worthReviewing([base, low, high]).map((m) => m.memory_id)).toEqual(["high", "low"]);
+    expect(matchesFilter(base, "review")).toBe(false);
+    expect(matchesFilter(high, "review")).toBe(true);
+    expect(reviewReasonLabel("written_by_agent")).toBe("Written by Raiker, not yet edited by you");
+    expect(reviewReasonLabel("something_new")).toBe("something new");
   });
 });

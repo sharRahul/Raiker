@@ -115,8 +115,16 @@ class ChannelAdapter(Protocol):
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
-        text: str, delivered_at: str,
+        text: str, delivered_at: str, delivery_id: str,
     ) -> OutboundRequest | AdapterRefusal: ...
+
+    def provider_message_id(self, response_body: bytes) -> str | None:
+        """DEC-14 step 7 — the platform's own id for a delivered message, or ``None``.
+
+        Read from the response and kept on the receipt; nothing else of the
+        response is kept.
+        """
+        ...
 
     def parse_inbound(self, payload: dict[str, Any]) -> InboundMessage | None:
         """``None`` for a payload that is not a message and never will be."""
@@ -150,7 +158,7 @@ class TelegramAdapter:
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
-        text: str, delivered_at: str,
+        text: str, delivered_at: str, delivery_id: str,
     ) -> OutboundRequest | AdapterRefusal:
         token = os.environ.get("RAIKER_TELEGRAM_BOT_TOKEN", "").strip()
         if not token:
@@ -180,8 +188,15 @@ class TelegramAdapter:
             headers={"X-Raiker-Delivered-At": delivered_at},
             # Telegram authenticates the token in the URL rather than a body HMAC,
             # so there is nothing for Raiker to sign and no control missing.
+            # Its Bot API takes no idempotency key, which is why a delivery the
+            # host stopped mid-send is reviewed rather than sent again.
             signed=False,
         )
+
+    def provider_message_id(self, response_body: bytes) -> str | None:
+        """``{"ok": true, "result": {"message_id": 123}}`` → ``"123"``."""
+        result = _json_object(response_body).get("result")
+        return _clean_provider_id(result.get("message_id")) if isinstance(result, dict) else None
 
     def parse_inbound(self, payload: dict[str, Any]) -> InboundMessage | None:
         message = payload.get("message") or payload.get("edited_message") or {}
@@ -223,6 +238,32 @@ def _telegram_sender_label(sender: object) -> str | None:
     return " ".join(names) or None
 
 
+#: The longest provider message id kept, and the characters it may hold. An id
+#: is the platform's reference, not content; anything else is not kept.
+_PROVIDER_ID_MAX = 128
+_PROVIDER_ID_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.:"
+)
+
+
+def _clean_provider_id(value: object) -> str | None:
+    """A provider id as text, or ``None`` when it is not a plain short id."""
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        return None
+    text = str(value).strip()
+    if not text or len(text) > _PROVIDER_ID_MAX or not set(text) <= _PROVIDER_ID_CHARS:
+        return None
+    return text
+
+
+def _json_object(response_body: bytes) -> dict[str, Any]:
+    try:
+        parsed = json.loads(response_body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def _telegram_event_id(payload: dict[str, Any]) -> str | None:
     """``update_id`` — Telegram's sequence number for one update, retries included."""
     update_id = payload.get("update_id")
@@ -260,7 +301,7 @@ class WebhookAdapter:
 
     def outbound(
         self, *, connector_id: str, pairing: dict[str, Any], arguments: dict[str, Any],
-        text: str, delivered_at: str,
+        text: str, delivered_at: str, delivery_id: str,
     ) -> OutboundRequest | AdapterRefusal:
         from raiker.runtime.executors.channels import sign_delivery
 
@@ -275,14 +316,26 @@ class WebhookAdapter:
                 "Channel delivery denied: this channel has no delivery destination.",
             )
         body = json.dumps(
-            {"text": text, "connector_id": connector_id, "delivered_at": delivered_at},
+            {
+                "text": text, "connector_id": connector_id, "delivered_at": delivered_at,
+                "delivery_id": delivery_id,
+            },
             sort_keys=True,
         ).encode("utf-8")
         signature, signed = sign_delivery(body)
-        headers = {"X-Raiker-Delivered-At": delivered_at}
+        # DEC-12 step 4 — the delivery's receipt id is its idempotency key, so a
+        # receiver that deduplicates can tell a second copy of one delivery from
+        # a second message. Raiker never sends one again on its own; the key is
+        # for a copy the network or a deliberate resend produces.
+        headers = {"X-Raiker-Delivered-At": delivered_at, "Idempotency-Key": delivery_id}
         if signed:
             headers["X-Raiker-Signature"] = signature
         return OutboundRequest(url=url, body=body, headers=headers, signed=signed)
+
+    def provider_message_id(self, response_body: bytes) -> str | None:
+        """The owner's receiver may answer ``{"id": …}`` or ``{"message_id": …}``."""
+        parsed = _json_object(response_body)
+        return _clean_provider_id(parsed.get("message_id", parsed.get("id")))
 
     def parse_inbound(self, payload: dict[str, Any]) -> InboundMessage | None:
         sender_id = str(payload.get("sender_id") or "").strip()

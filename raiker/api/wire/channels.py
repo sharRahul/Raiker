@@ -55,6 +55,14 @@ class ChannelUnpaired(TypedDict):
     removed: bool
 
 
+class ChannelDeliveryReviewed(TypedDict):
+    """DEC-14 step 7 — a failed or unknown delivery is off the review list."""
+
+    ok: bool
+    receipt_id: str
+    reviewed_at: str
+
+
 class ChannelTestDelivered(TypedDict):
     """One governed test delivery: sizes and status, never the text sent."""
 
@@ -65,6 +73,9 @@ class ChannelTestDelivered(TypedDict):
     sent_bytes: int
     status: int
     signed: bool
+    #: DEC-14 step 7 — the platform's own id for the message, when its answer
+    #: carried one.
+    provider_message_id: NotRequired[str | None]
 
 
 class InboundRoute(TypedDict):

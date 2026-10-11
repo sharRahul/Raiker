@@ -259,11 +259,29 @@ def _locked_with_backup(ws: Path, client: TestClient, h: dict[str, str]) -> str:
     data = bytearray(database.read_bytes())
     data[16:4096] = os.urandom(4080)
     database.write_bytes(bytes(data))
+    # A write-ahead log not yet checkpointed can still hold a good copy of the
+    # first page, and whether it does depends on timing; without it the damage
+    # is what every open reads.
+    for suffix in ("-wal", "-shm"):
+        database.with_name(database.name + suffix).unlink(missing_ok=True)
     return backup_id
 
 
 def _no_vault_key(monkeypatch: Any) -> None:
     monkeypatch.delenv("RAIKER_CONNECTOR_VAULT_KEY", raising=False)
+
+
+def _attention(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    """DEC-02 — a delivery waiting for review, so the feed has an item to describe."""
+    from raiker.contracts.ids import utc_now
+    from raiker.storage.sqlite import SQLiteStore
+
+    SQLiteStore(ws).insert_channel_receipt(
+        receipt_id="act_contract", connector_id="channel.webhooks", pairing_id=None,
+        direction="outbound", kind="message",
+        stages={"queued_at": utc_now(), "failed_at": utc_now()}, reason_code="delivery_failed:URLError",
+    )
+    return "/api/attention"
 
 
 def _health_rows(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
@@ -336,6 +354,7 @@ CASES: Cases = {
         plain("/api/security/health-check"), _no_vault_key
     ),
     ("GET", "/api/security/health"): patched(_health_rows, _no_vault_key),
+    ("GET", "/api/attention"): _attention,
     ("GET", "/api/vault/status"): plain("/api/vault/status"),
     ("PUT", "/api/vault/key"): _vault_key,
     ("DELETE", "/api/vault/key"): _vault_cleared,

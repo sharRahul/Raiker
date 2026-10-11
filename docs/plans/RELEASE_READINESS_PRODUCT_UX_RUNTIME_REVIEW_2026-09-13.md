@@ -1542,6 +1542,14 @@ closed with captured evidence.
 
 ## DEC-02 — Organize the product as Work, Review and Manage
 
+> **2026-10-11 (second round).** Steps 2, 4 and 5 closed as [FIXED-873](FIXED_ITEMS.md#fixed-873--homes-attention-rail-could-see-three-subsystems-and-nothing-else-that-waited-on-the-owner): `GET /api/attention`
+> reads approvals, blocked tasks, memory proposals, deliveries to review, held
+> MCP tools and containment signals from each subsystem's own record, returns
+> them by reference with id, severity, reason, origin, action and time, drops
+> an item once its subsystem resolves it and names an unreadable one as
+> unknown. Home's rail renders it. Steps 1, 3 and 6 (registry areas, Manage
+> grouping, aliases) were already in place through FIXED-705/706.
+
 **Decision:** Preserve specialist pages but simplify first-level navigation into
 three concepts: Work, Review and Manage. Create one aggregated Needs attention
 view rather than placing every subsystem alert in permanent navigation.
@@ -1854,6 +1862,11 @@ contract tests and account-delete restore/irreversibility evidence.
 
 ## DEC-11 — Turn Runtime settings into a guided boundary setup
 
+> **2026-10-11 (second round).** Step 6's deletion closed as [FIXED-865](FIXED_ITEMS.md#fixed-865--a-configured-runtime-could-be-turned-off-but-never-removed): a configured
+> target is removed only when no command runs there and, when it is the
+> default, together with the owner's choice of where work runs instead; what
+> ran there is kept.
+>
 > **2026-10-11.** Step 6's disable closed as [FIXED-857](FIXED_ITEMS.md#fixed-857--a-configured-runtime-could-not-be-turned-off-and-off-would-not-have-stopped-its-commands): turning a configured
 > target off stops new work, asks every command running there to stop, keeps
 > its evidence and settings, and says what stopped. Deletion with active
@@ -1890,6 +1903,9 @@ cleanup tests for every supported runtime type.
 
 ## DEC-12 — Define Tasks as a durable scheduler and run history
 
+> **2026-10-11 (second round).** Step 4's "reuse its idempotency key where the
+> destination supports it" closed for webhook deliveries as [FIXED-869](FIXED_ITEMS.md#fixed-869--a-webhook-delivery-carried-nothing-a-receiver-could-deduplicate-by).
+>
 > **2026-10-11.** Step 4's heartbeat closed as [FIXED-849](FIXED_ITEMS.md#fixed-849--a-scheduled-run-had-no-lease-so-one-nobody-was-working-on-stayed-running): a claim starts a
 > lease the worker renews every 30 seconds, a run unrenewed for five minutes is
 > settled as not finished on the next pass, and a worker that finds its claim
@@ -1970,6 +1986,13 @@ delivery failure and owner cancellation.
 
 ## DEC-13 — Give Memory one explicit lifecycle and review policy
 
+> **2026-10-11 (second round).** Step 3 closed as [FIXED-874](FIXED_ITEMS.md#fixed-874--nothing-said-which-memories-most-needed-the-owners-look-or-why): review priority is the
+> sum of named, weighted reasons (retention, sensitivity, verification and
+> provenance, conflict, use), a pin lowering it without exempting anything, and
+> Memory leads with *Worth reviewing first*. §13.2 item 4's suppression
+> tombstone closed as [FIXED-870](FIXED_ITEMS.md#fixed-870--a-memory-the-owner-forgot-could-be-proposed-or-written-straight-back): a forgotten sentence is not proposed or
+> written back; the owner adding it again restores it.
+
 **Decision:** Use the lifecycle Observed → Suggested → Approved →
 Reviewed/Expired → Archived → Deleted. Age raises review priority but does not
 delete by itself.
@@ -2008,6 +2031,14 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-11 (second round).** Step 7 is complete: the platform's own message id
+> ([FIXED-866](FIXED_ITEMS.md#fixed-866--a-delivered-message-had-no-reference-to-what-the-platform-accepted)), the dead-letter review of failed and unknown deliveries
+> ([FIXED-867](FIXED_ITEMS.md#fixed-867--a-delivery-that-failed-was-a-line-in-recent-activity-and-nothing-asked-anyone-to-look)) and a delivery a stopped host left queued settled as
+> *outcome unknown*, never resent ([FIXED-868](FIXED_ITEMS.md#fixed-868--a-delivery-a-stopped-host-was-in-the-middle-of-stayed-queued-for-ever), §13.2 item 7). Step 5's
+> signature, timestamp and nonce closed for the webhook as [FIXED-876](FIXED_ITEMS.md#fixed-876--a-webhook-message-carried-its-secret-on-the-wire-and-could-be-replayed-for-ever) — signed
+> messages within five minutes, accepted once, optionally required. BUG-315 is
+> unchanged.
+>
 > **2026-10-11.** Step 4 closed for the provider event id as [FIXED-844](FIXED_ITEMS.md#fixed-844--a-re-sent-channel-update-was-a-second-message-and-started-a-second-turn): Telegram's
 > `update_id` and a webhook's `Idempotency-Key` are claimed before any budget
 > is spent, and a repeat gets the first receipt and runs nothing. Step 8's
@@ -2073,6 +2104,11 @@ delivery retry/dead letter, pause and secret-redaction tests.
 
 ## DEC-15 — Put every MCP server behind explicit trust and isolation
 
+> **2026-10-11 (second round).** Step 2 closed for local servers as [FIXED-864](FIXED_ITEMS.md#fixed-864--a-local-mcp-server-could-only-be-given-a-secret-by-giving-it-to-every-local-server): a
+> secret is a name given to one server, its value in the vault, delivered to
+> that process only and replaced in what it writes back. A remote server keeps
+> its token reference.
+>
 > **2026-10-05.** Step 10's "updates show a permission diff and require review
 > when authority grows" holds for MCP servers: a tool a server adds or rewords
 > after the owner accepted it is held — not projected, refused if called — and
@@ -2701,6 +2737,12 @@ explicit amendment to these decisions.
 
 ## 13.4 DEC-22 — Session steering, compaction and delegation
 
+> **2026-10-11 (second round).** Step 3's retry closed as [FIXED-871](FIXED_ITEMS.md#fixed-871--a-retry-was-a-new-turn-that-nothing-linked-to-the-one-it-repeated): a Retry names
+> the turn it asks again, checked to be of the same conversation, and the
+> record and the transcript carry the link. Steps 1–2's stale-command refusal
+> closed as [FIXED-875](FIXED_ITEMS.md#fixed-875--a-late-stop-or-steer-was-applied-as-though-it-were-the-newest): each client numbers its stops and steers; an older
+> one is refused 409 and a repeated one applied once.
+>
 > **2026-10-11.** Step 2's queue is bounded ([FIXED-851](FIXED_ITEMS.md#fixed-851--instructions-for-a-running-turn-queued-without-limit)): twenty waiting
 > instructions, then `429 steer_queue_full` with nothing added. Refusing a stop
 > or steer sent when no turn is listed live was considered and not done: a stop
@@ -2806,6 +2848,10 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 
 ## 13.6 DEC-24 — Operational recovery, budgets and diagnostics
 
+> **2026-10-11 (second round).** Step 2's "cancelled calls that a provider still bills"
+> closed for Anthropic as [FIXED-872](FIXED_ITEMS.md#fixed-872--a-streamed-answer-the-owner-stopped-was-billed-and-counted-as-free); providers that report usage only at the
+> end of a stream are BUG-333.
+>
 > **2026-10-05.** Step 1's "do not label missing observations Healthy" closed
 > for the host's background passes as [FIXED-758](FIXED_ITEMS.md#fixed-758--a-background-pass-that-stopped-running-kept-saying-ok): a pass that has recorded nothing
 > for five minutes reads **not running**.

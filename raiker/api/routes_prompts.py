@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from hashlib import sha256
@@ -436,6 +437,15 @@ async def _prepare_turn(
         envelope = _build_envelope(body, session.principal_id, workspace)
     except ContractValidationError as exc:
         return _TurnRefusal(kind="invalid", response=_invalid_response(exc))
+    # DEC-22 step 3 — a Retry names the turn it asks again; the source must be
+    # a turn of this conversation, checked before anything is bound or written.
+    retry_of = (body.retry_of_turn_id or "").strip()
+    if retry_of and not body.session_id:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "retry_source_not_in_session")
+    if retry_of:
+        source = SQLiteStore(workspace).load_turn(retry_of)
+        if source is None or str(source.get("session_id")) != body.session_id:
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "retry_source_not_in_session")
     _bind_session_project(workspace, envelope.session_id, turn_project_id, principal)
     try:
         await _require_model_ready(request, session.principal_id, body.model_profile, body.model)
@@ -452,6 +462,10 @@ async def _prepare_turn(
             detail=exc.detail(),
         )
     _record_attachment_refs(workspace, envelope, session.principal_id)
+    if retry_of:
+        SQLiteStore(workspace).record_turn_retry(
+            turn_id=envelope.turn_id, retry_of_turn_id=retry_of, session_id=envelope.session_id
+        )
     return _PreparedTurn(
         envelope=envelope,
         gateway=AgentGateway(workspace, principal_id=session.principal_id),
@@ -539,6 +553,11 @@ async def stream_prompt(
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+#: DEC-22 steps 1–2 — what a client may call itself, and how far it may count.
+_CLIENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_MAX_CLIENT_SEQUENCE = 2**53
+
+
 @router.post("/api/interrupts")
 async def interrupts(
     body: InterruptRequest,
@@ -556,6 +575,35 @@ async def interrupts(
     session = store.load_session(body.session_id)
     if session is None or session.get("user_id") != user_id:
         raise refusal(status.HTTP_404_NOT_FOUND, "interrupt_target_not_found")
+
+    # DEC-22 steps 1–2 — one client's commands for one conversation are applied
+    # in the order it sent them: an older one arriving late is refused, and the
+    # same one sent twice is applied once.
+    if body.client_id is not None or body.client_sequence is not None:
+        if (
+            body.client_id is None
+            or body.client_sequence is None
+            or not _CLIENT_ID.fullmatch(body.client_id)
+            or isinstance(body.client_sequence, bool)
+            or not 0 <= body.client_sequence <= _MAX_CLIENT_SEQUENCE
+        ):
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "control_command_sequence_invalid")
+        digest = sha256(
+            json.dumps(
+                [body.action_type, body.task_id, body.all, body.reason, body.steer_text],
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()
+        verdict = store.claim_control_sequence(
+            body.session_id, body.client_id, int(body.client_sequence), digest
+        )
+        if verdict == "stale":
+            raise refusal(status.HTTP_409_CONFLICT, "control_command_stale")
+        if verdict == "duplicate":
+            repeated: InterruptResult = {
+                "applied": [], "safe_boundary": True, "turn_control": None, "duplicate": True,
+            }
+            return serialize_dto(repeated)
 
     if body.all:
         targets = [

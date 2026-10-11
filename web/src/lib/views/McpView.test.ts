@@ -86,6 +86,7 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     purpose: "Return the text it was given.",
     purpose_from: "server",
     pending_tools: [],
+    vault_env: [],
     ...partial,
   };
 }
@@ -119,6 +120,37 @@ function monitorRoutes(agentAccess: McpAgentAccess = access()) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("McpView", () => {
+  // DEC-15 step 2 — a secret for one server: a value goes in, names come back.
+  it("gives one server a secret from the vault and lists only its name", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/mcp/servers": [server({ vault_env: ["WEATHER_API_KEY"] })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "PUT /api/mcp/servers/mcp_1/secrets/GEO_KEY": {
+        ok: true, server_id: "mcp_1", names: ["GEO_KEY", "WEATHER_API_KEY"],
+      },
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    expect(await screen.findByText("Secrets for this server (1)")).toBeInTheDocument();
+    // The reach preview names it, as this server's only.
+    expect(screen.getByText(/also given WEATHER_API_KEY from the vault — this server only/)).toBeInTheDocument();
+    expect(screen.getByText("WEATHER_API_KEY")).toBeInTheDocument();
+    const box = screen.getByText("Secrets for this server (1)").closest("details")!;
+    await fireEvent.input(screen.getByLabelText("Variable name"), { target: { value: "GEO_KEY" } });
+    // Typing does not close the box it is typed into (found by the live round).
+    expect(box.open).toBe(true);
+    await fireEvent.input(screen.getByLabelText("Value"), { target: { value: "s3cret-geo" } });
+    expect(box.open).toBe(true);
+    await fireEvent.click(screen.getByRole("button", { name: "Give to this server" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/mcp/servers/mcp_1/secrets/GEO_KEY"),
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ value: "s3cret-geo" }) }),
+      ),
+    );
+    expect(await screen.findByText(/is started with GEO_KEY from now on/)).toBeInTheDocument();
+  });
+
   it("lists servers with status and discovered tools", async () => {
     stubFetch({
       "GET /api/mcp/servers": [server()],
@@ -129,6 +161,8 @@ describe("McpView", () => {
     await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
     expect(screen.getByText("Connected")).toBeInTheDocument();
     expect(screen.getByText("workspace_ping")).toBeInTheDocument();
+    // Found by the 2026-10-11 live round: the card printed the raw ISO string.
+    expect(screen.queryByText("2026-07-17T01:00:00Z")).toBeNull();
     expect(screen.getByText(/python .raiker\/mcp\/servers\/echo.py/)).toBeInTheDocument();
   });
 

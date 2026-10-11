@@ -221,12 +221,26 @@ Each approved memory provides owner controls:
 - **Archive / Restore** takes the record out of recall and keeps it, or brings
   it back exactly as it was.
 - **Forget** removes the memory from every retrieval path and leaves a tombstone
-  so projections can be reconciled safely.
+  so projections can be reconciled safely. The tombstone also stops the same
+  words coming back: a later turn that says them is not proposed again, and the
+  memory tool cannot write them. Adding the memory again yourself brings it back.
 - **Delete permanently** is the advanced, human-confirmed purge path.
 
 If a fact changes, edit/correct it rather than adding a contradictory duplicate.
 Corrections and supersession links let retrieval prefer the valid record while
 preserving an auditable history.
+
+## Worth reviewing first
+
+Memory's Overview leads with the records most worth a look, each with the
+reasons that put it there: past or near its review date, personal or
+unclassified, written by Raiker and never edited by you, written when Raiker
+was unsure, replacing an earlier memory, or not recalled for 90 days. Each
+reason has a fixed weight and a record's place is their sum, so the order can
+always be explained by reading the reasons. Pinning lowers a record's place but
+does not hide a reason — a pinned record that is expiring still says so. Age
+moves a record up the list and never removes it. **Show all worth reviewing**
+opens the Memories tab filtered and sorted that way.
 
 ## Archive, forget, and purge
 

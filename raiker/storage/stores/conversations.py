@@ -480,11 +480,78 @@ class ConversationStore:
         return True
 
     def list_turns(self: SQLiteStore, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        # DEC-22 step 3 — each turn carries the turn it retried, when it was one.
         rows = self._rows(
-            "SELECT * FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?",
+            """SELECT t.*, r.retry_of_turn_id AS retry_of_turn_id
+                 FROM turns t LEFT JOIN turn_retries r ON r.turn_id = t.turn_id
+                WHERE t.session_id = ? ORDER BY t.created_at ASC LIMIT ?""",
             (session_id, limit),
         )
         return [dict(row) for row in rows]
+
+    def claim_control_sequence(
+        self: SQLiteStore, session_id: str, client_id: str, sequence: int, digest: str
+    ) -> str:
+        """DEC-22 steps 1–2 — order one client's control commands for a session.
+
+        Returns ``"new"`` for the next command, ``"duplicate"`` for the same
+        command sent again under the number it already took (applied once), and
+        ``"stale"`` for anything older — or a different command reusing a
+        number — which is refused with nothing applied. Decided under one write
+        transaction, so two copies racing in cannot both be new.
+        """
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """SELECT last_sequence, last_digest FROM session_control_sequences
+                        WHERE session_id = ? AND client_id = ?""",
+                    (session_id, client_id),
+                ).fetchone()
+                verdict = "new"
+                if row is not None:
+                    last = int(row["last_sequence"])
+                    if sequence == last and str(row["last_digest"]) == digest:
+                        verdict = "duplicate"
+                    elif sequence <= last:
+                        verdict = "stale"
+                if verdict == "new":
+                    connection.execute(
+                        """INSERT INTO session_control_sequences
+                             (session_id, client_id, last_sequence, last_digest, updated_at)
+                           VALUES (?, ?, ?, ?, ?)
+                           ON CONFLICT(session_id, client_id) DO UPDATE SET
+                             last_sequence = excluded.last_sequence,
+                             last_digest = excluded.last_digest,
+                             updated_at = excluded.updated_at""",
+                        (session_id, client_id, sequence, digest, utc_now()),
+                    )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return verdict
+
+    def record_turn_retry(
+        self: SQLiteStore, *, turn_id: str, retry_of_turn_id: str, session_id: str
+    ) -> bool:
+        """DEC-22 step 3 — link a retry to the turn it asks again.
+
+        Only a turn of the same conversation can be a source; anything else is
+        refused (``False``) and nothing is written. Written before the retry's
+        own turn row exists, which is why the link is its own table.
+        """
+        source = self._row(
+            "SELECT session_id FROM turns WHERE turn_id = ?", (retry_of_turn_id,)
+        )
+        if source is None or str(source["session_id"]) != session_id:
+            return False
+        self._execute(
+            """INSERT OR IGNORE INTO turn_retries (turn_id, retry_of_turn_id, session_id, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (turn_id, retry_of_turn_id, session_id, utc_now()),
+        )
+        return True
 
     def count_turns_by_session(self: SQLiteStore, session_ids: list[str]) -> dict[str, int]:
         """How many turns each of these sessions holds (C11).

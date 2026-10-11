@@ -46,6 +46,19 @@ class MemoryWriteExecutor:
                 reason_code="missing_argument:text",
                 summary="Memory write denied: no text provided.",
             )
+        owner_principal_id = self._store.account_scope(principal.principal_id)
+        # §13.2 item 4 — Forget leaves a suppression tombstone. A write from a
+        # turn is not how something the owner forgot comes back; the owner adds
+        # it again themselves on Memory if they want it.
+        if self._store.memory_text_forgotten(text, owner_principal_id=owner_principal_id):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="memory_forgotten_by_owner",
+                summary=(
+                    "Memory write refused: the owner forgot this. It is not remembered "
+                    "again unless they add it themselves."
+                ),
+            )
         try:
             governance = self._build_governance(action)
         except (ValueError, TypeError) as exc:
@@ -66,7 +79,7 @@ class MemoryWriteExecutor:
             governance=governance,
             # A non-account principal (the terminal client) leaves this None so
             # write_memory falls back to the instance's original owner.
-            owner_principal_id=self._store.account_scope(principal.principal_id),
+            owner_principal_id=owner_principal_id,
         )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,

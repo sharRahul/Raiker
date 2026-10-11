@@ -30,6 +30,8 @@
     memoryPipeline,
     memoryState,
     retentionRows,
+    reviewReasonLabel,
+    worthReviewing,
     retentionSummary,
     type MemoryFilter,
   } from "../memoryLifecycle";
@@ -425,9 +427,11 @@
   const filtered = $derived(
     records.filter((m) => {
       return matchesFilter(m, statusFilter) && (scopeFilter === "all" || m.scope === scopeFilter) && (sensitivityFilter === "all" || m.sensitivity === sensitivityFilter) && (!pinnedOnly || m.pinned) && `${m.text} ${provenanceLabel(m)} ${m.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase());
-    }).sort((a, b) => sort === "review-date" ? (a.expires_at ?? "9999").localeCompare(b.expires_at ?? "9999") : b.created_at.localeCompare(a.created_at)),
+    }).sort((a, b) => sort === "review-date" ? (a.expires_at ?? "9999").localeCompare(b.expires_at ?? "9999") : sort === "review-priority" ? (b.review_priority ?? 0) - (a.review_priority ?? 0) || b.created_at.localeCompare(a.created_at) : b.created_at.localeCompare(a.created_at)),
   );
   const retention = $derived(retentionRows(retentionSummary(records)));
+  // DEC-13 step 3 — the records most worth a look, with the server's reasons.
+  const reviewFirst = $derived(worthReviewing(records));
   const pipeline = $derived(
     memoryPipeline({
       observations: observations ? observations.captured : null,
@@ -517,6 +521,25 @@
   </section>
   {/if}
 
+  <!-- DEC-13 step 3 — what is most worth a look, each with the reasons that
+       put it there. Age raises a record here and never removes it. -->
+  {#if reviewFirst.length > 0}
+  <section class="memory-section review-first" aria-label="Worth reviewing first">
+    <div class="section-head"><h3>Worth reviewing first</h3></div>
+    <ul class="review-list">
+      {#each reviewFirst as memory (memory.memory_id)}
+        <li>
+          <span class="review-text">{memory.text}</span>
+          <span class="review-reasons">
+            {#each memory.review_reasons ?? [] as reason (reason)}<span class="reason-chip">{reviewReasonLabel(reason)}</span>{/each}
+          </span>
+        </li>
+      {/each}
+    </ul>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={() => { sort = "review-priority"; selectTab("memories", "review"); }}>Show all worth reviewing</button>
+  </section>
+  {/if}
+
     {#if attention.length > 0}
       <!-- The attention half of the hub. Only decisions appear here:
            an expired memory has already stopped being recalled, so it is a fact
@@ -544,7 +567,7 @@
     <select bind:value={statusFilter} aria-label="Memory status">{#each MEMORY_FILTERS as option (option)}<option value={option}>{MEMORY_FILTER_LABELS[option]}</option>{/each}</select>
     <select bind:value={scopeFilter} aria-label="Memory scope"><option value="all">All scopes</option>{#each scopes as scope}<option value={scope}>{scope}</option>{/each}</select>
     <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
-    <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option></select>
+    <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option><option value="review-priority">Worth reviewing first</option></select>
     <label class="pinned-filter"><input type="checkbox" bind:checked={pinnedOnly} /> Pinned only</label>
   </section>
 
@@ -967,5 +990,14 @@
     .page-intro,.control-card,.posture-card { flex-direction:column; }
     .posture-action { white-space:normal; }
     .backend-field { min-width:0; width:100%; }
+  }
+  .review-list { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: var(--space-2); }
+  .review-list li { display: grid; gap: 0.25rem; padding-top: var(--space-2); border-top: 1px solid var(--border); min-width: 0; }
+  .review-text { overflow-wrap: anywhere; }
+  .review-reasons { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .reason-chip {
+    display: inline-flex; align-items: center; font-size: var(--text-2xs); font-weight: 650;
+    padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: var(--r-pill);
+    background: var(--sunken); color: var(--text-2);
   }
 </style>

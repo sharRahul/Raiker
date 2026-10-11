@@ -46,7 +46,7 @@ export const LIFECYCLE_VERBS = {
   forget: {
     label: "Forget",
     consequence:
-      "Erases the words and keeps a tombstone, so the audit history can still say a memory existed. Cannot be undone.",
+      "Erases the words and keeps a tombstone, so the audit history can still say a memory existed and a later turn cannot propose or write the same words back. Only you adding it again brings it back. Cannot be undone.",
     reversible: false,
   },
   purge: {
@@ -135,11 +135,12 @@ export function retentionSummary(
 }
 
 /** The Memories tab's list filters, and the ones a summary row links to. */
-export const MEMORY_FILTERS = ["active", "expires-soon", "stale", "expired", "archived", "all"] as const;
+export const MEMORY_FILTERS = ["active", "review", "expires-soon", "stale", "expired", "archived", "all"] as const;
 export type MemoryFilter = (typeof MEMORY_FILTERS)[number];
 
 export const MEMORY_FILTER_LABELS: Record<MemoryFilter, string> = {
   active: "Recallable",
+  review: "Worth reviewing",
   "expires-soon": "Expires soon",
   stale: "Stale — review",
   expired: "Expired",
@@ -162,6 +163,8 @@ export function matchesFilter(
       return true;
     case "active":
       return state !== "archived" && state !== "expired";
+    case "review":
+      return (memory.review_priority ?? 0) > 0;
     case "expires-soon":
       return state === "expires_soon";
     case "stale":
@@ -284,4 +287,35 @@ export function memoryPipeline(inputs: PipelineInputs, now: number = Date.now())
       href: "#/memory?tab=memories&filter=all",
     },
   ];
+}
+
+/**
+ * DEC-13 step 3 — each review reason in the owner's words. The server names the
+ * reasons and sums their weights; this only says them.
+ */
+export const REVIEW_REASON_LABELS: Record<string, string> = {
+  expired: "Past its review date — no longer recalled",
+  expires_soon: `Review date within ${EXPIRES_SOON_DAYS} days`,
+  personal: "Personal information",
+  unclassified: "Sensitivity not classified",
+  written_by_agent: "Written by Raiker, not yet edited by you",
+  low_confidence: "Raiker was unsure when it wrote this",
+  replaces_another: "Replaced an earlier memory",
+  stale: `Not recalled or edited in ${STALE_AFTER_DAYS} days`,
+  never_recalled: "Never recalled since it was written",
+};
+
+export function reviewReasonLabel(code: string): string {
+  return REVIEW_REASON_LABELS[code] ?? code.replaceAll("_", " ");
+}
+
+/** The records most worth a look, highest priority first, newest breaking ties. */
+export function worthReviewing(memories: MemoryControlView[], limit = 5): MemoryControlView[] {
+  return memories
+    .filter((memory) => (memory.review_priority ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        (b.review_priority ?? 0) - (a.review_priority ?? 0) || b.created_at.localeCompare(a.created_at),
+    )
+    .slice(0, limit);
 }

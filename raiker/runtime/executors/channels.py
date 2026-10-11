@@ -162,6 +162,7 @@ class ExternalChannelExecutor:
             arguments=action.arguments,
             text=text,
             delivered_at=delivered_at,
+            delivery_id=action.action_id,
         )
         if isinstance(built, AdapterRefusal):
             return receipt.settle(ExecutionResult(
@@ -172,7 +173,8 @@ class ExternalChannelExecutor:
 
         try:
             result = post_url(
-                url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
+                url, body, egress_allowlist=channel_egress_allowlist(), headers=headers,
+                keep_body=True,
             )
         except SandboxError as exc:
             return receipt.settle(ExecutionResult(
@@ -180,6 +182,9 @@ class ExternalChannelExecutor:
                 reason_code=str(exc),
                 summary="Channel delivery blocked (egress/transport).",
             ))
+        # DEC-14 step 7 — the platform's id for what it accepted, and nothing
+        # else of its answer: the response body is dropped here.
+        provider_id = adapter.provider_message_id(result.pop("body", b""))
         return receipt.settle(ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(
@@ -197,8 +202,9 @@ class ExternalChannelExecutor:
                 "sent_bytes": result["sent_bytes"],
                 "status": result["status"],
                 "signed": signed,
+                "provider_message_id": provider_id,
             },
-        ))
+        ), provider_message_id=provider_id)
 
 
 class _DeliveryReceipt:
@@ -229,7 +235,9 @@ class _DeliveryReceipt:
         except Exception:  # noqa: BLE001 — a missing ledger row never stops a governed send
             self._written = False
 
-    def settle(self, result: ExecutionResult) -> ExecutionResult:
+    def settle(
+        self, result: ExecutionResult, *, provider_message_id: str | None = None
+    ) -> ExecutionResult:
         if self._written:
             stage = "delivered_at" if result.ok else "failed_at"
             with suppress(Exception):
@@ -237,6 +245,7 @@ class _DeliveryReceipt:
                     self._id,
                     stages={stage: utc_now()},
                     reason_code=None if result.ok else result.reason_code,
+                    provider_message_id=provider_message_id,
                 )
         return result
 

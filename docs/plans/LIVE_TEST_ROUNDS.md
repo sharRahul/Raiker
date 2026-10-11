@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-11 (second) | Targeted | `2026-10-11-review-steps-round/` | **`scripts/live_ollama_standin.py`** serving `llama3.2:3b` on loopback (not Ollama, and every answer says so); the identity-linked Anthropic key supplied was entered through setup's Anthropic field and **could not be used** — it needs its workspace ID (BUG-332); a local receiver standing in for a webhook destination | Thirteen decision-record steps — DEC-15 step 2, DEC-11 step 6, DEC-14 steps 5 and 7, §13.2 items 4 and 7, DEC-12 step 4, DEC-22 steps 1–3, DEC-24 step 2, DEC-02 steps 2/4/5 and DEC-13 step 3 (FIXED-864 to FIXED-876). Proved live: **a Retry linked to its source after a reload**; **Home's server-backed attention feed** with a proposal and a delivery to review, the delivery gone once marked reviewed; **a delivery carrying its receipt id as `Idempotency-Key` and recording the receiver's own id**; **a delivery left queued by a stopped host read *outcome unknown* after restart**, never resent; **a signed webhook message accepted once**, its replay a repeat, a forged, altered or stale one refused; **a stale steer refused 409** and a repeated one applied once; **an SSH target removed**; **a secret given to one MCP server**, its value nowhere on the page; **a forgotten memory not proposed again**; Memory's *Worth reviewing first*; five pages at 390 wide, dark, with no horizontal overflow. **Three defects found and fixed** — a Retry proposed its memory twice (FIXED-877), the secrets box closed while typing (FIXED-878), two cards printed raw ISO times (FIXED-879); BUG-332 and BUG-333 filed |
 | 2026-10-11 | Targeted | `2026-10-11-channels-runtime-round/` | **OpenRouter** `openai/gpt-4o-mini` answering a Chat turn, the key entered through Connect; a local receiver standing in for a webhook destination | Fourteen decision-record steps — DEC-14 steps 3, 4, 7 and 8, DEC-24 steps 1 and 7, DEC-12 step 4, DEC-22 step 2, DEC-08 step 6, DEC-25, DEC-23 step 4 and DEC-11 step 6 (FIXED-844 to FIXED-857), with BUG-328 and BUG-329 closed. Proved live: **one Telegram update sent three times kept as one message**, a webhook `Idempotency-Key` answered with the first receipt, a malformed key refused 422; **an allowed sender named @rahul_live (4242)** from their own message; **Turn on refused until a test was delivered**, then on; a test receipt *queued → delivered*; **a configured SSH target turned off** with what stopped; memory pressure `ok` beside every pass `ok`; Messaging at 390 wide, dark, no overflow. **Three defects found and fixed** — setup ignored a chosen model (FIXED-858), the step-up window named the owner by id (FIXED-859), a fingerprint check never ran (FIXED-860) |
 | 2026-10-10 (second) | Targeted | `2026-10-10-spend-limit-round/` | **OpenRouter** `openai/gpt-4o-mini`, nine turns answered through Chat; OpenAI and the identity-linked Anthropic key connected through Connect, not exercised | Thirteen decision-record steps — DEC-17 step 7 (space, health check, compatibility), DEC-21 Updates (size, notes), DEC-12 step 4 (fencing), DEC-15 step 10 (plugin growth), DEC-24 steps 1, 2 and 7 (disk pressure, owner-wide spending limit, SAST and container gates), DEC-14 step 1 (capabilities, reply limit) as FIXED-828 to FIXED-842. Proved live: **a $0.01 limit reached by real spend stopped the next turn before any model call**, and clearing it let the next answer; **what each channel carries** at 1440 and at 390 dark with no overflow; storage space `ok`. **One defect found and fixed** — OpenRouter turns recorded no usage (FIXED-841); one filed (BUG-328) |
 | 2026-10-10 | Targeted | `2026-10-10-revisions-round/` | **None answered.** The Anthropic key supplied (`sk-ant-usr-…`, identity-linked) was entered through the Connect dialog; Anthropic refuses every call from it without an `anthropic-workspace-id`, which the key alone cannot look up | Thirteen decision-record steps from the release-readiness review — §13.2 item 6 for MCP, channels and projects, DEC-15 step 10's acceptance binding, DEC-14 step 10, DEC-21 (Personalisation, Updates, Git credential), DEC-24 steps 3, 5 and 7 and DEC-17 step 10 (FIXED-813 to FIXED-826). Proved live: the identity-linked key **explained, not called bad**; Compact and Dark **previewed unsaved and put back by Discard**; **a stale Messaging tab's sender list refused** with the newer list kept; **a paused channel keeping a message and starting nothing**; **a stale project editor refused with its text kept**; **an MCP tool reworded after the card was drawn not accepted**, and a stale rename refused; **a backup carrying 1 checkpoint file and 1 upload**; recovery points that can and cannot open this data; the credential's last loan; the recovery matrix; Messaging at 390 wide, dark, with no overflow; and, across a restart, **a routine left running settled and moved to its next slot**. **One defect found and fixed** — that routine had stayed running for ever (FIXED-825) |
@@ -96,6 +97,51 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-11 (second) — Deliveries that say what became of them, a feed of what waits, and a secret for one server
+
+**Tier:** Targeted. **Build:** `main` at `9f4de0a` plus this run's working tree.
+**Host:** `raiker-web` on Linux, a workspace reset with
+`scripts/reset_live_workspace.py`, `RAIKER_CHANNEL_INBOUND_SECRET` and a
+loopback channel egress allowlist set, driven by Playwright against the built
+web app. The host was stopped and started once on purpose (step 5).
+
+**Providers.** The identity-linked Anthropic key supplied (`sk-ant-usr-…`) was
+entered through setup's Anthropic field only and appears in no capture, source
+or log committed. Anthropic needs the key's workspace ID before it lists or
+answers anything; none was supplied, so no Anthropic turn ran (BUG-332). Chat
+turns were answered by **`scripts/live_ollama_standin.py`** serving
+`llama3.2:3b` on loopback — a stand-in, not Ollama, chosen through setup's
+Ollama row; every answer it gives says so. A loopback receiver stood in for a
+webhook destination and answered each delivery with its own id.
+
+**What it proved** (captures `01`–`10`, each in the folder's `manifest.json`):
+
+| Step | Evidence |
+|---|---|
+| FIXED-871 | *Rahul prefers tea*, then **Retry**: the second turn reads *Retry of an earlier turn — that turn is kept as it was*, and still does after a reload ([01](../screenshots/2026-10-11-review-steps-round/01-retry-linked-to-its-source.png)) |
+| FIXED-873 | Home: *2 proposed memories to review* and *1 delivery on a channel needs a look*, each with its one action; after the delivery was marked reviewed `/api/attention` listed only the proposals ([02](../screenshots/2026-10-11-review-steps-round/02-home-attention-feed.png)) |
+| FIXED-866, FIXED-869 | A webhook test refused by the closed capability, then — after **Turn on** in Permissions with its reason and threat-model acknowledgement — delivered: *Delivered · the channel's id for it is rcv-0001*; the receiver logged `Idempotency-Key` equal to the receipt id and `delivery_id` in the body ([03](../screenshots/2026-10-11-review-steps-round/03-delivery-id-and-review-list.png)) |
+| FIXED-867 | *Deliveries to review (1)* with the refusal and *Fix what stopped it, then send another test*; **Mark reviewed** took it off the list and left it *failed* in recent activity ([04](../screenshots/2026-10-11-review-steps-round/04-delivery-marked-reviewed.png)); at 390 wide, dark ([09](../screenshots/2026-10-11-review-steps-round/09-messaging-review-390-dark.png)) |
+| FIXED-868 | With the host stopped, one outbound receipt was seeded *queued* in the workspace's own store (a stand-in for a send the host was cut off in); after the restart it read *Outcome unknown — Raiker stopped while sending it. It was not sent again.* and the receiver had still been sent one delivery in all ([08](../screenshots/2026-10-11-review-steps-round/08-outcome-unknown-after-restart.png)) |
+| FIXED-876 | Against the running host: a signed message → 200; the same bytes again → the first message's id with `duplicate_event`; an altered body and a wrong key → 401 `channel_signature_invalid`; ten minutes old → 401 `channel_signature_expired` |
+| FIXED-875 | From the signed-in page: stop #2 applied; steer #1 → 409 `control_command_stale`; steer #3 queued; steer #3 again → `duplicate: true`, nothing queued twice |
+| FIXED-865 | An SSH target added through Runtime's form and removed: *Remove Build host? Its settings go; commands that ran here stay in the record.* then *Build host was removed.* ([05](../screenshots/2026-10-11-review-steps-round/05-runtime-target-removed.png)) |
+| FIXED-864 | MCP builder and connector turned on in Permissions, the `weather` sample generated, `WEATHER_API_KEY` given to it through **Secrets for this server**, Test connected with 2 tools; the value appears nowhere on the page ([06](../screenshots/2026-10-11-review-steps-round/06-mcp-server-secret.png), 390 dark: [10](../screenshots/2026-10-11-review-steps-round/10-mcp-secrets-390-dark.png)) |
+| FIXED-874 | The approved proposal on Memory → Overview under *Worth reviewing first* with *Sensitivity not classified* ([07](../screenshots/2026-10-11-review-steps-round/07-memory-worth-reviewing.png)) |
+| FIXED-870 | The memory forgotten from its card's **More** — the confirmation saying a later turn cannot propose or write the words back — then *Rahul prefers tea* in a new conversation: `/api/memory/proposals` stayed empty |
+| — | Messaging, MCP servers, Memory, Home and Runtime at 390×844, dark: horizontal overflow 0 px on every one |
+
+**What it found.** Three defects, each fixed in the run: the Retry of a turn
+proposed its memory a second time (FIXED-877); the MCP secrets box closed on
+the first keystroke (FIXED-878); the MCP card and the Runtime card printed raw
+ISO times (FIXED-879). Filed: setup recommends choosing a model from an
+Anthropic key that cannot list any until its workspace ID is added (BUG-332),
+and a stopped OpenAI-compatible stream still records no usage (BUG-333).
+Console errors in the round are the expected refusals — a 403 from the test
+while the capability was off and a 409 from the stale steer. FIXED-872 is
+proved by its tests only: no provider this round reports usage before the end
+of a stream.
 
 ## 2026-10-11 — A re-sent update kept once, a channel proven before it goes on, and a runtime that can be turned off
 

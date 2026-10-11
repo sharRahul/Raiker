@@ -141,6 +141,8 @@ describe("MessagingView", () => {
     // The webhook profile declares a *signed* callback. Whether a delivery is
     // actually signed is a fact about the bytes, not about the profile.
     expect(within(posture).getByText("Signing").closest("li")).toHaveTextContent("Unsigned");
+    // DEC-14 step 5 — signed inbound messages are accepted, not yet required.
+    expect(within(posture).getByText("Signed messages").closest("li")).toHaveTextContent("Accepted");
   });
 
   it("offers pairing, and says pairing is not switching on", async () => {
@@ -255,6 +257,60 @@ describe("MessagingView", () => {
     );
     await waitFor(() =>
       expect(screen.getByText(/is paused\. Messages are kept; nothing starts and nothing is sent/)).toBeInTheDocument(),
+    );
+  });
+
+  // DEC-14 step 7 — the dead-letter list, and marking one reviewed sends nothing.
+  it("lists deliveries to review and marks one reviewed without sending it again", async () => {
+    const failed = {
+      receipt_id: "act_9",
+      direction: "outbound" as const,
+      kind: "message" as const,
+      sender_role: null,
+      conversation_scope: null,
+      routing_mode: null,
+      session_id: null,
+      received_at: null,
+      accepted_at: null,
+      queued_at: "2026-10-11T10:00:00Z",
+      processed_at: null,
+      reply_queued_at: null,
+      delivered_at: null,
+      failed_at: null,
+      outcome_unknown_at: "2026-10-11T10:05:00Z",
+      reason_code: "delivery_outcome_unknown",
+      created_at: "2026-10-11T10:00:00Z",
+    };
+    const on = {
+      ...channelsView().profiles[0],
+      linked: true,
+      enabled: true,
+      pairing_id: "chp_1",
+      display_label: "Webhooks",
+      sender_count: 1,
+      senders: ["ops"],
+      deliveries_to_review: [failed],
+    };
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({ profiles: [on] }),
+      "POST /api/channels/deliveries/act_9/reviewed": {
+        ok: true, receipt_id: "act_9", reviewed_at: "2026-10-11T11:00:00Z",
+      },
+    });
+    render(MessagingView);
+    const list = await screen.findByRole("region", { name: "Webhooks deliveries to review" });
+    expect(within(list).getByText("Deliveries to review (1)")).toBeInTheDocument();
+    expect(within(list).getByText(/Outcome unknown — Raiker stopped while sending it/)).toBeInTheDocument();
+    expect(within(list).getByText(/may already be there/)).toBeInTheDocument();
+    await fireEvent.click(within(list).getByRole("button", { name: "Mark reviewed" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/channels/deliveries/act_9/reviewed"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/channels/deliver-test"), expect.anything(),
     );
   });
 

@@ -47,6 +47,16 @@ const SET_DECISION_MODE = {
   deny: contract.denyCapability,
 } as const;
 
+/** This tab's name for itself when it sends a control command (DEC-22). */
+const CONTROL_CLIENT_ID = `web-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+let controlSequence = 0;
+
+/** The next number in this tab's count of control commands. */
+export function nextControlSequence(): { client_id: string; client_sequence: number } {
+  controlSequence += 1;
+  return { client_id: CONTROL_CLIENT_ID, client_sequence: controlSequence };
+}
+
 export const api = {
   restoreSession,
   // DEC-01 — the signed-in owner as they are shown: a display name, not an id.
@@ -302,9 +312,18 @@ export const api = {
   // UX-MSG-04 — a test names no destination; it goes where the channel delivers.
   deliverChannelTest: (connector_id: string, text: string) =>
     contract.deliverChannelTest({ connector_id, text }),
+  // DEC-14 step 7 — take a failed or unknown delivery off the review list.
+  // Nothing is sent again; what happened to it is unchanged.
+  markChannelDeliveryReviewed: (receiptId: string) => contract.markChannelDeliveryReviewed(receiptId),
   setChannelDestination: (pairingId: string, delivery_url: string | null, revision?: string | null) =>
     contract.setChannelDestination(pairingId, { delivery_url, expected_revision: revision ?? null }),
+  // DEC-02 — everything waiting on the owner, read from each subsystem's record.
+  attention: () => contract.getAttention(),
   mcpServers: () => contract.listMcpServers(),
+  // DEC-15 step 2 — a secret for one local server. Values go in; names come back.
+  setMcpServerSecret: (serverId: string, name: string, value: string) =>
+    contract.setMcpServerSecret(serverId, name, { value }),
+  removeMcpServerSecret: (serverId: string, name: string) => contract.removeMcpServerSecret(serverId, name),
   // BUG-221 — servers installed plugins *offer*. An offer is a description, not
   // a connection: adding one posts to the ordinary create routes above, so the
   // capability gate and the audit event apply exactly as they would by hand.
@@ -613,6 +632,9 @@ export const api = {
   // DEC-11 step 6 — off stops what runs there and keeps the settings.
   setExecutionEnvironmentEnabled: (profile_id: string, enabled: boolean) =>
     contract.setExecutionEnvironmentEnabled(profile_id, { enabled }),
+  // DEC-11 step 6 — remove a configured target; `move_to` is required when it is the default.
+  removeExecutionEnvironment: (profile_id: string, move_to: string | null) =>
+    contract.removeExecutionEnvironment(profile_id, move_to ? { move_to } : {}),
   commandRuns: (sessionId?: string) =>
     contract.listCommands(sessionId ? { session_id: sessionId } : {}),
   commandRun: (runId: string) => contract.getCommand(runId),
@@ -998,7 +1020,11 @@ export const api = {
   // Non-streaming prompt submit; returns the final governed AgentResponse.
   submitPrompt: (body: PromptRequestBody) => contract.submitPrompt(body),
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
-  interrupt: (body: InterruptRequestBody) => contract.interrupts(body),
+  // DEC-22 steps 1–2 — every stop and steer this tab sends carries the tab's
+  // id and the next number in its own count, so the server applies them in
+  // the order they were sent and a retransmitted one once.
+  interrupt: (body: InterruptRequestBody) =>
+    contract.interrupts({ ...body, ...nextControlSequence() }),
   // GEP-02 — what the stop switch would reach beyond the task list: the turns
   // writing an answer right now and the commands still running.
   workInFlight: () => contract.workInFlight(),

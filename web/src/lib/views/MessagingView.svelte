@@ -25,6 +25,7 @@
     receiptOutcome,
     receiptStages,
     receiptTitle,
+    reviewAdvice,
     routeScopeFacts,
     channelCapabilityFacts,
   } from "../channelSetup";
@@ -619,6 +620,43 @@
               </dl>
             </details>
 
+            <!-- DEC-14 step 7 — the dead-letter list: deliveries that did not
+                 arrive, or may not have. Marking one reviewed takes it off this
+                 list and changes nothing else; nothing is ever sent again. -->
+            {#if (profile.deliveries_to_review ?? []).length > 0}
+              <section
+                class="receipts review-list"
+                aria-label={`${profile.display_name} deliveries to review`}
+              >
+                <h3>Deliveries to review ({(profile.deliveries_to_review ?? []).length})</h3>
+                <ul>
+                  {#each profile.deliveries_to_review ?? [] as receipt (receipt.receipt_id)}
+                    <li>
+                      <span class="receipt-head">
+                        <strong>{receiptTitle(receipt)}</strong>
+                        <span class="note">{relativeTime(receipt.created_at)}</span>
+                      </span>
+                      <span class="note">{receiptOutcome(receipt)}</span>
+                      <span class="note">{reviewAdvice(receipt)}</span>
+                      <span>
+                        <button
+                          type="button"
+                          class="btn btn-sm"
+                          disabled={channelBusy !== null}
+                          onclick={() =>
+                            void runChannelAction(
+                              `review:${receipt.receipt_id}`,
+                              () => api.markChannelDeliveryReviewed(receipt.receipt_id),
+                              "Marked reviewed. It stays in the channel's record as it was.",
+                            )}
+                        >Mark reviewed</button>
+                      </span>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/if}
+
             <!-- UX-MSG-06 — received, accepted, queued, processed, reply queued,
                  delivered and failed are separate facts, so a finished turn is
                  never read as a delivered reply. -->
@@ -636,7 +674,10 @@
                       </span>
                       <span class="receipt-stages">
                         {#each receiptStages(receipt) as stage (stage)}
-                          <span class="hook-tag" class:hook-tag-failed={stage === "failed"}>{stage}</span>
+                          <span
+                            class="hook-tag"
+                            class:hook-tag-failed={stage === "failed" || stage === "outcome unknown"}
+                          >{stage}</span>
                         {/each}
                       </span>
                       <span class="note">
@@ -755,6 +796,22 @@
           Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>; unset refuses every message.
         </span>
       </li>
+      <!-- DEC-14 step 5 — a webhook sender may sign each message instead of
+           sending the secret; the owner can require it. -->
+      <li>
+        <strong>Signed messages</strong>
+        <span class="hook-tag">
+          {channels.inbound.signature_required ? "Required" : "Accepted"}
+        </span>
+        <span class="note">
+          A webhook sender may send <code>X-Raiker-Timestamp</code> and
+          <code>X-Raiker-Signature</code> (HMAC-SHA256 of the timestamp, a dot and the body)
+          instead of the secret. Each is refused after five minutes and accepted once.
+          {channels.inbound.signature_required
+            ? "An unsigned webhook message is refused."
+            : "Set RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE to refuse unsigned ones."}
+        </span>
+      </li>
       <li>
         <strong>Rate limit</strong>
         <span class="hook-tag">
@@ -810,6 +867,7 @@
   .route-scope dt { color: var(--text-3); }
   .route-scope dd { margin: 0; color: var(--text-2); }
   .receipts { margin-top: var(--space-2); }
+  .review-list h3 { color: var(--warn-text); }
   .receipts h3 { margin: 0 0 0.3rem; font-size: var(--text-sm); color: var(--text-2); }
   .receipts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
   .receipts li { display: grid; gap: 0.15rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }

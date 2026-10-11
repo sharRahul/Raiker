@@ -74,7 +74,13 @@ first attempt only answered, Retry just answers again. If it *did* something —
 wrote a file, ran a command, sent a message — Raiker asks first and names what
 would happen a second time, because it cannot know whether repeating those is
 safe and you can. A turn that only read is never asked about: a question on
-every retry is a question nobody reads.
+every retry is a question nobody reads. The new turn is recorded as a retry of
+the one it repeats — *Retry of an earlier turn* links back to it, and the
+earlier turn is kept exactly as it was.
+
+Each tab numbers the stops and steers it sends to a running turn. One that
+arrives after a later one from the same tab is refused rather than applied out
+of order, and the same one sent twice is applied once.
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 
 ### Approval policy

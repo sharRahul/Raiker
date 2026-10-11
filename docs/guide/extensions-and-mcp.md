@@ -147,7 +147,16 @@ If a server genuinely needs a named variable, grant it by name:
 RAIKER_MCP_ENV_ALLOWLIST=MY_SERVER_TOKEN,NODE_PATH
 ```
 
-Every name listed is passed through to every local MCP server. The two variables
+Every name listed is passed through to every local MCP server. To give a secret
+to **one** server instead, use **Secrets for this server** on its card: a
+variable name and its value, which Raiker keeps in the encrypted vault and adds
+to that server's environment when it starts it — no other server gets it, the
+page only ever shows the name, and Raiker replaces the value in whatever the
+server writes back before anything reads it. Names Raiker sets itself (`PATH`,
+`HOME` and the rest) cannot be used, and removing the server removes its
+secrets. *What it can reach* lists them as this server's own.
+
+The two variables
 that configure this boundary — `RAIKER_MCP_ENV_ALLOWLIST` itself and
 `RAIKER_MCP_COMMAND_ALLOWLIST` — cannot be passed through it, so a line written
 to make one server work cannot quietly widen the rule it is written against.

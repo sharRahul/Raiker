@@ -332,7 +332,12 @@ once and revisited; More lists it under **Review** too.
 is progress and stays on the board below with its Stop control; what reaches the
 rail is work that will not move again until you act — a run waiting on an
 approval, or a paused one — along with approvals themselves and any runtime
-readiness problem.
+readiness problem. Below those, the rail lists what else is waiting on you from
+each part of Raiker's own record — memories it proposed, a channel delivery that
+did not arrive, an MCP tool held for your review, a containment signal — each
+with the one place to resolve it. An item goes away when that part of Raiker
+says it is resolved; a part that could not be read is named rather than taken
+as clear.
 
 **"Nothing needs you right now" is a claim about all three, and it is only made
 when all three were read.** If Raiker cannot read its own readiness it says so

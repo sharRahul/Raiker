@@ -40,6 +40,10 @@ export function testReason(code: string | null | undefined): string {
   if (value === "disabled_by_capability_gate")
     return "the channel capability is off in Permissions";
   if (value === "channel_destination_missing") return "no delivery URL is set";
+  // DEC-14 step 7 — the host stopped while sending; it may have arrived.
+  if (value === "delivery_outcome_unknown")
+    return "Raiker stopped while sending it, so it may or may not have arrived";
+  if (value.startsWith("delivery_failed")) return "the destination could not be reached";
   if (value === "channel_paused") return "the channel is paused — resume it to deliver";
   if (value === "telegram_bot_token_missing") return "RAIKER_TELEGRAM_BOT_TOKEN is not set";
   if (value === "telegram_chat_id_missing") return "no owner sender is chosen to deliver to";
@@ -217,7 +221,8 @@ export type ReceiptStage =
   | "processed"
   | "reply queued"
   | "delivered"
-  | "failed";
+  | "failed"
+  | "outcome unknown";
 
 /**
  * UX-MSG-06 — the stages a receipt has reached, in order, each a separate fact.
@@ -232,6 +237,7 @@ export function receiptStages(receipt: Receipt): ReceiptStage[] {
     ["reply queued", receipt.reply_queued_at],
     ["delivered", receipt.delivered_at],
     ["failed", receipt.failed_at],
+    ["outcome unknown", receipt.outcome_unknown_at ?? null],
   ];
   return stages.filter(([, at]) => Boolean(at)).map(([stage]) => stage);
 }
@@ -264,14 +270,34 @@ export function receiptConversationHref(receipt: Receipt): string | null {
 /** Where a receipt stopped, when it stopped short. */
 export function receiptOutcome(receipt: Receipt): string {
   if (receipt.failed_at) return `Failed: ${testReason(receipt.reason_code)}`;
+  // DEC-14 step 7 — settled at start for a delivery the host stopped mid-send.
+  if (receipt.outcome_unknown_at)
+    return "Outcome unknown — Raiker stopped while sending it. It was not sent again.";
   // DEC-14 step 10 — kept while the channel was paused, never acted on.
   if (receipt.reason_code === "channel_paused") return "Kept while paused — nothing started";
-  if (receipt.kind === "test_delivery" || receipt.direction === "outbound")
-    return receipt.delivered_at ? "Delivered" : "Sending";
+  if (receipt.kind === "test_delivery" || receipt.direction === "outbound") {
+    if (!receipt.delivered_at) return "Sending";
+    // DEC-14 step 7 — the platform's own reference, when it gave one.
+    return receipt.provider_message_id
+      ? `Delivered · the channel's id for it is ${receipt.provider_message_id}`
+      : "Delivered";
+  }
   if (receipt.delivered_at) return "Answered and returned to the caller";
   if (receipt.processed_at) return "Processed — no reply sent over the channel";
   if (receipt.queued_at) return "Waiting — queued for work";
   return "Recorded — the route starts nothing";
+}
+
+/**
+ * DEC-14 step 7 — what the owner can do about a delivery on the review list.
+ * Raiker never sends one again on its own: a failed one may be fixed and sent
+ * again by whatever asked for it, and an unknown one may already have arrived.
+ */
+export function reviewAdvice(receipt: Receipt): string {
+  if (receipt.outcome_unknown_at)
+    return "Check the channel before sending it again — it may already be there.";
+  if (receipt.kind === "test_delivery") return "Fix what stopped it, then send another test.";
+  return "Fix what stopped it; whatever asked for the message can send it again.";
 }
 
 type Capabilities = NonNullable<ChannelProfile["capabilities"]>;

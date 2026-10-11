@@ -219,6 +219,24 @@ export type AttachmentProvenance = {
   filename: string;
 };
 
+export type AttentionFeedView = {
+  items: AttentionItemView[];
+  unknown: string[];
+};
+
+/** One thing waiting on the owner, by reference. */
+export type AttentionItemView = {
+  id: string;
+  severity: "containment" | "blocking" | "waiting";
+  title: string;
+  reason: string;
+  origin_kind: string;
+  origin_id: string | null;
+  href: string;
+  action_label: string;
+  since: string | null;
+};
+
 /** The manifest of an export just produced; never its events. */
 export type AuditExportResult = {
   ok: boolean;
@@ -618,6 +636,13 @@ export type ChannelCapabilities = {
   authentication: string;
 };
 
+/** DEC-14 step 7 — a failed or unknown delivery is off the review list. */
+export type ChannelDeliveryReviewed = {
+  ok: boolean;
+  receipt_id: string;
+  reviewed_at: string;
+};
+
 /** UX-MSG-04 — where this channel delivers, bound on the pairing. */
 export type ChannelDestination = {
   kind: "url" | "owner_chat" | "none";
@@ -740,6 +765,7 @@ export type ChannelProfile = {
   last_test: ChannelLastTest | null;
   route_scope: ChannelRouteScope;
   receipts: ChannelReceipt[];
+  deliveries_to_review?: ChannelReceipt[];
   capabilities: ChannelCapabilities | null;
 };
 
@@ -761,6 +787,9 @@ export type ChannelReceipt = {
   failed_at: string | null;
   reason_code: string | null;
   created_at: string;
+  provider_message_id?: string | null;
+  outcome_unknown_at?: string | null;
+  reviewed_at?: string | null;
 };
 
 /** UX-MSG-05 — what the stored route actually does, stated by the server. */
@@ -810,6 +839,7 @@ export type ChannelTestDelivered = {
   sent_bytes: number;
   status: number;
   signed: boolean;
+  provider_message_id?: string | null;
 };
 
 /** One test delivery through the governed outbound path. */
@@ -848,6 +878,7 @@ export type ChannelUpdateIgnored = {
 /** Empty when the connector registry could not be read. */
 export type ChannelsInbound = {
   secret_configured?: boolean;
+  signature_required?: boolean;
   rate_limit_per_minute?: number;
   quarantined?: boolean;
   instructions_inert?: boolean;
@@ -1816,6 +1847,15 @@ export type ExecutionEnvironmentProbed = {
   environment: ExecutionEnvironmentView;
 };
 
+/** DEC-11 step 6 — a configured environment removed; what ran there is kept. */
+export type ExecutionEnvironmentRemoved = {
+  ok: boolean;
+  profile_id: string;
+  removed: boolean;
+  name: string;
+  selected_profile_id: string | null;
+};
+
 export type ExecutionEnvironmentReset = {
   ok: boolean;
   profile_id: string;
@@ -2458,6 +2498,8 @@ export type InterruptRequest = {
   action_type?: string;
   reason?: string;
   steer_text?: string | null;
+  client_id?: string | null;
+  client_sequence?: number | null;
 };
 
 /** Interrupts land at a safe boundary; ``turn_control`` is null when a task was named. */
@@ -2465,6 +2507,7 @@ export type InterruptResult = {
   applied: TaskInterrupted[];
   safe_boundary: boolean;
   turn_control: TurnControl | null;
+  duplicate?: boolean;
 };
 
 /** The first-run owner session, with the CSRF token for its cookie. */
@@ -2750,6 +2793,18 @@ export type McpServerRenamed = {
   name: string;
 };
 
+export type McpServerSecretRequest = {
+  value: string;
+};
+
+/** DEC-15 step 2 — the secret names one local server is given. Never values. */
+export type McpServerSecrets = {
+  ok: boolean;
+  server_id: string;
+  names: string[];
+  updated_at?: string | null;
+};
+
 /**
  * Owner-scoped view of one local stdio MCP server profile (Control Deck task 4). ``command`` is
  * the argv (interpreter + workspace-relative script); it is never a secret or a remote
@@ -2781,6 +2836,7 @@ export type McpServerView = {
   purpose: string | null;
   purpose_from: "plugin" | "server" | "none";
   pending_tools: PendingTool[];
+  vault_env: string[];
 };
 
 /** Owner-scoped, redacted monitor row for one MCP connection session. */
@@ -2855,6 +2911,8 @@ export type MemoryControlView = {
   last_recalled_session_id: string | null;
   last_recalled_turn_id: string | null;
   last_recalled_origin: string | null;
+  review_priority: number;
+  review_reasons: string[];
 };
 
 export type MemoryCorrected = {
@@ -3904,6 +3962,7 @@ export type PromptRequest = {
   planning_mode?: string | null;
   approval_mode?: string | null;
   model_profile?: string | null;
+  retry_of_turn_id?: string | null;
   model?: string | null;
   reasoning_effort?: string | null;
   max_tool_calls?: number | null;
@@ -5063,6 +5122,7 @@ export type TurnView = {
   reasoning: string | null;
   tool_rows: Record<string, unknown>[];
   content_parts: ContentPartView[];
+  retry_of_turn_id: string | null;
 };
 
 /** Something a server offers that Raiker does not use, in one sentence. */
@@ -5284,6 +5344,8 @@ export const contract = {
     call<AgentResponse>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resume`),
   uploadAttachment: (body: UploadAttachmentRequest) =>
     call<UploadedAttachment>("POST", "/api/attachments", { body }),
+  getAttention: () =>
+    request<AttentionFeedView>("/api/attention"),
   createAuditExport: (query: { session_id?: string; project_id?: string } = {}) =>
     call<AuditExportResult>("POST", withQuery("/api/audit/export", query)),
   listAuditExports: (query: { limit?: number } = {}) =>
@@ -5380,6 +5442,8 @@ export const contract = {
     request<ChannelsView>("/api/channels"),
   deliverChannelTest: (body: ChannelTestDeliveryRequest) =>
     call<ChannelTestDelivered>("POST", "/api/channels/deliver-test", { body }),
+  markChannelDeliveryReviewed: (receiptId: string) =>
+    call<ChannelDeliveryReviewed>("POST", `/api/channels/deliveries/${encodeURIComponent(receiptId)}/reviewed`),
   pairChannel: (body: PairChannelRequest) =>
     call<ChannelPaired>("POST", "/api/channels/pairings", { body }),
   unpairChannel: (pairingId: string, query: { expected_revision?: string } = {}) =>
@@ -5396,8 +5460,8 @@ export const contract = {
     call<ChannelSendersSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/senders`, { body }),
   receiveApprovalResponse: (connectorId: string, body: ChannelApprovalResponse, xRaikerChannelSecret?: string) =>
     call<ApprovalRelayAnswered>("POST", `/api/channels/${encodeURIComponent(connectorId)}/approval-response`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret } }),
-  receiveInbound: (connectorId: string, body: InboundChannelMessage, xRaikerChannelSecret?: string, idempotencyKey?: string) =>
-    call<ChannelInboundAccepted>("POST", `/api/channels/${encodeURIComponent(connectorId)}/inbound`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret, "idempotency-key": idempotencyKey } }),
+  receiveInbound: (connectorId: string, body: InboundChannelMessage, xRaikerChannelSecret?: string, idempotencyKey?: string, xRaikerTimestamp?: string, xRaikerSignature?: string) =>
+    call<ChannelInboundAccepted>("POST", `/api/channels/${encodeURIComponent(connectorId)}/inbound`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret, "idempotency-key": idempotencyKey, "x-raiker-timestamp": xRaikerTimestamp, "x-raiker-signature": xRaikerSignature } }),
   receiveTelegram: (connectorId: string, body: Record<string, unknown>, xTelegramBotApiSecretToken?: string) =>
     call<ChannelInboundAccepted | ChannelUpdateIgnored>("POST", `/api/channels/${encodeURIComponent(connectorId)}/telegram`, { body, headers: { "x-telegram-bot-api-secret-token": xTelegramBotApiSecretToken } }),
   searchChatHistory: (query: { q: string }) =>
@@ -5482,6 +5546,8 @@ export const contract = {
     call<ExecutionEnvironmentConfigured>("PUT", "/api/execution-environments/configure", { body }),
   selectExecutionEnvironment: (body: Record<string, unknown>) =>
     call<ExecutionEnvironmentSelected>("PUT", "/api/execution-environments/selection", { body }),
+  removeExecutionEnvironment: (profileId: string, query: { move_to?: string } = {}) =>
+    call<ExecutionEnvironmentRemoved>("DELETE", withQuery(`/api/execution-environments/${encodeURIComponent(profileId)}`, query)),
   setExecutionEnvironmentEnabled: (profileId: string, body: Record<string, unknown>) =>
     call<ExecutionEnvironmentEnabled>("PUT", `/api/execution-environments/${encodeURIComponent(profileId)}/enabled`, { body }),
   probeExecutionEnvironment: (profileId: string) =>
@@ -5592,6 +5658,12 @@ export const contract = {
     call<McpContainment>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`, { body }),
   resumeMcpServer: (serverId: string) =>
     call<McpResumed>("POST", `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`),
+  listMcpServerSecrets: (serverId: string) =>
+    request<McpServerSecrets>(`/api/mcp/servers/${encodeURIComponent(serverId)}/secrets`),
+  removeMcpServerSecret: (serverId: string, name: string) =>
+    call<McpServerSecrets>("DELETE", `/api/mcp/servers/${encodeURIComponent(serverId)}/secrets/${encodeURIComponent(name)}`),
+  setMcpServerSecret: (serverId: string, name: string, body: McpServerSecretRequest) =>
+    call<McpServerSecrets>("PUT", `/api/mcp/servers/${encodeURIComponent(serverId)}/secrets/${encodeURIComponent(name)}`, { body }),
   listMcpSessions: (serverId: string) =>
     request<McpSessionView[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
   approveMcpTools: (serverId: string, body: ApproveMcpToolsRequest) =>

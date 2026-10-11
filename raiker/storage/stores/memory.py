@@ -358,6 +358,54 @@ class MemoryStore:
             stored.setdefault(key, str(row["memory_id"]))
         return stored
 
+    def memory_candidate_text_pending(
+        self: SQLiteStore, text: str, *, owner_principal_id: str | None
+    ) -> bool:
+        """Whether this owner already has an undecided proposal with these words.
+
+        A Retry repeats the prompt that proposed them; one decision should be
+        asked once, not as two identical proposals.
+        """
+        sql = "SELECT 1 FROM memory_candidates WHERE decision = 'deferred' AND text = ?"
+        params: list[Any] = [text]
+        if owner_principal_id:
+            sql += " AND owner_principal_id = ?"
+            params.append(owner_principal_id)
+        return bool(self._rows(sql + " LIMIT 1", params))
+
+    def memory_text_forgotten(
+        self: SQLiteStore, text: str, *, owner_principal_id: str | None
+    ) -> bool:
+        """§13.2 item 4 — the suppression a Forget leaves behind.
+
+        True when this owner forgot a memory with exactly this text and holds no
+        active one like it. Forget keeps the row as a tombstone with its content
+        checksum, which is what is compared: a proposal or an agent's write of
+        the same sentence would otherwise quietly re-create what the owner
+        removed. The owner adding it again themselves is not suppressed — that
+        is the explicit restore the decision names — and once they have, an
+        active copy exists and this answers False.
+        """
+        checksums = {
+            hashlib.sha256(text.encode()).hexdigest(),
+            hashlib.sha256(text.strip().encode()).hexdigest(),
+        }
+        marks = ", ".join("?" for _ in checksums)
+        owner_clause = " AND owner_principal_id = ?" if owner_principal_id else ""
+        owner_params = [owner_principal_id] if owner_principal_id else []
+        rows = self._rows(
+            f"""SELECT
+                  SUM(CASE WHEN deleted_at IS NOT NULL AND approval_state = 'forgotten'
+                      THEN 1 ELSE 0 END) AS forgotten,
+                  SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) AS active
+                FROM approved_memory
+               WHERE content_checksum IN ({marks}){owner_clause}""",  # noqa: S608 - placeholders only
+            [*checksums, *owner_params],
+        )
+        if not rows:
+            return False
+        return bool(rows[0]["forgotten"]) and not bool(rows[0]["active"])
+
     def list_memory_embedding_spaces(
         self: SQLiteStore, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:

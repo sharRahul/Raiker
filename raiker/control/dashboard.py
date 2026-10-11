@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raiker.control.dashboard_parts.approvals import ApprovalService
+from raiker.control.dashboard_parts.attention import AttentionService
 from raiker.control.dashboard_parts.code import CodeService
 from raiker.control.dashboard_parts.execution import ExecutionService
 from raiker.control.dashboard_parts.extensions import ExtensionService
@@ -31,6 +32,7 @@ from raiker.storage.sqlite import SQLiteStore
 
 class DashboardService(
     ApprovalService,
+    AttentionService,
     CodeService,
     ExecutionService,
     ExtensionService,

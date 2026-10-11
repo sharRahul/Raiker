@@ -23,6 +23,18 @@ class ExecutionEnvironmentEnabled(TypedDict):
     stopped_runs: int
 
 
+class ExecutionEnvironmentRemoved(TypedDict):
+    """DEC-11 step 6 — a configured environment removed; what ran there is kept."""
+
+    ok: bool
+    profile_id: str
+    removed: bool
+    name: str
+    #: Where work now runs by default, when the removed one was the default and
+    #: the owner chose a replacement; ``None`` when it was not the default.
+    selected_profile_id: str | None
+
+
 class ExecutionEnvironmentSelected(TypedDict):
     ok: bool
     selected_profile_id: str

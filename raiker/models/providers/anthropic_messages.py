@@ -533,6 +533,13 @@ class AsyncAnthropicMessagesProvider:
                         start_usage = message.get("usage") if isinstance(message, dict) else None
                         if isinstance(start_usage, dict):
                             usage_acc.update(start_usage)
+                            # DEC-24 step 2 — the input is billed from here on,
+                            # whether or not the answer finishes. Said now, so a
+                            # turn stopped mid-answer still records what it cost;
+                            # the closing usage event supersedes it.
+                            yield ModelStreamEvent(
+                                event_type="usage", metadata={"usage": dict(usage_acc)}
+                            )
                     elif event_type == "content_block_start":
                         index = decoded.get("index")
                         block = decoded.get("content_block")

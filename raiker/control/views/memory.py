@@ -60,6 +60,11 @@ class MemoryControlView(View):
     #: The surface that conversation belongs to (``chat``/``build``/``design``),
     #: so the link reopens it where its own context is.
     last_recalled_origin: str | None = None
+    #: DEC-13 step 3 — how much this record is worth a look, as the sum of the
+    #: named reasons below (see ``raiker.memory.review_priority``). ``0`` and
+    #: no reasons for a record with nothing to review, or an archived one.
+    review_priority: int = 0
+    review_reasons: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

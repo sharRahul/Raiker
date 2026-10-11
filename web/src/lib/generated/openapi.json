@@ -1096,6 +1096,103 @@
         "title": "AttachmentProvenance",
         "type": "object"
       },
+      "AttentionFeedView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItemView"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "unknown"
+        ],
+        "title": "AttentionFeedView",
+        "type": "object"
+      },
+      "AttentionItemView": {
+        "description": "One thing waiting on the owner, by reference.",
+        "properties": {
+          "action_label": {
+            "title": "Action Label",
+            "type": "string"
+          },
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "origin_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Id"
+          },
+          "origin_kind": {
+            "title": "Origin Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "containment",
+              "blocking",
+              "waiting"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "severity",
+          "title",
+          "reason",
+          "origin_kind",
+          "origin_id",
+          "href",
+          "action_label",
+          "since"
+        ],
+        "title": "AttentionItemView",
+        "type": "object"
+      },
       "AuditExportResult": {
         "description": "The manifest of an export just produced; never its events.",
         "properties": {
@@ -2974,6 +3071,30 @@
         "title": "ChannelCapabilities",
         "type": "object"
       },
+      "ChannelDeliveryReviewed": {
+        "description": "DEC-14 step 7 — a failed or unknown delivery is off the review list.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "title": "Reviewed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "receipt_id",
+          "reviewed_at"
+        ],
+        "title": "ChannelDeliveryReviewed",
+        "type": "object"
+      },
       "ChannelDestination": {
         "description": "UX-MSG-04 — where this channel delivers, bound on the pairing.\n\n``url`` for the reference webhook (the owner sets it), ``owner_chat`` for\nTelegram (the bound owner sender's chat), ``none`` for a transport this\nbuild cannot deliver over. ``host`` is the bound URL's host only — a path\ncan carry a token and is never returned.",
         "properties": {
@@ -3391,6 +3512,13 @@
             "title": "Default State",
             "type": "string"
           },
+          "deliveries_to_review": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelReceipt"
+            },
+            "title": "Deliveries To Review",
+            "type": "array"
+          },
           "destination": {
             "$ref": "#/components/schemas/ChannelDestination"
           },
@@ -3675,6 +3803,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "outcome_unknown_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Unknown At"
+          },
           "processed_at": {
             "anyOf": [
               {
@@ -3685,6 +3824,17 @@
               }
             ],
             "title": "Processed At"
+          },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
           },
           "queued_at": {
             "anyOf": [
@@ -3733,6 +3883,17 @@
               }
             ],
             "title": "Reply Queued At"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
           },
           "routing_mode": {
             "anyOf": [
@@ -4017,6 +4178,17 @@
             "title": "Ok",
             "type": "boolean"
           },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
+          },
           "sent_bytes": {
             "title": "Sent Bytes",
             "type": "integer"
@@ -4199,6 +4371,10 @@
           },
           "secret_configured": {
             "title": "Secret Configured",
+            "type": "boolean"
+          },
+          "signature_required": {
+            "title": "Signature Required",
             "type": "boolean"
           }
         },
@@ -9026,6 +9202,47 @@
         "title": "ExecutionEnvironmentProbed",
         "type": "object"
       },
+      "ExecutionEnvironmentRemoved": {
+        "description": "DEC-11 step 6 — a configured environment removed; what ran there is kept.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "selected_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Profile Id"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "removed",
+          "name",
+          "selected_profile_id"
+        ],
+        "title": "ExecutionEnvironmentRemoved",
+        "type": "object"
+      },
       "ExecutionEnvironmentReset": {
         "properties": {
           "ok": {
@@ -12395,6 +12612,28 @@
             "title": "All",
             "type": "boolean"
           },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Sequence"
+          },
           "reason": {
             "default": "user requested stop",
             "title": "Reason",
@@ -12442,6 +12681,10 @@
             },
             "title": "Applied",
             "type": "array"
+          },
+          "duplicate": {
+            "title": "Duplicate",
+            "type": "boolean"
           },
           "safe_boundary": {
             "title": "Safe Boundary",
@@ -13904,6 +14147,58 @@
         "title": "McpServerRenamed",
         "type": "object"
       },
+      "McpServerSecretRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "McpServerSecretRequest",
+        "type": "object"
+      },
+      "McpServerSecrets": {
+        "description": "DEC-15 step 2 — the secret names one local server is given. Never values.",
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "server_id": {
+            "title": "Server Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "ok",
+          "server_id",
+          "names"
+        ],
+        "title": "McpServerSecrets",
+        "type": "object"
+      },
       "McpServerView": {
         "description": "Owner-scoped view of one local stdio MCP server profile (Control Deck\ntask 4). ``command`` is the argv (interpreter + workspace-relative script);\nit is never a secret or a remote endpoint. Read-only — building or\nconnecting a server is a governed runtime action, not a REST mutation.",
         "properties": {
@@ -14117,6 +14412,14 @@
               "$ref": "#/components/schemas/UnsupportedFeature"
             },
             "title": "Unsupported Features",
+            "type": "array"
+          },
+          "vault_env": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Vault Env",
             "type": "array"
           }
         },
@@ -14448,6 +14751,19 @@
           "retention": {
             "title": "Retention",
             "type": "string"
+          },
+          "review_priority": {
+            "default": 0,
+            "title": "Review Priority",
+            "type": "integer"
+          },
+          "review_reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Review Reasons",
+            "type": "array"
           },
           "scope": {
             "title": "Scope",
@@ -20152,6 +20468,17 @@
               }
             ],
             "title": "Reasoning Effort"
+          },
+          "retry_of_turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of Turn Id"
           },
           "session_id": {
             "anyOf": [
@@ -25859,6 +26186,18 @@
             "title": "Reasoning Chars",
             "type": "integer"
           },
+          "retry_of_turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Retry Of Turn Id"
+          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
@@ -27518,6 +27857,25 @@
           }
         },
         "summary": "Upload Attachment"
+      }
+    },
+    "/api/attention": {
+      "get": {
+        "description": "DEC-02 — everything waiting on the owner, read from each subsystem's own record.\n\nReferences and counts only; an item is gone when its subsystem says it is\nresolved. A subsystem that cannot be read is listed in ``unknown``.",
+        "operationId": "get_attention_api_attention_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionFeedView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Attention"
       }
     },
     "/api/audit/export": {
@@ -29244,6 +29602,46 @@
         "summary": "Deliver Channel Test"
       }
     },
+    "/api/channels/deliveries/{receipt_id}/reviewed": {
+      "post": {
+        "description": "DEC-14 step 7 — take a failed or unknown delivery off the review list.\n\nNothing is sent: a delivery that may already have arrived is the owner's to\nfollow up, not Raiker's to repeat.",
+        "operationId": "mark_channel_delivery_reviewed_api_channels_deliveries__receipt_id__reviewed_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelDeliveryReviewed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Channel Delivery Reviewed"
+      }
+    },
     "/api/channels/pairings": {
       "post": {
         "description": "Pair a connector. Paired is **not** enabled — that is a second decision.",
@@ -29654,7 +30052,7 @@
     },
     "/api/channels/{connector_id}/inbound": {
       "post": {
-        "description": "One message on the reference webhook.\n\nDEC-14 step 4 — a caller that may re-send sends ``Idempotency-Key``; a\nrepeat of a message already accepted under it is answered with the first\nmessage's receipt and runs nothing.",
+        "description": "One message on the reference webhook.\n\nDEC-14 step 4 — a caller that may re-send sends ``Idempotency-Key``; a\nrepeat of a message already accepted under it is answered with the first\nmessage's receipt and runs nothing.\n\nDEC-14 step 5 — a caller may sign instead of presenting the secret:\n``X-Raiker-Timestamp`` and ``X-Raiker-Signature``, verified before routing,\nwithin five minutes, once. With\n``RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE`` set, an unsigned message is\nrefused.",
         "operationId": "receive_inbound_api_channels__connector_id__inbound_post",
         "parameters": [
           {
@@ -29696,6 +30094,38 @@
                 }
               ],
               "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-raiker-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Raiker-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-raiker-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Raiker-Signature"
             }
           }
         ],
@@ -31448,6 +31878,62 @@
           }
         },
         "summary": "Select Execution Environment"
+      }
+    },
+    "/api/execution-environments/{profile_id}": {
+      "delete": {
+        "description": "DEC-11 step 6 — remove a configured environment nothing depends on.\n\nRefused 409 ``execution_environment_in_use`` while commands run there, and\n``execution_environment_selected`` while it is where work runs by default\nunless ``move_to`` names the environment to use instead.",
+        "operationId": "remove_execution_environment_api_execution_environments__profile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "move_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Move To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionEnvironmentRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Execution Environment"
       }
     },
     "/api/execution-environments/{profile_id}/enabled": {
@@ -33442,6 +33928,152 @@
           }
         },
         "summary": "Resume Mcp Server"
+      }
+    },
+    "/api/mcp/servers/{server_id}/secrets": {
+      "get": {
+        "description": "The variable names one local server is started with from the vault. Never values.",
+        "operationId": "list_mcp_server_secrets_api_mcp_servers__server_id__secrets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerSecrets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Mcp Server Secrets"
+      }
+    },
+    "/api/mcp/servers/{server_id}/secrets/{name}": {
+      "delete": {
+        "description": "Take one secret away from a local server; its next start goes without it.",
+        "operationId": "remove_mcp_server_secret_api_mcp_servers__server_id__secrets__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerSecrets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Mcp Server Secret"
+      },
+      "put": {
+        "description": "Give one local server a secret. Only that server's process receives it.",
+        "operationId": "set_mcp_server_secret_api_mcp_servers__server_id__secrets__name__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "server_id",
+            "required": true,
+            "schema": {
+              "title": "Server Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServerSecretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServerSecrets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Mcp Server Secret"
       }
     },
     "/api/mcp/servers/{server_id}/sessions": {

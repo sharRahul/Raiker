@@ -35,6 +35,8 @@ class ExtractionSummary:
     proposed: int = 0
     skipped: int = 0
     already_present: int = 0
+    #: §13.2 item 4 — passages the owner had forgotten, not proposed again.
+    suppressed: int = 0
 
 
 @dataclass(frozen=True)
@@ -179,10 +181,21 @@ def propose_completed_turn_memories(
     proposed = 0
     skipped = 0
     already = 0
+    suppressed = 0
     for role, raw_text in (("user", user_text), ("assistant", assistant_text)):
         text = raw_text.strip()[:8_000]
         if not text or not extract_relationship_candidates(text):
             skipped += 1
+            continue
+        # §13.2 item 4 — a passage the owner forgot is not proposed again
+        # because the same words came up in a later turn.
+        if store.memory_text_forgotten(text, owner_principal_id=owner_principal_id):
+            suppressed += 1
+            continue
+        # The same words already waiting for a decision are one proposal, not
+        # two — a Retry repeats the prompt that proposed them.
+        if store.memory_candidate_text_pending(text, owner_principal_id=owner_principal_id):
+            already += 1
             continue
         material = f"{owner_principal_id}\0{turn_id}\0{role}\0{EXTRACTOR_VERSION}"
         candidate_id = "memcand_" + hashlib.sha256(material.encode()).hexdigest()[:24]
@@ -212,4 +225,5 @@ def propose_completed_turn_memories(
         proposed=proposed,
         skipped=skipped,
         already_present=already,
+        suppressed=suppressed,
     )

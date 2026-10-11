@@ -186,7 +186,10 @@ class TestStreamingUsage:
         events = _collect(provider, _req(cache_ttl="5m", stream=True))
         usage_events = [e for e in events if e.event_type == "usage"]
         assert usage_events
-        merged = usage_events[0].metadata["usage"]
+        # DEC-24 step 2 — the input is said as soon as it is billed, so a stopped
+        # turn can record it; the closing event supersedes it with the total.
+        assert usage_events[0].metadata["usage"]["input_tokens"] == 100
+        merged = usage_events[-1].metadata["usage"]
         assert merged["cache_read_input_tokens"] == 80 and merged["output_tokens"] == 7
 
 

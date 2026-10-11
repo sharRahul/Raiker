@@ -30,6 +30,13 @@ differ, that ledger is canonical.
 - Raiker does not show a subscription's remaining plan usage. What a provider
   publishes about its own limits is not read, so a limit is discovered when a
   provider reports one.
+- A turn stopped part-way on an OpenAI-compatible provider (OpenAI, OpenRouter,
+  Ollama) is not counted toward the spending limit, because those providers
+  report usage only when an answer ends. Anthropic's input is counted as soon
+  as an answer starts.
+- An identity-linked Anthropic key (`sk-ant-usr-…`) needs its workspace ID
+  before it lists or answers anything; setup's recommendation can still say
+  *choose one of its models* until it is added.
 - Folders and files are named by typing an absolute path. There is no built-in
   browser for the host filesystem yet.
 

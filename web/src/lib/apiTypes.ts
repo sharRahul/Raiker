@@ -640,6 +640,9 @@ export interface PromptRequestBody {
   // to this turn alone; the owner's standing decision modes are untouched.
   capability_modes?: Record<string, string>;
   attachments?: PromptAttachment[];
+  // DEC-22 step 3 — this turn is a Retry of that earlier turn of the same
+  // conversation; the server records the link and refuses a source elsewhere.
+  retry_of_turn_id?: string;
 }
 
 export type { HookHandlerView };
@@ -688,6 +691,10 @@ export interface InterruptRequestBody {
   action_type?: string;
   reason?: string;
   steer_text?: string;
+  // DEC-22 steps 1–2 — added by `api.interrupt`: this tab's id and its own
+  // count of the commands it has sent, so a late, older one is refused.
+  client_id?: string;
+  client_sequence?: number;
 }
 
 export type { MemoryImportPreview };

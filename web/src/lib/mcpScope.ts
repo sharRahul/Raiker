@@ -29,7 +29,7 @@ const PERMISSION_NAMES: Record<string, string> = {
   mcp_builder_runtime: "MCP server builder",
 };
 
-export function scopeLines(scope: Scope): ScopeLine[] {
+export function scopeLines(scope: Scope, ownSecrets: string[] = []): ScopeLine[] {
   const local = scope.runs_on === "this_machine";
   const lines: ScopeLine[] = [];
   lines.push({
@@ -60,13 +60,21 @@ export function scopeLines(scope: Scope): ScopeLine[] {
         ? "Anything the account Raiker runs as may write — Raiker does not confine it."
         : "None on this machine.",
   });
+  // DEC-15 step 2 — this server's own secrets, from the vault, said by name.
+  const own =
+    ownSecrets.length > 0
+      ? ` It is also given ${ownSecrets.join(", ")} from the vault — this server only.`
+      : "";
   lines.push({
     label: "Secrets",
-    caution: scope.granted_environment.length > 0 || Boolean(scope.token_reference),
+    caution:
+      scope.granted_environment.length > 0 || Boolean(scope.token_reference) || ownSecrets.length > 0,
     value: local
       ? scope.granted_environment.length > 0
-        ? `Started with ${scope.environment.join(", ")} — including ${scope.granted_environment.join(", ")}, which you granted.`
-        : `None. It is started with ${scope.environment.join(", ")} and nothing else — no provider key.`
+        ? `Started with ${scope.environment.join(", ")} — including ${scope.granted_environment.join(", ")}, which you granted.${own}`
+        : ownSecrets.length > 0
+          ? `Started with ${scope.environment.join(", ")} and no provider key.${own}`
+          : `None. It is started with ${scope.environment.join(", ")} and nothing else — no provider key.`
       : scope.token_reference
         ? `The token in ${scope.token_reference}, sent to this endpoint only. Its value is never stored here.`
         : "None — no token is sent.",

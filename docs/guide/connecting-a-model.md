@@ -429,6 +429,11 @@ room again or you raise or clear the limit. A response already in flight when
 the limit was crossed still finishes, so the overrun is at most what was in
 flight.
 
+A turn you stop part-way through is still billed for what the provider had
+counted, and is recorded that way: Anthropic says what the input cost as soon as
+the answer starts. OpenAI-compatible providers report usage only when the
+answer ends, so a turn stopped on one of those is not yet counted.
+
 Spend is the providers' own token counts priced with the rates Models shows.
 A model with no known price is not counted and is named under the limit, so you
 know the limit is not protecting you there; set its price on Models to include

@@ -978,6 +978,33 @@ describe("MemoryView lifecycle and usage", () => {
     ).toBe(true);
   });
 
+  // DEC-13 step 3 — what is most worth a look, with the server's reasons.
+  it("leads the overview with the records worth reviewing and why", async () => {
+    stubFetch({
+      "GET /api/memory": [
+        { ...record, review_priority: 0, review_reasons: [] },
+        {
+          ...record,
+          memory_id: "mem_review",
+          text: "Rahul's home address is 1 Example Lane.",
+          review_priority: 5,
+          review_reasons: ["personal", "written_by_agent"],
+        },
+      ],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/observations": { observations: [], captured: 0, skipped: 0, due_for_expiry: [] },
+    });
+    render(MemoryView, { props: { tab: "overview" } });
+
+    const review = await screen.findByRole("region", { name: "Worth reviewing first" });
+    expect(within(review).getByText("Rahul's home address is 1 Example Lane.")).toBeInTheDocument();
+    expect(within(review).getByText("Personal information")).toBeInTheDocument();
+    expect(within(review).getByText("Written by Raiker, not yet edited by you")).toBeInTheDocument();
+    expect(within(review).getAllByRole("listitem")).toHaveLength(1);
+    await fireEvent.click(within(review).getByRole("button", { name: "Show all worth reviewing" }));
+    expect(window.location.hash).toBe("#/memory?tab=memories&filter=review");
+  });
+
   it("lists archived records only under their filter, and restores one", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [record, archived],

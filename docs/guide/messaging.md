@@ -154,7 +154,32 @@ the same update again; Raiker remembers each update's own id for two days and
 answers a repeat with the first message's receipt, starting nothing and
 spending no budget. Telegram's `update_id` does this on its own; a webhook
 caller that may retry sends an `Idempotency-Key` header (8–128 letters, digits,
-`_ . : -`). All five are set
+`_ . : -`).
+
+**A webhook sender can sign instead of sending the secret.** Send
+`X-Raiker-Timestamp` (Unix seconds) and `X-Raiker-Signature: sha256=<hex>`, the
+HMAC-SHA256 of the timestamp, a dot and the exact body, keyed by
+`RAIKER_CHANNEL_INBOUND_SECRET`. The secret then never travels; a signature
+more than five minutes from the host's clock is refused
+(`channel_signature_expired`), a wrong one is refused
+(`channel_signature_invalid`), and the same signed message sent again is a
+repeat that starts nothing. Set `RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE=1` to
+refuse unsigned webhook messages; **Delivery environment** says *Signed messages
+· Accepted* or *Required*.
+
+**What became of a delivery.** Every message Raiker sends over a channel has a
+receipt written before it is sent. A delivered one shows the platform's own id
+for it when the platform gave one (*Delivered · the channel's id for it is …*),
+and a webhook delivery carries the receipt's id as `Idempotency-Key` (and
+`delivery_id` in the body) so your receiver can drop a copy. One that failed, or
+that Raiker was sending when the host stopped — *Outcome unknown*, settled when
+the host next starts — goes on the channel's **Deliveries to review** list and
+on Home's *Needs your attention*. Raiker never sends one again on its own: fix
+what stopped it and send again from whatever asked, or check the channel first
+if the outcome is unknown. **Mark reviewed** takes it off the list and changes
+nothing else.
+
+All of these are set
 outside the app and all five are real — they are below the channels because
 connecting a messaging account should not begin with a briefing on them.
 

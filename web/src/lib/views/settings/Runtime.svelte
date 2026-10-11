@@ -14,6 +14,7 @@
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
   import { api, ApiError } from "../../api";
+  import { formatTimestamp } from "../../format";
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
   import { boundaryLabel, observationRows } from "../../sandboxPosture";
@@ -218,6 +219,56 @@
     }
   }
 
+  /**
+   * DEC-11 step 6 — remove a configured target nothing depends on. When it is
+   * where work runs by default, the confirm names where work will run instead —
+   * the owner's explicit choice, sent with the removal — and the server refuses
+   * while commands still run there (turning it off stops them first).
+   */
+  function replacementFor(profileId: string) {
+    const ready = (environments?.environments ?? []).filter(
+      (item) => item.profile_id !== profileId && item.available && item.enabled,
+    );
+    for (const id of ["native_sandbox", "container_default", "local_native"]) {
+      const found = ready.find((item) => item.profile_id === id);
+      if (found) return found;
+    }
+    return ready[0] ?? null;
+  }
+
+  async function removeEnvironment(profileId: string, name: string, selected: boolean) {
+    const instead = selected ? replacementFor(profileId) : null;
+    if (selected && instead === null) {
+      notice = { kind: "error", text: `${name} is where work runs, and no other environment is ready to take over. Add or check one first.` };
+      return;
+    }
+    const question = instead
+      ? `Remove ${name}? Work runs here by default, so from now on it runs on ${instead.name}. Commands that ran here stay in the record.`
+      : `Remove ${name}? Its settings go; commands that ran here stay in the record.`;
+    if (!window.confirm(question)) return;
+    switching = profileId;
+    notice = null;
+    try {
+      await api.removeExecutionEnvironment(profileId, instead?.profile_id ?? null);
+      await load();
+      notice = {
+        kind: "ok",
+        text: instead ? `${name} was removed. Work now runs on ${instead.name}.` : `${name} was removed.`,
+      };
+    } catch (e) {
+      const reason = e instanceof ApiError ? e.reasonCode : null;
+      notice = {
+        kind: "error",
+        text: reason === "execution_environment_in_use"
+          ? `${name} still has commands running. Turn it off first — that stops them — then remove it.`
+          : `${name} could not be removed.`,
+      };
+      await load();
+    } finally {
+      switching = null;
+    }
+  }
+
   async function selectEnvironment(profileId: string) {
     try { await api.selectExecutionEnvironment(profileId); await load(); }
     catch { notice = { kind: "error", text: "That environment is not ready. Complete its configuration and credential reference first." }; }
@@ -274,7 +325,7 @@
     </p>
     <dl>
       <div><dt>State</dt><dd>{running ? "Accepting new executions" : "Not accepting new executions"}</dd></div>
-      <div><dt>Last changed</dt><dd>{mode.activated_at || "Not recorded"}</dd></div>
+      <div><dt>Last changed</dt><dd>{mode.activated_at ? formatTimestamp(mode.activated_at) : "Not recorded"}</dd></div>
       <div><dt>Changed by</dt><dd>{mode.activated_by || "Administrator"}</dd></div>
     </dl>
     <div class="actions">
@@ -374,6 +425,12 @@
                 disabled={switching === environment.profile_id}
                 onclick={() => void setEnvironmentEnabled(environment.profile_id, environment.name, !environment.enabled)}
               >{environment.enabled ? "Turn off" : "Turn on"}</button>
+              <button
+                class="btn btn-ghost btn-sm danger"
+                type="button"
+                disabled={switching === environment.profile_id}
+                onclick={() => void removeEnvironment(environment.profile_id, environment.name, environment.selected)}
+              >Remove</button>
             {/if}
           </div>
           {#if !environment.enabled}<small class="plain environment-off">Off — nothing runs here until you turn it on.</small>{/if}

@@ -30,6 +30,7 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
     ExportSessionRequest,
+    McpServerSecretRequest,
     ModelCatalogueRefreshRequest,
     ModelConnectionRequest,
     ModelPriceRequest,
@@ -67,6 +68,7 @@ from raiker.api.wire.execution import (
     ExecutionEnvironmentConfigured,
     ExecutionEnvironmentEnabled,
     ExecutionEnvironmentProbed,
+    ExecutionEnvironmentRemoved,
     ExecutionEnvironmentReset,
     ExecutionEnvironmentSelected,
 )
@@ -77,6 +79,7 @@ from raiker.api.wire.mcp import (
     McpServerCreated,
     McpServerDeleted,
     McpServerRenamed,
+    McpServerSecrets,
     McpToolsApproved,
     RemoteMcpServerCreated,
 )
@@ -134,6 +137,7 @@ from raiker.api.wire.sessions import (
 )
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
+from raiker.control.dashboard_parts.attention import AttentionFeedView
 from raiker.control.views.projects import ProjectDeletionPreviewView
 from raiker.control.views.security import AuthSessionView, BackupRestored, BackupsView, BackupView
 from raiker.control.views.tasks import TASK_RECURRENCES, TaskView
@@ -566,6 +570,61 @@ async def delete_mcp_server(
     return serialize_dto(answer)
 
 
+# ── DEC-15 step 2 — secrets one local server is given ────────────────────────
+def _mcp_secret_result(result: Any) -> dict[str, Any]:
+    if result.ok:
+        return {"ok": True, **result.data}
+    reason = result.reason_code or ""
+    if reason.startswith("unknown_mcp_server") or reason == "unknown_mcp_secret":
+        raise refusal(status.HTTP_404_NOT_FOUND, reason)
+    if reason.startswith("mcp_secret_") or reason.startswith("connector_vault"):
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, reason)
+    raise refusal(status.HTTP_403_FORBIDDEN, reason)
+
+
+@router.get("/api/mcp/servers/{server_id}/secrets")
+async def list_mcp_server_secrets(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The variable names one local server is started with from the vault. Never values."""
+    result = _service(request).mcp_server_secrets(auth_data[0].principal_id, server_id)
+    answer = cast(McpServerSecrets, _mcp_secret_result(result))
+    return serialize_dto(answer)
+
+
+@router.put("/api/mcp/servers/{server_id}/secrets/{name}")
+async def set_mcp_server_secret(
+    server_id: str,
+    name: str,
+    body: McpServerSecretRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Give one local server a secret. Only that server's process receives it."""
+    result = _service(request).set_mcp_server_secret(
+        auth_data[0].principal_id, server_id, name, body.value
+    )
+    answer = cast(McpServerSecrets, _mcp_secret_result(result))
+    return serialize_dto(answer)
+
+
+@router.delete("/api/mcp/servers/{server_id}/secrets/{name}")
+async def remove_mcp_server_secret(
+    server_id: str,
+    name: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Take one secret away from a local server; its next start goes without it."""
+    result = _service(request).remove_mcp_server_secret(
+        auth_data[0].principal_id, server_id, name
+    )
+    answer = cast(McpServerSecrets, _mcp_secret_result(result))
+    return serialize_dto(answer)
+
+
 # ── Containment: kill switch + revocable pause + findings/notifications ───────
 @router.post("/api/mcp/servers/{server_id}/pause")
 async def pause_mcp_server(
@@ -900,6 +959,22 @@ async def scan_security(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> list[dict[str, Any]]:
     return serialize_dto(_service(request).scan_security(auth_data[0].principal_id))
+
+
+@router.get("/api/attention")
+async def get_attention(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """DEC-02 — everything waiting on the owner, read from each subsystem's own record.
+
+    References and counts only; an item is gone when its subsystem says it is
+    resolved. A subsystem that cannot be read is listed in ``unknown``.
+    """
+    user_id = SQLiteStore(_ws(request)).principal_user_id(auth_data[0].principal_id)
+    answer: AttentionFeedView = _service(request).attention_feed(
+        auth_data[0].principal_id, user_id, task_user_id=auth_data[1].delegated_by_user_id
+    )
+    return serialize_dto(answer)
 
 
 @router.get("/api/security/health")
@@ -1493,6 +1568,33 @@ async def set_execution_environment_enabled(
     if not result.ok:
         raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
     answer = cast(ExecutionEnvironmentEnabled, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.delete("/api/execution-environments/{profile_id}")
+async def remove_execution_environment(
+    profile_id: str,
+    request: Request,
+    move_to: str | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-11 step 6 — remove a configured environment nothing depends on.
+
+    Refused 409 ``execution_environment_in_use`` while commands run there, and
+    ``execution_environment_selected`` while it is where work runs by default
+    unless ``move_to`` names the environment to use instead.
+    """
+    result = _service(request).remove_execution_environment(
+        profile_id, auth_data[0].principal_id, move_to=move_to
+    )
+    if not result.ok:
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if result.reason_code == "unknown_execution_environment"
+            else status.HTTP_409_CONFLICT
+        )
+        raise refusal(code, result.reason_code)
+    answer = cast(ExecutionEnvironmentRemoved, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

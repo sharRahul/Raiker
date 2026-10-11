@@ -97,6 +97,22 @@ class ExecutionStore:
             )
         )
 
+    def delete_remote_execution_profile(
+        self: SQLiteStore, profile_id: str, *, owner_principal_id: str
+    ) -> bool:
+        """DEC-11 step 6 — remove one configured environment's settings.
+
+        Only the profile row goes. The commands that ran there and what a cloud
+        sandbox cost are evidence and stay where they are; the caller has
+        already checked nothing still depends on the profile.
+        """
+        return bool(
+            self._execute(
+                "DELETE FROM remote_execution_profiles WHERE profile_id = ? AND owner_principal_id = ?",
+                (profile_id, owner_principal_id),
+            )
+        )
+
     def list_remote_execution_profiles(
         self: SQLiteStore, enabled_only: bool = False, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:

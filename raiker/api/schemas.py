@@ -676,6 +676,13 @@ class CreateMcpServerRequest(StrictRequest):
     template: str
 
 
+class McpServerSecretRequest(StrictRequest):
+    # DEC-15 step 2 — the value of one secret a local MCP server is given. It is
+    # written to the encrypted vault and never returned by any read.
+
+    value: str
+
+
 class RenameMcpServerRequest(StrictRequest):
     # Rename one owner-scoped MCP server profile. The server normalizes the name
     # and rejects a clash with the caller's other servers.
@@ -767,6 +774,10 @@ class PromptRequest:
     planning_mode: str | None = None
     approval_mode: str | None = None
     model_profile: str | None = None
+    # DEC-22 step 3 — this turn is a Retry of that earlier turn of the same
+    # conversation. Recorded as a link; it grants nothing and repeats nothing on
+    # its own — the retry runs as an ordinary governed turn.
+    retry_of_turn_id: str | None = None
     # Optional concrete model for the chosen profile (per-turn only; provider
     # policy is still enforced downstream).
     model: str | None = None
@@ -886,6 +897,11 @@ class InterruptRequest:
     action_type: str = "cancel"
     reason: str = "user requested stop"
     steer_text: str | None = None
+    # DEC-22 steps 1–2 — the sending client (a browser tab, the terminal) and
+    # its own count of the control commands it has sent for this conversation.
+    # Optional: a client that sends neither is ordered by arrival, as before.
+    client_id: str | None = None
+    client_sequence: int | None = None
 
 
 class ResolveApprovalRequest(StrictRequest):

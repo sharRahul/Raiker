@@ -90,6 +90,7 @@ class ExtensionService:
         (through the authority/executor path), never a plain REST mutation, so
         this surface is read-only by design."""
         from raiker.plugins.contributions import contributed_mcp_servers
+        from raiker.runtime.mcp_secrets import secret_names
         from raiker.tools.mcp_review import pending_tools
 
         offered = {
@@ -133,6 +134,11 @@ class ExtensionService:
                     ),
                 ),
                 pending_tools=tuple(pending_tools(row)),
+                vault_env=(
+                    tuple(secret_names(self.store, principal_id, str(row["server_id"])))
+                    if str(row.get("transport", "stdio")) == "stdio"
+                    else ()
+                ),
                 **_mcp_provenance(row, offered),
             )
             for row in self.store.list_mcp_servers(principal_id)
@@ -211,6 +217,22 @@ class ExtensionService:
     ) -> ControlResult:
         """Owner-scoped, human-only delete of one MCP server profile."""
         return self.control.delete_mcp_server(acting_principal_id, server_id, expected_name)
+
+    def mcp_server_secrets(
+        self: DashboardService, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """DEC-15 step 2 — the names one local server is given (delegates)."""
+        return self.control.mcp_server_secrets(acting_principal_id, server_id)
+
+    def set_mcp_server_secret(
+        self: DashboardService, acting_principal_id: str | None, server_id: str, name: str, value: str
+    ) -> ControlResult:
+        return self.control.set_mcp_server_secret(acting_principal_id, server_id, name, value)
+
+    def remove_mcp_server_secret(
+        self: DashboardService, acting_principal_id: str | None, server_id: str, name: str
+    ) -> ControlResult:
+        return self.control.remove_mcp_server_secret(acting_principal_id, server_id, name)
 
     def pause_mcp_server(
         self: DashboardService, acting_principal_id: str | None, server_id: str, reason: str | None = None
@@ -647,6 +669,12 @@ class ExtensionService:
                     ]
                     if pairing is not None
                     else [],
+                    "deliveries_to_review": [
+                        _channel_receipt(row)
+                        for row in self.store.list_channel_deliveries_to_review(
+                            profile.connector_id, limit=20
+                        )
+                    ],
                     "capabilities": channel_capabilities(profile.channel_type),
                 }
             )
@@ -672,6 +700,10 @@ class ExtensionService:
                 "secret_configured": bool(
                     os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
                 ),
+                # DEC-14 step 5 — whether an unsigned webhook message is refused.
+                "signature_required": os.environ.get(
+                    "RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE", ""
+                ).strip().lower() in {"1", "true", "yes", "on"},
                 # Allowlisting says *who* may speak; the budget says how often.
                 # They are different questions, and an allowlisted sender was
                 # unbounded until one had an answer.
@@ -717,6 +749,11 @@ class ExtensionService:
         return self.control.set_channel_paused(
             acting_principal_id, pairing_id, paused, expected_revision
         )
+
+    def mark_channel_delivery_reviewed(
+        self: DashboardService, acting_principal_id: str | None, receipt_id: str
+    ) -> ControlResult:
+        return self.control.mark_channel_delivery_reviewed(acting_principal_id, receipt_id)
 
     def set_channel_senders(
         self: DashboardService,
@@ -874,6 +911,9 @@ def _channel_receipt(row: dict[str, Any]) -> ChannelReceipt:
         "failed_at": row.get("failed_at"),
         "reason_code": row.get("reason_code"),
         "created_at": str(row["created_at"]),
+        "provider_message_id": row.get("provider_message_id"),
+        "outcome_unknown_at": row.get("outcome_unknown_at"),
+        "reviewed_at": row.get("reviewed_at"),
     }
 
 

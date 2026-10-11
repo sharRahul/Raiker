@@ -2091,6 +2091,13 @@ class RuntimeOrchestrator:
                 if stopped_mid_stream:
                     with contextlib.suppress(Exception):
                         await stream.aclose()  # type: ignore[attr-defined]
+                    # DEC-24 step 2 — a call the owner stopped is still billed
+                    # for what the provider already counted. Recorded so every
+                    # spending limit reads it; a provider that reports usage only
+                    # at the end of a stream has said nothing yet, and nothing is
+                    # invented in its place.
+                    if usage:
+                        self._record_usage(envelope, provider, model, summarize_model_usage(usage))
                     # Any half-streamed tool call is discarded rather than
                     # reconstructed: the owner stopped the turn, so nothing the
                     # model was in the middle of asking for should run.
@@ -2099,6 +2106,10 @@ class RuntimeOrchestrator:
             except Exception as exc:  # noqa: BLE001
                 last_error_code = provider_error_code(exc)
                 last_failed_provider, last_failed_reason = provider, last_error_code
+                # DEC-24 step 2 — what the provider counted before it failed
+                # mid-stream is billed all the same.
+                if usage:
+                    self._record_usage(envelope, provider, model, summarize_model_usage(usage))
                 self._event(
                     envelope,
                     "model_request_failed",

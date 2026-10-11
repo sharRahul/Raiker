@@ -763,12 +763,15 @@ def test_the_adapter_table_owns_the_wire_format_and_nothing_else() -> None:
     assert adapter is not None
     assert {"outbound", "parse_inbound", "channel_type", "capabilities"} <= set(dir(adapter))
     # DEC-14 step 1 — `capabilities` is a declaration the page reads and the
-    # executor bounds a reply by; it widens nothing.
+    # executor bounds a reply by; it widens nothing. DEC-14 step 7 —
+    # `provider_message_id` reads one id out of the platform's answer.
     assert not [
         name
         for name in dir(adapter)
         if not name.startswith("_")
-        and name not in {"outbound", "parse_inbound", "channel_type", "capabilities"}
+        and name not in {
+            "outbound", "parse_inbound", "channel_type", "capabilities", "provider_message_id",
+        }
     ]
 
 

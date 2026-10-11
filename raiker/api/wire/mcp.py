@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -41,6 +41,16 @@ class McpServerRenamed(TypedDict):
 class McpServerDeleted(TypedDict):
     ok: bool
     server_id: str
+
+
+class McpServerSecrets(TypedDict):
+    """DEC-15 step 2 — the secret names one local server is given. Never values."""
+
+    ok: bool
+    server_id: str
+    names: list[str]
+    #: When a secret was last set or removed; absent from a change's answer.
+    updated_at: NotRequired[str | None]
 
 
 class McpContainment(TypedDict):

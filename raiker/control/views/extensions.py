@@ -179,6 +179,9 @@ class McpServerView(View):
     # one is refused, until the owner accepts it. The description is the
     # server's own sentence, labelled as such where it is shown.
     pending_tools: tuple[PendingTool, ...] = ()
+    # DEC-15 step 2 — the secret names this local server is started with from
+    # the vault, and only this server. Never the values.
+    vault_env: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -493,6 +496,14 @@ class ChannelReceipt(TypedDict):
     failed_at: str | None
     reason_code: str | None
     created_at: str
+    #: DEC-14 step 7 — the platform's own id for a delivered message, when its
+    #: answer carried one (Telegram's ``message_id``).
+    provider_message_id: NotRequired[str | None]
+    #: A delivery the host stopped in the middle of, settled at the next start:
+    #: it may have arrived, so it is never sent again on its own.
+    outcome_unknown_at: NotRequired[str | None]
+    #: When the owner marked a failed or unknown delivery reviewed.
+    reviewed_at: NotRequired[str | None]
 
 
 class ChannelProfile(TypedDict):
@@ -541,6 +552,9 @@ class ChannelProfile(TypedDict):
     route_scope: ChannelRouteScope
     #: The most recent first; at most five.
     receipts: list[ChannelReceipt]
+    #: DEC-14 step 7 — the dead-letter list: outbound deliveries that failed or
+    #: whose outcome is unknown, not yet marked reviewed. Most recent first.
+    deliveries_to_review: NotRequired[list[ChannelReceipt]]
     #: DEC-14 step 1 — what this channel can carry; ``None`` when this build has
     #: no adapter for its type.
     capabilities: ChannelCapabilities | None
@@ -564,6 +578,9 @@ class ChannelsInbound(TypedDict):
 
     #: RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses.
     secret_configured: NotRequired[bool]
+    #: DEC-14 step 5 — RAIKER_CHANNEL_INBOUND_REQUIRE_SIGNATURE is set: a
+    #: webhook message must carry a timestamped signature, not the bare secret.
+    signature_required: NotRequired[bool]
     #: Messages per sender per minute.
     rate_limit_per_minute: NotRequired[int]
     quarantined: NotRequired[bool]

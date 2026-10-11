@@ -26,6 +26,7 @@
     TaskView,
     WorkThread,
   } from "../apiTypes";
+  import type { AttentionFeedView } from "../generated/apiContract";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
   import { START_WORK } from "../workSurface";
@@ -56,6 +57,14 @@
   let sessions = $state<WorkThread[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
+  // DEC-02 — the server's attention feed. Approvals and blocked work keep their
+  // own tiles below; the feed adds what has no tile — a proposed memory, a
+  // delivery to review, a tool held for review, a containment signal.
+  let feed = $state<AttentionFeedView | null>(null);
+  let feedFailed = $state(false);
+  const TILED_KINDS = new Set(["approvals", "task"]);
+  const feedItems = $derived((feed?.items ?? []).filter((item) => !TILED_KINDS.has(item.origin_kind)));
+  const feedUnknown = $derived(feedFailed || (feed?.unknown ?? []).length > 0);
   let projects = $state<ProjectsList | null>(null);
   // NEW-HOME-01 — not read yet, read and failed, and nothing to report are
   // three states, never one `null`. A readiness claim nobody checked is worse
@@ -141,7 +150,11 @@
     (approvals ?? []).length === 0 &&
       healthIsCurrent &&
       runtimeIssues === 0 &&
-      blocked.length === 0,
+      blocked.length === 0 &&
+      // DEC-02 — and the feed was read whole, with nothing in it.
+      feed !== null &&
+      !feedUnknown &&
+      feedItems.length === 0,
   );
 
   /**
@@ -153,7 +166,7 @@
    * between a false all-clear and a blank rail.
    */
   const partialAllClear = $derived(
-    (approvals ?? []).length === 0 && blocked.length === 0 && !healthIsCurrent,
+    (approvals ?? []).length === 0 && blocked.length === 0 && feedItems.length === 0 && !healthIsCurrent,
   );
 
   /**
@@ -184,6 +197,15 @@
       tasks = loadedTasks;
       approvals = loadedApprovals;
       projects = loadedProjects;
+      try {
+        const attention = await api.attention();
+        if (seq !== loadSeq) return;
+        feed = attention;
+        feedFailed = false;
+      } catch {
+        if (seq !== loadSeq) return;
+        feedFailed = true;
+      }
       try {
         const diagnostics = await api.diagnostics();
         if (seq !== loadSeq) return;
@@ -563,6 +585,26 @@
           linkLabel="Open the live board"
         />
         {/if}
+        {#if feedItems.length > 0}
+          <!-- DEC-02 — each item names what waits and the one place it is
+               resolved; it goes when its own subsystem says it is done. -->
+          <ul class="feed" aria-label="Also waiting on you">
+            {#each feedItems as item (item.id)}
+              <li class="feed-item feed-{item.severity}">
+                <strong>{item.title}</strong>
+                <span>{item.reason}</span>
+                <a href={item.href}>{item.action_label}</a>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if feedUnknown}
+          <p class="all-clear">
+            {feedFailed
+              ? "Raiker could not read everything that may be waiting on you, so this is not a full list."
+              : `Raiker could not read ${(feed?.unknown ?? []).join(", ")}, so this is not a full list.`}
+          </p>
+        {/if}
       {/if}
     </aside>
   </div>
@@ -652,4 +694,13 @@
     .rows li { grid-template-columns: minmax(0, 1fr); }
     .row-actions { justify-content: flex-start; }
   }
+  .feed { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .feed-item {
+    display: grid; gap: 0.2rem; padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
+    font-size: var(--text-sm); min-width: 0; overflow-wrap: anywhere;
+  }
+  .feed-item span { color: var(--text-2); }
+  .feed-containment { border-color: var(--danger-border); }
+  .feed-blocking { border-color: var(--warn-border); }
 </style>

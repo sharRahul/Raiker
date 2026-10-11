@@ -335,6 +335,9 @@ class InterruptResult(TypedDict):
     applied: list[TaskInterrupted]
     safe_boundary: bool
     turn_control: TurnControl | None
+    #: DEC-22 steps 1–2 — this exact command was already applied under its
+    #: sequence number; nothing was applied again.
+    duplicate: NotRequired[bool]
 
 
 class TurnStopped(TypedDict):

@@ -4270,6 +4270,58 @@ CHANNEL_SENDER_LABELS_SQL = """
 ALTER TABLE channel_pairings ADD COLUMN sender_labels_json TEXT;
 """
 
+# DEC-14 step 7 — what became of an outbound delivery after it was sent, and
+# whether the owner has looked at one that did not arrive. The provider's own
+# id for a delivered message (Telegram's ``message_id``) ties the receipt to
+# the platform's record; ``outcome_unknown_at`` is the stage a delivery the host
+# stopped in the middle of is settled with at the next start — it may have
+# arrived, so it is never sent again on its own; ``reviewed_at`` is the owner's
+# mark on a failed or unknown delivery, which takes it off the review list
+# without changing what happened to it.
+CHANNEL_DELIVERY_REVIEW_MIGRATION_ID = "RAIKER-2103-channel-delivery-review"
+
+CHANNEL_DELIVERY_REVIEW_SQL = """
+ALTER TABLE channel_receipts ADD COLUMN provider_message_id TEXT;
+ALTER TABLE channel_receipts ADD COLUMN outcome_unknown_at TEXT;
+ALTER TABLE channel_receipts ADD COLUMN reviewed_at TEXT;
+"""
+
+# DEC-22 step 3 — "Retry creates a new attempt linked to its source." A retry
+# re-sent the same words as an unrelated new turn, so nothing recorded that
+# two turns were one request asked twice. The link is its own row, written when
+# the retry is accepted and before its turn exists; the source must be a turn
+# of the same conversation.
+TURN_RETRIES_MIGRATION_ID = "RAIKER-2104-turn-retries"
+
+TURN_RETRIES_SQL = """
+CREATE TABLE IF NOT EXISTS turn_retries (
+  turn_id TEXT PRIMARY KEY,
+  retry_of_turn_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_turn_retries_source ON turn_retries(retry_of_turn_id);
+"""
+
+# DEC-22 steps 1–2 — "serialize control decisions per session and reject stale
+# commands." Each client (a browser tab, the terminal) numbers the stop and
+# steer commands it sends for a conversation; the last number taken and what
+# that command was are kept here, so a command that arrives after a later one
+# from the same client is refused, and the same command sent twice is applied
+# once.
+SESSION_CONTROL_SEQUENCES_MIGRATION_ID = "RAIKER-2105-session-control-sequences"
+
+SESSION_CONTROL_SEQUENCES_SQL = """
+CREATE TABLE IF NOT EXISTS session_control_sequences (
+  session_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  last_sequence INTEGER NOT NULL,
+  last_digest TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, client_id)
+);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4518,6 +4570,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(CHANNEL_INBOUND_EVENTS_MIGRATION_ID, CHANNEL_INBOUND_EVENTS_SQL),
     Migration(TASK_RUN_HEARTBEAT_MIGRATION_ID, TASK_RUN_HEARTBEAT_SQL),
     Migration(CHANNEL_SENDER_LABELS_MIGRATION_ID, CHANNEL_SENDER_LABELS_SQL),
+    Migration(CHANNEL_DELIVERY_REVIEW_MIGRATION_ID, CHANNEL_DELIVERY_REVIEW_SQL),
+    Migration(TURN_RETRIES_MIGRATION_ID, TURN_RETRIES_SQL),
+    Migration(SESSION_CONTROL_SEQUENCES_MIGRATION_ID, SESSION_CONTROL_SEQUENCES_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

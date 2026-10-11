@@ -145,6 +145,12 @@ there is asked to stop, and its runs, receipts and settings are kept; the page
 says how many commands stopped. **Turn on** brings it back as it was; check it
 before relying on it.
 
+**Remove** takes a target away for good. It is refused while commands still run
+there — turn it off first, which stops them — and when the target is where work
+runs by default, the confirmation names where work will run instead and makes
+that the default before anything is removed. The commands that ran there, and
+what a cloud sandbox cost, stay in the record.
+
 ### Commands that run code
 
 `python`, `node`, `npm`, `npx` and `pip` run code the command line does not

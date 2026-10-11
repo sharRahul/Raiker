@@ -216,6 +216,15 @@ class InstanceRuntime:
                 _LOG.info("settled %d task run(s) interrupted by a host restart", len(interrupted))
         except Exception as exc:  # noqa: BLE001 — boot must not depend on this
             _LOG.warning("task-run recovery failed: %s", type(exc).__name__)
+        # DEC-14 step 7 — a delivery is sent inside the process that queued
+        # it, so one still queued now was cut off mid-send. It may have
+        # arrived: settled as outcome unknown for the owner, never re-sent.
+        try:
+            unknown = SQLiteStore(self.workspace_root).settle_unsettled_outbound_receipts()
+            if unknown:
+                _LOG.info("settled %d channel delivery(ies) a restart left unsettled", unknown)
+        except Exception as exc:  # noqa: BLE001 — boot must not depend on this
+            _LOG.warning("channel-delivery recovery failed: %s", type(exc).__name__)
 
     # ── lifecycle ───────────────────────────────────────────────────────────
 

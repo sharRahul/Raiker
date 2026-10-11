@@ -69,6 +69,9 @@ human authorizer, runtime authority, or other literal actor.
 | `channel_routing_changed` | The owner replaced a pairing's stored inbound route, target, owner identity, or relay choice |
 | `channel_paused` | The owner paused a channel (DEC-14 step 10): messages are still received and recorded, no work starts, nothing is delivered or relayed |
 | `channel_resumed` | The owner resumed a paused channel |
+| `mcp_server_secret_set` | The owner gave one local MCP server a secret (DEC-15 step 2); the payload names the variable, never its value |
+| `mcp_server_secret_removed` | The owner took a secret away from one local MCP server |
+| `channel_delivery_reviewed` | The owner marked a failed or outcome-unknown outbound delivery reviewed (DEC-14 step 7); what happened to it is unchanged and nothing is sent |
 | `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |
 | `brain_source_folder_revoked` | That access was withdrawn; every source indexed under the folder is removed with it |

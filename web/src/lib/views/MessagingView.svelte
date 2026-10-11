@@ -72,7 +72,16 @@
       "Use an https:// address, or http:// only to this machine or your own network, with no username or password in it.",
     channel_destination_not_configurable:
       "This channel delivers to your own chat, so there is no address to set.",
+    // DEC-14 step 3 — a typed destination is proven before the channel goes on.
+    channel_test_required:
+      "Send a test delivery first. Raiker cannot check a destination you typed in, so it turns a channel on only after a test to it was delivered.",
   };
+
+  /** DEC-14 step 3 — an allowed sender as they name themselves, with the id that is allowed. */
+  function senderName(profile: ChannelProfile, sender: string): string {
+    const label = profile.sender_labels?.[sender];
+    return label ? `${label} (${sender})` : sender;
+  }
 
   function channelReason(error: unknown): string {
     if (!(error instanceof ApiError)) return "That request failed.";
@@ -533,6 +542,17 @@
                   <button class="btn btn-sm" type="button" onclick={() => (sendersFor = null)}>Cancel</button>
                 </div>
                 <p class="note">Anyone not listed is refused and recorded. Allowed is not trusted.</p>
+                <!-- DEC-14 step 3 — who each id is, as their own messages name them. -->
+                {#if Object.keys(profile.sender_labels ?? {}).length > 0}
+                  <ul class="sender-names">
+                    {#each profile.senders as sender (sender)}
+                      {#if profile.sender_labels?.[sender]}
+                        <li><code>{sender}</code> goes by <strong>{profile.sender_labels[sender]}</strong></li>
+                      {/if}
+                    {/each}
+                  </ul>
+                  <p class="note">Names come from each sender's own messages. Anyone can call themselves anything — the id is what is allowed.</p>
+                {/if}
               </form>
             {/if}
             {#if routingFor === profile.connector_id}
@@ -548,7 +568,7 @@
                   <label class="field-label" for={`owner-${profile.connector_id}`}>You on this channel</label>
                   <select id={`owner-${profile.connector_id}`} class="input" bind:value={routeOwner}>
                     <option value="">Not chosen</option>
-                    {#each profile.senders as sender}<option value={sender}>{sender}</option>{/each}
+                    {#each profile.senders as sender}<option value={sender}>{senderName(profile, sender)}</option>{/each}
                   </select>
                   {#if routeMode !== "record_only"}
                     <label class="field-label" for={`target-${profile.connector_id}`}>Conversation</label>
@@ -760,6 +780,7 @@
   .channel-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; }
   .channel-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
   .channel-form { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+  .sender-names { margin: 0; padding-left: 1.1rem; font-size: var(--text-sm); color: var(--text-2); overflow-wrap: anywhere; }
   .channel-form label { display: grid; gap: 0.25rem; font-size: var(--text-sm); color: var(--text-2); }
   .notice { margin: 0 0 var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); }
   .notice-danger { border-color: var(--danger-border); background: var(--danger-soft); color: var(--danger); }

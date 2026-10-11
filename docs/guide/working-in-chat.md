@@ -420,6 +420,10 @@ contact rather than silently dropped.
 Attachment content never enters the durable event log — only the id, media type,
 size, and hash.
 
+A few large uploads are read at a time. If several are still arriving, the next
+is turned away before any of it is read — *Other uploads are still in progress*
+— and your draft stays; add the file again in a moment.
+
 ### Looking at a file again
 
 An uploaded file's chip in the transcript is a button. Clicking it opens a

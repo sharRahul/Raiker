@@ -15,6 +15,7 @@ const HEALTHY_DIAGNOSTICS = {
   search_indexes: [],
   scheduler_queue: { due: 0, oldest_due_at: null, oldest_wait_seconds: null, host_paused: false },
   storage_space: { state: "ok", free_bytes: 500 * 1024 ** 3, total_bytes: 1000 * 1024 ** 3 },
+  memory_pressure: { state: "ok", available_bytes: 16 * 1024 ** 3, total_bytes: 32 * 1024 ** 3 },
   model_profile_source: { kind: "packaged", location: "raiker" },
   scope_note: "",
 } as unknown as Diagnostics;
@@ -191,6 +192,25 @@ describe("allClearSentence", () => {
     const unknown = attentionItems({
       ...EVERYTHING_FINE,
       diagnostics: { ...HEALTHY_DIAGNOSTICS, storage_space: { state: "unknown", free_bytes: null, total_bytes: null } },
+    });
+        expect(unknown).toEqual([]);
+  });
+
+  // DEC-24 step 1 — memory pressure beside the disk.
+  it("names low and critical memory, and says nothing when there is room or no reading", () => {
+    const low = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, memory_pressure: { state: "low", available_bytes: 400 * 1024 ** 2, total_bytes: 16 * 1024 ** 3 } },
+    });
+    expect(low.map((item) => [item.title, item.tone])).toEqual([["Little memory left — 400.0 MB available", "waiting"]]);
+    const critical = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, memory_pressure: { state: "critical", available_bytes: 100 * 1024 ** 2, total_bytes: 16 * 1024 ** 3 } },
+    });
+    expect(critical.map((item) => [item.id, item.tone])).toEqual([["memory-pressure", "blocking"]]);
+    const unknown = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, memory_pressure: { state: "unknown", available_bytes: null, total_bytes: null } },
     });
     expect(unknown).toEqual([]);
   });

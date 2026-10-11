@@ -580,11 +580,21 @@ class ExtensionService:
         for profile in profiles:
             pairing = pairings.get(profile.connector_id)
             senders: list[str] = []
+            sender_labels: dict[str, str] = {}
             if pairing is not None:
                 try:
                     senders = list(_json.loads(pairing.get("sender_allowlist_json") or "[]"))
                 except (ValueError, TypeError):
                     senders = []
+                try:
+                    raw_labels = _json.loads(pairing.get("sender_labels_json") or "{}")
+                    sender_labels = {
+                        str(key): str(value)
+                        for key, value in dict(raw_labels).items()
+                        if key in senders
+                    }
+                except (ValueError, TypeError):
+                    sender_labels = {}
             rows.append(
                 {
                     "connector_id": profile.connector_id,
@@ -607,6 +617,9 @@ class ExtensionService:
                     # The owner's own contact list, sent only to the owner: the
                     # routing control picks which sender is the owner from it.
                     "senders": senders,
+                    # DEC-14 step 3 — what each allowed sender calls themselves
+                    # on the channel, learned from their own messages.
+                    "sender_labels": sender_labels,
                     "routing_mode": cast(
                         ChannelRoutingMode,
                         str(pairing.get("routing_mode") or "record_only") if pairing else "record_only",

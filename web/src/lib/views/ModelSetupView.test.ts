@@ -129,6 +129,53 @@ describe("first-run setup", () => {
     expect(screen.getByRole("button", { name: "Other options" })).toBeInTheDocument();
   });
 
+  // Found in the 2026-10-11 live round: a global model chosen on Models before
+  // returning to setup left this step offering only "Decide later".
+  it("counts a global model already chosen elsewhere as the choice", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": required,
+      "PUT /api/setup": {
+        ...required, status: "in_progress", selected_profile_id: "openrouter-policy-gated", selected_model: "openai/gpt-4o-mini",
+      },
+      "GET /api/models": {
+        profiles: [],
+        chat_profiles: [],
+        current_profile_id: "openrouter-policy-gated",
+        current_model: "openai/gpt-4o-mini",
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decide later" })).not.toBeInTheDocument();
+    const put = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/api/setup") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({
+      selected_profile_id: "openrouter-policy-gated", selected_model: "openai/gpt-4o-mini", model_deferred: false,
+    });
+  });
+
+  it("opens the providers when the recommendation asks for a model", async () => {
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": {
+        profiles: [
+          profile({
+            profile_id: "openrouter-policy-gated", provider: "openrouter", local_only: false,
+            requires_network: true, endpoint_kind: "remote_hosted", off_machine: true,
+            connection_configured: true, configured: true,
+          }),
+        ],
+        chat_profiles: [],
+      },
+      "GET /api/model-library": { roots: [], models: [] },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByText(/OpenRouter is connected/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Choose a model" }));
+    expect(screen.queryByRole("button", { name: "Other options" })).not.toBeInTheDocument();
+  });
+
   it("lets model setup be deferred", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": required,

@@ -484,7 +484,15 @@ it revokes every `http` rule at once without editing any hooks file, and the
 Hooks tab says which rules the grant does not cover. What leaves is the bounded,
 redacted event: the same thing a `prompt` handler sends to a model, with no
 credential and no identity attached. What comes back can deny or ask; it can
-never allow, and a failing endpoint is not a deny.
+never allow.
+
+**A guard that cannot answer does not wave the action through.** A hook you
+gave decision authority — a built-in check, or a `command` or `http` handler
+with `decision_authority` — that times out or fails counts as **ask**: the
+action comes to you for a decision, and the Hooks tab's line says *sent to you
+for a decision*. A hook without authority is an observer; its failure is
+recorded and work carries on, because it could not have stopped anything had it
+run.
 
 `mcp_tool` and `agent` handlers are refused: reaching an MCP tool from a hook
 would let it use authority the turn itself might have been denied, and an agent

@@ -865,6 +865,26 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-841](#fixed-841--a-streamed-openrouter-turn-recorded-no-usage-so-every-cost-limit-read-it-as-free) | High | Models / providers | Fixed 2026-10-10 — found by the live round |
 | [FIXED-842](#fixed-842--a-disk-running-out-of-space-was-nowhere-on-the-health-surfaces) | Low | Observability | Fixed 2026-10-10 |
 | [FIXED-843](#fixed-843--the-2026-10-10-changes-had-no-real-provider-turn-behind-them-was-bug-327) | Low | Live evidence | Closed 2026-10-10 (was BUG-327) |
+| [FIXED-844](#fixed-844--a-re-sent-channel-update-was-a-second-message-and-started-a-second-turn) | Medium | Messaging | Fixed 2026-10-11 |
+| [FIXED-845](#fixed-845--a-channels-inbound-budget-was-per-sender-only) | Low | Messaging | Fixed 2026-10-11 |
+| [FIXED-846](#fixed-846--a-channel-went-on-with-a-destination-nobody-had-tested) | Medium | Messaging | Fixed 2026-10-11 |
+| [FIXED-847](#fixed-847--memory-running-out-was-nowhere-on-the-health-surfaces) | Low | Observability | Fixed 2026-10-11 |
+| [FIXED-848](#fixed-848--container-base-images-were-never-scanned-and-neither-pinned-base-could-still-be-pulled-was-bug-329) | Medium | CI / containers | Fixed 2026-10-11 (was BUG-329) |
+| [FIXED-849](#fixed-849--a-scheduled-run-had-no-lease-so-one-nobody-was-working-on-stayed-running) | Medium | Tasks | Fixed 2026-10-11 |
+| [FIXED-850](#fixed-850--a-long-routine-held-up-every-other-background-pass) | Medium | Host / Observability | Fixed 2026-10-11 |
+| [FIXED-851](#fixed-851--instructions-for-a-running-turn-queued-without-limit) | Low | Chat / Build | Fixed 2026-10-11 |
+| [FIXED-852](#fixed-852--a-turn-a-fallback-model-answered-did-not-say-why) | Low | Models / Chat | Fixed 2026-10-11 |
+| [FIXED-853](#fixed-853--any-number-of-large-uploads-could-be-read-at-once) | Low | API ingress | Fixed 2026-10-11 |
+| [FIXED-854](#fixed-854--an-enforcing-hook-that-crashed-or-timed-out-let-the-action-through) | High | Hooks / governance | Fixed 2026-10-11 |
+| [FIXED-855](#fixed-855--a-delivery-raiker-sent-over-a-channel-left-no-record) | Medium | Messaging | Fixed 2026-10-11 |
+| [FIXED-856](#fixed-856--an-allowed-sender-was-a-bare-number) | Low | Messaging | Fixed 2026-10-11 |
+| [FIXED-857](#fixed-857--a-configured-runtime-could-not-be-turned-off-and-off-would-not-have-stopped-its-commands) | Medium | Runtime / Settings | Fixed 2026-10-11 |
+| [FIXED-858](#fixed-858--setup-ignored-a-model-already-chosen-and-hid-the-picker-it-asked-for) | Medium | First run | Fixed 2026-10-11 — found by the live round |
+| [FIXED-859](#fixed-859--the-step-up-window-named-the-owner-by-their-internal-id) | Medium | Permissions / identity | Fixed 2026-10-11 — found by the live round |
+| [FIXED-860](#fixed-860--the-ssh-fingerprint-fields-check-never-ran) | Low | Runtime / Settings | Fixed 2026-10-11 — found by the live round |
+| [FIXED-861](#fixed-861--a-hugging-face-repository-name-was-shown-as-redacted_secret-was-bug-328) | Low | Models / redaction | Fixed 2026-10-11 (was BUG-328) |
+| [FIXED-862](#fixed-862--a-hugging-face-access-token-matched-no-redaction-pattern) | Medium | Redaction / secrets | Fixed 2026-10-11 — found fixing FIXED-861 |
+| [FIXED-863](#fixed-863--the-sandbox-images-buildkit-frontend-was-an-unpinned-tag) | Low | CI / containers | Fixed 2026-10-11 — found fixing FIXED-848 |
 
 ---
 
@@ -32043,7 +32063,7 @@ image not pinned by `@sha256` digest, a final stage that never leaves root,
 `ADD` from a URL, a download piped into a shell, or a credential-shaped
 `ENV`/`ARG` with a value baked in. The sandbox and egress-proxy definitions pass.
 Scanning the built images for vulnerabilities remains open (TO_BE_FIXED
-[BUG-329](TO_BE_FIXED.md#bug-329--built-container-images-are-not-scanned-for-vulnerabilities)).
+BUG-329 (since closed as [FIXED-848](#fixed-848--container-base-images-were-never-scanned-and-neither-pinned-base-could-still-be-pulled-was-bug-329))).
 
 **Evidence.** `tests/test_scan_containers.py` (8), including the repository's
 own definitions.
@@ -32173,3 +32193,387 @@ through Chat on a build carrying FIXED-813 to FIXED-842, each answered end to
 end, and proved FIXED-840 and FIXED-841 with real spend. The Anthropic key
 supplied is identity-linked again and still needs its workspace ID; OpenAI was
 connected through the same dialog.
+
+---
+
+## FIXED-844 — A re-sent channel update was a second message and started a second turn
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 4's
+provider event id and idempotency result.**
+
+**Observed.** Telegram re-sends an update it got no 2xx for, and a routed turn
+can outlast its patience. Nothing kept the provider's `update_id`, so each
+re-send was accepted as a new message, spent the sender's budget again, counted
+towards the loop guard, and — on a `new_turn` route — started a second turn.
+
+**Fixed.** The Telegram adapter carries `update_id`; the generic webhook takes
+an optional `Idempotency-Key` (`[A-Za-z0-9_.:-]{8,128}`, else 422
+`idempotency_key_invalid`). Once the sender is known to be allowed, the event
+is claimed in `channel_inbound_events` (migration RAIKER-2100, keyed by
+connector and event, kept 48 hours) before any budget is spent. A repeat is
+answered 200 with the **first** message's receipt id and conversation,
+`reason_code: duplicate_event`, recorded in the audit log and given no second
+receipt. A message refused by a budget or the loop guard gives its claim back,
+so the provider's retry is a fresh try.
+
+**Evidence.** `tests/test_channel_inbound_dedup.py` (7 for this entry). Live:
+the same Telegram update posted three times returned one receipt id, the second
+and third `duplicate_event`; a new `update_id` with the same words was a new
+message; Messaging's recent activity listed two messages, not four. The webhook
+with one `Idempotency-Key` sent twice answered the first id, and `a b` was 422.
+
+---
+
+## FIXED-845 — A channel's inbound budget was per sender only
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 8's
+per-sender/channel/global limits.**
+
+**Observed.** BUG-225's budget bounded each allowlisted sender, and nothing
+bounded a channel with many senders (a group) or the host across channels.
+
+**Fixed.** Two more windows sit behind the sender's: one per channel
+(`RAIKER_CHANNEL_INBOUND_CHANNEL_RATE`, default four times the sender's) and
+one for the host (`RAIKER_CHANNEL_INBOUND_GLOBAL_RATE`, default ten times). The
+smallest scope is checked first and nothing is spent unless all three have
+room, so a flood from others never uses up a quiet sender's budget. Refusals
+are 429 `channel_rate_limited` / `inbound_rate_limited`, recorded with their
+limit; Messaging words both. The approval relay uses the same budgets.
+
+**Evidence.** `tests/test_channel_inbound_dedup.py` (4 for this entry),
+`channelSetup.test.ts`.
+
+---
+
+## FIXED-846 — A channel went on with a destination nobody had tested
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 3:
+"if discovery is unsupported, validate manual IDs with a test before
+enabling".**
+
+**Observed.** The setup checklist put *Test delivery* before *Turned on*, and
+the server turned a channel on whatever the checklist said — with a typed
+Telegram owner id or webhook URL nobody had ever delivered to.
+
+**Fixed.** `set_channel_enabled` refuses `409 channel_test_required` when the
+channel has a configured destination (Telegram's owner sender, the webhook's
+bound URL) and its last test was not delivered. A channel with nothing to
+deliver to has nothing to prove and turns on as before; turning off never
+needs a test. Choosing a different Telegram owner now forgets the last test,
+as binding a new URL already did. Messaging says why in words.
+
+**Evidence.** `tests/test_channel_enable_needs_test.py` (8). Live: Telegram with
+a chosen owner refused Turn on
+([04](../screenshots/2026-10-11-channels-runtime-round/04-turn-on-needs-test.png)); the webhook refused, then a test was
+delivered to a local receiver and the same button turned it on
+([05](../screenshots/2026-10-11-channels-runtime-round/05-webhook-tested-then-on.png)).
+
+---
+
+## FIXED-847 — Memory running out was nowhere on the health surfaces
+
+**Severity: Low. Area: Observability. Status: Fixed 2026-10-11. DEC-24 step 1's
+resource pressure, after FIXED-842 for disk.**
+
+**Fixed.** `GET /api/diagnostics` carries `memory_pressure` — the memory the
+operating system calls *available* (Windows `GlobalMemoryStatusEx`, Linux
+`MemAvailable`), `low` under 512 MB or 5%, `critical` under 256 MB or 2%, and
+`unknown` where it cannot be read, never `ok`. *Needs your attention* names low
+and critical memory with what to do. No dependency was added.
+
+**Evidence.** `tests/test_memory_pressure_health.py` (11),
+`observeAttention.test.ts`. Live: `memory_pressure: ok`, about 104 GB of 128 GB
+available.
+
+---
+
+## FIXED-848 — Container base images were never scanned, and neither pinned base could still be pulled (was BUG-329)
+
+**Severity: Medium. Area: CI / containers. Status: Fixed 2026-10-11. The rest of
+DEC-24 step 7 after FIXED-837.**
+
+**Observed.** FIXED-837 checked how the sandbox and egress-proxy images are
+built, not what they are built on. Pointing a scanner at the two pinned bases
+found that the registry no longer serves either digest
+(`MANIFEST_UNKNOWN`): neither image could have been rebuilt.
+
+**Fixed.** Both bases are re-pinned to the current `python:3.13.16-slim` and
+`-alpine` digests, and the sandbox's `# syntax=` frontend is pinned too
+(FIXED-863). `scripts/scan_images.py` scans every pinned `FROM` image with
+grype straight from the registry and fails a fixable High or Critical finding
+unless `.github/image-scan-exceptions.json` holds a reviewed, unexpired entry;
+an expired or unused entry fails too. CI's **Container image vulnerabilities**
+job installs grype 0.119.0 (a release over two weeks old) and checks its
+SHA-256 before running it — the scanner's own release channel is supply-chain
+input. One exception is recorded: zlib CVE-2026-85091 in the Alpine base, fixed
+upstream in 1.3.2-r1 but not yet in the image, expiring 2026-11-10.
+
+**Evidence.** `tests/test_scan_images.py` (8). Run against the real registry:
+2 base images scanned, no fixable High or Critical outside the exception.
+
+---
+
+## FIXED-849 — A scheduled run had no lease, so one nobody was working on stayed running
+
+**Severity: Medium. Area: Tasks. Status: Fixed 2026-10-11. DEC-12 step 4's
+heartbeat, after FIXED-833's fencing token.**
+
+**Observed.** A claim was fenced but had no lease. A run whose worker died
+without settling — a coroutine that never returned, a second host that went
+away — stayed `running` until the next restart.
+
+**Fixed.** A claim starts a lease (`run_heartbeat_at`, migration RAIKER-2101);
+the worker renews it every 30 seconds under its claim generation. Each
+scheduler pass settles a run unrenewed for five minutes as not finished — not
+retried, as a restart settles it — and a worker that finds its claim taken when
+it renews asks its turn to stop. The recovery matrix says so.
+
+**Evidence.** `tests/test_task_scheduler.py` (5 for this entry).
+
+---
+
+## FIXED-850 — A long routine held up every other background pass
+
+**Severity: Medium. Area: Host / Observability. Status: Fixed 2026-10-11.
+DEC-24 step 1's "give each worker bounded queues, watchdogs" — found writing
+FIXED-849.**
+
+**Observed.** The host tick awaited the scheduled-work pass, and one run may
+last an hour. For that hour approved work did not continue, no search index
+was checked and no local model was watched; after five minutes each of those
+passes read *not running* on *Needs your attention*.
+
+**Fixed.** The scheduled-work pass runs beside the tick as its own task, one at
+a time; while it is busy each tick records it alive, and FIXED-849's lease is
+what notices a run that has stopped.
+
+**Evidence.** `tests/test_due_work_beside_the_tick.py` (2). Live: every
+background pass read `ok` on the diagnostics read.
+
+---
+
+## FIXED-851 — Instructions for a running turn queued without limit
+
+**Severity: Low. Area: Chat / Build. Status: Fixed 2026-10-11. DEC-22 step 2's
+control commands and DEC-24's "no unbounded queues".**
+
+**Fixed.** At most 20 steer instructions wait for a running turn; one more is
+refused `429 steer_queue_full` with nothing added, and the composer says the
+turn reads the waiting ones at its next safe boundary. A channel `interrupt`
+route answers the same refusal instead of queueing.
+
+**Evidence.** `tests/test_turn_stop_and_steer.py` (2 for this entry),
+`TurnControl.test.ts`.
+
+---
+
+## FIXED-852 — A turn a fallback model answered did not say why
+
+**Severity: Low. Area: Models / Chat. Status: Fixed 2026-10-11. DEC-08 step 6:
+"record why fallback occurred".**
+
+**Fixed.** `model_fallback_engaged` names the candidate that failed before it
+(`after_provider`) and that candidate's own reason (`after_reason`), on both
+the streamed and the plain path; the turn timeline shows *Switched to …
+because … was unavailable — …*, and a retry *Retried … once after …*.
+
+**Evidence.** `tests/test_turn_model_fallback.py`, `turnPhases.test.ts`.
+
+---
+
+## FIXED-853 — Any number of large uploads could be read at once
+
+**Severity: Low. Area: API ingress. Status: Fixed 2026-10-11. DEC-25's
+"bound … concurrency".**
+
+**Fixed.** The routes with a larger body cap (attachments, skills, Knowledge
+Map uploads, dictation) admit four bodies in flight at a time; a fifth is
+answered `503 request_body_concurrency_limited` with `Retry-After: 2` before
+any of it is read. Ordinary routes and reads are not counted. The composer says
+other uploads are still in progress and to add the file again in a moment.
+
+**Evidence.** `tests/test_ingress_body_concurrency.py` (3),
+`composerAttachments.test.ts`.
+
+---
+
+## FIXED-854 — An enforcing hook that crashed or timed out let the action through
+
+**Severity: High. Area: Hooks / governance. Status: Fixed 2026-10-11. DEC-23
+step 4: "optional observer failure can continue; required enforcement failure
+stops".**
+
+**Observed.** A hook the owner gave decision authority — a built-in check, or
+a command or `http` handler with `decision_authority` — that timed out or
+errored was recorded and skipped, so the guard let through exactly what it was
+there to stop.
+
+**Fixed.** Its failure now counts as **ask**: the action goes to the owner for
+a decision. A hook without authority is an observer and still only records its
+failure. A deny from another hook still wins. `hook_timeout` / `hook_failed`
+say `failed_closed`, and the Hooks tab's line says *sent to you for a
+decision*.
+
+**Evidence.** `tests/test_hook_fail_closed.py` (5).
+
+---
+
+## FIXED-855 — A delivery Raiker sent over a channel left no record
+
+**Severity: Medium. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 7:
+"create outbound delivery records before send".**
+
+**Observed.** Only an owner's test left a receipt, written after it had
+settled; a real reply or notice sent over a paired channel left none, so
+Messaging could say what arrived and never what went out.
+
+**Fixed.** The channel executor writes the receipt — keyed by the governed
+action's id — as *queued* before anything is sent and settles it *delivered* or
+*failed* with the reason on every path (paused, too long, adapter refusal,
+egress, destination error). A test is a `test_delivery`; anything else a
+`message`, shown as *Raiker sent a message*. A test refused before the executor
+(a closed gate) still gets its receipt from the control service.
+
+**Evidence.** `tests/test_channel_outbound_receipts.py` (4),
+`channelSetup.test.ts`. Live: the webhook's test receipt read *queued →
+delivered* ([05](../screenshots/2026-10-11-channels-runtime-round/05-webhook-tested-then-on.png)).
+
+---
+
+## FIXED-856 — An allowed sender was a bare number
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-11. DEC-14 step 3's
+"discovered labels plus IDs".**
+
+**Fixed.** Raiker cannot list a bot's chats, so it learns what an allowed
+sender calls themselves from their own message — `@username`, or first and last
+name — cleaned, 64 characters at most, only for ids on the allowlist and
+forgotten with them (migration RAIKER-2102, not part of the pairing's
+revision). Messaging shows *@rahul_live (4242)* in the owner picker and the
+checklist, and says names are the sender's own and the id is what is allowed.
+
+**Evidence.** `tests/test_channel_inbound_dedup.py` (3 for this entry),
+`channelSetup.test.ts`. Live: [03](../screenshots/2026-10-11-channels-runtime-round/03-telegram-sender-named.png); at
+390 wide, dark, no overflow: [07](../screenshots/2026-10-11-channels-runtime-round/07-messaging-390-dark.png).
+
+---
+
+## FIXED-857 — A configured runtime could not be turned off, and off would not have stopped its commands
+
+**Severity: Medium. Area: Runtime / Settings. Status: Fixed 2026-10-11. DEC-11
+step 6: "disabling a runtime stops new claims, requests bounded cancellation for
+active work and preserves evidence".**
+
+**Fixed.** `PUT /api/execution-environments/{profile_id}/enabled` turns a
+configured SSH, Daytona or container target off or on. Off stops new work
+(resolution already refused a disabled profile and never fell back to the
+host), asks every command still running there to stop through the governed
+stop, and keeps its runs, receipts and settings; the answer counts what
+stopped. Settings → Runtime has **Turn off** / **Turn on** on configured
+targets, a confirm, the count, and *Off — nothing runs here until you turn it
+on*.
+
+**Evidence.** `tests/test_execution_environment_off.py` (4), a contract case,
+`Runtime.test.ts` (2). Live: an SSH target added through the form and turned
+off — *Build host is off. Nothing was running there.*
+([06](../screenshots/2026-10-11-channels-runtime-round/06-runtime-target-off.png)).
+
+---
+
+## FIXED-858 — Setup ignored a model already chosen, and hid the picker it asked for
+
+**Severity: Medium. Area: First run. Status: Fixed 2026-10-11 — found by the
+live round.**
+
+**Observed.** With OpenRouter connected and GPT-4o Mini already the global
+model, setup's model step read *OpenRouter is connected — choose one of its
+models* with no picker on screen and only **Decide later**, which would have
+recorded no model and made Ready say Chat had nothing to answer with.
+
+**Fixed.** The step adopts the global model when setup has none, so it reads
+*GPT-4o Mini is selected* with **Continue** and Ready names it; a
+recommendation that asks for a model has **Choose a model**, which opens the
+providers.
+
+**Evidence.** `ModelSetupView.test.ts` (2). Live:
+[02](../screenshots/2026-10-11-channels-runtime-round/02-setup-keeps-chosen-model.png); Ready read
+`openai/gpt-4o-mini`.
+
+---
+
+## FIXED-859 — The step-up window named the owner by their internal id
+
+**Severity: Medium. Area: Permissions / identity. Status: Fixed 2026-10-11 —
+found by the live round. DEC-01 step 4.**
+
+**Observed.** Turning a capability on read *Acting as
+**principal_user_36d5…**. This decision is recorded against your principal.*
+The page passed the session's principal id down as the name to show.
+
+**Fixed.** The shell reads `/api/auth/whoami` and shows the display name —
+*Acting as Rahul … recorded against your account*. Who acts is still decided by
+the session on the server; the name is only shown.
+
+**Evidence.** Live: [08](../screenshots/2026-10-11-channels-runtime-round/08-step-up-names-the-owner.png).
+
+---
+
+## FIXED-860 — The SSH fingerprint field's check never ran
+
+**Severity: Low. Area: Runtime / Settings. Status: Fixed 2026-10-11 — found by
+the live round.**
+
+**Observed.** The browser compiles `pattern` with the `v` flag, where an
+unescaped `/` inside a class is a syntax error, so `SHA256:[A-Za-z0-9+/]{43}`
+logged an error and was ignored; any text passed.
+
+**Fixed.** `/` is escaped; a short fingerprint is now invalid and nothing is
+logged. A test compiles every pattern on the page the way the browser does.
+
+**Evidence.** `Runtime.test.ts`. Live: `SHA256:short` invalid, no console
+error.
+
+---
+
+## FIXED-861 — A Hugging Face repository name was shown as `[REDACTED_SECRET]` (was BUG-328)
+
+**Severity: Low. Area: Models / redaction. Status: Fixed 2026-10-11.**
+
+**Fixed.** `repo_id` is read as the Hub's model id, not a Raiker record id, so
+a long hyphenated repository name gets the model-name rule (segmented paths
+spared) instead of the record-id one. Every credential shape still applies
+first.
+
+**Evidence.** `tests/test_hf_repo_id_redaction.py` (3).
+
+---
+
+## FIXED-862 — A Hugging Face access token matched no redaction pattern
+
+**Severity: Medium. Area: Redaction / secrets. Status: Fixed 2026-10-11 — found
+fixing FIXED-861.**
+
+**Observed.** An `hf_` token is 37 characters — under the generic fallback's
+40 — and no pattern knew its shape, so it passed redaction anywhere it
+appeared, and the committed-credential scan did not know it either.
+
+**Fixed.** `hf_` followed by 30 or more letters and digits is a token in the
+redactor, and the credential gate gained a `huggingface_token` rule.
+
+**Evidence.** `tests/test_hf_repo_id_redaction.py`; `scripts/scan_secrets.py`
+passes with no new exception.
+
+---
+
+## FIXED-863 — The sandbox image's BuildKit frontend was an unpinned tag
+
+**Severity: Low. Area: CI / containers. Status: Fixed 2026-10-11 — found fixing
+FIXED-848.**
+
+**Observed.** `# syntax=docker/dockerfile:1.7` names an image BuildKit pulls and
+runs to parse the file — the same unreviewed code an unpinned base would be.
+
+**Fixed.** Pinned by digest, and `scripts/scan_containers.py` fails a
+`# syntax=` directive without one (`frontend_not_pinned`).
+
+**Evidence.** `tests/test_scan_containers.py`.

@@ -65,6 +65,7 @@ from raiker.api.wire.code import (
 )
 from raiker.api.wire.execution import (
     ExecutionEnvironmentConfigured,
+    ExecutionEnvironmentEnabled,
     ExecutionEnvironmentProbed,
     ExecutionEnvironmentReset,
     ExecutionEnvironmentSelected,
@@ -1472,6 +1473,26 @@ async def configure_execution_environment(
     if not result.ok:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, result.reason_code)
     answer = cast(ExecutionEnvironmentConfigured, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.put("/api/execution-environments/{profile_id}/enabled")
+async def set_execution_environment_enabled(
+    profile_id: str,
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """DEC-11 step 6 — turn a configured environment off (stopping what runs there) or on."""
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_enabled")
+    result = _service(request).set_execution_environment_enabled(
+        profile_id, enabled, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
+    answer = cast(ExecutionEnvironmentEnabled, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

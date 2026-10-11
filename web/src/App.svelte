@@ -125,6 +125,11 @@
   let authState = $state<
     "locked" | "verifying" | "ready" | "verification_failed"
   >("locked");
+  /**
+   * DEC-01 — who the owner is *to read*: their display name, never the internal
+   * principal id. Pages show it in the step-up window ("Acting as …"); the
+   * server knows who is acting from the session and never takes it from here.
+   */
   let principal = $state("—");
   let projects = $state<ProjectsList | null>(null);
   let continuedSessionId = $state<string | null>(
@@ -225,9 +230,15 @@
   });
 
   // Called by the lock screen once a full control session exists.
-  function onAuthenticated(principalId: string) {
-    principal = principalId;
+  function onAuthenticated(_principalId: string) {
+    principal = "you";
     authState = "verifying";
+    void api
+      .whoami()
+      .then((me) => {
+        principal = me.display_name || "you";
+      })
+      .catch(() => {});
     void bootstrap();
   }
 

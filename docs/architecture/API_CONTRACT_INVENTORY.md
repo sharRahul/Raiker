@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**378 operations: 367 verified, 0 eligible, 0 deferred, 11 special.**
+**379 operations: 368 verified, 0 eligible, 0 deferred, 11 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -128,6 +128,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/execution-environments` |  | ExecutionEnvironmentsView | verified | DashboardService.execution_environments |
 | PUT | `/api/execution-environments/configure` | dict | ExecutionEnvironmentConfigured | verified | declared by cast |
 | PUT | `/api/execution-environments/selection` | dict | ExecutionEnvironmentSelected | verified | declared by cast |
+| PUT | `/api/execution-environments/{profile_id}/enabled` | dict | ExecutionEnvironmentEnabled | verified | declared by cast |
 | POST | `/api/execution-environments/{profile_id}/probe` |  | ExecutionEnvironmentProbed | verified | declared ExecutionEnvironmentProbed |
 | POST | `/api/execution-environments/{profile_id}/reset` | dict | ExecutionEnvironmentReset | verified | declared by cast |
 | GET | `/api/extensions` |  | ExtensionsOverviewView | verified | WebReadModels.extensions_overview |

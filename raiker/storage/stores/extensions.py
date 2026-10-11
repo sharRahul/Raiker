@@ -822,11 +822,23 @@ class ExtensionStore:
         """Replace the inbound route as one atomic owner decision."""
         with self.connect() as connection:
             cursor = connection.execute(
+                # DEC-14 step 3 — Telegram delivers to the owner sender's chat,
+                # so choosing another owner forgets the test of the old one,
+                # as binding a new webhook URL already does.
                 """UPDATE channel_pairings
-                   SET routing_mode = ?, target_session_id = ?, owner_sender_id = ?,
+                   SET last_test_at = CASE WHEN channel_type = 'telegram'
+                         AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_at END,
+                       last_test_ok = CASE WHEN channel_type = 'telegram'
+                         AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_ok END,
+                       last_test_reason = CASE WHEN channel_type = 'telegram'
+                         AND owner_sender_id IS NOT ? THEN NULL ELSE last_test_reason END,
+                       routing_mode = ?, target_session_id = ?, owner_sender_id = ?,
                        approval_relay_enabled = ?
                    WHERE pairing_id = ?""",
                 (
+                    owner_sender_id,
+                    owner_sender_id,
+                    owner_sender_id,
                     routing_mode,
                     target_session_id,
                     owner_sender_id,
@@ -853,6 +865,47 @@ class ExtensionStore:
                 (delivery_url, pairing_id),
             )
             return cursor.rowcount > 0
+
+    #: DEC-14 step 3 — the longest label kept for a sender.
+    CHANNEL_SENDER_LABEL_CHARS = 64
+
+    def record_channel_sender_label(
+        self: SQLiteStore, pairing_id: str, sender_id: str, label: str
+    ) -> bool:
+        """Remember what an allowed sender calls themselves on the channel.
+
+        Kept only for ids on the pairing's allowlist — the map is rebuilt from
+        it each time, so removing a sender forgets their label too — and only
+        when it changed, so an ordinary message writes nothing.
+        """
+        clean = " ".join("".join(ch for ch in label if ch.isprintable()).split())
+        clean = clean[: self.CHANNEL_SENDER_LABEL_CHARS]
+        if not clean:
+            return False
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT sender_allowlist_json, sender_labels_json FROM channel_pairings "
+                "WHERE pairing_id = ?",
+                (pairing_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            try:
+                allowed = {str(item) for item in json.loads(row["sender_allowlist_json"] or "[]")}
+                labels = dict(json.loads(row["sender_labels_json"] or "{}"))
+            except (TypeError, ValueError):
+                allowed, labels = set(), {}
+            if sender_id not in allowed:
+                return False
+            kept = {key: str(value) for key, value in labels.items() if key in allowed}
+            if kept.get(sender_id) == clean and len(kept) == len(labels):
+                return False
+            kept[sender_id] = clean
+            connection.execute(
+                "UPDATE channel_pairings SET sender_labels_json = ? WHERE pairing_id = ?",
+                (json.dumps(kept, sort_keys=True), pairing_id),
+            )
+        return True
 
     def record_channel_pairing_test(
         self: SQLiteStore, pairing_id: str, *, ok: bool, reason_code: str | None
@@ -961,6 +1014,58 @@ class ExtensionStore:
                 tuple(params),
             )
             return cursor.rowcount > 0
+
+    #: DEC-14 step 4 — how long a provider event id is remembered. Telegram
+    #: gives up re-sending an update well inside a day; two leaves margin.
+    CHANNEL_INBOUND_EVENT_TTL_HOURS = 48
+
+    def claim_channel_inbound_event(
+        self: SQLiteStore, connector_id: str, event_key: str, receipt_id: str
+    ) -> str | None:
+        """Record that ``receipt_id`` answers this provider event.
+
+        Returns ``None`` when this is the first time the event arrived, and the
+        receipt the first arrival produced when it is a repeat. One statement
+        under the primary key decides it, so two copies racing in on top of a
+        slow turn cannot both win.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        cutoff = (
+            datetime.now(UTC) - timedelta(hours=self.CHANNEL_INBOUND_EVENT_TTL_HOURS)
+        ).isoformat().replace("+00:00", "Z")
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM channel_inbound_events WHERE created_at < ?", (cutoff,)
+            )
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO channel_inbound_events
+                     (connector_id, event_key, receipt_id, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (connector_id, event_key, receipt_id, utc_now()),
+            )
+            if cursor.rowcount > 0:
+                return None
+            row = connection.execute(
+                """SELECT receipt_id FROM channel_inbound_events
+                   WHERE connector_id = ? AND event_key = ?""",
+                (connector_id, event_key),
+            ).fetchone()
+        return str(row["receipt_id"]) if row is not None else None
+
+    def release_channel_inbound_event(
+        self: SQLiteStore, connector_id: str, event_key: str, receipt_id: str
+    ) -> None:
+        """Give back a claim whose message was refused, so a retry is a fresh try."""
+        self._execute(
+            """DELETE FROM channel_inbound_events
+               WHERE connector_id = ? AND event_key = ? AND receipt_id = ?""",
+            (connector_id, event_key, receipt_id),
+        )
+
+    def load_channel_receipt(self: SQLiteStore, receipt_id: str) -> dict[str, Any] | None:
+        rows = self._rows("SELECT * FROM channel_receipts WHERE receipt_id = ?", (receipt_id,))
+        return dict(rows[0]) if rows else None
 
     def list_channel_receipts(
         self: SQLiteStore, connector_id: str, *, limit: int = 5

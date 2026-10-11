@@ -726,6 +726,7 @@ export type ChannelProfile = {
   display_label: string | null;
   sender_count: number;
   senders: string[];
+  sender_labels?: Record<string, string>;
   routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
   target_session_id: string | null;
   owner_sender_id: string | null;
@@ -1662,6 +1663,7 @@ export type DiagnosticsView = {
   search_indexes: SearchIndexHealth[];
   scheduler_queue: SchedulerQueue;
   storage_space: StorageSpace;
+  memory_pressure: MemoryPressure;
   model_profile_source: ModelProfileSource;
   scope_note: string;
 };
@@ -1799,6 +1801,14 @@ export type ExecutionBoundaryView = {
 export type ExecutionEnvironmentConfigured = {
   ok: boolean;
   profile_id: string;
+};
+
+/** DEC-11 step 6 — an environment turned on or off, and the commands that stopped with it. */
+export type ExecutionEnvironmentEnabled = {
+  ok: boolean;
+  profile_id: string;
+  enabled: boolean;
+  stopped_runs: number;
 };
 
 export type ExecutionEnvironmentProbed = {
@@ -2969,6 +2979,13 @@ export type MemoryPinned = {
   ok: boolean;
   memory_id: string;
   pinned: boolean;
+};
+
+/** DEC-24 step 1 — memory this machine has left, as the operating system reports it. */
+export type MemoryPressure = {
+  state: "ok" | "low" | "critical" | "unknown";
+  available_bytes: number | null;
+  total_bytes: number | null;
 };
 
 /** A sentence the runtime proposed remembering, waiting on the owner. */
@@ -5379,8 +5396,8 @@ export const contract = {
     call<ChannelSendersSet>("PUT", `/api/channels/pairings/${encodeURIComponent(pairingId)}/senders`, { body }),
   receiveApprovalResponse: (connectorId: string, body: ChannelApprovalResponse, xRaikerChannelSecret?: string) =>
     call<ApprovalRelayAnswered>("POST", `/api/channels/${encodeURIComponent(connectorId)}/approval-response`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret } }),
-  receiveInbound: (connectorId: string, body: InboundChannelMessage, xRaikerChannelSecret?: string) =>
-    call<ChannelInboundAccepted>("POST", `/api/channels/${encodeURIComponent(connectorId)}/inbound`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret } }),
+  receiveInbound: (connectorId: string, body: InboundChannelMessage, xRaikerChannelSecret?: string, idempotencyKey?: string) =>
+    call<ChannelInboundAccepted>("POST", `/api/channels/${encodeURIComponent(connectorId)}/inbound`, { body, headers: { "x-raiker-channel-secret": xRaikerChannelSecret, "idempotency-key": idempotencyKey } }),
   receiveTelegram: (connectorId: string, body: Record<string, unknown>, xTelegramBotApiSecretToken?: string) =>
     call<ChannelInboundAccepted | ChannelUpdateIgnored>("POST", `/api/channels/${encodeURIComponent(connectorId)}/telegram`, { body, headers: { "x-telegram-bot-api-secret-token": xTelegramBotApiSecretToken } }),
   searchChatHistory: (query: { q: string }) =>
@@ -5465,6 +5482,8 @@ export const contract = {
     call<ExecutionEnvironmentConfigured>("PUT", "/api/execution-environments/configure", { body }),
   selectExecutionEnvironment: (body: Record<string, unknown>) =>
     call<ExecutionEnvironmentSelected>("PUT", "/api/execution-environments/selection", { body }),
+  setExecutionEnvironmentEnabled: (profileId: string, body: Record<string, unknown>) =>
+    call<ExecutionEnvironmentEnabled>("PUT", `/api/execution-environments/${encodeURIComponent(profileId)}/enabled`, { body }),
   probeExecutionEnvironment: (profileId: string) =>
     call<ExecutionEnvironmentProbed>("POST", `/api/execution-environments/${encodeURIComponent(profileId)}/probe`),
   resetExecutionEnvironment: (profileId: string, body: Record<string, unknown>) =>

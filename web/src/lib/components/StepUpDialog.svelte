@@ -71,7 +71,7 @@
   >
     <h2 id="stepup-title">{title}</h2>
     <p class="principal">
-      Acting as <strong>{principal}</strong>. This decision is recorded against your principal.
+      Acting as <strong>{principal}</strong>. This decision is recorded against your account.
     </p>
 
     <label class="field-label" for="stepup-reason">Reason (required)</label>

@@ -4227,6 +4227,49 @@ CREATE TABLE IF NOT EXISTS owner_spend_limits (
 );
 """
 
+# DEC-14 step 4 — a provider's own event id, kept for the message Raiker
+# accepted under it. Telegram re-sends an update it got no 2xx for, and a long
+# turn can outlast its patience; without the id the re-send was a second
+# message and started a second turn. The key is the provider's id (or a
+# webhook caller's ``Idempotency-Key``), scoped to the connector; the row
+# names the receipt it produced so a repeat is answered with that receipt and
+# runs nothing. Rows age out after two days — longer than any provider retries.
+CHANNEL_INBOUND_EVENTS_MIGRATION_ID = "RAIKER-2100-channel-inbound-events"
+
+CHANNEL_INBOUND_EVENTS_SQL = """
+CREATE TABLE IF NOT EXISTS channel_inbound_events (
+  connector_id TEXT NOT NULL,
+  event_key TEXT NOT NULL,
+  receipt_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (connector_id, event_key)
+);
+CREATE INDEX IF NOT EXISTS idx_channel_inbound_events_created
+  ON channel_inbound_events(created_at);
+"""
+
+# DEC-12 step 4 — the lease half of a scheduled run's claim. The worker renews
+# ``run_heartbeat_at`` while its run is going, under its claim generation; a
+# run whose heartbeat has lapsed has no worker left on it, and the host's next
+# pass settles it — the same settlement a restart gives, without waiting for
+# one. A worker that finds its claim taken when it renews stops its turn.
+TASK_RUN_HEARTBEAT_MIGRATION_ID = "RAIKER-2101-task-run-heartbeat"
+
+TASK_RUN_HEARTBEAT_SQL = """
+ALTER TABLE tasks ADD COLUMN run_heartbeat_at TEXT;
+"""
+
+# DEC-14 step 3 — the name an allowed sender goes by on the channel, as the
+# channel's own messages carry it. Raiker cannot list a Telegram bot's chats,
+# so it learns a label the first time an allowed sender writes, and Messaging
+# shows "@alex (4242)" where it showed "4242". Only for ids on the allowlist,
+# and never part of the pairing's revision: it is observed, not configured.
+CHANNEL_SENDER_LABELS_MIGRATION_ID = "RAIKER-2102-channel-sender-labels"
+
+CHANNEL_SENDER_LABELS_SQL = """
+ALTER TABLE channel_pairings ADD COLUMN sender_labels_json TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4472,6 +4515,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(GIT_CREDENTIAL_LAST_USE_MIGRATION_ID, GIT_CREDENTIAL_LAST_USE_SQL),
     Migration(TASK_CLAIM_GENERATION_MIGRATION_ID, TASK_CLAIM_GENERATION_SQL),
     Migration(OWNER_SPEND_LIMIT_MIGRATION_ID, OWNER_SPEND_LIMIT_SQL),
+    Migration(CHANNEL_INBOUND_EVENTS_MIGRATION_ID, CHANNEL_INBOUND_EVENTS_SQL),
+    Migration(TASK_RUN_HEARTBEAT_MIGRATION_ID, TASK_RUN_HEARTBEAT_SQL),
+    Migration(CHANNEL_SENDER_LABELS_MIGRATION_ID, CHANNEL_SENDER_LABELS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

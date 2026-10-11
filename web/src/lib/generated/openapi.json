@@ -3518,6 +3518,13 @@
             "title": "Sender Count",
             "type": "integer"
           },
+          "sender_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sender Labels",
+            "type": "object"
+          },
           "senders": {
             "items": {
               "type": "string"
@@ -8166,6 +8173,9 @@
             "title": "Disabled Capabilities",
             "type": "array"
           },
+          "memory_pressure": {
+            "$ref": "#/components/schemas/MemoryPressure"
+          },
           "missing_config": {
             "default": [],
             "items": {
@@ -8968,6 +8978,35 @@
           "profile_id"
         ],
         "title": "ExecutionEnvironmentConfigured",
+        "type": "object"
+      },
+      "ExecutionEnvironmentEnabled": {
+        "description": "DEC-11 step 6 — an environment turned on or off, and the commands that stopped with it.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "stopped_runs": {
+            "title": "Stopped Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "enabled",
+          "stopped_runs"
+        ],
+        "title": "ExecutionEnvironmentEnabled",
         "type": "object"
       },
       "ExecutionEnvironmentProbed": {
@@ -15055,6 +15094,50 @@
           "pinned"
         ],
         "title": "MemoryPinned",
+        "type": "object"
+      },
+      "MemoryPressure": {
+        "description": "DEC-24 step 1 — memory this machine has left, as the operating system reports it.\n\nRead when the page asks; nothing is written. A local model, an index\nrebuild and a backup all want memory at once, and a machine that is out of\nit fails them slowly and without a reason — so it is named before then.",
+        "properties": {
+          "available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Bytes"
+          },
+          "state": {
+            "enum": [
+              "ok",
+              "low",
+              "critical",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          }
+        },
+        "required": [
+          "state",
+          "available_bytes",
+          "total_bytes"
+        ],
+        "title": "MemoryPressure",
         "type": "object"
       },
       "MemoryProposal": {
@@ -29571,6 +29654,7 @@
     },
     "/api/channels/{connector_id}/inbound": {
       "post": {
+        "description": "One message on the reference webhook.\n\nDEC-14 step 4 — a caller that may re-send sends ``Idempotency-Key``; a\nrepeat of a message already accepted under it is answered with the first\nmessage's receipt and runs nothing.",
         "operationId": "receive_inbound_api_channels__connector_id__inbound_post",
         "parameters": [
           {
@@ -29596,6 +29680,22 @@
                 }
               ],
               "title": "X-Raiker-Channel-Secret"
+            }
+          },
+          {
+            "in": "header",
+            "name": "idempotency-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
             }
           }
         ],
@@ -31348,6 +31448,58 @@
           }
         },
         "summary": "Select Execution Environment"
+      }
+    },
+    "/api/execution-environments/{profile_id}/enabled": {
+      "put": {
+        "description": "DEC-11 step 6 — turn a configured environment off (stopping what runs there) or on.",
+        "operationId": "set_execution_environment_enabled_api_execution_environments__profile_id__enabled_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionEnvironmentEnabled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Execution Environment Enabled"
       }
     },
     "/api/execution-environments/{profile_id}/probe": {

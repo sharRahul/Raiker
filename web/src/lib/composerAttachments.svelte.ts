@@ -202,9 +202,12 @@ export function createAttachmentStore(): AttachmentStore {
       ];
     } catch (e) {
       error =
-        e instanceof ApiError
-          ? `Upload rejected (${e.reasonCode ?? e.status}).`
-          : "Upload failed — could not reach the local runtime.";
+        e instanceof ApiError && e.reasonCode === "request_body_concurrency_limited"
+          ? // DEC-25 — other uploads are still being read; nothing was stored.
+            "Other uploads are still in progress. Add this file again in a moment."
+          : e instanceof ApiError
+            ? `Upload rejected (${e.reasonCode ?? e.status}).`
+            : "Upload failed — could not reach the local runtime.";
     } finally {
       uploading = false;
     }

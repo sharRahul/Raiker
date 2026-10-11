@@ -5,8 +5,10 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from collections import defaultdict, deque
+from contextlib import suppress
 from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -112,7 +114,70 @@ def channel_inbound_limit() -> int:
     return value if value > 0 else CHANNEL_INBOUND_DEFAULT_MAX
 
 
-def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
+# DEC-14 step 8 — per sender was the only budget, so a channel with many
+# allowlisted senders (a group) or many channels at once had no bound at all.
+# Two more windows sit behind it: one per channel and one for the host. Each is
+# a multiple of the per-sender budget unless set, so raising the sender budget
+# for one busy person does not leave the channel's bound below it.
+CHANNEL_INBOUND_CHANNEL_FACTOR = 4
+CHANNEL_INBOUND_GLOBAL_FACTOR = 10
+
+_channel_hits: dict[str, deque[float]] = defaultdict(deque)
+_global_hits: deque[float] = deque()
+
+
+def _positive_env(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def channel_inbound_channel_limit() -> int:
+    """Messages per channel per minute, every sender together."""
+    return _positive_env(
+        "RAIKER_CHANNEL_INBOUND_CHANNEL_RATE",
+        channel_inbound_limit() * CHANNEL_INBOUND_CHANNEL_FACTOR,
+    )
+
+
+def channel_inbound_global_limit() -> int:
+    """Messages per minute across every channel on this host."""
+    return _positive_env(
+        "RAIKER_CHANNEL_INBOUND_GLOBAL_RATE",
+        channel_inbound_limit() * CHANNEL_INBOUND_GLOBAL_FACTOR,
+    )
+
+
+def _inbound_budget_refusal(connector_id: str, sender_id: str) -> str | None:
+    """Spend one message from every budget it falls under, or name the one that is spent.
+
+    Checked smallest scope first, and nothing is recorded unless all three have
+    room: a message refused by the channel's budget must not also use up the
+    sender's, or a flood from others would lock a quiet sender out after it.
+    """
+    now = time.monotonic()
+    cutoff = now - CHANNEL_INBOUND_WINDOW_SECONDS
+    if not _within_inbound_budget(connector_id, sender_id, record=False):
+        return "rate_limited"
+    channel = _channel_hits[connector_id]
+    while channel and channel[0] < cutoff:
+        channel.popleft()
+    if len(channel) >= channel_inbound_channel_limit():
+        return "channel_rate_limited"
+    while _global_hits and _global_hits[0] < cutoff:
+        _global_hits.popleft()
+    if len(_global_hits) >= channel_inbound_global_limit():
+        return "inbound_rate_limited"
+    _within_inbound_budget(connector_id, sender_id)
+    channel.append(now)
+    _global_hits.append(now)
+    return None
+
+
+def _within_inbound_budget(connector_id: str, sender_id: str, *, record: bool = True) -> bool:
     """Record this message against the sender's budget; False when it is spent."""
     limit = channel_inbound_limit()
     now = time.monotonic()
@@ -129,8 +194,14 @@ def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
     hits = _inbound_hits[(connector_id, sender_id)]
     if len(hits) >= limit:
         return False
-    hits.append(now)
+    if record:
+        hits.append(now)
     return True
+
+
+#: DEC-14 step 4 — the shape a webhook caller's ``Idempotency-Key`` must have,
+#: the same as every other route that takes one.
+_EVENT_KEY = re.compile(r"^[A-Za-z0-9_.:-]{8,128}$")
 
 
 # ── Loop guard (DEC-14 step 9) ───────────────────────────────────────────────
@@ -214,9 +285,11 @@ def _channel_result(result: Any) -> dict[str, Any]:
     if result.ok:
         return {"ok": True, **result.data}
     reason = result.reason_code or ""
-    if reason == CHANNEL_CONFLICT:
+    if reason in {CHANNEL_CONFLICT, "channel_test_required"}:
         # §13.2 item 6 — another tab changed this pairing since the page read
         # it. Nothing was written; the page re-reads and the owner decides again.
+        # DEC-14 step 3 — the channel's state stands in the way until a test
+        # to its destination is delivered.
         raise refusal(status.HTTP_409_CONFLICT, reason)
     if (
         reason.startswith("unknown_connector")
@@ -438,10 +511,26 @@ async def receive_inbound(
     body: InboundChannelMessage,
     request: Request,
     x_raiker_channel_secret: str | None = Header(default=None),
+    idempotency_key: str | None = Header(default=None),
 ) -> dict[str, Any]:
+    """One message on the reference webhook.
+
+    DEC-14 step 4 — a caller that may re-send sends ``Idempotency-Key``; a
+    repeat of a message already accepted under it is answered with the first
+    message's receipt and runs nothing.
+    """
     _require_channel_secret(x_raiker_channel_secret)
+    event_key: str | None = None
+    if idempotency_key is not None:
+        if not _EVENT_KEY.fullmatch(idempotency_key):
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "idempotency_key_invalid")
+        event_key = f"key:{idempotency_key}"
     return serialize_dto(await _handle_inbound(
-        connector_id, sender_id=body.sender_id, text=body.text, request=request
+        connector_id,
+        sender_id=body.sender_id,
+        text=body.text,
+        request=request,
+        event_key=event_key,
     ))
 
 
@@ -496,6 +585,8 @@ async def receive_telegram(
         text=parsed.text,
         request=request,
         conversation_scope=parsed.conversation_scope,
+        event_key=parsed.event_id,
+        sender_label=parsed.sender_label,
     ))
 
 
@@ -507,6 +598,8 @@ async def _handle_inbound(
     text: str,
     request: Request,
     conversation_scope: str = "endpoint",
+    event_key: str | None = None,
+    sender_label: str | None = None,
 ) -> ChannelInboundAccepted:
     store = SQLiteStore(_ws(request))
     writer = EventLogWriter(store)
@@ -566,11 +659,40 @@ async def _handle_inbound(
             },
         )
 
-    if not _within_inbound_budget(connector_id, sender_id):
+    if sender_label:
+        # DEC-14 step 3 — an allowed sender's own name for themselves, so
+        # Messaging can show it beside the id. Never used to decide anything.
+        with suppress(Exception):
+            store.record_channel_sender_label(
+                str(pairing.get("pairing_id") or ""), sender_id, sender_label
+            )
+
+    # DEC-14 step 4 — claimed once the sender is known to be allowed and
+    # before anything spends a budget, so a provider re-sending an update it
+    # got no answer for is neither a second turn nor a second hit on the rate
+    # limit or the loop guard. A refusal below gives the claim back: a message
+    # that was refused was not accepted, and the provider's retry is a fresh try.
+    if event_key is not None:
+        first = store.claim_channel_inbound_event(connector_id, event_key, channel_message_id)
+        if first is not None:
+            return _duplicate_answer(
+                store, writer, pairing, first,
+                connector_id=connector_id,
+                channel_type=channel_type,
+                is_owner=is_owner,
+            )
+
+    def _release_event() -> None:
+        if event_key is not None:
+            store.release_channel_inbound_event(connector_id, event_key, channel_message_id)
+
+    spent = _inbound_budget_refusal(connector_id, sender_id)
+    if spent is not None:
+        _release_event()
         _receipt(
             {"failed_at": utc_now()},
             role="owner" if is_owner else "allowed",
-            reason="rate_limited",
+            reason=spent,
         )
         writer.append(make_event(
             session_id="channels",
@@ -582,15 +704,19 @@ async def _handle_inbound(
                 "channel_type": channel_type,
                 "sender_id": sender_id,
                 "trust_level": "untrusted",
-                "reason": "rate_limited",
-                "limit_per_minute": channel_inbound_limit(),
+                "reason": spent,
+                "limit_per_minute": {
+                    "rate_limited": channel_inbound_limit,
+                    "channel_rate_limited": channel_inbound_channel_limit,
+                    "inbound_rate_limited": channel_inbound_global_limit,
+                }[spent](),
             },
         ))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
                 "ok": False,
-                "reason_code": "rate_limited",
+                "reason_code": spent,
                 "trust_level": "untrusted",
                 "quarantined": True,
             },
@@ -598,6 +724,7 @@ async def _handle_inbound(
 
     loop = _loop_reason(connector_id, sender_id, text)
     if loop is not None:
+        _release_event()
         _receipt(
             {"failed_at": utc_now()},
             role="owner" if is_owner else "allowed",
@@ -708,6 +835,51 @@ async def _handle_inbound(
     return answer
 
 
+def _duplicate_answer(
+    store: SQLiteStore,
+    writer: EventLogWriter,
+    pairing: dict[str, Any],
+    first_receipt_id: str,
+    *,
+    connector_id: str,
+    channel_type: str,
+    is_owner: bool,
+) -> ChannelInboundAccepted:
+    """A repeat of an accepted event: the first receipt, and nothing run.
+
+    Answered 200 so the provider stops re-sending. The audit log says a repeat
+    arrived and which message it repeated; the receipt ledger is not given a
+    second row for a message that happened once.
+    """
+    first = store.load_channel_receipt(first_receipt_id) or {}
+    writer.append(make_event(
+        session_id="channels",
+        turn_id=None,
+        event_type="channel_message_rejected",
+        actor="channel_receiver",
+        payload={
+            "connector_id": connector_id,
+            "channel_type": channel_type,
+            "trust_level": "owner" if is_owner else "untrusted",
+            "reason": "duplicate_event",
+            "channel_message_id": first_receipt_id,
+        },
+    ))
+    answer = cast(ChannelInboundAccepted, {
+        "ok": True,
+        "channel_message_id": first_receipt_id,
+        "trust_level": "owner" if is_owner else "untrusted",
+        "quarantined": True,
+        "routed": False,
+        "routing_mode": str(pairing.get("routing_mode") or "record_only"),
+        "reason_code": "duplicate_event",
+    })
+    session_id = first.get("session_id")
+    if session_id:
+        answer["session_id"] = str(session_id)
+    return answer
+
+
 def _settle_receipt(
     store: SQLiteStore, receipt_id: str, routed: InboundRoute, *, channel_type: str
 ) -> None:
@@ -780,8 +952,9 @@ async def receive_approval_response(
     owner_sender = str(pairing.get("owner_sender_id") or "")
     if not owner_sender or not hmac.compare_digest(body.sender_id, owner_sender):
         raise refusal(403, "channel_owner_sender_required")
-    if not _within_inbound_budget(connector_id, body.sender_id):
-        raise refusal(status.HTTP_429_TOO_MANY_REQUESTS, "rate_limited")
+    spent = _inbound_budget_refusal(connector_id, body.sender_id)
+    if spent is not None:
+        raise refusal(status.HTTP_429_TOO_MANY_REQUESTS, spent)
     relay = store.get_approval_relay(body.relay_id)
     if (
         relay is None
@@ -947,7 +1120,17 @@ async def _route_inbound_message(
             store.request_turn_stop(target, principal_id, reason="owner requested stop over paired channel")
             action = "stop"
         else:
-            store.queue_turn_steer(target, principal_id, text=text[:4000])
+            from raiker.storage.stores.conversations import SteerQueueFull
+
+            try:
+                store.queue_turn_steer(target, principal_id, text=text[:4000])
+            except SteerQueueFull:
+                answer_full: InboundRoute = {
+                    "routed": False,
+                    "routing_mode": mode,
+                    "reason_code": "steer_queue_full",
+                }
+                return answer_full
             action = "steer"
         EventLogWriter(store).append(make_event(
             session_id=target,

@@ -91,6 +91,29 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-11. Fourteen more decision-record steps
+> closed.** DEC-14 step 4: a re-sent provider event is one message
+> ([FIXED-844](FIXED_ITEMS.md#fixed-844--a-re-sent-channel-update-was-a-second-message-and-started-a-second-turn)); step 8: a channel's and the host's inbound budgets behind the
+> sender's ([FIXED-845](FIXED_ITEMS.md#fixed-845--a-channels-inbound-budget-was-per-sender-only)); step 3: a typed destination is tested before the channel
+> goes on ([FIXED-846](FIXED_ITEMS.md#fixed-846--a-channel-went-on-with-a-destination-nobody-had-tested)) and an allowed sender is named as their own messages name
+> them ([FIXED-856](FIXED_ITEMS.md#fixed-856--an-allowed-sender-was-a-bare-number)); step 7: an outbound delivery's receipt exists before it is
+> sent ([FIXED-855](FIXED_ITEMS.md#fixed-855--a-delivery-raiker-sent-over-a-channel-left-no-record)). DEC-24 step 1: memory pressure on the health surfaces
+> ([FIXED-847](FIXED_ITEMS.md#fixed-847--memory-running-out-was-nowhere-on-the-health-surfaces)) and scheduled work beside the host tick, not inside it
+> ([FIXED-850](FIXED_ITEMS.md#fixed-850--a-long-routine-held-up-every-other-background-pass)); step 7: the pinned container bases scanned by a pinned scanner,
+> with both bases re-pinned because the registry no longer served either
+> ([FIXED-848](FIXED_ITEMS.md#fixed-848--container-base-images-were-never-scanned-and-neither-pinned-base-could-still-be-pulled-was-bug-329), closes BUG-329). DEC-12 step 4: a run's lease and the pass that
+> settles one nobody renews ([FIXED-849](FIXED_ITEMS.md#fixed-849--a-scheduled-run-had-no-lease-so-one-nobody-was-working-on-stayed-running)). DEC-22 step 2: a bounded steer queue
+> ([FIXED-851](FIXED_ITEMS.md#fixed-851--instructions-for-a-running-turn-queued-without-limit)). DEC-08 step 6: a fallback says why ([FIXED-852](FIXED_ITEMS.md#fixed-852--a-turn-a-fallback-model-answered-did-not-say-why)). DEC-25: large
+> bodies bounded in number ([FIXED-853](FIXED_ITEMS.md#fixed-853--any-number-of-large-uploads-could-be-read-at-once)). DEC-23 step 4: an enforcing hook fails
+> closed ([FIXED-854](FIXED_ITEMS.md#fixed-854--an-enforcing-hook-that-crashed-or-timed-out-let-the-action-through)). DEC-11 step 6: a configured runtime turned off stops what
+> runs there ([FIXED-857](FIXED_ITEMS.md#fixed-857--a-configured-runtime-could-not-be-turned-off-and-off-would-not-have-stopped-its-commands)). The work found an unpinned BuildKit frontend
+> ([FIXED-863](FIXED_ITEMS.md#fixed-863--the-sandbox-images-buildkit-frontend-was-an-unpinned-tag)) and an unredacted Hugging Face token shape ([FIXED-862](FIXED_ITEMS.md#fixed-862--a-hugging-face-access-token-matched-no-redaction-pattern), with
+> [FIXED-861](FIXED_ITEMS.md#fixed-861--a-hugging-face-repository-name-was-shown-as-redacted_secret-was-bug-328) closing BUG-328); the live round — real OpenRouter turns — found
+> setup ignoring a chosen model ([FIXED-858](FIXED_ITEMS.md#fixed-858--setup-ignored-a-model-already-chosen-and-hid-the-picker-it-asked-for)), the step-up window naming the owner
+> by id ([FIXED-859](FIXED_ITEMS.md#fixed-859--the-step-up-window-named-the-owner-by-their-internal-id)) and a fingerprint check that never ran ([FIXED-860](FIXED_ITEMS.md#fixed-860--the-ssh-fingerprint-fields-check-never-ran)). DEC-21b
+> (GitHub.com OAuth), RR-AUTHORITY-01, RR-INSTALL-01, RR-DESIGN-01, RR-VERIFY-01
+> and the decision records' other steps remain open.
+>
 > **Implementation status, 2026-10-10 (second round). Thirteen more
 > decision-record steps closed.** DEC-17 step 7's staged update now refuses a
 > disk it would fill ([FIXED-828](FIXED_ITEMS.md#fixed-828--an-update-could-start-on-a-disk-it-would-fill)), checks the swapped tree and rolls back on
@@ -1459,6 +1482,10 @@ vertically complete slice that has an honest UI and a fully enforcing backend.
 
 ## DEC-01 — Separate presentation identity from authorization identity
 
+> **2026-10-11.** The live round found step 4's audit incomplete: the step-up
+> window said *Acting as principal_user_…*; it now reads the display name
+> ([FIXED-859](FIXED_ITEMS.md#fixed-859--the-step-up-window-named-the-owner-by-their-internal-id)).
+>
 > **2026-10-05.** Step 5 closed as [FIXED-768](FIXED_ITEMS.md#fixed-768--support-could-ask-for-the-account-id-and-no-page-showed-it): Account's folded *Support details*
 > shows the internal account ID with Copy and what it is — not a name, shared
 > only when someone helping asks.
@@ -1721,6 +1748,10 @@ without orphan blobs.
 
 ## DEC-08 — Make model selection a readiness journey
 
+> **2026-10-11.** Step 6's "record why fallback occurred" closed as [FIXED-852](FIXED_ITEMS.md#fixed-852--a-turn-a-fallback-model-answered-did-not-say-why):
+> the fallback event names the candidate that failed and its reason, and the
+> turn timeline says so.
+>
 **Decision:** Ask where work may run before asking for a provider/model. Define
 one selection hierarchy: global default, optional work/project default, and
 explicit per-composer override.
@@ -1823,6 +1854,11 @@ contract tests and account-delete restore/irreversibility evidence.
 
 ## DEC-11 — Turn Runtime settings into a guided boundary setup
 
+> **2026-10-11.** Step 6's disable closed as [FIXED-857](FIXED_ITEMS.md#fixed-857--a-configured-runtime-could-not-be-turned-off-and-off-would-not-have-stopped-its-commands): turning a configured
+> target off stops new work, asks every command running there to stop, keeps
+> its evidence and settings, and says what stopped. Deletion with active
+> references has no route yet and remains.
+>
 **Decision:** Offer four user-facing runtime types—This device, Isolated
 container, My server and Managed remote—and keep fingerprints, ports, image
 digests and raw egress in Advanced.
@@ -1854,6 +1890,12 @@ cleanup tests for every supported runtime type.
 
 ## DEC-12 — Define Tasks as a durable scheduler and run history
 
+> **2026-10-11.** Step 4's heartbeat closed as [FIXED-849](FIXED_ITEMS.md#fixed-849--a-scheduled-run-had-no-lease-so-one-nobody-was-working-on-stayed-running): a claim starts a
+> lease the worker renews every 30 seconds, a run unrenewed for five minutes is
+> settled as not finished on the next pass, and a worker that finds its claim
+> taken stops its turn. The persisted effect intent before execution remains —
+> for channel deliveries it is now the receipt written before send ([FIXED-855](FIXED_ITEMS.md#fixed-855--a-delivery-raiker-sent-over-a-channel-left-no-record)).
+>
 > **2026-10-10 (second round).** Step 4's fencing token closed as [FIXED-833](FIXED_ITEMS.md#fixed-833--a-worker-whose-run-was-settled-under-it-could-still-write-its-outcome):
 > each claim takes the next generation and a run settles only by swapping it, so
 > a worker whose run was settled under it writes nothing. A heartbeat and a
@@ -1966,6 +2008,15 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-11.** Step 4 closed for the provider event id as [FIXED-844](FIXED_ITEMS.md#fixed-844--a-re-sent-channel-update-was-a-second-message-and-started-a-second-turn): Telegram's
+> `update_id` and a webhook's `Idempotency-Key` are claimed before any budget
+> is spent, and a repeat gets the first receipt and runs nothing. Step 8's
+> channel and host budgets closed as [FIXED-845](FIXED_ITEMS.md#fixed-845--a-channels-inbound-budget-was-per-sender-only). Step 3 closed as [FIXED-846](FIXED_ITEMS.md#fixed-846--a-channel-went-on-with-a-destination-nobody-had-tested) (a
+> typed destination is tested before the channel goes on) and [FIXED-856](FIXED_ITEMS.md#fixed-856--an-allowed-sender-was-a-bare-number) (an
+> allowed sender's own name beside the id). Step 7's delivery record before
+> send closed as [FIXED-855](FIXED_ITEMS.md#fixed-855--a-delivery-raiker-sent-over-a-channel-left-no-record); retry and dead-letter review of a failed delivery
+> remain. BUG-315 (a Telegram reply never goes back over Telegram) is unchanged.
+>
 > **2026-10-10 (second round).** Step 1 closed as [FIXED-838](FIXED_ITEMS.md#fixed-838--messaging-could-not-say-what-a-channel-carries-before-it-was-set-up) and [FIXED-839](FIXED_ITEMS.md#fixed-839--a-reply-longer-than-the-channel-accepts-was-sent-to-fail): each
 > adapter declares what it carries and its longest reply, Messaging shows it
 > before setup, and a longer reply is refused with the limit rather than sent to
@@ -2650,6 +2701,12 @@ explicit amendment to these decisions.
 
 ## 13.4 DEC-22 — Session steering, compaction and delegation
 
+> **2026-10-11.** Step 2's queue is bounded ([FIXED-851](FIXED_ITEMS.md#fixed-851--instructions-for-a-running-turn-queued-without-limit)): twenty waiting
+> instructions, then `429 steer_queue_full` with nothing added. Refusing a stop
+> or steer sent when no turn is listed live was considered and not done: a stop
+> pressed while a turn is still gathering context, before the loop lists it, is
+> a real stop and must be kept.
+>
 **Decision:** Extend the existing session/task services; do not build a second
 agent loop. Covers TUI, steering, conversation actions, compaction, search,
 work profiles, parallel agents and board views from section 5.
@@ -2698,6 +2755,10 @@ defer those optimizations when benefit is unproven.
 
 ## 13.5 DEC-23 — Govern extension learning, lifecycle and contributed UI
 
+> **2026-10-11.** Step 4's failure semantics closed as [FIXED-854](FIXED_ITEMS.md#fixed-854--an-enforcing-hook-that-crashed-or-timed-out-let-the-action-through): a hook with
+> decision authority that times out or errors counts as *ask*; an advisory hook
+> still only records its failure.
+>
 **Decision:** Reuse Skills, Plugins, Hooks and MCP contracts. Self-improvement
 may propose a version, never approve its own authority. This covers remaining
 extension and learning catalogue entries.
@@ -2796,7 +2857,14 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 > models named; proving it live found [FIXED-841](FIXED_ITEMS.md#fixed-841--a-streamed-openrouter-turn-recorded-no-usage-so-every-cost-limit-read-it-as-free). Step 1's resource pressure
 > closed for disk as [FIXED-842](FIXED_ITEMS.md#fixed-842--a-disk-running-out-of-space-was-nowhere-on-the-health-surfaces). Step 7's SAST gate closed as [FIXED-835](FIXED_ITEMS.md#fixed-835--no-static-analysis-for-security-ran-on-any-change) (triage
 > found [FIXED-836](FIXED_ITEMS.md#fixed-836--a-utf-16-document-part-could-carry-the-dtd-the-attachment-check-refuses)) and the container definitions as [FIXED-837](FIXED_ITEMS.md#fixed-837--nothing-checked-the-container-definitions-raiker-builds); scanning the built
-> images remains ([BUG-329](TO_BE_FIXED.md#bug-329--built-container-images-are-not-scanned-for-vulnerabilities)).
+> images remains (BUG-329, since closed as [FIXED-848](FIXED_ITEMS.md#fixed-848--container-base-images-were-never-scanned-and-neither-pinned-base-could-still-be-pulled-was-bug-329)).
+>
+> **2026-10-11.** Step 1's memory pressure closed as [FIXED-847](FIXED_ITEMS.md#fixed-847--memory-running-out-was-nowhere-on-the-health-surfaces), and its
+> "bounded queues, watchdogs" for the host's own passes as [FIXED-850](FIXED_ITEMS.md#fixed-850--a-long-routine-held-up-every-other-background-pass) — a
+> scheduled run no longer holds up every other pass. Step 7 is complete:
+> [FIXED-848](FIXED_ITEMS.md#fixed-848--container-base-images-were-never-scanned-and-neither-pinned-base-could-still-be-pulled-was-bug-329) scans the pinned bases with a pinned, checksummed grype and a
+> reviewed, expiring exception file, after re-pinning both bases the registry
+> had stopped serving, and [FIXED-863](FIXED_ITEMS.md#fixed-863--the-sandbox-images-buildkit-frontend-was-an-unpinned-tag) pins the BuildKit frontend.
 
 **Decision:** Treat health and recovery as runtime features with content-minimal
 evidence. This closes the remaining operations catalogue entries.
@@ -2854,6 +2922,10 @@ owner-approved hardware profile before being called release SLOs.
 > **2026-10-05 (second round).** Incoming decompression is now refused rather
 > than merely unused: any `Content-Encoding` other than `identity` is answered
 > 415 `request_body_encoding_unsupported` before the body is read ([FIXED-772](FIXED_ITEMS.md#fixed-772--an-encoded-request-body-would-have-been-counted-compressed)).
+>
+> **2026-10-11.** Concurrency closed as [FIXED-853](FIXED_ITEMS.md#fixed-853--any-number-of-large-uploads-could-be-read-at-once): four large bodies in flight at
+> a time, a fifth answered 503 `request_body_concurrency_limited` with
+> `Retry-After` before any of it is read.
 
 **Decision:** Carry forward the previous audit's actual-byte body-limit gap
 explicitly. The declared-Content-Length middleware in

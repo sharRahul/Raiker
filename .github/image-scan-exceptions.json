@@ -1,0 +1,13 @@
+{
+  "_comment": "DEC-24 step 7 / BUG-329 — fixable High or Critical findings in a pinned base image that were read and accepted for now. Each names the image, the vulnerability, the package, an owner, a reason and an expiry; an expired or unused entry fails scripts/scan_images.py. Prefer re-pinning the base to a rebuilt image over renewing.",
+  "exceptions": [
+    {
+      "image": "python:3.13.16-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a",
+      "vulnerability": "CVE-2026-85091",
+      "package": "zlib",
+      "owner": "Raiker maintainers",
+      "reason": "Fixed in Alpine's zlib 1.3.2-r1, which the newest python:3.13-alpine image (2026-10-11) does not carry yet. The egress proxy image runs Raiker's stdlib-only proxy and inflates no untrusted compressed data; re-pin when the base is rebuilt",
+      "expires": "2026-11-10"
+    }
+  ]
+}

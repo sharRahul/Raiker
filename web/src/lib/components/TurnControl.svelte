@@ -69,7 +69,13 @@
       steerCount = result.turn_control?.queued ?? steerCount + 1;
       steerText = "";
     } catch (e) {
-      error = e instanceof ApiError ? `Steer failed (${e.status}).` : "Could not reach the local runtime.";
+      // DEC-22 step 2 — the instructions already waiting have not been read yet.
+      error =
+        e instanceof ApiError && e.reasonCode === "steer_queue_full"
+          ? "Twenty instructions are already waiting. The turn reads them at its next safe boundary — send more after that."
+          : e instanceof ApiError
+            ? `Steer failed (${e.status}).`
+            : "Could not reach the local runtime.";
     } finally {
       busy = false;
     }

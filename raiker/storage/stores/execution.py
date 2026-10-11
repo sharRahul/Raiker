@@ -85,6 +85,18 @@ class ExecutionStore:
             ),
         )
 
+    def set_remote_execution_profile_enabled(
+        self: SQLiteStore, profile_id: str, *, owner_principal_id: str, enabled: bool
+    ) -> bool:
+        """DEC-11 step 6 — turn one configured environment on or off, keeping its settings."""
+        return bool(
+            self._execute(
+                """UPDATE remote_execution_profiles SET enabled = ?, updated_at = ?
+                   WHERE profile_id = ? AND owner_principal_id = ?""",
+                (int(enabled), utc_now(), profile_id, owner_principal_id),
+            )
+        )
+
     def list_remote_execution_profiles(
         self: SQLiteStore, enabled_only: bool = False, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:

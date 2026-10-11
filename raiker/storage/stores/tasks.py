@@ -188,9 +188,9 @@ class TaskStore:
                 # generation it must settle at.
                 if connection.execute(
                     "UPDATE tasks SET status = 'running', current_step = ?, updated_at = ?, "
-                    "claim_generation = claim_generation + 1 "
+                    "claim_generation = claim_generation + 1, run_heartbeat_at = ? "
                     "WHERE task_id = ? AND status = 'queued'",
-                    ("Starting scheduled run", now, row["task_id"]),
+                    ("Starting scheduled run", now, now, row["task_id"]),
                 ).rowcount:
                     current = connection.execute(
                         "SELECT * FROM tasks WHERE task_id = ?", (row["task_id"],)
@@ -214,6 +214,35 @@ class TaskStore:
                 (task_id, generation),
             )
         )
+
+    def beat_task_run(self: SQLiteStore, task_id: str, generation: int, now: str) -> bool:
+        """Renew a running run's lease (DEC-12 step 4). ``False``: the claim is no longer held.
+
+        Renewed only under the generation the worker claimed at and only while
+        the run is still ``running``, so a worker whose run was settled, or
+        claimed again, learns it here rather than when it tries to settle.
+        """
+        return bool(
+            self._execute(
+                "UPDATE tasks SET run_heartbeat_at = ? "
+                "WHERE task_id = ? AND claim_generation = ? AND status = 'running'",
+                (now, task_id, generation),
+            )
+        )
+
+    def lapsed_task_runs(self: SQLiteStore, before: str) -> list[TaskRecord]:
+        """Running runs whose lease was last renewed before ``before`` (DEC-12 step 4).
+
+        A run with no heartbeat at all was claimed by a build without one; the
+        settlement at start covers it, and it is left alone here rather than
+        guessed at.
+        """
+        rows = self._rows(
+            """SELECT * FROM tasks WHERE status = 'running'
+               AND run_heartbeat_at IS NOT NULL AND run_heartbeat_at < ?""",
+            (before,),
+        )
+        return [self._task_from_row(row) for row in rows]
 
     def scheduler_queue(self: SQLiteStore, now: str) -> dict[str, Any]:
         """DEC-24 step 1 — the scheduler's queue: how much is due and how long it has waited.

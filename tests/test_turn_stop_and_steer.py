@@ -350,3 +350,40 @@ class TestInterruptEndpoint:
             headers=self._login(workspace),
         )
         assert response.status_code == 404
+
+
+class TestSteerQueueBound:
+    """DEC-22 step 2 — the instructions waiting for a turn are a bounded queue."""
+
+    def test_the_queue_stops_at_its_bound_and_adds_nothing(self, workspace: Path) -> None:
+        from raiker.storage.stores.conversations import MAX_QUEUED_STEERS, SteerQueueFull
+
+        store = SQLiteStore(workspace)
+        for n in range(MAX_QUEUED_STEERS):
+            assert store.queue_turn_steer("s1", _OWNER, text=f"note {n}") == n + 1
+        with pytest.raises(SteerQueueFull):
+            store.queue_turn_steer("s1", _OWNER, text="one too many")
+        steers = store.take_turn_control("s1", _OWNER)["steer_texts"]
+        assert len(steers) == MAX_QUEUED_STEERS and "one too many" not in steers
+        # Once the turn has read them, there is room again.
+        assert store.queue_turn_steer("s1", _OWNER, text="after") == 1
+
+    def test_the_endpoint_says_the_queue_is_full(self, workspace: Path) -> None:
+        from raiker.storage.stores.conversations import MAX_QUEUED_STEERS
+
+        client = TestClient(create_app(workspace))
+        raw, _ = ApiSessionStore(workspace).create_session(_OWNER)
+        headers = {"Authorization": f"Bearer {raw}"}
+        store = SQLiteStore(workspace)
+        store.create_session("sess_busy", str(workspace))
+        for n in range(MAX_QUEUED_STEERS):
+            store.queue_turn_steer("sess_busy", _OWNER, text=f"note {n}")
+
+        response = client.post(
+            "/api/interrupts",
+            json={"session_id": "sess_busy", "all": True, "action_type": "steer", "steer_text": "more"},
+            headers=headers,
+        )
+
+        assert response.status_code == 429, response.text
+        assert response.json()["detail"]["reason_code"] == "steer_queue_full"

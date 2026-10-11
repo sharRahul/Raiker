@@ -13,6 +13,16 @@ class ExecutionEnvironmentConfigured(TypedDict):
     profile_id: str
 
 
+class ExecutionEnvironmentEnabled(TypedDict):
+    """DEC-11 step 6 — an environment turned on or off, and the commands that stopped with it."""
+
+    ok: bool
+    profile_id: str
+    enabled: bool
+    #: Commands that were running there and were asked to stop.
+    stopped_runs: int
+
+
 class ExecutionEnvironmentSelected(TypedDict):
     ok: bool
     selected_profile_id: str

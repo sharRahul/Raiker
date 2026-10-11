@@ -72,10 +72,14 @@ RECOVERY_MATRIX: tuple[RecoveryRow, ...] = (
         subsystem="scheduled_tasks",
         label="Tasks and routines",
         source_of_truth="The task's row in the encrypted database, and its run history.",
-        claim="A due task moves from queued to running in one conditional update, so two passes cannot both take it.",
+        claim=(
+            "A due task moves from queued to running in one conditional update, so two passes "
+            "cannot both take it, and its worker renews a lease on it every 30 seconds."
+        ),
         after_restart=(
             "A run the host stopped in the middle of is settled at start as one that did not "
-            "complete; a routine moves to its next slot."
+            "complete; a routine moves to its next slot. A run whose lease goes five minutes "
+            "unrenewed while the host keeps running is settled the same way on the next pass."
         ),
         uncertain_effects="Never run again on its own: what it did before stopping is not known.",
         cleanup="Three failed cycles in a row pause a routine and tell you.",
@@ -83,6 +87,7 @@ RECOVERY_MATRIX: tuple[RecoveryRow, ...] = (
         anchors=(
             "raiker.storage.sqlite:SQLiteStore.claim_due_tasks",
             "raiker.tasks.scheduler:TaskScheduler.settle_interrupted_runs",
+            "raiker.tasks.scheduler:TaskScheduler.settle_lapsed_runs",
             "raiker.tasks.scheduler:TaskScheduler._rearm",
         ),
     ),

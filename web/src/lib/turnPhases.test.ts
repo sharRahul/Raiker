@@ -100,4 +100,25 @@ describe("turnPhases", () => {
       "Recorded 2 source(s) this turn (file, web); 3 in total.",
     );
   });
+
+  // DEC-08 step 6 — a turn a fallback answered says so, and why.
+  it("says which model a fallback switched to, and what the one before it said", () => {
+    const engaged = lifecycle("model_fallback_engaged", {
+      provider: "openrouter",
+      model: "qwen/qwen3",
+      fallback_rank: 1,
+      after_provider: "anthropic",
+      after_reason: "provider_rate_limited",
+    });
+    expect(phaseForEvent("model_fallback_engaged")).toBe("act");
+    expect(summarizeEvent(engaged)).toBe(
+      "Switched to openrouter / qwen/qwen3 (fallback 1) because anthropic was unavailable — provider_rate_limited.",
+    );
+    const retried = lifecycle("model_request_retried", {
+      provider: "anthropic",
+      model: "claude",
+      reason: "provider_connection_failed",
+    });
+    expect(summarizeEvent(retried)).toBe("Retried anthropic / claude once after provider_connection_failed.");
+  });
 });

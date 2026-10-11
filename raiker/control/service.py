@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -932,6 +933,12 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
         if channel_is_stale(pairing, expected_revision):
             return ControlResult(ok=False, reason_code=CHANNEL_CONFLICT)
+        if enabled and not bool(pairing.get("enabled")) and _untested_destination(pairing):
+            # DEC-14 step 3 — Raiker cannot discover a channel's chats or check
+            # a typed delivery address, so a destination the owner entered by
+            # hand is proven by a delivered test before the channel goes on.
+            # A channel with nothing to deliver to has nothing to prove.
+            return ControlResult(ok=False, reason_code="channel_test_required")
         if not self._store.set_channel_pairing_enabled(pairing_id, enabled):
             return ControlResult(ok=False, reason_code="unknown_channel_pairing")
         self._writer.append(
@@ -1267,19 +1274,23 @@ class RuntimeControlService:
             self._store.record_channel_pairing_test(
                 pairing_id, ok=mapped.ok, reason_code=mapped.reason_code
             )
-            self._store.insert_channel_receipt(
-                receipt_id=action.action_id,
-                connector_id=connector_id,
-                pairing_id=pairing_id,
-                direction="outbound",
-                kind="test_delivery",
-                stages=(
-                    {"queued_at": queued_at, "delivered_at": settled_at}
-                    if mapped.ok
-                    else {"queued_at": queued_at, "failed_at": settled_at}
-                ),
-                reason_code=None if mapped.ok else mapped.reason_code,
-            )
+            # DEC-14 step 7 — the executor writes the receipt before it sends.
+            # One refused before it reached the executor (a closed gate, a
+            # decision the owner has to make) has none yet, and gets it here.
+            if self._store.load_channel_receipt(action.action_id) is None:
+                self._store.insert_channel_receipt(
+                    receipt_id=action.action_id,
+                    connector_id=connector_id,
+                    pairing_id=pairing_id,
+                    direction="outbound",
+                    kind="test_delivery",
+                    stages=(
+                        {"queued_at": queued_at, "delivered_at": settled_at}
+                        if mapped.ok
+                        else {"queued_at": queued_at, "failed_at": settled_at}
+                    ),
+                    reason_code=None if mapped.ok else mapped.reason_code,
+                )
         if not mapped.ok:
             return mapped
         return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})
@@ -1777,3 +1788,21 @@ class RuntimeControlService:
             resolved.unlink(missing_ok=True)
         except OSError:
             return
+
+
+def _untested_destination(pairing: Mapping[str, Any]) -> bool:
+    """DEC-14 step 3 — a hand-entered destination with no delivered test since it was set.
+
+    Telegram delivers to the owner's own chat, named by the owner sender; the
+    webhook to the URL bound on the pairing. Changing either forgets the last
+    test, so a passed test is always a test of the destination as it stands.
+    """
+    channel_type = str(pairing.get("channel_type") or "")
+    if channel_type == "telegram":
+        configured = bool(pairing.get("owner_sender_id"))
+    elif channel_type == "webhooks":
+        configured = bool(pairing.get("delivery_url"))
+    else:
+        configured = False
+    return configured and not bool(pairing.get("last_test_ok"))
+

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -111,14 +112,20 @@ class ExternalChannelExecutor:
                 summary="Channel delivery denied: connector is not paired/enabled.",
             )
 
+        # DEC-14 step 7 — the delivery's record exists before anything is sent,
+        # and says what became of it independently of the task that asked: a
+        # refusal, a failure at the destination and a delivery are each a
+        # stage on the one receipt. Queued now; settled below on every path.
+        receipt = _DeliveryReceipt(self._store, action, connector_id, pairing)
+
         if bool(pairing.get("paused")):
             # DEC-14 step 10 — a paused channel is contained: nothing is sent
             # to it, a test included, until the owner resumes it.
-            return ExecutionResult(
+            return receipt.settle(ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code="channel_paused",
                 summary="Channel delivery held: the owner paused this channel.",
-            )
+            ))
         channel_type = str(pairing.get("channel_type") or "webhooks")
         delivered_at = utc_now()
 
@@ -129,18 +136,18 @@ class ExternalChannelExecutor:
         # identically whichever one answers.
         adapter = adapter_for(channel_type)
         if adapter is None:
-            return ExecutionResult(
+            return receipt.settle(ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code=f"channel_transport_unsupported:{channel_type}",
                 summary=f"Channel delivery denied: no wire format for '{channel_type}'.",
-            )
+            ))
         # DEC-14 step 1 — a reply longer than the channel accepts is refused
         # with the channel's limit, before anything is sent. Cutting it short
         # would deliver a different message than the one approved; sending it
         # would fail at the platform with nothing said about why.
         limit = adapter.capabilities["max_text_chars"]
         if len(text) > limit:
-            return ExecutionResult(
+            return receipt.settle(ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code="channel_message_too_long",
                 summary=(
@@ -148,7 +155,7 @@ class ExternalChannelExecutor:
                     f"this channel accepts at most {limit}. Shorten it and send again."
                 ),
                 artifacts={"text_chars": len(text), "max_text_chars": limit},
-            )
+            ))
         built = adapter.outbound(
             connector_id=connector_id,
             pairing=pairing,
@@ -157,10 +164,10 @@ class ExternalChannelExecutor:
             delivered_at=delivered_at,
         )
         if isinstance(built, AdapterRefusal):
-            return ExecutionResult(
+            return receipt.settle(ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code=built.reason_code, summary=built.summary,
-            )
+            ))
         url, body, headers, signed = built.url, built.body, built.headers, built.signed
 
         try:
@@ -168,12 +175,12 @@ class ExternalChannelExecutor:
                 url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
             )
         except SandboxError as exc:
-            return ExecutionResult(
+            return receipt.settle(ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
                 reason_code=str(exc),
                 summary="Channel delivery blocked (egress/transport).",
-            )
-        return ExecutionResult(
+            ))
+        return receipt.settle(ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=(
                 f"Delivered to '{connector_id}' ({result['sent_bytes']}b)"
@@ -191,7 +198,47 @@ class ExternalChannelExecutor:
                 "status": result["status"],
                 "signed": signed,
             },
-        )
+        ))
+
+
+class _DeliveryReceipt:
+    """DEC-14 step 7 — one outbound delivery's receipt, written before it is sent.
+
+    The receipt id is the governed action's id, so the record, the audit event
+    and the approval it went through name the same delivery. An owner's test is
+    a ``test_delivery``; anything else is a ``message``. Holding no text, no
+    destination and no provider token — roles, stages and a reason, as every
+    channel receipt does (UX-MSG-06).
+    """
+
+    def __init__(
+        self, store: SQLiteStore, action: GovernedAction, connector_id: str, pairing: dict
+    ) -> None:
+        self._store = store
+        self._id = action.action_id
+        try:
+            store.insert_channel_receipt(
+                receipt_id=action.action_id,
+                connector_id=connector_id,
+                pairing_id=str(pairing.get("pairing_id") or "") or None,
+                direction="outbound",
+                kind="test_delivery" if action.authority_kind == OWNER_CHANNEL_TEST else "message",
+                stages={"queued_at": utc_now()},
+            )
+            self._written = True
+        except Exception:  # noqa: BLE001 — a missing ledger row never stops a governed send
+            self._written = False
+
+    def settle(self, result: ExecutionResult) -> ExecutionResult:
+        if self._written:
+            stage = "delivered_at" if result.ok else "failed_at"
+            with suppress(Exception):
+                self._store.advance_channel_receipt(
+                    self._id,
+                    stages={stage: utc_now()},
+                    reason_code=None if result.ok else result.reason_code,
+                )
+        return result
 
 
 class ChannelApprovalRelayExecutor:

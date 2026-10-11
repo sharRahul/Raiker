@@ -130,6 +130,9 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
     (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), REDACTED_TOKEN),
     (re.compile(r"\bghp_[A-Za-z0-9]{20,}"), REDACTED_TOKEN),
     (re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"), REDACTED_TOKEN),
+    # A Hugging Face access token: ``hf_`` and 34 letters and digits — 37
+    # characters, under the generic fallback's 40, so it matched nothing.
+    (re.compile(r"\bhf_[A-Za-z0-9]{30,}\b"), REDACTED_TOKEN),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), REDACTED_TOKEN),
     (
         re.compile(r"\bauthorization\s*:\s*bearer\s+[A-Za-z0-9._\-]{8,}", re.IGNORECASE),

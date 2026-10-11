@@ -3,7 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const uploadAttachment = vi.fn();
 vi.mock("./api", () => ({
   api: { uploadAttachment: (...args: unknown[]) => uploadAttachment(...args) },
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    constructor(
+      readonly status: number,
+      readonly reasonCode: string | null,
+      message = "",
+    ) {
+      super(message);
+    }
+  },
 }));
 
 const { createAttachmentStore, MAX_ATTACHMENTS } = await import("./composerAttachments.svelte");
@@ -44,6 +52,18 @@ describe("files dropped on a composer", () => {
     await store.acceptFiles(dropped);
     expect(store.items).toHaveLength(MAX_ATTACHMENTS);
     expect(store.error).toContain(String(MAX_ATTACHMENTS));
+  });
+
+  // DEC-25 — the host admits a few large uploads at a time.
+  it("asks for a moment when the host is still reading other uploads", async () => {
+    const { ApiError } = await import("./api");
+    uploadAttachment.mockRejectedValueOnce(
+      new (ApiError as unknown as new (s: number, r: string | null) => Error)(503, "request_body_concurrency_limited"),
+    );
+    const store = createAttachmentStore();
+    await store.acceptFiles([file("spec.md", "text/markdown")]);
+    expect(store.items).toHaveLength(0);
+    expect(store.error).toBe("Other uploads are still in progress. Add this file again in a moment.");
   });
 
   it("still refuses an oversized image, the same as the picker does", async () => {

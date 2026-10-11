@@ -3,7 +3,7 @@
 
 Raiker runs owner commands and its egress proxy in containers it builds from
 the ``Containerfile``/``Dockerfile`` definitions in this repository. Each one is
-read here, without a network and without a container engine, for the five
+read here, without a network and without a container engine, for the six
 properties the sandbox and proxy depend on:
 
 * **every base image is pinned by digest** (``FROM image@sha256:…``) — a tag is
@@ -16,12 +16,15 @@ properties the sandbox and proxy depend on:
   unverified file at build time;
 * **nothing is piped into a shell** — ``curl … | sh`` runs whatever the server
   sent;
+* **the BuildKit frontend is pinned too** — a ``# syntax=`` directive names an
+  image BuildKit pulls and runs to parse the file, so a tag there is the same
+  unreviewed code as an unpinned base;
 * **no credential-shaped value is baked in** — an ``ENV``/``ARG`` named like a
   token, key, secret or password with a value assigned ends up in every layer.
 
-This checks the definitions, not the images' contents: vulnerability scanning
-of the built images is a separate step that needs a pinned scanner and its own
-reviewed exception policy.
+This checks the definitions, not the images' contents: ``scan_images.py``
+scans the pinned base images for vulnerabilities with a pinned scanner and its
+own reviewed exception policy (BUG-329).
 
     python scripts/scan_containers.py
 """
@@ -46,6 +49,7 @@ _SECRET_ASSIGN = re.compile(
     re.IGNORECASE,
 )
 _ROOT_USERS = {"root", "0", "0:0", "root:root"}
+_SYNTAX = re.compile(r"^#\s*syntax\s*=\s*(\S+)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,17 @@ def instructions(text: str) -> list[tuple[int, str]]:
 
 def scan_definition(path: str, text: str) -> list[Problem]:
     problems: list[Problem] = []
+    # A parser directive is only one while it is above the first instruction.
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line.startswith("#"):
+            break
+        directive = _SYNTAX.match(line)
+        if directive and "@sha256:" not in directive.group(1):
+            problems.append(Problem(
+                path, number, "frontend_not_pinned",
+                f"the syntax frontend {directive.group(1)} is not pinned by @sha256 digest",
+            ))
     stages: set[str] = set()
     last_user: tuple[int, str] | None = None
     saw_from = False

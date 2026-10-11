@@ -161,6 +161,12 @@ class TestFallbackEngagement:
         events = gw.store.list_event_index(turn_id=env.turn_id, limit=100)
         engaged = [e for e in events if e["event_type"] == "model_fallback_engaged"]
         assert len(engaged) == 1
+        # DEC-08 step 6 — the event says which candidate failed and why.
+        payload = EventViewer(gw.store).read_event_payload(engaged[0]["event_id"]) or {}
+        inner = payload.get("payload", payload)
+        assert inner["after_provider"] == "ollama"
+        assert inner["after_reason"]
+        assert inner["provider"] == "anthropic"
 
     def test_policy_denied_fallback_is_skipped(self, tmp_path: Path) -> None:
         """A hosted fallback that policy denies is skipped, not fatal — the next

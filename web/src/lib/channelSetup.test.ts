@@ -115,6 +115,20 @@ describe("routeScopeFacts", () => {
   });
 });
 
+describe("sender names", () => {
+  // DEC-14 step 3 — the owner sees who an id is, as their own messages name them.
+  it("names the owner by what they go by, with the id that is allowed", () => {
+    const owner = channelSteps(
+      profile({ owner_sender_id: "4242", senders: ["4242"], sender_labels: { "4242": "@alex" } }),
+    ).find((step) => step.id === "owner");
+    expect(owner?.detail).toBe("You are @alex (4242) on this channel.");
+    const unnamed = channelSteps(profile({ owner_sender_id: "4242", senders: ["4242"] })).find(
+      (step) => step.id === "owner",
+    );
+    expect(unnamed?.detail).toBe("You are 4242 on this channel.");
+  });
+});
+
 describe("receipts", () => {
   const base = {
     receipt_id: "r",
@@ -165,6 +179,29 @@ describe("receipts", () => {
   it("words the codes a test comes back with", () => {
     expect(testReason("disabled_by_capability_gate")).toMatch(/Permissions/);
     expect(testReason("http_error:502")).toBe("the destination answered 502");
+    // DEC-14 step 8 — the budgets behind the sender's own.
+    expect(testReason("channel_rate_limited")).toMatch(/channel went over its rate limit/);
+    expect(testReason("inbound_rate_limited")).toMatch(/every channel/);
+  });
+
+  // DEC-14 step 7 — what Raiker sent is recorded as well as what it received.
+  it("names an outbound delivery as Raiker's, queued until it settles", () => {
+    const outbound = {
+      ...base,
+      direction: "outbound" as const,
+      sender_role: null,
+      conversation_scope: null,
+      routing_mode: null,
+      received_at: null,
+      accepted_at: null,
+      queued_at: "t",
+    };
+    expect(receiptTitle(outbound)).toBe("Raiker sent a message");
+    expect(receiptOutcome(outbound)).toBe("Sending");
+    expect(receiptOutcome({ ...outbound, delivered_at: "t" })).toBe("Delivered");
+    expect(receiptOutcome({ ...outbound, failed_at: "t", reason_code: "http_error:500" })).toBe(
+      "Failed: the destination answered 500",
+    );
   });
 });
 

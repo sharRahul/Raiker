@@ -58,4 +58,17 @@ describe("TurnControl", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Stop failed/));
     expect(screen.queryByText(/Stop requested/)).not.toBeInTheDocument();
   });
+
+  // DEC-22 step 2 — the queue of waiting instructions is bounded.
+  it("says the turn has not read the waiting instructions when the queue is full", async () => {
+    stubFetch({
+      "POST /api/interrupts": { __status: 429, detail: { ok: false, reason_code: "steer_queue_full" } },
+    });
+    render(TurnControl, { sessionId: "sess_1" });
+    await fireEvent.input(screen.getByLabelText("Add to this turn"), { target: { value: "and this" } });
+    await fireEvent.click(screen.getByRole("button", { name: /Steer/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/already waiting.*next safe boundary/),
+    );
+  });
 });

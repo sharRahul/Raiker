@@ -138,6 +138,13 @@ are not switches waiting to be found; they are not built, and the card says so.
 Re-measuring the boundary opens one connection to this host's default gateway on
 a closed port, which is how the network claim is tested rather than asserted.
 
+A target you added — an SSH host, a Daytona sandbox, a container profile — has
+**Turn off** on its card. Off means nothing new runs there (work that chose it
+is refused, never moved to this machine instead), every command still running
+there is asked to stop, and its runs, receipts and settings are kept; the page
+says how many commands stopped. **Turn on** brings it back as it was; check it
+before relying on it.
+
 ### Commands that run code
 
 `python`, `node`, `npm`, `npx` and `pip` run code the command line does not
@@ -362,7 +369,9 @@ MCP) require all three of:
   not a credential you have to obtain from anywhere;
 - a **threat-model acknowledgement** tick.
 
-**Confirm change** stays disabled until they are satisfied.
+**Confirm change** stays disabled until they are satisfied. The dialog names
+you by your display name; who is acting is decided by your signed-in session,
+never by what the page shows.
 
 The acknowledgement points at a real document. As of 2026-08-23 **every
 capability with a working executor has a written threat model** — what it does,

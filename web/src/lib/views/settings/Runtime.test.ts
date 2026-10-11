@@ -310,3 +310,58 @@ describe("Runtime configuration reading order", () => {
     expect(ports.closest("details")?.open).toBe(false);
   });
 });
+
+// DEC-11 step 6 — a configured target can be turned off, and off stops what runs there.
+describe("Runtime turning a target off", () => {
+  it("offers Turn off only on a target the owner configured, and says what stopped", async () => {
+    stubRuntime();
+    const toggle = vi
+      .spyOn(api, "setExecutionEnvironmentEnabled")
+      .mockResolvedValue({ ok: true, profile_id: "container-review", enabled: false, stopped_runs: 2 });
+    vi.stubGlobal("confirm", () => true);
+    render(Runtime);
+
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    expect(localCard.queryByRole("button", { name: "Turn off" })).not.toBeInTheDocument();
+    await fireEvent.click(card.getByRole("button", { name: "Turn off" }));
+
+    await waitFor(() => expect(toggle).toHaveBeenCalledWith("container-review", false));
+    expect(await screen.findByText(/Repository review is off\. 2 running commands were stopped\./)).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("says a target is off and offers to turn it back on", async () => {
+    stubRuntime();
+    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
+      ...view,
+      environments: [
+        view.environments[0],
+        { ...view.environments[1], enabled: false, status: "off", availability_reason: null },
+      ],
+    });
+    render(Runtime);
+
+    const card = within((await screen.findByText("Repository review")).closest("article")!);
+    expect(card.getByText(/Off — nothing runs here/)).toBeInTheDocument();
+    expect(card.getByRole("button", { name: "Turn on" })).toBeInTheDocument();
+  });
+});
+
+// Found in the 2026-10-11 live round: the browser compiles `pattern` with the
+// `v` flag, where an unescaped "/" in a class is a syntax error — so the
+// fingerprint check was silently never applied.
+describe("Runtime field patterns", () => {
+  it("every pattern on the page compiles the way the browser compiles it", async () => {
+    stubRuntime();
+    const { container } = render(Runtime);
+    await screen.findByText("Repository review");
+    const patterns = [...container.querySelectorAll("input[pattern]")].map((input) => input.getAttribute("pattern") ?? "");
+    expect(patterns.length).toBeGreaterThan(0);
+    for (const pattern of patterns) expect(() => new RegExp(`^(?:${pattern})$`, "v")).not.toThrow();
+    const fingerprint = new RegExp(`^(?:${patterns.find((p) => p.startsWith("SHA256"))})$`, "v");
+    expect(fingerprint.test("SHA256:/cZYD7wNWwk8It+s1GdraLEv7RbNRGVdZUf0IkT6MEM")).toBe(true);
+    expect(fingerprint.test("SHA256:short")).toBe(false);
+  });
+});
+

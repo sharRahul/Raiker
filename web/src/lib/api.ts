@@ -49,6 +49,8 @@ const SET_DECISION_MODE = {
 
 export const api = {
   restoreSession,
+  // DEC-01 — the signed-in owner as they are shown: a display name, not an id.
+  whoami: () => contract.whoami(),
   // ── The user guide, served from the install rather than a repository ──
   guide: () => contract.guideIndex(),
   guideSection: (slug: string) => contract.guideSection(slug),
@@ -608,6 +610,9 @@ export const api = {
   ) => contract.resetExecutionEnvironment(profile_id, { session_id, recreate }),
   selectExecutionEnvironment: (profile_id: string) =>
     contract.selectExecutionEnvironment({ profile_id }),
+  // DEC-11 step 6 — off stops what runs there and keeps the settings.
+  setExecutionEnvironmentEnabled: (profile_id: string, enabled: boolean) =>
+    contract.setExecutionEnvironmentEnabled(profile_id, { enabled }),
   commandRuns: (sessionId?: string) =>
     contract.listCommands(sessionId ? { session_id: sessionId } : {}),
   commandRun: (runId: string) => contract.getCommand(runId),

@@ -598,9 +598,16 @@ async def interrupts(
     turn_control: TurnControl | None = None
     if not body.task_id:
         if body.action_type == "steer" and (body.steer_text or "").strip():
-            queued = store.queue_turn_steer(
-                body.session_id, principal.principal_id, text=(body.steer_text or "").strip()
-            )
+            from raiker.storage.stores.conversations import SteerQueueFull
+
+            try:
+                queued = store.queue_turn_steer(
+                    body.session_id, principal.principal_id, text=(body.steer_text or "").strip()
+                )
+            except SteerQueueFull:
+                # DEC-22 step 2 — the turn has not reached a safe boundary to
+                # read the instructions already waiting; nothing was added.
+                raise refusal(status.HTTP_429_TOO_MANY_REQUESTS, "steer_queue_full") from None
             turn_control = {"action": "steer", "queued": queued}
         elif body.action_type == "cancel":
             store.request_turn_stop(body.session_id, principal.principal_id, reason=reason)

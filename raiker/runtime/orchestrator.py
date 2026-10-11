@@ -1788,6 +1788,10 @@ class RuntimeOrchestrator:
         # The last provider's own reason code, so a turn that runs out of
         # providers reports why rather than a generic "connection failed".
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
+        # DEC-08 step 6 — the candidate that failed last and its own reason,
+        # for the fallback event that follows it.
+        last_failed_provider: str | None = None
+        last_failed_reason: str | None = None
         # BUG-72 — a transport failure earns one immediate re-attempt on the same
         # model before the chain falls through to the next one. `retry_armed` is
         # set only by the failure handler below, so the extra slot costs nothing
@@ -1804,6 +1808,7 @@ class RuntimeOrchestrator:
                 # the owner's repair is the provider's fault, not the breaker's.
                 if last_error_code == UNCLASSIFIED_PROVIDER_ERROR:
                     last_error_code = contained
+                last_failed_provider, last_failed_reason = provider, contained
                 continue
             if is_retry:
                 self._event(
@@ -1812,6 +1817,8 @@ class RuntimeOrchestrator:
                     {"provider": provider, "model": model, "reason": last_error_code},
                 )
             elif rank > 0:
+                # DEC-08 step 6 — say why: the candidate before this one and the
+                # reason it gave, so a turn answered by a fallback reads as one.
                 self._event(
                     envelope,
                     "model_fallback_engaged",
@@ -1820,6 +1827,8 @@ class RuntimeOrchestrator:
                         "model": model,
                         "fallback_rank": rank,
                         "reason": "primary_provider_unavailable",
+                        "after_provider": last_failed_provider,
+                        "after_reason": last_failed_reason,
                     },
                 )
             self._event(
@@ -1839,6 +1848,7 @@ class RuntimeOrchestrator:
                     )
             except ModelProviderError as exc:
                 last_error_code = provider_error_code(exc)
+                last_failed_provider, last_failed_reason = provider, last_error_code
                 self._event(
                     envelope,
                     "model_request_failed",
@@ -1978,6 +1988,10 @@ class RuntimeOrchestrator:
         another provider's response into the same transcript.
         """
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
+        # DEC-08 step 6 — the candidate that failed last and its own reason,
+        # for the fallback event that follows it.
+        last_failed_provider: str | None = None
+        last_failed_reason: str | None = None
         # BUG-72 — a transport failure earns one immediate re-attempt on the same
         # model before the chain falls through to the next one. `retry_armed` is
         # set only by the failure handler below, so the extra slot costs nothing
@@ -1994,6 +2008,7 @@ class RuntimeOrchestrator:
                 # the owner's repair is the provider's fault, not the breaker's.
                 if last_error_code == UNCLASSIFIED_PROVIDER_ERROR:
                     last_error_code = contained
+                last_failed_provider, last_failed_reason = provider, contained
                 continue
             if is_retry:
                 self._event(
@@ -2002,6 +2017,8 @@ class RuntimeOrchestrator:
                     {"provider": provider, "model": model, "reason": last_error_code},
                 )
             elif rank > 0:
+                # DEC-08 step 6 — say why: the candidate before this one and the
+                # reason it gave, so a turn answered by a fallback reads as one.
                 self._event(
                     envelope,
                     "model_fallback_engaged",
@@ -2010,6 +2027,8 @@ class RuntimeOrchestrator:
                         "model": model,
                         "fallback_rank": rank,
                         "reason": "primary_provider_unavailable",
+                        "after_provider": last_failed_provider,
+                        "after_reason": last_failed_reason,
                     },
                 )
             self._event(
@@ -2079,6 +2098,7 @@ class RuntimeOrchestrator:
                     return
             except Exception as exc:  # noqa: BLE001
                 last_error_code = provider_error_code(exc)
+                last_failed_provider, last_failed_reason = provider, last_error_code
                 self._event(
                     envelope,
                     "model_request_failed",

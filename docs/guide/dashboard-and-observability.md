@@ -50,7 +50,11 @@ Use **Observability** when you need evidence rather than a summary:
   list rather than counting as healthy. A disk with little space left where the
   workspace lives is on it too — waiting under 2 GB or 5% free, blocking under
   512 MB or 2% — because a full disk stops conversations, backups and updates
-  from being saved all at once.
+  from being saved all at once. So is memory running out on this machine —
+  waiting under 512 MB or 5% available, blocking under 256 MB or 2% — counting
+  only what the system calls *available*, since memory held by caches is given
+  back on demand. A long routine run does not make the other background passes
+  read *not running*: scheduled work runs beside them, not in front of them.
 - **Sessions** is the evidence inspector: every conversation with the runtime,
   its turns, and the governed events behind each turn. Opening a turn offers
   **Open in the conversation**, which lands on that exchange, and a session

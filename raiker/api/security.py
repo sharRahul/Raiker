@@ -83,7 +83,12 @@ _CONTENT_SECURITY_POLICY = b"; ".join(
 _CSP_EXEMPT_PATHS = frozenset({"/api/docs", "/api/redoc", "/api/openapi.json"})
 
 
-async def _send_json(send: Send, status_code: int, body: dict[str, object]) -> None:
+async def _send_json(
+    send: Send,
+    status_code: int,
+    body: dict[str, object],
+    extra_headers: tuple[tuple[bytes, bytes], ...] = (),
+) -> None:
     raw = json.dumps(body).encode("utf-8")
     await send({
         "type": "http.response.start",
@@ -92,6 +97,7 @@ async def _send_json(send: Send, status_code: int, body: dict[str, object]) -> N
             (b"content-type", b"application/json"),
             (b"content-length", str(len(raw)).encode("latin-1")),
             *(_SECURITY_HEADERS),
+            *extra_headers,
         ],
     })
     await send({"type": "http.response.body", "body": raw, "more_body": False})
@@ -137,6 +143,10 @@ class SecurityHeadersMiddleware:
 BODY_IDLE_SECONDS = 30.0
 BODY_BASE_SECONDS = 30.0
 BODY_MIN_BYTES_PER_SECOND = 64 * 1024
+#: DEC-25 — uploads to a large-body route that may be in flight at once. Each
+#: may hold tens of megabytes while its route decodes it, so the bound on one
+#: body is not a bound on memory until the number of them is bounded too.
+MAX_CONCURRENT_LARGE_BODIES = 4
 
 _TOO_LARGE: tuple[int, dict[str, object]] = (
     413,
@@ -182,6 +192,12 @@ class MaxBodySizeMiddleware:
     refused 415 ``request_body_encoding_unsupported`` before any of it is read:
     nothing here decompresses, so the byte cap could only count the compressed
     size of whatever a later decoder expanded.
+
+    DEC-25 — the caps bound one body; the routes with a larger cap
+    (``path_overrides``) can each hold tens of megabytes while they decode, so
+    at most ``max_large_bodies`` of them run at once. One more is answered 503
+    ``request_body_concurrency_limited`` with ``Retry-After`` before any of it
+    is read; the composer keeps the draft and the owner sends it again.
     """
 
     def __init__(
@@ -193,10 +209,15 @@ class MaxBodySizeMiddleware:
         idle_seconds: float = BODY_IDLE_SECONDS,
         base_seconds: float = BODY_BASE_SECONDS,
         min_bytes_per_second: int = BODY_MIN_BYTES_PER_SECOND,
+        max_large_bodies: int = MAX_CONCURRENT_LARGE_BODIES,
     ) -> None:
         self.app = app
         self._max_bytes = max_bytes
         self._path_overrides = dict(path_overrides or {})
+        self._max_large_bodies = max(1, max_large_bodies)
+        #: Large-body requests in flight. One event loop serves this app, so a
+        #: plain counter changed only between awaits needs no lock.
+        self._large_in_flight = 0
         self._idle_seconds = idle_seconds
         self._base_seconds = base_seconds
         self._min_rate = max(1, min_bytes_per_second)
@@ -232,6 +253,29 @@ class MaxBodySizeMiddleware:
                     )
                     return
 
+        large = (
+            str(scope.get("path", "")) in self._path_overrides
+            and str(scope.get("method", "")).upper() in {"POST", "PUT", "PATCH"}
+        )
+        if large:
+            if self._large_in_flight >= self._max_large_bodies:
+                await _send_json(
+                    send,
+                    503,
+                    {"ok": False, "reason_code": "request_body_concurrency_limited"},
+                    ((b"retry-after", b"2"),),
+                )
+                return
+            self._large_in_flight += 1
+            try:
+                await self._bounded(scope, receive, send, limit)
+            finally:
+                self._large_in_flight -= 1
+            return
+        await self._bounded(scope, receive, send, limit)
+
+    async def _bounded(self, scope: Scope, receive: Receive, send: Send, limit: int) -> None:
+        """The body under its byte cap and its deadline."""
         received = 0
         refused = False
         #: Which refusal ``refused`` is: too large (413) or too slow (408).

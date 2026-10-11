@@ -589,3 +589,73 @@ def test_a_settle_that_lost_the_claim_leaves_the_run_to_its_worker(tmp_path: Pat
     assert stale is not None
     scheduler._land_outcome(manager, task_id, "completed", "All done.", claim=generation)
     assert store.fence_task_claim(task_id, stale.claim_generation) is False
+
+
+# ── DEC-12 step 4: a claim is a lease, renewed by its worker ─────────────────
+
+
+def test_a_claim_starts_its_lease(tmp_path: Path) -> None:
+    store, _manager, task_id, _generation = _claimed_one_off(tmp_path)
+    task = store.load_task(task_id)
+    assert task is not None and task.run_heartbeat_at == "2020-01-02T00:00:00Z"
+
+
+def test_only_the_claim_holder_renews_and_only_while_running(tmp_path: Path) -> None:
+    store, manager, task_id, generation = _claimed_one_off(tmp_path)
+    assert store.beat_task_run(task_id, generation, "2020-01-02T00:00:30Z") is True
+    assert store.beat_task_run(task_id, generation - 1, "2020-01-02T00:01:00Z") is False
+    TaskScheduler(tmp_path)._land_outcome(manager, task_id, "completed", "Done.", claim=generation)
+    # Settled: the claim moved on, so the old worker's renewal tells it so.
+    assert store.beat_task_run(task_id, generation, "2020-01-02T00:01:30Z") is False
+
+
+def test_a_run_whose_lease_lapsed_is_settled_and_not_retried(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from raiker.tasks.scheduler import LEASE_LAPSED
+
+    store, manager, task_id, generation = _claimed_one_off(tmp_path)
+    scheduler = TaskScheduler(tmp_path)
+    # Four minutes after the last renewal the worker is slow, not gone.
+    assert scheduler.settle_lapsed_runs(datetime(2020, 1, 2, 0, 4, tzinfo=UTC)) == []
+    assert scheduler.settle_lapsed_runs(datetime(2020, 1, 2, 0, 6, tzinfo=UTC)) == [task_id]
+    task = store.load_task(task_id)
+    assert task is not None and task.status == "failed" and task.summary == LEASE_LAPSED
+    # The worker that comes back writes nothing over it.
+    scheduler._land_outcome(manager, task_id, "completed", "All done.", claim=generation)
+    task = store.load_task(task_id)
+    assert task is not None and task.summary == LEASE_LAPSED
+
+
+def test_a_run_claimed_before_heartbeats_existed_is_left_to_the_restart_settlement(
+    tmp_path: Path,
+) -> None:
+    from datetime import UTC, datetime
+
+    store, _manager, task_id, _generation = _claimed_one_off(tmp_path)
+    store._execute("UPDATE tasks SET run_heartbeat_at = NULL WHERE task_id = ?", (task_id,))
+    assert TaskScheduler(tmp_path).settle_lapsed_runs(datetime(2030, 1, 1, tzinfo=UTC)) == []
+
+
+def test_a_worker_whose_claim_was_taken_stops_its_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from raiker.tasks import scheduler as scheduler_module
+
+    store, _manager, task_id, generation = _claimed_one_off(tmp_path)
+    task = store.load_task(task_id)
+    assert task is not None
+    monkeypatch.setattr(scheduler_module, "RUN_HEARTBEAT_SECONDS", 0.01)
+    assert store.fence_task_claim(task_id, generation) is True  # settled elsewhere
+
+    asyncio.run(
+        asyncio.wait_for(
+            TaskScheduler(tmp_path)._renew_lease(task, task.run_session_id, "principal_owner"),
+            timeout=5,
+        )
+    )
+    control = store.take_turn_control(task.run_session_id, "principal_owner")
+    assert control["stop_requested"] is True
+    assert control["stop_reason"] == scheduler_module.CLAIM_TAKEN_REASON

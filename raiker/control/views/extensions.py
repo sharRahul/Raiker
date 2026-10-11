@@ -522,6 +522,10 @@ class ChannelProfile(TypedDict):
     sender_count: int
     #: The owner's own allowlist, returned to the owner so routing can name one.
     senders: list[str]
+    #: DEC-14 step 3 — sender id → the name they go by on the channel, as their
+    #: own messages carry it. Set by the sender; shown beside the id, never used
+    #: to decide anything.
+    sender_labels: NotRequired[dict[str, str]]
     routing_mode: ChannelRoutingMode
     target_session_id: str | None
     owner_sender_id: str | None

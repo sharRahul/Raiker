@@ -375,6 +375,45 @@ class TaskScheduler:
                 settled.append(task.task_id)
         return settled
 
+    def settle_lapsed_runs(self, now: datetime | None = None) -> list[str]:
+        """Settle every running run whose lease has lapsed (DEC-12 step 4).
+
+        A worker renews its run's heartbeat every :data:`RUN_HEARTBEAT_SECONDS`;
+        one that has not for :data:`RUN_LEASE_SECONDS` has no worker left — its
+        coroutine died without settling, or the process that claimed it is gone
+        while this one keeps running. Settling takes the claim first, so a
+        worker that was merely slow writes nothing when it comes back, and its
+        next renewal tells it to stop. Like a restart's settlement, the run is
+        **not** retried: what it did is not known.
+        """
+        instant = now or datetime.now(UTC)
+        before = format_instant(instant - timedelta(seconds=RUN_LEASE_SECONDS))
+        manager = TaskManager(self.store, EventLogWriter(self.store))
+        settled: list[str] = []
+        for task in self.store.lapsed_task_runs(before):
+            if not self.store.fence_task_claim(task.task_id, task.claim_generation):
+                continue
+            self._land_outcome(manager, task.task_id, "failed", LEASE_LAPSED)
+            settled.append(task.task_id)
+        if settled:
+            _LOG.warning("settled %d scheduled run(s) whose worker stopped renewing", len(settled))
+        return settled
+
+    async def _renew_lease(self, task: TaskRecord, session_id: str, principal_id: str) -> None:
+        """Keep a claimed run's lease alive; stop its turn the moment the claim is gone."""
+        while True:
+            await asyncio.sleep(RUN_HEARTBEAT_SECONDS)
+            try:
+                held = self.store.beat_task_run(task.task_id, task.claim_generation, utc_now())
+            except Exception:  # noqa: BLE001 — a missed renewal is retried next beat
+                continue
+            if not held:
+                # The run was settled (or claimed again) while this worker was
+                # on it. Whatever it would do next is no longer its to do.
+                with suppress(Exception):
+                    self.store.request_turn_stop(session_id, principal_id, reason=CLAIM_TAKEN_REASON)
+                return
+
     def _land_outcome(
         self,
         manager: TaskManager,
@@ -507,6 +546,10 @@ class TaskScheduler:
         # it becomes due the moment the owner resumes. Continuing a run the owner
         # already approved is deliberately *not* gated here: that work is already
         # under way, and abandoning it would make Pause a way to lose a decision.
+        # DEC-12 step 4 — before anything new is claimed, a run nobody is
+        # working on any more is settled. Done whether or not the host is
+        # paused: settling starts no work, and a lapsed run is not progress.
+        self.settle_lapsed_runs()
         if HostControl(self.workspace_root).is_paused():
             return 0
         tasks = self.store.claim_due_tasks(utc_now())
@@ -633,9 +676,15 @@ class TaskScheduler:
         # DEC-12 step 6 — one run is bounded. At the limit the turn is asked to
         # stop at its next safe boundary, the way the owner's Stop asks.
         minutes = effective_minutes(task.max_run_minutes)
-        response, overran = await self._within_limit(
-            submission, seconds=minutes * 60, session_id=run_session_id, principal_id=principal_id
-        )
+        lease = asyncio.create_task(self._renew_lease(task, run_session_id, principal_id))
+        try:
+            response, overran = await self._within_limit(
+                submission, seconds=minutes * 60, session_id=run_session_id, principal_id=principal_id
+            )
+        finally:
+            lease.cancel()
+            with suppress(asyncio.CancelledError):
+                await lease
         if overran:
             manager = TaskManager(self.store, EventLogWriter(self.store))
             self._land_outcome(
@@ -685,6 +734,22 @@ INTERRUPTED_BY_RESTART = (
     "run again on its own, because what it did before stopping is not known — check "
     "its conversation before running it again."
 )
+
+#: DEC-12 step 4 — how often a worker renews its run's lease, and how long a
+#: lease lasts unrenewed. Ten missed renewals is not a slow turn; it is a run
+#: with nobody on it.
+RUN_HEARTBEAT_SECONDS = 30.0
+RUN_LEASE_SECONDS = 300.0
+
+#: What a run whose lease lapsed says.
+LEASE_LAPSED = (
+    "This run stopped reporting progress, so it was settled as not finished. It was not "
+    "run again on its own, because what it did is not known — check its conversation "
+    "before running it again."
+)
+
+#: The stop a worker asks of its own turn when its claim was taken from it.
+CLAIM_TAKEN_REASON = "This run was settled while it was still working, so it stopped."
 
 #: What a skipped slot says, on the card and in the routine's history.
 MISSED_RUN_SKIPPED = (

@@ -280,6 +280,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/connector-store/{connector_id}/manifest"),
         ("POST", "/api/credential-deltas/{run_id}/discard"),
         ("POST", "/api/execution-environments/{profile_id}/probe"),
+        ("PUT", "/api/execution-environments/{profile_id}/enabled"),
         ("POST", "/api/execution-environments/{profile_id}/reset"),
         ("POST", "/api/git-credential/grant"),
         ("POST", "/api/host/pause"),

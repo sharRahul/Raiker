@@ -130,9 +130,8 @@ names.
 | [BUG-324](#bug-324--deleting-a-project-a-task-or-a-picture-is-not-journalled-so-a-restore-brings-it-back) | Low | Storage / restore | Open — FIXED-802 journals forgotten and purged memories and deleted conversations; a project, task or Design picture deleted after a backup still comes back with a restore |
 | [BUG-325](#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause) | Low | Tasks / cost limit | Open — a run's spend is counted per orchestrator, and a run continued after an approval starts counting again |
 | [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
-| [BUG-328](#bug-328--a-hugging-face-repository-name-is-shown-as-redacted_secret) | Low | Models / redaction | Open — a public repository id matched the high-entropy redactor |
-| [BUG-329](#bug-329--built-container-images-are-not-scanned-for-vulnerabilities) | Low | CI / containers | Open — the image half of DEC-24 step 7 after FIXED-837 |
 | [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open — CRLF fixtures, a `\\?\` path prefix and a receipt race; not caused by a code change |
+| [BUG-331](#bug-331--setups-model-step-waits-on-every-providers-check-before-it-shows-anything) | Low | First run / Models | Open — found 2026-10-11; about five seconds of *Preparing your setup…* on a reload |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2488,39 +2487,6 @@ test that imports the orchestrator first does.
 **Proposed fix.** Move the image executor's `get_model_connection` import into
 the function that uses it, and add an import-each-module-alone test.
 
-## BUG-328 — A Hugging Face repository name is shown as `[REDACTED_SECRET]`
-
-**Severity: Low. Area: Models / redaction. Status: Open — found 2026-10-10.**
-
-**Observed.** In Models → Add model, the trending Hugging Face list showed one
-repository (5,134,275 downloads, 1,124 likes) as `[REDACTED_SECRET]` instead of
-its name. A public repository id is not a secret; the response redactor's
-high-entropy fallback matched it.
-
-**Effect.** The owner cannot see, search for or choose that repository from the
-list; nothing leaks.
-
-**Proposed fix.** Exempt Hugging Face repository ids (`owner/name`, the hub's
-own character set) from the high-entropy fallback on the Hugging Face routes,
-as model names already are (`raiker/context/redaction.py`), with a regression
-test using the id the hub returned.
-
-## BUG-329 — Built container images are not scanned for vulnerabilities
-
-**Severity: Low. Area: CI / containers. Status: Open — the remainder of DEC-24
-step 7 after FIXED-837.**
-
-**Observed.** FIXED-837 checks the container *definitions* (digest pins,
-non-root, no build-time fetches or baked credentials). The *images* built from
-them — the sandbox and the egress proxy — are not scanned for known
-vulnerabilities in their base layers and packages.
-
-**Proposed fix.** Add an image scan on the pinned bases with a scanner pinned
-by digest and checksum (DEC-17 step 5 forbids a mutable download), gating on
-fixable high/critical findings with a reviewed, expiring exception file in the
-shape of `.github/sast-exceptions.json`. Choose the scanner deliberately: a
-scanner's own release channel is supply-chain input.
-
 ## BUG-330 — Five tests fail on Windows and pass on Linux CI
 
 **Severity: Low. Area: Tests / Windows. Status: Open — found 2026-10-10 running
@@ -2548,10 +2514,35 @@ CI runs Linux only, so nothing flags it. The first three are fixture
 assumptions; the fourth needs a look, because a receipt race is product
 behaviour.
 
+**2026-10-11.** The full suite on Windows again failed the first three
+(four tests); the lease-reclaim test passed this time, and
+`tests/test_mcp_remote_transport_trust.py::test_the_real_transport_does_not_follow_a_redirect_itself`
+failed once under full-suite load (`mcp_remote_unreachable`) and passed alone —
+a timing dependency worth the same look.
+
 **Proposed fix.** Write fixtures with `newline="
 "` / bytes, compare paths
 through `Path`, and trace the lease reclaim's double write on Windows. Consider
 a Windows job for the Python suite.
+
+## BUG-331 — Setup's model step waits on every provider's check before it shows anything
+
+**Severity: Low. Area: First run / Models. Status: Open — found 2026-10-11 in
+the live round.**
+
+**Observed.** Reloading `#/model-setup` with one hosted provider connected and
+twelve Ollama models served showed *Preparing your setup…* for about five
+seconds before the step appeared. The view loads `/api/setup` and `/api/models`
+together and renders nothing until both answer; the models read is the slow
+one.
+
+**Effect.** A blank first-run screen for seconds reads as a hang. Nothing is
+lost and the step is correct once it appears.
+
+**Proposed fix.** Render the step from `/api/setup` at once and fill the
+provider rows as `/api/models` answers, with each row's own loading state;
+measure where `/api/models` spends the time (local runtime probes, catalogue
+reads) before deciding whether any of it belongs in the background.
 
 ## Decision statements added 2026-10-05
 

@@ -16,6 +16,7 @@ import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from raiker.approval_previews import redact_secret_like_text
@@ -39,6 +40,7 @@ from raiker.control.views.models import (
 from raiker.control.views.security import (
     BackgroundWorkerHealth,
     DiagnosticsView,
+    MemoryPressure,
     ModelProfileSource,
     ProviderHealthView,
     SchedulerQueue,
@@ -1720,6 +1722,7 @@ class ModelService:
             ),
             scheduler_queue=self._scheduler_queue(),
             storage_space=storage_space(self.store.paths.workspace_root),
+            memory_pressure=memory_pressure(),
             search_indexes=tuple(
                 cast(
                     SearchIndexHealth,
@@ -1824,3 +1827,83 @@ def storage_space(workspace_root: Any) -> StorageSpace:
     else:
         state = "ok"
     return StorageSpace(state=state, free_bytes=usage.free, total_bytes=usage.total)
+
+
+#: DEC-24 step 1 — below these, memory available to new work is named on *Needs
+#: your attention*. Set low on purpose: an operating system keeps memory busy
+#: with caches it gives back on demand, so only what is *available* counts, and
+#: a machine running at 10% available is ordinary, not an incident.
+MEMORY_LOW_BYTES = 512 * 1024**2
+MEMORY_CRITICAL_BYTES = 256 * 1024**2
+MEMORY_LOW_FRACTION = 0.05
+MEMORY_CRITICAL_FRACTION = 0.02
+
+
+def _system_memory() -> tuple[int, int] | None:
+    """``(available, total)`` bytes, or ``None`` where this build cannot read them.
+
+    No dependency: Windows answers ``GlobalMemoryStatusEx`` and Linux
+    ``/proc/meminfo``'s ``MemAvailable`` — the kernel's own estimate of what a
+    new process can have without swapping. Anything else says unknown rather
+    than guessing from a total.
+    """
+    import sys
+
+    if sys.platform == "win32":
+        import ctypes
+
+        class _MemoryStatus(ctypes.Structure):
+            _fields_ = [  # noqa: RUF012 - the ctypes layout, not a mutable default
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = _MemoryStatus()
+        status.dwLength = ctypes.sizeof(_MemoryStatus)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):  # type: ignore[attr-defined]
+            return None
+        return int(status.ullAvailPhys), int(status.ullTotalPhys)
+    try:
+        text = Path("/proc/meminfo").read_text(encoding="ascii")
+    except OSError:
+        return None
+    return _parse_meminfo(text)
+
+
+def _parse_meminfo(text: str) -> tuple[int, int] | None:
+    fields: dict[str, int] = {}
+    for line in text.splitlines():
+        name, _, rest = line.partition(":")
+        parts = rest.split()
+        if parts and parts[0].isdigit():
+            fields[name.strip()] = int(parts[0]) * 1024
+    if "MemAvailable" not in fields or not fields.get("MemTotal"):
+        return None
+    return fields["MemAvailable"], fields["MemTotal"]
+
+
+def memory_pressure(read: Any = None) -> MemoryPressure:
+    """Memory available to new work on this machine, as the operating system reports it."""
+    try:
+        reading = (read or _system_memory)()
+    except (OSError, ValueError, AttributeError):
+        reading = None
+    if reading is None:
+        return MemoryPressure(state="unknown", available_bytes=None, total_bytes=None)
+    available, total = reading
+    fraction = available / total if total else 0.0
+    state: Literal["ok", "low", "critical"]
+    if available < MEMORY_CRITICAL_BYTES or fraction < MEMORY_CRITICAL_FRACTION:
+        state = "critical"
+    elif available < MEMORY_LOW_BYTES or fraction < MEMORY_LOW_FRACTION:
+        state = "low"
+    else:
+        state = "ok"
+    return MemoryPressure(state=state, available_bytes=available, total_bytes=total)

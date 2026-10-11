@@ -186,6 +186,23 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         linkLabel: "See runtime health",
       });
     }
+    // DEC-24 step 1 — memory, the other pressure that fails work slowly and
+    // without a reason. Only what the system says is *available* counts; memory
+    // held by caches is given back on demand and is not pressure.
+    const memory = inputs.diagnostics.memory_pressure;
+    if (memory && (memory.state === "low" || memory.state === "critical") && memory.available_bytes !== null) {
+      const critical = memory.state === "critical";
+      items.push({
+        id: "memory-pressure",
+        tone: critical ? "blocking" : "waiting",
+        title: `${critical ? "Almost no" : "Little"} memory left — ${formatBytes(memory.available_bytes)} available`,
+        detail: critical
+          ? "A local model, a search rebuild or a backup may fail or stall. Close other programs, or stop a local model you are not using."
+          : "Work that needs memory — a local model, a search rebuild, a backup — may slow down. Close programs you are not using.",
+        href: "#/observe?tab=overview",
+        linkLabel: "See runtime health",
+      });
+    }
     if (inputs.diagnostics.missing_config.length > 0) {
       items.push({
         id: "missing-config",

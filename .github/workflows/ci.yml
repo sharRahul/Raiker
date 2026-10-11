@@ -198,6 +198,47 @@ jobs:
           python -m pip_audit --progress-spinner off --disable-pip --require-hashes \
             -r requirements/release.txt
 
+  # DEC-24 step 7 / BUG-329 — the container definitions are checked in the
+  # Python job; this scans the pinned base images they build on. The scanner is
+  # one exact grype release, checked against its published SHA-256 before it
+  # runs: a scanner's own release channel is supply-chain input, so nothing
+  # mutable is fetched. A fixable High or Critical finding fails unless it has
+  # a reviewed, unexpired entry in .github/image-scan-exceptions.json.
+  image-scan:
+    name: Container image vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GRYPE_VERSION: "0.119.0"
+      GRYPE_SHA256: "3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b"
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: ./.github/actions/setup-python
+      - name: Install the pinned scanner
+        run: |
+          archive="grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$archive" \
+            "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/${archive}"
+          echo "${GRYPE_SHA256}  ${archive}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/grype"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/grype" grype
+          echo "GRYPE=$RUNNER_TEMP/grype/grype" >> "$GITHUB_ENV"
+      - name: Scan the pinned base images
+        run: |
+          python scripts/scan_images.py --report image-scan.json
+      - name: Keep the report
+        if: always()
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: image-scan
+          path: image-scan.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it
     # is the part that builds the operating-system boundary. It is built and

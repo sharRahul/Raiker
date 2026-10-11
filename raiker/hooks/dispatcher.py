@@ -95,7 +95,38 @@ class HookDispatcher:
         """
         event = str(payload.get("event") or "")
         handler = str(payload.get("handler_id") or "")
-        return " · ".join(part for part in (event, handler) if part)
+        # DEC-23 step 4 — what a failed enforcing hook did instead of nothing.
+        closed = "sent to you for a decision" if payload.get("failed_closed") else ""
+        return " · ".join(part for part in (event, handler, closed) if part)
+
+    @staticmethod
+    def _fail_closed(
+        handler: HookHandler,
+        scope: str,
+        decisions: list[HandlerDecision],
+        reasons: list[str],
+        what: str,
+    ) -> bool:
+        """DEC-23 step 4 — an enforcing hook that could not answer does not wave the action through.
+
+        A handler the owner gave decision authority (a built-in check, or a
+        command or ``http`` handler with ``decision_authority``) is enforcement:
+        its silence used to be read as no objection, so a guard that hung or
+        crashed let through exactly what it was there to stop. It now counts as
+        **ask** — the action goes to the owner, never through. A handler without
+        authority is an observer; its failure is recorded and work continues,
+        because it could not have stopped anything had it run. A prompt handler
+        is never authority (its model output is advice).
+        """
+        enforcing = handler.type == "builtin" or (
+            handler.type in {"command", "http"} and handler.decision_authority
+        )
+        if not enforcing:
+            return False
+        reason = f"The hook {handler.id} {what}, so this needs your decision."
+        decisions.append(HandlerDecision(scope, "ask", True, reason))
+        reasons.append(reason)
+        return True
 
     def dispatch(
         self,
@@ -155,9 +186,15 @@ class HookDispatcher:
                         output = run_command(handler, hook_input, self.workspace_root)
                         authority = handler.decision_authority
                 except (CommandHookTimeout, TimeoutError):
+                    closed = self._fail_closed(handler, rule.scope, decisions, reasons, "timed out")
                     self._emit(
                         "hook_timeout",
-                        {"event": hook_input.event_name, "handler_id": handler.id, "scope": rule.scope},
+                        {
+                            "event": hook_input.event_name,
+                            "handler_id": handler.id,
+                            "scope": rule.scope,
+                            "failed_closed": closed,
+                        },
                         session_id=session_id,
                         turn_id=turn_id,
                         client=client,
@@ -170,9 +207,16 @@ class HookDispatcher:
                     HttpHookError,
                     ModelProviderError,
                 ) as exc:
+                    closed = self._fail_closed(handler, rule.scope, decisions, reasons, "failed")
                     self._emit(
                         "hook_failed",
-                        {"event": hook_input.event_name, "handler_id": handler.id, "scope": rule.scope, "error": str(exc)},
+                        {
+                            "event": hook_input.event_name,
+                            "handler_id": handler.id,
+                            "scope": rule.scope,
+                            "error": str(exc),
+                            "failed_closed": closed,
+                        },
                         session_id=session_id,
                         turn_id=turn_id,
                         client=client,

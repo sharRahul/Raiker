@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-10-11 | Targeted | `2026-10-11-channels-runtime-round/` | **OpenRouter** `openai/gpt-4o-mini` answering a Chat turn, the key entered through Connect; a local receiver standing in for a webhook destination | Fourteen decision-record steps — DEC-14 steps 3, 4, 7 and 8, DEC-24 steps 1 and 7, DEC-12 step 4, DEC-22 step 2, DEC-08 step 6, DEC-25, DEC-23 step 4 and DEC-11 step 6 (FIXED-844 to FIXED-857), with BUG-328 and BUG-329 closed. Proved live: **one Telegram update sent three times kept as one message**, a webhook `Idempotency-Key` answered with the first receipt, a malformed key refused 422; **an allowed sender named @rahul_live (4242)** from their own message; **Turn on refused until a test was delivered**, then on; a test receipt *queued → delivered*; **a configured SSH target turned off** with what stopped; memory pressure `ok` beside every pass `ok`; Messaging at 390 wide, dark, no overflow. **Three defects found and fixed** — setup ignored a chosen model (FIXED-858), the step-up window named the owner by id (FIXED-859), a fingerprint check never ran (FIXED-860) |
 | 2026-10-10 (second) | Targeted | `2026-10-10-spend-limit-round/` | **OpenRouter** `openai/gpt-4o-mini`, nine turns answered through Chat; OpenAI and the identity-linked Anthropic key connected through Connect, not exercised | Thirteen decision-record steps — DEC-17 step 7 (space, health check, compatibility), DEC-21 Updates (size, notes), DEC-12 step 4 (fencing), DEC-15 step 10 (plugin growth), DEC-24 steps 1, 2 and 7 (disk pressure, owner-wide spending limit, SAST and container gates), DEC-14 step 1 (capabilities, reply limit) as FIXED-828 to FIXED-842. Proved live: **a $0.01 limit reached by real spend stopped the next turn before any model call**, and clearing it let the next answer; **what each channel carries** at 1440 and at 390 dark with no overflow; storage space `ok`. **One defect found and fixed** — OpenRouter turns recorded no usage (FIXED-841); one filed (BUG-328) |
 | 2026-10-10 | Targeted | `2026-10-10-revisions-round/` | **None answered.** The Anthropic key supplied (`sk-ant-usr-…`, identity-linked) was entered through the Connect dialog; Anthropic refuses every call from it without an `anthropic-workspace-id`, which the key alone cannot look up | Thirteen decision-record steps from the release-readiness review — §13.2 item 6 for MCP, channels and projects, DEC-15 step 10's acceptance binding, DEC-14 step 10, DEC-21 (Personalisation, Updates, Git credential), DEC-24 steps 3, 5 and 7 and DEC-17 step 10 (FIXED-813 to FIXED-826). Proved live: the identity-linked key **explained, not called bad**; Compact and Dark **previewed unsaved and put back by Discard**; **a stale Messaging tab's sender list refused** with the newer list kept; **a paused channel keeping a message and starting nothing**; **a stale project editor refused with its text kept**; **an MCP tool reworded after the card was drawn not accepted**, and a stale rename refused; **a backup carrying 1 checkpoint file and 1 upload**; recovery points that can and cannot open this data; the credential's last loan; the recovery matrix; Messaging at 390 wide, dark, with no overflow; and, across a restart, **a routine left running settled and moved to its next slot**. **One defect found and fixed** — that routine had stayed running for ever (FIXED-825) |
 | 2026-10-05 (fifth) | Targeted | `2026-10-05-recovery-round/` | Anthropic (`claude-haiku-4-5-20251001`) answering two Chat turns and running a routine, the key entered through the Connect dialog | Ten decision-record steps from the release-readiness review — BUG-323 and DEC-24 steps 5–6 (restore from the lock screen, quarantine, deletion journal), DEC-17 step 8 (refuse a newer schema), DEC-12 step 6's cost limit, DEC-21's General row (weather place, answer language, date format) and §13.2 item 6 for permissions and task creation (FIXED-801 to FIXED-809). Proved live: **a real answer in French to an English prompt**, with the turn told `answer_language: fr` and no place; dates written in German; **a stale tab's permission change refused** and the page showing the other tab's Never; **one task for a draft sent twice**; **a $0.01 routine stopped after one model call**; and, across two restarts, **a damaged workspace restored from the lock screen** with the deleted conversation still gone, and **a newer-schema workspace refused and restored** at 390 wide. **Three defects found and fixed** — cached tokens recorded as zero (FIXED-810), cache rates dropped (FIXED-811) and damage past the first page read as the machine's memory (FIXED-812) |
@@ -95,6 +96,45 @@ specific change. That is the honest state of coverage, and it is why the plan no
 carries a tier that says which one a round ran.
 
 ---
+
+## 2026-10-11 — A re-sent update kept once, a channel proven before it goes on, and a runtime that can be turned off
+
+**Tier:** Targeted. **Build:** `main` at `c37eaf3` plus this run's working tree.
+**Host:** `raiker-web` on Windows 11, a workspace reset with
+`scripts/reset_live_workspace.py`, `RAIKER_CHANNEL_INBOUND_SECRET` and a
+loopback channel egress allowlist set, driven by the Playwright browser tools.
+
+**Providers.** The OpenRouter key was entered through its Connect field only and
+appears in no capture, source or log committed; `openai/gpt-4o-mini` was chosen
+from OpenRouter's catalogue as the global model and answered a Chat turn
+(*17 times 3 is 51.*). The OpenAI and identity-linked Anthropic keys supplied
+were not needed by any step and were not entered.
+
+**What it proved** (captures `01`–`08`, each in the folder's `manifest.json`):
+
+| Step | Evidence |
+|---|---|
+| FIXED-844 | One Telegram update (`update_id` 777001) posted three times: one receipt id, the second and third answered `duplicate_event`; a new `update_id` with the same words was a new message; recent activity listed two messages. A webhook message sent twice under one `Idempotency-Key` answered the first id; `Idempotency-Key: a b` was 422 |
+| FIXED-856 | The owner picker read *@rahul_live (4242)* and the checklist *You are @rahul_live (4242) on this channel* ([03](../screenshots/2026-10-11-channels-runtime-round/03-telegram-sender-named.png)); at 390 wide and dark with no horizontal overflow ([07](../screenshots/2026-10-11-channels-runtime-round/07-messaging-390-dark.png)) |
+| FIXED-846 | Telegram with an owner chosen and the webhook with a delivery URL both refused **Turn on** with *Send a test delivery first …* ([04](../screenshots/2026-10-11-channels-runtime-round/04-turn-on-needs-test.png)); after a test delivered to the local receiver the webhook turned on ([05](../screenshots/2026-10-11-channels-runtime-round/05-webhook-tested-then-on.png)) |
+| FIXED-855 | The webhook test's receipt read *queued → delivered*; the earlier one refused by the closed capability read *queued → failed: the channel capability is off in Permissions* |
+| FIXED-857 | An SSH target added through Settings → Runtime's form and turned off: *Build host is off. Nothing was running there.* and *Off — nothing runs here until you turn it on* ([06](../screenshots/2026-10-11-channels-runtime-round/06-runtime-target-off.png)) |
+| FIXED-847, FIXED-850 | `GET /api/diagnostics`: `memory_pressure: ok` (about 104 GB of 128 GB available), every background pass `ok` |
+| FIXED-858 | Setup's model step, after GPT-4o Mini was chosen on Models: *GPT-4o Mini is selected* with **Continue** ([02](../screenshots/2026-10-11-channels-runtime-round/02-setup-keeps-chosen-model.png)); Ready named `openai/gpt-4o-mini` |
+| FIXED-859 | Turning a capability on: *Acting as Rahul. This decision is recorded against your account.* ([08](../screenshots/2026-10-11-channels-runtime-round/08-step-up-names-the-owner.png)) |
+| FIXED-860 | `SHA256:short` in the fingerprint field is invalid, and nothing is logged |
+| — | A real OpenRouter answer through Chat after setup ([01](../screenshots/2026-10-11-channels-runtime-round/01-openrouter-chat-answer.png)) |
+
+**What it found.** Three defects, each fixed in the run: setup's model step
+ignored a model already chosen on Models and hid the picker it asked for
+(FIXED-858); the step-up window showed `principal_user_…` (FIXED-859); the
+fingerprint field's `pattern` was invalid under the browser's `v` flag
+(FIXED-860). Console errors in the round are the expected refusals — two 409s
+from **Turn on** without a test, one 403 from the test while the capability was
+off — and the pattern error before its fix. FIXED-845, FIXED-848, FIXED-849,
+FIXED-851 to FIXED-854 and FIXED-861 to FIXED-863 are proved by their tests and
+by `scripts/scan_images.py` against the real registry; their paths (CI, a second
+host, a hung worker, a failing hook) are not reachable from a browser round.
 
 ## 2026-10-10 (second) — A spending limit reached by real spend, and channels that say what they carry
 

@@ -198,6 +198,20 @@ class StorageSpace(TypedDict):
     total_bytes: int | None
 
 
+class MemoryPressure(TypedDict):
+    """DEC-24 step 1 — memory this machine has left, as the operating system reports it.
+
+    Read when the page asks; nothing is written. A local model, an index
+    rebuild and a backup all want memory at once, and a machine that is out of
+    it fails them slowly and without a reason — so it is named before then.
+    """
+
+    #: ``ok``, ``low`` or ``critical``; ``unknown`` where this build cannot read it.
+    state: Literal["ok", "low", "critical", "unknown"]
+    available_bytes: int | None
+    total_bytes: int | None
+
+
 class SearchIndexHealth(TypedDict):
     """One search index as the host's last check found it (BUG-322, DEC-24 step 6)."""
 
@@ -261,6 +275,10 @@ class DiagnosticsView(View):
     # DEC-24 step 1 — resource pressure: free space where the workspace lives.
     storage_space: StorageSpace = field(
         default_factory=lambda: StorageSpace(state="unknown", free_bytes=None, total_bytes=None)
+    )
+    # DEC-24 step 1 — resource pressure: memory left on this machine.
+    memory_pressure: MemoryPressure = field(
+        default_factory=lambda: MemoryPressure(state="unknown", available_bytes=None, total_bytes=None)
     )
     # GCR-45 — which file the built-in model registry was actually read from,
     # independent of the working directory the host was launched from.

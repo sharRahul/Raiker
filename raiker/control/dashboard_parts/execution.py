@@ -296,7 +296,8 @@ class ExecutionService:
                         "enabled": profile.enabled,
                         "configured": validate_execution_profile(profile) is None,
                         "available": available,
-                        "status": "ready" if available else "unavailable",
+                        # DEC-11 step 6 — off is the owner's choice, not a fault.
+                        "status": "ready" if available else ("off" if not profile.enabled else "unavailable"),
                         "selected": selected == profile.profile_id,
                         "credential_configured": True,
                         "budget": None,
@@ -382,6 +383,8 @@ class ExecutionService:
                     "available": available,
                     "status": "ready"
                     if available
+                    else "off"
+                    if not row["enabled"]
                     else (
                         "credential_required"
                         if configured and not credential_configured
@@ -565,6 +568,41 @@ class ExecutionService:
             return ControlResult(ok=False, reason_code="execution_environment_unavailable")
         self.store.select_execution_environment(owner_principal_id, profile_id)
         return ControlResult(ok=True, data={"selected_profile_id": profile_id})
+
+    def set_execution_environment_enabled(
+        self: DashboardService, profile_id: str, enabled: bool, owner_principal_id: str
+    ) -> ControlResult:
+        """Turn a configured environment off or back on (DEC-11 step 6).
+
+        Off means three things, in this order: nothing new is placed there —
+        command resolution already refuses a disabled profile and never falls
+        back to the host — every command still running there is asked to stop
+        through the same governed stop the Commands panel sends, and its runs,
+        receipts and settings are kept. On re-reads the profile as it stands;
+        it is not proof of anything until the next probe.
+        """
+        if not self.store.set_remote_execution_profile_enabled(
+            profile_id, owner_principal_id=owner_principal_id, enabled=enabled
+        ):
+            return ControlResult(ok=False, reason_code="unknown_execution_environment")
+        stopped = 0
+        if not enabled:
+            from raiker.execution.commands.models import TERMINAL_COMMAND_STATES
+            from raiker.execution.commands.service import CommandService
+
+            service = CommandService.for_workspace(self.workspace_root)
+            for run in service.store.list_runs(owner_principal_id, limit=500):
+                if run.profile_id != profile_id or run.state in TERMINAL_COMMAND_STATES:
+                    continue
+                try:
+                    service.stop(owner_principal_id, run.run_id)
+                except Exception:  # noqa: BLE001 — one run that will not stop does not keep the rest going
+                    continue
+                stopped += 1
+        return ControlResult(
+            ok=True,
+            data={"profile_id": profile_id, "enabled": enabled, "stopped_runs": stopped},
+        )
 
     def reset_execution_environment(
         self: DashboardService, profile_id: str, session_id: str, *, recreate: bool, owner_principal_id: str

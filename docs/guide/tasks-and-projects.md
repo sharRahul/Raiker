@@ -100,7 +100,9 @@ host stops while a task is running, the next start settles that run as one that
 did not finish — its history says so — and does not run it again on its own,
 because what it did before stopping is not known. A routine moves to its next
 slot as after any failed cycle; read its conversation, then **Run now** if you
-want it again.
+want it again. The same holds without a restart: a running run checks in every
+30 seconds, and one that has not for five minutes has nobody working on it, so
+the next scheduler pass settles it the same way.
 
 Use the attachment panel to add a workspace path, image, or document. The same
 governed attachment payload used by Chat and Build is stored with the task and

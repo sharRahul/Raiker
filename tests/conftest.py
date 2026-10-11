@@ -242,7 +242,18 @@ def _fresh_channel_loop_guard() -> None:
     The loop guard is process-local by design, like the per-sender budget; a
     message one test sent must not read as a repeat in the next.
     """
-    from raiker.api.routes_channels import _recent_inbound, _recent_replies
+    from raiker.api.routes_channels import (
+        _channel_hits,
+        _global_hits,
+        _inbound_hits,
+        _recent_inbound,
+        _recent_replies,
+    )
 
     _recent_inbound.clear()
     _recent_replies.clear()
+    # DEC-14 step 8 — the per-channel and host-wide budgets are process-local
+    # too, and the suite posts far more than a minute's worth across tests.
+    _inbound_hits.clear()
+    _channel_hits.clear()
+    _global_hits.clear()

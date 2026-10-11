@@ -30,6 +30,9 @@ const EVENT_PHASE: Record<string, PhaseId> = {
   model_request_started: "act",
   model_request_completed: "act",
   model_request_failed: "act",
+  // DEC-08 step 6 — the turn moved to another model, and why.
+  model_request_retried: "act",
+  model_fallback_engaged: "act",
   model_tool_call_rejected: "act",
   model_tool_calls_dropped: "act",
   // ADD-02 — calls held behind an approval boundary. Still the act phase: they
@@ -150,6 +153,12 @@ export function summarizeEvent(ev: StreamEvent): string {
       return `Model responded (finish: ${str(p.finish_reason)}${p.tool_call_count !== undefined ? `, ${p.tool_call_count} tool call(s)` : ""}).`;
     case "model_request_failed":
       return `Model request failed safely: ${str(p.safe_error_code) || str(p.finish_reason)}.`;
+    case "model_request_retried":
+      return `Retried ${str(p.provider)} / ${str(p.model)} once after ${str(p.reason) || "a connection failure"}.`;
+    case "model_fallback_engaged":
+      return `Switched to ${str(p.provider)} / ${str(p.model)} (fallback ${str(p.fallback_rank)})${
+        p.after_provider ? ` because ${str(p.after_provider)} was unavailable${p.after_reason ? ` — ${str(p.after_reason)}` : ""}` : ""
+      }.`;
     case "model_tool_call_rejected":
       return `Tool call rejected: ${str(p.tool_name)} — ${str(p.reason)}.`;
     case "model_tool_call_refused": {

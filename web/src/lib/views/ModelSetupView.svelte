@@ -57,8 +57,23 @@
 
   async function load() {
     try {
-      [setup, { profiles }] = await Promise.all([api.setup(), api.models()]);
+      let view;
+      [setup, view] = await Promise.all([api.setup(), api.models()]);
+      profiles = view.profiles;
       backupTarget = setup.backup_target ?? "";
+      // A model the owner already chose — here earlier, or as the global model
+      // on Models before coming back — is a choice, not "decide later". Without
+      // this the step offered only "Decide later" and Ready then claimed no
+      // model was set up while Chat answered with one.
+      const chosen = !setup.model_deferred && setup.selected_model ? setup.selected_model : view.current_model;
+      if (chosen) picked = modelName(chosen);
+      if (!setup.selected_model && view.current_profile_id && view.current_model) {
+        setup = await api.updateSetup(body({
+          selected_profile_id: view.current_profile_id,
+          selected_model: view.current_model,
+          model_deferred: false,
+        }));
+      }
     } catch {
       error = "Setup could not be loaded.";
     }
@@ -308,6 +323,11 @@
           <p class="eyebrow">Recommended</p>
           <strong>{recommended.label}</strong>
           <span>{recommended.detail}</span>
+          {#if !allProvidersOpen && picked === null}
+            <!-- The recommendation asks for a model; the picker that answers it
+                 is in the providers below, so it opens them. -->
+            <button class="primary choose" onclick={() => (showAllProviders = true)}>Choose a model</button>
+          {/if}
         </div>
       {/if}
       {#if !allProvidersOpen}
@@ -446,6 +466,7 @@
   .note { margin: 0; color: var(--text-3); font-size: var(--text-sm); line-height: 1.5; max-width: 45rem; }
   /* Recommended is one sentence with a reason, not a card competing with the
      matrix below it: the point is that most owners need read no further. */
+  .recommended .choose { justify-self: start; margin-top: var(--space-2); }
   .recommended { display: grid; gap: .25rem; padding: var(--space-4); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--accent-soft); }
   .optional { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }

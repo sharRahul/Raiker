@@ -1135,6 +1135,9 @@ class TaskRecord:
     #: it was claimed at for the next (``SQLiteStore.fence_task_claim``), so a
     #: worker whose claim was taken from it settles nothing.
     claim_generation: int = 0
+    #: DEC-12 step 4 — when the worker running this claim last renewed its
+    #: lease. A running run whose heartbeat has lapsed has nobody on it.
+    run_heartbeat_at: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     #: Where this task's governed turns run. The thread when it has one, and the

@@ -481,7 +481,9 @@ down.
 "Unavailable" is four specific things: no network, a timeout, a host that does
 not respond, or a policy denial. Raiker tries the next candidate in your order
 for each of them, and with no fallback configured the turn fails closed rather
-than silently choosing a backend you did not pick.
+than silently choosing a backend you did not pick. A turn a fallback answered
+says so in its timeline — *Switched to … because … was unavailable* — with the
+reason the earlier one gave.
 
 ---
 

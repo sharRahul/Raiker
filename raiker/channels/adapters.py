@@ -69,6 +69,14 @@ class InboundMessage:
     #: Authored by another bot. Never routed: two automated parties answering
     #: each other is the loop the messaging contract names.
     from_bot: bool = False
+    #: DEC-14 step 4 — the provider's own id for this delivery, when it has
+    #: one. A re-send of the same update carries the same id, which is how the
+    #: receiver tells a retry from a second message.
+    event_id: str | None = None
+    #: DEC-14 step 3 — what the sender calls themselves on the channel, when
+    #: the transport says. Set by the sender, so it is a label to show beside
+    #: the id, never something to authorise by.
+    sender_label: str | None = None
 
 
 class ChannelCapabilities(TypedDict):
@@ -195,7 +203,32 @@ class TelegramAdapter:
             text=text,
             conversation_scope="direct" if chat_type == "private" else "group",
             from_bot=bool(isinstance(sender, dict) and sender.get("is_bot")),
+            event_id=_telegram_event_id(payload),
+            sender_label=_telegram_sender_label(sender),
         )
+
+
+def _telegram_sender_label(sender: object) -> str | None:
+    """``@username`` when the sender has one, else their first and last name."""
+    if not isinstance(sender, dict):
+        return None
+    username = sender.get("username")
+    if isinstance(username, str) and username.strip():
+        return f"@{username.strip()}"
+    names = [
+        str(sender.get(part)).strip()
+        for part in ("first_name", "last_name")
+        if isinstance(sender.get(part), str) and str(sender.get(part)).strip()
+    ]
+    return " ".join(names) or None
+
+
+def _telegram_event_id(payload: dict[str, Any]) -> str | None:
+    """``update_id`` — Telegram's sequence number for one update, retries included."""
+    update_id = payload.get("update_id")
+    if isinstance(update_id, int) and not isinstance(update_id, bool):
+        return f"update:{update_id}"
+    return None
 
 
 # ── The reference webhook ─────────────────────────────────────────────────────

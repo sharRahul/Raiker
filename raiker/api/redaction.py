@@ -109,7 +109,12 @@ _DIGEST_KEY_SUFFIXES = (
 # picker keys its options by the model id, the duplicate crashed the render.
 # A model name is a vendor-issued, slash-segmented identifier, so it gets the
 # segmented-path fallback; every specific credential shape still applies first.
-_MODEL_KEYS = frozenset({"model", "models"})
+#
+# BUG-328 — a Hugging Face ``repo_id`` (``owner/name``) is the Hub's model id, so
+# it is read as one: under the generic ``_id`` rule only a server-issued record
+# id was spared, and a public repository with a long hyphenated name came back
+# as ``[REDACTED_SECRET]``.
+_MODEL_KEYS = frozenset({"model", "models", "repo_id", "repo_ids"})
 _MODEL_KEY_SUFFIXES = ("_model", "_models")
 
 
@@ -122,7 +127,7 @@ def is_locator_field(key: str) -> bool:
 def is_identifier_field(key: str) -> bool:
     """True when a field's name says its value is a server-issued record id."""
     lower = key.lower()
-    return lower.endswith(_IDENTIFIER_KEY_SUFFIXES)
+    return lower.endswith(_IDENTIFIER_KEY_SUFFIXES) and lower not in _MODEL_KEYS
 
 
 def is_digest_field(key: str) -> bool:

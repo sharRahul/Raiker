@@ -48,6 +48,9 @@ export function testReason(code: string | null | undefined): string {
   if (value.startsWith("fetch_failed")) return "the destination could not be reached";
   if (value === "sender_not_allowlisted") return "the sender is not on the allowlist";
   if (value === "rate_limited") return "the sender went over the rate limit";
+  // DEC-14 step 8 — the budgets behind the sender's own.
+  if (value === "channel_rate_limited") return "the channel went over its rate limit across every sender";
+  if (value === "inbound_rate_limited") return "Raiker went over its rate limit across every channel";
   // DEC-14 step 9 — the loop guard's two refusals.
   if (value === "loop_echo") return "it repeated one of Raiker's own replies, so it was not answered again";
   if (value === "loop_repeated")
@@ -95,7 +98,11 @@ export function channelSteps(profile: ChannelProfile): ChannelStep[] {
     id: "owner",
     label: "Owner verified",
     detail: profile.owner_sender_id
-      ? `You are ${profile.owner_sender_id} on this channel.`
+      ? `You are ${
+          profile.sender_labels?.[profile.owner_sender_id]
+            ? `${profile.sender_labels[profile.owner_sender_id]} (${profile.owner_sender_id})`
+            : profile.owner_sender_id
+        } on this channel.`
       : "Choose which allowed sender is you. Only you can start work or answer approvals from here.",
   });
   raw.push({
@@ -232,6 +239,8 @@ export function receiptStages(receipt: Receipt): ReceiptStage[] {
 /** One line naming what a receipt is, without a sender id (it has none). */
 export function receiptTitle(receipt: Receipt): string {
   if (receipt.kind === "test_delivery") return "Test delivery";
+  // DEC-14 step 7 — a delivery Raiker sent over the channel, recorded before it left.
+  if (receipt.direction === "outbound") return "Raiker sent a message";
   const who =
     receipt.sender_role === "owner"
       ? "You"
@@ -257,7 +266,8 @@ export function receiptOutcome(receipt: Receipt): string {
   if (receipt.failed_at) return `Failed: ${testReason(receipt.reason_code)}`;
   // DEC-14 step 10 — kept while the channel was paused, never acted on.
   if (receipt.reason_code === "channel_paused") return "Kept while paused — nothing started";
-  if (receipt.kind === "test_delivery") return receipt.delivered_at ? "Delivered" : "Sent";
+  if (receipt.kind === "test_delivery" || receipt.direction === "outbound")
+    return receipt.delivered_at ? "Delivered" : "Sending";
   if (receipt.delivered_at) return "Answered and returned to the caller";
   if (receipt.processed_at) return "Processed — no reply sent over the channel";
   if (receipt.queued_at) return "Waiting — queued for work";

@@ -69,3 +69,12 @@ def test_the_repositorys_own_definitions_pass() -> None:
     for name in names:
         text = (ROOT / name).read_text(encoding="utf-8")
         assert scan_containers.scan_definition(name, text) == [], name
+
+
+def test_an_unpinned_syntax_frontend_fails_and_a_pinned_one_passes() -> None:
+    """The ``# syntax=`` image is pulled and run to parse the file, like a base."""
+    assert _rules(f"# syntax=docker/dockerfile:1.7\n{PINNED}\nUSER app\n") == ["frontend_not_pinned"]
+    pinned = "# syntax=docker/dockerfile:1.7@sha256:" + "b" * 64
+    assert _rules(f"{pinned}\n{PINNED}\nUSER app\n") == []
+    # Below the first instruction it is an ordinary comment, not a directive.
+    assert _rules(f"{PINNED}\n# syntax=docker/dockerfile:1.7\nUSER app\n") == []

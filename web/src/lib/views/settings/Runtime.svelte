@@ -191,6 +191,33 @@
     }
   }
 
+  /** The built-in targets are always there; only one the owner configured can be turned off. */
+  const BUILT_IN_ENVIRONMENTS = new Set(["local_native", "native_sandbox", "container_default"]);
+  let switching = $state<string | null>(null);
+  async function setEnvironmentEnabled(profileId: string, name: string, enabled: boolean) {
+    // DEC-11 step 6 — off stops new work and asks every command running there
+    // to stop; its runs, receipts and settings are kept.
+    if (!enabled && !window.confirm(`Turn off ${name}? Nothing new will run there, and commands running there now are stopped. Its settings are kept.`)) return;
+    switching = profileId;
+    notice = null;
+    try {
+      const result = await api.setExecutionEnvironmentEnabled(profileId, enabled);
+      await load();
+      notice = {
+        kind: "ok",
+        text: enabled
+          ? `${name} is on. Check it before relying on it.`
+          : result.stopped_runs > 0
+            ? `${name} is off. ${result.stopped_runs} running command${result.stopped_runs === 1 ? " was" : "s were"} stopped.`
+            : `${name} is off. Nothing was running there.`,
+      };
+    } catch {
+      notice = { kind: "error", text: `${name} could not be turned ${enabled ? "on" : "off"}.` };
+    } finally {
+      switching = null;
+    }
+  }
+
   async function selectEnvironment(profileId: string) {
     try { await api.selectExecutionEnvironment(profileId); await load(); }
     catch { notice = { kind: "error", text: "That environment is not ready. Complete its configuration and credential reference first." }; }
@@ -317,7 +344,7 @@
               <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
               <span class="boundary">Foreground command execution</span>
               <small class="plain">PTY, background execution, persistence, restart recovery, filtered egress, and command credential delivery are unavailable.</small>
-              {#if environment.availability_reason}<small class="remediation">{environment.availability_reason.replaceAll("_", " ")}</small>{/if}
+              {#if environment.availability_reason && environment.enabled}<small class="remediation">{environment.availability_reason.replaceAll("_", " ")}</small>{/if}
               <button class="btn btn-ghost btn-sm reprobe" type="button" disabled={probing === environment.profile_id} onclick={() => void reprobe(environment.profile_id)}>{probing === environment.profile_id ? "Checking…" : "Check supervisor"}</button>
               {#if environment.cost}<small>USD {environment.cost.committed_cost.toFixed(2)} committed · {environment.cost.remaining_cost?.toFixed(2) ?? "0.00"} remaining · {environment.cost.reconciliation_status.replaceAll("_", " ")}</small>{/if}
             {/if}
@@ -338,7 +365,18 @@
               <small class="plain">Resetting discards what commands left behind. The next command starts from the approved image.</small>
             {/if}
           </div>
-          <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
+          <div class="environment-actions">
+            <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
+            {#if !BUILT_IN_ENVIRONMENTS.has(environment.profile_id)}
+              <button
+                class="btn btn-ghost btn-sm"
+                type="button"
+                disabled={switching === environment.profile_id}
+                onclick={() => void setEnvironmentEnabled(environment.profile_id, environment.name, !environment.enabled)}
+              >{environment.enabled ? "Turn off" : "Turn on"}</button>
+            {/if}
+          </div>
+          {#if !environment.enabled}<small class="plain environment-off">Off — nothing runs here until you turn it on.</small>{/if}
         </article>
       {/each}
     </div>
@@ -351,7 +389,7 @@
       {#if environmentKind === "ssh"}
         <label>Host<input bind:value={host} required placeholder="build.example.com" /></label><label>Remote user<input bind:value={remoteUser} required placeholder="raiker" /></label>
         <label>Pinned host public key<input bind:value={hostPublicKey} required placeholder="ssh-ed25519 AAAA…" /></label>
-        <label>Host fingerprint<input bind:value={hostKeySha256} required pattern={"SHA256:[A-Za-z0-9+/]{43}"} placeholder="SHA256:…" /></label>
+        <label>Host fingerprint<input bind:value={hostKeySha256} required pattern={"SHA256:[A-Za-z0-9+\\/]{43}"} placeholder="SHA256:…" /></label>
       {:else if environmentKind === "daytona"}
         <label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label>
         <details class="form-advanced"><summary>Advanced</summary><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label></details>
@@ -435,6 +473,7 @@
 {/if}
 
 <style>
+  .environment-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
   .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .description, .danger-zone p { color: var(--text-2); }
   /* The readiness window is the one editable field in this section, so it needs
      the same stacked label/hint/control shape the other settings sections use

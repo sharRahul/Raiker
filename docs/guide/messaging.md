@@ -93,7 +93,13 @@ button:
 5. **Test delivery** — set where it delivers, then send a test. A refusal says
    why (*the channel capability is off in Permissions*, *the host is not on the
    channel egress allowlist*).
-6. **Turned on** — nothing is accepted or delivered until it is.
+6. **Turned on** — nothing is accepted or delivered until it is. A channel
+   with somewhere to deliver — Telegram once you have chosen which sender is
+   you, the webhook once it has a delivery address — turns on only after a test
+   to that destination was delivered: Raiker cannot check a chat id or URL you
+   typed, so the test is the check. Choosing a different owner, or a different
+   address, forgets the last test. A channel with nowhere to deliver turns on
+   without one.
 
 **What this route does** states the stored route as what the receiver does with
 it: whether direct messages and groups are both heard (Telegram) or there is one
@@ -107,7 +113,10 @@ A Telegram answer stays in Raiker; nothing is sent back over the channel yet.
 
 **Recent activity** lists each message and test with its stages as separate
 facts — *received, accepted, queued, processed, reply queued, delivered,
-failed* — so a finished turn is never read as a delivered reply. It names the
+failed* — so a finished turn is never read as a delivered reply. What Raiker
+sends over a channel is listed too, as *Raiker sent a message*: its record is
+written as *queued* before anything leaves, then *delivered* or *failed* with
+the reason. It names the
 sender by role (you, an allowed sender, a sender who is not allowed), never by
 id, holds no message text, and links to the conversation a routed message
 became. The last 200 per channel are kept, and unpairing keeps them.
@@ -130,7 +139,22 @@ too, so a card can tell you a token is missing without ever having seen one.
 
 **Delivery environment**, at the foot of the page, is the host process's own
 configuration read back: the outbound capability, the egress allowlist, HMAC
-signing, the inbound secret and the per-sender rate limit. All five are set
+signing, the inbound secret and the per-sender rate limit.
+
+Behind each sender's budget (`RAIKER_CHANNEL_INBOUND_RATE`, 60 a minute) sit
+two more: one for the whole channel (`RAIKER_CHANNEL_INBOUND_CHANNEL_RATE`,
+four times the sender's unless set) and one for every channel on the host
+(`RAIKER_CHANNEL_INBOUND_GLOBAL_RATE`, ten times). A message over any of them
+is refused 429 — `rate_limited`, `channel_rate_limited` or
+`inbound_rate_limited` — and recorded; a message refused by the channel's
+budget does not use up its sender's.
+
+**A re-sent message is kept once.** A platform that got no answer in time sends
+the same update again; Raiker remembers each update's own id for two days and
+answers a repeat with the first message's receipt, starting nothing and
+spending no budget. Telegram's `update_id` does this on its own; a webhook
+caller that may retry sends an `Idempotency-Key` header (8–128 letters, digits,
+`_ . : -`). All five are set
 outside the app and all five are real — they are below the channels because
 connecting a messaging account should not begin with a briefing on them.
 
@@ -163,7 +187,9 @@ anything it does not get a `2xx` for and retrying a join forever helps nobody.
 
 **The sender allowlist is Telegram user ids**, as strings: the numeric `id` on
 `message.from`, not a @username. A username can be changed by its owner; an id
-cannot.
+cannot. Once an allowed sender writes, Messaging shows the name they go by
+beside the id — *@alex (4242)* — taken from their own message. It is a label
+for you to recognise them by, never something Raiker decides by.
 
 Outbound messages carry no Raiker signature, unlike the webhook transport. That
 is not an omission — the receiver is Telegram, which authenticates the token in

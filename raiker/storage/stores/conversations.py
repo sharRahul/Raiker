@@ -30,6 +30,20 @@ if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 
+#: DEC-22 step 2 — instructions that may wait for a running turn at once. A
+#: turn reads every waiting one at its next safe boundary; twenty unread means
+#: the turn is not reaching one, and more would only grow its next prompt.
+MAX_QUEUED_STEERS = 20
+
+
+class SteerQueueFull(Exception):
+    """A steer was refused because the running turn has not read the ones before it."""
+
+    def __init__(self, depth: int) -> None:
+        super().__init__("steer_queue_full")
+        self.depth = depth
+
+
 class ConversationStore:
 
     def create_session(
@@ -1205,7 +1219,10 @@ class ConversationStore:
         """Append one owner instruction for the running turn; returns the queue depth.
 
         Appending rather than replacing is deliberate: an owner who types two
-        corrections while a turn runs meant both of them.
+        corrections while a turn runs meant both of them. The queue is bounded
+        (DEC-22 step 2, DEC-24's "no unbounded queues"): past
+        :data:`MAX_QUEUED_STEERS` waiting instructions, :class:`SteerQueueFull`
+        is raised and nothing is added — the turn has not read the ones before.
         """
         now = utc_now()
         with self.connect() as connection:
@@ -1221,6 +1238,8 @@ class ConversationStore:
                         queued = [str(item) for item in parsed]
                 except ValueError:
                     queued = []
+            if len(queued) >= MAX_QUEUED_STEERS:
+                raise SteerQueueFull(len(queued))
             queued.append(text)
             connection.execute(
                 """INSERT INTO turn_controls

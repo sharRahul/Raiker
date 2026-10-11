@@ -64,6 +64,8 @@ class InstanceRuntime:
         self.workspace_root = app.state.workspace_root
         self._stop = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
+        #: The scheduled-work pass in flight, if any (DEC-24 step 1).
+        self._due_work: asyncio.Task[None] | None = None
         self._started = False
         self._resuming = asyncio.Lock()
 
@@ -109,7 +111,7 @@ class InstanceRuntime:
             if ticks % INDEX_CHECK_EVERY_TICKS == 0:
                 await self._contained("search_index_check", asyncio.to_thread(self._check_indexes))
             ticks += 1
-            await self._contained("scheduled_tasks", scheduler.run_due())
+            self._start_due_work(scheduler)
             # Continuing approved work is a separate pass from starting due
             # work, and it is contained separately: a continuation that
             # throws must not stop the next tick from starting due runs, and
@@ -128,6 +130,25 @@ class InstanceRuntime:
             await self._contained("local_model_watch", self._watch_local_models())
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=TICK_SECONDS)
+
+    def _start_due_work(self, scheduler: TaskScheduler) -> None:
+        """Start the scheduled-work pass beside the tick, never inside it (DEC-24 step 1).
+
+        A routine's run may last an hour. Awaited here, it held up every other
+        pass for as long — approved work did not continue, no index was checked,
+        a local model went unwatched — and after five minutes each of them read
+        as *not running* on the attention list, while the one thing actually
+        running was fine. So the pass runs as its own task, one at a time, and
+        while it is busy each tick says it is alive: the run renews its own
+        lease, which is what notices a run that has stopped (DEC-12 step 4).
+        """
+        if self._due_work is not None and not self._due_work.done():
+            with suppress(Exception):
+                SQLiteStore(self.workspace_root).record_background_pass("scheduled_tasks")
+            return
+        self._due_work = asyncio.create_task(
+            self._contained("scheduled_tasks", scheduler.run_due())
+        )
 
     def _check_indexes(self) -> None:
         from raiker.notify.index_notifier import notify_search_index_damaged
@@ -225,6 +246,9 @@ class InstanceRuntime:
         self._stop.set()
         with suppress(Exception):
             self.app.state.scheduler_wakeup.request()
+        if self._due_work is not None:
+            self._tasks.append(self._due_work)
+            self._due_work = None
         for task in self._tasks:
             task.cancel()
         for task in self._tasks:

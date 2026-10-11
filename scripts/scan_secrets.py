@@ -40,6 +40,7 @@ RULES: dict[str, re.Pattern[str]] = {
     "openai_key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b"),
     "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
     "github_pat": re.compile(r"\bgithub_pat_[A-Za-z0-9_]{60,}\b"),
+    "huggingface_token": re.compile(r"\bhf_[A-Za-z0-9]{34}\b"),
     "aws_access_key": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     "slack_token": re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
     "google_api_key": re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"),

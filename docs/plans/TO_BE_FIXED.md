@@ -77,6 +77,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced again 2026-09-04; `prompt` closed as FIXED-303 and `http` as [FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two), while `mcp_tool` and `agent` stay refused with their reasons |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
+| [BUG-280](#bug-280--weather-and-the-environment-clock-are-unmeasured-against-a-real-provider-and-a-real-model) | Low | Weather / live provider evidence | **Open remainder** — clock/model round trip verified in [FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here); external Open-Meteo request still unverified due host egress |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — the same egress limit as [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host); since [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) a live round has a second thing to prove — that turning **Image generation** off refuses a generation |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
 | [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about) | Medium | Memory / recall | Open — a question carrying an instruction ("Answer in one sentence") recalls nothing, because the lexical leg needs every content word in the record |
@@ -616,6 +617,66 @@ test*; sharing the helper there would hide the behaviour they exist to check.
 how the evidence behind its FIXED entry is refreshed rather than invalidated.
 
 **Required user-interface outcome.** None; this is harness-only.
+
+---
+
+## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
+
+**Severity: Low. Area: runtime / environment context, weather. Raised while
+implementing ENV-01…05 and WEATHER-01…03.**
+
+**Half of this closed 2026-09-15 as
+[FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here).**
+The clock half was measurable the moment a host had a working key: a real
+Anthropic turn names the runtime's date and day, and follows the owner's zone
+when it changes. The spec reads the expectation from `/api/environment` rather
+than hardcoding a date, so it measures agreement between the runtime and the
+model rather than agreement with whatever day it was written on.
+
+**The weather half is still open, and still for the same reason.** Every attempt
+to reach `api.open-meteo.com` from this host is cut by the environment's egress
+policy — verified again on 2026-09-15, `curl` returns no status through the
+proxy's tunnel — so the tool answers `weather_provider_unavailable`, which is the
+correct typed answer to an unreachable provider and is not evidence that a
+reachable one is read correctly. Closing it needs a host with egress, not a
+change to Raiker.
+
+**Observed.** The 2026-09-07 round proved the whole of the environment and
+weather contract against the runtime: the bundle a turn is given, the event it
+records, the precedence, the DST behaviour, the stale-refresh note, and every
+governed refusal. Two halves of it were not measured, and neither is a code gap.
+
+*No model reasoned from the bundle.* The round's key is identity-linked, as the
+previous six were, and this host has no local runtime, so no provider on it can
+complete a turn. The bundle is asserted against the messages the orchestrator
+builds — which is the right place, since it is derived before any provider is
+called — but "the model answered `tomorrow` correctly" is a claim only a real
+turn can support.
+
+*No weather request left the machine.* The provider path is asserted against a
+stand-in that answers as Open-Meteo does, and every governed refusal is asserted
+against the real gate, decision mode and blocklist. What is unmeasured is the
+real HTTP round trip. `api.open-meteo.com` resolves from this host and every
+attempt to reach it — with or without the environment's proxy — is refused with
+`403` by that environment's own egress policy, so the tool returns
+`weather_provider_unavailable`. That is the correct typed answer to an
+unreachable provider; it is not evidence that a reachable one is read correctly.
+
+**Why it was left.** Both need something the round did not have — a working
+provider credential and outbound egress — rather than something Raiker is
+missing. Recording it here is what stops the plan's `Done` reading as a claim
+about evidence that was never taken.
+
+**Proposed check.** On a host with egress and a working model: ask *"what day is
+it, and what is the weather here?"* in Chat, and confirm the answer names today's
+real date in the owner's zone and cites the weather provider with its observation
+time. Then set the timezone to another continent and ask *"what time is it?"*
+again.
+
+**Interface outcome that has to be true before this closes.** A real turn
+answers a relative-time question from the runtime's clock rather than from
+training knowledge, and a real weather answer names its provider and how old the
+reading is.
 
 ---
 

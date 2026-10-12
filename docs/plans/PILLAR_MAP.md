@@ -169,7 +169,7 @@ is BUG-194 — interactive, background and remote execution inside the sandbox.
 | Owner-authored slash commands | [FIXED-299](FIXED_ITEMS.md#fixed-299--skills-had-no-owner-authored-command-handle) | **Closed 2026-08-27** — active skills can have owner-scoped command handles that grant nothing |
 | Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md#add-06--a-zero-trust-gate-for-self-authored-skills) | Proposed |
 | Governed browser control | [backlog #24](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md#add-23--governed-browser-control-as-a-narrow-tool-set) | Proposed — **an owner decision** |
-| Live-spec sign-in | [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Open |
+| Live-spec sign-in | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Open |
 
 **No blocking item.** The protocol upgrade landed on 2026-08-23 and unblocked
 three rows at once; each is now ordinary work rather than a dependency. The

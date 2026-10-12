@@ -1,5 +1,7 @@
 # Raiker plans — current-status index
 
+The [2026-10-12 competitive decision gap review](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md#competitive-decision-gap-review--2026-10-12) records ten prioritised **recommendations pending owner acceptance**, their code boundaries, competitive rationale, dependencies and required evidence. These are not newly accepted owner decisions or completed implementation work.
+
 The [personal-agent UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
 owns UX-01–UX-12, with detailed reasons, decisions, alternatives, dependencies,
 state/failure behavior and acceptance. It extends existing surfaces under

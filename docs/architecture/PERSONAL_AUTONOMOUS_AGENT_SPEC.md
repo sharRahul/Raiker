@@ -8,6 +8,10 @@ that understands an owner's context, accepts outcome-based goals, plans and
 executes bounded work, continues across sessions, and verifies useful results.
 Its assistant, coding/build agent and extensible platform remain part of one
 product. See [ADR-0001](../adr/ADR-0001-personal-autonomous-agent.md).
+The product serves one individual owner. Personal work may involve the owner's
+workplace or organisational accounts, but Raiker does not become a tenant or
+staff-management application, and remote service administration never supersedes
+that owner's explicit authority.
 
 Autonomy means independently choosing and completing steps within delegated
 scope. It does not grant new capability permissions, change defaults, or

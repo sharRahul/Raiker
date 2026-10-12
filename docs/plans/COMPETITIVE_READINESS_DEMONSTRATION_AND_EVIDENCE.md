@@ -4,15 +4,16 @@
 
 **Status: accepted documentation direction, 2026-10-05; implementation and competitive validation remain separately evidenced.** The owner requested detailed demonstration and evidence requirements across `docs/plans/**`. This document is the canonical acceptance contract, not a second defect ledger and not a claim that Raiker matches any competitor.
 
-**Decision.** Assess Raiker against three complementary reference groups (personal-agent scope extended 2026-10-07):
+**Decision.** Assess Raiker against four explicit reference groups (Meta Muse made a separately testable competitor on 2026-10-12):
 
 | Reference group | Required dimensions |
 |---|---|
-| Muse.ai, Claude.ai personal-work surface | Durable goals, personal context, proactive work, confirmed cross-service outcomes and usable artifacts (PA-S01–PA-S06/08; CR-01/03/04/05/07/09–12) |
+| **Meta Muse personal AI agent** | Persistent personal goals, owner-aware suggestions, unattended background work, persistent isolated browser/secure VM, cross-app outcomes, delegated subagents/tools, scoped credentials, approvals, privacy and receipts (PA-S01–PA-S06/08; CR-01/03/04/05/07/09–12; RCD-10) |
+| Claude.ai / Cowork / ChatGPT Work | Personal assistant usability, project context, connected work and deliverables, scheduling and recovery; name the exact selected product surface (CR-01/03–05/09–12) |
 | OpenClaw, Hermes Agent | Agent autonomy, model/deployment flexibility, integrations, memory, scheduling, extensibility and operational control (CR-01–CR-07) |
-| Codex, Cursor, Claude | Coding quality, completed work, ease of use, recovery and overall polish (CR-08–CR-12) |
+| Codex, Cursor, Claude Code | Coding quality, completed work, ease of use, recovery and overall polish (CR-08–CR-12) |
 
-For coding comparisons, identify the exact Codex surface, Cursor mode and Claude Code release. Use the Claude app only for explicitly identified assistant/usability scenarios. A company or model family is not a sufficiently specific test subject. Product names here establish evaluation scope; they do not assert that each competitor supports every scenario.
+For Meta Muse comparisons, identify **the Muse personal agent** (not the Muse Wonder model family or Muse Code), client/device, account tier and available integrations. Meta announced Muse Wonder and Wonder Full on 2026-10-12; new models are not proof of a shipped personal-agent feature. For coding comparisons, identify the exact Codex surface, Cursor mode and Claude Code release. Use the Claude app only for explicitly identified assistant/usability scenarios. A company or model family is not a sufficiently specific test subject. Product names here establish evaluation scope; they do not assert that each competitor supports every scenario.
 
 **Reason.** Comparable source structures or passing edit helpers cannot establish autonomous completion, reliability or user experience. Competitors also implement governance. Raiker must demonstrate that its controls support useful completed work, alongside model choice and extensibility.
 
@@ -155,7 +156,7 @@ No credentials, tokens, private prompts or sensitive destination content belong 
 [PA-S01–PA-S08](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md#scenarios-to-demonstrate)
 add personal briefing, goal persistence, connector effects, proactive usefulness,
 isolated browser, reusable workflow, coding and channel continuity scenarios.
-Muse.ai and Claude.ai are now explicit personal-work references alongside
+Meta Muse and Claude.ai are explicit personal-work references alongside
 OpenClaw/Hermes; Codex/Cursor/Claude Code retain coding scope. Claude's current
 help pages describe a gradual unified experience and remote scheduling; record
 exact surface/plan/host and distinguish older local schedules.
@@ -164,7 +165,7 @@ Use the [reference source index](../architecture/REFERENCE_PLATFORM_COMPATIBILIT
 and [design adaptations](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#reference-ideas-and-raiker-adaptations).
 Apply all existing CR evidence rules, five-trial protocol and authority/privacy
 zero-tolerance checks. Run only supported equivalent scopes; file unavailable
-accounts/regions/models/effects as blocked or unsupported. No Muse or new Claude
+accounts/regions/models/effects as blocked or unsupported. No Meta Muse or new Claude
 comparison has been executed for this documentation update.
 
 
@@ -172,7 +173,7 @@ comparison has been executed for this documentation update.
 
 **Status: recommendations for owner acceptance; not an accepted DEC, an implemented feature, or a benchmark result.** Reviewed against Raiker §CR-01–12, PAA-01–12, current BUG/ADD ledgers and selected executable paths at baseline `23cb971c0065ceadb1ea4d49d3ffbbbb10a9dee3`. Record subsequent code changes before promoting any status. This section narrows decisions about the *next useful product outcomes*, not a second implementation backlog; existing BUG, PAA, ADD, DEC and release gates remain the authoritative work owners.
 
-**Source comparison:** Cursor [Cloud Agents](https://prod.cursor.com/help/ai-features/background-agents) and [Bugbot](https://cursor.com/docs/bugbot); OpenAI [Codex remote/worktrees/steering](https://developers.openai.com/blog/mastering-codex-remote-for-engineering) and [repository-specific review rules](https://developers.openai.com/blog/custom-code-review-rules-for-codex); Hermes [cron lifecycle, skill-bound scheduled jobs and delivery](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/) and [skills](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/creating-skills.md); Claude Code [subagents](https://code.claude.com/docs/en/sub-agents), [hooks](https://code.claude.com/docs/en/hooks) and [checkpointing](https://code.claude.com/docs/en/checkpointing); OpenClaw [architecture](https://docs.openclaw.ai/concepts/architecture) and [sandboxing](https://docs.openclaw.ai/gateway/sandboxing). These are public product descriptions, not matched live tests. Features may vary by plan, provider, version and host; the corresponding CR criterion controls competitive claims.
+**Source comparison:** **Meta Muse** [official personal-agent introduction](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [security and VM](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/), [product](https://ai.meta.com/muse/), and [Muse Wonder model release, 2026-10-12](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/); Cursor [Cloud Agents](https://prod.cursor.com/help/ai-features/background-agents) and [Bugbot](https://cursor.com/docs/bugbot); OpenAI [Codex remote/worktrees/steering](https://developers.openai.com/blog/mastering-codex-remote-for-engineering) and [repository-specific review rules](https://developers.openai.com/blog/custom-code-review-rules-for-codex); Hermes [cron lifecycle, skill-bound scheduled jobs and delivery](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/) and [skills](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/creating-skills.md); Claude Code [subagents](https://code.claude.com/docs/en/sub-agents), [hooks](https://code.claude.com/docs/en/hooks) and [checkpointing](https://code.claude.com/docs/en/checkpointing); OpenClaw [architecture](https://docs.openclaw.ai/concepts/architecture) and [sandboxing](https://docs.openclaw.ai/gateway/sandboxing). These are public product descriptions, not matched live tests. Features may vary by plan, provider, version and host; the corresponding CR criterion controls competitive claims.
 
 ### Decision gap triage (priority then effort)
 
@@ -186,6 +187,7 @@ comparison has been executed for this documentation update.
 | RCD-05: add outcome-validated review automation | P1 / M | Build already has diff review and a code-review skill; an independent continuously verified PR-quality gate was **not established** in this review | DEC-06, ADD-27, CR-08/09 | Precise review findings, reproducible checks, no duplicate noise, human-controlled fixes/merge |
 | RCD-06: unify owner-consented proactive triggers | P1 / M | `raiker/tasks/schedule.py` supports timezone-aware slots; PAA-04 event-backed intentions remain planned, and the scheduled executor is read-only | PAA-04, DEC-12/21a, BUG-339 | One lifecycle for time/event triggers, dedup, cooldown, budget and delivery |
 | RCD-07: prove memory freshness and correction | P1 / M | `raiker/memory/retrieval.py` preserves source/scope/trust metadata; the owner-facing explicit/inferred personal profile remains PAA-03 work | PAA-03, ADD-25, CR-04 | Relevant, sourced, updatable memory with safe forget propagation |
+| RCD-10: demonstrate Meta Muse-style personal-agent outcomes | P1 / M | PAA-01–08/10 define goals, context, proactivity, effects, secure browser and host continuity but remain planned; no Meta Muse matched live test | PAA-01/02/03/04/05/06/07/08/10, CR-01/03/04/05/07/09–12 | A useful goal finishes across trusted apps with durable progress, isolation, approval, verification and accessible handoff |
 | RCD-08: learn reusable procedures only after proof | P2 / M | Skill install/review surfaces exist; generating a skill from verified successful personal work is PAA-09 planned scope | PAA-09, ADD-05/06/21, CR-06 | A versioned suggestion that improves later performance without increasing permission |
 | RCD-09: remote continuity with honest host semantics | P2 / L | Local-first execution and selected SSH/Daytona adapters exist; general paired-device control/always-on personal agent is PAA-10/ADD-11 future work | PAA-10, ADD-11, DEC-20, CR-05/10/11 | A reachable owner-controlled host, scoped pairing and visible offline behavior |
 
@@ -270,6 +272,18 @@ comparison has been executed for this documentation update.
 **Rejected:** Automatically promoting every chat assertion to global profile truth; treating stale memories as source-of-truth; a hidden model-only “forget” instruction.
 
 **Acceptance:** Conflicting facts, changed timezone, wrong project, revoked source, deletion and restore cases. Measure contextual retrieval quality and latency on a frozen corpus; demonstrate that forbidden/forgotten facts do not reappear in summaries or generated tasks.
+
+### RCD-10 — Match Meta Muse on finished personal goals, not marketing features
+
+**Recommended decision:** Treat [Meta Muse](https://ai.meta.com/muse/) as a **first-class, separately named personal-agent competitor**. Its documented product journey includes persistent goals, proactive assistance, background continuation after closing an app, long-lived isolated browser/VM, cross-application actions, owner permissions and auditable actions. The agent should be compared to Raiker's personal-goal orchestration (PAA-01–08), while Muse Code and the newly announced Muse Wonder models remain separate products/model offerings and cannot stand in for the agent in a parity claim.
+
+**Why / code and product boundary:** Meta's [September 8 product introduction](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) describes the end-user agent and [engineering security description](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/) describes the Sentinel-enforced secure VM and separate credential handling. Meta's [October 12 Muse Wonder announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) newly claims Active Memory and Active Focus in its models; these are **model claims**, not measured performance of Muse personal-agent workflows. Raiker's durable-goal coordinator, user-editable context, proactive event triggers, browser executor, verified external effects and always-on pairing remain distinct planned PAA slices; a basic tool registry or memory index does not close those gaps.
+
+**Recommended implementation and integration direction:** Reuse the existing Raiker policy/broker, tasks, approvals, memory, connectors, event journal and budget/Stop controls. Build a small governed goal journey before introducing broad new integrations: goal acceptance/plan, personal-context lookup with provenance, background scheduler with truthful host readiness, safe read/plan via browser or connector, exact-effect human approval, destination read-back and a clear progress/receipt view. Compare authorization trade-offs explicitly: Raiker's local-first/owner-chosen models versus Meta's cloud-hosted Secure VM; neither architecture alone proves better security. A sensitive domain (finance, legal/health decisions, purchases) stays outside executable scope until independently approved; do not enable payment or credential-sharing features merely to mimic Muse.
+
+**Rejected:** Copying Meta's deployment/cloud data model into Raiker without owner choice; replacing exact approval with inferred intent; calling a model memory claim verified cross-session recall; treating browser click success as a confirmed provider effect; shipping unreviewed self-modifying tools; making all Muse capabilities a mandatory first-release blocker.
+
+**Evidence required:** Add an **explicit Meta Muse track** to PA-S01 (consented inbox/calendar briefing), PA-S02 (multi-day persistent goal), PA-S03 (connector create/read-back), PA-S04 (proactive monitor), PA-S05 (isolated browser), and PA-S08 (channel and offline continuity); include approvals, privacy, app closure/reopen, changed instructions, denied actions and host loss. For each scenario, pin Muse app/client/version/tier and Raiker SHA/model/host, same achievable fixture and independent success validator. Record permission prompts, provider receipts, completion quality, duration, interventions and cost where observable, with platform-side measurement gaps marked unknown. Run five trials where possible; use blocked/unsupported for unavailable Muse accounts/features, not invented results. Claims of parity or superiority need both products' real runs plus CR-01/03/04/05/07/09–12 scorecards. **No live Meta Muse run or benchmark was executed in this documentation change.**
 
 ### RCD-08 — Self-improvement is a suggested skill, never self-granted authority
 

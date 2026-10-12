@@ -761,6 +761,31 @@ export const api = {
   grantGitCredential: (scope: string, sessionId?: string) =>
     contract.grantGitCredential({ scope, session_id: sessionId ?? null }),
   revokeGitCredential: () => contract.revokeGitCredential(),
+  // ADD-27 — Settings → Connections → GitHub. Nothing here carries a secret back.
+  github: () => contract.getGithubConnection(),
+  githubDiscovery: () => contract.discoverGithubMethods(),
+  addGithubCredential: (method: "gh_cli" | "os_helper" | "ssh" | "app_installation", selector: string) =>
+    contract.addGithubCredential({ method, selector }),
+  selectGithubCredential: (credentialId: string) => contract.selectGithubCredential(credentialId),
+  checkGithubCredential: (credentialId: string) => contract.checkGithubCredential(credentialId),
+  disconnectGithubCredential: (credentialId: string) => contract.disconnectGithubCredential(credentialId),
+  startGithubSignIn: (method: "device" | "browser") => contract.startGithubSignIn({ method }),
+  pollGithubSignIn: (attemptId: string) => contract.pollGithubSignIn(attemptId),
+  cancelGithubSignIn: (attemptId: string) => contract.cancelGithubSignIn(attemptId),
+  refreshGithubRepositories: () => contract.refreshGithubRepositories(),
+  selectGithubRepository: (repositoryId: string, credentialId: string, selected: boolean) =>
+    contract.selectGithubRepository(repositoryId, { credential_id: credentialId, selected }),
+  createGithubDelegation: (body: {
+    repository: string;
+    operations: string[];
+    branch_pattern: string | null;
+    expires_in_hours: number;
+    max_actions: number | null;
+  }) => contract.createGithubDelegation({ ...body, note: null }),
+  revokeGithubDelegation: (delegationId: string) => contract.revokeGithubDelegation(delegationId),
+  configureGithubApp: (body: Parameters<typeof contract.configureGithubApp>[0]) => contract.configureGithubApp(body),
+  validateGithubApp: () => contract.validateGithubApp(),
+  removeGithubApp: () => contract.removeGithubApp(),
   // ── Reliable memory controls (backlog item 3) ────────────────────────
   // User-facing surface over the existing governed memory store. List carries
   // provenance/scope/sensitivity/confidence/retention + pin; forget reuses

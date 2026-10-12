@@ -73,7 +73,7 @@ describe("supported-preferences settings", () => {
     expect(within(secure).getByRole("button", { name: "Privacy" })).toBeVisible();
     // A setting belongs to exactly one group.
     expect(within(experience).queryByRole("button", { name: "Account" })).toBeNull();
-    for (const label of ["Web access", "Git credential", "Runtime configuration"]) {
+    for (const label of ["Web access", "GitHub", "Runtime configuration"]) {
       expect(within(runtime).getByRole("button", { name: label })).toBeVisible();
       expect(within(experience).queryByRole("button", { name: label })).toBeNull();
       expect(within(secure).queryByRole("button", { name: label })).toBeNull();
@@ -87,7 +87,8 @@ describe("supported-preferences settings", () => {
     // first of them is what a deep link lands on.
     ["personalisation", "Personalisation"], ["security", "Signing in and devices"],
     ["privacy", "Privacy"], ["account", "Account"], ["web-access", "Web access"],
-    ["git-credential", "Git credential"], ["runtime", "Runtime configuration"], ["updates", "Updates"],
+    // ADD-27 — the old Git credential link opens Settings → GitHub.
+    ["github", "GitHub"], ["git-credential", "GitHub"], ["runtime", "Runtime configuration"], ["updates", "Updates"],
   ])("renders the %s deep link with its named heading", async (tab, heading) => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab } });

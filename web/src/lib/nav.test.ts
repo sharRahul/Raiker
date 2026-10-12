@@ -137,6 +137,8 @@ describe("nav model", () => {
     // must keep working — a stale hash opens the right panel, never the
     // Workbench fallback.
     expect(routeFromHash("#/activity")).toBe("observe");
+    // ADD-27 — the old Git credential section opens Settings → GitHub.
+    expect(tabFromHash("#/settings?tab=git-credential")).toBe("github");
     expect(tabFromHash("#/activity")).toBe("activity");
     expect(routeFromHash("#/work")).toBe("observe");
     expect(tabFromHash("#/work")).toBe("work");

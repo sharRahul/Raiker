@@ -257,7 +257,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "privacy",
     "account",
     "web-access",
-    "git-credential",
+    "github",
     "runtime",
     "memory-engine",
     "updates",
@@ -321,6 +321,11 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   // is a section of Overview now.
   observe: {
     diagnostics: "overview",
+  },
+  // ADD-27 GH-19 — Settings → Git credential became Settings → GitHub; every
+  // link that named the old section opens the new one.
+  settings: {
+    "git-credential": "github",
   },
 };
 

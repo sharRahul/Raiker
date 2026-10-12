@@ -14,19 +14,22 @@
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
-  import GitCredential from "./settings/GitCredential.svelte";
+  import GitHubConnection from "./settings/GitHubConnection.svelte";
   import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
-  import { SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
+  import { SECTION_ALIASES, SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
   /** Group names in rail order, taken from the sections themselves (the Settings grouping). */
   const GROUPS = [...new Set(SECTIONS.map((section) => section.group))];
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
 
 
-  let active = $derived<string>(SECTIONS.some((section) => section.id === tab) ? tab : "general");
+  let active = $derived.by<string>(() => {
+    const wanted = SECTION_ALIASES[tab] ?? tab;
+    return SECTIONS.some((section) => section.id === wanted) ? wanted : "general";
+  });
   let settings = $state<Record<string, unknown>>({});
   let status = $state<{ vault: string; mfa_enrolled: boolean; username: string }>({
     vault: "missing",
@@ -384,8 +387,8 @@
       <Account {settings} {save} {status} />
     {:else if active === "web-access"}
       <WebAccess />
-    {:else if active === "git-credential"}
-      <GitCredential />
+    {:else if active === "github"}
+      <GitHubConnection />
     {:else if active === "memory-engine"}
       <MemoryEngine />
     {:else if active === "updates"}

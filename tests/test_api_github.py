@@ -64,7 +64,7 @@ def test_a_sign_in_attempt_belongs_to_the_session_that_started_it(api: tuple[Tes
     assert started["user_code"] == "WDJB-MJHT" and started["outcome"] == "pending"
     other = _second_session(client)
     refused = client.post(f"/api/github/sign-in/{started['attempt_id']}/poll", headers=other)
-    assert refused.status_code == 409 and refused.json()["detail"] == "github_sign_in_other_session"
+    assert refused.status_code == 409 and refused.json()["detail"]["reason_code"] == "github_sign_in_other_session"
     cancelled = client.post(f"/api/github/sign-in/{started['attempt_id']}/cancel", headers=h).json()
     assert cancelled["outcome"] == "cancelled"
 
@@ -90,7 +90,7 @@ def test_a_delegation_refuses_merge_and_is_listed(api: tuple[TestClient, dict[st
         json={"repository": "github.com/octo/demo", "operations": ["merge"], "branch_pattern": "raiker/*"},
         headers=h,
     )
-    assert refused.status_code == 422 and refused.json()["detail"] == "delegation_operation_not_delegable:merge"
+    assert refused.status_code == 422 and refused.json()["detail"]["reason_code"] == "delegation_operation_not_delegable:merge"
     made = client.post(
         "/api/github/delegations",
         json={"repository": "github.com/octo/demo", "operations": ["push"], "branch_pattern": "raiker/*", "max_actions": 3},

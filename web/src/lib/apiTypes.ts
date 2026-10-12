@@ -70,6 +70,14 @@ import type {
   FileProvenanceEntryView,
   GitCredentialGrant,
   GitCredentialStatus,
+  GitHubConnection,
+  GitHubCredentialView,
+  GitHubDelegationView,
+  GitHubDiscovery,
+  GitHubRiskView,
+  GitHubSignInAttempt,
+  GitHubAppValidation,
+  GitHubAppView,
   GuideIndex,
   GuideSection,
   GuideSectionSummary,
@@ -806,6 +814,18 @@ export type WebBlocklistProbe = BlocklistProbe;
 export type { GitCredentialGrant };
 
 export type { GitCredentialStatus };
+
+// ADD-27 — Settings → Connections → GitHub.
+export type {
+  GitHubAppValidation,
+  GitHubAppView,
+  GitHubConnection,
+  GitHubCredentialView,
+  GitHubDelegationView,
+  GitHubDiscovery,
+  GitHubRiskView,
+  GitHubSignInAttempt,
+};
 
 // ── BUG-305 — one answer to "what can Raiker read" ─────────────────────────
 // Two controllers, one inventory. `held` is the whole distinction and decides

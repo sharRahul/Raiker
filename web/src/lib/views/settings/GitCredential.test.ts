@@ -72,8 +72,9 @@ describe("Settings → Git credential", () => {
     await waitFor(() =>
       expect(screen.getByText("A scoped GitHub token")).toBeInTheDocument(),
     );
-    expect(screen.getByText(/Not this machine's credential manager/)).toBeInTheDocument();
-    expect(screen.getByText(/a credential nobody governed/)).toBeInTheDocument();
+    expect(screen.getByText(/Never this machine's credential manager by default/)).toBeInTheDocument();
+    // ADD-27 GH-21 — chosen deliberately, by username, and checked at each lend.
+    expect(screen.getByText(/checked against GitHub each time it is lent/)).toBeInTheDocument();
   });
 
   it("names the host list from the answer rather than from its own prose", async () => {

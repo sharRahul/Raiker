@@ -22,6 +22,7 @@ from pydantic import Field
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import require_human
+from raiker.api.refusals import refusal
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
@@ -58,7 +59,7 @@ def _http() -> GitHubHttp:
 
 
 def _fail(reason: str, code: int = status.HTTP_400_BAD_REQUEST) -> HTTPException:
-    return HTTPException(status_code=code, detail=reason)
+    return refusal(code, reason)
 
 
 # ── the connection as a whole ───────────────────────────────────────────

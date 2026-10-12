@@ -40,7 +40,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
   { id: "account", label: "Account", icon: "user", group: "Security & data" },
   { id: "web-access", label: "Web access", icon: "connections", group: "Developer & runtime" },
-  { id: "git-credential", label: "Git credential", icon: "branch", group: "Developer & runtime" },
+  // ADD-27 GH-19 — Settings → Connections → GitHub replaces "Git credential";
+  // the old deep link still opens it (SECTION_ALIASES).
+  { id: "github", label: "GitHub", icon: "branch", group: "Developer & runtime" },
   { id: "runtime", label: "Runtime configuration", icon: "system", group: "Developer & runtime" },
   // REM-MEM-03 — the recall engine's own configuration. Memory keeps the
   // owner's facts and the sentence that says whether recall matches meaning;
@@ -48,6 +50,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "memory-engine", label: "Memory engine", icon: "memory", group: "Developer & runtime" },
   { id: "updates", label: "Updates", icon: "refresh", group: "Developer & runtime" },
 ];
+
+/** Sections that were renamed: an old deep link opens the new one, never General. */
+export const SECTION_ALIASES: Readonly<Record<string, string>> = { "git-credential": "github" };
 
 const BY_ID = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]));
 
@@ -58,5 +63,5 @@ const BY_ID = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]))
  * differently from the rail (OPT-20).
  */
 export function settingsSection(id: string): SettingsSection | undefined {
-  return BY_ID.get(id);
+  return BY_ID.get(SECTION_ALIASES[id] ?? id);
 }

@@ -14,6 +14,12 @@
   import PageState from "../../components/PageState.svelte";
   import Icon from "../../components/Icon.svelte";
 
+  /**
+   * Inside Settings → GitHub, which carries the page heading itself and is told
+   * when the token or an approval changes, so its six states stay true.
+   */
+  let { embedded = false, onchanged }: { embedded?: boolean; onchanged?: () => void } = $props();
+
   let status = $state<GitCredentialStatus | null>(null);
   let loadError = $state<string | null>(null);
   let token = $state("");
@@ -49,6 +55,7 @@
       // is a token on screen.
       token = "";
       message = "Token stored. Git commands still need your approval each time.";
+      onchanged?.();
     } catch (error) {
       message = error instanceof ApiError ? "That does not look like a GitHub token." : String(error);
     } finally {
@@ -62,6 +69,7 @@
     try {
       status = await api.grantGitCredential(scope);
       message = null;
+      onchanged?.();
     } catch (error) {
       message = error instanceof ApiError ? error.message : String(error);
     } finally {
@@ -73,6 +81,7 @@
     busy = true;
     status = await api.revokeGitCredential();
     busy = false;
+    onchanged?.();
   }
 
   async function forget(): Promise<void> {
@@ -80,19 +89,22 @@
     status = await api.deleteGitCredential();
     message = "Token removed, and every approval that depended on it withdrawn.";
     busy = false;
+    onchanged?.();
   }
 
   onMount(load);
 </script>
 
 <section class="git-credential">
-  <header class="section-heading">
-    <h2>Git credential</h2>
-    <p>
-      The token Raiker uses to push. It is stored encrypted on this device and lent
-      to a single command at a time.
-    </p>
-  </header>
+  {#if !embedded}
+    <header class="section-heading">
+      <h2>Git credential</h2>
+      <p>
+        The token Raiker uses to push. It is stored encrypted on this device and lent
+        to a single command at a time.
+      </p>
+    </header>
+  {/if}
 
   {#if loadError}
     <PageState state="error" title="Couldn't load the git credential" detail={loadError} />
@@ -129,7 +141,7 @@
       <li class="card step">
         <h3><span class="step-number" aria-hidden="true">2</span> How it is supplied</h3>
         <p class="lead">
-          One supported method, and one that Raiker deliberately does not use.
+          This method, and why this machine's keychain is not used unless you choose it.
         </p>
         <ul class="methods">
           <li class="method supported">
@@ -146,12 +158,12 @@
           <li class="method declined">
             <Icon name="info" size="sm" />
             <div>
-              <strong>Not this machine's credential manager</strong>
+              <strong>Never this machine's credential manager by default</strong>
               <p>
                 A governed push clears whatever helper this machine has configured
-                before it runs. A keychain answers for whichever account signed in
-                last, which Raiker cannot name for you, cannot scope, and cannot
-                withdraw — so it would be a credential nobody governed.
+                before it runs, because a keychain answers for whichever account
+                signed in last. You can still choose a saved Git credential on the
+                GitHub page — by username, checked against GitHub each time it is lent.
               </p>
             </div>
           </li>

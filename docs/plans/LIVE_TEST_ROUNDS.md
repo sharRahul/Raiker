@@ -622,7 +622,7 @@ FIXED-762 to FIXED-775.
   with `invalid_event_type:task_resumed` — fixed as FIXED-765.
 * The damaged-index notice is inside *Runtime health, in detail*, not in *Needs
   your attention* — filed as
-  [BUG-322](TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold).
+  [BUG-322](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold).
 * Harness: the deletion-count regex met adjacent list items, the receipt
   assertion matched hidden route-scope text, and a retried loop scenario met the
   guard's own ten-minute window. Each fixed in the spec and re-run.
@@ -707,9 +707,9 @@ FIXED-750 to FIXED-761.
   captured *Working…* (FIXED-761); the Diagnostics step captured the overview
   because the passes sit under *Runtime health, in detail*. Both re-run.
 * Filed: the notification dock covers Chat's newest prompt
-  ([BUG-320](TO_BE_FIXED.md#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat)),
+  ([BUG-320](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn)),
   and Chromium's zone list spells some zones by their old names
-  ([BUG-321](TO_BE_FIXED.md#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones)).
+  ([BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones)).
 
 **What it could not prove.** Provider bodies past 32 MB and SSE lines past
 4 MB were not provoked from a real provider; the unit suite proves them against
@@ -871,7 +871,7 @@ left the list below the scrolled history). Captures:
 
 **Filed:** [BUG-316](TO_BE_FIXED.md#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in)
 (Build says *Working in* a project whose folder it does not work in) and
-[BUG-317](TO_BE_FIXED.md#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build)
+[BUG-317](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other)
 (the approval toast covers Build's own decision card).
 
 **What it could not prove.** Research references (FIXED-733) and image export of
@@ -1454,7 +1454,7 @@ ones run here.
 
 **Raised, not fixed.** On Approvals the notice dock still repeats the approval
 being reviewed and draws its *unread* link over the queue's header —
-[BUG-309](TO_BE_FIXED.md#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header).
+[BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing).
 
 **BUG-248, two more.** `review-readiness-probe-live` and
 `c17-b14-recall-and-inline-diff-live` now use the shared sign-in. Both signed in
@@ -1733,7 +1733,7 @@ what the round *observed*.
 **What it could not prove.** Nothing in this round needed a provider Raiker
 cannot reach from this host, so nothing was deferred. The two scenarios that
 have historically been blocked on egress — the weather provider
-([BUG-280](TO_BE_FIXED.md#bug-280--weather-and-the-environment-clock-are-unmeasured-against-a-real-provider-and-a-real-model))
+([BUG-280](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line))
 and the image providers
 ([BUG-287](TO_BE_FIXED.md#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider))
 — were not part of it and remain open for the same reason.
@@ -1744,7 +1744,7 @@ conversation library — rename, move, pin, archive, tags and bulk delete — is
 still in the inspector, because moving it needs the work index to grow a
 `pinned` and an `archived` facet first, and a control that cannot be undone
 from the surface it moved to is worse than one that has not moved. Filed as
-[BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector).
+[BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector).
 
 ## 2026-09-16 — One answer, wherever it is read back
 
@@ -1784,7 +1784,7 @@ in one round; it took a real model choosing to call a tool.
   turn's table as a table, from parts the server derived from the stored text
   with the same splitter. The governed events listed under it still quote the raw
   record, which is correct — and which is also
-  [BUG-302](TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload),
+  [BUG-302](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence),
   because four of them quote the *same* raw record instead of saying what each
   event did. `sessions-reopened-typed-answer.png`.
 * **A Knowledge Map with nothing in it says so.** No **Workspace** node, no **Add
@@ -1805,10 +1805,10 @@ in one round; it took a real model choosing to call a tool.
 **Three defects found by the round and filed:**
 [FIXED-550](FIXED_ITEMS.md#fixed-550--a-turn-that-wrote-anything-before-calling-a-tool-stored-a-different-answer-than-it-showed)
 (fixed in the round),
-[BUG-301](TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links)
+[BUG-301](FIXED_ITEMS.md#fixed-557--the-guides-own-cross-references-were-punctuation)
 — the guide's own chapter-to-chapter links render as literal text, visible in
 `guide-working-in-build.png` — and
-[BUG-302](TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload).
+[BUG-302](FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence).
 
 **Two things the harness learned.** A `viewMode` the server's preference
 allowlist did not name was accepted, dropped and returned at its default, which
@@ -2361,7 +2361,7 @@ moved to *1 of 14 connected*. **Test** answered with the provider's own refusal
 in words, with no `http_400` anywhere on the card —
 [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)
 holding on a fifth key it was not written against.
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 is blocked for a fifth time on the same missing workspace id, and the round said
 so and proved the things that do not need a turn.
 
@@ -2426,7 +2426,7 @@ destination.**
 round is identity-linked like the previous three: `/v1/models` answers `400`
 *"not scoped to a workspace"* and `/v1/organizations/workspaces` answers `403`,
 so the workspace id is again not recoverable from the credential.
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 is blocked for a fourth time on the same missing value, and the round said so and
 moved on rather than attempting the three model-dependent scenarios blind.
 
@@ -2758,7 +2758,7 @@ making a scenario test the wrong thing:
   is also the path an owner takes.
 * **Sign-in waited for a first-run heading**, so a workspace the round had
   already configured could never be signed into a second time. That is
-  [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace)
+  [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in)
   behaving as recorded; the helper now waits for the navigation rail, which is
   what "there is a session here" actually means.
 * **Two locators matched hidden elements** — a project name inside a `<select>`
@@ -2849,7 +2849,7 @@ have the same limitation and are recorded in
 [`TO_BE_FIXED.md`](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport).
 
 Sign-in against a workspace an earlier spec had already configured failed twice
-during this round, which is [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace)
+during this round, which is [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in)
 behaving exactly as recorded rather than a new defect. Each spec was given its
 own empty workspace.
 
@@ -3708,7 +3708,7 @@ day's work. Three genuine mobile bleeds, each needing *content* to exist:
 
 The morning run had none of them because the workspace had no memory and no
 indexed model. **A responsive check against an empty page is a check of the empty
-state.** That is the layer under [BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs):
+state.** That is the layer under [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject):
 not that a spec can re-run against a used workspace, but that running against one
 finds what an empty one hides. Closed as
 [FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything).
@@ -3728,7 +3728,7 @@ this repository.
    A destination was added through **Observability → Overview**, put on **Hourly**
    through the select on its own card, and the card then read *"Next in 58m"*.
    Setting it back to **On demand only** cleared the claim. The interface outcome
-   [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+   [BUG-276](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button)
    required is met: the card states which of the two it is on, always. Evidence:
    `bug-276-delivery-cadence.png`. Closed as
    [FIXED-386](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button).
@@ -3802,10 +3802,10 @@ this repository.
   strict-mode violation naming four elements; and a missing network precondition
   reported as a three-minute timeout on a click. All three are recorded under
   [BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
-  and [BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs).
+  and [BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject).
 
 **What it could not run, for the third round in a row.** The three scenarios of
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 need a model to answer, and this round's key is identity-linked like the last
 two. `/v1/organizations/me`, `/v1/organizations/workspaces` and
 `/v1/organizations/api_keys` all answer it `403`, so the workspace id is again
@@ -3905,7 +3905,7 @@ appears in this repository.
 and authenticating needs the workspace id itself, which only the key's owner has
 — and the key cannot be asked for it: `/v1/organizations/*` answers a key of this
 kind with `403`.
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 stays open for that reason, unchanged: it is waiting on a value, not on code.
 
 **Screenshots:** [`screenshots/widths/`](screenshots/widths) — every route at 390
@@ -3956,7 +3956,7 @@ dialog. No key appears in this repository.
 
 **What it could not prove.** A real provider *turn* on this key: authenticating
 still needs the workspace id itself, which only the key's owner has.
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 stays open for that reason and is now waiting on a value rather than on a
 product change.
 

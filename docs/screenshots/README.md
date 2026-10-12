@@ -113,7 +113,7 @@ round record is in
 | Capture | What it is evidence for |
 |---|---|
 | `export-review-declared-parts.png` | The export review naming the tables and charts the file will carry, before a format is chosen ([FIXED-551](../plans/FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else)) |
-| `sessions-reopened-typed-answer.png` | A turn reopened from the record rendering its declared table as a table — and the governed events beneath it still quoting the raw record, which is [BUG-302](../plans/TO_BE_FIXED.md#bug-302--four-audit-summaries-quote-the-whole-answer-including-a-payload) |
+| `sessions-reopened-typed-answer.png` | A turn reopened from the record rendering its declared table as a table — and the governed events beneath it still quoting the raw record, which is [BUG-302](../plans/FIXED_ITEMS.md#fixed-558--four-events-describing-themselves-with-one-borrowed-sentence) |
 | `knowledge-map-empty-state.png` | A map with nothing in it saying so, instead of three placeholder records ([FIXED-552](../plans/FIXED_ITEMS.md#fixed-552--a-brand-new-knowledge-map-was-given-three-records-nobody-had-made)) |
 | `knowledge-map-list-view.png` | The same records as a list, with the canvas hidden and the simulation stopped ([FIXED-553](../plans/FIXED_ITEMS.md#fixed-553--reading-the-knowledge-map-required-reading-a-moving-picture)) |
-| `guide-working-in-build.png` | Build opening the chapter the product had been shipping and could not reach — and, visible in the prose, [BUG-301](../plans/TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links) |
+| `guide-working-in-build.png` | Build opening the chapter the product had been shipping and could not reach — and, visible in the prose, [BUG-301](../plans/FIXED_ITEMS.md#fixed-557--the-guides-own-cross-references-were-punctuation) |

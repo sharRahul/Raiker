@@ -24,7 +24,11 @@ Add durable goal coordination around existing tasks and ordinary gateway turns.
 Preserve owner-controlled models, local-first operation, machine identity,
 policy/broker authority, monitored security and equal client status. Personal
 context, proactivity and learning are governed capabilities, never grants.
-Coding remains a first-class personal-agent workflow.
+Coding remains a first-class personal-agent workflow. Raiker's product identity
+is the **single-owner personal AI agent**, rather than an organisation-managed
+application. The owner may still connect workplace accounts, GitHub organisations
+and hosted services; these are resources under their individual permissions,
+not a separate organisational administration model.
 
 ## Options considered
 

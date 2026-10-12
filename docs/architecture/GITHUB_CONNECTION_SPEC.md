@@ -1,6 +1,6 @@
 # GitHub Connection Specification
 
-> **Status: Architecture Accepted / Implementation Planned — 2026-10-12.**
+> **Status: Architecture Accepted / Implementation Partly Delivered — 2026-10-12.** The code-backed §18 inventory confirms sign-in, credential methods, GitHub App flow, repository delegations and the Settings journey as implemented in stated scopes; BUG-337/338/339 and real-GitHub RR-38…RR-41 evidence remain open. The managed App needs operator registration and a trusted credential service. Do not interpret implemented-against-stand-ins as externally verified.
 > This document holds the protocol and contract detail behind the
 > [DEC-21b amendment](../plans/RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication).
 > The decision record owns *what was decided and why*; this specification owns

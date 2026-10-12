@@ -902,6 +902,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-878](#fixed-878--the-mcp-secrets-box-closed-under-the-field-being-typed-into) | Low | MCP / interface | Fixed 2026-10-11 — found by the live round |
 | [FIXED-879](#fixed-879--the-mcp-card-and-the-runtime-card-printed-raw-iso-times) | Low | Interface / dates | Fixed 2026-10-11 — found by the live round |
 | [FIXED-880](#fixed-880--the-web-client-did-not-load-over-plain-http-to-a-lan-address) | High | Interface / start-up | Fixed 2026-10-11 — found by the Web UI workflow |
+| [FIXED-881](#fixed-881--two-threat-models-described-the-github-credential-and-connector-as-they-were-before-the-vault-and-before-writes) | Low | Documentation / threat models | Fixed 2026-10-12 — found reviewing DEC-21b |
 
 ---
 
@@ -32804,4 +32805,28 @@ every context has, in the same `web-` and sixteen hex digits form.
 
 **Evidence.** `controlSequence.test.ts` loads the client with no `randomUUID`
 and fails without the fix; the mocked end-to-end suite passes.
+
+## FIXED-881 — Two threat models described the GitHub credential and connector as they were before the vault and before writes
+
+**Severity: Low. Area: Documentation / threat models. Status: Fixed 2026-10-12 — found reviewing the code for the DEC-21b amendment.**
+
+**Observed.** `docs/threat-models/connectors-github.md` was titled *Read-Only
+Connector* and said comment and modify actions were "deliberately **not
+implemented**", while `github_write` (`create_comment`, `create_pull_request`,
+approval-required) has shipped since B11. `docs/threat-models/git-push.md`
+named `RAIKER_GITHUB_TOKEN` as the only push credential, though RAIKER-2022 had
+moved it into the vault and lent it under grants. The permissions guide said a
+push needs `RAIKER_GITHUB_TOKEN` set, contradicting the Build guide.
+
+**Fixed.** The connector page describes reads and the two approval-gated
+writes, states that it still uses the environment token and not the broker, and
+points to the planned shared broker (ADD-27 GH-56); its index row is renamed.
+The push page describes the vault credential, the grant, the legacy variable and
+the three defects found with it (BUG-334, BUG-335, BUG-336). The permissions
+guide and both known-limits pages say what a push needs today.
+
+**Evidence.** Code read on 2026-10-12: `raiker/models/tool_registry.py`
+(`github_write`), `raiker/runtime/executors/connectors.py`,
+`raiker/runtime/git_credential.py`, `raiker/runtime/executors/tier1_git.py`;
+the documentation link check passes.
 

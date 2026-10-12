@@ -91,6 +91,19 @@ end contract.
 
 ## What blocks a public first release
 
+> **Decision status, 2026-10-12. DEC-21b amended — no longer waiting on an
+> OAuth client ID.** The owner replaced the GitHub.com OAuth-application
+> prerequisite with a hybrid architecture: an operator-registered GitHub App for
+> managed use, and explicitly selected, brokered local methods (gh CLI,
+> credential manager, SSH, fine-grained token) that need no registration
+> ([amendment](#dec-21b-amendment-2026-10-12--hybrid-github-authentication)).
+> It is Architecture Accepted / Implementation Planned, not implemented; the
+> tasks are [ADD-27](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)
+> and the scenarios RR-37…RR-41. The code review behind it filed BUG-334
+> (High), BUG-335 and BUG-336, which are now the first work on the Git push
+> path. Earlier notes below that list DEC-21b as waiting on the owner are
+> history.
+>
 > **Implementation status, 2026-10-11. Fourteen more decision-record steps
 > closed.** DEC-14 step 4: a re-sent provider event is one message
 > ([FIXED-844](FIXED_ITEMS.md#fixed-844--a-re-sent-channel-update-was-a-second-message-and-started-a-second-turn)); step 8: a channel's and the host's inbound budgets behind the
@@ -1474,7 +1487,7 @@ vertically complete slice that has an honest UI and a fully enforcing backend.
 | DEC-18 | Adopt without behavior changes | P1/P2 | Large-view decomposition and contract generation |
 | DEC-19 | Adopt as release gate | P1 | Accessibility, responsive, empty/error and evidence coverage |
 | DEC-20 | Defer pending explicit owner decision | P3 | Multi-user/team mode and paired device expansion |
-| DEC-21 | Adopt incrementally; section 13.3 | P1/P2 | Detailed General, Notifications, Personalisation, Web access, Git and Updates contracts |
+| DEC-21 | Adopt incrementally; section 13.3 | P1/P2 | Detailed General, Notifications, Personalisation, Web access, Git and Updates contracts; DEC-21b amended 2026-10-12 (hybrid GitHub authentication, ADD-27) |
 | DEC-22 | Adopt in scoped slices; section 13.4 | P1/P2 | Session steering, compaction, search, TUI and delegation |
 | DEC-23 | Adopt after boundary verification; section 13.5 | P2/P3 | Extension lifecycle, learning, migration and contributed UI |
 | DEC-24 | Adopt; section 13.6 | P1 | Operational recovery, resource budgets, diagnostics and backup |
@@ -2575,6 +2588,22 @@ symbols and tests rather than relying on line numbers that drift after edits.
 
 ## 13.3 DEC-21 — Complete the smaller Settings-page contracts
 
+> **2026-10-12.** DEC-21b is amended and now reads **Architecture Accepted /
+> Implementation Planned**: the notes below that say it waits on the owner's
+> OAuth client ID or registered application are superseded. The managed
+> integration is an operator-registered GitHub App; local and self-hosted
+> methods need no registration
+> ([amendment](#dec-21b-amendment-2026-10-12--hybrid-github-authentication),
+> [specification](../architecture/GITHUB_CONNECTION_SPEC.md),
+> [ADD-27](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)).
+> Reviewing the Git credential code for it found three defects: a token stored
+> in Settings cannot carry a proposed push
+> ([BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings)),
+> a *this session* grant reaches every session
+> ([BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session)),
+> and a push is not bound to the approved commit
+> ([BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved)).
+>
 > **2026-10-05.** General's preview now states the UTC offset ([FIXED-756](FIXED_ITEMS.md#fixed-756--the-time-zone-was-a-name-and-a-short-name-is-ambiguous)), and Web
 > access's check says why in words, names the rule and which of the three lists
 > holds it, and no longer calls a name that does not resolve "private" ([FIXED-759](FIXED_ITEMS.md#fixed-759--a-web-access-check-printed-a-reason-code-and-called-a-name-that-does-not-exist-private)).
@@ -2634,6 +2663,12 @@ OAuth provider scope. This acceptance does not mark either feature implemented
 or verified. Preserve current settings and behavior until the implementation
 and migration contracts below are delivered.
 
+**Amendment, 2026-10-12.** The owner amended DEC-21b: GitHub connection is a
+hybrid of an operator-registered GitHub App and explicitly selected local
+methods, and a registered OAuth application is no longer a prerequisite for
+GitHub operations. DEC-21a is unchanged. See the
+[DEC-21b amendment](#dec-21b-amendment-2026-10-12--hybrid-github-authentication).
+
 ### DEC-21a — Quiet hours are quiet unless the owner chooses an exception
 
 > **Verified 2026-10-05.** Implemented as [FIXED-776](FIXED_ITEMS.md#fixed-776--quiet-hours-were-a-promise-nothing-could-keep) (policy, stored decision,
@@ -2686,6 +2721,16 @@ state/deduplication work; it is not already supplied by the current in-memory se
 
 ### DEC-21b — Start Git OAuth with GitHub.com and keep the existing grant boundary
 
+> **Amended 2026-10-12 — Architecture Accepted / Implementation Planned.**
+> The owner amended this decision: a registered OAuth application and its
+> Client ID are no longer a prerequisite for GitHub operations. The preferred
+> managed integration is an operator-registered GitHub App; local Git, gh CLI,
+> credential-manager, SSH and PAT methods work without it, each explicitly
+> selected and brokered. GitHub.com-first, the PAT fallback and the grant
+> boundary below are preserved. The text below is the 2026-10-05 decision,
+> kept as history; the [amendment](#dec-21b-amendment-2026-10-12--hybrid-github-authentication)
+> follows it and governs where they differ.
+
 **Accepted decision.** Scope the first OAuth integration to **GitHub.com**.
 Retain the current GitHub token fallback. Defer GitLab.com, Bitbucket Cloud,
 Azure DevOps and self-hosted/enterprise forge endpoints to separate provider
@@ -2734,6 +2779,117 @@ acceptance closes both pending product decisions. Engineering must implement
 the contracts and supply their acceptance evidence before either is marked
 Verified; additional providers or changed quiet-hour defaults require an
 explicit amendment to these decisions.
+
+#### DEC-21b amendment 2026-10-12 — Hybrid GitHub authentication
+
+**Amendment record.** Rahul Sharma, acting as product owner, instructed this
+amendment on 2026-10-12 and set its decisions (A–Q below) as mandatory; this
+record finalises them. Roles under §13.9: product owner — decisions; security
+reviewer — §11 and §15 of the specification before Wave 2 code merges;
+engineering — ADD-27 tasks; QA — RR-37…RR-41. **Status: Architecture Accepted /
+Implementation Planned.** It is not Implemented or Verified: the code review
+below found no OAuth or GitHub App code, and a real App registration and live
+sign-in evidence are prerequisites for verifying the managed integration.
+
+**What is preserved.** GitHub.com is the first and only provider until a
+separate adapter decision; the fine-grained personal access token stays
+supported; the grant boundary (300 s once, 3600 s session, host-scoped helper,
+inherited helpers cleared, per-operation approval, revocation) stays and is
+narrowed, never widened; other forges and enterprise hosts stay deferred.
+
+**What changes.** The original text made the first OAuth integration wait for a
+"registered GitHub OAuth application, whose client identity is the owner's to
+supply" (status notes of 2026-10-05 and 2026-10-10 above). That is **no longer
+a prerequisite for GitHub operations in general**. The preferred managed
+integration is a **GitHub App** the product operator registers once; local
+Git, the gh CLI, an OS credential-manager entry, SSH and personal access tokens
+work without it, each explicitly selected and brokered; self-hosted operators
+may bring their own App. Ordinary users never register applications or handle
+Client IDs.
+
+**Contracts and tasks.** Protocol detail is in the
+[GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md);
+tasks, priorities, effort, dependencies and acceptance evidence are
+[ADD-27](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)
+GH-01…GH-61; end-to-end scenarios are
+[RR-37…RR-41](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md#h-github-connection-and-repository-authority--dec-21b);
+three defects found while reviewing the code are
+[BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings),
+[BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session) and
+[BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved).
+
+**Provider facts.** GitHub's behaviour was checked on 2026-10-12 against the
+`github/docs` source at commit `be38ec5` because `docs.github.com` itself could
+not be reached from the review environment; the specification's §2.1 lists
+each fact with its page, and §2.2 separates it from what is taken from Codex
+and Claude Code, which is their visible experience only.
+
+| ID | Decision | Reason | Rejected alternative | Specification |
+|---|---|---|---|---|
+| DEC-21b-A | The managed integration is an official **Raiker GitHub App**, registered and maintained by the operator: installer-selected repositories, fine-grained permissions, user sign-in, one-hour installation tokens, Git and API authentication, optional verified webhooks, renewal and revocation. Installing it authorises no Git operation | GitHub prefers Apps for exactly these properties and for automation (P1–P3) | An OAuth App (broad scopes, every repository the user can reach, non-expiring tokens) | §3, §4, §5 |
+| DEC-21b-B | **Local first.** Local repository work needs no GitHub connection. Remote authentication is by App user sign-in, explicitly selected gh CLI sign-in, an explicitly selected credential-manager entry, a governed SSH identity, or a fine-grained PAT. **Detection is not consent**: a detected credential is used only after selection and verification of account, repository, host, permission and operation, and only through the broker | Local coding assistants work with the existing Git setup; requiring OAuth first would break the local-first model. Inheriting helpers is why FIXED-578 cleared them | Unrestricted inheritance of helpers, SSH agents or environment | §5, §10, §11 |
+| DEC-21b-C | **Managed cloud** uses the official App. User access token, installation access token and Raiker execution grant are three identities, never interchangeable. Installation tokens are minted only by a trusted credential service, narrowed by repository id and permission, when needed. Private keys, client secrets and refresh tokens never enter prompts, model context, repository files, untrusted subprocesses or distributable packages | Cloud work cannot borrow the user's machine, and an installation must not become standing authority for a model | One long-lived token per user or installation shared across tasks | §4, §5, §10 |
+| DEC-21b-D | **Self-hosted** works without any Raiker-hosted service: local methods through the local broker, or an administrator's **bring-your-own GitHub App** (App ID, Client ID, private-key and client-secret references, callbacks, installation ids, webhook secret, host contract, storage, rotation, validation) — deployment configuration, not user onboarding. No private key ships in any distribution | Open-source and self-hosted use must not depend on the operator | Requiring the official hosted service | §3.1 |
+| DEC-21b-E | **Flow per environment.** Browser authorisation code with `state` and PKCE S256 where a server holds the client secret; the **device flow** for the desktop release and terminal/headless hosts, which GitHub recommends for desktop apps and CLIs and which needs no client secret for sign-in or refresh. Fixed endpoints, exact redirects, no wildcards, one-time codes, ten-minute attempts bound to the starting session, cancellation, polling limits, encrypted storage, rotation, re-authentication and account switching. Installation, user authorisation and token creation are separate states. The App still has a Client ID: the operator publishes it; users never supply one | GitHub requires the client secret for code exchange and for refreshing browser-flow tokens (P6, P7) and says a public client cannot protect it (P10); the owner's rule keeps it out of distributables | Shipping the client secret with PKCE in the desktop build (GitHub's own suggestion for public clients) — declined by owner rule; recorded in §19 | §6 |
+| DEC-21b-F | **Least privilege.** The official App requests Metadata, Contents read/write, Pull requests read/write and Issues read; Workflows, Administration and deletion are excluded and need their own approval and permission request. GitHub's permissions are the outer limit; Raiker never implies a user can raise them | Permissions are a maximum external boundary; Raiker adds its own narrower one | Requesting broad permissions up front to avoid later approval prompts | §8 |
+| DEC-21b-G | **Repository-bound.** Every credential-backed operation carries principal, account, installation, repository id (authoritative) and name, host, operation, permission, environment, approval/delegation reference and expiry; identity and permission are re-checked before consequential operations; renames, transfers, uninstalls and permission changes never redirect authority | Names change; ids do not (P17) | Binding by `owner/name` | §9 |
+| DEC-21b-H | **Extend the broker.** `GitCredentialBroker` becomes provider-aware (PAT, App user, installation, gh CLI, credential manager, SSH) with separate discovery, selection, storage, issuance, lending, revocation and audit contracts; every current guarantee is kept; existing token deployments keep working | The broker's tested guarantees (FIXED-578, FIXED-826, the grant tests) are the asset | A new GitHub service beside it | §10, §17 |
+| DEC-21b-I | **Authentication is not authorisation.** Connecting authorises nothing; capability gates, decision modes, policy and approvals govern every consequential operation; twelve operations have distinct risk classes; GitHub permission, Raiker authority and human approval are three layers; a session grant is limited to its operation and target | Prevents a sign-in from becoming write access | Treating installation or sign-in as consent | §8.2 |
+| DEC-21b-J | **Delegated autonomy.** Long-running repository work runs under an explicit, stored, repository-bound delegation; a read grant never writes, a branch grant stays on its branch, a PR grant never merges, a scheduled task never creates authority, a resumed task revalidates, a child never exceeds its parent, an agent never approves its own escalation; what was authorised and what ran are reconstructible | Lets autonomous work proceed without repeated prompts for an unchanged action, without inventing authority | Standing grants covering Git writes generically | §12 |
+| DEC-21b-K | **Credential delivery** keeps secrets out of model context and command lines, injects short-lived credentials through the broker's helper or header, and addresses environment inheritance, helper substitution, `insteadOf`, push URLs, submodules, redirects, malicious config, hooks, SSH host keys and agent identities, cross-repository access, logs and prompt injection. API host policy and Git transport host policy are separate. A method whose controls cannot be enforced is unavailable | Each item is a known route by which a credential escapes its governed use | Best-effort controls with silent fallback | §11 |
+| DEC-21b-L | **Lifecycle**: initial authentication, validation, storage, issuance, refresh, expiration, GitHub-side and Raiker-side revocation, disconnect, re-authentication, account switching, uninstallation, permission removal. Installation tokens one hour; user tokens eight hours with a six-month refresh token where expiry is enabled; not every credential refreshes; failures fail closed with the right recovery action; disconnect ends local lending at once and reports provider revocation truthfully; nothing revoked returns through a restore | Raiker's grants are shorter than GitHub's tokens and enforced independently | Relying on GitHub expiry alone | §7 |
+| DEC-21b-M | **One model for Chat, Build and agents.** The push path and the API connector stay separately governed; the connector moves onto the shared broker for credential selection and lending only (GH-56). The connector does **not** use the broker today | One connection, not one integration per feature | A separate GitHub sign-in per surface | §13 |
+| DEC-21b-N | **Settings → Connections → GitHub**, organised by intent: Connect GitHub, use GitHub CLI sign-in, use a saved Git credential, configure SSH, use a PAT, custom GitHub App (advanced, self-hosted), repositories, permissions, disconnect. Six states shown separately, never one *Connected*; named recovery for each failure | Users choose what they want to do, not a protocol | Exposing Client IDs, App IDs or token kinds in normal onboarding | §14 |
+| DEC-21b-O | **Per-distribution requirements**: local source needs no App; the desktop release publishes the official Client ID only (no private key, no client secret) and does not imply installation tokens; managed cloud needs the registration, server-side credentials, callbacks, brokerage and installation mapping, verified before it is offered; self-hosted needs nothing hosted. Nothing unrelated waits on the App | Different distributions can hold different secrets | One configuration for all | §3 |
+| DEC-21b-P | **Audit** records non-secret metadata for every security-relevant GitHub event and never a token, key, code, verifier, header or credentialled URL; webhooks are signature-verified, deduplicated, mapped to an installation and treated as untrusted data | Reconstructability without a secret sink | Logging request bodies | §15, §16 |
+| DEC-21b-Q | **Additive migration**: the stored PAT keeps working and is referenced, not moved; nothing is deleted without consent; APIs change only additively or versioned; grant durations, revocation and push approval semantics are kept; no silent credential replacement or permission upgrade; revoked authority cannot return by rollback; implemented compatibility is kept apart from proposed behaviour | Existing deployments must not break or silently change authority | Replacing `github_token` with a new store in one step | §17 |
+
+**Code evidence (reviewed at `fef79d0`).** Implemented and kept: vault token
+`github_token` and the legacy `RAIKER_GITHUB_TOKEN` (`raiker/runtime/git_credential.py`);
+once/session grants with expiry on read, supersession, revocation and last use
+(`raiker/storage/stores/approvals.py`, migrations RAIKER-2022 and RAIKER-2097);
+the inline helper that answers only `get` for `CREDENTIAL_HOSTS` and the empty
+`credential.helper` that clears inherited ones; `git remote get-url --push`
+resolution, HTTPS-only, URL-credential refusal, hooks disabled and a constructed
+environment for the push (`raiker/tools/git.py`); `git_push` high-risk,
+approval-required, non-delegable under `git_push_execution`
+(`raiker/models/tool_registry.py`); approvals re-governed at execution by the
+relay. Missing: OAuth, PKCE, device flow, GitHub App, JWT, installation tokens,
+account identity, clone/fetch, SSH for Git, gh CLI and credential-manager
+selection, credential events, revocation journalling across restore, and the
+API connector's use of the broker (`raiker/runtime/connectors.py` reads the
+environment only). Defects: BUG-334, BUG-335, BUG-336. The full classification
+is the specification's [gap table](../architecture/GITHUB_CONNECTION_SPEC.md#18-current-implementation-gap-analysis).
+
+**Definition of done for *Architecture Accepted / Implementation Planned*.**
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | Owner decisions documented | Done — A–Q above |
+| 2 | Each requirement has a reason and selected design | Done — table above and specification |
+| 3 | Rejected alternatives and trade-offs | Done — table above and specification §19 |
+| 4 | Implementation dependencies | Done — ADD-27 *Depends on* column |
+| 5 | Existing code reviewed for compatibility | Done — code evidence above |
+| 6 | Every gap classified implemented / partial / missing / blocked | Done — specification §18 |
+| 7 | Tasks with priority, effort, dependencies, acceptance | Done — ADD-27 |
+| 8 | Security controls and credential flows | Done — specification §6, §10, §11 |
+| 9 | Unambiguous UI/UX requirements | Done — specification §14 |
+| 10 | Release acceptance and live-testing scenarios | Done — RR-37…RR-41 and specification §20 |
+| 11 | Related documentation consistent | Done 2026-10-12 — see the commit that carries this amendment |
+| 12 | No owner decision left open without an external prerequisite | Done — the only external prerequisites are the operator's App registration (GH-30), a trusted credential service deployment, and consented test accounts; none blocks local functionality |
+
+**External prerequisites, not blockers.** The official App registration and
+its secret store; a trusted credential service for managed cloud (and for an
+optional desktop browser sign-in); consented GitHub test accounts and
+repositories for live evidence. Local Git, PAT, gh CLI, credential-manager and
+SSH work (Wave 1) depends on none of them.
+
+**Remaining technical questions** (engineering, not owner decisions) are listed
+in the specification's
+[§21](../architecture/GITHUB_CONNECTION_SPEC.md#21-external-prerequisites-and-open-technical-questions):
+loopback ports for GitHub App callbacks, revoking a device-flow token without
+the client secret, the stateless installation-token shape, gh CLI account
+selection, and non-interactive credential-manager queries.
 
 ## 13.4 DEC-22 — Session steering, compaction and delegation
 
@@ -3942,7 +4098,7 @@ References: [plan authority](README.md#decision-recording-policy--2026-10-05),
 
 **Release decision.** Before a candidate run, declare supported configurations, in-scope scenarios, owners/reviewers, budgets and thresholds. Require end-to-end evidence for in-scope user promises; document any accepted exception and narrow the claim. Competitive comparisons additionally require named product versions, identical task goals/validators, all trials and disclosed model/configuration differences. Missing competitive evidence prohibits a parity assertion; it does not silently make every competitor feature a release blocker. Existing security and product gates remain authoritative.
 
-**Sign-off record.** For each CR criterion link its owning DEC/BUG/ADD, implementation revision, evidence record, residual gap, reviewer/date and permitted claim. No closure or owner implementation sign-off is created by this documentation amendment. Quiet-hours and Git OAuth decisions already accepted in DEC-21a/b remain unchanged.
+**Sign-off record.** For each CR criterion link its owning DEC/BUG/ADD, implementation revision, evidence record, residual gap, reviewer/date and permitted claim. No closure or owner implementation sign-off is created by this documentation amendment. Quiet-hours and Git OAuth decisions already accepted in DEC-21a/b remain unchanged by this amendment; DEC-21b was later amended on 2026-10-12 by its own dated record.
 
 ## Personal-agent release scope extension — 2026-10-07
 
@@ -3959,7 +4115,7 @@ activate deployments or convert historical evidence into competitive proof.
 
 Implementation of PAA items is not sufficient for release. The
 [release acceptance protocol](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) defines
-RR-01–RR-36, independent expected outcomes, certified configuration coverage,
+RR-01–RR-41, independent expected outcomes, certified configuration coverage,
 security/privacy negative cases, five clean model-driven trials, 72-hour soak,
 first-use/accessibility and explicit GO/NO-GO gates. Existing DEC decisions and
 live records retain their scope; no prior result is upgraded to a release pass.

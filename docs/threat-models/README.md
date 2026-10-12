@@ -87,7 +87,7 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 | Capability | Threat model |
 |---|---|
 | `external_channel_runtime`, `channel_approval_relay` | [Reference channel](channels.md) |
-| `connector_github_runtime` | [GitHub read-only connector](connectors-github.md) |
+| `connector_github_runtime` | [GitHub connector (reads and approval-gated writes)](connectors-github.md) |
 | `connector_gmail_runtime` | [Gmail read-only connector](connectors-gmail.md) |
 | `connector_gcal_runtime` | [Google Calendar read-only connector](connectors-gcal.md) |
 | `connector_slack_runtime` | [Slack read-only connector](connectors-slack.md) |

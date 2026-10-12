@@ -134,6 +134,9 @@ names.
 | [BUG-331](#bug-331--setups-model-step-waits-on-every-providers-check-before-it-shows-anything) | Low | First run / Models | Open — found 2026-10-11; about five seconds of *Preparing your setup…* on a reload |
 | [BUG-332](#bug-332--setup-calls-an-identity-linked-anthropic-key-connected-and-offers-models-it-cannot-list) | Low | First run / Models | Open — found 2026-10-11; the key is stored, the workspace ID is missing, and the recommendation says *choose one of its models* |
 | [BUG-333](#bug-333--a-stopped-openai-compatible-stream-records-no-usage) | Low | Models / usage | Open — found 2026-10-11 closing FIXED-872; those providers report usage only when the stream ends |
+| [BUG-334](#bug-334--a-push-proposal-ignores-the-token-stored-in-settings) | High | Build / Git push | Open — found 2026-10-12 reviewing DEC-21b; with the token only in the vault, every proposed push is refused as `push_credential_unset` naming `RAIKER_GITHUB_TOKEN` |
+| [BUG-335](#bug-335--a-this-session-git-grant-is-not-tied-to-any-session) | Medium | Build / Git credential | Open — found 2026-10-12 reviewing DEC-21b; Settings grants without a session and the push asks without one, so *this session* covers every chat and routine for an hour |
+| [BUG-336](#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved) | Medium | Build / Git push | Open — found 2026-10-12 reviewing DEC-21b; the approval shows a head and its commits, and the push sends whatever the branch holds at execution |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2589,6 +2592,82 @@ read as settled), and reconcile it if the provider's usage endpoint later
 reports the call. Requires an `estimated` column and a decision on whether
 estimated spend counts against the owner-wide limit (DEC-24 step 2 says to
 separate estimated from settled usage).
+
+## BUG-334 — A push proposal ignores the token stored in Settings
+
+**Severity: High. Area: Build / Git push. Status: Open — found 2026-10-12
+reviewing the code for the DEC-21b amendment.**
+
+**Observed.** RAIKER-2022 moved the push credential into the vault
+(**Settings → Git credential**), and the executor borrows it through
+`GitCredentialBroker.lend`. The proposal step does not. `ToolBroker._approval_preview`
+(`raiker/tools/broker.py`) and the dashboard's approval preview
+(`raiker/control/dashboard_parts/approvals.py`) call `proposed_push_snapshot`
+with no `credential=`, and `_push_credential(None)` reads only
+`RAIKER_GITHUB_TOKEN` from the environment (`raiker/tools/git.py`). With the
+token stored in Settings and nothing in the environment, the preview fails as
+`push_credential_unset` naming `RAIKER_GITHUB_TOKEN`, and a failed preview is
+returned to the model as a refusal before any approval is raised. Reproduced
+2026-10-12 against a workspace with a vault token, an allowlisted
+`github.com` remote and no environment token. Every push-path test sets the
+environment variable, which is why none caught it.
+
+**Effect.** The method the guides and the Settings page call supported cannot
+carry a model-proposed push; only an install that also exports the legacy
+variable can push, and that path skips the grant ([DEC-21b-H](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication)).
+
+**Proposed fix.** The proposal asks the broker whether a credential *is
+configured* (`token_configured()`), never for its value, and reports
+`push_credential_unset` naming Settings → Git credential. Add a push-path test
+with the token in the vault only. This is the first task of ADD-27's Wave 1
+([GH-10](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)).
+
+## BUG-335 — A "this session" Git grant is not tied to any session
+
+**Severity: Medium. Area: Build / Git credential. Status: Open — found
+2026-10-12 reviewing the code for the DEC-21b amendment.**
+
+**Observed.** `active_git_credential_grant` applies the session filter only
+when both the grant and the caller name a session. The Settings page grants
+with no session id (`api.grantGitCredential(scope)`), so the row's
+`session_id` is `NULL`; and the push executor asks with
+`action.arguments.get("session_id")`, which an approved `git_push` never
+carries (its arguments are `remote` and `branch`). The approving session is
+available to the relay as `origin_session_id` and is not used.
+
+**Effect.** *For this session* is in practice *for the next hour, everywhere*:
+a grant made while working in one chat lends the credential to a push approved
+from another chat or a routine within the hour.
+`test_a_session_grant_does_not_carry_into_another_chat` passes because it
+supplies session ids the product never supplies.
+
+**Proposed fix.** A session grant requires a session id and is refused
+without one (`git_grant_session_required`); the executor asks with the
+approval's `origin_session_id`; Settings offers *this session* only from a
+surface that has one, and otherwise *once*. Test through the push executor,
+not the store. Tracked as [GH-11](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority).
+
+## BUG-336 — A push sends the branch as it is when it runs, not the commits that were approved
+
+**Severity: Medium. Area: Build / Git push. Status: Open — found 2026-10-12
+reviewing the code for the DEC-21b amendment.**
+
+**Observed.** The push approval shows the branch, the remote, the head and the
+commits the remote does not have. Its stored arguments are only `remote` and
+`branch` (both optional, resolved from the checkout when absent), and the
+relay's payload hash covers those arguments. `push_branch` re-derives the
+snapshot at execution and pushes `refs/heads/<branch>`, whatever it then points
+at; nothing compares it with the head the owner saw.
+
+**Effect.** A commit made between the approval and the push — by the agent
+under a standing *Git writes* decision, or by anything else — is published
+under an approval that never showed it. DEC-21b-I's "a previously approved
+operation cannot be changed before execution" does not hold for a push.
+
+**Proposed fix.** Record the approved head and resolved remote URL with the
+approval; push `<approved-sha>:refs/heads/<branch>` (still fast-forward only)
+and refuse `push_target_changed` if the branch, remote URL or head moved.
+Tracked as [GH-12](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority).
 
 ## Decision statements added 2026-10-05
 

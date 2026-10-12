@@ -1,8 +1,16 @@
-# Threat Model — GitHub Read-Only Connector (web-app task 4)
+# Threat Model — GitHub Connector (web-app task 4)
 
 > Status marker: runtime_enablement_candidate — real executor, default-ask
 > decision mode, owner env-only credential, owner egress allowlist,
 > metadata-only events.
+>
+> **2026-10-12.** This page described a read-only slice. The connector has
+> since gained approval-gated writes (`github_write`: `create_comment`,
+> `create_pull_request`, B11), described below. Its credential is still the
+> environment variable only; it does **not** use the Git push credential broker.
+> The accepted [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md)
+> (DEC-21b as amended) plans to move it onto the shared broker for credential
+> selection and lending (ADD-27 GH-56) without changing its gate or approvals.
 
 Per-capability threat model required by
 [`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
@@ -14,8 +22,16 @@ Slack replicate the same store-nothing-new pattern.
 
 A model may read one GitHub **issue** or **pull request** through a brokered
 tool, `github_read(resource, repo, number)`. The fetched content is returned to
-the model as **untrusted data, never instructions**. Reads only — send/comment/
-modify actions are deliberately **not implemented** and fail closed.
+the model as **untrusted data, never instructions**.
+
+It may also **propose** one of two writes through `github_write(operation, repo,
+…)`: `create_comment` on an issue or pull request, or `create_pull_request`
+from a pushed head to a base. `github_write` is high risk, approval-required and
+not delegable; it runs only when `route_action` dispatches an approved action
+(or, outside the router, when the gate is on and the decision mode allows it),
+and its artifacts are metadata only — repository, number, comment or PR id and
+URL, never the body. Other modifications (merge, close, labels, reviews, branch
+or repository changes) are not implemented and fail closed.
 
 Two surfaces, one governance:
 
@@ -76,7 +92,10 @@ the owner can see exactly what is still fail-closed.
   is labelled untrusted data and cannot execute anything by itself; every action
   the model proposes afterwards still flows through the broker, policy, and
   approvals.
-- Out of scope: write/comment/modify actions (require approval and a separate
-  slice), listing/searching, other GitHub resources, other connectors
-  (Gmail/Calendar/Slack — same pattern, separate slices), and OAuth/app-token
-  flows (this slice uses an owner-provided token only).
+- Out of scope: modifications beyond a comment or a pull request,
+  listing/searching, other GitHub resources, and other connectors
+  (Gmail/Calendar/Slack — same pattern, separate slices). OAuth and GitHub App
+  tokens are not used by this connector today (it uses an owner-provided
+  environment token only); they are planned under the
+  [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md),
+  where a sign-in or App installation grants no connector authority by itself.

@@ -64,6 +64,26 @@ Sensitive and remote capabilities remain fail-closed until a real executor,
 explicit gate, policy requirements, and applicable human approval are present.
 Operational security boundaries are defined in [SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md).
 
+## Forge credentials and repository authority
+
+Today one forge credential exists: a GitHub token held in the vault (or the
+legacy `RAIKER_GITHUB_TOKEN`), lent to `github.com` only, for one command or
+one hour, under an owner grant, through a helper that answers no other host and
+after clearing every inherited credential helper. Known defects on that path
+are BUG-334, BUG-335 and BUG-336.
+
+The accepted target ([DEC-21b as amended 2026-10-12](GITHUB_CONNECTION_SPEC.md))
+keeps three layers apart: GitHub's own permissions (the outer limit), Raiker's
+capability gates, decision modes and repository-bound delegations (the inner
+limit), and a human approval or explicit delegation (the trigger). Signing in,
+installing the GitHub App, selecting repositories or storing a credential
+grants nothing by itself. A credential found on the machine — gh CLI sign-in,
+an OS credential-manager entry, an SSH key — is used only after the owner
+selects it and its account is verified, and only through the broker. Tokens,
+refresh tokens, App private keys and client secrets never reach a model, a
+transcript, a log or an agent sandbox, and a method whose controls cannot be
+enforced is unavailable rather than ungoverned.
+
 ## Container tool boundary
 
 Container profiles do not grant tools or bypass the broker. Policy, decision

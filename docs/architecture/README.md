@@ -93,6 +93,7 @@ and planned memory work is
 | Plugin contributions and lifecycle | [Plugin system](PLUGIN_SYSTEM_SPEC.md) |
 | Strict plugin metadata | [Plugin manifest schema](PLUGIN_MANIFEST_SCHEMA.md) |
 | External messaging boundaries | [Channels](CHANNELS_SPEC.md) |
+| GitHub sign-in, credential methods and repository authority (DEC-21b, planned) | [GitHub connection](GITHUB_CONNECTION_SPEC.md) |
 | Governed self-observation and learning | [Self-improvement model](SELF_IMPROVEMENT_MODEL.md) |
 
 ## Security

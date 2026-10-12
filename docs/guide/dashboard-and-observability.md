@@ -333,7 +333,11 @@ another forge, or a redirect that sends git somewhere unexpected, is answered
 without it. Raiker deliberately does not use this machine's own credential
 manager: a keychain answers for whichever account signed in last, which Raiker
 cannot name for you, cannot scope, and cannot withdraw. A fine-grained token
-scoped to the repositories you want is the supported method. Under the approval
+scoped to the repositories you want is the supported method. Signing in with
+GitHub, and explicitly choosing an existing GitHub CLI sign-in, credential
+manager entry or SSH key, are planned; even then nothing found on the machine
+is used until you choose it, and connecting grants no permission by itself.
+Under the approval
 controls it says when the credential was last lent and for what — *Last lent …
 to push a branch, under a one-command approval* — or that it has never been.
 

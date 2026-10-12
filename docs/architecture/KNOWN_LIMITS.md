@@ -167,7 +167,12 @@ alternative would be worse.
   lasts. `RAIKER_GITHUB_TOKEN` in the host environment still works for an
   install configured that way, and the page says which of the two you are on.
   Only HTTPS GitHub remotes are pushable, because that is the credential Raiker
-  holds; it never forces and never deletes a branch.
+  holds; it never forces and never deletes a branch. Known defects, found
+  2026-10-12: a proposed push consults only `RAIKER_GITHUB_TOKEN`, so a
+  vault-only token cannot carry one (BUG-334); a session grant is not tied to
+  its session (BUG-335); and the push is not bound to the approved commit
+  (BUG-336). The accepted target is the
+  [GitHub connection specification](GITHUB_CONNECTION_SPEC.md).
 - **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
   and `web_search` work on a fresh install: there is no list to fill in first,
   and `web_search` uses a keyless endpoint until you point

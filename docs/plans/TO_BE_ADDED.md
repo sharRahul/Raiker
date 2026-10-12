@@ -101,6 +101,7 @@ from competitor feature lists.
 | [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
 | [ADD-25](#add-25--post-stage-j-memory-expansion) | Tier 4 | Memory / temporal, polyglot, context and transactions | Proposal — after Stage J |
 | [ADD-26](#add-26--a-premium-responsive-workspace-shell) | Tier 2 | Web UI / theme and adaptive navigation | Implemented 2026-08-25 |
+| [ADD-27](#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority) | Tier 1 | Build / GitHub connection and repository authority | Accepted 2026-10-12 (DEC-21b amendment) — Wave 0 done; Waves 1–4 planned; managed App needs operator registration |
 
 **2026-08-21 review against the reference platforms.** Evidence-bound graph
 review and visible checkpoint failure are proven meaningful differentiators and
@@ -1101,6 +1102,95 @@ under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2
 
 ---
 
+## ADD-27 — A hybrid GitHub connection that separates sign-in, repository access, credential and authority
+
+**Status: architecture accepted, implementation planned — 2026-10-12. Tier 1
+(safe autonomy). Effort: high overall; ordered below so that high-priority,
+low-effort work lands first. Owner decision recorded as the
+[DEC-21b amendment](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication);
+the contracts are in the [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md).**
+
+**What exists today.** One push credential: a GitHub token in the vault
+(`github_token`, Settings → Git credential), or the legacy
+`RAIKER_GITHUB_TOKEN`, lent to `github.com` only for one command (300 s) or
+an hour (3600 s) under a grant, through a host-checking helper that clears
+inherited helpers. The GitHub API connector (`github_read`, `github_write`)
+uses only the environment token. There is no OAuth, GitHub App, gh CLI, OS
+credential-manager or Git-over-SSH path, no clone or fetch, no account
+identity, and grants are not bound to a repository, branch or commit. The
+[gap table](../architecture/GITHUB_CONNECTION_SPEC.md#18-current-implementation-gap-analysis)
+classifies every requirement against the code.
+
+**What should change.** One GitHub connection model for Chat, Build and
+autonomous work, in which *signed in*, *app installed*, *repository
+authorised*, *credential available*, *capability enabled* and *operation
+approved* are separate facts; local repositories keep working with no GitHub
+connection at all; ordinary users never register an OAuth application; and
+every credential, whatever its source, reaches Git or the API only through
+Raiker's broker under an operation-, repository- and time-bound grant.
+
+**Governed outcome.** Connecting GitHub authorises nothing. GitHub's
+permissions are the outer limit, Raiker's capability gates and delegation the
+inner one, and a human approval or an explicit, repository-bound delegation the
+trigger — three layers that never substitute for one another.
+
+**Tasks.** Priority P0 > P1 > P2; effort S (≤2 days), M (≤1 week), L (>1
+week). A task starts only when its dependencies are done. Each closes into
+`FIXED_ITEMS.md` with the acceptance evidence named.
+
+| Task | Wave / priority / effort | Work | Depends on | Acceptance evidence |
+|---|---|---|---|---|
+| GH-01 | 0 / P0 / S — **done 2026-10-12** | Amend DEC-21b; publish the specification, deployment modes, identity and permission matrices, lifecycle and gap table | — | This entry, the amendment and the specification |
+| GH-10 | 1 / P0 / S | Fix [BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings): the proposal asks the broker whether a credential is configured, never for its value | — | Push-path test with the token only in the vault; live push to a test repository |
+| GH-11 | 1 / P0 / S | Fix [BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session): a session grant requires a session and the executor asks with the approval's origin session | — | Executor-level test: a grant made in chat A does not lend to chat B or a routine |
+| GH-12 | 1 / P0 / M | Fix [BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved): bind the approved head and resolved push URL; push the approved commit; refuse `push_target_changed` | — | Test: a commit made after approval is not pushed and the push is refused |
+| GH-13 | 1 / P0 / S | The legacy `RAIKER_GITHUB_TOKEN` is a credential *method* lent under the same grant; the CLI's one-shot push records an explicit once-grant | GH-10 | Test: with the variable set and no grant, the executor refuses `git_grant_required` |
+| GH-14 | 1 / P0 / S | Credential and grant events (`git_credential_stored`, `…_forgotten`, `git_grant_created`, `…_revoked`, `git_credential_lent`) — metadata only; EVENT_CATALOG | — | Event-shape tests; secret canary absent from every event |
+| GH-15 | 1 / P1 / S | Explicit redaction patterns for `ghs_`, `ghu_`, `gho_`, `ghr_` beside `ghp_` and `github_pat_`, including the stateless `ghs_APPID_JWT` installation-token format GitHub began rolling out on 2026-04-27 | — | Redaction tests for each prefix, short and JWT-shaped forms included |
+| GH-16 | 1 / P1 / M | Revocation outlives restore: forgetting a credential, revoking a grant and disconnecting are journalled and replayed after a restore | GH-14 | Restore test: a backup taken before *Remove stored token* does not bring the token or an active grant back |
+| GH-17 | 1 / P1 / M | Grants bind principal, method, account, host, repository (GitHub repository id when known), operation, branch and expiry; additive migration | GH-11, GH-12 | Test: a grant for repository A or for *push* does not lend to repository B or to *fetch* |
+| GH-18 | 1 / P1 / M | Provider-aware credential records (`git_credentials`: method, account id/login, permissions summary, expiry, status) referencing vault payloads; the existing token migrates as method `pat` in place; **Check** validates it against `GET /user` | GH-14 | Migration test from a populated RAIKER-2097 database; the stored secret is never re-displayed |
+| GH-19 | 1 / P1 / M | **Settings → Connections → GitHub**: intent-led entry, the six separate states, account, method, permission level, repositories, last use, expiry and the recovery messages of the specification; Git credential page redirects there | GH-18 | Component tests per state; screenshots at 390/1440 light and dark; keyboard path |
+| GH-20 | 1 / P1 / M | Use existing **gh CLI** sign-in, explicitly selected: detection reads `gh auth status` only; the token is read by the broker at lend time, checked against the selected account, never stored | GH-17, GH-18 | Tests: detection does not lend; an account switch in gh fails closed `git_account_mismatch` |
+| GH-21 | 1 / P1 / M | Use an **OS credential manager** entry, explicitly selected: the broker queries the system helper for `github.com` and the selected username in a controlled subprocess, verifies the account, and lends through Raiker's own helper | GH-17, GH-18 | Tests with a fake helper: another account's credential is refused; prompting helpers fail closed |
+| GH-22 | 1 / P1 / L | Governed **SSH** remotes: a selected identity (`IdentitiesOnly`, no agent unless a key is selected by fingerprint), pinned GitHub host keys, `StrictHostKeyChecking=yes`, a constructed `GIT_SSH_COMMAND` | GH-17 | Tests: an unselected key or an unpinned host is refused; live push over SSH |
+| GH-23 | 1 / P1 / M | Governed **clone and fetch** (read-class network capability): no recursive submodules, `protocol.file.allow=never`, hooks and `core.fsmonitor` disabled, object checks on | GH-17, GH-24, GH-25 | Hostile-repository tests: submodule, `insteadOf`, file-protocol and hook payloads get no credential and run nothing |
+| GH-24 | 1 / P1 / S | Local read-only git commands run in the constructed environment, not the host's, with `core.fsmonitor` cleared | — | Test: a repository `core.fsmonitor` command does not run on `git status` |
+| GH-25 | 1 / P1 / S | Separate GitHub **API** host policy from **Git transport** host policy (one allowlist today, two matching rules) while honouring the existing variable | — | Test: allowing `api.github.com` does not allow Git transport and vice versa |
+| GH-30 | 2 / P1 / S — **external** | Register the official Raiker GitHub App (operator): permissions per the matrix, exact callback URLs with wildcard matching **disabled**, device flow enabled, expiring user tokens on, webhook off by default, private key in a sign-only key vault | — | Registration record (App ID, Client ID, permissions) in the operator runbook; no secret in the repository |
+| GH-31 | 2 / P1 / M | Authentication attempts: state, PKCE S256, exact redirect, ten-minute expiry, one-time redemption, cancel/deny outcomes, attempt bound to the Raiker session that started it | GH-18 | Tests: invalid state, verifier mismatch, wrong redirect, replayed code, expiry, other session's callback |
+| GH-32 | 2 / P1 / M | Browser sign-in with server-side exchange (managed cloud, a BYO App on a server); a desktop loopback variant only once GitHub's loopback rule is confirmed for GitHub Apps | GH-30, GH-31 | Live sign-in with a consented test account (RR-38) |
+| GH-33 | 2 / P1 / M | Device sign-in — the default for the desktop release and for terminal and headless hosts (GitHub's guidance for desktop apps and CLIs; no client secret for sign-in or refresh) — with interval, `slow_down` and expiry handling | GH-30, GH-31 | Tests with a fake device endpoint; live device sign-in |
+| GH-34 | 2 / P1 / M | Token exchange, storage, refresh with rotation, and the refresh-failure path, in the trusted credential service only | GH-31 | Tests: refresh rotation, revoked refresh token fails closed with *Sign in again* |
+| GH-35 | 2 / P1 / M | GitHub account ↔ Raiker principal association by immutable account id; account switching invalidates grants and lends nothing across accounts | GH-34 | Two-account test (F-USER): no credential or grant crosses |
+| GH-36 | 2 / P1 / M | Repository discovery through the user's installations; repository selection by id; rename/transfer/removal detection | GH-35 | Tests: unselected repository refused; a transfer does not carry authority |
+| GH-37 | 2 / P1 / S | Disconnect: local lending and grants end at once; provider-side revocation attempted where supported and its outcome reported exactly | GH-34 | Test: disconnect during a lend; UI reports *revoked at GitHub* or *could not confirm* |
+| GH-40 | 3 / P1 / L | Trusted credential service: App private key in a secret store, JWT minting, installation tokens narrowed by repository ids and permissions, never inside an agent sandbox | GH-30, GH-17 | Tests: token minted for repository A cannot push to B; key material absent from every agent-visible sink |
+| GH-41 | 3 / P1 / M | **Bring your own GitHub App** configuration for self-hosted operators: references not values, validation against `GET /app`, permission check against the matrix, key rotation with overlap | GH-40 | Validation tests for each missing/incorrect input; runbook walk-through |
+| GH-42 | 3 / P1 / M | Installation mapping and lifecycle: org approval pending, suspended, uninstalled, repositories removed | GH-40 | Tests per state; the UI states each recovery action |
+| GH-43 | 3 / P2 / M | Webhook receiver (off by default): `X-Hub-Signature-256`, delivery-id deduplication, installation mapping, event allowlist, payload as untrusted data | GH-42 | Spoofed, replayed, wrong-installation and oversized deliveries refused |
+| GH-44 | 3 / P1 / S | Isolation suite across accounts, installations and principals | GH-35, GH-40 | RR-39 and the isolation tests pass |
+| GH-50 | 4 / P1 / M | Repository-bound **delegation** records (repository id, operations, branch pattern, PR yes/no, merge never by default, expiry, budget); standing grants cannot cover a Git or GitHub write without one | GH-17 | Tests: read grant never writes; PR grant never merges; branch grant never reaches another branch |
+| GH-51 | 4 / P1 / S | Risk classes and capabilities for the twelve operations in the specification's matrix | GH-50 | Capability/risk table test; Permissions page copy |
+| GH-52 | 4 / P1 / M | Resume revalidation: delegation, credential, installation, repository id and effective permissions are rechecked before a resumed task's next consequential step | GH-50, GH-36 | RR-40: revocation mid-task leaves a recoverable blocked state |
+| GH-53 | 4 / P1 / S | Child agents never receive more than the parent's delegation; an agent never approves its own escalation | GH-50 | Delegation-ceiling tests |
+| GH-54 | 4 / P2 / M | Provider receipts and reconciliation: pushed ref read back, PR number and URL recorded | GH-12, GH-40 | Receipt tests; RR-38/40 evidence |
+| GH-55 | 4 / P2 / M | Issue-to-PR routine template: read-only by default; writes only under a delegation | GH-50, GH-52, GH-54 | RR-40 and PA-S07 with a real repository |
+| GH-56 | 4 / P1 / M | The API connector borrows through the shared broker (selected method, repository-bound grant) instead of reading the environment; its gate and approvals unchanged | GH-17, GH-18 | Connector tests with vault, App and legacy credentials |
+| GH-60 | 5 / P2 / L — deferred | GitHub Enterprise Server and `ghe.com` as their own adapter with their own hosts and endpoints | GH-40 | Separate decision before work starts |
+| GH-61 | 5 / P2 / L — deferred | GitLab, Bitbucket and Azure DevOps adapters | GH-17 | Separate decision before work starts |
+
+**Ordering.** Wave 1's P0 rows (GH-10…GH-14) are small and close real
+defects, so they precede everything else. GH-30 is an operator action that
+gates Waves 2–3 only; nothing local waits on it.
+
+**Beyond the reference platforms? NO — parity of convenience, stricter
+authority.** Codex and Claude Code show that signing in once and choosing
+repositories is the expected experience; Raiker's contribution is that the
+sign-in grants nothing by itself.
+
+---
+
 ## Appendix A — Reference sketch: the zero-trust executor wrapper
 
 The shape ADD-01 describes, as originally sketched. It is a sketch, not the
@@ -1285,8 +1375,9 @@ does not close a defect or mark an ADD shipped. Browser ADD-23, off-machine
 ADD-11, memory ADD-25 and self-improvement ADD-05/06 retain their own boundaries.
 
 Personal-agent release claims require the relevant PA-S scenarios and existing
-CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, accepted
-Git OAuth scope, model choice and coding quality. New observations go to the
+CR evidence gates. Preserve capability defaults, quiet-hours DEC-21a, the
+GitHub connection decision (DEC-21b as amended 2026-10-12, ADD-27), model
+choice and coding quality. New observations go to the
 proper defect/evidence ledger; do not duplicate the PAA backlog here.
 
 ## Personal-agent UX delivery — 2026-10-08

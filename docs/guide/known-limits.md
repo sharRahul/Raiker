@@ -104,6 +104,23 @@ turn controls, not replacements for capability gates or runtime policy. “Skip
 all approvals” skips an ordinary UI prompt; it does not bypass policy,
 confinement, sandboxing, or critical holds.
 
+Pushing to GitHub has three known gaps, being fixed first in the GitHub
+connection work:
+
+- A push Raiker proposes is refused as *credential unset* when the token is
+  stored only in **Settings → Git credential**; today it also needs
+  `RAIKER_GITHUB_TOKEN` in the host environment, and that variable lends
+  without a grant (BUG-334).
+- A grant made **for this session** in Settings is not tied to a conversation:
+  for its hour it covers a push approved anywhere, routines included (BUG-335).
+  Use **once** when that matters.
+- A push sends the branch as it is when it runs, so a commit made after you
+  approved would go with it (BUG-336).
+
+Only HTTPS GitHub remotes with a personal access token are supported. Signing
+in with GitHub, or choosing your existing GitHub CLI sign-in, a saved Git
+credential or an SSH key, is planned and not yet available.
+
 ## Hooks, plugins, and MCP
 
 - Hooks cover 20 of the 31 lifecycle events in the reference format. The 11

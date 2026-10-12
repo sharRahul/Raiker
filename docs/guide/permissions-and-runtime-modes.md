@@ -630,7 +630,9 @@ gates, not assumed:
   you decide you see the repository, the remote and its host, the branch, and the
   commits the remote does not have. It never forces and never deletes a branch,
   and it does nothing at all until the remote's host is on
-  `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and `RAIKER_GITHUB_TOKEN` is set. Unlike a
+  `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a GitHub credential is available
+  (see [Known limits](known-limits.md#approvals-and-execution) for why a proposed
+  push still needs `RAIKER_GITHUB_TOKEN` today). Unlike a
   commit, this leaves your machine and git cannot take it back — undo it on the
   remote.
 - **Approve (record only).** Everything else — network, process, and any

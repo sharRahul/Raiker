@@ -200,6 +200,17 @@ scope. Changed price, recipient, destination, arguments or plan/envelope version
 invalidates the covered proposal. Existing Raiker decision modes and critical
 approval lifecycle remain authoritative; Muse permission defaults are not copied.
 
+**Repository work (2026-10-12).** GitHub repositories follow the
+[GitHub connection specification](GITHUB_CONNECTION_SPEC.md) (DEC-21b as
+amended). Signing in, installing the App or storing a credential grants no
+effect. A goal that pushes or opens pull requests runs under an explicit,
+stored delegation naming the repository id, operations and branch pattern; a
+read delegation never writes, a PR delegation never merges, a scheduled run
+creates no authority, a resumed run revalidates delegation, credential,
+installation and permission first, and a child never exceeds its parent
+(PAA-12). Issue, PR and comment text is untrusted data and cannot select a
+credential or change a decision mode.
+
 ## User experience and learning
 
 Use the existing Chat/Build/Tasks/Projects/Approvals/Activity surfaces. The target
@@ -217,7 +228,7 @@ code. Instruction-only Raiker skills remain distinct from governed script tools.
 
 ## Acceptance and claim rule
 
-PAA-01–PAA-11 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
+PAA-01–PAA-12 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
 are the rollout gates. Use existing CR evidence levels, preserve older live
 records, and run identical declared scenarios on exact supported reference
 surfaces before asserting parity. No benchmark was performed for this update.

@@ -30,13 +30,14 @@ before promoting a requirement from planned to implemented or verified.
 | PAA-02 / B | Goal coordinator uses existing tasks, dependency graph, atomic leases, fresh identity, aggregate budget reservations and truthful parent completion | PAA-01; existing scheduler, identity and delegation paths | Runtime maintainer | Multiple workers claim once; blocked child prevents completion; approval/restart/Stop/revocation traces; budget across children/cycles |
 | PAA-03 / B | Inspectable personal context/profile with explicit vs inferred facts, freshness, timezone, governed memory and correction/purge | PAA-01; existing memory lifecycle; ADD-25 only for optional scale expansion | Memory/privacy maintainer | Fixed recall corpus; stale/conflicting facts; corrected timezone; forget removes derived references; actual hosted/local context inspection |
 | PAA-04 / C | Owner-created standing intents: scheduled/polling checks, cooldowns, freshness, deduplication, daily budgets and quiet digest; later supported event adapters | PAA-02/03; existing task schedule and DEC-21a | Scheduler/host maintainer | No useful change means no unnecessary alert; DST/missed slots; duplicate trigger; invalid sender/event; budget; no work while stopped |
-| PAA-05 / C | Verified connector workflows with effect schemas, read/write classification, least scope, exact approvals, receipts, reconciliation and revocation | PAA-02; existing connector executor/vault; preserve accepted OAuth scope decisions | Integrations maintainer | Real read → proposed write → decision → provider-confirmed result; changed arguments; expired/revoked credential; unknown timeout with no resend |
+| PAA-05 / C | Verified connector workflows with effect schemas, read/write classification, least scope, exact approvals, receipts, reconciliation and revocation | PAA-02; existing connector executor/vault; preserve accepted OAuth scope decisions, including DEC-21b as amended 2026-10-12 | Integrations maintainer | Real read → proposed write → decision → provider-confirmed result; changed arguments; expired/revoked credential; unknown timeout with no resend |
 | PAA-06 / D | Bounded isolated browser workflow with account/session isolation, secret-safe handoff, typed actions, egress policy and destination verification | PAA-05; ADD-23 owns executor; ADD-11 is not implicitly activated | Execution/security maintainer | Isolated-session navigation/form fixture; denied effect; injection; redirect/private-address refusal; credential redaction; disconnect/cleanup |
 | PAA-07 / C | Goal progress in existing Home/Chat/Build/Tasks, usable artifacts, named blockers, sources, receipts, budgets and pause/resume/stop | PAA-01/02; current shell/UX work including ADD-26 retains ownership | Product/UI maintainer | Observed complete workflow; keyboard/focus/mobile checks; screenshots tied to actions; no inert controls or false success |
 | PAA-08 / B–D | Independent outcome verification, durable effect journal, bounded retry classes and honest partial/unknown results | PAA-02; integration receipts depend on PAA-05; browser effects on PAA-06 | Verification/runtime maintainer | Crash before/after effect; destination read-back; duplicate prevention; partial deliverables; unsupported compensation reported |
 | PAA-09 / E | Turn verified outcomes into proposed versioned skills with fixtures, permission diff, owner activation and revocation | PAA-03/08; ADD-05/06/21 retain skill/self-improvement ownership | Skills/security maintainer | Useful repeat-run improvement; malformed/poisoned skill; no authority expansion; rejected activation; rollback and uninstall |
 | PAA-10 / D | Continue personal goals through paired channels and an explicitly selected always-on private host | PAA-02/04/05; existing CHANNELS_SPEC; ADD-11 for new off-machine transport | Host/channel maintainer | Authenticated sender to verified effect; impersonation/replay refusal; host offline/reconnect/missed-run; Stop/revocation from supported surfaces |
 | PAA-11 / each phase | Publish support matrix and outcome evidence, test reference products on identical supported scenarios and gate claims | CR-01–CR-12; all relevant PAA prerequisites | Release/evidence maintainer | Complete run records, independent validators, five clean trials per supported product/configuration and visible blocked/unsupported cases |
+| PAA-12 / B–C | Repository-bound autonomous GitHub work: stored delegations (repository id, operations, branch pattern, PR yes / merge never), resume revalidation of delegation, credential, installation and permission, child-agent ceilings, provider receipts and an approved issue-to-PR routine | PAA-02/05/08; [ADD-27](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority) Waves 1–3 (GH-17 grants, GH-36 repositories, GH-40 installation tokens) own the connection; this row owns Wave 4 (GH-50…GH-55) | Runtime/integrations maintainer | RR-39 and RR-40; PA-S07 against a real repository; a read grant never writes, a PR grant never merges, a scheduled run creates no authority |
 
 Phase A defines contracts and storage without background effects. Phase B earns
 local multi-step goal completion, context and recovery. Phase C earns proactive
@@ -104,8 +105,9 @@ migration/versioning and revocation behavior, then pass existing validation.
 
 Accepted: one runtime; durable goals reuse tasks; local-first host and chosen
 models; bounded owner-controlled proactivity; verified effects; reviewed learning.
-Preserved: quiet hours and enumerated exceptions (DEC-21a), existing Git OAuth
-provider decision, capability unset rules, account-wide Chat recall, sensitive
+Preserved: quiet hours and enumerated exceptions (DEC-21a), the Git provider
+decision (DEC-21b, amended 2026-10-12: GitHub.com first, hybrid App and local
+methods, connection grants no authority), capability unset rules, account-wide Chat recall, sensitive
 domain limits and hosted multi-user deferral. Browser implementation remains
 ADD-23 and off-machine gateway expansion remains ADD-11.
 
@@ -117,7 +119,7 @@ documentation update. No undocumented activation or implied production support.
 
 ## Release qualification beyond feature completion — 2026-10-08
 
-[RR-01–RR-36](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) extend PA-S briefs into a
+[RR-01–RR-41](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) extend PA-S briefs into a
 candidate release protocol. Every implementation needs component tests plus
 real entry-point/outcome proof at the advertised configuration. PAA-11 owns the
 complete candidate scorecard and evidence collection; an independent release

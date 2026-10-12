@@ -386,7 +386,7 @@ end contract.
 > Closing REM-SESSIONS left its own tail, filed rather than claimed: the
 > conversation-library controls are still in the evidence inspector, because
 > moving them needs the work index to grow a `pinned` and an `archived` facet
-> first ([BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector)).
+> first ([BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector)).
 >
 > **Implementation status, 2026-09-28.** RR-AUTHORITY-01 was reduced a third
 > time, and its first half — *broker-issued authority for every side effect* —
@@ -3831,7 +3831,7 @@ All rows are proposed. Priorities P1/P2 indicate relative product/correctness im
 > 2026-09-20** as
 > [FIXED-587](FIXED_ITEMS.md#fixed-587--the-recall-engines-controls-were-on-the-page-for-reading-your-own-memories)
 > — in part: the two source controllers it also names are
-> [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both).
+> [BUG-305](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read).
 
 | ID / priority / effort | Remove, move or replace | Decision and explanation | Implementation and completion evidence |
 | --- | --- | --- | --- |

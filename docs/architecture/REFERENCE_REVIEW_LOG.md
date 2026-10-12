@@ -145,7 +145,7 @@ observability surface describes the thing it links to.
 | Gap | Reference | Raiker today | Compatibility requirement to close it |
 |---|---|---|---|
 | **A turn that survives the server, not just the reader** | Cowork and Codex run work that outlives any client *process*; a restart resumes or reports it | A detached turn survives the client. It does not survive `raiker-web` stopping mid-turn | This is durable execution, not stream handling: the turn's position would have to be a record the runtime can resume from. Worth stating separately from FIXED-331 so the smaller fix is not mistaken for the larger property. |
-| **A workspace the harness can reset** ([BUG-250](../plans/TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs)) | Not a product question | Containment, settings and connections all persist between specs, correctly | Two things, in order: mark the specs that genuinely need a first run, and make the rest assert behaviour rather than a fresh install's values. |
+| **A workspace the harness can reset** ([BUG-250](../plans/FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject)) | Not a product question | Containment, settings and connections all persist between specs, correctly | Two things, in order: mark the specs that genuinely need a first run, and make the rest assert behaviour rather than a fresh install's values. |
 
 ### Recommended improvements, in the order they are worth doing
 
@@ -188,7 +188,7 @@ permission surface must say, and what a citation must open.
 2. **OpenTelemetry export** (backlog #18). Raiker already records strictly more
    per action than the six events Cowork exports; what it lacks is the wire.
 3. **Per-hunk decisions** (B14's remainder), once the runtime can record one.
-4. **The remaining live-spec passwords** ([BUG-247](../plans/TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password)),
+4. **The remaining live-spec passwords** ([BUG-247](../plans/FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)),
    one spec per re-run, so each closed entry's evidence is refreshed rather than
    invalidated.
 

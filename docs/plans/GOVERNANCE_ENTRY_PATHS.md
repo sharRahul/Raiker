@@ -669,7 +669,7 @@ parent. BUG-315's automatic sender remains a proposed additional entry.
 References: [entry registry](../../raiker/runtime/authority/entry_paths.py),
 [inventory tests](../../tests/test_governance_entry_paths.py),
 [GEP-02](#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths),
-[BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things),
+[BUG-239](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository),
 [BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).
 
 ## Competitive operational-control evidence — 2026-10-05

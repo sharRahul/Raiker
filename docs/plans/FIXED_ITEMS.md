@@ -14296,7 +14296,7 @@ prose. What is now clickable is a coordinate the ledger recorded, which is the
 same rule citations follow: the ledger is the fact, the sentence is the claim.
 Rendering an exchange named inside a citation as its own link needs a per-result
 row in `turn_sources`, and is recorded as
-[BUG-245](TO_BE_FIXED.md#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one)
+[BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one)
 rather than half-built.
 
 **User-interface outcome.** A search hit lands on the exchange that matched, with
@@ -14716,7 +14716,7 @@ pages that used the old name are corrected too.
 
 **What is left, and it is a different defect.** Thirty-three specs still hardcode
 their own owner password, so two of them cannot share one workspace — the next
-layer of the same problem, recorded as [BUG-247](TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password).
+layer of the same problem, recorded as [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite).
 `OWNER_CREDENTIALS` is the answer to it and already ships: `signInAsOwner(page,
 base)` now takes no credential, reading `RAIKER_LIVE_OWNER` /
 `RAIKER_LIVE_PASSWORD` with a default, and the four specs added in this round
@@ -15986,7 +15986,7 @@ loopback.
 browser hands it, and Chrome ships remote ones for several languages. That is a
 smaller problem — what crosses the boundary is the response text rather than a
 recording of the owner — but it is the same asymmetry in the other direction, and
-it is raised as [BUG-269](TO_BE_FIXED.md#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local).
+it is raised as [BUG-269](FIXED_ITEMS.md#fixed-373--read-aloud-was-the-half-of-voice-that-was-still-not-local).
 
 **User-interface outcome.** The microphone works entirely on this machine when
 the owner sets a runtime up; **Settings → Voice** states which of the two is in
@@ -16461,7 +16461,7 @@ workspace, and the request has to name which:
 ```
 
 Raiker had no field for it, so a valid credential was unusable and the round's
-three live scenarios ([BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun))
+three live scenarios ([BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more))
 could not run.
 
 **Fixed.** The connection carries an optional **Workspace ID**, stored in the
@@ -17028,7 +17028,7 @@ rather than against the encoder. Evidence:
 **What is deliberately not built, and is now an open entry.** There is no
 background sender: a delivery happens when the owner asks for one. That is stated
 on the card (`N delivered`, `Last run …`) rather than implied away, and it is
-raised as [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+raised as [BUG-276](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button)
 rather than left as a footnote — a collector that receives only while its
 operator is watching is half a wire, and the honest shape for the other half is a
 routine over the scheduler that already exists.
@@ -17358,7 +17358,7 @@ says in one sentence what a destination receives.
 ## FIXED-386 — Governed events only left when somebody pressed a button
 
 **Severity: Low. Area: Observability / telemetry export. Status: Fixed
-2026-09-04. Closes [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+2026-09-04. Closes [BUG-276](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button)
 and completes [backlog #18](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort).**
 
 **Observed.** `telemetry_export` delivered governed events to an owner-named OTLP
@@ -17722,7 +17722,7 @@ with nothing persisted resolves `UNSET_OFF`. Four capabilities are in that map
 and are therefore genuinely on out of the box; the other forty-odd are not. The
 docstring described the table and called it the product.
 
-This is the shape [BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things)
+This is the shape [BUG-239](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository)
 names — *an empty gate table means three different things* — showing up not as a
 behaviour defect but as a **claim** defect: the code is right and conservative,
 and the sentence next to it was neither.
@@ -17890,9 +17890,9 @@ identically on unmodified `main`, which is what proved it was not the day's work
 of these needs *content* to appear: an approved memory, an indexed local model.
 The morning's sweep ran on a workspace that had neither. **A responsive check
 against an empty page is a check of the empty state**, and this suite has spent
-three rounds ([BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace),
-[BUG-247](TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password),
-[BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs))
+three rounds ([BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in),
+[BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite),
+[BUG-250](FIXED_ITEMS.md#fixed-549--a-spec-that-had-to-disambiguate-its-own-subject))
 peeling away that same assumption one layer at a time. This is the layer under
 BUG-250: not that a spec cannot re-run against a used workspace, but that running
 against a used one **finds defects an empty one hides**.
@@ -19300,7 +19300,7 @@ in that file that genuinely need a turn** — the two that ask one, the export t
 (there is nothing to export until a turn has produced a conversation), and the
 two task tests (creating a task with instructions goes through the readiness
 check). Each now *skips with the reason*, naming
-[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+[BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more)
 and what to set, instead of failing — the same shape `requireFirstRunWorkspace`
 gives a spec that needs a fresh workspace (BUG-250). The other four run.
 
@@ -21604,7 +21604,7 @@ set from the contract rather than restated locally.
 VIS2-20's half: `DesignCanvasRegion.svelte` now owns how an asset is presented,
 so the surface's object has a component of its own. The other five regions the
 review names for Design describe a canvas runtime Raiker does not have
-([BUG-277](TO_BE_FIXED.md#bug-277--design-is-a-one-shot-generator-so-most-of-its-composer-has-nothing-to-reach));
+([BUG-277](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network));
 they are left unbuilt rather than extracted as empty shells, which is the same
 rule the composer applies to controls with no runtime behind them.
 
@@ -24688,7 +24688,7 @@ record the product stores under a name, never a prompt, a path or a key.
 
 **Severity: High. Area: runtime / turn answer. Status: Fixed 2026-09-16.
 Found live on the first press of Send while closing
-[BUG-300](TO_BE_FIXED.md#bug-300--a-typed-answer-is-typed-in-chat-and-build-and-is-characters-everywhere-else).**
+[BUG-300](FIXED_ITEMS.md#fixed-551--a-declared-table-was-a-table-in-the-conversation-and-json-everywhere-else).**
 
 **Observed.** Asked for three cities as a table, the model answered in two
 rounds: it wrote a ` ```raiker:table ` block, called `update_plan`, and then
@@ -24910,7 +24910,7 @@ chapter. Zero console errors.
 chapter-to-chapter Markdown links render as literal text, because the Markdown
 renderer's URL allowlist is a deliberate boundary for model-authored content and
 a relative `.md` target is not `http(s):`.
-[BUG-301](TO_BE_FIXED.md#bug-301--the-guides-own-cross-references-are-not-links).
+[BUG-301](FIXED_ITEMS.md#fixed-557--the-guides-own-cross-references-were-punctuation).
 
 ---
 
@@ -25162,7 +25162,7 @@ still on this page. Moving them to Threads needs the work index to grow a
 `pinned` and an `archived` facet and an ordering that honours them, and a control
 whose effect cannot be undone from the same surface is worse than one that has
 not moved yet. Filed as
-[BUG-303](TO_BE_FIXED.md#bug-303--the-conversation-library-controls-are-still-in-the-evidence-inspector).
+[BUG-303](FIXED_ITEMS.md#fixed-576--the-conversation-library-lived-in-the-evidence-inspector).
 
 ---
 
@@ -26053,7 +26053,7 @@ until something tried to send; corrected with the tests.
 
 **Severity: Low. Area: Memory / settings. Status: Fixed 2026-09-20. Closes
 [REM-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions)
-in part; see [BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both)
+in part; see [BUG-305](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read)
 for the half that remains.**
 
 **Observed.** Memory's *Recall & indexing* tab carried the embedding-space
@@ -26157,7 +26157,7 @@ either would be worse than not widening it.
 ## FIXED-590 — A turn that failed blamed the local runtime for it
 
 **Severity: Medium. Area: Chat / Build / provider errors. Status: Fixed
-2026-09-20. Closes [BUG-285](TO_BE_FIXED.md#bug-285--an-ollama-cloud-model-tests-and-runs-in-ollama-but-chat-cannot-use-it).**
+2026-09-20. Closes [BUG-285](FIXED_ITEMS.md#fixed-590--a-turn-that-failed-blamed-the-local-runtime-for-it).**
 
 **Observed.** An Ollama model that passed the Models page's **Test connection**,
 and that answered under `ollama run`, ended a Chat turn with **"Could not reach
@@ -26203,7 +26203,7 @@ connection sentence and the absence of the reachability one.
 ## FIXED-591 — Retry looked the same whether the turn had sent an email or nothing
 
 **Severity: Medium. Area: Chat / Build / conversation commands. Status: Fixed
-2026-09-20. Closes [BUG-306](TO_BE_FIXED.md#bug-306--three-surfaces-carry-their-own-conversation-menu)
+2026-09-20. Closes [BUG-306](FIXED_ITEMS.md#fixed-591--retry-looked-the-same-whether-the-turn-had-sent-an-email-or-nothing)
 and REM-CHAT-02, the last §18.3 row.**
 
 **Observed — the row.** Rename, archive, pin, move and retry are reachable from
@@ -26255,7 +26255,7 @@ retry goes straight through.
 ## FIXED-592 — Two kinds of source, and nowhere that answered "what can Raiker read"
 
 **Severity: Low. Area: Memory / Knowledge Map. Status: Fixed 2026-09-20. Closes
-[BUG-305](TO_BE_FIXED.md#bug-305--two-source-controllers-and-nothing-that-owns-both),
+[BUG-305](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read),
 and with it the second clause of REM-MEM-03.**
 
 **Observed.** Raiker has two kinds of source. A **managed file** is bytes Raiker
@@ -26839,7 +26839,7 @@ classified `credential_like`, and with the credential redacted.
 ## FIXED-609 — The policy allowed inline styles for a reason that was not true
 
 **Severity: Low. Area: Web UI / security headers. Status: Fixed 2026-09-28.
-Closes [BUG-307](TO_BE_FIXED.md#bug-307--the-content-security-policy-still-allows-inline-styles).**
+Closes [BUG-307](FIXED_ITEMS.md#fixed-609--the-policy-allowed-inline-styles-for-a-reason-that-was-not-true).**
 
 **Observed.** `style-src` kept `'unsafe-inline'` on the belief that Svelte writes
 component state into `style` attributes, which CSP cannot nonce.
@@ -27233,7 +27233,7 @@ approval still pending
 ## FIXED-622 — On Approvals, the notice dock repeated the approval the queue was listing
 
 **Severity: Low. Area: Web UI / notifications. Status: Fixed 2026-09-28. Closes
-[BUG-309](TO_BE_FIXED.md#bug-309--on-approvals-the-notice-dock-repeats-the-approval-and-covers-the-queues-header).**
+[BUG-309](FIXED_ITEMS.md#fixed-622--on-approvals-the-notice-dock-repeated-the-approval-the-queue-was-listing).**
 
 **Observed.** The second 2026-09-28 round's capture of Approvals showed the
 notice dock holding *Approval needed … run 'write_file'* over the queue that
@@ -28009,7 +28009,7 @@ name the two lists, and last activity is its own fact on each card.
 ## FIXED-654 — Seven Python tests failed on Windows and nowhere else
 
 **Severity: Low. Area: Tests / Windows. Status: Fixed 2026-10-01. Closes
-[BUG-310](TO_BE_FIXED.md#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else).**
+[BUG-310](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else).**
 
 **Fixed.** The plugin-runtime and source-review fixtures are written as bytes, so
 Windows' newline translation cannot change a digest or a size. A failed instance
@@ -28189,7 +28189,7 @@ command and supervisor suites.
 ## FIXED-663 — On Windows a registry read could say there were no instances
 
 **Severity: Medium. Area: Instances / Windows. Status: Fixed 2026-10-01 — the
-part of [BUG-310](TO_BE_FIXED.md#bug-310--seven-python-tests-fail-on-windows-and-nowhere-else)
+part of [BUG-310](FIXED_ITEMS.md#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else)
 that [FIXED-654](#fixed-654--seven-python-tests-failed-on-windows-and-nowhere-else) left: `test_the_registry_is_published_atomically`
 still failed on every run on a Windows host.**
 
@@ -30718,7 +30718,7 @@ answered 415 by the running host (scenario 8).
 ## FIXED-773 — The time-zone list offered the old names of renamed zones
 
 **Severity: Low. Area: Settings → General. Status: Fixed 2026-10-05. Closes
-[BUG-321](TO_BE_FIXED.md#bug-321--the-time-zone-list-offers-the-browsers-own-zone-ids-not-the-current-ones).**
+[BUG-321](FIXED_ITEMS.md#fixed-773--the-time-zone-list-offered-the-old-names-of-renamed-zones).**
 
 **Observed.** Chromium's `supportedValuesOf("timeZone")` answers with ICU ids,
 which for renamed zones are the old names — `Asia/Calcutta`, `Europe/Kiev`.
@@ -30888,7 +30888,7 @@ recorded without interrupting, or *Sent and held: quiet hours are on until
 ## FIXED-781 — A notice sat over Chat's newest prompt for a whole turn
 
 **Severity: Low. Area: Notifications / layout. Status: Fixed 2026-10-05.
-Closes [BUG-320](TO_BE_FIXED.md#bug-320--a-notification-toast-covers-the-newest-prompt-in-chat).**
+Closes [BUG-320](FIXED_ITEMS.md#fixed-781--a-notice-sat-over-chats-newest-prompt-for-a-whole-turn).**
 
 **Fixed.** On Chat, Build and Design the dock shows a notice for six seconds
 and then folds it into the bell, which keeps counting it; pointing at it or
@@ -30903,7 +30903,7 @@ reading *1 unread* and nothing over the conversation.
 ## FIXED-782 — Build's decision was offered twice, one card over the other
 
 **Severity: Low. Area: Build / notifications. Status: Fixed 2026-10-05.
-Closes [BUG-317](TO_BE_FIXED.md#bug-317--the-global-approval-toast-covers-the-decision-it-duplicates-in-build).**
+Closes [BUG-317](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other).**
 
 **Fixed.** A page showing a decision inline marks it (`use:shownInline`, Build's
 *Waiting on you*); the floating approval card leaves it alone while that
@@ -30922,7 +30922,7 @@ it, and the same pending decision floating on Home.
 ## FIXED-783 — A damaged search index waited behind a closed fold
 
 **Severity: Low. Area: Observability / search. Status: Fixed 2026-10-05.
-Closes [BUG-322](TO_BE_FIXED.md#bug-322--a-damaged-search-index-is-named-only-under-diagnostics-fold);
+Closes [BUG-322](FIXED_ITEMS.md#fixed-783--a-damaged-search-index-waited-behind-a-closed-fold);
 DEC-24 steps 1 and 6.**
 
 **Fixed.** The host tick runs the read-only index check on its first pass and
@@ -31262,7 +31262,7 @@ that file in the archive; the snapshot is also listed under Settings → Account
 ## FIXED-801 — A locked workspace could not be restored from its own backups
 
 **Severity: Medium. Area: Storage / lock screen. Status: Fixed 2026-10-05.
-Closes [BUG-323](TO_BE_FIXED.md#bug-323--a-locked-workspace-cannot-be-restored-from-its-own-backups),
+Closes [BUG-323](FIXED_ITEMS.md#fixed-801--a-locked-workspace-could-not-be-restored-from-its-own-backups),
 DEC-24 step 6's quarantine and step 5's atomic switch.**
 
 **Observed.** FIXED-789 to FIXED-792 made, verified and restored backups from

@@ -46,14 +46,16 @@ a profile record alone is not enough. Approval resolution remains metadata-only
 for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
-**Checkpoint restore is a known gap.** `CheckpointRestoreExecutor`
-(`raiker/runtime/executors/tier1_checkpoint.py`) is implemented, registered and
-tested, and it captures its own pre-image so a restore is itself reversible —
-but **no route, terminal command or model tool proposes a restore**. The CLI's
-`/checkpoints restore` and the web Checkpoints view both compute a *preflight*
-and perform nothing. Capture is automatic and complete; rewind is not reachable
-by an owner. Tracked in
-[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort).
+**Checkpoint restore is owner-reachable and approval-gated (2026-08-23 onward).**
+`CheckpointRestoreExecutor` (`raiker/runtime/executors/tier1_checkpoint.py`)
+has a pre-image and governed execution path. `POST /api/checkpoints/{id}/restore`
+and `/checkpoints restore <id> --confirm` propose a restore through
+`checkpoint_restore_execution`; the Chat/Build rewind control uses the same
+preflight and ordinary approval. Cross-principal restore stays on its critical
+human-only path. This corrects the historical gap below without claiming that
+every restore/restart fault has been live-verified; see
+[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)
+and CR-11.
 
 Per-turn machine identity is `implemented_verified`. Every ordinary, resumed,
 scheduled, plugin-relay, CLI-agentic, and child-agent tool call reaches the

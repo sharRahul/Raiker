@@ -253,3 +253,7 @@ RR-33 must capture whether first-time users understand what an approval changes,
 which account/destination is involved, why work waits and where a result can be
 opened, in addition to actual completion. UX tasks are planned/not run until
 implementation and evidence land; the overall release protocol remains NOT ASSESSED.
+
+## Meta Muse matched-product qualification — 2026-10-12
+
+[Meta Muse](https://ai.meta.com/muse/) is an **explicit personal-agent reference product** for PA-S01–PA-S08 and the relevant release scenarios. Benchmarking is **not** a prerequisite for a narrower independently qualified Raiker release, but it is mandatory for claims of Meta Muse parity or superiority. Compare the Muse personal agent, **not** Muse Wonder models or Muse Code, with the same supported task fixture, verifier and consented service accounts. Record exact client/platform, model where disclosed, subscription/region, host, connection permissions, outcome receipts, denied actions, blocked functionality, number of interventions and app-close/restart continuity. The vendor's [Secure VM security design](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/) is an architecture claim that needs independent fault/attack testing; do not treat it as proof from our test run. Do not assert a completed competitive run until evidence is recorded under the [CR contract](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md#rcd-10--match-meta-muse-on-finished-personal-goals-not-marketing-features).

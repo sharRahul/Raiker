@@ -1,5 +1,11 @@
 # Raiker plans — current-status index
 
+The [2026-10-12 887-ID fixed-item verification inventory](FIXED_ITEMS_VERIFICATION_AUDIT_2026-10-12.md) classifies evidence per closure, flags numbering gaps and links to passing CI. **This is not certification that every historical fix works end to end.**
+
+The [2026-10-12 competitive decision gap review](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md#competitive-decision-gap-review--2026-10-12) records eleven prioritised **recommendations pending owner acceptance**, their code boundaries, competitive rationale, dependencies and required evidence. These are not newly accepted owner decisions or completed implementation work.
+
+The [active defects ledger](TO_BE_FIXED.md) now lists only unresolved BUGs; historical closures are retained in [FIXED_ITEMS.md](FIXED_ITEMS.md) and Git history. The [Meta Muse competition track](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#9-meta-muse-competitive-track--2026-10-12) distinguishes Meta's personal agent from Muse Wonder models and defines independently validated personal-goal outcomes.
+
 The [personal-agent UX implementation plan](PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
 owns UX-01–UX-12, with detailed reasons, decisions, alternatives, dependencies,
 state/failure behavior and acceptance. It extends existing surfaces under
@@ -161,7 +167,7 @@ References: [decision lifecycle](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_202
 
 ## Competitive demonstration requirements — 2026-10-05
 
-**Decision.** Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) as the shared acceptance contract for competitive claims. OpenClaw/Hermes define the agent-platform comparison; Codex/Cursor/Claude define coding outcomes and experience. The contract contains twelve detailed criteria, source anchors, evidence levels and release/claim gates.
+**Decision.** Use [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) as the shared acceptance contract for competitive claims. Meta Muse defines the personal-agent product comparison; OpenClaw/Hermes define agent-platform comparison; Codex/Cursor/Claude Code define coding outcomes and experience. The contract contains twelve detailed criteria, source anchors, evidence levels and release/claim gates.
 
 | Plan owner | What Raiker must demonstrate | Evidence required |
 |---|---|---|

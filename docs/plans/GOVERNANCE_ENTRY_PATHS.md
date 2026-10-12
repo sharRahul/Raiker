@@ -229,15 +229,15 @@ row, and it is recorded rather than removed for the reason this section exists.
 
 ### 3.6 Every capability with a real executor, and the path that reaches it
 
-All forty-eight, so the enumeration is complete rather than illustrative.
+All fifty, so the enumeration is complete rather than illustrative.
 `telemetry_export` was the forty-sixth, added 2026-09-04 with backlog item 18;
-`image_generation` is the forty-seventh, added 2026-09-05 with the Design
-surface. The invariant below is what required each to appear here at all. The
+`image_generation` the forty-seventh, added 2026-09-05 with the Design
+surface; `git_fetch_execution` is the newest, added 2026-10-12 with ADD-27 GH-23. The invariant below is what required each to appear here at all. The
 first column is computed (`CAPABILITY_GATE_MAP` over `TOOL_DEFINITIONS`,
 `EXECUTABLE_ON_APPROVAL`); the rest is read from the code and marked where it was
 not fully traced.
 
-**Reached by a model tool** — seventeen, each entering chokepoint B by name:
+**Reached by a model tool** — eighteen, each entering chokepoint B by name:
 
 | Capability | Tool(s) |
 |---|---|
@@ -246,6 +246,7 @@ not fully traced.
 | `shell_execution` | `shell` |
 | `git_write_execution` | `git_branch`, `git_commit` |
 | `git_push_execution` | `git_push` |
+| `git_fetch_execution` | `git_fetch`, `git_clone` |
 | `connector_github_runtime` | `github_write` |
 | `memory_write_execution` | `memory_write` |
 | `memory_forget_execution` | `memory_forget` |
@@ -269,11 +270,11 @@ grant asks the same placement in the broker. Its entries are therefore the
 `shell` tool and the approval relay, which `RECLASSIFIED_FROM` in
 `entry_paths.py` states and the invariants derive rather than list. Where this
 machine has the native sandbox the command is placed there instead and this
-capability is never asked. That makes forty-eight.
+capability is never asked. That makes fifty.
 
-Twelve of these seventeen are also **relayed by an approval**
+Thirteen of these eighteen are also **relayed by an approval**
 (`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `language_intelligence`,
-`graph_indexing_runtime`, `web_fetch` and `subagents` are not. The thirteenth relayed capability,
+`graph_indexing_runtime`, `web_fetch` and `subagents` are not. The fourteenth relayed capability,
 `checkpoint_restore_execution`, has no model tool at all: only paths 21 and 22
 propose a restore, so an agent can never rewind the workspace on its own say-so.
 
@@ -343,7 +344,7 @@ page can offer a control for — has to be traced before it ships.
 
 ---
 
-## 4. The fourteen modules that check the gate themselves
+## 4. The fifteen modules that check the gate themselves
 
 These read the capability gate directly rather than calling
 `RuntimeAuthority.check_capability_gate` through `route_action`. **Since
@@ -368,17 +369,18 @@ which is GEP-01 closed.
 | `raiker/memory/query_embedding.py` | `model_provider_runtime` | **Egress admission precheck, followed by chokepoint B** |
 | `raiker/control/service.py` | every gate it reports | **Describes rather than enforces** (BUG-239) |
 | `raiker/runtime/read_capabilities.py` | `web_fetch` | **Describes rather than enforces** — typed readiness for the global read set |
+| `raiker/api/routes_github.py` | `git_push_execution`, `connector_github_runtime`, `git_fetch_execution` | **Describes rather than enforces** — the *Capability* state on Settings → GitHub (ADD-27 GH-19) |
 
 **This is defensible and it is not free.** The design intent is stated in
 `raiker/policy/engine.py:132–138`: a projected MCP tool is *read-shaped at the
 policy layer* because what actually governs it is enforced inside the tool. The
 same argument covers the others.
 
-**The three describing modules are here for the opposite reason to the rest.**
-`context/gatherer.py`, `control/service.py` since 2026-08-30, and
-`runtime/read_capabilities.py` since 2026-09-07 decide nothing at all — they
-*report* a gate, to the model, to the owner and to the composer's Tools menu
-respectively. They
+**The four describing modules are here for the opposite reason to the rest.**
+`context/gatherer.py`, `control/service.py` since 2026-08-30,
+`runtime/read_capabilities.py` since 2026-09-07 and `api/routes_github.py` since
+2026-10-12 decide nothing at all — they *report* a gate, to the model, to the
+owner, to the composer's Tools menu and on Settings → GitHub respectively. They
 read `capability_admission` precisely because a description that resolves an
 empty gate table its own way is a description that can contradict the thing it
 describes, and both of them once did: the gatherer told the model

@@ -524,7 +524,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
 
 1. Ask for a branch and a commit. Approve each. **MUST**: the commit stages
    exactly the paths you reviewed — never `--all`.
-2. Store a token in **Settings → Git credential**. Ask for a push.
+2. Store a token in **Settings → GitHub**. Ask for a push.
    - **MUST**: it does nothing until the remote's host is on
      `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`.
    - **MUST**: the credential never appears in a log, an error or the command's

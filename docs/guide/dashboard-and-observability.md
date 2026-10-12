@@ -326,17 +326,19 @@ command at a time under a grant you make once or for a session. It is redacted
 from commands, logs, errors, and output. Publishing is a separate permission
 from changing a local repository.
 
-**Settings → Git credential** says what the credential is for before it asks for
+**Settings → GitHub** says what the credential is for before it asks for
 one: the hosts Raiker will offer it to, the operations it is used for, and that
 every use asks first. It is only ever offered to those hosts — a remote on
 another forge, or a redirect that sends git somewhere unexpected, is answered
-without it. Raiker deliberately does not use this machine's own credential
-manager: a keychain answers for whichever account signed in last, which Raiker
-cannot name for you, cannot scope, and cannot withdraw. A fine-grained token
-scoped to the repositories you want is the supported method. Signing in with
-GitHub, and explicitly choosing an existing GitHub CLI sign-in, credential
-manager entry or SSH key, are planned; even then nothing found on the machine
-is used until you choose it, and connecting grants no permission by itself.
+without it. The page keeps six things apart — the GitHub account, the Raiker
+app, the repositories, the credential, the capability and the approval — rather
+than one *Connected* light. **Find credentials on this machine** lists a GitHub
+CLI sign-in, a configured credential manager and SSH keys by fingerprint without
+reading any secret; nothing found is used until you choose it, and each is
+checked against GitHub's answer for its account, again at every use. A
+fine-grained token scoped to the repositories you want still works. *Connect
+GitHub* appears once a GitHub App is available (a self-hosted install can
+configure its own under *Advanced*). Connecting grants no permission by itself.
 Under the approval
 controls it says when the credential was last lent and for what — *Last lent …
 to push a branch, under a one-command approval* — or that it has never been.

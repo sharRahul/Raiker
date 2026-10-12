@@ -2598,11 +2598,11 @@ symbols and tests rather than relying on line numbers that drift after edits.
 > [ADD-27](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)).
 > Reviewing the Git credential code for it found three defects: a token stored
 > in Settings cannot carry a proposed push
-> ([BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings)),
+> ([BUG-334](FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334)),
 > a *this session* grant reaches every session
-> ([BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session)),
+> ([BUG-335](FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335)),
 > and a push is not bound to the approved commit
-> ([BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved)).
+> ([BUG-336](FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336)).
 >
 > **2026-10-05.** General's preview now states the UTC offset ([FIXED-756](FIXED_ITEMS.md#fixed-756--the-time-zone-was-a-name-and-a-short-name-is-ambiguous)), and Web
 > access's check says why in words, names the rule and which of the three lists
@@ -2814,9 +2814,9 @@ tasks, priorities, effort, dependencies and acceptance evidence are
 GH-01…GH-61; end-to-end scenarios are
 [RR-37…RR-41](RELEASE_ACCEPTANCE_TEST_SCENARIOS.md#h-github-connection-and-repository-authority--dec-21b);
 three defects found while reviewing the code are
-[BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings),
-[BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session) and
-[BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved).
+[BUG-334](FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334),
+[BUG-335](FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335) and
+[BUG-336](FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336).
 
 **Provider facts.** GitHub's behaviour was checked on 2026-10-12 against the
 `github/docs` source at commit `be38ec5` because `docs.github.com` itself could

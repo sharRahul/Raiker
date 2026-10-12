@@ -104,22 +104,19 @@ turn controls, not replacements for capability gates or runtime policy. “Skip
 all approvals” skips an ordinary UI prompt; it does not bypass policy,
 confinement, sandboxing, or critical holds.
 
-Pushing to GitHub has three known gaps, being fixed first in the GitHub
-connection work:
+Pushing to GitHub works with a token stored in **Settings → GitHub**, the
+GitHub CLI's sign-in, a saved Git credential or an SSH key — each one chosen by
+you and checked against the GitHub account it claims. What is still limited:
 
-- A push Raiker proposes is refused as *credential unset* when the token is
-  stored only in **Settings → Git credential**; today it also needs
-  `RAIKER_GITHUB_TOKEN` in the host environment, and that variable lends
-  without a grant (BUG-334).
-- A grant made **for this session** in Settings is not tied to a conversation:
-  for its hour it covers a push approved anywhere, routines included (BUG-335).
-  Use **once** when that matters.
-- A push sends the branch as it is when it runs, so a commit made after you
-  approved would go with it (BUG-336).
-
-Only HTTPS GitHub remotes with a personal access token are supported. Signing
-in with GitHub, or choosing your existing GitHub CLI sign-in, a saved Git
-credential or an SSH key, is planned and not yet available.
+- **Signing in with GitHub** needs the official Raiker GitHub App, which is not
+  registered yet; until it is, *Connect GitHub* appears only on a self-hosted
+  install configured with its own App (Settings → GitHub → Advanced).
+- A **delegation's branch pattern** limits where the agent pushes, not yet where
+  it commits locally (BUG-337), and its repository is checked against Raiker's
+  last *Refresh from GitHub* rather than asked of GitHub at each step (BUG-338).
+- The **issue-to-pull-request routine** has its template and authority plan, but
+  scheduled routines cannot yet run its write steps unattended (BUG-339).
+- Only GitHub.com; other forges and GitHub Enterprise are not supported.
 
 ## Hooks, plugins, and MCP
 

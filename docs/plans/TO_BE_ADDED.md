@@ -101,7 +101,7 @@ from competitor feature lists.
 | [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
 | [ADD-25](#add-25--post-stage-j-memory-expansion) | Tier 4 | Memory / temporal, polyglot, context and transactions | Proposal — after Stage J |
 | [ADD-26](#add-26--a-premium-responsive-workspace-shell) | Tier 2 | Web UI / theme and adaptive navigation | Implemented 2026-08-25 |
-| [ADD-27](#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority) | Tier 1 | Build / GitHub connection and repository authority | Accepted 2026-10-12 (DEC-21b amendment) — Wave 0 done; Waves 1–4 planned; managed App needs operator registration |
+| [ADD-27](#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority) | Tier 1 | Build / GitHub connection and repository authority | Accepted 2026-10-12 (DEC-21b amendment) — Waves 0–4 and the Settings page delivered 2026-10-12 against a stand-in GitHub; GH-55 partial (BUG-339); GH-30 and live evidence external; Wave 5 deferred |
 
 **2026-08-21 review against the reference platforms.** Evidence-bound graph
 review and visible checkpoint failure are proven meaningful differentiators and
@@ -1104,13 +1104,26 @@ under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2
 
 ## ADD-27 — A hybrid GitHub connection that separates sign-in, repository access, credential and authority
 
-**Status: architecture accepted, implementation planned — 2026-10-12. Tier 1
+**Status: architecture accepted 2026-10-12; Waves 1–4 delivered 2026-10-12 (see
+*Delivery* below). Tier 1
 (safe autonomy). Effort: high overall; ordered below so that high-priority,
 low-effort work lands first. Owner decision recorded as the
 [DEC-21b amendment](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication);
 the contracts are in the [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md).**
 
-**What exists today.** One push credential: a GitHub token in the vault
+**Delivery (2026-10-12).** Every task below through Wave 4 is implemented and
+tested against a stand-in GitHub (`tests/github_fakes.py`), with the
+[gap table](../architecture/GITHUB_CONNECTION_SPEC.md#18-current-implementation-gap-analysis)
+as the per-requirement record. Done: GH-10…GH-25, GH-31…GH-37, GH-40…GH-44,
+GH-50…GH-54, GH-56, and GH-19 (Settings → GitHub, live screenshots in
+`docs/screenshots/2026-10-12-github-connection/`). Partial: GH-50 for local
+branch and commit ([BUG-337](TO_BE_FIXED.md#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation)),
+GH-52 against GitHub itself ([BUG-338](TO_BE_FIXED.md#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step)),
+GH-55 has its template but no runner ([BUG-339](TO_BE_FIXED.md#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner)).
+External: GH-30 (official App registration) and the live evidence RR-38…RR-41,
+which needs consented test accounts. Deferred by the decision: Wave 5.
+
+**What existed before this work.** One push credential: a GitHub token in the vault
 (`github_token`, Settings → Git credential), or the legacy
 `RAIKER_GITHUB_TOKEN`, lent to `github.com` only for one command (300 s) or
 an hour (3600 s) under a grant, through a host-checking helper that clears
@@ -1141,9 +1154,9 @@ week). A task starts only when its dependencies are done. Each closes into
 | Task | Wave / priority / effort | Work | Depends on | Acceptance evidence |
 |---|---|---|---|---|
 | GH-01 | 0 / P0 / S — **done 2026-10-12** | Amend DEC-21b; publish the specification, deployment modes, identity and permission matrices, lifecycle and gap table | — | This entry, the amendment and the specification |
-| GH-10 | 1 / P0 / S | Fix [BUG-334](TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings): the proposal asks the broker whether a credential is configured, never for its value | — | Push-path test with the token only in the vault; live push to a test repository |
-| GH-11 | 1 / P0 / S | Fix [BUG-335](TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session): a session grant requires a session and the executor asks with the approval's origin session | — | Executor-level test: a grant made in chat A does not lend to chat B or a routine |
-| GH-12 | 1 / P0 / M | Fix [BUG-336](TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved): bind the approved head and resolved push URL; push the approved commit; refuse `push_target_changed` | — | Test: a commit made after approval is not pushed and the push is refused |
+| GH-10 | 1 / P0 / S | Fix [BUG-334](FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334): the proposal asks the broker whether a credential is configured, never for its value | — | Push-path test with the token only in the vault; live push to a test repository |
+| GH-11 | 1 / P0 / S | Fix [BUG-335](FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335): a session grant requires a session and the executor asks with the approval's origin session | — | Executor-level test: a grant made in chat A does not lend to chat B or a routine |
+| GH-12 | 1 / P0 / M | Fix [BUG-336](FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336): bind the approved head and resolved push URL; push the approved commit; refuse `push_target_changed` | — | Test: a commit made after approval is not pushed and the push is refused |
 | GH-13 | 1 / P0 / S | The legacy `RAIKER_GITHUB_TOKEN` is a credential *method* lent under the same grant; the CLI's one-shot push records an explicit once-grant | GH-10 | Test: with the variable set and no grant, the executor refuses `git_grant_required` |
 | GH-14 | 1 / P0 / S | Credential and grant events (`git_credential_stored`, `…_forgotten`, `git_grant_created`, `…_revoked`, `git_credential_lent`) — metadata only; EVENT_CATALOG | — | Event-shape tests; secret canary absent from every event |
 | GH-15 | 1 / P1 / S | Explicit redaction patterns for `ghs_`, `ghu_`, `gho_`, `ghr_` beside `ghp_` and `github_pat_`, including the stateless `ghs_APPID_JWT` installation-token format GitHub began rolling out on 2026-04-27 | — | Redaction tests for each prefix, short and JWT-shaped forms included |

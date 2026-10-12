@@ -250,13 +250,27 @@ repository's own hooks are disabled for the invocation.
 **A push answers to its own switch.** Publishing sends repository content off
 the machine, so `git_push` answers to **Git push** (`git_push_execution`) rather
 than to Git writes, and it does nothing until the remote's host is on
-`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The credential is stored encrypted from
-**Settings → Git credential** and lent to one command at a time under a grant you
-make — **once**, or **for this session** — carrying its own expiry, withdrawable
-in one press, passed in the command's environment rather than on a command line,
-and removed from every log, error and captured output for as long as the loan
-lasts. Only HTTPS GitHub remotes are pushable. Raiker never forces and never
-deletes a branch.
+`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The credential is the one you select in
+**Settings → GitHub** — a stored token, your GitHub CLI sign-in, a saved Git
+credential or an SSH key, each checked against the GitHub account it claims —
+and it is lent to one command at a time under a grant you make — **once**, or
+**for the conversation** that proposed the push — narrowed to the repository and
+branch, carrying its own expiry, withdrawable in one press, passed in the
+command's environment rather than on a command line, and removed from every
+log, error and captured output for as long as the loan lasts. The approval
+records the commit it showed you, and the push sends that commit or refuses if
+the branch moved; afterwards the remote's branch is read back and the result
+says whether it was confirmed. GitHub.com remotes only, over HTTPS or SSH.
+Raiker never forces and never deletes a branch.
+
+**Letting the agent push without asking each time** takes a **delegation**
+(Settings → GitHub → *Delegations*): one repository, the operations you allow,
+the branches it may touch (a prefix such as `raiker/*`, never the default
+branch), how long, and how many actions. Neither a standing grant nor setting
+**Git push** to *always allow* is enough on its own. Merging, deleting a branch
+and changing workflows are never delegated. Before each step the delegation is
+checked again — credential, account, installation and repository — and if
+anything changed, the step waits for you.
 
 ## Reading the repository
 

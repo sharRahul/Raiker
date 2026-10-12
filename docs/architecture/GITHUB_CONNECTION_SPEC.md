@@ -423,6 +423,15 @@ GitHub **API** host policy (`api.github.com`) and **Git transport** host policy
 cannot enforce these controls for a method on a platform, that method is
 unavailable there.
 
+**Control plane and agent egress are different traffic.** Sign-in, the
+`GET /user` account check, repository discovery, token refresh, revocation, App
+validation and installation-token minting are Raiker's own requests to fixed
+endpoints on `github.com` and `api.github.com`, made by one client
+(`raiker/github/http.py`) that allows only those two hosts, HTTPS only, and
+refuses every redirect. They are not subject to `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`,
+which governs what the *agent* reaches: Git transport and the API connector's
+requests on its behalf still need their host on that list.
+
 ## 12. Delegated autonomous work
 
 A **delegation** is the owner's explicit, stored authority for repository work
@@ -565,37 +574,47 @@ GitHub.
 
 ## 18. Current implementation gap analysis
 
-Reviewed against the code on 2026-10-12 (commit `fef79d0`).
+Reviewed against the code on 2026-10-12 after Waves 1–4 and the Settings page
+landed. "Stand-in" means proven against `tests/github_fakes.py`, not yet against
+GitHub itself — that is RR-38…RR-41.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Vault-held PAT, never redisplayed | Implemented | `raiker/runtime/git_credential.py` (`CREDENTIAL_KEY = "github_token"`, `store_token`, status fields named `credential_*`) |
-| Once/session grants 300/3600 s, expiry on read, revoke, last use | Implemented | `GRANT_SECONDS`; `raiker/storage/stores/approvals.py` grant store; `tests/test_git_credential_grant.py` |
-| Host-scoped helper, inherited helpers cleared, token off the command line | Implemented | `credential_helper`, `credential_config`; `raiker/tools/git.py` `_credential_args`, `push_branch` |
-| Push URL / `insteadOf` resolution, HTTPS only, no URL credentials | Implemented | `proposed_push_snapshot` (`git remote get-url --push`) |
-| Hooks disabled on writes and push | Implemented | `_NO_HOOKS` |
-| Vault token usable for a proposed push | **Missing — defect** | [BUG-334](../plans/TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings): previews read only `RAIKER_GITHUB_TOKEN` |
-| Session grant bound to a session | **Partial — defect** | [BUG-335](../plans/TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session) |
-| Approval bound to the exact pushed commit | **Missing — defect** | [BUG-336](../plans/TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved) |
-| Legacy environment token under a grant | Partial | `tier1_git.py` lends without a grant when `RAIKER_GITHUB_TOKEN` is set (documented legacy path) — GH-13 |
-| Grants bound to repository, operation, branch, account | Missing | grant rows carry principal, scope, session only — GH-17 |
-| Account identity, `GET /user` check | Missing | username hard-coded `x-access-token`; no account record — GH-18 |
-| Credential/grant events | Missing | no entries in `EVENT_TYPES` — GH-14 |
-| Revocation survives restore | Missing | `deletion_journal` replays memory and sessions only; a restore brings back a forgotten token and revoked grants — GH-16 |
-| Redaction of every GitHub token prefix | Partial | `ghp_`, `github_pat_` explicit; `ghs_`/`ghu_`/`gho_`/`ghr_` rely on the 40-character entropy fallback, which the stateless `ghs_APPID_JWT` installation format (P19) may not match — GH-15 |
-| Reads in a constructed environment | Partial | `run_git`/`_git` inherit `os.environ`; push uses `sandbox_environment` — GH-24 |
-| Separate API and Git transport host policy | Partial | both read `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` (exact vs glob matching) — GH-25 |
-| Clone / fetch | Missing | no tool or capability — GH-23 |
-| gh CLI, OS credential manager | Missing (deliberately declined until now) | Settings copy declines the credential manager — GH-20, GH-21 |
-| Git over SSH | Missing | push refuses non-HTTPS — GH-22; SSH exists only for remote execution |
-| OAuth (state, PKCE, device flow), GitHub App, installation tokens | Missing | no authorise/callback route, no JWT library — GH-31…GH-40 |
-| BYO App configuration | Missing | GH-41 |
-| GitHub webhook receiver | Missing | channel HMAC verifier and dedupe table are reusable patterns only — GH-43 |
-| API connector on the shared broker | Missing | `raiker/runtime/connectors.py` reads the environment only — GH-56 |
-| Repository-bound delegation; standing grants excluded from Git writes | Missing | `grants.py` has no Git exclusion — GH-50 |
-| Child agents cannot widen authority | Implemented | `DELEGABLE_TOOLS` read-only; `git_*` writes `delegable=False` |
-| Approvals re-governed at execution | Implemented | approval relay recomputes the payload hash and re-routes; the grant is re-checked at lend time |
-| Managed cloud, official App | **Blocked — external** | needs GH-30 operator registration and a trusted credential service |
+| Vault-held PAT, never redisplayed | Implemented | `raiker/runtime/git_credential.py`; status fields named `credential_*` |
+| Once/session grants, expiry on read, revoke, last use | Implemented | `GRANT_SECONDS`; `tests/test_git_credential_grant.py` |
+| Host-scoped helper, inherited helpers cleared, token off the command line | Implemented | `credential_config`; `raiker/tools/git.py` `_credential_args`, `push_branch` |
+| Push URL / `insteadOf` resolution, no URL credentials | Implemented | `proposed_push_snapshot` (`git remote get-url --push`) |
+| Hooks and fsmonitor disabled on every git invocation | Implemented | `_NO_HOOKS`, `_NO_FSMONITOR` |
+| Vault token usable for a proposed push | Implemented | [FIXED-882](../plans/FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334) |
+| Session grant bound to the proposing conversation | Implemented | [FIXED-883](../plans/FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335) |
+| Approval bound to the exact pushed commit | Implemented | [FIXED-884](../plans/FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336); `tests/test_git_push_binding.py` |
+| Legacy environment token under a grant | Implemented | an *environment* credential row, lent only under a grant — GH-13 |
+| Grants bound to repository, operation, branch, credential, account | Implemented | RAIKER-2107; `covering_grant` — GH-17 |
+| Account identity (`GET /user`), credential records by method | Implemented | `raiker/github/accounts.py`, `git_credentials` — GH-18 |
+| Credential, grant, sign-in and delegation events | Implemented | [Event catalog](EVENT_CATALOG.md) — GH-14 |
+| Revocation survives restore | Implemented | `deletion_journal` kinds for credentials, grants, delegations; `tests/test_git_credential_restore.py` — GH-16 |
+| Redaction of every GitHub token prefix | Implemented | `gh[pousr]_` and `ghs_APPID_JWT` shapes; `tests/test_github_token_redaction.py` — GH-15 |
+| Reads in a constructed environment | Implemented | `local_git_environment`; `tests/test_local_git_environment.py` — GH-24 |
+| Separate API, Git transport and control-plane host policy | Implemented | `raiker/github/hosts.py`; §11; `tests/test_github_host_policy.py` — GH-25 |
+| Clone / fetch | Implemented | `git_fetch_execution`; `tests/test_git_fetch_clone.py` — GH-23 |
+| gh CLI, OS credential manager | Implemented — chosen explicitly, account re-checked at each lend | `raiker/github/local_methods.py` — GH-20, GH-21 |
+| Git over SSH | Implemented — selected key, `IdentitiesOnly`, pinned host keys | GH-22 |
+| Device and browser sign-in (state, PKCE), refresh with rotation, disconnect | Implemented against a stand-in | `raiker/github/auth.py`; `tests/test_github_sign_in.py` — GH-31…GH-37 |
+| GitHub App service, installation tokens narrowed per operation and repository | Implemented against a stand-in | `raiker/github/app_service.py`; `tests/test_github_app_operations.py` — GH-40, GH-42 |
+| BYO App configuration and validation | Implemented | `PUT /api/github/app`, Settings → GitHub → Advanced — GH-41 |
+| GitHub webhook receiver | Implemented (configured App only) | `raiker/github/webhooks.py`; `tests/test_api_github.py` — GH-43 |
+| Two owners never share a credential | Implemented | `tests/test_github_app_operations.py` — GH-44 |
+| API connector on the shared broker | Implemented | `GithubConnectorService._borrow`; [FIXED-885](../plans/FIXED_ITEMS.md#fixed-885--an-agents-push-looked-for-a-credential-of-its-own-not-the-owners) — GH-56 |
+| Repository-bound delegation; standing grants and modes excluded from pushes and GitHub writes | Implemented | [FIXED-886](../plans/FIXED_ITEMS.md#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github) — GH-50 |
+| …and from local branch and commit | **Partial** | [BUG-337](../plans/TO_BE_FIXED.md#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation) |
+| Risk classes for the twelve operations | Implemented | `raiker/github/delegations.py` `OPERATION_RISKS`; Settings → GitHub → Permissions — GH-51 |
+| Resume revalidation before each consequential step | Implemented against Raiker's records; **Partial** against GitHub | [BUG-338](../plans/TO_BE_FIXED.md#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step) — GH-52 |
+| Child agents never exceed the parent's delegation | Implemented | `DelegationService.narrow`; `DELEGABLE_TOOLS` read-only — GH-53 |
+| Provider receipts | Implemented — pushed ref read back; PR number and URL recorded | `read_back_ref` — GH-54 |
+| Issue-to-PR routine | **Partial** — template and authority plan; no runner | [BUG-339](../plans/TO_BE_FIXED.md#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) — GH-55 |
+| Settings → Connections → GitHub, six states, recovery messages | Implemented | `web/src/lib/views/settings/GitHubConnection.svelte`; screenshots `docs/screenshots/2026-10-12-github-connection/` — GH-19 |
+| Approvals re-governed at execution | Implemented | the relay recomputes the payload hash and re-routes; the grant or delegation is re-checked at lend time |
+| Official App, managed cloud | **Blocked — external** | needs GH-30 operator registration and a trusted credential service |
 
 ## 19. Rejected alternatives
 
@@ -629,8 +648,8 @@ credentials; a read-only installation cannot write.
 
 **Governance.** Connecting does not authorise a push; read permission never
 writes; a denied push contacts no remote; an approved operation cannot change
-before execution (BUG-336); session grants expire and stay in their session
-(BUG-335); revocation ends pending and active grants; a scheduled agent cannot
+before execution (FIXED-884); session grants expire and stay in their session
+(FIXED-883); revocation ends pending and active grants; a scheduled agent cannot
 elevate; a child never exceeds its parent; Stop prevents later unapproved
 effects.
 
@@ -642,7 +661,7 @@ identity and pinned host; spoofed or replayed webhooks refused; GitHub content
 cannot change policy; expired or revoked credentials unusable after restart and
 after restore.
 
-**Compatibility.** Existing stored PATs keep working (BUG-334 fixed first);
+**Compatibility.** Existing stored PATs keep working (FIXED-882);
 push approval semantics preserved; old databases migrate; failed migration
 recoverable; rollback cannot restore revoked authority; local development works
 without OAuth; self-hosted works without the managed service.
@@ -661,6 +680,12 @@ without OAuth; self-hosted works without the managed service.
 - Consented GitHub test accounts (two users, one organisation) and test
   repositories for live evidence.
 
+**Status 2026-10-12.** Waves 1–4 are implemented and tested against a stand-in
+GitHub. Still external: GH-30 (no official Client ID is published, so *Connect
+GitHub* appears only with a configured custom App or `RAIKER_GITHUB_APP_CLIENT_ID`),
+the trusted credential service, and live evidence with consented accounts
+(RR-38…RR-41). Wave 5 is deferred by the decision.
+
 **Open technical questions (to settle in the named task, not owner decisions).**
 
 - Whether GitHub accepts a varying loopback port for a GitHub App's
@@ -668,9 +693,9 @@ without OAuth; self-hosted works without the managed service.
   if a desktop browser sign-in is added later (GH-32); the default desktop path
   is the device flow, which needs no callback.
 - Whether `DELETE /applications/{client_id}/token` can revoke a device-flow
-  user token without the client secret. If not, a desktop disconnect reports
-  *could not confirm revocation at GitHub* and links to the account's
-  authorised-applications page (GH-37).
+  user token without the client secret. Implemented conservatively: without the
+  secret a disconnect reports *could not confirm* rather than claiming a
+  revocation (GH-37).
 - The exact shape of the stateless `ghs_APPID_JWT` installation token (P19),
   so that GH-15's pattern matches it whole, including any `.` separators.
 - Whether a token from `gh auth token` for a selected account can be read

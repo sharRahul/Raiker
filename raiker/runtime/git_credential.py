@@ -391,7 +391,7 @@ class GitCredentialBroker:
             raise GitCredentialError(
                 "git_token_not_configured",
                 "Store a GitHub token before approving git commands "
-                "(Settings → Git credential).",
+                "(Settings → GitHub).",
             )
         selected = self.methods.selected() or {}
         row = self._store.create_git_credential_grant(
@@ -451,7 +451,7 @@ class GitCredentialBroker:
             raise GitCredentialError(
                 "git_grant_required",
                 "This git command needs your approval. Approve it once from "
-                "Settings → Git credential, or for this conversation from the approval.",
+                "Settings → GitHub, or for this conversation from the approval.",
             )
         if grant.scope == "session" and (
             not grant.session_id or not session_id or grant.session_id != session_id
@@ -637,7 +637,7 @@ class GitCredentialBroker:
         if selected is None:
             raise GitCredentialError(
                 "git_token_not_configured",
-                "No GitHub credential is selected. Add one in Settings → Git credential.",
+                "No GitHub credential is selected. Add one in Settings → GitHub.",
             )
         try:
             if selected["method"] == METHOD_SSH:

@@ -85,6 +85,10 @@ LOCAL_GATE_CHECK_MODULES = {
     # Reading the enforcing path's own answer is the only way a description of
     # a gate can be held to the gate. It decides nothing.
     "raiker/control/service.py",
+    # ADD-27 GH-19 — Settings → GitHub shows *capability enabled* as one of the
+    # six states it keeps apart. A description again, held to the enforcing
+    # path's answer for the same reason as the two above. It decides nothing.
+    "raiker/api/routes_github.py",
 }
 
 #: Capabilities with a real executor that no product path constructs. Each is
@@ -157,10 +161,10 @@ def test_i3_every_real_executor_capability_is_named_in_the_enumeration() -> None
     )
 
 
-def test_i3b_the_tool_reachable_set_is_exactly_seventeen() -> None:
+def test_i3b_the_tool_reachable_set_is_exactly_eighteen() -> None:
     """The one reachability fact that *is* exactly computable.
 
-    Seventeen capabilities are reached by a model tool through
+    Eighteen capabilities are reached by a model tool through
     `CAPABILITY_GATE_MAP`. Everything else is reached by an approval, by the
     control plane, by a tool that checks its own gate (§4), or by nothing at all
     (§3.5). A change here moves a capability between those categories and the
@@ -173,9 +177,9 @@ def test_i3b_the_tool_reachable_set_is_exactly_seventeen() -> None:
     by_tool = {
         CAPABILITY_GATE_MAP.get(d.name, d.name) for d in TOOL_DEFINITIONS
     } & REAL_EXECUTOR_CAPABILITIES
-    assert len(by_tool) == 17, (
+    assert len(by_tool) == 18, (
         "The number of capabilities a model tool can name changed "
-        f"({len(by_tool)}, was 17). Update §3.6 of {ENTRY_PATHS_DOC}: "
+        f"({len(by_tool)}, was 18). Update §3.6 of {ENTRY_PATHS_DOC}: "
         f"{sorted(by_tool)}"
     )
 

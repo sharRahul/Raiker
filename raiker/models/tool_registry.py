@@ -785,7 +785,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         required_list_args=(),
         optional_args=("remote",),
         arg_schemas=(),
-        description="Propose fetching a remote of the selected repository into its remote-tracking branches (approval required). Nothing is merged or checked out. Optional remote defaults to the tracked remote. Only available when the owner enabled Git fetch and allowlisted the remote's host.",
+        description="Propose fetching a remote of the selected repository into its remote-tracking branches (approval required). It never merges or checks out. Optional remote defaults to the tracked remote. Only available when the owner enabled Git fetch and allowlisted the remote's host.",
     ),
     ToolDefinition(
         name="git_clone",

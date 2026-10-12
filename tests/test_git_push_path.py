@@ -271,7 +271,7 @@ class TestProposalFailsClosed:
         result = proposed_push_snapshot(repo, credential_configured=False)
         assert result["error"]["type"] == "push_credential_unset"
         # Named as the place the owner stores one, not as an environment variable.
-        assert result["error"]["credential"] == "Settings → Git credential"
+        assert result["error"]["credential"] == "Settings → GitHub"
 
     def test_nothing_to_push(self, repo: Path, allowed: None) -> None:
         # A tracking ref that already holds this branch's head means the remote

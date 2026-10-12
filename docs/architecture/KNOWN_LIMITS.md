@@ -159,19 +159,18 @@ alternative would be worse.
   publishing is egress carrying repository content off the machine, so it answers
   to **Git push** (`git_push_execution`) rather than to Git writes, and it does
   nothing until the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The
-  credential is stored encrypted from **Settings → Git credential** and lent to
-  one command at a time under a grant you make — **once**, or **for this
-  session** — which carries its own expiry and can be withdrawn in a press. It is
-  passed in the command's own environment rather than on a command line, and
-  removed from every log, error and captured output for as long as the loan
-  lasts. `RAIKER_GITHUB_TOKEN` in the host environment still works for an
-  install configured that way, and the page says which of the two you are on.
-  Only HTTPS GitHub remotes are pushable, because that is the credential Raiker
-  holds; it never forces and never deletes a branch. Known defects, found
-  2026-10-12: a proposed push consults only `RAIKER_GITHUB_TOKEN`, so a
-  vault-only token cannot carry one (BUG-334); a session grant is not tied to
-  its session (BUG-335); and the push is not bound to the approved commit
-  (BUG-336). The accepted target is the
+  credential is the one you select in **Settings → GitHub** — a token in the
+  vault, the GitHub CLI's sign-in, a saved Git credential, an SSH key, or (with a
+  GitHub App) a sign-in or an installation — checked against the GitHub account
+  it claims and lent to one command under a grant you make — **once**, or **for
+  the conversation** that proposed it — narrowed to the operation, repository and
+  branch. The approval records the commit, and the push sends that commit or
+  refuses. It is passed in the command's own environment rather than on a command
+  line, and removed from every log, error and captured output for as long as the
+  loan lasts. An agent pushes without a per-step approval only under a
+  repository delegation you made, re-checked before each step. HTTPS and SSH
+  GitHub.com remotes only; it never forces and never deletes a branch. Open:
+  BUG-337, BUG-338, BUG-339. See the
   [GitHub connection specification](GITHUB_CONNECTION_SPEC.md).
 - **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
   and `web_search` work on a fresh install: there is no list to fill in first,

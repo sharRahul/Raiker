@@ -134,9 +134,12 @@ names.
 | [BUG-331](#bug-331--setups-model-step-waits-on-every-providers-check-before-it-shows-anything) | Low | First run / Models | Open — found 2026-10-11; about five seconds of *Preparing your setup…* on a reload |
 | [BUG-332](#bug-332--setup-calls-an-identity-linked-anthropic-key-connected-and-offers-models-it-cannot-list) | Low | First run / Models | Open — found 2026-10-11; the key is stored, the workspace ID is missing, and the recommendation says *choose one of its models* |
 | [BUG-333](#bug-333--a-stopped-openai-compatible-stream-records-no-usage) | Low | Models / usage | Open — found 2026-10-11 closing FIXED-872; those providers report usage only when the stream ends |
-| [BUG-334](#bug-334--a-push-proposal-ignores-the-token-stored-in-settings) | High | Build / Git push | Open — found 2026-10-12 reviewing DEC-21b; with the token only in the vault, every proposed push is refused as `push_credential_unset` naming `RAIKER_GITHUB_TOKEN` |
-| [BUG-335](#bug-335--a-this-session-git-grant-is-not-tied-to-any-session) | Medium | Build / Git credential | Open — found 2026-10-12 reviewing DEC-21b; Settings grants without a session and the push asks without one, so *this session* covers every chat and routine for an hour |
-| [BUG-336](#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved) | Medium | Build / Git push | Open — found 2026-10-12 reviewing DEC-21b; the approval shows a head and its commits, and the push sends whatever the branch holds at execution |
+| [BUG-334](FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334) | High | Build / Git push | **Closed 2026-10-12 ([FIXED-882](FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334))** — the proposal asks the broker whether a credential is configured, never for its value |
+| [BUG-335](FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335) | Medium | Build / Git credential | **Closed 2026-10-12 ([FIXED-883](FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335))** — a session grant needs its session; the push asks with the approving conversation |
+| [BUG-336](FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336) | Medium | Build / Git push | **Closed 2026-10-12 ([FIXED-884](FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336))** — the approval records the commit; the push sends that commit and refuses if the target moved |
+| [BUG-337](#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation) | Low | Build / Git writes | Open — found 2026-10-12 building GH-50; pushes and GitHub writes need a delegation, local branch and commit do not yet |
+| [BUG-338](#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step) | Low | Build / delegations | Open — found 2026-10-12 building GH-52; the router re-checks Raiker's records, not GitHub, before each delegated step |
+| [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun), reconfirmed 2026-09-13 with three keys |
 | [BUG-291](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** |
 | [BUG-292](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame) | Low | Live test harness | **Closed 2026-09-14 ([FIXED-534](FIXED_ITEMS.md#fixed-534--a-live-helper-that-found-nothing-let-a-later-assertion-take-the-blame))** — `chooseModelForTurn` is the helper every turn-sending spec uses |
@@ -2593,81 +2596,67 @@ reports the call. Requires an `estimated` column and a decision on whether
 estimated spend counts against the owner-wide limit (DEC-24 step 2 says to
 separate estimated from settled usage).
 
-## BUG-334 — A push proposal ignores the token stored in Settings
+## BUG-337 — A standing *Git writes* decision still covers local branches and commits without a delegation
 
-**Severity: High. Area: Build / Git push. Status: Open — found 2026-10-12
-reviewing the code for the DEC-21b amendment.**
+**Severity: Low. Area: Build / Git writes. Status: Open — found 2026-10-12
+building ADD-27 GH-50.**
 
-**Observed.** RAIKER-2022 moved the push credential into the vault
-(**Settings → Git credential**), and the executor borrows it through
-`GitCredentialBroker.lend`. The proposal step does not. `ToolBroker._approval_preview`
-(`raiker/tools/broker.py`) and the dashboard's approval preview
-(`raiker/control/dashboard_parts/approvals.py`) call `proposed_push_snapshot`
-with no `credential=`, and `_push_credential(None)` reads only
-`RAIKER_GITHUB_TOKEN` from the environment (`raiker/tools/git.py`). With the
-token stored in Settings and nothing in the environment, the preview fails as
-`push_credential_unset` naming `RAIKER_GITHUB_TOKEN`, and a failed preview is
-returned to the model as a refusal before any approval is raised. Reproduced
-2026-10-12 against a workspace with a vault token, an allowlisted
-`github.com` remote and no environment token. Every push-path test sets the
-environment variable, which is why none caught it.
+**Observed.** Since GH-50 a push and a GitHub write run without a per-step
+approval only under a repository delegation that covers them
+([FIXED-886](FIXED_ITEMS.md#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github)). Creating a local branch and
+committing on it (`git_write_execution`) are the specification's other two
+delegable operations (§8.2), and they still follow the capability's decision
+mode and any standing grant alone.
 
-**Effect.** The method the guides and the Settings page call supported cannot
-carry a model-proposed push; only an install that also exports the legacy
-variable can push, and that path skips the grant ([DEC-21b-H](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication)).
+**Effect.** Small: neither leaves the machine, and the push that would carry
+them off still needs a delegation or an approval. But an owner reading
+*Delegations* could expect a branch pattern to limit where the agent commits,
+and it does not yet.
 
-**Proposed fix.** The proposal asks the broker whether a credential *is
-configured* (`token_configured()`), never for its value, and reports
-`push_credential_unset` naming Settings → Git credential. Add a push-path test
-with the token in the vault only. This is the first task of ADD-27's Wave 1
-([GH-10](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)).
+**Proposed fix.** Give `GitWriteExecutor` a `repository_target` (the selected
+repository's origin, the branch named or current) so the router applies the
+same rule; a repository with no GitHub remote keeps today's behaviour, since
+there is no repository to delegate.
 
-## BUG-335 — A "this session" Git grant is not tied to any session
+## BUG-338 — A delegation's repository identity is checked against the last discovery, not asked of GitHub at each step
 
-**Severity: Medium. Area: Build / Git credential. Status: Open — found
-2026-10-12 reviewing the code for the DEC-21b amendment.**
+**Severity: Low. Area: Build / delegations. Status: Open — found 2026-10-12
+building ADD-27 GH-52.**
 
-**Observed.** `active_git_credential_grant` applies the session filter only
-when both the grant and the caller name a session. The Settings page grants
-with no session id (`api.grantGitCredential(scope)`), so the row's
-`session_id` is `NULL`; and the push executor asks with
-`action.arguments.get("session_id")`, which an approved `git_push` never
-carries (its arguments are `remote` and `branch`). The approving session is
-available to the relay as `origin_session_id` and is not used.
+**Observed.** `DelegationService.revalidate` re-checks the delegation, the
+credential, the account, the installation and the repository id before every
+delegated step. The repository id and installation are compared with what
+Raiker last discovered (`github_repositories`, `github_installations`). It asks
+GitHub (`GET /repos/{owner}/{name}`) only when the caller passes a client, and
+the router does not.
 
-**Effect.** *For this session* is in practice *for the next hour, everywhere*:
-a grant made while working in one chat lends the credential to a push approved
-from another chat or a routine within the hour.
-`test_a_session_grant_does_not_carry_into_another_chat` passes because it
-supplies session ids the product never supplies.
+**Effect.** A repository transferred or deleted and re-created since the last
+*Refresh from GitHub* is not seen until the next refresh — the push itself still
+goes only to the bound remote, and the installation token is still narrowed to
+the recorded id, so authority is not redirected; the step just is not refused
+as early as §9 asks.
 
-**Proposed fix.** A session grant requires a session id and is refused
-without one (`git_grant_session_required`); the executor asks with the
-approval's `origin_session_id`; Settings offers *this session* only from a
-surface that has one, and otherwise *once*. Test through the push executor,
-not the store. Tracked as [GH-11](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority).
+**Proposed fix.** Pass the broker's client to `revalidate` from the router for
+pushes and pull requests, with a short per-delegation cache so a burst of steps
+asks once; treat *could not reach GitHub* as *blocked — needs owner*.
 
-## BUG-336 — A push sends the branch as it is when it runs, not the commits that were approved
+## BUG-339 — The issue-to-pull-request routine has a template and no runner
 
-**Severity: Medium. Area: Build / Git push. Status: Open — found 2026-10-12
-reviewing the code for the DEC-21b amendment.**
+**Severity: Low. Area: Tasks / routines. Status: Open — found 2026-10-12
+building ADD-27 GH-55.**
 
-**Observed.** The push approval shows the branch, the remote, the head and the
-commits the remote does not have. Its stored arguments are only `remote` and
-`branch` (both optional, resolved from the checkout when absent), and the
-relay's payload hash covers those arguments. `push_branch` re-derives the
-snapshot at execution and pushes `refs/heads/<branch>`, whatever it then points
-at; nothing compares it with the head the owner saw.
+**Observed.** `raiker/github/routines.py` names the routine's steps and, given
+its delegation, which would run and which would ask — read-only by default,
+writes only under a delegation re-validated first, never merge. Scheduled
+routines (`raiker/runtime/executors/scheduled.py`) run a bounded **read-only**
+subagent, so nothing can yet carry the plan's write steps out unattended.
 
-**Effect.** A commit made between the approval and the push — by the agent
-under a standing *Git writes* decision, or by anything else — is published
-under an approval that never showed it. DEC-21b-I's "a previously approved
-operation cannot be changed before execution" does not hold for a push.
+**Effect.** The issue-to-PR routine of PA-S07 / RR-40 is an owner-driven flow
+today, not a scheduled one.
 
-**Proposed fix.** Record the approved head and resolved remote URL with the
-approval; push `<approved-sha>:refs/heads/<branch>` (still fast-forward only)
-and refuse `push_target_changed` if the branch, remote URL or head moved.
-Tracked as [GH-12](TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority).
+**Proposed fix.** A routine kind that runs a governed agent turn (not a
+subagent) under the routine's delegation reference, with the plan's decisions as
+its ceiling; live evidence is RR-40 against a consented repository.
 
 ## Decision statements added 2026-10-05
 

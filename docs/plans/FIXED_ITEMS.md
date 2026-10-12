@@ -903,6 +903,12 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-879](#fixed-879--the-mcp-card-and-the-runtime-card-printed-raw-iso-times) | Low | Interface / dates | Fixed 2026-10-11 — found by the live round |
 | [FIXED-880](#fixed-880--the-web-client-did-not-load-over-plain-http-to-a-lan-address) | High | Interface / start-up | Fixed 2026-10-11 — found by the Web UI workflow |
 | [FIXED-881](#fixed-881--two-threat-models-described-the-github-credential-and-connector-as-they-were-before-the-vault-and-before-writes) | Low | Documentation / threat models | Fixed 2026-10-12 — found reviewing DEC-21b |
+| [FIXED-882](#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334) | High | Build / Git push | Fixed 2026-10-12 (was BUG-334) |
+| [FIXED-883](#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335) | Medium | Build / Git credential | Fixed 2026-10-12 (was BUG-335) |
+| [FIXED-884](#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336) | Medium | Build / Git push | Fixed 2026-10-12 (was BUG-336) |
+| [FIXED-885](#fixed-885--an-agents-push-looked-for-a-credential-of-its-own-not-the-owners) | Medium | Build / Git push / GitHub connector | Fixed 2026-10-12 — found building ADD-27 GH-50 |
+| [FIXED-886](#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github) | High | Governance / Git and GitHub writes | Fixed 2026-10-12 (ADD-27 GH-50) |
+| [FIXED-887](#fixed-887--checking-a-github-app-installation-credential-could-not-succeed) | Low | Settings → GitHub | Fixed 2026-10-12 — found building the GitHub routes |
 
 ---
 
@@ -32830,3 +32836,125 @@ guide and both known-limits pages say what a push needs today.
 `raiker/runtime/git_credential.py`, `raiker/runtime/executors/tier1_git.py`;
 the documentation link check passes.
 
+
+---
+
+## FIXED-882 — A push proposal ignored the token stored in Settings (was BUG-334)
+
+**Severity: High. Area: Build / Git push. Status: Fixed 2026-10-12.**
+
+**Observed.** The proposal step read only `RAIKER_GITHUB_TOKEN`; with the token
+in the vault and nothing in the environment every proposed push was refused as
+`push_credential_unset` before an approval was raised.
+
+**Fixed.** The tool broker and the dashboard's preview ask the broker whether a
+credential is configured (`token_configured()`), never for its value, and a
+refusal names Settings → GitHub. The value is lent only at execution, under a
+grant.
+
+**Evidence.** `tests/test_git_push_path.py` — a vault-only token proposes and
+pushes; no test in the file sets the environment variable any more.
+
+---
+
+## FIXED-883 — A "this session" Git grant was not tied to any session (was BUG-335)
+
+**Severity: Medium. Area: Build / Git credential. Status: Fixed 2026-10-12.**
+
+**Observed.** Settings granted with no session and the push asked with none, so
+*this session* covered every chat and routine for an hour.
+
+**Fixed.** A session grant needs a session (`git_grant_session_required`);
+Settings offers only *once*; the push executor asks with the approval's
+`origin_session_id`, and a grant for another conversation refuses
+`git_grant_other_session`. Grants are also narrowed to operation, repository,
+branch, credential and account (GH-17).
+
+**Evidence.** `tests/test_git_credential_grant.py` through the executor, not the
+store; `web/src/lib/views/settings/GitCredential.test.ts`.
+
+---
+
+## FIXED-884 — A push sent the branch as it was when it ran, not the commits that were approved (was BUG-336)
+
+**Severity: Medium. Area: Build / Git push. Status: Fixed 2026-10-12.**
+
+**Observed.** The approval showed a head and its commits; the push sent whatever
+`refs/heads/<branch>` held at execution.
+
+**Fixed.** Raising a push approval records the remote, its resolved URL, the
+branch and the head SHA (`git_push_bindings`, RAIKER-2106). The push sends
+`<approved-sha>:refs/heads/<branch>` and refuses `push_target_changed` naming
+what moved; an approval with no binding refuses `push_binding_missing`. The
+approval card shows the bound commit and warns when the branch has moved. The
+pushed ref is read back into a receipt (GH-54).
+
+**Evidence.** `tests/test_git_push_binding.py` (10);
+`tests/test_git_push_path.py` read-back cases.
+
+---
+
+## FIXED-885 — An agent's push looked for a credential of its own, not the owner's
+
+**Severity: Medium. Area: Build / Git push / GitHub connector. Status: Fixed
+2026-10-12 — found building ADD-27 GH-50.**
+
+**Observed.** The push and fetch executors built the credential broker for the
+acting principal. Under a standing decision that principal is the turn's agent,
+which holds no credential, so an agent-run push or private fetch was refused as
+`push_credential_unset` even with the owner's token stored; the API connector
+had the same shape once it moved onto the broker.
+
+**Fixed.** `credential_owner()` resolves an agent to the owner it acts for —
+through the owner's account, or, on a machine with no password account, the one
+human principal for the same user — and the executors, the connector and the
+router's delegation check all use it.
+
+**Evidence.** `tests/test_repository_delegations.py` (the connector reads with
+the owner's vault credential as the turn's agent; the router finds the owner's
+delegation for the agent).
+
+---
+
+## FIXED-886 — A standing grant or allow mode alone let an agent push or write to GitHub
+
+**Severity: High. Area: Governance / Git and GitHub writes. Status: Fixed
+2026-10-12 (ADD-27 GH-50, GH-52).**
+
+**Observed.** A standing grant for `git_push`, or the push or GitHub capability
+in *always allow* / *auto*, let an agent's push or pull request run with no
+per-step approval and nothing naming the repository or branch.
+
+**Fixed.** A push or GitHub write by an agent runs unprompted only under a
+**repository delegation** the owner made: one repository, named operations
+(merge, branch deletion, workflows and settings are never delegable), a branch
+pattern that cannot reach the default branch, an expiry and an optional budget.
+Before each step it is re-validated — delegation, credential, account,
+installation, repository id — and spent; otherwise the step asks, and
+`repository_delegation_refused` says why. The composer's *auto* / *skip* modes
+send such a step to the approval queue instead of failing it. A child's
+delegation is narrowed from its parent's and never wider.
+
+**Evidence.** `tests/test_repository_delegations.py` (38): a read delegation
+never writes, a PR delegation never merges, a branch delegation never reaches
+another branch, a revocation mid-task parks the next step, an approved push
+needs no delegation.
+
+---
+
+## FIXED-887 — Checking a GitHub App installation credential could not succeed
+
+**Severity: Low. Area: Settings → GitHub. Status: Fixed 2026-10-12 — found
+building the GitHub routes.**
+
+**Observed.** *Check* on an App-installation credential asked for its token
+without a repository, which an installation token is never minted without, so
+it always failed `github_installation_needs_scope`; and an installation GitHub
+stopped listing stayed *active*.
+
+**Fixed.** Checking an installation asks GitHub for the App's installations;
+one no longer listed is marked removed, and a GitHub that cannot be asked is an
+error, not a pass.
+
+**Evidence.** The `POST /api/github/credentials/{credential_id}/check` and
+installation cases in `tests/test_api_contract_responses.py`.

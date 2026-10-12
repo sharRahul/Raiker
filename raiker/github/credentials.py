@@ -467,7 +467,7 @@ class CredentialMethods:
         token = token.strip()
         if not token:
             raise CredentialMethodError(
-                "git_token_not_configured", "No GitHub token is stored. Add one in Settings → Git credential."
+                "git_token_not_configured", "No GitHub token is stored. Add one in Settings → GitHub."
             )
         if verify and method in REREAD_METHODS:
             self._confirm_account(row, token)

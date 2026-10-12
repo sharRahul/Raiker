@@ -66,11 +66,14 @@ Operational security boundaries are defined in [SECURITY_ARCHITECTURE.md](SECURI
 
 ## Forge credentials and repository authority
 
-Today one forge credential exists: a GitHub token held in the vault (or the
-legacy `RAIKER_GITHUB_TOKEN`), lent to `github.com` only, for one command or
-one hour, under an owner grant, through a helper that answers no other host and
-after clearing every inherited credential helper. Known defects on that path
-are BUG-334, BUG-335 and BUG-336.
+GitHub is the one forge. Its credential is whichever method the owner selected
+(vault token, the legacy `RAIKER_GITHUB_TOKEN`, gh CLI, a saved Git credential,
+SSH, or a GitHub App sign-in or installation), checked against its GitHub
+account, and lent to `github.com` only — for one command or one conversation,
+narrowed to operation, repository and branch — through a helper that answers no
+other host, after clearing every inherited credential helper. An agent's push or
+GitHub write runs without a per-step approval only under a repository
+delegation ([FIXED-886](../plans/FIXED_ITEMS.md#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github)).
 
 The accepted target ([DEC-21b as amended 2026-10-12](GITHUB_CONNECTION_SPEC.md))
 keeps three layers apart: GitHub's own permissions (the outer limit), Raiker's

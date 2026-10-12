@@ -22,8 +22,8 @@ from pydantic import Field
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import require_human
-from raiker.api.refusals import refusal
 from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.refusals import refusal
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.github import (

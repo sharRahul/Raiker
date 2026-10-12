@@ -52,10 +52,10 @@ capability is: it reaches the network.
 | Governed entry only | `git_push` is in `approval_required_actions`; `git_push_execution` is in `EXECUTABLE_ON_APPROVAL` and is reached only through `ApprovalExecutionRelay` → `route_action`. An AI may propose; only a human decision publishes. |
 | Its own owner switch | `CAPABILITY_GATE_MAP` maps `git_push` to `git_push_execution`, separate from `git_write_execution`. With it off, resolution returns to metadata-only and the detail view says so **before** the decision. |
 | Owner egress allowlist | The remote's host must be on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` (empty ⇒ fail closed), checked at proposal *and* at execution. Refused as `push_egress_denied`, naming the host. |
-| Owner credential | The GitHub token stored from **Settings → Git credential** (vault key `github_token`, RAIKER-2022) is lent by `GitCredentialBroker` to one command under an owner grant — *once* (300 s) or *for this session* (3600 s) — and the grant is consumed or expires on its own; the legacy `RAIKER_GITHUB_TOKEN` is still honoured and today skips the grant (ADD-27 GH-13). No credential is refused as `push_credential_unset`. The gate being on is not a substitute for either boundary. **Known defects (2026-10-12):** the proposal step consults only the environment variable, so a vault-only token cannot carry a proposed push ([BUG-334](../plans/TO_BE_FIXED.md#bug-334--a-push-proposal-ignores-the-token-stored-in-settings)); a session grant is not tied to its session ([BUG-335](../plans/TO_BE_FIXED.md#bug-335--a-this-session-git-grant-is-not-tied-to-any-session)). |
+| Owner credential | The credential the owner selected in **Settings → GitHub** — a vault token (`github_token`, RAIKER-2022), the legacy `RAIKER_GITHUB_TOKEN`, the gh CLI's sign-in, a saved Git credential, an SSH key, or a GitHub App sign-in or installation token minted for this one repository — is checked against its GitHub account and lent by `GitCredentialBroker` to one command under an owner grant: *once* (300 s) or *for the conversation that proposed it* (3600 s), narrowed to operation, repository and branch, consumed or expired on its own ([FIXED-882](../plans/FIXED_ITEMS.md#fixed-882--a-push-proposal-ignored-the-token-stored-in-settings-was-bug-334), [FIXED-883](../plans/FIXED_ITEMS.md#fixed-883--a-this-session-git-grant-was-not-tied-to-any-session-was-bug-335)). An agent's push without a per-step approval runs only under a repository delegation, re-validated before each step. No credential is refused as `push_credential_unset`. The gate being on is not a substitute for any of these. |
 | Only the host the credential belongs to | The credential is a GitHub credential (`CREDENTIAL_HOSTS`: `github.com`, `www.github.com`). A remote on any other host is refused as `unsupported_remote_host` rather than having the owner's token sent to it, and the helper itself answers no other host. |
-| HTTPS only, and only a remote git will really contact | The URL is read with `git remote get-url --push`, so `pushurl` and `url.<base>.insteadOf` rewrites are resolved: what is checked is the address git will contact, not the one the config file spells. SSH is refused (a key this process does not govern), plaintext HTTP is refused, and a remote URL carrying its own credential is refused as `remote_url_has_credentials` — it would be used *instead of* the governed one and would ride past every check. |
-| Never forces, never deletes | The refspec is written out in full (`refs/heads/<branch>:refs/heads/<branch>`), so a branch name can neither be read as an option nor move a ref it does not name. `--force`, `--force-with-lease`, `--delete` and `--mirror` are not reachable from the tool. A non-fast-forward is reported as `push_rejected_non_fast_forward`, not resolved by overwriting. |
+| HTTPS or governed SSH, and only a remote git will really contact | The URL is read with `git remote get-url --push`, so `pushurl` and `url.<base>.insteadOf` rewrites are resolved: what is checked is the address git will contact, not the one the config file spells. SSH is allowed only to `github.com:22` or `ssh.github.com:443` as `git`, with the selected key, `IdentitiesOnly`, no agent and GitHub's pinned host keys; plaintext HTTP is refused, and a remote URL carrying its own credential is refused as `remote_url_has_credentials` — it would be used *instead of* the governed one and would ride past every check. |
+| Never forces, never deletes, sends what was approved | The refspec is written out in full (`<approved-sha>:refs/heads/<branch>`), the commit recorded with the approval, so nothing committed afterwards rides along and a moved target refuses `push_target_changed` ([FIXED-884](../plans/FIXED_ITEMS.md#fixed-884--a-push-sent-the-branch-as-it-was-when-it-ran-not-the-commits-that-were-approved-was-bug-336)); and a branch name can neither be read as an option nor move a ref it does not name. `--force`, `--force-with-lease`, `--delete` and `--mirror` are not reachable from the tool. A non-fast-forward is reported as `push_rejected_non_fast_forward`, not resolved by overwriting. |
 | The credential never reaches the command line | The token is passed in the child process's environment and read by an inline credential helper, so it is absent from the process table and from any captured command string. Git's output is scrubbed of the token before it is returned or stored. |
 | No inherited credential | An **empty** `credential.helper` is configured first, clearing whatever the host has set, so a system keychain cannot quietly supply a different account's credential than the one the owner governed. |
 | No interactive block | `GIT_TERMINAL_PROMPT=0` and empty `GIT_ASKPASS`/`SSH_ASKPASS`: a push that cannot authenticate fails with a reason instead of holding the process until its wall-clock cap. |
@@ -71,20 +71,16 @@ capability is: it reaches the network.
   "it leaves this machine and git cannot take it back — undo it on the remote" —
   rather than implying a rewind. The checkpoint store holds pre-images of file
   mutations; a published ref is not one of them.
-- **The approval is not yet bound to the commit.** The push sends the branch as
-  it is when the push runs; a commit made after the approval would go with it
-  ([BUG-336](../plans/TO_BE_FIXED.md#bug-336--a-push-sends-the-branch-as-it-is-when-it-runs-not-the-commits-that-were-approved)).
+- **What landed is read back, not assumed.** After the push the remote's ref is
+  read back under the same loan; the receipt says *confirmed* only when it is the
+  approved commit.
 - **The commit range is what this machine last knew.** The preview is computed
   without contacting the remote, deliberately. If someone else pushed to that
   branch since the last fetch, the count shown can be stale — the push then fails
   closed as `push_rejected_non_fast_forward` rather than overwriting their work.
-- **One forge.** Only HTTPS GitHub remotes are pushable, because a GitHub token
-  is the only push credential Raiker holds. Supporting another forge is a
-  credential question before it is a code one. The accepted
+- **One forge.** Only GitHub.com remotes are pushable, under the methods the
   [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md)
-  (DEC-21b as amended 2026-10-12) adds explicitly selected methods — GitHub App
-  sign-in, gh CLI, an OS credential-manager entry, SSH — and repository-bound
-  grants for GitHub.com only; other forges are separate adapters.
+  describes; other forges are separate adapters.
 - **One branch, no tags, no deletes.** Pushing tags, deleting a remote branch,
   and pushing to a ref other than the branch's own name are not implemented and
   are not reachable from the tool.

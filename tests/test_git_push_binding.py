@@ -131,7 +131,7 @@ def test_with_no_credential_the_refusal_names_settings(repo: Path) -> None:
     GitCredentialBroker(SQLiteStore(repo), OWNER).forget_token()
     result = _propose(repo, "sess_a")
     assert result.status == "failed"
-    assert result.error == {"type": "push_credential_unset", "credential": "Settings → Git credential"}
+    assert result.error == {"type": "push_credential_unset", "credential": "Settings → GitHub"}
 
 
 def test_the_approval_records_the_commit_it_showed(repo: Path) -> None:

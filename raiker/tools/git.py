@@ -582,7 +582,7 @@ GIT_PUSH_TOKEN_ENV = "RAIKER_GITHUB_TOKEN"
 #: Where the owner gives a push its credential. A refusal names this rather than
 #: an environment variable: the vault is the supported home (RAIKER-2022), and
 #: the variable is only one more way of filling it.
-GIT_CREDENTIAL_SETTING = "Settings → Git credential"
+GIT_CREDENTIAL_SETTING = "Settings → GitHub"
 # The token above is a GitHub credential. Sending it to another forge because a
 # remote happens to be HTTPS would be a credential leak dressed up as a feature,
 # so a push is only offered for the host the credential belongs to — and the

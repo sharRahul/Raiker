@@ -71,7 +71,7 @@ human authorizer, runtime authority, or other literal actor.
 | `channel_resumed` | The owner resumed a paused channel |
 | `mcp_server_secret_set` | The owner gave one local MCP server a secret (DEC-15 step 2); the payload names the variable, never its value |
 | `mcp_server_secret_removed` | The owner took a secret away from one local MCP server |
-| `git_credential_stored` | The owner stored a GitHub token in the vault (Settings → Git credential); never the value |
+| `git_credential_stored` | The owner stored a GitHub token in the vault (Settings → GitHub); never the value |
 | `git_credential_forgotten` | The owner removed the stored token; every grant on it was revoked |
 | `git_grant_created` | The owner lent the Git credential once or for one conversation, with the operation, repository and branch it is narrowed to |
 | `git_grant_revoked` | The owner withdrew the grant in force |

@@ -4,7 +4,7 @@
 
 **Accepted direction, 2026-10-07. All PAA items are planned; no implementation
 or live/competitive qualification is claimed by this update.** The owner asked
-for a personal autonomous agent inspired by Muse.ai, Claude.ai, OpenClaw and
+for a personal autonomous agent inspired by Meta Muse, Claude.ai, OpenClaw and
 Hermes Agent. The [architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 and [ADR](../adr/ADR-0001-personal-autonomous-agent.md) define the decision.
 PAA IDs own new goal/personal-agent delivery work. They do not replace existing
@@ -161,3 +161,7 @@ adds goal detail, context and continuity as their PAA contracts land. Wave 3
 runs observed first-user and release qualification. Existing ADD-26 shell and
 manual Chat/Build work modes remain. UX tasks start planned/not run; no release
 or implementation state is upgraded by accepting their design.
+
+## Meta Muse benchmark traceability — 2026-10-12
+
+Meta Muse is a distinct personal-agent comparison (not Muse Wonder models or Muse Code). [RCD-10](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md#rcd-10--match-meta-muse-on-finished-personal-goals-not-marketing-features) owns the proposed competitive decision; [reference compatibility §9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#9-meta-muse-competitive-track--2026-10-12) owns the sourced capability matrix. PA-S01/02/03/04/05/08 require matched-run Meta Muse evidence to support any parity claim: version/tier/region/client/host, agreed fixture and validator, same bounded authorisations, effects read-back, owner interventions, privacy, and correct resume after app closure. A blocked account/connector is **blocked**, not a Muse failure or Raiker win. Muse's hosted Secure VM does not change Raiker's local-first decision, and a Muse model announcement is not an end-to-end benchmark.

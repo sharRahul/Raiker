@@ -480,7 +480,7 @@ def discover_repositories(
         try:
             listed = GitHubAppService(
                 store, str(row.get("app_ref") or "byo"), http=client
-            ).installation_repositories(installation_id)  # type: ignore[attr-defined]
+            ).installation_repositories(installation_id)
         except AppServiceError as exc:
             raise SignInError(exc.reason, exc.message) from None
         for repo in listed:

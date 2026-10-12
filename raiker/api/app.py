@@ -37,6 +37,7 @@ from raiker.api.routes_context import router as context_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_egress import router as egress_router
+from raiker.api.routes_github import router as github_router
 from raiker.api.routes_guide import router as guide_router
 from raiker.api.routes_host import router as host_router
 from raiker.api.routes_images import router as images_router
@@ -648,6 +649,7 @@ def create_app(
     app.include_router(skills_router)
     app.include_router(language_router)
     app.include_router(egress_router)
+    app.include_router(github_router)
     app.include_router(guide_router)
     # Serve the built local web dashboard (web/dist) from the same loopback origin, so the
     # dashboard launches with one command and the SPA's relative /api paths resolve directly.

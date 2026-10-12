@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**385 operations: 374 verified, 0 eligible, 0 deferred, 11 special.**
+**403 operations: 390 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -140,6 +140,24 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/git-credential` | GitTokenRequest | GitCredentialStatus | verified | GitCredentialBroker.status |
 | DELETE | `/api/git-credential/grant` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
 | POST | `/api/git-credential/grant` | GitGrantRequest | GitCredentialStatus | verified | GitCredentialBroker.status |
+| GET | `/api/github` |  | GitHubConnection | verified | _connection |
+| DELETE | `/api/github/app` |  | GitHubConnection | verified | _connection |
+| PUT | `/api/github/app` | AppConfigRequest | GitHubAppView | verified | declared GitHubAppView |
+| POST | `/api/github/app/validate` |  | GitHubAppValidation | verified | declared GitHubAppValidation |
+| GET | `/api/github/callback` |  |  | special | special |
+| POST | `/api/github/credentials` | AddCredentialRequest | GitHubConnection | verified | _methods_call |
+| DELETE | `/api/github/credentials/{credential_id}` |  | GitHubDisconnected | verified | declared GitHubDisconnected |
+| POST | `/api/github/credentials/{credential_id}/check` |  | GitHubConnection | verified | _methods_call |
+| POST | `/api/github/credentials/{credential_id}/select` |  | GitHubConnection | verified | _methods_call |
+| POST | `/api/github/delegations` | DelegationRequest | GitHubDelegationView | verified | declared GitHubDelegationView |
+| DELETE | `/api/github/delegations/{delegation_id}` |  | GitHubConnection | verified | _connection |
+| GET | `/api/github/discovery` |  | GitHubDiscovery | verified | declared GitHubDiscovery |
+| POST | `/api/github/repositories/refresh` |  | GitHubConnection | verified | _connection |
+| PUT | `/api/github/repositories/{repository_id}` | RepositorySelection | GitHubConnection | verified | _connection |
+| POST | `/api/github/sign-in` | SignInRequest | GitHubSignInAttempt | verified | attempt_view |
+| POST | `/api/github/sign-in/{attempt_id}/cancel` |  | GitHubSignInAttempt | verified | _attempt_call |
+| POST | `/api/github/sign-in/{attempt_id}/poll` |  | GitHubSignInAttempt | verified | _attempt_call |
+| POST | `/api/github/webhook` |  |  | special | special |
 | GET | `/api/guide` |  | GuideIndex | verified | declared GuideIndex |
 | GET | `/api/guide/{slug}` |  | GuideSection | verified | declared GuideSection |
 | GET | `/api/health` |  | HealthView | verified | declared by cast |

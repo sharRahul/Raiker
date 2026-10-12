@@ -99,6 +99,33 @@
         "title": "ActivateRuntimeModeRequest",
         "type": "object"
       },
+      "AddCredentialRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "enum": [
+              "gh_cli",
+              "os_helper",
+              "ssh",
+              "app_installation"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "selector": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Selector",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "selector"
+        ],
+        "title": "AddCredentialRequest",
+        "type": "object"
+      },
       "AddressGuard": {
         "description": "The private-address refusal: always on, and not a setting.",
         "properties": {
@@ -360,6 +387,81 @@
           }
         },
         "title": "AnswerOwnerQuestionRequest",
+        "type": "object"
+      },
+      "AppConfigRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "callback_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Callback Url"
+          },
+          "client_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "private_key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "webhook_secret": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecretReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "webhooks_enabled": {
+            "default": false,
+            "title": "Webhooks Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "title": "AppConfigRequest",
         "type": "object"
       },
       "ApplyUpdateRequest": {
@@ -8099,6 +8201,76 @@
         "title": "DecisionScope",
         "type": "object"
       },
+      "DelegationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "branch_pattern": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Pattern"
+          },
+          "expires_in_hours": {
+            "default": 24.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 720.0,
+            "title": "Expires In Hours",
+            "type": "number"
+          },
+          "max_actions": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Actions"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Operations",
+            "type": "array"
+          },
+          "repository": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repository",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository",
+          "operations"
+        ],
+        "title": "DelegationRequest",
+        "type": "object"
+      },
       "DeviceSessionView": {
         "description": "One sign-in of this account, without its token.",
         "properties": {
@@ -9990,6 +10162,24 @@
         "title": "GenerateImageRequest",
         "type": "object"
       },
+      "GhAccountView": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "active"
+        ],
+        "title": "GhAccountView",
+        "type": "object"
+      },
       "GistDiscarded": {
         "properties": {
           "discarded": {
@@ -10025,6 +10215,17 @@
               }
             ],
             "title": "Branch"
+          },
+          "credential_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
           },
           "expires_at": {
             "title": "Expires At",
@@ -10094,7 +10295,8 @@
           "uses",
           "operation",
           "repository",
-          "branch"
+          "branch",
+          "credential_id"
         ],
         "title": "GitCredentialGrant",
         "type": "object"
@@ -10133,6 +10335,17 @@
       "GitCredentialStatus": {
         "description": "What a surface needs to render the control. Never the token.\n\n``credential_*`` rather than ``token_*``: the API redactor masks any key\ncontaining \"token\", which is the right blunt instrument to keep.",
         "properties": {
+          "account_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Login"
+          },
           "checked_at": {
             "title": "Checked At",
             "type": "string"
@@ -10140,6 +10353,28 @@
           "credential_configured": {
             "title": "Credential Configured",
             "type": "boolean"
+          },
+          "credential_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
+          },
+          "credential_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Method"
           },
           "credential_source": {
             "title": "Credential Source",
@@ -10197,6 +10432,9 @@
         "required": [
           "credential_configured",
           "credential_source",
+          "credential_method",
+          "credential_id",
+          "account_login",
           "grant",
           "last_used",
           "scopes",
@@ -10271,6 +10509,729 @@
           }
         },
         "title": "GitGrantRequest",
+        "type": "object"
+      },
+      "GitHubAppCheck": {
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "result": {
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "result"
+        ],
+        "title": "GitHubAppCheck",
+        "type": "object"
+      },
+      "GitHubAppValidation": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubAppCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "excess_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excess Permissions",
+            "type": "array"
+          },
+          "installations": {
+            "title": "Installations",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "checks",
+          "excess_permissions",
+          "installations"
+        ],
+        "title": "GitHubAppValidation",
+        "type": "object"
+      },
+      "GitHubAppView": {
+        "properties": {
+          "app_ref": {
+            "title": "App Ref",
+            "type": "string"
+          },
+          "browser_sign_in": {
+            "title": "Browser Sign In",
+            "type": "boolean"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "private_key_configured": {
+            "title": "Private Key Configured",
+            "type": "boolean"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "webhooks_enabled": {
+            "title": "Webhooks Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "app_ref",
+          "client_id",
+          "slug",
+          "browser_sign_in",
+          "private_key_configured",
+          "webhooks_enabled"
+        ],
+        "title": "GitHubAppView",
+        "type": "object"
+      },
+      "GitHubConnection": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubAppView"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "browser_sign_in": {
+            "title": "Browser Sign In",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "credentials": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubCredentialView"
+            },
+            "title": "Credentials",
+            "type": "array"
+          },
+          "delegations": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubDelegationView"
+            },
+            "title": "Delegations",
+            "type": "array"
+          },
+          "device_sign_in": {
+            "title": "Device Sign In",
+            "type": "boolean"
+          },
+          "installations": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubInstallationView"
+            },
+            "title": "Installations",
+            "type": "array"
+          },
+          "repositories": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubRepositoryView"
+            },
+            "title": "Repositories",
+            "type": "array"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/GitHubRiskView"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitHubCredentialView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "states": {
+            "$ref": "#/components/schemas/GitHubStates"
+          }
+        },
+        "required": [
+          "states",
+          "selected",
+          "credentials",
+          "device_sign_in",
+          "browser_sign_in",
+          "apps",
+          "installations",
+          "repositories",
+          "delegations",
+          "risks",
+          "checked_at"
+        ],
+        "title": "GitHubConnection",
+        "type": "object"
+      },
+      "GitHubCredentialView": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
+          "account_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Login"
+          },
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          },
+          "validated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validated At"
+          }
+        },
+        "required": [
+          "credential_id",
+          "method",
+          "label",
+          "account_login",
+          "account_id",
+          "status",
+          "selected",
+          "usable",
+          "expires_at",
+          "validated_at",
+          "last_error"
+        ],
+        "title": "GitHubCredentialView",
+        "type": "object"
+      },
+      "GitHubDelegationView": {
+        "properties": {
+          "actions_used": {
+            "title": "Actions Used",
+            "type": "integer"
+          },
+          "branch_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Pattern"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "delegation_id": {
+            "title": "Delegation Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "max_actions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Actions"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "parent_delegation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Delegation Id"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Id"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "delegation_id",
+          "repository",
+          "repository_id",
+          "operations",
+          "branch_pattern",
+          "expires_at",
+          "max_actions",
+          "actions_used",
+          "state",
+          "parent_delegation_id",
+          "created_at"
+        ],
+        "title": "GitHubDelegationView",
+        "type": "object"
+      },
+      "GitHubDisconnected": {
+        "properties": {
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "github": {
+            "title": "Github",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id",
+          "method",
+          "github"
+        ],
+        "title": "GitHubDisconnected",
+        "type": "object"
+      },
+      "GitHubDiscovery": {
+        "properties": {
+          "credential_helpers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Credential Helpers",
+            "type": "array"
+          },
+          "gh_accounts": {
+            "items": {
+              "$ref": "#/components/schemas/GhAccountView"
+            },
+            "title": "Gh Accounts",
+            "type": "array"
+          },
+          "ssh_keys": {
+            "items": {
+              "$ref": "#/components/schemas/SshKeyView"
+            },
+            "title": "Ssh Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "gh_accounts",
+          "credential_helpers",
+          "ssh_keys"
+        ],
+        "title": "GitHubDiscovery",
+        "type": "object"
+      },
+      "GitHubInstallationView": {
+        "properties": {
+          "account_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Login"
+          },
+          "account_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Type"
+          },
+          "app_ref": {
+            "title": "App Ref",
+            "type": "string"
+          },
+          "installation_id": {
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "repository_selection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Selection"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "installation_id",
+          "app_ref",
+          "account_login",
+          "account_type",
+          "repository_selection",
+          "status"
+        ],
+        "title": "GitHubInstallationView",
+        "type": "object"
+      },
+      "GitHubRepositoryView": {
+        "properties": {
+          "credential_id": {
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "installation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Id"
+          },
+          "private": {
+            "title": "Private",
+            "type": "boolean"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "string"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential_id",
+          "repository_id",
+          "full_name",
+          "private",
+          "installation_id",
+          "status",
+          "selected"
+        ],
+        "title": "GitHubRepositoryView",
+        "type": "object"
+      },
+      "GitHubRiskView": {
+        "properties": {
+          "capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability"
+          },
+          "default": {
+            "title": "Default",
+            "type": "string"
+          },
+          "delegable": {
+            "title": "Delegable",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "risk": {
+            "title": "Risk",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "label",
+          "risk",
+          "default",
+          "delegable",
+          "capability"
+        ],
+        "title": "GitHubRiskView",
+        "type": "object"
+      },
+      "GitHubSignInAttempt": {
+        "properties": {
+          "attempt_id": {
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "authorize_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorize Url"
+          },
+          "credential_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "next_poll_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Poll At"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "user_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Code"
+          },
+          "verification_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Uri"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "method",
+          "outcome",
+          "reason",
+          "user_code",
+          "verification_uri",
+          "authorize_url",
+          "expires_at",
+          "next_poll_at",
+          "credential_id"
+        ],
+        "title": "GitHubSignInAttempt",
+        "type": "object"
+      },
+      "GitHubStates": {
+        "description": "§4.2 — the six states, kept apart. No single *Connected* light.",
+        "properties": {
+          "application_installed": {
+            "title": "Application Installed",
+            "type": "boolean"
+          },
+          "capability_enabled": {
+            "title": "Capability Enabled",
+            "type": "boolean"
+          },
+          "connected_account": {
+            "title": "Connected Account",
+            "type": "boolean"
+          },
+          "credential_available": {
+            "title": "Credential Available",
+            "type": "boolean"
+          },
+          "operation_approved": {
+            "title": "Operation Approved",
+            "type": "boolean"
+          },
+          "repository_authorised": {
+            "title": "Repository Authorised",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connected_account",
+          "application_installed",
+          "repository_authorised",
+          "credential_available",
+          "capability_enabled",
+          "operation_approved"
+        ],
+        "title": "GitHubStates",
         "type": "object"
       },
       "GitTokenRequest": {
@@ -21593,6 +22554,27 @@
         "title": "ReplaceApprovalRequest",
         "type": "object"
       },
+      "RepositorySelection": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "credential_id",
+          "selected"
+        ],
+        "title": "RepositorySelection",
+        "type": "object"
+      },
       "ResolveApprovalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -22211,6 +23193,33 @@
           "first_damaged_at"
         ],
         "title": "SearchIndexHealth",
+        "type": "object"
+      },
+      "SecretReference": {
+        "additionalProperties": false,
+        "description": "Where a secret lives: an environment variable, a file, or pasted (vault).",
+        "properties": {
+          "kind": {
+            "enum": [
+              "env",
+              "file",
+              "vault"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "SecretReference",
         "type": "object"
       },
       "SecurityFindingView": {
@@ -23546,6 +24555,22 @@
         "title": "SetupUpdateRequest",
         "type": "object"
       },
+      "SignInRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "default": "device",
+            "enum": [
+              "device",
+              "browser"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "title": "SignInRequest",
+        "type": "object"
+      },
       "SkillActiveSet": {
         "properties": {
           "active": {
@@ -24036,6 +25061,24 @@
           "max_usd"
         ],
         "title": "SpendLimitView",
+        "type": "object"
+      },
+      "SshKeyView": {
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "fingerprint"
+        ],
+        "title": "SshKeyView",
         "type": "object"
       },
       "StandingGrantCreated": {
@@ -32326,6 +33369,635 @@
           }
         },
         "summary": "Grant Git Credential"
+      }
+    },
+    "/api/github": {
+      "get": {
+        "description": "The six states, the credentials by method, repositories and delegations.",
+        "operationId": "get_github_connection_api_github_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Github Connection"
+      }
+    },
+    "/api/github/app": {
+      "delete": {
+        "description": "Forget the custom App's configuration. Sign-ins made with it stop refreshing.",
+        "operationId": "remove_github_app_api_github_app_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove Github App"
+      },
+      "put": {
+        "description": "Configure your own GitHub App. Secrets are kept by reference, never echoed.",
+        "operationId": "configure_github_app_api_github_app_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAppView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Configure Github App"
+      }
+    },
+    "/api/github/app/validate": {
+      "post": {
+        "description": "Check the App against GitHub: its key, its id, its permissions, its installations.",
+        "operationId": "validate_github_app_api_github_app_validate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubAppValidation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Validate Github App"
+      }
+    },
+    "/api/github/callback": {
+      "get": {
+        "description": "Where GitHub sends the browser back. Completed only by the session that started it.",
+        "operationId": "github_sign_in_callback_api_github_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Github Sign In Callback"
+      }
+    },
+    "/api/github/credentials": {
+      "post": {
+        "description": "Use a credential this machine already holds; its account is checked first.",
+        "operationId": "add_github_credential_api_github_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Github Credential"
+      }
+    },
+    "/api/github/credentials/{credential_id}": {
+      "delete": {
+        "description": "Stop using a credential at once; say whether GitHub confirmed the revocation.",
+        "operationId": "disconnect_github_credential_api_github_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDisconnected"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect Github Credential"
+      }
+    },
+    "/api/github/credentials/{credential_id}/check": {
+      "post": {
+        "description": "Ask GitHub whose this credential is now.",
+        "operationId": "check_github_credential_api_github_credentials__credential_id__check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Github Credential"
+      }
+    },
+    "/api/github/credentials/{credential_id}/select": {
+      "post": {
+        "description": "Use this credential from now on. Another account's grants end at once.",
+        "operationId": "select_github_credential_api_github_credentials__credential_id__select_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Github Credential"
+      }
+    },
+    "/api/github/delegations": {
+      "post": {
+        "description": "Delegate repository work. Only a person can; merges and deletions never.",
+        "operationId": "create_github_delegation_api_github_delegations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDelegationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Github Delegation"
+      }
+    },
+    "/api/github/delegations/{delegation_id}": {
+      "delete": {
+        "description": "End a delegation and every share narrowed from it.",
+        "operationId": "revoke_github_delegation_api_github_delegations__delegation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "delegation_id",
+            "required": true,
+            "schema": {
+              "title": "Delegation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Github Delegation"
+      }
+    },
+    "/api/github/discovery": {
+      "get": {
+        "description": "What this machine already has — gh accounts, helpers, SSH keys. Reads no secret.",
+        "operationId": "discover_github_methods_api_github_discovery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubDiscovery"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Discover Github Methods"
+      }
+    },
+    "/api/github/repositories/refresh": {
+      "post": {
+        "description": "Ask GitHub, now, which repositories the selected credential reaches.",
+        "operationId": "refresh_github_repositories_api_github_repositories_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh Github Repositories"
+      }
+    },
+    "/api/github/repositories/{repository_id}": {
+      "put": {
+        "operationId": "select_github_repository_api_github_repositories__repository_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repository_id",
+            "required": true,
+            "schema": {
+              "title": "Repository Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepositorySelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubConnection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Github Repository"
+      }
+    },
+    "/api/github/sign-in": {
+      "post": {
+        "description": "Start a sign-in. Device: a code to enter at GitHub. Browser: a URL to open.",
+        "operationId": "start_github_sign_in_api_github_sign_in_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubSignInAttempt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Github Sign In"
+      }
+    },
+    "/api/github/sign-in/{attempt_id}/cancel": {
+      "post": {
+        "operationId": "cancel_github_sign_in_api_github_sign_in__attempt_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubSignInAttempt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Github Sign In"
+      }
+    },
+    "/api/github/sign-in/{attempt_id}/poll": {
+      "post": {
+        "description": "Ask GitHub once — no sooner than it allows — whether the code was entered.",
+        "operationId": "poll_github_sign_in_api_github_sign_in__attempt_id__poll_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubSignInAttempt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Poll Github Sign In"
+      }
+    },
+    "/api/github/webhook": {
+      "post": {
+        "description": "One delivery to the configured App. Its signature is its authentication.",
+        "operationId": "receive_github_webhook_api_github_webhook_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Receive Github Webhook Api Github Webhook Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Receive Github Webhook"
       }
     },
     "/api/guide": {

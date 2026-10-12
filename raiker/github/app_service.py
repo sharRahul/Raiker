@@ -186,12 +186,24 @@ class GitHubAppService:
         return result
 
     # ── installations (GH-42) ───────────────────────────────────────────
-    def sync_installations(self) -> list[dict[str, Any]]:
+    def installation_repositories(self, installation_id: str) -> list[dict[str, Any]]:
+        return _installation_repositories(self, installation_id)
+
+    def sync_installations(self, *, strict: bool = False) -> list[dict[str, Any]]:
+        """What GitHub says this App is installed on now.
+
+        An installation GitHub no longer lists is marked removed. With *strict*
+        a GitHub that cannot be asked is an error rather than an empty answer.
+        """
         try:
             response = self._app_request("GET", "/app/installations?per_page=100")
         except AppServiceError:
+            if strict:
+                raise
             return []
         if response.status != 200 or not isinstance(response.data, list):
+            if strict:
+                raise AppServiceError(f"github_installations_failed:{response.status}", "GitHub did not answer.")
             return []
         seen: list[dict[str, Any]] = []
         for item in response.data:
@@ -207,6 +219,12 @@ class GitHubAppService:
                 permissions=_as_dict(item.get("permissions")),
             )
             seen.append(item)
+        listed = {str(item["id"]) for item in seen}
+        for known in self._store.list_github_installations():
+            if known.get("app_ref") == self._app_ref and str(known["installation_id"]) not in listed:
+                self._store.upsert_github_installation(
+                    str(known["installation_id"]), app_ref=self._app_ref, status="removed"
+                )
         return seen
 
     # ── installation tokens (GH-40) ─────────────────────────────────────
@@ -291,8 +309,6 @@ def _installation_repositories(service: GitHubAppService, installation_id: str) 
             break
     return found
 
-
-GitHubAppService.installation_repositories = _installation_repositories  # type: ignore[attr-defined]
 
 
 def forget_installation_tokens() -> None:

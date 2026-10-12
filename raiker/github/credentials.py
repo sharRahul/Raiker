@@ -238,6 +238,22 @@ class CredentialMethods:
         )
         return self.get(credential_id)
 
+    def discover(self) -> dict[str, Any]:
+        """What this machine offers, found without reading a secret (§10 Discovery).
+
+        The CLI's signed-in accounts, the credential helpers git is configured
+        with (a helper cannot list its usernames without answering for one), and
+        SSH keys by fingerprint. A program that is missing or fails offers nothing.
+        """
+        found: dict[str, Any] = {"gh_accounts": [], "credential_helpers": [], "ssh_keys": []}
+        with contextlib.suppress(Exception):
+            found["gh_accounts"] = [{"login": a.login, "active": a.active} for a in self._gh.accounts()]
+        with contextlib.suppress(Exception):
+            found["credential_helpers"] = list(self._helper.helpers())
+        with contextlib.suppress(Exception):
+            found["ssh_keys"] = [{"path": k.path, "fingerprint": k.fingerprint} for k in self._ssh.discover()]
+        return found
+
     # ── adding methods ──────────────────────────────────────────────────
     def _create_verified(
         self, method: str, account: Account, *, select: bool = True, **fields: Any
@@ -343,6 +359,8 @@ class CredentialMethods:
                     str(row.get("key_path") or ""), write_known_hosts(self._store.paths.workspace_root)
                 )
                 account = Account(account_id=f"ssh:{login.lower()}", login=login)
+            elif row["method"] == METHOD_APP_INSTALLATION:
+                account = self._check_installation(row)
             else:
                 account = self.check_token(self.secret(row, verify=False))
         except (CredentialMethodError, LocalCredentialError) as exc:
@@ -367,6 +385,26 @@ class CredentialMethods:
             {"credential_id": credential_id, "result": "ok", "account_id": account.account_id},
         )
         return self.get(credential_id)
+
+    def _check_installation(self, row: dict[str, Any]) -> Account:
+        """An installation has no user to ask about: ask GitHub whether it is still there."""
+        from raiker.github.app_service import AppServiceError, GitHubAppService
+
+        installation_id = str(row.get("selector") or "")
+        try:
+            GitHubAppService(
+                self._store, str(row.get("app_ref") or "byo"), http=self._http
+            ).sync_installations(strict=True)
+        except AppServiceError as exc:
+            raise CredentialMethodError(exc.reason, exc.message) from None
+        installation = self._store.load_github_installation(installation_id)
+        if installation is None or installation.get("status") != "active":
+            status = (installation or {}).get("status") or "removed"
+            raise CredentialMethodError(f"github_installation_{status}", "The Raiker app is no longer installed there.")
+        return Account(
+            account_id=f"installation:{installation_id}",
+            login=str(installation.get("account_login") or installation_id),
+        )
 
     def remove(self, credential_id: str) -> dict[str, Any]:
         """Forget one credential: its vault entries, its row, and every grant."""

@@ -3,6 +3,7 @@
 from tests.contract_cases.auth import CASES as AUTH
 from tests.contract_cases.base import merge
 from tests.contract_cases.extensions import CASES as EXTENSIONS
+from tests.contract_cases.github import CASES as GITHUB
 from tests.contract_cases.governance import CASES as GOVERNANCE
 from tests.contract_cases.host import CASES as HOST
 from tests.contract_cases.memory import CASES as MEMORY
@@ -11,4 +12,4 @@ from tests.contract_cases.projects import CASES as PROJECTS
 from tests.contract_cases.read_models import CASES as READ_MODELS
 from tests.contract_cases.sessions import CASES as SESSIONS
 
-CASES = merge(READ_MODELS, AUTH, SESSIONS, PROJECTS, MEMORY, MODELS, GOVERNANCE, EXTENSIONS, HOST)
+CASES = merge(READ_MODELS, AUTH, SESSIONS, PROJECTS, MEMORY, MODELS, GOVERNANCE, EXTENSIONS, HOST, GITHUB)

@@ -26,6 +26,11 @@ export type ActivateRuntimeModeRequest = {
   as_principal?: string | null;
 };
 
+export type AddCredentialRequest = {
+  method: "gh_cli" | "os_helper" | "ssh" | "app_installation";
+  selector: string;
+};
+
 /** The private-address refusal: always on, and not a setting. */
 export type AddressGuard = {
   enforced: boolean;
@@ -78,6 +83,16 @@ export type AgentResponse = {
 export type AnswerOwnerQuestionRequest = {
   answers?: Record<string, unknown>;
   response?: string | null;
+};
+
+export type AppConfigRequest = {
+  client_id: string;
+  app_id?: string | null;
+  callback_url?: string | null;
+  private_key?: SecretReference | null;
+  client_secret?: SecretReference | null;
+  webhook_secret?: SecretReference | null;
+  webhooks_enabled?: boolean;
 };
 
 export type ApplyUpdateRequest = {
@@ -1637,6 +1652,15 @@ export type DecisionScope = {
   project_id: string | null;
 };
 
+export type DelegationRequest = {
+  repository: string;
+  operations: string[];
+  branch_pattern?: string | null;
+  expires_in_hours?: number;
+  max_actions?: number | null;
+  note?: string | null;
+};
+
 /** One sign-in of this account, without its token. */
 export type DeviceSessionView = {
   session_id: string;
@@ -1992,6 +2016,11 @@ export type GenerateImageRequest = {
   references?: ImageReferenceRequest[];
 };
 
+export type GhAccountView = {
+  login: string;
+  active: boolean;
+};
+
 export type GistDiscarded = {
   ok: boolean;
   gist_id: string;
@@ -2009,6 +2038,7 @@ export type GitCredentialGrant = {
   operation: string | null;
   repository: string | null;
   branch: string | null;
+  credential_id: string | null;
 };
 
 /** DEC-21 Git credential — when the credential was last lent, and for what. */
@@ -2022,6 +2052,9 @@ export type GitCredentialLastUse = {
 export type GitCredentialStatus = {
   credential_configured: boolean;
   credential_source: string;
+  credential_method: string | null;
+  credential_id: string | null;
+  account_login: string | null;
   grant: GitCredentialGrant | null;
   last_used: GitCredentialLastUse | null;
   scopes: string[];
@@ -2038,6 +2071,132 @@ export type GitGrantRequest = {
   operation?: "push" | null;
   repository?: string | null;
   branch?: string | null;
+};
+
+export type GitHubAppCheck = {
+  check: string;
+  result: string;
+};
+
+export type GitHubAppValidation = {
+  ok: boolean;
+  checks: GitHubAppCheck[];
+  excess_permissions: string[];
+  installations: number;
+};
+
+export type GitHubAppView = {
+  app_ref: string;
+  client_id: string;
+  slug: string | null;
+  browser_sign_in: boolean;
+  private_key_configured: boolean;
+  webhooks_enabled: boolean;
+};
+
+export type GitHubConnection = {
+  states: GitHubStates;
+  selected: GitHubCredentialView | null;
+  credentials: GitHubCredentialView[];
+  device_sign_in: boolean;
+  browser_sign_in: boolean;
+  apps: GitHubAppView[];
+  installations: GitHubInstallationView[];
+  repositories: GitHubRepositoryView[];
+  delegations: GitHubDelegationView[];
+  risks: GitHubRiskView[];
+  checked_at: string;
+};
+
+export type GitHubCredentialView = {
+  credential_id: string;
+  method: string;
+  label: string;
+  account_login: string | null;
+  account_id: string | null;
+  status: string;
+  selected: boolean;
+  usable: boolean;
+  expires_at: string | null;
+  validated_at: string | null;
+  last_error: string | null;
+};
+
+export type GitHubDelegationView = {
+  delegation_id: string;
+  repository: string;
+  repository_id: string | null;
+  operations: string[];
+  branch_pattern: string | null;
+  expires_at: string;
+  max_actions: number | null;
+  actions_used: number;
+  state: string;
+  parent_delegation_id: string | null;
+  created_at: string;
+};
+
+export type GitHubDisconnected = {
+  credential_id: string;
+  method: string;
+  github: string;
+};
+
+export type GitHubDiscovery = {
+  gh_accounts: GhAccountView[];
+  credential_helpers: string[];
+  ssh_keys: SshKeyView[];
+};
+
+export type GitHubInstallationView = {
+  installation_id: string;
+  app_ref: string;
+  account_login: string | null;
+  account_type: string | null;
+  repository_selection: string | null;
+  status: string;
+};
+
+export type GitHubRepositoryView = {
+  credential_id: string;
+  repository_id: string;
+  full_name: string;
+  private: boolean;
+  installation_id: string | null;
+  status: string;
+  selected: boolean;
+};
+
+export type GitHubRiskView = {
+  operation: string;
+  label: string;
+  risk: string;
+  default: string;
+  delegable: boolean;
+  capability: string | null;
+};
+
+export type GitHubSignInAttempt = {
+  attempt_id: string;
+  method: string;
+  outcome: string;
+  reason: string | null;
+  user_code: string | null;
+  verification_uri: string | null;
+  authorize_url: string | null;
+  expires_at: string;
+  next_poll_at: string | null;
+  credential_id: string | null;
+};
+
+/** §4.2 — the six states, kept apart. No single *Connected* light. */
+export type GitHubStates = {
+  connected_account: boolean;
+  application_installed: boolean;
+  repository_authorised: boolean;
+  credential_available: boolean;
+  capability_enabled: boolean;
+  operation_approved: boolean;
 };
 
 export type GitTokenRequest = {
@@ -4197,6 +4356,11 @@ export type ReplaceApprovalRequest = {
   reason?: string;
 };
 
+export type RepositorySelection = {
+  credential_id: string;
+  selected: boolean;
+};
+
 export type ResolveApprovalRequest = {
   approve: boolean;
   reason: string;
@@ -4325,6 +4489,12 @@ export type SearchIndexHealth = {
   damaged_count: number;
   checked_at: string;
   first_damaged_at: string | null;
+};
+
+/** Where a secret lives: an environment variable, a file, or pasted (vault). */
+export type SecretReference = {
+  kind: "env" | "file" | "vault";
+  value: string;
 };
 
 /**
@@ -4593,6 +4763,10 @@ export type SetupUpdateRequest = {
   background_service_enabled?: boolean;
 };
 
+export type SignInRequest = {
+  method?: "device" | "browser";
+};
+
 export type SkillActiveSet = {
   ok: boolean;
   skill_id: string;
@@ -4705,6 +4879,11 @@ export type SpendLimitView = {
   reached: boolean;
   min_usd: number;
   max_usd: number;
+};
+
+export type SshKeyView = {
+  path: string;
+  fingerprint: string;
 };
 
 export type StandingGrantCreated = {
@@ -5572,6 +5751,38 @@ export const contract = {
     call<GitCredentialStatus>("DELETE", "/api/git-credential/grant"),
   grantGitCredential: (body: GitGrantRequest) =>
     call<GitCredentialStatus>("POST", "/api/git-credential/grant", { body }),
+  getGithubConnection: () =>
+    request<GitHubConnection>("/api/github"),
+  removeGithubApp: () =>
+    call<GitHubConnection>("DELETE", "/api/github/app"),
+  configureGithubApp: (body: AppConfigRequest) =>
+    call<GitHubAppView>("PUT", "/api/github/app", { body }),
+  validateGithubApp: () =>
+    call<GitHubAppValidation>("POST", "/api/github/app/validate"),
+  addGithubCredential: (body: AddCredentialRequest) =>
+    call<GitHubConnection>("POST", "/api/github/credentials", { body }),
+  disconnectGithubCredential: (credentialId: string) =>
+    call<GitHubDisconnected>("DELETE", `/api/github/credentials/${encodeURIComponent(credentialId)}`),
+  checkGithubCredential: (credentialId: string) =>
+    call<GitHubConnection>("POST", `/api/github/credentials/${encodeURIComponent(credentialId)}/check`),
+  selectGithubCredential: (credentialId: string) =>
+    call<GitHubConnection>("POST", `/api/github/credentials/${encodeURIComponent(credentialId)}/select`),
+  createGithubDelegation: (body: DelegationRequest) =>
+    call<GitHubDelegationView>("POST", "/api/github/delegations", { body }),
+  revokeGithubDelegation: (delegationId: string) =>
+    call<GitHubConnection>("DELETE", `/api/github/delegations/${encodeURIComponent(delegationId)}`),
+  discoverGithubMethods: () =>
+    request<GitHubDiscovery>("/api/github/discovery"),
+  refreshGithubRepositories: () =>
+    call<GitHubConnection>("POST", "/api/github/repositories/refresh"),
+  selectGithubRepository: (repositoryId: string, body: RepositorySelection) =>
+    call<GitHubConnection>("PUT", `/api/github/repositories/${encodeURIComponent(repositoryId)}`, { body }),
+  startGithubSignIn: (body: SignInRequest) =>
+    call<GitHubSignInAttempt>("POST", "/api/github/sign-in", { body }),
+  cancelGithubSignIn: (attemptId: string) =>
+    call<GitHubSignInAttempt>("POST", `/api/github/sign-in/${encodeURIComponent(attemptId)}/cancel`),
+  pollGithubSignIn: (attemptId: string) =>
+    call<GitHubSignInAttempt>("POST", `/api/github/sign-in/${encodeURIComponent(attemptId)}/poll`),
   guideIndex: () =>
     request<GuideIndex>("/api/guide"),
   guideSection: (slug: string) =>

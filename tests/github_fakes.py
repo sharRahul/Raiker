@@ -41,6 +41,7 @@ class FakeGitHub:
     })
     public_key: Any = None
     removed_installations: set[int] = field(default_factory=set)
+    user_repositories: list[dict[str, Any]] = field(default_factory=list)
     revoked: list[str] = field(default_factory=list)
     requests: list[dict[str, Any]] = field(default_factory=list)
     _counter: int = 0
@@ -118,6 +119,10 @@ class FakeGitHub:
                 return answer(401, {"message": "Bad credentials"})
             account_id, login = self.users[bearer]
             return answer(200, {"id": account_id, "login": login})
+        if path == "/user/repos":
+            if bearer not in self.users:
+                return answer(401, {"message": "Bad credentials"})
+            return answer(200, self.user_repositories if "page=1" in parsed.query else [])
         if path == "/user/installations":
             return answer(200, {"installations": self.installations})
         if path.startswith("/user/installations/") and path.endswith("/repositories"):

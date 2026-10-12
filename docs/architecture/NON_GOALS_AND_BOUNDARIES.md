@@ -23,7 +23,8 @@ Raiker is not:
 11. a multi-agent swarm that can spawn arbitrary workers;
 12. a hosted-model proxy that silently sends local data to remote providers;
 13. a general malware-analysis or offensive automation platform;
-14. a system where interface richness decides authority.
+14. a system where interface richness decides authority;
+15. an organisation-wide administration, tenant-management, or employee-monitoring system.
 
 > **Read the operative word.** Several non-goals above forbid *silent*,
 > *ungoverned*, or *unrestricted* behaviour ("silently sends local data",

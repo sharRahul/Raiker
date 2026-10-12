@@ -76,6 +76,13 @@ human authorizer, runtime authority, or other literal actor.
 | `git_grant_created` | The owner lent the Git credential once or for one conversation, with the operation, repository and branch it is narrowed to |
 | `git_grant_revoked` | The owner withdrew the grant in force |
 | `git_credential_lent` | The credential was lent to one governed git command under a grant: the grant, source, conversation, operation, repository and branch — never the token |
+| `git_credential_selected` | The owner chose which connected GitHub credential Raiker uses; switching to another account revoked every grant made for the old one |
+| `git_credential_checked` | The owner re-checked one credential against GitHub: the account it answers as, or why it failed — never the token |
+| `github_webhook_rejected` | A delivery to the configured GitHub App's webhook failed its signature check; nothing it carried was applied |
+| `repository_delegation_created` | The owner delegated repository work: the repository and its id, the operations, the branch pattern, the expiry, the budget and the credential it is tied to; a child's narrowed share names its parent |
+| `repository_delegation_used` | One push or GitHub write ran under a delegation: what the delegation allowed beside what ran |
+| `repository_delegation_refused` | A push or GitHub write that would otherwise have run unprompted was sent to the owner instead: no delegation covered it, or the one that did no longer held (credential, account, installation or repository changed) |
+| `repository_delegation_revoked` | The owner revoked a delegation, and every share narrowed from it |
 | `channel_delivery_reviewed` | The owner marked a failed or outcome-unknown outbound delivery reviewed (DEC-14 step 7); what happened to it is unchanged and nothing is sent |
 | `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |

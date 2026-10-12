@@ -1674,16 +1674,6 @@ class ToolBroker:
 
         principal = Principal(**raw_principal)
 
-        preview = self._approval_preview(action) if approval_mode == "auto" else None
-        self._event(
-            session_id=session_id,
-            turn_id=turn_id,
-            event_type="tool_started",
-            actor="tool_broker",
-            payload={"action_id": action.action_id, "tool_name": action.tool_name},
-            client=client,
-        )
-        self._stream_tool(action, "tool_started", status="running")
         from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
         from raiker.runtime.executors import build_default_executor_registry
 
@@ -1707,6 +1697,21 @@ class ToolBroker:
             # ordinary and the owner selected auto/skip for this turn.
             decision_mode_override="always_allow",
         )
+        # GH-50 — a push or GitHub write is not the composer mode's to wave
+        # through: without a delegation that covers it, it goes to the owner's
+        # approval queue like any other turn's would.
+        if not authority.repository_delegation_available(governed, principal):
+            return None
+        preview = self._approval_preview(action) if approval_mode == "auto" else None
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="tool_started",
+            actor="tool_broker",
+            payload={"action_id": action.action_id, "tool_name": action.tool_name},
+            client=client,
+        )
+        self._stream_tool(action, "tool_started", status="running")
         governed_result = authority.route_action(governed, principal)
         if governed_result.decision != "allow" or governed_result.error is not None:
             blocked_decision = PolicyDecision(

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="misc"
 """Rows for the GitHub connection (ADD-27). No secret is ever stored here.
 
 Secrets live in the vault (``connector_credentials``) under a reference these
@@ -179,6 +180,13 @@ class GitHubStore:
                    WHERE attempt_id = ? AND outcome = 'pending'""",
                 (attempt_id,),
             )
+        )
+
+    def release_github_auth_attempt(self: SQLiteStore, attempt_id: str) -> None:
+        """Put a claimed attempt back to ``pending``: GitHub said not yet."""
+        self._execute(
+            "UPDATE github_auth_attempts SET outcome = 'pending' WHERE attempt_id = ? AND outcome = 'redeeming'",
+            (attempt_id,),
         )
 
     def close_github_auth_attempt(
@@ -462,8 +470,12 @@ class GitHubStore:
         found = [self.load_repository_delegation(str(row[0])) for row in rows]
         return [row for row in found if row is not None]
 
-    def revoke_repository_delegation(self: SQLiteStore, delegation_id: str, principal_id: str) -> bool:
-        """Revoke a delegation and every child delegated from it."""
+    def revoke_repository_delegation(self: SQLiteStore, delegation_id: str, principal_id: str) -> list[str]:
+        """Revoke a delegation and everything narrowed from it, at any depth.
+
+        Returns the ids revoked, the delegation itself first; empty when it was
+        not this principal's or had already ended.
+        """
         now = utc_now()
         with self.connect() as connection:
             changed = connection.execute(
@@ -471,12 +483,28 @@ class GitHubStore:
                    WHERE delegation_id = ? AND principal_id = ? AND revoked_at IS NULL""",
                 (now, delegation_id, principal_id),
             ).rowcount
-            connection.execute(
-                """UPDATE repository_delegations SET revoked_at = ?
-                   WHERE parent_delegation_id = ? AND revoked_at IS NULL""",
-                (now, delegation_id),
-            )
-        return bool(changed)
+            if not changed:
+                return []
+            revoked = [delegation_id]
+            frontier = [delegation_id]
+            while frontier:
+                parent = frontier.pop()
+                children = [
+                    str(row[0])
+                    for row in connection.execute(
+                        """SELECT delegation_id FROM repository_delegations
+                           WHERE parent_delegation_id = ? AND revoked_at IS NULL""",
+                        (parent,),
+                    ).fetchall()
+                ]
+                for child in children:
+                    connection.execute(
+                        "UPDATE repository_delegations SET revoked_at = ? WHERE delegation_id = ?",
+                        (now, child),
+                    )
+                revoked.extend(children)
+                frontier.extend(children)
+        return revoked
 
     def count_repository_delegation_action(self: SQLiteStore, delegation_id: str) -> bool:
         """Spend one action of a bounded delegation; False when none is left."""

@@ -992,6 +992,74 @@ class RuntimeAuthority:
         self._event("standing_grant_revoked", revoker.principal_id, {"grant_id": grant_id})
         return None
 
+    # ── repository delegations (ADD-27 GH-50, GH-52) ──────────────────────────
+
+    def repository_write_target(
+        self, action: GovernedAction, principal: Principal
+    ) -> dict[str, Any] | None:
+        """What repository write *action* is, or None when it is not one.
+
+        Only the executor can say — the push's repository is wherever the local
+        remote points, the pull request's is in its arguments — so an executor
+        that performs repository writes answers ``repository_target``.
+        """
+        capability = CAPABILITY_GATE_MAP.get(action.action_type, action.action_type)
+        executor = self.executor_registry.get(capability)
+        resolve = getattr(executor, "repository_target", None)
+        if resolve is None:
+            return None
+        try:
+            target = resolve(action, principal)
+        except Exception:  # noqa: BLE001 — an unresolvable target is still a write
+            return {"repository": "", "operation": "unresolved", "branch": None}
+        return dict(target) if target else None
+
+    def _covering_delegation(
+        self, principal: Principal, target: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, list[str], Any]:
+        from raiker.github.delegations import DelegationService, credential_owner
+
+        service = DelegationService(self.store, credential_owner(self.store, principal.principal_id))
+        repository = str(target.get("repository") or "")
+        branch = target.get("branch")
+        row = (
+            service.covering(repository, str(target.get("operation") or ""), str(branch) if branch else None)
+            if repository
+            else None
+        )
+        if row is None:
+            return None, ["delegation_required"], service
+        problems = service.revalidate(row)
+        return (None, problems, service) if problems else (row, [], service)
+
+    def repository_delegation_available(self, action: GovernedAction, principal: Principal) -> bool:
+        """Whether a write would run under a delegation now — spending nothing."""
+        if principal.principal_type == PrincipalType.HUMAN or action.authority_kind == "approval":
+            return True
+        target = self.repository_write_target(action, principal)
+        return target is None or self._covering_delegation(principal, target)[0] is not None
+
+    def _repository_delegation(
+        self, action: GovernedAction, principal: Principal, target: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, list[str]]:
+        """The delegation that lets this write run unprompted, or why none does.
+
+        A covering delegation is re-validated first — credential, account,
+        installation, repository identity — so a resumed task's next step
+        meets the world as it is now, not as it was when the work began.
+        """
+        row, problems, service = self._covering_delegation(principal, target)
+        if row is None:
+            return None, problems
+        operation = str(target.get("operation") or "")
+        branch = target.get("branch")
+        if not service.spend(
+            row, operation=operation, branch=str(branch) if branch else None,
+            action_id=action.action_id, session_id=action.session_id or None,
+        ):
+            return None, ["delegation_exhausted"]
+        return row, []
+
     def find_matching_standing_grant(
         self, principal: Principal, action: GovernedAction, risk_level: str
     ) -> dict[str, Any] | None:
@@ -1623,6 +1691,43 @@ class RuntimeAuthority:
             if grant is not None:
                 grant_applied = grant
                 effective_needs_approval = False
+
+        # GH-50 — a push or a GitHub write leaves the machine under the owner's
+        # GitHub identity. Neither a standing grant nor a standing decision mode
+        # is enough for that on its own: it runs unprompted only under a
+        # delegation the owner made for this repository and operation, and that
+        # still holds now (GH-52). Otherwise it asks, and says why.
+        delegation_applied: dict[str, Any] | None = None
+        if (
+            principal.principal_type != PrincipalType.HUMAN
+            and action.authority_kind != "approval"
+        ):
+            target = self.repository_write_target(action, principal)
+            if target is not None:
+                delegation_applied, problems = self._repository_delegation(action, principal, target)
+                grant_applied = None
+                effective_needs_approval = delegation_applied is None
+                if delegation_applied is None:
+                    self._event(
+                        event_type="repository_delegation_refused",
+                        actor="runtime_authority",
+                        payload={
+                            "action_id": action.action_id,
+                            "action_type": action.action_type,
+                            "repository": target.get("repository"),
+                            "operation": target.get("operation"),
+                            "branch": target.get("branch"),
+                            "problems": problems,
+                        },
+                        session_id=action.session_id,
+                        turn_id=action.turn_id,
+                    )
+                else:
+                    action = replace(
+                        action,
+                        authority_kind="delegation",
+                        authority_id=str(delegation_applied["delegation_id"]),
+                    )
 
         if effective_needs_approval and principal.principal_type != PrincipalType.HUMAN:
             return GovernedActionResult(

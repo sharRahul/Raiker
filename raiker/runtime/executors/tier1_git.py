@@ -222,6 +222,32 @@ class GitPushExecutor:
             )
         return binding
 
+    def repository_target(self, action: GovernedAction, principal: Principal) -> dict[str, Any]:
+        """Which repository and branch this push would reach (GH-50).
+
+        Resolved from the repository as it is now, without the network, so the
+        router can ask whether a delegation covers it. Anything that cannot be
+        resolved is still a push — it just has no delegation to run under.
+        """
+        from raiker.runtime.git_credential import repository_key
+        from raiker.tools.git import proposed_push_snapshot
+
+        remote = action.arguments.get("remote")
+        branch = action.arguments.get("branch")
+        snapshot = proposed_push_snapshot(
+            self._repo_root(principal),
+            str(remote).strip() if remote else None,
+            str(branch).strip() if branch else None,
+            credential_configured=True,
+        )
+        if snapshot.get("status") != "success":
+            return {"repository": "", "operation": "push", "branch": None}
+        return {
+            "repository": repository_key(str(snapshot["remote_url"])),
+            "operation": "push",
+            "branch": str(snapshot["branch"]),
+        }
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         if action.action_type not in ("git_push", "git_push_execution"):
             return ExecutionResult(
@@ -229,6 +255,7 @@ class GitPushExecutor:
                 reason_code=f"unknown_git_operation:{action.action_type or 'missing'}",
                 summary="Git push failed closed.", artifacts={},
             )
+        from raiker.github.delegations import credential_owner
         from raiker.runtime.git_credential import (
             RUNTIME_TOKEN_VAR,
             GitCredentialBroker,
@@ -242,7 +269,7 @@ class GitPushExecutor:
             remote = action.arguments.get("remote")
             branch = action.arguments.get("branch")
             broker = (
-                GitCredentialBroker(self._store, principal.principal_id)
+                GitCredentialBroker(self._store, credential_owner(self._store, principal.principal_id))
                 if self._store is not None
                 else None
             )
@@ -276,6 +303,7 @@ class GitPushExecutor:
                     operation="push",
                     repository=repository_key(str(snapshot["remote_url"])),
                     branch=str(snapshot["branch"]),
+                    delegation_id=action.authority_id if action.authority_kind == "delegation" else None,
                 ) as environment:
                     result = push_branch(
                         root, str(snapshot["remote"]), str(snapshot["branch"]),
@@ -303,9 +331,15 @@ class GitPushExecutor:
                 artifacts={"error": error, "repository": repository},
             )
         created = " (new remote branch)" if result["created_remote_branch"] else ""
+        receipt = result.get("receipt") or {}
+        confirmed = (
+            " Confirmed on the remote."
+            if receipt.get("verified")
+            else " Not yet confirmed on the remote — check the branch there."
+        )
         summary = (
             f"Pushed {result['commit_count']} commit(s) on {result['branch']} to "
-            f"{result['remote']} ({result['host']}){created}."
+            f"{result['remote']} ({result['host']}){created}.{confirmed}"
         )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
@@ -319,6 +353,7 @@ class GitPushExecutor:
                 "commit_count": result["commit_count"],
                 "created_remote_branch": result["created_remote_branch"],
                 "repository": repository,
+                "receipt": receipt,
             },
         )
 
@@ -369,6 +404,7 @@ class GitFetchExecutor:
         )
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.github.delegations import DelegationService, credential_owner
         from raiker.runtime.git_credential import (
             RUNTIME_TOKEN_VAR,
             GitCredentialBroker,
@@ -390,7 +426,7 @@ class GitFetchExecutor:
             )
         try:
             broker = (
-                GitCredentialBroker(self._store, principal.principal_id)
+                GitCredentialBroker(self._store, credential_owner(self._store, principal.principal_id))
                 if self._store is not None
                 else None
             )
@@ -428,6 +464,25 @@ class GitFetchExecutor:
                     )
                 except GitCredentialError:
                     loan = None
+            if self._store is not None and broker is not None and loan is None and principal.principal_type != "human":
+                # GH-50 — or under the owner's delegation to fetch this repository,
+                # re-checked now and spending one of its actions.
+                owner = credential_owner(self._store, principal.principal_id)
+                delegations = DelegationService(self._store, owner)
+                covering = delegations.covering(str(snapshot["repository_key"]), "fetch")
+                if (
+                    covering is not None
+                    and not delegations.revalidate(covering)
+                    and delegations.spend(
+                        covering, operation="fetch", branch=None,
+                        action_id=action.action_id, session_id=session,
+                    )
+                ):
+                    loan = broker.lend(
+                        session_id=session, operation="fetch",
+                        repository=str(snapshot["repository_key"]),
+                        delegation_id=str(covering["delegation_id"]),
+                    )
             if snapshot["transport"] == "ssh" and loan is None:
                 return ExecutionResult(
                     ok=False, capability=self.capability, action_id=action.action_id,

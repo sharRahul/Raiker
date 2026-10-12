@@ -40,6 +40,18 @@ class GithubConnectorExecutor:
         self._store = store
         self._fetch_fn = fetch_fn
 
+    def repository_target(self, action: GovernedAction, principal: Principal) -> dict[str, Any] | None:
+        """A write's repository and operation, for the delegation check (GH-50); None for a read."""
+        operation = str(action.arguments.get("operation", "read")).strip()
+        repo = str(action.arguments.get("repo", "")).strip()
+        if operation == "create_pull_request":
+            head = str(action.arguments.get("head", "")).strip()
+            return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": head or None}
+        if operation == "read":
+            return None
+        # A comment, or anything else that writes: never covered by a delegation.
+        return {"repository": f"github.com/{repo}", "operation": operation or "unknown", "branch": None}
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         from raiker.runtime.connectors import GithubConnectorService
 

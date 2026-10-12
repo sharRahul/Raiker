@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
@@ -17,6 +19,7 @@ from raiker.runtime.executors.sandbox import (
     get_url,
     post_json_url,
 )
+from raiker.runtime.git_credential import GitCredentialError
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -103,9 +106,39 @@ class GithubConnectorService:
     def _mode(self) -> DecisionMode:
         return _admission(self._store, self._principal_id, _CAP).decision_mode
 
-    @staticmethod
-    def credential_configured() -> bool:
-        return bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip())
+    # ── Credential (ADD-27 GH-56) ────────────────────────────────────────
+    def _broker(self) -> Any | None:
+        """The owner's GitHub connection, or None for a caller with no principal.
+
+        The connector used to read ``RAIKER_GITHUB_TOKEN`` itself. It now asks
+        the shared broker for the credential the owner selected — a sign-in, a
+        stored token, an App installation narrowed to the repository, or that
+        same variable — and nothing else about its governance changes.
+        """
+        if not self._principal_id:
+            return None
+        from raiker.github.delegations import credential_owner
+        from raiker.runtime.git_credential import GitCredentialBroker
+
+        return GitCredentialBroker(self._store, credential_owner(self._store, self._principal_id))
+
+    def credential_configured(self) -> bool:
+        broker = self._broker()
+        if broker is None:
+            return bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip())
+        try:
+            return bool(broker.token_configured())
+        except Exception:  # noqa: BLE001 — an unreadable connection is no connection
+            return False
+
+    @contextlib.contextmanager
+    def _borrow(self, repo: str, operation: str) -> Iterator[str]:
+        broker = self._broker()
+        if broker is None:
+            yield os.environ.get(GITHUB_TOKEN_ENV, "").strip()
+            return
+        with broker.borrow_for_api(repository=f"github.com/{repo}", operation=operation) as token:
+            yield token
 
     @staticmethod
     def egress_allowed() -> bool:
@@ -178,16 +211,12 @@ class GithubConnectorService:
             )
 
         url = f"https://{GITHUB_HOST}/repos/{repo}/{_RESOURCE_PATHS[resource]}/{number_int}"
-        token = os.environ.get(GITHUB_TOKEN_ENV, "").strip()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "raiker-connector",
-        }
         fetch = self._fetch_fn or _default_fetch
         try:
-            fetched = fetch(url, headers)
+            with self._borrow(repo, "read_issue" if resource == "issue" else "read_pull_request") as token:
+                fetched = fetch(url, _headers(token))
+        except GitCredentialError as exc:
+            return _denied(exc.reason, f"GitHub read denied: {exc.message}")
         except SandboxError as exc:
             return _denied(f"connector_fetch_failed:{exc}", "GitHub read failed closed.")
         except Exception:  # noqa: BLE001 — every transport failure fails closed
@@ -259,20 +288,16 @@ class GithubConnectorService:
             )
 
         url = f"https://{GITHUB_HOST}/repos/{repo}/issues/{number_int}/comments"
-        token = os.environ.get(GITHUB_TOKEN_ENV, "").strip()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "raiker-connector",
-        }
         try:
-            resp = post_json_url(
-                url,
-                {"body": body_text},
-                egress_allowlist=connector_egress_allowlist(),
-                headers=headers,
-            )
+            with self._borrow(repo, "issue_comment") as token:
+                resp = post_json_url(
+                    url,
+                    {"body": body_text},
+                    egress_allowlist=connector_egress_allowlist(),
+                    headers=_headers(token),
+                )
+        except GitCredentialError as exc:
+            return _denied(exc.reason, f"GitHub write denied: {exc.message}")
         except SandboxError as exc:
             return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
         except Exception:  # noqa: BLE001 — every transport failure fails closed
@@ -355,25 +380,21 @@ class GithubConnectorService:
             )
 
         url = f"https://{GITHUB_HOST}/repos/{repo}/pulls"
-        token = os.environ.get(GITHUB_TOKEN_ENV, "").strip()
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "raiker-connector",
-        }
         try:
-            resp = post_json_url(
-                url,
-                {
-                    "title": title_text,
-                    "head": head_ref,
-                    "base": base_ref,
-                    "body": (body or "").strip()[:MAX_BODY_CHARS],
-                },
-                egress_allowlist=connector_egress_allowlist(),
-                headers=headers,
-            )
+            with self._borrow(repo, "pull_request") as token:
+                resp = post_json_url(
+                    url,
+                    {
+                        "title": title_text,
+                        "head": head_ref,
+                        "base": base_ref,
+                        "body": (body or "").strip()[:MAX_BODY_CHARS],
+                    },
+                    egress_allowlist=connector_egress_allowlist(),
+                    headers=_headers(token),
+                )
+        except GitCredentialError as exc:
+            return _denied(exc.reason, f"GitHub write denied: {exc.message}")
         except SandboxError as exc:
             return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
         except Exception:  # noqa: BLE001 — every transport failure fails closed
@@ -422,6 +443,15 @@ class GithubConnectorService:
                 "decision mode to allow.",
             )
         return None
+
+
+def _headers(token: str) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "raiker-connector",
+    }
 
 
 def _default_fetch(url: str, headers: dict[str, str]) -> dict[str, Any]:

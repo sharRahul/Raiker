@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from raiker.contracts.ids import utc_now
 from raiker.runtime.git_credential import CREDENTIAL_HOSTS, credential_config
 from raiker.tools.filesystem import (
     PROTECTED_WORKSPACE_DIRS,
@@ -896,22 +897,7 @@ def push_branch(
     # RAIKER-2023: a constructed environment, not the host's. A push inheriting
     # `os.environ` handed the child every credential the host held, which is the
     # opposite of lending one for a single command.
-    from raiker.runtime.command_policy import sandbox_environment
-
-    environment = sandbox_environment(
-        workspace_root=root,
-        extra={
-            _PUSH_TOKEN_VAR: _push_credential(credential),
-            # No terminal, no GUI prompt: a push that cannot authenticate must
-            # fail with a reason rather than block this process for its cap.
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_ASKPASS": "",
-            "SSH_ASKPASS": "",
-            # Over SSH, the selected key and the pinned host keys only. The
-            # variable outranks any `core.sshCommand` a repository sets.
-            **({"GIT_SSH_COMMAND": ssh_command} if ssh_command else {}),
-        },
-    )
+    environment = _lend_environment(root, credential, ssh_command)
     args = [
         "git",
         "-C",
@@ -959,7 +945,75 @@ def push_branch(
         "commit_count": int(snapshot["commit_count"]),
         "created_remote_branch": bool(snapshot["creates_remote_branch"]),
         "output": output,
+        # GH-54 — what the remote says the branch is now, read back under the
+        # same loan: git reporting success is not the same as the ref landing.
+        "receipt": read_back_ref(
+            root, remote_name, branch_name, expected_sha=head_sha,
+            credential=credential, ssh_command=ssh_command,
+        ),
     }
+
+
+def _lend_environment(root: Path, credential: str | None, ssh_command: str | None) -> dict[str, str]:
+    from raiker.runtime.command_policy import sandbox_environment
+
+    return sandbox_environment(
+        workspace_root=root,
+        extra={
+            _PUSH_TOKEN_VAR: _push_credential(credential),
+            # No terminal, no GUI prompt: a push that cannot authenticate must
+            # fail with a reason rather than block this process for its cap.
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ASKPASS": "",
+            "SSH_ASKPASS": "",
+            # Over SSH, the selected key and the pinned host keys only. The
+            # variable outranks any `core.sshCommand` a repository sets.
+            **({"GIT_SSH_COMMAND": ssh_command} if ssh_command else {}),
+        },
+    )
+
+
+_READ_BACK_TIMEOUT = 30
+
+
+def read_back_ref(
+    repo_root: str | Path,
+    remote_name: str,
+    branch_name: str,
+    *,
+    expected_sha: str,
+    credential: str | None = None,
+    ssh_command: str | None = None,
+) -> dict[str, Any]:
+    """Ask the remote what ``refs/heads/<branch>`` points at (ADD-27 GH-54).
+
+    The receipt says whether it is the commit just pushed. It never fails the
+    push — that already happened — it only says whether it was confirmed.
+    """
+    root = resolve_workspace_path(repo_root, ".")
+    checked_at = utc_now()
+    args = [
+        "git", "-C", str(root), *_NO_HOOKS, *_credential_args(),
+        "ls-remote", "--refs", remote_name, f"refs/heads/{branch_name}",
+    ]
+    try:
+        proc = subprocess.run(
+            args, check=False, capture_output=True, text=True,
+            timeout=_READ_BACK_TIMEOUT, env=_lend_environment(root, credential, ssh_command),
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return {"verified": False, "remote_sha": None, "reason": "read_back_failed", "checked_at": checked_at}
+    if proc.returncode != 0:
+        return {"verified": False, "remote_sha": None, "reason": "read_back_failed", "checked_at": checked_at}
+    remote_sha = ""
+    for line in (proc.stdout or "").splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref.strip() == f"refs/heads/{branch_name}":
+            remote_sha = sha.strip()
+            break
+    verified = bool(remote_sha) and remote_sha == expected_sha
+    reason = None if verified else ("remote_ref_missing" if not remote_sha else "remote_ref_differs")
+    return {"verified": verified, "remote_sha": remote_sha or None, "reason": reason, "checked_at": checked_at}
 
 
 # ── ADD-27 GH-23: governed fetch and clone ──────────────────────────────────

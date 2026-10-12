@@ -336,6 +336,11 @@ class TestExecution:
                 seen["env"] = dict(kwargs.get("env") or {})
                 seen["timeout"] = kwargs.get("timeout")
                 return subprocess.CompletedProcess(command, returncode, "", stderr)
+            if "ls-remote" in command:
+                seen["read_back"] = list(command)
+                seen["read_back_env"] = dict(kwargs.get("env") or {})
+                sha = real_run(["git", "-C", command[2], "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+                return subprocess.CompletedProcess(command, 0, f"{sha}\trefs/heads/main\n", "")
             return real_run(command, *args, **kwargs)
 
         monkeypatch.setattr(git_tools.subprocess, "run", fake)
@@ -355,6 +360,33 @@ class TestExecution:
         # BUG-336 — the source is the commit the snapshot found, not the name,
         # so nothing committed after it can ride along.
         assert command[-1] == f"{_git(repo, 'rev-parse', 'main')}:refs/heads/main"
+
+    def test_the_pushed_ref_is_read_back_under_the_same_loan(
+        self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ADD-27 GH-54 — the receipt says what the remote holds, not what git said."""
+        seen = self._capture(monkeypatch)
+        result = push_branch(repo, credential=_TOKEN)
+        receipt = result["receipt"]
+        assert receipt["verified"] is True and receipt["remote_sha"] == _git(repo, "rev-parse", "main")
+        assert seen["read_back"][-2:] == ["origin", "refs/heads/main"]
+        assert _TOKEN not in seen["read_back"]
+        assert "core.hooksPath=raiker-no-such-hooks" in seen["read_back"]
+
+    def test_a_ref_that_did_not_land_is_reported_unconfirmed(self, repo: Path) -> None:
+        from raiker.tools.git import read_back_ref
+
+        def answer(stdout: str, code: int = 0) -> Any:
+            return lambda command, *a, **k: subprocess.CompletedProcess(command, code, stdout, "")
+
+        sha = _git(repo, "rev-parse", "main")
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(git_tools.subprocess, "run", answer(f"{'0' * 40}\trefs/heads/main\n"))
+            assert read_back_ref(repo, "origin", "main", expected_sha=sha)["reason"] == "remote_ref_differs"
+            patch.setattr(git_tools.subprocess, "run", answer(""))
+            assert read_back_ref(repo, "origin", "main", expected_sha=sha)["reason"] == "remote_ref_missing"
+            patch.setattr(git_tools.subprocess, "run", answer("", code=128))
+            assert read_back_ref(repo, "origin", "main", expected_sha=sha)["reason"] == "read_back_failed"
 
     def test_repository_hooks_never_run(
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch

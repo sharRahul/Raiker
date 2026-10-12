@@ -239,11 +239,24 @@ def test_a_grant_made_for_one_credential_does_not_lend_another(
 ) -> None:
     broker = _broker(tmp_path, github, programs)
     broker.store_token("ghp_patToken000000000000000000000000000")
+    pat = broker.methods.selected() or {}
+    broker.methods.check(str(pat["credential_id"]))  # the same account as the CLI's: octo
     broker.grant("once")
     broker.methods.add_gh_cli("octo")  # now selected
     with pytest.raises(GitCredentialError) as caught, broker.lend(operation="push"):
         pass
     assert caught.value.reason == "git_grant_other_credential"
+
+
+def test_switching_to_another_account_withdraws_every_grant(
+    tmp_path: Path, github: FakeGitHub, programs: FakePrograms
+) -> None:
+    """§6.4 — nothing lent for one account may run as another, even unasked."""
+    broker = _broker(tmp_path, github, programs)
+    broker.store_token("ghp_patToken000000000000000000000000000")  # never checked: no account yet
+    broker.grant("once")
+    broker.methods.add_gh_cli("octo")
+    assert broker.live_grant() is None
 
 
 def test_removing_a_credential_withdraws_every_grant(

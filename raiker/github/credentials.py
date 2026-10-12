@@ -44,10 +44,18 @@ METHOD_GH_CLI = "gh_cli"
 METHOD_OS_HELPER = "os_helper"
 METHOD_SSH = "ssh"
 METHOD_APP_USER = "app_user"
+#: M-APP-INSTALL — the App acting as itself on one installation (automation).
+METHOD_APP_INSTALLATION = "app_installation"
 
-METHODS = (METHOD_PAT, METHOD_ENVIRONMENT, METHOD_GH_CLI, METHOD_OS_HELPER, METHOD_SSH, METHOD_APP_USER)
+METHODS = (
+    METHOD_PAT, METHOD_ENVIRONMENT, METHOD_GH_CLI, METHOD_OS_HELPER, METHOD_SSH,
+    METHOD_APP_USER, METHOD_APP_INSTALLATION,
+)
 #: Methods that authenticate HTTPS with a token; SSH authenticates with a key.
-TOKEN_METHODS = frozenset({METHOD_PAT, METHOD_ENVIRONMENT, METHOD_GH_CLI, METHOD_OS_HELPER, METHOD_APP_USER})
+TOKEN_METHODS = frozenset({
+    METHOD_PAT, METHOD_ENVIRONMENT, METHOD_GH_CLI, METHOD_OS_HELPER, METHOD_APP_USER,
+    METHOD_APP_INSTALLATION,
+})
 #: Methods whose secret lives somewhere Raiker does not control, so the account
 #: is checked again at every lend.
 REREAD_METHODS = frozenset({METHOD_GH_CLI, METHOD_OS_HELPER})
@@ -63,6 +71,7 @@ LABELS = {
     METHOD_OS_HELPER: "Saved Git credential",
     METHOD_SSH: "SSH key",
     METHOD_APP_USER: "GitHub sign-in",
+    METHOD_APP_INSTALLATION: "GitHub App installation",
 }
 
 #: How long a re-read credential's account answer is trusted in this process.
@@ -200,6 +209,13 @@ class CredentialMethods:
             return bool((self.vault_get(access_key) or {}).get("access_token"))
         if method == METHOD_SSH:
             return bool(row.get("key_path")) and Path(str(row["key_path"])).is_file()
+        if method == METHOD_APP_INSTALLATION:
+            installation = self._store.load_github_installation(str(row.get("selector") or ""))
+            app = self._store.load_github_app(str(row.get("app_ref") or ""))
+            return (
+                installation is not None and installation.get("status") == "active"
+                and app is not None and bool(app.get("private_key_ref"))
+            )
         # gh CLI and credential-manager entries are read at lend time; a row the
         # owner verified is usable until that read says otherwise.
         return row.get("status") == "active"
@@ -210,7 +226,12 @@ class CredentialMethods:
             raise CredentialMethodError(
                 "git_credential_unavailable", "That credential is not available on this machine."
             )
+        previous = self._store.selected_git_credential(self._principal_id)
         self._store.select_git_credential(self._principal_id, credential_id)
+        if previous is not None and previous.get("account_id") != row.get("account_id"):
+            # Switching account ends every grant made for the old one at once
+            # (§6.4): nothing lent for one account may run as another.
+            self._store.revoke_git_credential_grants(self._principal_id)
         self._record(
             "git_credential_selected",
             {"credential_id": credential_id, "method": row["method"], "account_id": row.get("account_id")},
@@ -290,6 +311,28 @@ class CredentialMethods:
             selector=fingerprint, key_path=str(path),
         )
 
+    def add_app_installation(self, installation_id: str, app_ref: str = "byo") -> dict[str, Any]:
+        """Use the App's own identity on one installation (M-APP-INSTALL).
+
+        For automation the owner delegates: tokens are minted per operation by
+        the trusted service and narrowed to the repository it touches.
+        """
+        installation = self._store.load_github_installation(installation_id)
+        if installation is None or installation.get("app_ref") != app_ref:
+            raise CredentialMethodError("github_installation_unknown", "That installation is not known here.")
+        if installation.get("status") != "active":
+            raise CredentialMethodError(
+                f"github_installation_{installation.get('status')}", "The Raiker app is not active there."
+            )
+        account = Account(
+            account_id=f"installation:{installation_id}",
+            login=str(installation.get("account_login") or installation_id),
+        )
+        return self._create_verified(
+            METHOD_APP_INSTALLATION, account, selector=installation_id, app_ref=app_ref,
+            label=f"GitHub App on {account.login}",
+        )
+
     # ── checking and removing ───────────────────────────────────────────
     def check(self, credential_id: str) -> dict[str, Any]:
         """Ask GitHub which account the credential belongs to now, and record the answer."""
@@ -348,7 +391,14 @@ class CredentialMethods:
         return row
 
     # ── reading the selected secret ─────────────────────────────────────
-    def secret(self, row: dict[str, Any], *, verify: bool = True) -> str:
+    def secret(
+        self,
+        row: dict[str, Any],
+        *,
+        verify: bool = True,
+        repository: str | None = None,
+        operation: str | None = None,
+    ) -> str:
         """The token *row* lends, read from wherever it lives.
 
         For the CLI and the credential manager the token is read now, and — with
@@ -362,6 +412,8 @@ class CredentialMethods:
             token = os.environ.get(LEGACY_ENV, "")
         elif method == METHOD_APP_USER:
             token = self._app_user_token(row)
+        elif method == METHOD_APP_INSTALLATION:
+            token = self._installation_token(row, repository, operation)
         elif method == METHOD_GH_CLI:
             try:
                 token = self._gh.token(str(row.get("selector") or ""))
@@ -400,6 +452,30 @@ class CredentialMethods:
             )
         _verified[key] = now + _VERIFIED_SECONDS
 
+    def _installation_token(self, row: dict[str, Any], repository: str | None, operation: str | None) -> str:
+        """A token minted now for this one repository and operation (P3), never stored."""
+        from raiker.github.app_service import AppServiceError, GitHubAppService
+
+        if not repository or not operation:
+            raise CredentialMethodError(
+                "github_installation_needs_scope", "An installation token is minted for one repository."
+            )
+        full_name = repository.split("/", 1)[1] if "/" in repository else repository
+        repo = self._store.github_repository_by_name(self._principal_id, full_name)
+        if repo is None or repo.get("status") != "available" or repo.get("installation_id") != row.get("selector"):
+            raise CredentialMethodError(
+                "github_repository_not_authorised", "That repository is not one the app was given."
+            )
+        try:
+            token, _expires = GitHubAppService(
+                self._store, str(row.get("app_ref") or "byo"), http=self._http
+            ).installation_token(
+                str(row.get("selector")), repository_ids=[str(repo["repository_id"])], operation=operation
+            )
+        except AppServiceError as exc:
+            raise CredentialMethodError(exc.reason, exc.message) from None
+        return token
+
     def _app_user_token(self, row: dict[str, Any]) -> str:
         access_key, _refresh = app_user_vault_keys(row["credential_id"])
         stored = self.vault_get(access_key) or {}
@@ -409,6 +485,9 @@ class CredentialMethods:
                 raise CredentialMethodError("github_sign_in_expired", "Your GitHub sign-in expired.")
             return self._refresher(row)
         return stored.get("access_token", "")
+
+    def set_refresher(self, refresher: Callable[[dict[str, Any]], str]) -> None:
+        self._refresher = refresher
 
     def ssh_environment(self, row: dict[str, Any]) -> dict[str, str]:
         """``GIT_SSH_COMMAND`` for the selected key, with Raiker's pinned host keys."""

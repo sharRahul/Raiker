@@ -74,6 +74,8 @@ def pushes(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         if "push" in command:
             seen.append({"command": list(command), "env": dict(kwargs.get("env") or {})})
             return subprocess.CompletedProcess(command, 0, "", "")
+        if "ls-remote" in command:  # the receipt's read-back: nothing to say
+            return subprocess.CompletedProcess(command, 0, "", "")
         return real_run(command, *args, **kwargs)
 
     monkeypatch.setattr(git_tools.subprocess, "run", fake)

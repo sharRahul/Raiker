@@ -169,19 +169,19 @@ def reapply_deletions(store: SQLiteStore, deletions: list[Deletion]) -> dict[str
             if removed:
                 applied[GIT_CREDENTIAL_FORGET] += 1
         elif entry.kind == GIT_GRANT_REVOKE:
-            changed = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
+            revoked_grants = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
                 """UPDATE git_credential_grants SET status = 'revoked', revoked_at = ?
                    WHERE owner_principal_id = ? AND status = 'active' AND granted_at <= ?""",
                 (entry.at, entry.object_id, entry.at),
             )
-            if changed:
+            if revoked_grants:
                 applied[GIT_GRANT_REVOKE] += 1
         elif entry.kind == DELEGATION_REVOKE:
-            changed = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
+            revoked_delegations = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
                 """UPDATE repository_delegations SET revoked_at = ?
                    WHERE (delegation_id = ? OR parent_delegation_id = ?) AND revoked_at IS NULL""",
                 (entry.at, entry.object_id, entry.object_id),
             )
-            if changed:
+            if revoked_delegations:
                 applied[DELEGATION_REVOKE] += 1
     return applied

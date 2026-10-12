@@ -253,6 +253,16 @@ class GitCredentialBroker:
         self.methods: CredentialMethods = methods or CredentialMethods(
             store, principal_id, record=self._record, **method_options
         )
+        if methods is None:
+            from raiker.github.auth import GitHubSignIn
+
+            # An App sign-in past its eight hours is refreshed where that can be
+            # done without exposing a secret, and otherwise asks for sign-in.
+            self.methods.set_refresher(
+                lambda row: GitHubSignIn(
+                    store, principal_id, http=method_options.get("http"), methods=self.methods
+                ).refresh(row)
+            )
 
     def _record(self, event_type: str, payload: dict[str, Any]) -> None:
         """GH-14 — one metadata-only event per credential decision. Never the token."""
@@ -471,6 +481,85 @@ class GitCredentialBroker:
                 )
         return grant
 
+    @contextlib.contextmanager
+    def borrow_for_api(
+        self, *, repository: str, operation: str, session_id: str | None = None
+    ) -> Iterator[str]:
+        """The selected credential as a bearer token for one GitHub API request (GH-56).
+
+        Selection and lending only: the API connector keeps its own gate,
+        decision mode and approvals, and nothing here grants it anything. What
+        changes is where the token comes from — the method the owner selected,
+        narrowed to this repository and operation where the method can be — and
+        that the loan is recorded and redacted like a git one. An SSH key cannot
+        call the API, so it is refused rather than worked around.
+        """
+        from raiker.context.redaction import forget_secret, remember_secret
+        from raiker.github.credentials import METHOD_SSH, CredentialMethodError
+
+        selected = self.methods.selected()
+        if selected is None:
+            raise GitCredentialError(
+                "git_token_not_configured",
+                "No GitHub credential is selected. Connect GitHub in Settings → Connections.",
+            )
+        if selected["method"] == METHOD_SSH:
+            raise GitCredentialError(
+                "github_api_needs_token",
+                "An SSH key cannot call the GitHub API. Select a sign-in or token for GitHub.",
+            )
+        try:
+            token = self.methods.secret(selected, verify=True, repository=repository, operation=operation)
+        except CredentialMethodError as exc:
+            raise GitCredentialError(exc.reason, exc.message) from None
+        remember_secret(token)
+        try:
+            self._record(
+                "git_credential_lent",
+                {
+                    "grant_id": None, "scope": "api", "source": self.token_source(),
+                    "credential_id": selected["credential_id"], "account_id": selected.get("account_id"),
+                    "session_id": session_id, "operation": operation, "repository": repository, "branch": None,
+                },
+            )
+            yield token
+        finally:
+            forget_secret(token)
+
+    def delegation_grant(
+        self,
+        delegation_id: str,
+        *,
+        operation: str | None,
+        repository: str | None,
+        branch: str | None,
+    ) -> GrantView:
+        """The owner's delegation, as the grant a lend is made under (GH-50)."""
+        from raiker.github.delegations import DelegationError, DelegationService
+
+        try:
+            row = DelegationService(self._store, self._principal_id).covering(
+                repository or "", operation or "", branch, delegation_id=delegation_id
+            )
+        except DelegationError:
+            row = None
+        if row is None:
+            raise GitCredentialError(
+                "git_delegation_does_not_cover",
+                "Your delegation does not cover this repository, branch or operation.",
+            )
+        selected = self.methods.selected() or {}
+        if row.get("credential_id") and row["credential_id"] != selected.get("credential_id"):
+            raise GitCredentialError(
+                "git_grant_other_credential",
+                "The delegation was made for a different credential than the one now selected.",
+            )
+        return GrantView(
+            str(row["delegation_id"]), "delegation", "active", str(row["created_at"]),
+            str(row["expires_at"]), None, int(row.get("actions_used") or 0),
+            operation, row.get("repository"), branch, row.get("credential_id"), selected.get("account_id"),
+        )
+
     def status(self, *, session_id: str | None = None) -> GitCredentialStatus:
         """What a surface needs to render the control. Never the token."""
         grant = self.live_grant()
@@ -516,6 +605,7 @@ class GitCredentialBroker:
         operation: str | None = None,
         repository: str | None = None,
         branch: str | None = None,
+        delegation_id: str | None = None,
     ) -> Iterator[dict[str, str]]:
         """Yield the environment additions one git command may run with.
 
@@ -528,11 +618,20 @@ class GitCredentialBroker:
         The grant has to cover this use: its session, and any operation,
         repository or branch it was narrowed to. The legacy
         ``RAIKER_GITHUB_TOKEN`` is lent under exactly the same rule (GH-13).
+
+        With *delegation_id* the router has already found the owner's
+        delegation covering this use (GH-50); it stands in for the grant, is
+        checked again here against the same operation, repository and branch,
+        and is not consumed — its budget was spent when the router let it run.
         """
         from raiker.github.credentials import METHOD_SSH, CredentialMethodError
 
-        grant = self.covering_grant(
-            session_id=session_id, operation=operation, repository=repository, branch=branch
+        grant = (
+            self.delegation_grant(delegation_id, operation=operation, repository=repository, branch=branch)
+            if delegation_id
+            else self.covering_grant(
+                session_id=session_id, operation=operation, repository=repository, branch=branch
+            )
         )
         selected = self.methods.selected()
         if selected is None:
@@ -545,7 +644,9 @@ class GitCredentialBroker:
                 token = ""
                 environment = self.methods.ssh_environment(selected)
             else:
-                token = self.methods.secret(selected, verify=True)
+                token = self.methods.secret(
+                    selected, verify=True, repository=repository, operation=operation
+                )
                 environment = {}
         except CredentialMethodError as exc:
             raise GitCredentialError(exc.reason, exc.message) from None
@@ -576,6 +677,7 @@ class GitCredentialBroker:
             )
             yield environment
         finally:
-            self._store.consume_git_credential_grant(grant.grant_id, operation)
+            if grant.scope != "delegation":
+                self._store.consume_git_credential_grant(grant.grant_id, operation)
             if token:
                 forget_secret(token)

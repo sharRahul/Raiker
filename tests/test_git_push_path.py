@@ -46,6 +46,7 @@ from raiker.runtime.executors import (
     build_default_executor_registry,
 )
 from raiker.runtime.executors.tier1_git import GitPushExecutor
+from raiker.runtime.git_credential import GitCredentialBroker
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools import git as git_tools
 from raiker.tools.git import (
@@ -97,6 +98,14 @@ def allowed(monkeypatch: pytest.MonkeyPatch) -> None:
     """The owner's two boundaries, both satisfied."""
     monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "github.com")
     monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_test_token_value")
+
+
+_TOKEN = "ghp_test_token_value"
+
+
+def _snapshot(repo: Path, *args: Any) -> dict[str, Any]:
+    """A proposal for an owner who holds a credential (the broker's answer, BUG-334)."""
+    return proposed_push_snapshot(repo, *args, credential_configured=True)
 
 
 def _principal() -> Principal:
@@ -190,26 +199,26 @@ class TestProposalFailsClosed:
 
     def test_no_remote(self, repo: Path, allowed: None) -> None:
         _git(repo, "remote", "remove", "origin")
-        assert proposed_push_snapshot(repo)["error"]["type"] == "no_remote_configured"
+        assert _snapshot(repo)["error"]["type"] == "no_remote_configured"
 
     def test_unknown_remote(self, repo: Path, allowed: None) -> None:
-        result = proposed_push_snapshot(repo, "upstream")
+        result = _snapshot(repo, "upstream")
         assert result["error"]["type"] == "unknown_remote"
         assert result["error"]["remote"] == "upstream"
 
     def test_unknown_branch(self, repo: Path, allowed: None) -> None:
-        result = proposed_push_snapshot(repo, None, "nope")
+        result = _snapshot(repo, None, "nope")
         assert result["error"]["type"] == "unknown_branch"
 
     def test_an_ssh_remote_is_refused(self, repo: Path, allowed: None) -> None:
         # An SSH remote authenticates with a key this process does not govern and
         # carries no host the egress allowlist can be checked against.
         _git(repo, "remote", "set-url", "origin", "git@github.com:owner/repo.git")
-        assert proposed_push_snapshot(repo)["error"]["type"] == "unsupported_remote_url"
+        assert _snapshot(repo)["error"]["type"] == "unsupported_remote_url"
 
     def test_a_plaintext_remote_is_refused(self, repo: Path, allowed: None) -> None:
         _git(repo, "remote", "set-url", "origin", "http://github.com/owner/repo.git")
-        assert proposed_push_snapshot(repo)["error"]["type"] == "insecure_remote_url"
+        assert _snapshot(repo)["error"]["type"] == "insecure_remote_url"
 
     def test_a_remote_carrying_its_own_credential_is_refused(
         self, repo: Path, allowed: None
@@ -217,7 +226,7 @@ class TestProposalFailsClosed:
         # A credential baked into the remote URL would be used instead of the
         # owner's governed one, and would be pushed past every check below it.
         _git(repo, "remote", "set-url", "origin", "https://user:pw@github.com/owner/repo.git")
-        assert proposed_push_snapshot(repo)["error"]["type"] == "remote_url_has_credentials"
+        assert _snapshot(repo)["error"]["type"] == "remote_url_has_credentials"
 
     def test_a_host_the_credential_does_not_belong_to_is_refused(
         self, repo: Path, allowed: None
@@ -225,7 +234,7 @@ class TestProposalFailsClosed:
         # `RAIKER_GITHUB_TOKEN` is a GitHub credential. Sending it to another
         # forge because a remote happens to be HTTPS is a credential leak.
         _git(repo, "remote", "set-url", "origin", "https://gitlab.com/owner/repo.git")
-        result = proposed_push_snapshot(repo)
+        result = _snapshot(repo)
         assert result["error"]["type"] == "unsupported_remote_host"
         assert result["error"]["host"] == "gitlab.com"
 
@@ -234,7 +243,7 @@ class TestProposalFailsClosed:
     ) -> None:
         monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "")
         monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_test_token_value")
-        result = proposed_push_snapshot(repo)
+        result = _snapshot(repo)
         assert result["error"]["type"] == "push_egress_denied"
         assert result["error"]["host"] == "github.com"
 
@@ -243,15 +252,17 @@ class TestProposalFailsClosed:
     ) -> None:
         monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "github.com")
         monkeypatch.delenv("RAIKER_GITHUB_TOKEN", raising=False)
-        result = proposed_push_snapshot(repo)
+        result = proposed_push_snapshot(repo, credential_configured=False)
         assert result["error"]["type"] == "push_credential_unset"
+        # Named as the place the owner stores one, not as an environment variable.
+        assert result["error"]["credential"] == "Settings → Git credential"
 
     def test_nothing_to_push(self, repo: Path, allowed: None) -> None:
         # A tracking ref that already holds this branch's head means the remote
         # has everything; approving a no-op is noise the owner should not be
         # asked for.
         _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
-        assert proposed_push_snapshot(repo)["error"]["type"] == "nothing_to_push"
+        assert _snapshot(repo)["error"]["type"] == "nothing_to_push"
 
 
 class TestProposal:
@@ -260,7 +271,7 @@ class TestProposal:
     ) -> None:
         (repo / "app.py").write_text("print('two')\n", encoding="utf-8")
         _git(repo, "commit", "-am", "Change the print")
-        snapshot = proposed_push_snapshot(repo)
+        snapshot = _snapshot(repo)
         assert snapshot["status"] == "success"
         assert snapshot["remote"] == "origin"
         assert snapshot["host"] == "github.com"
@@ -275,7 +286,7 @@ class TestProposal:
         _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
         (repo / "app.py").write_text("print('two')\n", encoding="utf-8")
         _git(repo, "commit", "-am", "Change the print")
-        snapshot = proposed_push_snapshot(repo)
+        snapshot = _snapshot(repo)
         assert snapshot["commit_count"] == 1
         assert snapshot["creates_remote_branch"] is False
 
@@ -293,7 +304,7 @@ class TestProposal:
 
         monkeypatch.setattr(git_tools.subprocess, "run", guard)
         before = _git(repo, "rev-parse", "HEAD")
-        assert proposed_push_snapshot(repo)["status"] == "success"
+        assert _snapshot(repo)["status"] == "success"
         assert _git(repo, "rev-parse", "HEAD") == before
 
 
@@ -318,14 +329,16 @@ class TestExecution:
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         seen = self._capture(monkeypatch)
-        result = push_branch(repo)
+        result = push_branch(repo, credential=_TOKEN)
         assert result["status"] == "success"
         command = seen["command"]
         assert "--force" not in command and "-f" not in command
         assert "--delete" not in command and "--mirror" not in command
         # The refspec is written out in full, so a branch name can neither be
         # read as an option nor move a ref it does not name.
-        assert command[-1] == "refs/heads/main:refs/heads/main"
+        # BUG-336 — the source is the commit the snapshot found, not the name,
+        # so nothing committed after it can ride along.
+        assert command[-1] == f"{_git(repo, 'rev-parse', 'main')}:refs/heads/main"
 
     def test_repository_hooks_never_run(
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
@@ -334,14 +347,14 @@ class TestExecution:
         # written; running it would make a governed push an un-governed
         # code-execution path.
         seen = self._capture(monkeypatch)
-        push_branch(repo)
+        push_branch(repo, credential=_TOKEN)
         assert "core.hooksPath=raiker-no-such-hooks" in seen["command"]
 
     def test_the_credential_stays_out_of_the_command_line(
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         seen = self._capture(monkeypatch)
-        push_branch(repo)
+        push_branch(repo, credential=_TOKEN)
         assert not any("ghp_test_token_value" in part for part in seen["command"])
         assert seen["env"]["RAIKER_GIT_PUSH_TOKEN"] == "ghp_test_token_value"
         # An empty helper first, so a system keychain cannot quietly supply a
@@ -353,21 +366,21 @@ class TestExecution:
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._capture(monkeypatch, returncode=1, stderr="! [rejected] main -> main (non-fast-forward)")
-        result = push_branch(repo)
+        result = push_branch(repo, credential=_TOKEN)
         assert result["error"]["type"] == "push_rejected_non_fast_forward"
 
     def test_a_refused_credential_is_named(
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._capture(monkeypatch, returncode=1, stderr="fatal: Authentication failed for 'https://github.com/'")
-        result = push_branch(repo)
+        result = push_branch(repo, credential=_TOKEN)
         assert result["error"]["type"] == "push_authentication_failed"
 
     def test_the_credential_is_redacted_out_of_git_output(
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._capture(monkeypatch, returncode=128, stderr="fatal: bad url ghp_test_token_value")
-        result = push_branch(repo)
+        result = push_branch(repo, credential=_TOKEN)
         assert "ghp_test_token_value" not in str(result)
 
     def test_the_executor_refuses_before_the_owner_allows_egress(
@@ -387,9 +400,11 @@ class TestExecution:
         self, repo: Path, allowed: None, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._capture(monkeypatch)
-        executor = GitPushExecutor(repo, SQLiteStore(repo))
+        store = SQLiteStore(repo)
+        GitCredentialBroker(store, "principal_owner").grant("once", operation="push")
+        executor = GitPushExecutor(repo, store)
         result = executor.execute(_action("git_push", {}), _principal())
-        assert result.ok is True
+        assert result.ok is True, result.reason_code
         assert result.artifacts["remote"] == "origin"
         assert result.artifacts["branch"] == "main"
         assert result.artifacts["created_remote_branch"] is True

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import difflib
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -540,6 +539,10 @@ def create_commit(
 # credential. Neither is model-supplied, and both are checked again at execution.
 
 GIT_PUSH_TOKEN_ENV = "RAIKER_GITHUB_TOKEN"
+#: Where the owner gives a push its credential. A refusal names this rather than
+#: an environment variable: the vault is the supported home (RAIKER-2022), and
+#: the variable is only one more way of filling it.
+GIT_CREDENTIAL_SETTING = "Settings → Git credential"
 # The token above is a GitHub credential. Sending it to another forge because a
 # remote happens to be HTTPS would be a credential leak dressed up as a feature,
 # so a push is only offered for the host the credential belongs to — and the
@@ -567,14 +570,14 @@ def push_egress_allowlist() -> frozenset[str]:
 
 
 def _push_credential(lent: str | None = None) -> str:
-    """The credential a push may use.
+    """The credential a push may use: only what the broker lent for this command.
 
-    *lent* is the value a :class:`~raiker.runtime.git_credential.GitCredentialBroker`
-    handed over for this one command, and it wins. The environment is the legacy
-    fallback for a host configured before RAIKER-2022 and for the CLI, which has
-    no session to hold a grant.
+    Reading ``RAIKER_GITHUB_TOKEN`` here as well let a host that still exported
+    it push with no grant at all (ADD-27 GH-13). The broker now treats that
+    variable as one more source of the owner's token and lends it under the same
+    grant as the vault's, so this function has nothing to fall back to.
     """
-    return (lent or "").strip() or os.environ.get(GIT_PUSH_TOKEN_ENV, "").strip()
+    return (lent or "").strip()
 
 
 def _remote_names(root: Path) -> list[str]:
@@ -620,6 +623,12 @@ def _count(root: Path, selection: list[str]) -> int:
         return 0
 
 
+def _branch_sha(root: Path, branch: str) -> str:
+    """The full commit *branch* points at, or ``""``."""
+    proc = _git(root, ["rev-parse", "--verify", "--quiet", f"refs/heads/{branch}^{{commit}}"], timeout=10)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
 def _commit_lines(root: Path, selection: list[str]) -> list[str]:
     proc = _git(
         root,
@@ -662,8 +671,15 @@ def proposed_push_snapshot(
     branch: str | None = None,
     *,
     credential: str | None = None,
+    credential_configured: bool | None = None,
 ) -> dict[str, Any]:
     """Exactly what pushing would send — computed without touching the network.
+
+    *credential_configured* is the broker's answer to "does the owner hold a
+    credential for this?", which is all a proposal needs: the value itself is
+    lent only at execution, under a grant. A preview that read only the legacy
+    environment variable refused every push for an owner whose token was in the
+    vault (BUG-334).
 
     Fail-closed on every case a later execution could not honour: no repository,
     a detached or unknown branch, an unknown remote, a remote this process holds
@@ -700,11 +716,14 @@ def proposed_push_snapshot(
         return _failed("remote_url_has_credentials", remote=remote_name, host=parsed.hostname)
     host = parsed.hostname.lower()
     if host not in GIT_PUSH_CREDENTIAL_HOSTS:
-        return _failed("unsupported_remote_host", host=host, credential=GIT_PUSH_TOKEN_ENV)
+        return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING)
     if host not in push_egress_allowlist():
         return _failed("push_egress_denied", host=host)
-    if not _push_credential(credential):
-        return _failed("push_credential_unset", credential=GIT_PUSH_TOKEN_ENV)
+    available = (
+        bool(_push_credential(credential)) if credential_configured is None else credential_configured
+    )
+    if not available:
+        return _failed("push_credential_unset", credential=GIT_CREDENTIAL_SETTING)
     tracking = _tracking_ref(root, remote_name, branch_name)
     creates_remote_branch = not tracking
     selection = _outgoing(remote_name, branch_name, tracking)
@@ -720,6 +739,9 @@ def proposed_push_snapshot(
         "host": host,
         "branch": branch_name,
         "head": _head_commit(root),
+        # The commit this push would send, in full. It is what an approval is
+        # bound to (BUG-336): the push sends this commit and nothing newer.
+        "head_sha": _branch_sha(root, branch_name),
         "creates_remote_branch": creates_remote_branch,
         "commit_count": ahead,
         "behind": behind,
@@ -728,24 +750,56 @@ def proposed_push_snapshot(
     }
 
 
+#: What an approval of a push is bound to (BUG-336): the remote and the URL git
+#: will contact, the branch, and the commit the owner saw at its head.
+PUSH_BINDING_FIELDS: tuple[str, ...] = ("remote", "remote_url", "branch", "head_sha")
+
+
+def push_target_changes(snapshot: dict[str, Any], expected: dict[str, Any]) -> list[str]:
+    """The fields of *expected* the repository no longer matches, in a stable order."""
+    return [
+        field
+        for field in PUSH_BINDING_FIELDS
+        if str(expected.get(field) or "") != str(snapshot.get(field) or "")
+    ]
+
+
 def push_branch(
     repo_root: str | Path,
     remote: str | None = None,
     branch: str | None = None,
     *,
     credential: str | None = None,
+    expected: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Push the proposed branch to the proposed remote. Re-validates everything first.
 
     Never forces and never deletes: the refspec is written out in full so a
     branch name can neither be read as an option nor move a ref it does not name.
+
+    The source of the refspec is the commit the snapshot found, not the branch
+    name, so a commit made while this function runs cannot ride along. With
+    *expected* — the binding recorded when the owner was asked — a remote, URL,
+    branch or head that moved since then refuses ``push_target_changed`` instead
+    of publishing something the approval never showed (BUG-336).
     """
-    snapshot = proposed_push_snapshot(repo_root, remote, branch, credential=credential)
+    snapshot = proposed_push_snapshot(
+        repo_root, remote, branch, credential=credential,
+        credential_configured=bool(_push_credential(credential)),
+    )
     if snapshot["status"] != "success":
         return snapshot
+    if expected is not None:
+        changed = push_target_changes(snapshot, expected)
+        if changed:
+            return _failed("push_target_changed", changed=changed,
+                           remote=str(snapshot["remote"]), branch=str(snapshot["branch"]))
     root = resolve_workspace_path(repo_root, ".")
     remote_name = str(snapshot["remote"])
     branch_name = str(snapshot["branch"])
+    head_sha = str(snapshot["head_sha"])
+    if not head_sha:
+        return _failed("unknown_branch", branch=branch_name)
     # RAIKER-2023: a constructed environment, not the host's. A push inheriting
     # `os.environ` handed the child every credential the host held, which is the
     # opposite of lending one for a single command.
@@ -774,9 +828,8 @@ def push_branch(
         # that sends git elsewhere is never offered this token.
         *_credential_args(),
         "push",
-        "--set-upstream",
         remote_name,
-        f"refs/heads/{branch_name}:refs/heads/{branch_name}",
+        f"{head_sha}:refs/heads/{branch_name}",
     ]
     try:
         proc = subprocess.run(
@@ -795,12 +848,18 @@ def push_branch(
             return _failed("push_authentication_failed", remote=remote_name,
                            branch=branch_name, output=output)
         return _failed("git_command_failed", command="push", output=output)
+    if snapshot["creates_remote_branch"] and not _upstream_remote(root, branch_name):
+        # A commit as the refspec's source sets no upstream, which
+        # `--set-upstream` did for a branch name; record it the same way.
+        _git(root, ["config", f"branch.{branch_name}.remote", remote_name], timeout=10)
+        _git(root, ["config", f"branch.{branch_name}.merge", f"refs/heads/{branch_name}"], timeout=10)
     return {
         "status": "success",
         "remote": remote_name,
         "host": str(snapshot["host"]),
         "branch": branch_name,
-        "head": _head_commit(root),
+        "head": head_sha[:7],
+        "head_sha": head_sha,
         "commit_count": int(snapshot["commit_count"]),
         "created_remote_branch": bool(snapshot["creates_remote_branch"]),
         "output": output,

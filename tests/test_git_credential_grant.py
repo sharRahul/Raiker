@@ -63,7 +63,7 @@ def test_forgetting_the_token_revokes_what_depended_on_it(
     broker: GitCredentialBroker,
 ) -> None:
     broker.store_token(TOKEN)
-    broker.grant("session")
+    broker.grant("session", session_id="sess_a")
     broker.forget_token()
     assert broker.active_grant() is None
     assert broker.status()["credential_configured"] is False
@@ -98,9 +98,9 @@ def test_an_unknown_scope_is_refused(broker: GitCredentialBroker) -> None:
 @pytest.mark.parametrize("scope", ["once", "session"])
 def test_each_scope_can_be_granted(broker: GitCredentialBroker, scope: str) -> None:
     broker.store_token(TOKEN)
-    grant = broker.grant(scope)
+    grant = broker.grant(scope, session_id="sess_a")
     assert grant.scope == scope
-    assert broker.active_grant() is not None
+    assert broker.active_grant(session_id="sess_a") is not None
 
 
 def test_a_session_grant_does_not_carry_into_another_chat(
@@ -116,8 +116,8 @@ def test_a_new_grant_supersedes_the_last_one(broker: GitCredentialBroker) -> Non
     """Two live grants would mean the owner cannot tell which is in force."""
     broker.store_token(TOKEN)
     first = broker.grant("once")
-    second = broker.grant("session")
-    active = broker.active_grant()
+    second = broker.grant("session", session_id="sess_a")
+    active = broker.live_grant()
     assert active is not None
     assert active.grant_id == second.grant_id != first.grant_id
 
@@ -141,10 +141,98 @@ def test_revoking_withdraws_the_approval_but_keeps_the_token(
     broker: GitCredentialBroker,
 ) -> None:
     broker.store_token(TOKEN)
-    broker.grant("session")
+    broker.grant("session", session_id="sess_a")
     broker.revoke()
     assert broker.active_grant() is None
     assert broker.status()["credential_configured"] is True
+
+
+def test_a_session_grant_has_to_name_its_session(broker: GitCredentialBroker) -> None:
+    """BUG-335 — Settings made session grants with no session, and they lent everywhere."""
+    broker.store_token(TOKEN)
+    with pytest.raises(GitCredentialError) as caught:
+        broker.grant("session")
+    assert caught.value.reason == "git_grant_session_required"
+
+
+def test_a_session_grant_lends_only_inside_its_session(broker: GitCredentialBroker) -> None:
+    broker.store_token(TOKEN)
+    broker.grant("session", session_id="sess_a")
+    for elsewhere in ("sess_b", None):
+        with pytest.raises(GitCredentialError) as caught, broker.lend(session_id=elsewhere):
+            pass
+        assert caught.value.reason == "git_grant_other_session"
+    with broker.lend(session_id="sess_a"):
+        pass
+
+
+def test_a_session_grant_made_before_the_fix_lends_to_nothing(broker: GitCredentialBroker) -> None:
+    """A row with scope `session` and no session — what Settings wrote — covers no chat."""
+    broker.store_token(TOKEN)
+    broker._store.create_git_credential_grant(  # noqa: SLF001 — an old row is the subject
+        principal_id="principal_owner", scope="session", expires_at=grant_expiry("session")
+    )
+    assert broker.active_grant(session_id="sess_a") is None
+    with pytest.raises(GitCredentialError) as caught, broker.lend(session_id="sess_a"):
+        pass
+    assert caught.value.reason == "git_grant_other_session"
+
+
+@pytest.mark.parametrize(
+    ("bound", "granted", "asked"),
+    [
+        ("operation", {"operation": "push"}, {"operation": "fetch"}),
+        ("repository", {"repository": "github.com/acme/a"}, {"repository": "github.com/acme/b"}),
+        ("branch", {"branch": "fix/1"}, {"branch": "main"}),
+    ],
+)
+def test_a_narrowed_grant_lends_only_for_what_it_names(
+    broker: GitCredentialBroker, bound: str, granted: dict[str, str], asked: dict[str, str]
+) -> None:
+    """GH-17 — a grant for one repository, operation or branch is not one for another."""
+    broker.store_token(TOKEN)
+    broker.grant("once", **granted)  # type: ignore[arg-type]
+    with pytest.raises(GitCredentialError) as caught, broker.lend(**asked):  # type: ignore[arg-type]
+        pass
+    assert caught.value.reason == f"git_grant_other_{bound}"
+    with broker.lend(**granted):  # type: ignore[arg-type]
+        pass
+
+
+def test_the_environment_token_is_lent_only_under_a_grant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GH-13 — the legacy variable used to push with no grant at all."""
+    monkeypatch.setenv("RAIKER_GITHUB_TOKEN", TOKEN)
+    legacy = GitCredentialBroker(SQLiteStore(tmp_path), "principal_owner")
+    with pytest.raises(GitCredentialError) as caught, legacy.lend(operation="push"):
+        pass
+    assert caught.value.reason == "git_grant_required"
+    legacy.grant("once")
+    with legacy.lend(operation="push") as environment:
+        assert environment[RUNTIME_TOKEN_VAR] == TOKEN
+
+
+def test_every_decision_is_recorded_without_the_token(broker: GitCredentialBroker) -> None:
+    """GH-14 — stored, granted, lent, revoked and forgotten, as metadata only."""
+    broker.store_token(TOKEN)
+    broker.grant("once", operation="push", repository="github.com/acme/a")
+    with broker.lend(operation="push", repository="github.com/acme/a"):
+        pass
+    broker.grant("session", session_id="sess_a")
+    broker.revoke()
+    broker.forget_token()
+    from raiker.events.query import EventViewer
+
+    viewer = EventViewer(broker._store)  # noqa: SLF001 — the event log is the subject
+    rows = list(reversed(viewer.list_events(session_id="git_credential", limit=20)))
+    kinds = [row["event_type"] for row in rows]
+    assert sorted(kinds) == sorted([
+        "git_credential_stored", "git_grant_created", "git_credential_lent",
+        "git_grant_created", "git_grant_revoked", "git_credential_forgotten",
+    ])
+    payloads = [viewer.read_event_payload(row["event_id"]) for row in rows]
+    assert all(payloads) and TOKEN not in str(payloads)
 
 
 def test_a_session_grant_lasts_longer_than_a_single_use_one() -> None:
@@ -166,8 +254,8 @@ def test_the_loan_carries_the_token_only_inside_the_block(
     broker: GitCredentialBroker,
 ) -> None:
     broker.store_token(TOKEN)
-    broker.grant("session")
-    with broker.lend() as environment:
+    broker.grant("session", session_id="sess_a")
+    with broker.lend(session_id="sess_a") as environment:
         assert environment[RUNTIME_TOKEN_VAR] == TOKEN
         # Registered while it is out, so nothing captured now can carry it.
         assert registered_secret_count() >= 1
@@ -199,10 +287,10 @@ def test_the_status_says_when_the_credential_was_last_lent(broker: GitCredential
 
 def test_a_session_grant_survives_a_use(broker: GitCredentialBroker) -> None:
     broker.store_token(TOKEN)
-    broker.grant("session")
-    with broker.lend():
+    broker.grant("session", session_id="sess_a")
+    with broker.lend(session_id="sess_a"):
         pass
-    active = broker.active_grant()
+    active = broker.active_grant(session_id="sess_a")
     assert active is not None
     assert active.uses == 1
 
@@ -283,8 +371,8 @@ def test_the_loan_installs_the_helper_against_the_credentials_hosts_only(
     broker: GitCredentialBroker,
 ) -> None:
     broker.store_token(TOKEN)
-    broker.grant("session")
-    with broker.lend() as environment:
+    broker.grant("session", session_id="sess_a")
+    with broker.lend(session_id="sess_a") as environment:
         count = int(environment["GIT_CONFIG_COUNT"])
         keys = [environment[f"GIT_CONFIG_KEY_{index}"] for index in range(count)]
     # The first entry is what drops this machine's own helpers; every other one
@@ -308,8 +396,8 @@ def test_the_loans_own_environment_answers_github_and_nothing_else(
     nothing at all for anywhere else.
     """
     broker.store_token(TOKEN)
-    broker.grant("session")
-    with broker.lend() as loan:
+    broker.grant("session", session_id="sess_a")
+    with broker.lend(session_id="sess_a") as loan:
         environment = dict(
             os.environ,
             **loan,

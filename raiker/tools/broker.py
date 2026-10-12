@@ -1109,6 +1109,34 @@ class ToolBroker:
         )
         return failed, decision
 
+    def _git_credential_configured(self) -> bool:
+        """BUG-334 — whether the owner holds a push credential, asked of the broker.
+
+        Only the answer: the token itself is lent at execution, under a grant.
+        """
+        if self.store is None:
+            return False
+        from raiker.runtime.git_credential import GitCredentialBroker
+
+        try:
+            return GitCredentialBroker(self.store, self.owner_scope or self.principal_id).token_configured()
+        except Exception:  # noqa: BLE001 — an unreadable vault holds no credential
+            return False
+
+    def _record_push_binding(self, approval_id: str, preview: Any) -> None:
+        """BUG-336 — keep what the owner is being shown, so the push is held to it."""
+        if self.store is None or not isinstance(preview, dict) or preview.get("status") != "success":
+            return
+        self.store.record_git_push_binding(
+            approval_id=approval_id,
+            principal_id=self.owner_scope or self.principal_id,
+            repository=str(preview.get("repository") or "."),
+            remote=str(preview.get("remote") or ""),
+            remote_url=str(preview.get("remote_url") or ""),
+            branch=str(preview.get("branch") or ""),
+            head_sha=str(preview.get("head_sha") or ""),
+        )
+
     def _approval_preview(self, action: ToolAction) -> dict[str, Any] | None:
         if action.tool_name in {"write_file", "create_document"}:
             if action.tool_name == "create_document" and not str(
@@ -1155,6 +1183,7 @@ class ToolBroker:
                     self.git_root(),
                     str(action.arguments["remote"]) if action.arguments.get("remote") else None,
                     str(action.arguments["branch"]) if action.arguments.get("branch") else None,
+                    credential_configured=self._git_credential_configured(),
                 )
             )
         if action.tool_name == "apply_patch":
@@ -2048,6 +2077,8 @@ class ToolBroker:
             )
             if self.store is not None:
                 self.store.insert_approval(approval_id, action)
+                if action.tool_name == "git_push":
+                    self._record_push_binding(approval_id, proposal_preview)
                 self.store.insert_tool_action(
                     sanitized_action, session_id, turn_id, "approval_required"
                 )

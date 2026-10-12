@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -13,15 +12,6 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
-
-
-def _legacy_credential() -> bool:
-    """True when this host still carries the token in its environment."""
-    import os
-
-    from raiker.runtime.git_credential import LEGACY_TOKEN_ENV
-
-    return bool(os.environ.get(LEGACY_TOKEN_ENV, "").strip())
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -200,37 +190,37 @@ class GitPushExecutor:
             self._workspace_root, selected_repository_subpath(self._store, scope)
         )
 
-    def _lend(
-        self, principal: Principal, action: GovernedAction
-    ) -> tuple[str | None, Callable[[], Any]] | ExecutionResult:
-        """The credential for this push, and the callable that ends the loan.
-
-        Returns an :class:`ExecutionResult` instead when the owner has not
-        approved one — a refusal the model can read and act on, rather than an
-        exception.
-        """
-        from raiker.runtime.git_credential import (
-            RUNTIME_TOKEN_VAR,
-            GitCredentialBroker,
-            GitCredentialError,
+    def _refused(self, action: GovernedAction, error: dict[str, Any], root: Path) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False, capability=self.capability, action_id=action.action_id,
+            reason_code=f"push_failed:{error['type']}",
+            summary="Push refused; nothing left this machine.",
+            artifacts={"error": error, "repository": repository_label(self._workspace_root, root)},
         )
 
-        if self._store is None:
-            # No store means no grant can exist to check, so the only honest
-            # path is the legacy environment credential.
-            return None, lambda: None
-        broker = GitCredentialBroker(self._store, principal.principal_id)
-        loan = broker.lend(session_id=action.arguments.get("session_id"), operation="push")
-        try:
-            environment = loan.__enter__()
-        except GitCredentialError as exc:
-            if exc.reason == "git_grant_required" and _legacy_credential():
-                return None, lambda: None
+    def _binding(self, action: GovernedAction) -> dict[str, Any] | None | ExecutionResult:
+        """What the owner was shown, when this push runs on their approval (BUG-336).
+
+        A push that runs under a standing decision instead had no approval to be
+        shown, so there is nothing to hold it to beyond the snapshot it takes
+        itself. A push on an approval that recorded nothing — one raised before
+        RAIKER-2106 — is refused rather than run unbound.
+        """
+        if action.authority_kind != "approval":
+            return None
+        binding = (
+            self._store.load_git_push_binding(action.authority_id)
+            if self._store is not None and action.authority_id
+            else None
+        )
+        if binding is None:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
-                reason_code=exc.reason, summary=exc.message, artifacts={},
+                reason_code="push_failed:push_binding_missing",
+                summary="This approval did not record what it would push; ask for the push again.",
+                artifacts={},
             )
-        return environment.get(RUNTIME_TOKEN_VAR), lambda: loan.__exit__(None, None, None)
+        return binding
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         if action.action_type not in ("git_push", "git_push_execution"):
@@ -239,28 +229,63 @@ class GitPushExecutor:
                 reason_code=f"unknown_git_operation:{action.action_type or 'missing'}",
                 summary="Git push failed closed.", artifacts={},
             )
+        from raiker.runtime.git_credential import (
+            RUNTIME_TOKEN_VAR,
+            GitCredentialBroker,
+            GitCredentialError,
+            repository_key,
+        )
+        from raiker.tools.git import proposed_push_snapshot, push_target_changes
+
         try:
             root = self._repo_root(principal)
             remote = action.arguments.get("remote")
             branch = action.arguments.get("branch")
-            remote_name = str(remote).strip() if remote else None
-            branch_name = str(branch).strip() if branch else None
+            broker = (
+                GitCredentialBroker(self._store, principal.principal_id)
+                if self._store is not None
+                else None
+            )
+            snapshot = proposed_push_snapshot(
+                root,
+                str(remote).strip() if remote else None,
+                str(branch).strip() if branch else None,
+                credential_configured=broker is not None and broker.token_configured(),
+            )
+            if snapshot["status"] != "success":
+                return self._refused(action, snapshot["error"], root)
+            binding = self._binding(action)
+            if isinstance(binding, ExecutionResult):
+                return binding
+            # Without an approval to hold it to, the push is held to what it
+            # found a moment ago, so nothing committed in between rides along.
+            expected = binding or snapshot
+            changed = push_target_changes(snapshot, expected)
+            if changed:
+                return self._refused(action, {"type": "push_target_changed", "changed": changed}, root)
+            if broker is None:
+                return self._refused(action, {"type": "push_credential_unset"}, root)
             # RAIKER-2022 — the credential is lent for this one command, under a
-            # grant the owner made. `lend()` refuses without one, registers the
-            # exact value with the redactor for the length of the call, and
-            # consumes a one-shot grant on the way out.
-            #
-            # A host still configured the old way (RAIKER_GITHUB_TOKEN in the
-            # environment, no grant row) keeps working: the push falls back to
-            # it. This adds a control without taking a working deployment away.
-            granted = self._lend(principal, action)
-            if isinstance(granted, ExecutionResult):
-                return granted
-            lent, release = granted
+            # grant the owner made, which has to cover this conversation, this
+            # repository and this branch (BUG-335, GH-17). The conversation is
+            # the one that proposed the push, carried on the approval; the relay
+            # itself runs in the inbox's session.
             try:
-                result = push_branch(root, remote_name, branch_name, credential=lent)
-            finally:
-                release()
+                with broker.lend(
+                    session_id=action.origin_session_id or action.session_id or None,
+                    operation="push",
+                    repository=repository_key(str(snapshot["remote_url"])),
+                    branch=str(snapshot["branch"]),
+                ) as environment:
+                    result = push_branch(
+                        root, str(snapshot["remote"]), str(snapshot["branch"]),
+                        credential=environment.get(RUNTIME_TOKEN_VAR), expected=expected,
+                    )
+            except GitCredentialError as exc:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code=exc.reason, summary=exc.message, artifacts={},
+                )
         except Exception as exc:  # noqa: BLE001 — every failure is reported, never raised
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,

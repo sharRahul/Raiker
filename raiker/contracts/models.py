@@ -481,6 +481,12 @@ EVENT_TYPES = {
     "channel_delivery_reviewed",
     "mcp_server_secret_set",
     "mcp_server_secret_removed",
+    # ADD-27 GH-14 — the Git credential's decisions, metadata only.
+    "git_credential_stored",
+    "git_credential_forgotten",
+    "git_grant_created",
+    "git_grant_revoked",
+    "git_credential_lent",
     "channel_message_rejected",
     "approval_relay_requested",
     "approval_relay_approved",

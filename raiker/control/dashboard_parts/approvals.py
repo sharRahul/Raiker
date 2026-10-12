@@ -208,7 +208,7 @@ class ApprovalService:
             raw_args = {}
         arguments = self._redact_arguments(raw_args)
         diff, diff_path, kind = self._build_preview(
-            view.tool_name, raw_args, principal_id=principal_id
+            view.tool_name, raw_args, principal_id=principal_id, approval_id=approval_id
         )
         connector_write = view.tool_name == "connector_write"
         # BUG-06 — the notice is derived from what the server will actually do,
@@ -464,7 +464,12 @@ class ApprovalService:
         return (raw_path, size) if size > MAX_PRE_IMAGE_BYTES else None
 
     def _build_preview(
-        self: DashboardService, tool_name: str, args: dict[str, Any], *, principal_id: str | None = None
+        self: DashboardService,
+        tool_name: str,
+        args: dict[str, Any],
+        *,
+        principal_id: str | None = None,
+        approval_id: str | None = None,
     ) -> tuple[str | None, str | None, PreviewKind]:
         """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
         if tool_name == "checkpoint_restore":
@@ -634,20 +639,33 @@ class ApprovalService:
         # shown: the remote and its host, the branch, and the commits that are
         # not there yet.
         if tool_name == "git_push":
+            from raiker.runtime.git_credential import GitCredentialBroker
+
             snapshot = proposed_push_snapshot(
                 repo_root,
                 str(args["remote"]) if args.get("remote") else None,
                 str(args["branch"]) if args.get("branch") else None,
+                credential_configured=bool(principal_id)
+                and GitCredentialBroker(self.store, str(principal_id)).token_configured(),
             )
             if snapshot["status"] != "success":
                 return None, None, "arguments"
+            # BUG-336 — the commit this approval is bound to. The push sends it
+            # and nothing newer, and refuses if the branch has moved since.
+            binding = self.store.load_git_push_binding(approval_id) if approval_id else None
+            bound_sha = str(binding["head_sha"]) if binding else str(snapshot.get("head_sha") or "")
             lines = [
                 f"repository    {repository}",
                 f"remote        {snapshot['remote']} ({snapshot['host']})",
                 f"branch        {snapshot['branch']}"
                 + ("  — new on the remote" if snapshot["creates_remote_branch"] else ""),
+                f"commit        {bound_sha[:12]}  — this commit and nothing newer",
                 f"sending       {snapshot['commit_count']} commit(s)",
             ]
+            if binding and bound_sha != str(snapshot.get("head_sha") or ""):
+                lines.append(
+                    "changed       the branch has moved since you were asked; approving will refuse the push"
+                )
             if snapshot["behind"]:
                 lines.append(
                     f"remote ahead  {snapshot['behind']} commit(s) this branch does not have"

@@ -2006,6 +2006,9 @@ export type GitCredentialGrant = {
   expires_at: string;
   session_id: string | null;
   uses: number;
+  operation: string | null;
+  repository: string | null;
+  branch: string | null;
 };
 
 /** DEC-21 Git credential — when the credential was last lent, and for what. */
@@ -2032,6 +2035,9 @@ export type GitGrantRequest = {
   scope?: string;
   session_id?: string | null;
   reason?: string;
+  operation?: "push" | null;
+  repository?: string | null;
+  branch?: string | null;
 };
 
 export type GitTokenRequest = {

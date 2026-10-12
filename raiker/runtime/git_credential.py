@@ -101,6 +101,30 @@ def credential_config(token_var: str, hosts: Sequence[str] = CREDENTIAL_HOSTS) -
 CREDENTIAL_HELPER = credential_helper(RUNTIME_TOKEN_VAR)
 
 
+#: The dimensions a grant can be narrowed on (GH-17), in the order a refusal
+#: names the first one that does not match.
+GRANT_BOUNDS: tuple[str, ...] = ("operation", "repository", "branch")
+
+
+def repository_key(remote_url: str) -> str:
+    """``host/owner/name`` for an HTTPS remote URL, lower-case, without ``.git``.
+
+    The one spelling a grant, a binding and an audit record agree on, so a
+    remote written ``https://GitHub.com/Owner/Repo.git/`` and one written
+    ``https://github.com/owner/repo`` are the same repository.
+    """
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit((remote_url or "").strip())
+    host = (parsed.hostname or "").lower()
+    if host == "www.github.com":
+        host = "github.com"
+    path = parsed.path.strip("/").lower()
+    if path.endswith(".git"):
+        path = path[: -len(".git")]
+    return f"{host}/{path}" if host and path else ""
+
+
 class GitCredentialGrant(TypedDict):
     grant_id: str
     scope: str
@@ -109,6 +133,9 @@ class GitCredentialGrant(TypedDict):
     expires_at: str
     session_id: str | None
     uses: int
+    operation: str | None
+    repository: str | None
+    branch: str | None
 
 
 class GitCredentialLastUse(TypedDict):
@@ -158,6 +185,18 @@ class GrantView:
     expires_at: str
     session_id: str | None
     uses: int
+    operation: str | None = None
+    repository: str | None = None
+    branch: str | None = None
+
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> GrantView:
+        return cls(
+            str(row["grant_id"]), str(row["scope"]), str(row["status"]),
+            str(row["granted_at"]), str(row["expires_at"]),
+            row.get("session_id"), int(row.get("uses") or 0),
+            row.get("operation"), row.get("repository"), row.get("branch"),
+        )
 
     def as_dict(self) -> GitCredentialGrant:
         return {
@@ -168,6 +207,9 @@ class GrantView:
             "expires_at": self.expires_at,
             "session_id": self.session_id,
             "uses": self.uses,
+            "operation": self.operation,
+            "repository": self.repository,
+            "branch": self.branch,
         }
 
 
@@ -190,6 +232,22 @@ class GitCredentialBroker:
         self._store = store
         self._principal_id = principal_id
 
+    def _record(self, event_type: str, payload: dict[str, Any]) -> None:
+        """GH-14 — one metadata-only event per credential decision. Never the token."""
+        from raiker.events.types import make_event
+        from raiker.events.writer import EventLogWriter
+
+        with contextlib.suppress(Exception):
+            EventLogWriter(self._store).append(
+                make_event(
+                    session_id="git_credential",
+                    turn_id=None,
+                    event_type=event_type,
+                    actor="git_credential_broker",
+                    payload={"principal_id": self._principal_id, **payload},
+                )
+            )
+
     # ── storage ──────────────────────────────────────────────────────────
     def _vault(self) -> Any:
         from raiker.runtime.connector_ecosystem import ConnectorVault
@@ -204,6 +262,7 @@ class GitCredentialBroker:
         if len(value) > 512:
             raise GitCredentialError("git_token_too_long", "That is not a GitHub token.")
         self._vault().put(self._principal_id, CREDENTIAL_KEY, {"token": value})
+        self._record("git_credential_stored", {"source": "vault"})
 
     def forget_token(self) -> None:
         with contextlib.suppress(Exception), self._store.connect() as connection:
@@ -211,7 +270,8 @@ class GitCredentialBroker:
                 "DELETE FROM connector_credentials WHERE principal_id=? AND connector_id=?",
                 (self._principal_id, CREDENTIAL_KEY),
             )
-        self._store.revoke_git_credential_grants(self._principal_id)
+        revoked = self._store.revoke_git_credential_grants(self._principal_id)
+        self._record("git_credential_forgotten", {"grants_revoked": revoked})
 
     def _token(self) -> str:
         """The stored token, falling back to the legacy environment variable.
@@ -241,12 +301,32 @@ class GitCredentialBroker:
         return "environment" if os.environ.get(LEGACY_TOKEN_ENV, "").strip() else "none"
 
     # ── grants ───────────────────────────────────────────────────────────
-    def grant(self, scope: str, *, session_id: str | None = None, reason: str = "") -> GrantView:
-        """Record the owner's decision to lend the credential."""
+    def grant(
+        self,
+        scope: str,
+        *,
+        session_id: str | None = None,
+        reason: str = "",
+        operation: str | None = None,
+        repository: str | None = None,
+        branch: str | None = None,
+    ) -> GrantView:
+        """Record the owner's decision to lend the credential.
+
+        A session grant has to name its session (BUG-335): one made without a
+        session lent the credential to every chat and routine for its hour.
+        ``operation``, ``repository`` and ``branch`` narrow it further (GH-17).
+        """
         if scope not in GRANT_SCOPES:
             raise GitCredentialError(
                 "git_grant_scope_invalid",
                 "A git grant is either 'once' or 'session'.",
+            )
+        if scope == "session" and not (session_id or "").strip():
+            raise GitCredentialError(
+                "git_grant_session_required",
+                "A grant for a session has to be made from that conversation; "
+                "approve once instead.",
             )
         if not self.token_configured():
             raise GitCredentialError(
@@ -260,30 +340,74 @@ class GitCredentialBroker:
             expires_at=grant_expiry(scope),
             session_id=session_id if scope == "session" else None,
             reason=reason,
+            operation=(operation or None),
+            repository=(repository or None),
+            branch=(branch or None),
         )
-        return GrantView(
-            row["grant_id"], scope, "active", row["granted_at"], row["expires_at"],
-            row.get("session_id"), 0,
+        view = GrantView.from_row({**row, "uses": 0})
+        self._record(
+            "git_grant_created",
+            {
+                "grant_id": view.grant_id, "scope": scope, "expires_at": view.expires_at,
+                "session_id": view.session_id, "operation": view.operation,
+                "repository": view.repository, "branch": view.branch,
+            },
         )
+        return view
 
     def revoke(self) -> int:
-        return self._store.revoke_git_credential_grants(self._principal_id)
+        revoked = self._store.revoke_git_credential_grants(self._principal_id)
+        if revoked:
+            self._record("git_grant_revoked", {"grants_revoked": revoked})
+        return revoked
+
+    def live_grant(self) -> GrantView | None:
+        """The one grant in force, whatever it covers — what a surface shows."""
+        row = self._store.live_git_credential_grant(self._principal_id)
+        return GrantView.from_row(row) if row is not None else None
 
     def active_grant(self, *, session_id: str | None = None) -> GrantView | None:
         row = self._store.active_git_credential_grant(
             self._principal_id, session_id=session_id
         )
-        if row is None:
-            return None
-        return GrantView(
-            str(row["grant_id"]), str(row["scope"]), str(row["status"]),
-            str(row["granted_at"]), str(row["expires_at"]),
-            row.get("session_id"), int(row.get("uses") or 0),
-        )
+        return GrantView.from_row(row) if row is not None else None
+
+    def covering_grant(
+        self,
+        *,
+        session_id: str | None,
+        operation: str | None = None,
+        repository: str | None = None,
+        branch: str | None = None,
+    ) -> GrantView:
+        """The grant that covers this exact use, or a refusal naming what does not match."""
+        grant = self.live_grant()
+        if grant is None:
+            raise GitCredentialError(
+                "git_grant_required",
+                "This git command needs your approval. Approve it once from "
+                "Settings → Git credential, or for this conversation from the approval.",
+            )
+        if grant.scope == "session" and (
+            not grant.session_id or not session_id or grant.session_id != session_id
+        ):
+            raise GitCredentialError(
+                "git_grant_other_session",
+                "The credential was lent for another conversation. Approve it for this one.",
+            )
+        wanted = {"operation": operation, "repository": repository, "branch": branch}
+        for bound in GRANT_BOUNDS:
+            granted = getattr(grant, bound)
+            if granted and granted != (wanted[bound] or ""):
+                raise GitCredentialError(
+                    f"git_grant_other_{bound}",
+                    f"The credential was lent for {bound} {granted}, not this one.",
+                )
+        return grant
 
     def status(self, *, session_id: str | None = None) -> GitCredentialStatus:
         """What a surface needs to render the control. Never the token."""
-        grant = self.active_grant(session_id=session_id)
+        grant = self.live_grant()
         # `credential_*` rather than `token_*`: the API redactor masks any field
         # whose *key* contains "token", which is the right blunt instrument to
         # keep. Renaming the field is cheaper than punching a hole in it.
@@ -316,7 +440,12 @@ class GitCredentialBroker:
     # ── lending ──────────────────────────────────────────────────────────
     @contextlib.contextmanager
     def lend(
-        self, *, session_id: str | None = None, operation: str | None = None
+        self,
+        *,
+        session_id: str | None = None,
+        operation: str | None = None,
+        repository: str | None = None,
+        branch: str | None = None,
     ) -> Iterator[dict[str, str]]:
         """Yield the environment additions one git command may run with.
 
@@ -325,14 +454,14 @@ class GitCredentialBroker:
         carry it; on the way out the grant is consumed and the registration is
         dropped. The value is only ever inside the yielded mapping — callers pass
         that to the child's environment and never log it.
+
+        The grant has to cover this use: its session, and any operation,
+        repository or branch it was narrowed to. The legacy
+        ``RAIKER_GITHUB_TOKEN`` is lent under exactly the same rule (GH-13).
         """
-        grant = self.active_grant(session_id=session_id)
-        if grant is None:
-            raise GitCredentialError(
-                "git_grant_required",
-                "This git command needs your approval. Approve it once, or for this "
-                "session, from the composer or Settings → Git credential.",
-            )
+        grant = self.covering_grant(
+            session_id=session_id, operation=operation, repository=repository, branch=branch
+        )
         token = self._token()
         if not token:
             raise GitCredentialError(
@@ -353,6 +482,14 @@ class GitCredentialBroker:
                 key, _, value = entry.partition("=")
                 environment[f"GIT_CONFIG_KEY_{index}"] = key
                 environment[f"GIT_CONFIG_VALUE_{index}"] = value
+            self._record(
+                "git_credential_lent",
+                {
+                    "grant_id": grant.grant_id, "scope": grant.scope,
+                    "source": self.token_source(), "session_id": session_id,
+                    "operation": operation, "repository": repository, "branch": branch,
+                },
+            )
             yield environment
         finally:
             self._store.consume_git_credential_grant(grant.grant_id, operation)

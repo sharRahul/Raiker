@@ -10015,6 +10015,17 @@
       },
       "GitCredentialGrant": {
         "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
           "expires_at": {
             "title": "Expires At",
             "type": "string"
@@ -10026,6 +10037,28 @@
           "granted_at": {
             "title": "Granted At",
             "type": "string"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
           },
           "scope": {
             "title": "Scope",
@@ -10058,7 +10091,10 @@
           "granted_at",
           "expires_at",
           "session_id",
-          "uses"
+          "uses",
+          "operation",
+          "repository",
+          "branch"
         ],
         "title": "GitCredentialGrant",
         "type": "object"
@@ -10175,11 +10211,47 @@
       "GitGrantRequest": {
         "additionalProperties": false,
         "properties": {
+          "branch": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "const": "push",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation"
+          },
           "reason": {
             "default": "",
             "maxLength": 500,
             "title": "Reason",
             "type": "string"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
           },
           "scope": {
             "default": "once",

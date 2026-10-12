@@ -28,6 +28,25 @@ function mount(overrides: Record<string, unknown> = {}) {
 }
 
 describe("Settings → Git credential", () => {
+  it("offers only a one-command approval, since this page is no conversation (BUG-335)", async () => {
+    mount({ credential_configured: true, credential_source: "vault" });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Approve Once/ })).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /Approve This conversation/ })).toBeNull();
+    expect(screen.getByText(/approve it from that\s+conversation's push/)).toBeInTheDocument();
+  });
+
+  it("names what a narrowed grant lends for (GH-17)", async () => {
+    mount({
+      credential_configured: true,
+      grant: {
+        grant_id: "grant_1", scope: "once", status: "active", granted_at: "2026-10-12T10:00:00Z",
+        expires_at: "2026-10-12T10:05:00Z", session_id: null, uses: 0,
+        operation: "push", repository: "github.com/acme/demo", branch: "fix/1",
+      },
+    });
+    await waitFor(() => expect(screen.getByText(/for github.com\/acme\/demo, branch fix\/1/)).toBeInTheDocument());
+  });
+
   it("states the scope the runtime issues the credential inside", async () => {
     mount();
     await waitFor(() => expect(screen.getByText("github.com")).toBeInTheDocument());

@@ -4322,6 +4322,41 @@ CREATE TABLE IF NOT EXISTS session_control_sequences (
 );
 """
 
+# BUG-336 — what an approval of a push was shown. The approval row keeps the
+# model's arguments (a remote and a branch, both optional), and the push used to
+# send whatever the branch held when it ran. The remote, the URL git will
+# contact, the branch and the commit at its head are recorded here when the
+# owner is asked, and the push sends that commit or refuses.
+GIT_PUSH_BINDINGS_MIGRATION_ID = "RAIKER-2106-git-push-bindings"
+
+GIT_PUSH_BINDINGS_SQL = """
+CREATE TABLE IF NOT EXISTS git_push_bindings (
+  approval_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  remote TEXT NOT NULL,
+  remote_url TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  head_sha TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
+# ADD-27 GH-17 — a grant names what it lends for. A grant was the owner, a
+# scope and (for a session grant) a session; it now also carries the operation,
+# the repository (``github.com/owner/name``), the branch, and the credential and
+# account it lends. A column left empty is a dimension the owner did not narrow,
+# which is what every existing row means.
+GIT_GRANT_BOUNDS_MIGRATION_ID = "RAIKER-2107-git-grant-bounds"
+
+GIT_GRANT_BOUNDS_SQL = """
+ALTER TABLE git_credential_grants ADD COLUMN operation TEXT;
+ALTER TABLE git_credential_grants ADD COLUMN repository TEXT;
+ALTER TABLE git_credential_grants ADD COLUMN branch TEXT;
+ALTER TABLE git_credential_grants ADD COLUMN credential_id TEXT;
+ALTER TABLE git_credential_grants ADD COLUMN account_id TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4573,6 +4608,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(CHANNEL_DELIVERY_REVIEW_MIGRATION_ID, CHANNEL_DELIVERY_REVIEW_SQL),
     Migration(TURN_RETRIES_MIGRATION_ID, TURN_RETRIES_SQL),
     Migration(SESSION_CONTROL_SEQUENCES_MIGRATION_ID, SESSION_CONTROL_SEQUENCES_SQL),
+    Migration(GIT_PUSH_BINDINGS_MIGRATION_ID, GIT_PUSH_BINDINGS_SQL),
+    Migration(GIT_GRANT_BOUNDS_MIGRATION_ID, GIT_GRANT_BOUNDS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

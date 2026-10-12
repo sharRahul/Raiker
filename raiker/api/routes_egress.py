@@ -62,6 +62,10 @@ class GitGrantRequest(StrictRequest):
     scope: str = Field(default="once")
     session_id: str | None = None
     reason: str = Field(default="", max_length=500)
+    # GH-17 — what the grant lends for. Each one left out is not narrowed.
+    operation: Literal["push"] | None = None
+    repository: str | None = Field(default=None, max_length=200)
+    branch: str | None = Field(default=None, max_length=255)
 
 
 # ── Web egress blocklist ─────────────────────────────────────────────────────
@@ -244,7 +248,10 @@ async def grant_git_credential(
     session, _principal = auth_data
     broker = _broker(request, session)
     try:
-        broker.grant(body.scope, session_id=body.session_id, reason=body.reason)
+        broker.grant(
+            body.scope, session_id=body.session_id, reason=body.reason,
+            operation=body.operation, repository=body.repository, branch=body.branch,
+        )
     except GitCredentialError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=exc.reason

@@ -66,13 +66,20 @@ class ApprovalStore:
         expires_at: str,
         session_id: str | None = None,
         reason: str = "",
+        operation: str | None = None,
+        repository: str | None = None,
+        branch: str | None = None,
+        credential_id: str | None = None,
+        account_id: str | None = None,
     ) -> dict[str, Any]:
         """Record one owner decision to lend the git credential.
 
         ``scope`` is ``once`` or ``session``. Creating a grant supersedes any
         active one for the same principal: two live grants would mean the owner
         could not tell which decision was in force, and revoking one would leave
-        the other standing.
+        the other standing. ``operation``, ``repository``, ``branch``,
+        ``credential_id`` and ``account_id`` narrow what it lends for (GH-17);
+        each one left ``None`` is a dimension the owner did not narrow.
         """
         grant_id = new_id("grant_")
         now = utc_now()
@@ -85,9 +92,13 @@ class ApprovalStore:
             connection.execute(
                 """INSERT INTO git_credential_grants
                    (grant_id, owner_principal_id, session_id, scope, status, reason,
-                    granted_at, expires_at)
-                   VALUES (?, ?, ?, ?, 'active', ?, ?, ?)""",
-                (grant_id, principal_id, session_id, scope, reason[:500], now, expires_at),
+                    granted_at, expires_at, operation, repository, branch,
+                    credential_id, account_id)
+                   VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    grant_id, principal_id, session_id, scope, reason[:500], now, expires_at,
+                    operation, repository, branch, credential_id, account_id,
+                ),
             )
         return {
             "grant_id": grant_id,
@@ -96,7 +107,24 @@ class ApprovalStore:
             "granted_at": now,
             "expires_at": expires_at,
             "session_id": session_id,
+            "operation": operation,
+            "repository": repository,
+            "branch": branch,
+            "credential_id": credential_id,
+            "account_id": account_id,
         }
+
+    def live_git_credential_grant(
+        self: SQLiteStore, principal_id: str, *, now: str | None = None
+    ) -> dict[str, Any] | None:
+        """The owner's one unexpired, unrevoked grant, whatever it covers."""
+        row = self._row(
+            """SELECT * FROM git_credential_grants
+               WHERE owner_principal_id = ? AND status = 'active' AND expires_at > ?
+               ORDER BY granted_at DESC LIMIT 1""",
+            (principal_id, now or utc_now()),
+        )
+        return dict(row) if row is not None else None
 
     def active_git_credential_grant(
         self: SQLiteStore, principal_id: str, *, session_id: str | None = None, now: str | None = None
@@ -107,22 +135,15 @@ class ApprovalStore:
         last an hour must stop working an hour later whether or not anything has
         run since.
         """
-        moment = now or utc_now()
-        row = self._row(
-            """SELECT * FROM git_credential_grants
-               WHERE owner_principal_id = ? AND status = 'active' AND expires_at > ?
-               ORDER BY granted_at DESC LIMIT 1""",
-            (principal_id, moment),
-        )
-        if row is None:
+        grant = self.live_git_credential_grant(principal_id, now=now)
+        if grant is None:
             return None
-        grant = dict(row)
-        # A session grant is exactly that: it does not carry into another chat.
-        if (
-            str(grant.get("scope")) == "session"
-            and grant.get("session_id")
-            and session_id is not None
-            and str(grant["session_id"]) != session_id
+        # A session grant is exactly that: it does not carry into another chat,
+        # and a caller that names no chat is not inside the one it was made in.
+        # A session grant without a session — every one Settings made before
+        # BUG-335 — therefore lends to nothing.
+        if str(grant.get("scope")) == "session" and (
+            not grant.get("session_id") or session_id is None or str(grant["session_id"]) != session_id
         ):
             return None
         return grant
@@ -151,6 +172,30 @@ class ApprovalStore:
                ORDER BY last_used_at DESC LIMIT 1""",
             (principal_id,),
         )
+        return dict(row) if row is not None else None
+
+    def record_git_push_binding(
+        self: SQLiteStore,
+        *,
+        approval_id: str,
+        principal_id: str,
+        repository: str,
+        remote: str,
+        remote_url: str,
+        branch: str,
+        head_sha: str,
+    ) -> None:
+        """BUG-336 — what the owner was shown when asked to approve a push."""
+        self._execute(
+            """INSERT OR REPLACE INTO git_push_bindings
+               (approval_id, principal_id, repository, remote, remote_url, branch,
+                head_sha, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (approval_id, principal_id, repository, remote, remote_url, branch, head_sha, utc_now()),
+        )
+
+    def load_git_push_binding(self: SQLiteStore, approval_id: str) -> dict[str, Any] | None:
+        row = self._row("SELECT * FROM git_push_bindings WHERE approval_id = ?", (approval_id,))
         return dict(row) if row is not None else None
 
     def revoke_git_credential_grants(self: SQLiteStore, principal_id: str) -> int:

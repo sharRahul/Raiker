@@ -71,6 +71,11 @@ human authorizer, runtime authority, or other literal actor.
 | `channel_resumed` | The owner resumed a paused channel |
 | `mcp_server_secret_set` | The owner gave one local MCP server a secret (DEC-15 step 2); the payload names the variable, never its value |
 | `mcp_server_secret_removed` | The owner took a secret away from one local MCP server |
+| `git_credential_stored` | The owner stored a GitHub token in the vault (Settings → Git credential); never the value |
+| `git_credential_forgotten` | The owner removed the stored token; every grant on it was revoked |
+| `git_grant_created` | The owner lent the Git credential once or for one conversation, with the operation, repository and branch it is narrowed to |
+| `git_grant_revoked` | The owner withdrew the grant in force |
+| `git_credential_lent` | The credential was lent to one governed git command under a grant: the grant, source, conversation, operation, repository and branch — never the token |
 | `channel_delivery_reviewed` | The owner marked a failed or outcome-unknown outbound delivery reviewed (DEC-14 step 7); what happened to it is unchanged and nothing is sent |
 | `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |

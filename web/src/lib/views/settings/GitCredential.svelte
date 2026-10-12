@@ -22,7 +22,7 @@
 
   const SCOPE_LABEL: Record<string, string> = {
     once: "Once",
-    session: "This session",
+    session: "This conversation",
   };
 
   function minutes(seconds: number): string {
@@ -203,8 +203,9 @@
     <div class="card">
       <h3>Approval for git commands</h3>
       <p class="lead">
-        Every git command that needs the token asks first. Approve one command, or a
-        working session — a session approval expires on its own, so leaving it on is
+        Every git command that needs the token asks first. Approve the next command
+        from here; to lend it for a whole conversation, approve it from that
+        conversation's push. Either kind expires on its own, so leaving one on is
         not the same as leaving it on forever.
       </p>
 
@@ -212,6 +213,11 @@
         <div class="grant" role="status">
           <div>
             <strong>{SCOPE_LABEL[status.grant.scope] ?? status.grant.scope} approved</strong>
+            {#if status.grant.repository || status.grant.branch}
+              <span class="detail">
+                for {status.grant.repository ?? "any repository"}{#if status.grant.branch}, branch {status.grant.branch}{/if}
+              </span>
+            {/if}
             <span class="detail">
               expires {localTime(new Date(status.grant.expires_at))}
               {#if status.grant.uses}· used {status.grant.uses}×{/if}
@@ -224,7 +230,10 @@
       {:else}
         <p class="state">Nothing is approved. The next git command will ask.</p>
         <div class="scopes">
-          {#each status.scopes as scope (scope)}
+          <!-- BUG-335 — a session grant belongs to a conversation, and this page
+               is not one: a grant made here for "this session" lent the
+               credential to every chat and routine for its hour. -->
+          {#each status.scopes.filter((scope) => scope === "once") as scope (scope)}
             <button
               class="btn"
               type="button"

@@ -1187,6 +1187,26 @@ class ToolBroker:
                     credential_method=self._git_credential_method(),
                 )
             )
+        # ADD-27 GH-23 — where a fetch or clone would go, said before the owner decides.
+        if action.tool_name == "git_fetch":
+            from raiker.tools.git import proposed_fetch_snapshot
+
+            return self._with_repository(
+                proposed_fetch_snapshot(
+                    self.git_root(),
+                    str(action.arguments["remote"]) if action.arguments.get("remote") else None,
+                    credential_method=self._git_credential_method(),
+                )
+            )
+        if action.tool_name == "git_clone":
+            from raiker.tools.git import proposed_clone_snapshot
+
+            return proposed_clone_snapshot(
+                self.workspace_root,
+                str(action.arguments.get("repository", "")),
+                str(action.arguments["path"]) if action.arguments.get("path") else None,
+                credential_method=self._git_credential_method(),
+            )
         if action.tool_name == "apply_patch":
             try:
                 return proposed_patch_snapshot(
@@ -2062,9 +2082,9 @@ class ToolBroker:
                         "files": action.tool_name in {"write_file", "create_document", "edit_file", "apply_patch"},
                         # B11 — the repository's own history, which no file-level
                         # checkpoint rewinds.
-                        "repository": action.tool_name in {"git_branch", "git_commit", "git_push", "github_write"},
+                        "repository": action.tool_name in {"git_branch", "git_commit", "git_push", "git_clone", "github_write"},
                         "memory": action.tool_name in {"memory_write", "memory_forget"},
-                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write", "github_write", "git_push"},
+                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write", "github_write", "git_push", "git_fetch", "git_clone"},
                         "shell": action.tool_name in {"shell", "remote_execute", "cloud_execute"},
                         "provider": False,
                         "export": False,

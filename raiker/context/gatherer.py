@@ -42,6 +42,7 @@ CAPABILITY_GATE_TOOLS: dict[str, tuple[str, ...]] = {
     # commit and say so, not attempt a push it will be refused.
     "git_write_execution": ("git_branch", "git_commit"),
     "git_push_execution": ("git_push",),
+    "git_fetch_execution": ("git_fetch", "git_clone"),
     "shell_execution": ("shell",),
     "remote_execution_cap": ("remote_execute",),
     "cloud_execution_cap": ("cloud_execute",),

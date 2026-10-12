@@ -184,12 +184,12 @@ def test_relayed_capability_count_is_stated_correctly() -> None:
     """The technical threat model commits to the executor count."""
     from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL
 
-    assert len(EXECUTABLE_ON_APPROVAL) == 13, (
+    assert len(EXECUTABLE_ON_APPROVAL) == 14, (
         "EXECUTABLE_ON_APPROVAL changed size; update "
         "docs/architecture/THREAT_MODEL.md, which names it"
     )
     threat_model = Path("docs/architecture/THREAT_MODEL.md").read_text(encoding="utf-8")
-    assert "explicit **thirteen**-member frozenset" in threat_model
+    assert "explicit **fourteen**-member frozenset" in threat_model
 
 
 def _first_id_table(text: str) -> str:

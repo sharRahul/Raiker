@@ -313,6 +313,17 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "never deletes a ref.",
     ),
     _row(
+        "git_fetch_execution",
+        SIDE_EFFECT_EXTERNAL,
+        "A fetch or clone reaches GitHub from this machine, under the owner's "
+        "credential for a private repository, and brings in content written by "
+        "someone else.",
+        "Its own gate and an approval, the connector egress allowlist for the "
+        "Git host, a clone address built from `owner/name` rather than taken "
+        "from a model, no submodules, no hooks, no file transport, and the "
+        "credential lent only under a grant for fetching that repository.",
+    ),
+    _row(
         "image_generation",
         SIDE_EFFECT_EXTERNAL,
         "The prompt — and, for an edit, the source image — would be sent to a "

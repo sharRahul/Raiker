@@ -84,6 +84,13 @@
       whereLabel: "Channels",
     },
     {
+      capability: "git_fetch_execution",
+      carries: "Which repository is being fetched, and your Git credential for a private one.",
+      destination: "GitHub, at the address the repository's remote names.",
+      where: "#/settings?tab=git-credential",
+      whereLabel: "Git credentials",
+    },
+    {
       capability: "git_push_execution",
       carries: "The files and commit history in the repository being pushed.",
       destination: "The git remote the repository is configured with.",

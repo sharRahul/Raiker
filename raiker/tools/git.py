@@ -960,3 +960,227 @@ def push_branch(
         "created_remote_branch": bool(snapshot["creates_remote_branch"]),
         "output": output,
     }
+
+
+# ── ADD-27 GH-23: governed fetch and clone ──────────────────────────────────
+#
+# Bringing a repository's history onto this machine is network egress like a
+# push, so it answers to its own capability (`git_fetch_execution`), the same
+# host rules, and the owner's decision. What it must never do is run what it
+# fetched: no submodule is followed, no hook runs, the `file` and `ext`
+# transports are off, an fsmonitor is ignored and every object is checked. A
+# clone's address is built here from `owner/name`; a model never supplies a URL.
+
+_FETCH_TIMEOUT = 180
+_SAFE_TRANSFER = (
+    "-c", "protocol.file.allow=never",
+    "-c", "protocol.ext.allow=never",
+    "-c", "transfer.fsckObjects=true",
+    "-c", "submodule.recurse=false",
+    "-c", "fetch.recurseSubmodules=false",
+)
+_GITHUB_REPOSITORY = re.compile(r"^(?P<owner>[A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/(?P<name>[A-Za-z0-9._-]{1,100})$")
+
+
+def _transport_refusal(url: str, remote_name: str, credential_method: str | None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """The checks a push makes on where git will go, shared with fetch."""
+    from raiker.github.hosts import SSH_TRANSPORT_HOSTS, transport_allowed
+
+    parts = parse_remote(url)
+    transport = parts["transport"]
+    host = str(parts.get("host") or "")
+    if transport == "ssh":
+        port = parts.get("port")
+        if host not in SSH_TRANSPORT_HOSTS:
+            return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING), parts
+        if parts.get("user") != "git" or (port is not None and port != SSH_TRANSPORT_HOSTS[host]):
+            return _failed("unsupported_remote_url", remote=remote_name, scheme="ssh"), parts
+        if credential_method != "ssh":
+            return _failed("fetch_credential_wrong_method", transport="ssh",
+                           credential=GIT_CREDENTIAL_SETTING), parts
+    elif transport in ("https", "http"):
+        if transport != "https":
+            return _failed("insecure_remote_url", remote=remote_name, host=host), parts
+        if parts.get("user") or parts.get("password"):
+            return _failed("remote_url_has_credentials", remote=remote_name, host=host), parts
+        if host not in GIT_PUSH_CREDENTIAL_HOSTS:
+            return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING), parts
+    else:
+        return _failed("unsupported_remote_url", remote=remote_name, scheme=str(parts.get("scheme"))), parts
+    if not transport_allowed(host, push_egress_allowlist()):
+        return _failed("fetch_egress_denied", host=host), parts
+    return None, parts
+
+
+def _fetch_url(root: Path, remote: str) -> str:
+    proc = _git(root, ["remote", "get-url", remote], timeout=10)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def proposed_fetch_snapshot(
+    repo_root: str | Path, remote: str | None = None, *, credential_method: str | None = None
+) -> dict[str, Any]:
+    """Where a fetch would go and with what — computed without touching the network."""
+    from raiker.runtime.git_credential import repository_key
+
+    root, refusal = _repository(repo_root)
+    if refusal is not None:
+        return refusal
+    remotes = _remote_names(root)
+    if not remotes:
+        return _failed("no_remote_configured")
+    branch = current_branch(root)
+    remote_name = (
+        (remote or "").strip()
+        or (_upstream_remote(root, branch) if branch else "")
+        or ("origin" if "origin" in remotes else remotes[0])
+    )
+    if remote_name not in remotes:
+        return _failed("unknown_remote", remote=remote_name, remotes=remotes)
+    url = _fetch_url(root, remote_name)
+    refused, parts = _transport_refusal(url, remote_name, credential_method)
+    if refused is not None:
+        return refused
+    return {
+        "status": "success",
+        "remote": remote_name,
+        "remote_url": url,
+        "transport": parts["transport"],
+        "host": parts["host"],
+        "repository_key": repository_key(url),
+    }
+
+
+def _transfer_environment(root: Path, credential: str | None, ssh_command: str | None) -> dict[str, str]:
+    from raiker.runtime.command_policy import sandbox_environment
+
+    return sandbox_environment(
+        workspace_root=root,
+        extra={
+            _PUSH_TOKEN_VAR: _push_credential(credential),
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ASKPASS": "",
+            "SSH_ASKPASS": "",
+            **({"GIT_SSH_COMMAND": ssh_command} if ssh_command else {}),
+        },
+    )
+
+
+def _transfer_failure(proc: subprocess.CompletedProcess[str], output: str, **detail: Any) -> dict[str, Any]:
+    lowered = output.lower()
+    if "authentication failed" in lowered or "could not read username" in lowered or "permission denied" in lowered:
+        return _failed("fetch_authentication_required", **detail)
+    if "not found" in lowered or "does not exist" in lowered:
+        return _failed("fetch_repository_not_found", **detail)
+    if "host key verification failed" in lowered:
+        return _failed("ssh_host_key_mismatch", **detail)
+    return _failed("git_command_failed", output=output, **detail)
+
+
+def fetch_remote(
+    repo_root: str | Path,
+    remote: str | None = None,
+    *,
+    credential: str | None = None,
+    ssh_command: str | None = None,
+) -> dict[str, Any]:
+    """Fetch *remote* into its remote-tracking refs. Nothing is merged or checked out."""
+    snapshot = proposed_fetch_snapshot(
+        repo_root, remote, credential_method="ssh" if ssh_command else None
+    )
+    if snapshot["status"] != "success":
+        return snapshot
+    root = resolve_workspace_path(repo_root, ".")
+    args = [
+        "git", "-C", str(root), *_NO_HOOKS, *_NO_FSMONITOR, *_SAFE_TRANSFER,
+        *_credential_args(), "fetch", "--no-recurse-submodules", "--no-write-fetch-head",
+        str(snapshot["remote"]),
+    ]
+    try:
+        proc = subprocess.run(
+            args, check=False, capture_output=True, text=True, timeout=_FETCH_TIMEOUT,
+            env=_transfer_environment(root, credential, ssh_command),
+        )
+    except subprocess.TimeoutExpired:
+        return _failed("fetch_timed_out", remote=snapshot["remote"])
+    output = _redact_token(_git_output(proc), credential)
+    if proc.returncode != 0:
+        return _transfer_failure(proc, output, remote=snapshot["remote"])
+    updated = [line.strip() for line in output.splitlines() if "->" in line]
+    return {**snapshot, "updated_refs": updated[:50], "output": output}
+
+
+def proposed_clone_snapshot(
+    workspace_root: str | Path,
+    repository: str,
+    path: str | None = None,
+    *,
+    credential_method: str | None = None,
+) -> dict[str, Any]:
+    """What cloning ``owner/name`` would create, and where — without touching the network."""
+    from raiker.github.hosts import transport_allowed
+
+    match = _GITHUB_REPOSITORY.match((repository or "").strip())
+    if match is None or match.group("name") in (".", ".."):
+        return _failed("invalid_repository", repository=repository)
+    owner, name = match.group("owner"), match.group("name")
+    if name.endswith(".git"):
+        name = name[: -len(".git")]
+    target = (path or name).strip()
+    try:
+        destination = resolve_workspace_path(workspace_root, target)
+    except Exception:  # noqa: BLE001 — every refusal from the containment check is one named reason
+        return _failed("clone_destination_outside_workspace", path=target)
+    if destination.exists():
+        return _failed("clone_destination_exists", path=target)
+    if credential_method == "ssh":
+        url, host, transport = f"git@github.com:{owner}/{name}.git", "github.com", "ssh"
+    else:
+        url, host, transport = f"https://github.com/{owner}/{name}.git", "github.com", "https"
+    if not transport_allowed(host, push_egress_allowlist()):
+        return _failed("fetch_egress_denied", host=host)
+    return {
+        "status": "success",
+        "repository": f"{owner}/{name}",
+        "repository_key": f"github.com/{owner.lower()}/{name.lower()}",
+        "remote_url": url,
+        "transport": transport,
+        "host": host,
+        "destination": str(destination),
+        "path": target,
+    }
+
+
+def clone_repository(
+    workspace_root: str | Path,
+    repository: str,
+    path: str | None = None,
+    *,
+    credential: str | None = None,
+    ssh_command: str | None = None,
+) -> dict[str, Any]:
+    """Clone a GitHub repository into the workspace. No submodule is followed, no hook runs."""
+    snapshot = proposed_clone_snapshot(
+        workspace_root, repository, path, credential_method="ssh" if ssh_command else None
+    )
+    if snapshot["status"] != "success":
+        return snapshot
+    destination = Path(str(snapshot["destination"]))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    args = [
+        "git", *_NO_HOOKS, *_NO_FSMONITOR, *_SAFE_TRANSFER, *_credential_args(),
+        "clone", "--no-recurse-submodules", "--origin", "origin", "--",
+        str(snapshot["remote_url"]), str(destination),
+    ]
+    try:
+        proc = subprocess.run(
+            args, check=False, capture_output=True, text=True, timeout=_FETCH_TIMEOUT,
+            env=_transfer_environment(destination.parent, credential, ssh_command),
+            cwd=str(destination.parent),
+        )
+    except subprocess.TimeoutExpired:
+        return _failed("fetch_timed_out", repository=snapshot["repository"])
+    output = _redact_token(_git_output(proc), credential)
+    if proc.returncode != 0:
+        return _transfer_failure(proc, output, repository=snapshot["repository"])
+    return {**snapshot, "head": _head_commit(destination), "output": output}

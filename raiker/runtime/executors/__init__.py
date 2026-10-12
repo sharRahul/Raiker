@@ -31,7 +31,7 @@ from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_audit import AuditExportExecutor
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
-from raiker.runtime.executors.tier1_git import GitPushExecutor, GitWriteExecutor
+from raiker.runtime.executors.tier1_git import GitFetchExecutor, GitPushExecutor, GitWriteExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
 from raiker.runtime.executors.tier1_tasks import (
     ProjectAssignmentExecutor,
@@ -83,7 +83,7 @@ __all__ = [
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
     "ApprovalExecutionRelay", "AuditExportExecutor", "CheckpointRestoreExecutor",
     "FileWriteExecutor", "PatchApplyExecutor",
-    "GitWriteExecutor", "GitPushExecutor",
+    "GitWriteExecutor", "GitPushExecutor", "GitFetchExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "HostNetworkCodeExecutor", "WebFetchExecutor", "TelemetryExportExecutor",
@@ -171,6 +171,8 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # owner's connector egress allowlist and the owner's own credential; it never
     # forces and never deletes a ref.
     "git_push_execution",
+    # ADD-27 GH-23 — fetch and clone, egress on the push's terms.
+    "git_fetch_execution",
     # The Design surface. Egress on the same terms as any other model call: the
     # model egress allowlist, the owner's saved provider credential, and an
     # endpoint built from the configured profile rather than from the request.
@@ -289,6 +291,7 @@ def build_default_executor_registry(
     registry.register("patch_apply_execution", PatchApplyExecutor(ws, authority=authority))
     registry.register("git_write_execution", GitWriteExecutor(ws, store))
     registry.register("git_push_execution", GitPushExecutor(ws, store))
+    registry.register("git_fetch_execution", GitFetchExecutor(ws, store))
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
     registry.register("audit_export", AuditExportExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))

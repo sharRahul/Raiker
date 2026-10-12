@@ -74,6 +74,8 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     # same one, and an approval that said "approving sends this" and then sent
     # nothing would be the defect this list exists to prevent.
     "git_push_execution",
+    # ADD-27 GH-23 — a fetch or clone approved is a fetch or clone run.
+    "git_fetch_execution",
     "connector_github_runtime",
     # BUG-71 — durable memory. A memory row is local, owner-scoped and
     # individually reversible (`memory_forget` removes exactly the record the

@@ -54,6 +54,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "patch_apply_execution",
     "git_write_execution",
     "git_push_execution",
+    "git_fetch_execution",
     "memory_write_execution",
     "memory_forget_execution",
     "checkpoint_restore_execution",
@@ -213,6 +214,7 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                             # BUG-308 — code running with the host's network.
                             "host_network_code_execution",
                             "git_push_execution",
+                            "git_fetch_execution",
                             # Backlog #18 — Tier 2 for the reason the rest are:
                             # it leaves the machine.
                             "telemetry_export",

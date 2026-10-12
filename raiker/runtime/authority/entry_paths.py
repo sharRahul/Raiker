@@ -129,6 +129,7 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("host_network_code_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("git_write_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("git_push_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
+    _own("git_fetch_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("connector_github_runtime", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY,
          ENTRY_LOCAL_ADMISSION),
     _own("memory_write_execution", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),

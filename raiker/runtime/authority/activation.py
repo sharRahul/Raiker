@@ -141,6 +141,10 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["git_push_execution"] = _req(
         "git_push_execution", "2", threat_ack=True, human_confirm=True,
         notes="Owner credential + connector egress allowlist; never forces, never deletes.")
+    # ADD-27 GH-23 — fetch and clone. Egress, so Tier 2 like the push.
+    r["git_fetch_execution"] = _req(
+        "git_fetch_execution", "2", threat_ack=True, human_confirm=True,
+        notes="Connector egress allowlist; no submodules, no hooks; credential only under a fetch grant.")
     # Backlog #18 — the governed record over OTLP. Tier 2 because it leaves the
     # machine; metadata-only unless the owner opts into redacted content, and the
     # credential is an environment-variable *name*, never a stored value.

@@ -321,3 +321,155 @@ class GitPushExecutor:
                 "repository": repository,
             },
         )
+
+
+class GitFetchExecutor:
+    """Real executor for ``git_fetch_execution`` — one governed fetch or clone (ADD-27 GH-23).
+
+    Network egress like a push, so its own capability and the same host rules;
+    but it brings content in rather than sending it out, so a public repository
+    needs no credential. The owner's credential is lent only when a grant covers
+    fetching this repository, and a private repository fetched without one is
+    refused with a reason that says so.
+    """
+
+    capability = "git_fetch_execution"
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore | None = None) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    def _repo_root(self, principal: Principal) -> Path:
+        scope: str | None = None
+        if self._store is not None:
+            try:
+                scope = self._store.account_scope(principal.principal_id) or principal.principal_id
+            except Exception:  # noqa: BLE001 — a storage failure falls back to the workspace
+                scope = None
+        return resolve_repository_root(
+            self._workspace_root, selected_repository_subpath(self._store, scope)
+        )
+
+    def _result(self, action: GovernedAction, outcome: dict[str, Any], summary: str) -> ExecutionResult:
+        if outcome["status"] != "success":
+            error = outcome["error"]
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"fetch_failed:{error['type']}",
+                summary="Nothing was fetched.", artifacts={"error": error},
+            )
+        artifacts = {
+            key: outcome.get(key)
+            for key in ("remote", "repository", "path", "host", "transport", "head", "updated_refs")
+            if outcome.get(key) is not None
+        }
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary=summary, artifacts={"summary": summary, **artifacts},
+        )
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.runtime.git_credential import (
+            RUNTIME_TOKEN_VAR,
+            GitCredentialBroker,
+            GitCredentialError,
+        )
+        from raiker.tools.git import (
+            clone_repository,
+            fetch_remote,
+            proposed_clone_snapshot,
+            proposed_fetch_snapshot,
+        )
+
+        operation = action.action_type
+        if operation not in ("git_fetch", "git_clone"):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"unknown_git_operation:{operation or 'missing'}",
+                summary="Git fetch failed closed.", artifacts={},
+            )
+        try:
+            broker = (
+                GitCredentialBroker(self._store, principal.principal_id)
+                if self._store is not None
+                else None
+            )
+            method = broker.selected_method() if broker is not None else None
+            if operation == "git_clone":
+                repository = str(action.arguments.get("repository", ""))
+                path = action.arguments.get("path")
+                snapshot = proposed_clone_snapshot(
+                    self._workspace_root, repository, str(path) if path else None,
+                    credential_method=method,
+                )
+            else:
+                remote = action.arguments.get("remote")
+                snapshot = proposed_fetch_snapshot(
+                    self._repo_root(principal), str(remote) if remote else None,
+                    credential_method=method,
+                )
+            if snapshot["status"] != "success":
+                return self._result(action, snapshot, "")
+            session = action.origin_session_id or action.session_id or None
+            environment: dict[str, str] = {}
+            loan = None
+            if broker is not None and broker.live_grant() is not None:
+                # Lend only under a grant that covers fetching this repository;
+                # a grant for anything else is a reason to fetch anonymously,
+                # not to borrow it.
+                try:
+                    broker.covering_grant(
+                        session_id=session, operation="fetch",
+                        repository=str(snapshot["repository_key"]), branch=None,
+                    )
+                    loan = broker.lend(
+                        session_id=session, operation="fetch",
+                        repository=str(snapshot["repository_key"]),
+                    )
+                except GitCredentialError:
+                    loan = None
+            if snapshot["transport"] == "ssh" and loan is None:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="git_grant_required",
+                    summary="Fetching over SSH needs your SSH key lent for fetching this repository.",
+                    artifacts={},
+                )
+            try:
+                if loan is not None:
+                    environment = loan.__enter__()
+                if operation == "git_clone":
+                    outcome = clone_repository(
+                        self._workspace_root, str(action.arguments.get("repository", "")),
+                        str(action.arguments["path"]) if action.arguments.get("path") else None,
+                        credential=environment.get(RUNTIME_TOKEN_VAR),
+                        ssh_command=environment.get("GIT_SSH_COMMAND"),
+                    )
+                    summary = f"Cloned {outcome.get('repository')} into {outcome.get('path')}."
+                else:
+                    outcome = fetch_remote(
+                        self._repo_root(principal),
+                        str(action.arguments["remote"]) if action.arguments.get("remote") else None,
+                        credential=environment.get(RUNTIME_TOKEN_VAR),
+                        ssh_command=environment.get("GIT_SSH_COMMAND"),
+                    )
+                    summary = (
+                        f"Fetched {outcome.get('remote')} ({len(outcome.get('updated_refs') or [])} ref(s) updated)."
+                    )
+            finally:
+                if loan is not None:
+                    loan.__exit__(None, None, None)
+            if outcome["status"] != "success" and outcome["error"]["type"] == "fetch_authentication_required" and loan is None:
+                outcome["error"]["hint"] = "Approve your Git credential for fetching this repository."
+            return self._result(action, outcome, summary)
+        except GitCredentialError as exc:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=exc.reason, summary=exc.message, artifacts={},
+            )
+        except Exception as exc:  # noqa: BLE001 — every failure is reported, never raised
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"git_fetch_failed:{type(exc).__name__}",
+                summary="Git fetch failed closed.", artifacts={},
+            )

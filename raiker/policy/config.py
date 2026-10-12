@@ -54,6 +54,8 @@ class StaticPolicyConfig:
             # it on. Listed for the same reason the pair above is: a capability
             # in neither set is hard-denied on its way to its own executor.
             "git_push", "git_push_execution",
+            # ADD-27 GH-23 — fetch and clone, on their own capability.
+            "git_fetch", "git_clone", "git_fetch_execution",
             "memory_write", "memory_forget",
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.

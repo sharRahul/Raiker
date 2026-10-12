@@ -28,6 +28,7 @@ acknowledging.
 | `host_network_code_execution` | [Code with this machine's network](host-network-code.md) |
 | `git_write_execution` | [Git writes](git-write.md) |
 | `git_push_execution` | [Git push](git-push.md) |
+| `git_fetch_execution` | [Git fetch and clone](git-fetch.md) |
 | `container_execution_cap` | [Local container execution](container.md) |
 | `remote_execution_cap`, `cloud_execution_cap` | [Remote / cloud execution](remote-cloud.md) |
 | `scheduled_routines` | [Scheduled routines](scheduled-routines.md) |

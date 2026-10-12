@@ -388,6 +388,7 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // authenticates to are four halves of the same decision.
   git_write_execution: "Git",
   git_push_execution: "Git",
+  git_fetch_execution: "Git",
   connector_github_runtime: "Git",
   shell_execution: "Execution",
   process_execution: "Execution",
@@ -786,6 +787,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Git push",
     description:
       "Send an approved branch to its remote with your own credential. Separate from Git writes because a push leaves this machine: it still needs the remote's host on your connector egress allowlist, and it never forces or deletes a branch.",
+  },
+  git_fetch_execution: {
+    label: "Git fetch",
+    description:
+      "Bring a repository's history onto this machine when you approve it: fetch a remote of the selected repository, or clone a GitHub repository into a new folder. Submodules are not followed and the repository's hooks never run; a private repository needs your Git credential approved for fetching.",
   },
   memory_write_execution: {
     label: "Memory store",

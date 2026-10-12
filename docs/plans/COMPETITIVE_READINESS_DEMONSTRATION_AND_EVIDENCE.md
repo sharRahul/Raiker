@@ -166,3 +166,134 @@ Apply all existing CR evidence rules, five-trial protocol and authority/privacy
 zero-tolerance checks. Run only supported equivalent scopes; file unavailable
 accounts/regions/models/effects as blocked or unsupported. No Muse or new Claude
 comparison has been executed for this documentation update.
+
+
+## Competitive decision gap review — 2026-10-12
+
+**Status: recommendations for owner acceptance; not an accepted DEC, an implemented feature, or a benchmark result.** Reviewed against Raiker §CR-01–12, PAA-01–12, current BUG/ADD ledgers and selected executable paths at baseline `23cb971c0065ceadb1ea4d49d3ffbbbb10a9dee3`. Record subsequent code changes before promoting any status. This section narrows decisions about the *next useful product outcomes*, not a second implementation backlog; existing BUG, PAA, ADD, DEC and release gates remain the authoritative work owners.
+
+**Source comparison:** Cursor [Cloud Agents](https://prod.cursor.com/help/ai-features/background-agents) and [Bugbot](https://cursor.com/docs/bugbot); OpenAI [Codex remote/worktrees/steering](https://developers.openai.com/blog/mastering-codex-remote-for-engineering) and [repository-specific review rules](https://developers.openai.com/blog/custom-code-review-rules-for-codex); Hermes [cron lifecycle, skill-bound scheduled jobs and delivery](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron/) and [skills](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/creating-skills.md); Claude Code [subagents](https://code.claude.com/docs/en/sub-agents), [hooks](https://code.claude.com/docs/en/hooks) and [checkpointing](https://code.claude.com/docs/en/checkpointing); OpenClaw [architecture](https://docs.openclaw.ai/concepts/architecture) and [sandboxing](https://docs.openclaw.ai/gateway/sandboxing). These are public product descriptions, not matched live tests. Features may vary by plan, provider, version and host; the corresponding CR criterion controls competitive claims.
+
+### Decision gap triage (priority then effort)
+
+| Recommendation | Priority / estimated effort | Verified Raiker boundary or documentation state | Canonical implementation owner | What better must mean |
+|---|---|---|---|---|
+| RCD-00: reconcile evidence and status | P0 / S | This plan previously used older evidence baselines; the GitHub spec header called a partially implemented feature wholly planned | CR-01–12, PAA-11, implementation-status / release ledgers | One current code-revision-supported product claim, not competing stale statuses |
+| RCD-01: verify before declaring complete | P0 / M | `raiker/verification/verifier.py` exists, but [reference matrix §2.1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#21-agent-runtime-and-execution-loop) describes turn-level verification as advisory; PAA-08 is planned | PAA-08, CR-09/11, DEC-06 | Independently checked artifact/effect and an honest partial/unknown result |
+| RCD-02: complete delegated GitHub workflow | P0 / M | `raiker/github/routines.py` is explicitly a template; `raiker/runtime/executors/scheduled.py` executes read-only subagents; BUG-337/338/339 are open | [BUG-337–339](TO_BE_FIXED.md), ADD-27, PAA-12 | Scoped issue → tested change → authorised branch/push → PR with receipt, never implicit merge |
+| RCD-03: finish the cross-channel reply loop | P0 / M | [BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) records Telegram inbound work without outbound answer | BUG-315, DEC-14, PAA-10 | One authorised inbound instruction leads to one correlated delivery or an explicit failure |
+| RCD-04: bind Build to an isolated working tree | P1 / M | [BUG-316](TO_BE_FIXED.md#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in) records project-label vs execution-folder mismatch; no named worktree implementation file was found in this focused tree audit | BUG-316, DEC-04/06, CR-08/11 | Clear path, branch and change isolation before command execution, without mixing concurrent tasks |
+| RCD-05: add outcome-validated review automation | P1 / M | Build already has diff review and a code-review skill; an independent continuously verified PR-quality gate was **not established** in this review | DEC-06, ADD-27, CR-08/09 | Precise review findings, reproducible checks, no duplicate noise, human-controlled fixes/merge |
+| RCD-06: unify owner-consented proactive triggers | P1 / M | `raiker/tasks/schedule.py` supports timezone-aware slots; PAA-04 event-backed intentions remain planned, and the scheduled executor is read-only | PAA-04, DEC-12/21a, BUG-339 | One lifecycle for time/event triggers, dedup, cooldown, budget and delivery |
+| RCD-07: prove memory freshness and correction | P1 / M | `raiker/memory/retrieval.py` preserves source/scope/trust metadata; the owner-facing explicit/inferred personal profile remains PAA-03 work | PAA-03, ADD-25, CR-04 | Relevant, sourced, updatable memory with safe forget propagation |
+| RCD-08: learn reusable procedures only after proof | P2 / M | Skill install/review surfaces exist; generating a skill from verified successful personal work is PAA-09 planned scope | PAA-09, ADD-05/06/21, CR-06 | A versioned suggestion that improves later performance without increasing permission |
+| RCD-09: remote continuity with honest host semantics | P2 / L | Local-first execution and selected SSH/Daytona adapters exist; general paired-device control/always-on personal agent is PAA-10/ADD-11 future work | PAA-10, ADD-11, DEC-20, CR-05/10/11 | A reachable owner-controlled host, scoped pairing and visible offline behavior |
+
+**Ordering rule:** Within a priority do smaller verified tasks before larger ones; dependencies can override ordering only with a recorded explanation. P0 means important to an *advertised autonomy/completion claim*, not automatically a blocker to a narrower single-user Chat/Build release. An optional browser or 24/7 claim is gated only when advertised. Do not relabel the established BUG severities based on this comparative prioritisation.
+
+### RCD-00 — A product claim must match one current implementation baseline
+
+**Recommended decision:** Treat the newest *executable entry point + test/live outcome + revision* as the status authority; treat older compatibility matrix rows as dated research, not proof of today's implementation. Revise the canonical status and user guide when implementation changes, or tag the precise contradiction as documentation drift. Never replace a closed BUG with an open feature request or count a planned PAA item as shipped.
+
+**Why:** GitHub sign-in, credentials, repositories, delegation and Settings reached implementation in October, while the opening banner in `GITHUB_CONNECTION_SPEC.md` still said “Implementation Planned”. Conversely `IMPLEMENTATION_STATUS.md` contained an old “checkpoint restore is a known gap” paragraph after the route and CLI restore work closed in August. Stale readiness is itself a product risk.
+
+**Rejected:** Duplicating feature truth in another master spreadsheet; counting component tests as live provider validation.
+
+**Acceptance:** Automated cross-check of named entry points, capability flags, test pointers, open BUG links and candidate revision. Assertions distinguish implemented against fakes from tested against GitHub/Ollama/Telegram. CR evidence levels and RR scenarios stay explicit.
+
+### RCD-01 — Completion requires independent verification, not a confident answer
+
+**Recommended decision:** A consequential task may report `completed_verified` only after checking its declared acceptance conditions against the actual destination. Keep `completed_unverified`, `partially_completed`, `blocked` and `outcome_unknown` distinct in the durable run ledger, API and UI. A validator cannot be the same model statement that claimed success; use test execution, read-back, hashes, external IDs and independent checks as appropriate. Preserve evidence of both successful and failed attempts.
+
+**Why / competition:** Codex and Cursor are judged by tested code and reviewable artifacts, not merely produced patches. Raiker already has verification classes but lacks proof that their verdict gates all user-visible completion paths. This is a strengthening of PAA-08 and CR-09, **not** a request for a second runtime.
+
+**Rejected:** Marking a task done on the final LLM text; automatic retry of an external effect with an ambiguous first outcome.
+
+**Acceptance:** A failing hidden test, a file saved to the wrong location, a provider timeout after a write and a missing read-back each prevent `completed_verified`. Inject restart between effect and receipt; reconcile without repeating an irreversible action. Show the exact remaining work on Chat, Build and Tasks.
+
+### RCD-02 — GitHub autonomy is a reviewable, bounded workflow
+
+**Recommended decision:** Implement BUG-337/338/339 in that dependency order: bind local branch/commit authority to a selected remote when applicable; re-check repository/installation identity with the provider before consequential delegated steps; then execute a narrow issue-to-PR flow under an **owner-created** repository delegation. The flow must reserve a dedicated branch/workspace, inspect the issue as untrusted content, apply a focused change, run required tests, inspect the diff, request a push/PR action covered by the delegation and verify the PR ID/URL. Merge, repository settings and protected-branch actions remain human-only.
+
+**Why / competition:** Cursor Cloud Agents can produce PRs, and Codex workflows can lead to reviewable changes. Raiker has most primitives but an explicit missing runner. A feature named “issue-to-PR automation” is not delivered by the existence of `ISSUE_TO_PR_STEPS` alone.
+
+**Rejected:** Using the owner's broad OAuth connection as consent; letting a schedule mint or widen its own delegation; treating git push output as proof a PR exists.
+
+**Acceptance:** RR-39/40 and PA-S07 on a consented repository with wrong repository, transferred repository, expired installation, branch collision, hidden failing tests, approval pause, interrupted push, retry, and duplicate webhook. An owner can revoke before execution and prove no further write; no scheduled agent merges.
+
+### RCD-03 — An inbound channel turn must have an independently verified outbound result
+
+**Recommended decision:** Model inbound receipt, processing, outbound send and provider acknowledgement as separate correlated effects. Carry owner and sender scope across the turn; enforce destination policy and quiet hours before delivery; after an ambiguous timeout reconcile by provider message ID where supported, otherwise report unknown instead of blindly resending. A parked approval must not look like a delivered answer.
+
+**Why / competition:** OpenClaw and Hermes are used through messaging gateways. Raiker's inbound Telegram path is real while BUG-315 says the answer is not sent back. Fixing this improves autonomy more than another decorative channel integration.
+
+**Rejected:** Copying the final answer into a “sent” audit event with no provider acknowledgement; allowing a different chat/account to receive a delegated result.
+
+**Acceptance:** A real paired Telegram test produces one same-thread answer and linked delivery ID. Exercise duplicate inbound updates, replay, send refusal, provider outage, receiver disconnect, quiet hours and an owner Stop. Reopen the dashboard and see exactly whether it was delivered, held or unknown.
+
+### RCD-04 — Project selection must select where code *actually* runs
+
+**Recommended decision:** Name and enforce an execution target (host, workspace root, repository identity, branch/worktree and sandbox posture) **before** a Build turn starts. For parallel write-capable tasks prefer separate worktrees with branch ownership and safe cleanup; for a single task use the owner-selected existing checkout if explicitly chosen. Bind commands, file reads, diffs, checkpoints and PR receipts to the same target; refuse path traversal or a stale/moved target. This extends BUG-316 instead of obscuring it with a label change.
+
+**Why / competition:** Codex remote control exposes host/worktree choice; Cursor isolates cloud coding runs. Showing “Working in Project X” while running commands elsewhere is a correctness problem and defeats reliable multi-task coding.
+
+**Rejected:** Silently changing the process working directory; one shared mutable checkout for concurrent agents; cleaning up a branch containing unreviewed owner changes.
+
+**Acceptance:** Two concurrent tasks touching the same filename never overwrite one another; the displayed location matches actual executor and diff; a resume validates the workspace fingerprint; owner changes outside the worktree survive cancel/rollback. First run against Linux and Windows-supported paths.
+
+### RCD-05 — Code review must detect problems without fabricating quality
+
+**Recommended decision:** Define a review pipeline over an exact commit/diff and repository instructions: static and secret checks, policy/architecture rule checks, independent test/validator runs, model review where selected, severity and confidence, linked line/range and fix proposal. Store findings per patch fingerprint and deduplicate across repeated review; allow a bounded *proposed* repair on a fresh branch, but require existing policy/approval and never merge automatically. **Discovery prerequisite:** first inventory the existing code-review skill, Build diff view and GitHub connector to avoid adding a parallel reviewer.
+
+**Why / competition:** Cursor Bugbot offers event-triggered PR review and bounded autofix; Codex supports repository-specific review rules. Raiker's human diff review is useful but does not by itself establish parity with a verified PR reviewer.
+
+**Rejected:** Treating model-generated findings as proven vulnerabilities; spamming duplicate PR comments; infinite review↔fix loops; privileging a repository instruction over Raiker policy.
+
+**Acceptance:** Seed known correctness, regression, secret and prompt-injection cases plus false-positive controls. Measure precision, recall on the fixed set, duplicate rate, runtime and useful accepted fixes, with exact model/version/budget. Confirm no GitHub comment or patch appears without selected authority.
+
+### RCD-06 — Triggers should reuse one governed routine engine
+
+**Recommended decision:** Extend PAA-04 with one trigger envelope across scheduled times, supported provider events and owner-authorised manual re-runs. Use stable deduplication keys, local zone/DST rules, missed-run policy, lease/claim, max attempts, per-run model/skill selection, aggregate spend, cooldown and delivery target. Start with read/draft tasks; enable a write-capable routine only through the exact delegation design of RCD-02. A simple no-model script is optional and must still pass the same host/tool policy.
+
+**Why / competition:** Hermes supports skill-bound scheduled jobs, event triggers and delivery options. Raiker's timezone-aware scheduler is substantially stronger than the old four-cadence comparison row suggests, but the personal proactive effect path is not yet one end-to-end verified product.
+
+**Rejected:** A new cron daemon separate from Tasks; recursive routine creation by a routine; interpreting missing host power/network as a successful run; spending beyond approval pauses (BUG-325).
+
+**Acceptance:** Duplicate/out-of-order events produce one outcome, DST works, an offline host reports missed slots, quiet hours hold or digest notices, retries respect spend and Stop, and a revoked connector prevents the next effect. Include real provider event/delivery receipts before calling it end to end.
+
+### RCD-07 — Persistent personal context must be correctable and provenance-rich
+
+**Recommended decision:** PAA-03 should separate explicit owner-stated facts, inferred observations, project-scoped preferences and stale third-party data. Store source, observation time, last validation, confidence, sensitivity, scope, retention and supersession chain. An inferred fact may help rank a suggestion but must not become permission. Show why a memory was retrieved; owner correction/forget must invalidate derived summaries and embeddings according to retention policy.
+
+**Why / competition:** Hermes and OpenClaw emphasize persistent memory; Raiker already has hybrid retrieval and governance metadata. The differentiator is **demonstrable correctness and user control**, not simply longer retention.
+
+**Rejected:** Automatically promoting every chat assertion to global profile truth; treating stale memories as source-of-truth; a hidden model-only “forget” instruction.
+
+**Acceptance:** Conflicting facts, changed timezone, wrong project, revoked source, deletion and restore cases. Measure contextual retrieval quality and latency on a frozen corpus; demonstrate that forbidden/forgotten facts do not reappear in summaries or generated tasks.
+
+### RCD-08 — Self-improvement is a suggested skill, never self-granted authority
+
+**Recommended decision:** Capture a reproducible successful procedure and propose a versioned skill with inputs, output validator, minimal permissions, evidence links and a rollback point. Require explicit owner activation when code, new tools, schedule or permissions are introduced; suggestions may be inspected or dismissed. Run the candidate on a separate held-out fixture before declaring it better. Do not enable self-authored hooks or scripts through a trusted-sounding skill description.
+
+**Why / competition:** Hermes exposes reusable skills and suggestion/blueprint workflows. Raiker has Agent Skills support and governed skill controls, but PAA-09 remains planned for learning from verified personal work.
+
+**Rejected:** Unreviewed skill auto-install, autonomous authority expansion, evaluation on only the example used to generate the skill.
+
+**Acceptance:** A repeated workflow demonstrably improves success/cost/latency on fresh inputs, and malicious skill metadata, revoked permission, rollback, plugin update and schedule creation are handled through their existing boundaries.
+
+### RCD-09 — Remote control is an explicit deployment decision, not a false promise of 24/7
+
+**Recommended decision:** Preserve local-first single-owner deployment. Later offer a selected always-on private host and explicitly paired remote control device, with identity-bound sessions, end-to-end authenticated commands, queue/steer/Stop and live host health. Disclose where code and data actually run and what cannot happen when the host is offline. Keep hosted multi-user service out of scope until DEC-20 is revisited.
+
+**Why / competition:** Codex remote, Cursor Cloud Agents and OpenClaw/Hermes gateway patterns reduce the need to leave a laptop open; Raiker has pieces of a host/execution foundation but not a validated comparable personal remote-control experience.
+
+**Rejected:** Calling a locally scheduled task a cloud task; silently routing private work to a third-party host; exposing the owner control plane unauthenticated.
+
+**Acceptance:** Pair, revoke, reconnect, failed host, stale approval, cross-account spoof, network partition, resume and Stop on each declared OS/device. An offline test must show a trustworthy unavailable state, not a fabricated completed job.
+
+### Implementation and claim discipline
+
+* **No duplicate backlog IDs.** RCD is a decision-gap reference, **not** a second implementation task identifier. File newly observed failures in `TO_BE_FIXED.md`, extensions in `TO_BE_ADDED.md` or the owning PAA plan, and verified closures in `FIXED_ITEMS.md`. If a proposal needs a separate task, link it from its canonical owner and put the acceptance evidence there.
+* **Do not claim product parity yet.** Each RCD must close with a production reachability check, negative/authority checks, a real applicable provider/host outcome and the CR matched-task benchmark. An external provider stand-in is component proof only.
+* **No broad security regression.** Approval, capability gates, owner identity, scoped credentials, revocation, cost ceilings, audits, isolation, provenance and Stop remain enforced. Connecting a model, GitHub account, plugin or channel **never** grants a write by itself.
+* **Owner sign-off pending.** This review records recommended choices, reasons and rejected alternatives; existing accepted DEC/PAA/BUG statuses remain unchanged. Promote a proposed choice to accepted only with an explicit owner decision and update its canonical plan accordingly.

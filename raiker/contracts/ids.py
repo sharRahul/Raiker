@@ -122,6 +122,11 @@ _PREFIXES = {
     "dres_",
     # One durable governed command invocation.
     "cmd_",
+    # ADD-27 — the GitHub connection. A credential record (never the secret),
+    # a sign-in attempt, and a repository-bound delegation.
+    "gcred_",
+    "ghauth_",
+    "deleg_",
 }
 
 

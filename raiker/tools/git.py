@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import difflib
+import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -100,6 +102,39 @@ def repository_label(workspace_root: str | Path, repo_root: str | Path) -> str:
     return relative or "."
 
 
+#: Names that mark an environment variable as a credential. A local git command
+#: never needs one, and a child of git — a filter, a hook-like `fsmonitor`, a
+#: helper — would inherit whatever the host process holds (ADD-27 GH-24).
+_SECRET_NAME_PARTS = ("TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "API_KEY", "PRIVATE_KEY")
+_DROPPED_NAMES = frozenset({"SSH_AUTH_SOCK", "GIT_ASKPASS", "SSH_ASKPASS", "GH_ENTERPRISE_TOKEN"})
+
+#: Applied to every local git command: a repository's own `core.fsmonitor`
+#: names a program git runs on `status`, which would make a read a way to run
+#: code. Turning it off costs only speed on very large trees.
+_NO_FSMONITOR = ("-c", "core.fsmonitor=false")
+
+
+def local_git_environment(source: dict[str, str] | None = None) -> dict[str, str]:
+    """The host environment without anything that looks like a credential.
+
+    Not the empty, workspace-homed environment a push or a sandboxed command
+    gets: a local command keeps ``HOME`` so the owner's own ``user.name`` and
+    ``user.email`` still sign their commits. What it loses is every token,
+    secret, password and key variable, the SSH agent socket and any askpass
+    program, and it can never prompt.
+    """
+    base = dict(os.environ if source is None else source)
+    kept = {
+        name: value
+        for name, value in base.items()
+        if name not in _DROPPED_NAMES
+        and not name.startswith("RAIKER_")
+        and not any(part in name.upper() for part in _SECRET_NAME_PARTS)
+    }
+    kept["GIT_TERMINAL_PROMPT"] = "0"
+    return kept
+
+
 def run_git(
     repo_root: str | Path,
     subcommand: str,
@@ -113,8 +148,11 @@ def run_git(
             "error": {"type": "git_subcommand_denied", "subcommand": subcommand},
         }
     root = resolve_workspace_path(repo_root, ".")
-    command = ["git", "-C", str(root), subcommand, *(args or [])]
-    proc = subprocess.run(command, check=False, capture_output=True, text=True, timeout=10)
+    command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *(args or [])]
+    proc = subprocess.run(
+        command, check=False, capture_output=True, text=True, timeout=10,
+        env=local_git_environment(),
+    )
     output = (proc.stdout + proc.stderr)[:max_bytes]
     return {
         "status": "success" if proc.returncode == 0 else "failed",
@@ -138,11 +176,12 @@ def _git(
     root: Path, args: list[str], *, timeout: int = _WRITE_TIMEOUT
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", "-C", str(root), *args],
+        ["git", "-C", str(root), *_NO_FSMONITOR, *args],
         check=False,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=local_git_environment(),
     )
 
 
@@ -665,6 +704,33 @@ def _redact_token(text: str, lent: str | None = None) -> str:
     return text.replace(token, "***") if token else text
 
 
+_SCP_REMOTE = re.compile(r"^(?P<user>[A-Za-z0-9._-]+)@(?P<host>[A-Za-z0-9.-]+):(?P<path>[^/].*)$")
+
+
+def parse_remote(url: str) -> dict[str, Any]:
+    """The transport, host, port, user and path of a remote URL git will contact.
+
+    HTTPS (``https://github.com/owner/repo.git``) and SSH, in both spellings git
+    accepts (``git@github.com:owner/repo.git`` and
+    ``ssh://git@ssh.github.com:443/owner/repo.git``). Anything else is reported
+    with ``transport`` ``""`` so the caller can name it.
+    """
+    value = (url or "").strip()
+    scp = _SCP_REMOTE.match(value)
+    if scp and "://" not in value:
+        return {"transport": "ssh", "host": scp.group("host").lower(), "port": None,
+                "user": scp.group("user"), "path": scp.group("path")}
+    parsed = urlsplit(value)
+    if parsed.scheme == "ssh" and parsed.hostname:
+        return {"transport": "ssh", "host": parsed.hostname.lower(), "port": parsed.port,
+                "user": parsed.username or "", "path": parsed.path.lstrip("/")}
+    if parsed.scheme in ("https", "http") and parsed.hostname:
+        return {"transport": parsed.scheme, "host": parsed.hostname.lower(), "port": parsed.port,
+                "user": parsed.username or "", "password": parsed.password or "",
+                "netloc": parsed.netloc, "path": parsed.path.lstrip("/")}
+    return {"transport": "", "host": "", "scheme": parsed.scheme or "ssh"}
+
+
 def proposed_push_snapshot(
     repo_root: str | Path,
     remote: str | None = None,
@@ -672,6 +738,7 @@ def proposed_push_snapshot(
     *,
     credential: str | None = None,
     credential_configured: bool | None = None,
+    credential_method: str | None = None,
 ) -> dict[str, Any]:
     """Exactly what pushing would send — computed without touching the network.
 
@@ -705,23 +772,47 @@ def proposed_push_snapshot(
     if remote_name not in remotes:
         return _failed("unknown_remote", remote=remote_name, remotes=remotes)
     url = _remote_url(root, remote_name)
-    parsed = urlsplit(url)
-    if parsed.scheme not in ("https", "http") or not parsed.hostname:
-        return _failed("unsupported_remote_url", remote=remote_name, scheme=parsed.scheme or "ssh")
-    if parsed.scheme != "https":
-        return _failed("insecure_remote_url", remote=remote_name, host=parsed.hostname)
-    if "@" in parsed.netloc:
-        # A credential baked into the remote URL would be used instead of the
-        # owner's governed one, and would be pushed past every check below.
-        return _failed("remote_url_has_credentials", remote=remote_name, host=parsed.hostname)
-    host = parsed.hostname.lower()
-    if host not in GIT_PUSH_CREDENTIAL_HOSTS:
-        return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING)
-    if host not in push_egress_allowlist():
+    from raiker.github.hosts import SSH_TRANSPORT_HOSTS, transport_allowed
+
+    remote_parts = parse_remote(url)
+    transport = remote_parts["transport"]
+    if transport == "ssh":
+        # ADD-27 GH-22 — SSH to GitHub, as the `git` user, on the port each
+        # GitHub SSH host answers on. The key is the owner's selected one, lent
+        # with Raiker's pinned host keys; nothing in the user's SSH config is read.
+        host = str(remote_parts["host"])
+        if host not in SSH_TRANSPORT_HOSTS:
+            return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING)
+        port = remote_parts.get("port")
+        if remote_parts.get("user") != "git" or (port is not None and port != SSH_TRANSPORT_HOSTS[host]):
+            return _failed("unsupported_remote_url", remote=remote_name, scheme="ssh")
+    elif transport in ("https", "http"):
+        host = str(remote_parts["host"])
+        if transport != "https":
+            return _failed("insecure_remote_url", remote=remote_name, host=host)
+        if remote_parts.get("user") or remote_parts.get("password"):
+            # A credential baked into the remote URL would be used instead of the
+            # owner's governed one, and would be pushed past every check below.
+            return _failed("remote_url_has_credentials", remote=remote_name, host=host)
+        if host not in GIT_PUSH_CREDENTIAL_HOSTS:
+            return _failed("unsupported_remote_host", host=host, credential=GIT_CREDENTIAL_SETTING)
+    else:
+        return _failed("unsupported_remote_url", remote=remote_name, scheme=str(remote_parts.get("scheme")))
+    if not transport_allowed(host, push_egress_allowlist()):
         return _failed("push_egress_denied", host=host)
-    available = (
-        bool(_push_credential(credential)) if credential_configured is None else credential_configured
-    )
+    if credential_method is not None:
+        # The selected credential has to be the kind this remote authenticates
+        # with: a token for HTTPS, a key for SSH. Neither stands in for the other.
+        if (transport == "ssh") != (credential_method == "ssh"):
+            return _failed(
+                "push_credential_wrong_method", transport=transport,
+                credential=GIT_CREDENTIAL_SETTING,
+            )
+        available = True
+    else:
+        available = (
+            bool(_push_credential(credential)) if credential_configured is None else credential_configured
+        )
     if not available:
         return _failed("push_credential_unset", credential=GIT_CREDENTIAL_SETTING)
     tracking = _tracking_ref(root, remote_name, branch_name)
@@ -736,6 +827,7 @@ def proposed_push_snapshot(
         "status": "success",
         "remote": remote_name,
         "remote_url": url,
+        "transport": transport,
         "host": host,
         "branch": branch_name,
         "head": _head_commit(root),
@@ -771,6 +863,7 @@ def push_branch(
     *,
     credential: str | None = None,
     expected: dict[str, Any] | None = None,
+    ssh_command: str | None = None,
 ) -> dict[str, Any]:
     """Push the proposed branch to the proposed remote. Re-validates everything first.
 
@@ -785,7 +878,7 @@ def push_branch(
     """
     snapshot = proposed_push_snapshot(
         repo_root, remote, branch, credential=credential,
-        credential_configured=bool(_push_credential(credential)),
+        credential_method="ssh" if ssh_command else ("token" if _push_credential(credential) else None),
     )
     if snapshot["status"] != "success":
         return snapshot
@@ -814,6 +907,9 @@ def push_branch(
             "GIT_TERMINAL_PROMPT": "0",
             "GIT_ASKPASS": "",
             "SSH_ASKPASS": "",
+            # Over SSH, the selected key and the pinned host keys only. The
+            # variable outranks any `core.sshCommand` a repository sets.
+            **({"GIT_SSH_COMMAND": ssh_command} if ssh_command else {}),
         },
     )
     args = [

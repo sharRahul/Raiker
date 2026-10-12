@@ -250,7 +250,7 @@ class GitPushExecutor:
                 root,
                 str(remote).strip() if remote else None,
                 str(branch).strip() if branch else None,
-                credential_configured=broker is not None and broker.token_configured(),
+                credential_method=broker.selected_method() if broker is not None else None,
             )
             if snapshot["status"] != "success":
                 return self._refused(action, snapshot["error"], root)
@@ -280,6 +280,7 @@ class GitPushExecutor:
                     result = push_branch(
                         root, str(snapshot["remote"]), str(snapshot["branch"]),
                         credential=environment.get(RUNTIME_TOKEN_VAR), expected=expected,
+                        ssh_command=environment.get("GIT_SSH_COMMAND"),
                     )
             except GitCredentialError as exc:
                 return ExecutionResult(

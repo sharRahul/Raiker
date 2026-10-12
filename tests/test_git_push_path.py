@@ -210,11 +210,27 @@ class TestProposalFailsClosed:
         result = _snapshot(repo, None, "nope")
         assert result["error"]["type"] == "unknown_branch"
 
-    def test_an_ssh_remote_is_refused(self, repo: Path, allowed: None) -> None:
-        # An SSH remote authenticates with a key this process does not govern and
-        # carries no host the egress allowlist can be checked against.
+    def test_an_ssh_remote_needs_a_selected_ssh_key(self, repo: Path, allowed: None) -> None:
+        # ADD-27 GH-22 — an SSH remote is pushed with the owner's selected key and
+        # nothing else; a token cannot stand in for it, nor a key for a token.
         _git(repo, "remote", "set-url", "origin", "git@github.com:owner/repo.git")
-        assert _snapshot(repo)["error"]["type"] == "unsupported_remote_url"
+        refused = proposed_push_snapshot(repo, credential_method="pat")
+        assert refused["error"]["type"] == "push_credential_wrong_method"
+        accepted = proposed_push_snapshot(repo, credential_method="ssh")
+        assert accepted["status"] == "success" and accepted["transport"] == "ssh"
+        _git(repo, "remote", "set-url", "origin", "https://github.com/owner/repo.git")
+        assert proposed_push_snapshot(repo, credential_method="ssh")["error"]["type"] == (
+            "push_credential_wrong_method"
+        )
+
+    def test_an_ssh_remote_on_another_host_or_user_is_refused(self, repo: Path, allowed: None) -> None:
+        for url, reason in (
+            ("git@gitlab.com:owner/repo.git", "unsupported_remote_host"),
+            ("deploy@github.com:owner/repo.git", "unsupported_remote_url"),
+            ("ssh://git@github.com:2222/owner/repo.git", "unsupported_remote_url"),
+        ):
+            _git(repo, "remote", "set-url", "origin", url)
+            assert proposed_push_snapshot(repo, credential_method="ssh")["error"]["type"] == reason
 
     def test_a_plaintext_remote_is_refused(self, repo: Path, allowed: None) -> None:
         _git(repo, "remote", "set-url", "origin", "http://github.com/owner/repo.git")

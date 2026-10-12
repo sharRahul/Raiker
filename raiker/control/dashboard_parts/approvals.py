@@ -645,8 +645,11 @@ class ApprovalService:
                 repo_root,
                 str(args["remote"]) if args.get("remote") else None,
                 str(args["branch"]) if args.get("branch") else None,
-                credential_configured=bool(principal_id)
-                and GitCredentialBroker(self.store, str(principal_id)).token_configured(),
+                credential_method=(
+                    GitCredentialBroker(self.store, str(principal_id)).selected_method()
+                    if principal_id
+                    else None
+                ),
             )
             if snapshot["status"] != "success":
                 return None, None, "arguments"

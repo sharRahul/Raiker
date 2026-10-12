@@ -39,6 +39,9 @@ RULES: dict[str, re.Pattern[str]] = {
     "anthropic_key": re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}"),
     "openai_key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b"),
     "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
+    # The stateless installation-token form GitHub began issuing 2026-04-27:
+    # `ghs_`, the App id, an underscore and a JWT.
+    "github_installation_jwt": re.compile(r"\bghs_[0-9]+_[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
     "github_pat": re.compile(r"\bgithub_pat_[A-Za-z0-9_]{60,}\b"),
     "huggingface_token": re.compile(r"\bhf_[A-Za-z0-9]{34}\b"),
     "aws_access_key": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),

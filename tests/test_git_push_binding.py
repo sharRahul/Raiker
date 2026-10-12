@@ -232,3 +232,36 @@ def test_an_approval_that_recorded_nothing_is_refused(
     result = GitPushExecutor(repo, store).execute(_approved_push("apr_old", "sess_a"), human(OWNER, role_ids=()))
     assert result.reason_code == "push_failed:push_binding_missing"
     assert pushes == []
+
+
+def test_an_ssh_push_uses_the_selected_key_and_pinned_hosts(
+    repo: Path, pushes: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GH-22 end to end through the executor: the lend's SSH command reaches git."""
+    from raiker.github.local_methods import SshKeys
+
+    def programs(argv: Any, stdin: Any, env: Any, timeout: float) -> tuple[int, str, str]:
+        if argv[:2] == ["ssh-keygen", "-lf"]:
+            return 0, "256 SHA256:keyFingerprint000000000000000000000000000000 x (ED25519)\n", ""
+        return 1, "", "Hi octo! You've successfully authenticated, but GitHub does not provide shell access.\n"
+
+    _git(repo, "remote", "set-url", "origin", "git@github.com:acme/demo.git")
+    key = repo.parent / "id_ed25519"
+    key.write_text("KEY", encoding="utf-8")
+    store = SQLiteStore(repo)
+    broker = GitCredentialBroker(store, OWNER, ssh=SshKeys(programs, home=repo.parent))
+    broker.methods.add_ssh(str(key))
+    _propose(repo, "sess_a")
+    broker.grant("session", session_id="sess_a")
+    executor = GitPushExecutor(repo, store)
+    monkeypatch.setattr(
+        "raiker.runtime.git_credential.GitCredentialBroker",
+        lambda store_, principal: GitCredentialBroker(store_, principal, ssh=SshKeys(programs, home=repo.parent)),
+    )
+    result = executor.execute(_approved_push(_approval_id(repo), "sess_a"), human(OWNER, role_ids=()))
+    assert result.ok is True, result.reason_code
+    (push,) = pushes
+    command = push["env"]["GIT_SSH_COMMAND"]
+    assert "IdentitiesOnly=yes" in command and str(key) in command
+    assert "github_known_hosts" in command
+    assert push["env"].get("RAIKER_GIT_PUSH_TOKEN", "") == ""

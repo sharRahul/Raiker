@@ -46,8 +46,19 @@ MEMORY_FORGET = "memory_forget"
 MEMORY_PURGE = "memory_purge"
 #: A conversation deleted with its turns, sources and transcript.
 SESSION_DELETE = "session_delete"
+#: A Git credential the owner removed or disconnected (ADD-27 GH-16): the id is
+#: the vault entry it was kept under, or the credential record's id.
+GIT_CREDENTIAL_FORGET = "git_credential_forget"
+#: Every Git grant the owner withdrew: the id is the owner, and the grants made
+#: at or before the line's time are revoked again after a restore.
+GIT_GRANT_REVOKE = "git_grant_revoke"
+#: A repository delegation the owner revoked (ADD-27 GH-50).
+DELEGATION_REVOKE = "repository_delegation_revoke"
 
-KINDS = (MEMORY_FORGET, MEMORY_PURGE, SESSION_DELETE)
+KINDS = (
+    MEMORY_FORGET, MEMORY_PURGE, SESSION_DELETE,
+    GIT_CREDENTIAL_FORGET, GIT_GRANT_REVOKE, DELEGATION_REVOKE,
+)
 
 
 def journal_path(workspace_root: str | Path) -> Path:
@@ -141,4 +152,36 @@ def reapply_deletions(store: SQLiteStore, deletions: list[Deletion]) -> dict[str
                 ).unlink(missing_ok=True)
             if existed:
                 applied[MEMORY_PURGE] += 1
+        elif entry.kind == GIT_CREDENTIAL_FORGET:
+            # Authority the owner took back is not handed back by a snapshot:
+            # the vault entry, the record that named it and every grant on it go.
+            with store.connect() as connection:
+                removed = connection.execute(
+                    "DELETE FROM connector_credentials WHERE principal_id = ? AND connector_id = ?",
+                    (entry.owner, entry.object_id),
+                ).rowcount
+                removed += connection.execute(
+                    """DELETE FROM git_credentials
+                       WHERE principal_id = ? AND (credential_id = ? OR secret_ref = ?)""",
+                    (entry.owner, entry.object_id, entry.object_id),
+                ).rowcount
+            store.revoke_git_credential_grants(entry.owner)
+            if removed:
+                applied[GIT_CREDENTIAL_FORGET] += 1
+        elif entry.kind == GIT_GRANT_REVOKE:
+            changed = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
+                """UPDATE git_credential_grants SET status = 'revoked', revoked_at = ?
+                   WHERE owner_principal_id = ? AND status = 'active' AND granted_at <= ?""",
+                (entry.at, entry.object_id, entry.at),
+            )
+            if changed:
+                applied[GIT_GRANT_REVOKE] += 1
+        elif entry.kind == DELEGATION_REVOKE:
+            changed = store._execute(  # noqa: SLF001 — a bounded revocation with no method of its own
+                """UPDATE repository_delegations SET revoked_at = ?
+                   WHERE (delegation_id = ? OR parent_delegation_id = ?) AND revoked_at IS NULL""",
+                (entry.at, entry.object_id, entry.object_id),
+            )
+            if changed:
+                applied[DELEGATION_REVOKE] += 1
     return applied

@@ -1109,19 +1109,20 @@ class ToolBroker:
         )
         return failed, decision
 
-    def _git_credential_configured(self) -> bool:
-        """BUG-334 — whether the owner holds a push credential, asked of the broker.
+    def _git_credential_method(self) -> str | None:
+        """BUG-334 — the owner's selected push credential's method, asked of the broker.
 
-        Only the answer: the token itself is lent at execution, under a grant.
+        Only that answer: the secret itself is lent at execution, under a grant.
+        ``None`` when nothing is selected or the vault cannot be read.
         """
         if self.store is None:
-            return False
+            return None
         from raiker.runtime.git_credential import GitCredentialBroker
 
         try:
-            return GitCredentialBroker(self.store, self.owner_scope or self.principal_id).token_configured()
+            return GitCredentialBroker(self.store, self.owner_scope or self.principal_id).selected_method()
         except Exception:  # noqa: BLE001 — an unreadable vault holds no credential
-            return False
+            return None
 
     def _record_push_binding(self, approval_id: str, preview: Any) -> None:
         """BUG-336 — keep what the owner is being shown, so the push is held to it."""
@@ -1183,7 +1184,7 @@ class ToolBroker:
                     self.git_root(),
                     str(action.arguments["remote"]) if action.arguments.get("remote") else None,
                     str(action.arguments["branch"]) if action.arguments.get("branch") else None,
-                    credential_configured=self._git_credential_configured(),
+                    credential_method=self._git_credential_method(),
                 )
             )
         if action.tool_name == "apply_patch":

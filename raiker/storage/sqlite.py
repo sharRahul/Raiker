@@ -613,6 +613,7 @@ from raiker.storage.stores.code import CodeStore  # noqa: E402
 from raiker.storage.stores.conversations import ConversationStore  # noqa: E402
 from raiker.storage.stores.execution import ExecutionStore  # noqa: E402
 from raiker.storage.stores.extensions import ExtensionStore  # noqa: E402
+from raiker.storage.stores.github import GitHubStore  # noqa: E402
 from raiker.storage.stores.governance import GovernanceStore  # noqa: E402
 from raiker.storage.stores.knowledge import KnowledgeStore  # noqa: E402
 from raiker.storage.stores.memory import MemoryStore  # noqa: E402
@@ -633,6 +634,7 @@ class SQLiteStore(
     ConversationStore,
     ExecutionStore,
     ExtensionStore,
+    GitHubStore,
     GovernanceStore,
     KnowledgeStore,
     MemoryStore,

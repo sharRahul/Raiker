@@ -128,7 +128,12 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
         REDACTED_PRIVATE_KEY,
     ),
     (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), REDACTED_TOKEN),
-    (re.compile(r"\bghp_[A-Za-z0-9]{20,}"), REDACTED_TOKEN),
+    # Every GitHub token prefix — personal (`ghp_`), OAuth (`gho_`), GitHub App
+    # user-to-server (`ghu_`) and refresh (`ghr_`), and installation (`ghs_`).
+    # Installation tokens are moving to a stateless `ghs_APPID_JWT` form, which
+    # carries dots and is not 40 characters, so the body admits a JWT's alphabet
+    # and the entropy fallback below is not relied on (ADD-27 GH-15).
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9][A-Za-z0-9_.\-]{15,}"), REDACTED_TOKEN),
     (re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}"), REDACTED_TOKEN),
     # A Hugging Face access token: ``hf_`` and 34 letters and digits — 37
     # characters, under the generic fallback's 40, so it matched nothing.

@@ -4357,6 +4357,146 @@ ALTER TABLE git_credential_grants ADD COLUMN credential_id TEXT;
 ALTER TABLE git_credential_grants ADD COLUMN account_id TEXT;
 """
 
+# ADD-27 — the GitHub connection (DEC-21b as amended 2026-10-12). One place for
+# everything the connection knows, none of it a secret: secrets stay in the
+# vault (``connector_credentials``) and these rows name them by reference.
+#
+# * ``git_credentials`` — each credential the owner selected or connected, by
+#   method (personal token, the legacy environment token, gh CLI sign-in, an OS
+#   credential-manager entry, an SSH key, a GitHub App sign-in), with the
+#   GitHub account it was verified to belong to. One is selected at a time.
+# * ``github_auth_attempts`` — a sign-in in progress: who started it and in
+#   which Raiker session, the hashed state, the method, when it expires and how
+#   it ended. The PKCE verifier and device code are in the vault.
+# * ``github_apps`` — the official App's public identity and an operator's own
+#   App, by reference to where its private key and secrets are kept.
+# * ``github_installations`` / ``github_repositories`` — what GitHub says the
+#   App is installed on and which repositories, by immutable id, each
+#   credential can reach.
+# * ``github_webhook_deliveries`` — delivery ids seen, so a replay is refused.
+# * ``repository_delegations`` — the owner's explicit, repository-bound
+#   authority for autonomous Git and GitHub work.
+GITHUB_CONNECTION_MIGRATION_ID = "RAIKER-2108-github-connection"
+
+GITHUB_CONNECTION_SQL = """
+CREATE TABLE IF NOT EXISTS git_credentials (
+  credential_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'github.com',
+  method TEXT NOT NULL,
+  label TEXT,
+  account_id TEXT,
+  account_login TEXT,
+  selector TEXT,
+  secret_ref TEXT,
+  key_path TEXT,
+  app_ref TEXT,
+  permissions_json TEXT NOT NULL DEFAULT '{}',
+  expires_at TEXT,
+  refresh_expires_at TEXT,
+  status TEXT NOT NULL,
+  selected INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  validated_at TEXT,
+  last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_git_credentials_principal ON git_credentials(principal_id, selected);
+
+CREATE TABLE IF NOT EXISTS github_auth_attempts (
+  attempt_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  session_ref TEXT NOT NULL,
+  method TEXT NOT NULL,
+  app_ref TEXT NOT NULL,
+  state_hash TEXT,
+  redirect_uri TEXT,
+  user_code TEXT,
+  verification_uri TEXT,
+  poll_interval INTEGER,
+  next_poll_at TEXT,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  outcome TEXT NOT NULL DEFAULT 'pending',
+  outcome_reason TEXT,
+  credential_id TEXT,
+  closed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_github_auth_attempts_state ON github_auth_attempts(state_hash);
+
+CREATE TABLE IF NOT EXISTS github_apps (
+  app_ref TEXT PRIMARY KEY,
+  app_id TEXT,
+  client_id TEXT,
+  slug TEXT,
+  private_key_ref TEXT,
+  client_secret_ref TEXT,
+  webhook_secret_ref TEXT,
+  callback_url TEXT,
+  setup_url TEXT,
+  webhooks_enabled INTEGER NOT NULL DEFAULT 0,
+  validated_at TEXT,
+  validation_json TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);
+
+CREATE TABLE IF NOT EXISTS github_installations (
+  installation_id TEXT PRIMARY KEY,
+  app_ref TEXT NOT NULL,
+  principal_id TEXT,
+  account_id TEXT,
+  account_login TEXT,
+  account_type TEXT,
+  repository_selection TEXT,
+  permissions_json TEXT NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS github_repositories (
+  principal_id TEXT NOT NULL,
+  credential_id TEXT NOT NULL,
+  repository_id TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  installation_id TEXT,
+  permissions_json TEXT NOT NULL DEFAULT '{}',
+  private INTEGER NOT NULL DEFAULT 0,
+  selected INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'available',
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, credential_id, repository_id)
+);
+
+CREATE TABLE IF NOT EXISTS github_webhook_deliveries (
+  delivery_id TEXT PRIMARY KEY,
+  event TEXT NOT NULL,
+  installation_id TEXT,
+  received_at TEXT NOT NULL,
+  outcome TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repository_delegations (
+  delegation_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  repository_id TEXT,
+  operations_json TEXT NOT NULL,
+  branch_pattern TEXT,
+  allow_pull_request INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  max_actions INTEGER,
+  actions_used INTEGER NOT NULL DEFAULT 0,
+  credential_id TEXT,
+  parent_delegation_id TEXT,
+  task_id TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT,
+  note TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_repository_delegations_principal ON repository_delegations(principal_id);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4610,6 +4750,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(SESSION_CONTROL_SEQUENCES_MIGRATION_ID, SESSION_CONTROL_SEQUENCES_SQL),
     Migration(GIT_PUSH_BINDINGS_MIGRATION_ID, GIT_PUSH_BINDINGS_SQL),
     Migration(GIT_GRANT_BOUNDS_MIGRATION_ID, GIT_GRANT_BOUNDS_SQL),
+    Migration(GITHUB_CONNECTION_MIGRATION_ID, GITHUB_CONNECTION_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

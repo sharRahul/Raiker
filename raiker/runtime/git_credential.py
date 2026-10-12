@@ -15,6 +15,7 @@ captured stdout even if the command echoes it back.
 from __future__ import annotations
 
 import contextlib
+import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -23,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import TypedDict
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.deletion_journal import GIT_CREDENTIAL_FORGET, GIT_GRANT_REVOKE
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -107,7 +109,7 @@ GRANT_BOUNDS: tuple[str, ...] = ("operation", "repository", "branch")
 
 
 def repository_key(remote_url: str) -> str:
-    """``host/owner/name`` for an HTTPS remote URL, lower-case, without ``.git``.
+    """``host/owner/name`` for an HTTPS or SSH remote URL, lower-case, without ``.git``.
 
     The one spelling a grant, a binding and an audit record agree on, so a
     remote written ``https://GitHub.com/Owner/Repo.git/`` and one written
@@ -115,11 +117,16 @@ def repository_key(remote_url: str) -> str:
     """
     from urllib.parse import urlsplit
 
-    parsed = urlsplit((remote_url or "").strip())
-    host = (parsed.hostname or "").lower()
-    if host == "www.github.com":
+    value = (remote_url or "").strip()
+    scp = re.match(r"^[A-Za-z0-9._-]+@(?P<host>[A-Za-z0-9.-]+):(?P<path>[^/].*)$", value)
+    if scp and "://" not in value:
+        host, path = scp.group("host").lower(), scp.group("path").strip("/").lower()
+    else:
+        parsed = urlsplit(value)
+        host, path = (parsed.hostname or "").lower(), parsed.path.strip("/").lower()
+    # One repository whichever GitHub host or transport names it.
+    if host in ("www.github.com", "ssh.github.com"):
         host = "github.com"
-    path = parsed.path.strip("/").lower()
     if path.endswith(".git"):
         path = path[: -len(".git")]
     return f"{host}/{path}" if host and path else ""
@@ -136,6 +143,7 @@ class GitCredentialGrant(TypedDict):
     operation: str | None
     repository: str | None
     branch: str | None
+    credential_id: str | None
 
 
 class GitCredentialLastUse(TypedDict):
@@ -155,6 +163,10 @@ class GitCredentialStatus(TypedDict):
 
     credential_configured: bool
     credential_source: str
+    #: ADD-27 GH-18 — the selected credential's method, id and account.
+    credential_method: str | None
+    credential_id: str | None
+    account_login: str | None
     grant: GitCredentialGrant | None
     #: The most recent loan under any grant, or ``None`` if it was never lent.
     last_used: GitCredentialLastUse | None
@@ -188,6 +200,8 @@ class GrantView:
     operation: str | None = None
     repository: str | None = None
     branch: str | None = None
+    credential_id: str | None = None
+    account_id: str | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> GrantView:
@@ -196,6 +210,7 @@ class GrantView:
             str(row["granted_at"]), str(row["expires_at"]),
             row.get("session_id"), int(row.get("uses") or 0),
             row.get("operation"), row.get("repository"), row.get("branch"),
+            row.get("credential_id"), row.get("account_id"),
         )
 
     def as_dict(self) -> GitCredentialGrant:
@@ -210,6 +225,7 @@ class GrantView:
             "operation": self.operation,
             "repository": self.repository,
             "branch": self.branch,
+            "credential_id": self.credential_id,
         }
 
 
@@ -228,9 +244,15 @@ def grant_expiry(scope: str, *, now: datetime | None = None) -> str:
 class GitCredentialBroker:
     """Stores the token, records the owner's decision, and lends it once."""
 
-    def __init__(self, store: SQLiteStore, principal_id: str) -> None:
+    def __init__(self, store: SQLiteStore, principal_id: str, *, methods: Any = None, **method_options: Any) -> None:
+        from raiker.github.credentials import CredentialMethods
+
         self._store = store
         self._principal_id = principal_id
+        #: ADD-27 GH-18 — which credential, by method, is the one in use.
+        self.methods: CredentialMethods = methods or CredentialMethods(
+            store, principal_id, record=self._record, **method_options
+        )
 
     def _record(self, event_type: str, payload: dict[str, Any]) -> None:
         """GH-14 — one metadata-only event per credential decision. Never the token."""
@@ -248,6 +270,12 @@ class GitCredentialBroker:
                 )
             )
 
+    def _journal(self, kind: str, object_id: str) -> None:
+        """GH-16 — written outside the database, so restoring a backup cannot undo it."""
+        from raiker.storage.deletion_journal import record_deletion
+
+        record_deletion(self._store.paths.workspace_root, kind, object_id, self._principal_id)
+
     # ── storage ──────────────────────────────────────────────────────────
     def _vault(self) -> Any:
         from raiker.runtime.connector_ecosystem import ConnectorVault
@@ -255,50 +283,71 @@ class GitCredentialBroker:
         return ConnectorVault(self._store)
 
     def store_token(self, token: str) -> None:
-        """Encrypt and keep the owner's token. Never echoed back by any read."""
+        """Encrypt and keep the owner's personal token, and make it the one in use.
+
+        Never echoed back by any read. The token keeps the vault key it has had
+        since RAIKER-2022, so an existing deployment's token is the same entry.
+        """
+        from raiker.github.credentials import LEGACY_VAULT_KEY, METHOD_PAT
+
         value = (token or "").strip()
         if not value:
             raise GitCredentialError("git_token_empty", "A GitHub token is required.")
         if len(value) > 512:
             raise GitCredentialError("git_token_too_long", "That is not a GitHub token.")
         self._vault().put(self._principal_id, CREDENTIAL_KEY, {"token": value})
-        self._record("git_credential_stored", {"source": "vault"})
+        rows = self._store.list_git_credentials(self._principal_id)
+        row = next(
+            (r for r in rows if r["method"] == METHOD_PAT and r.get("secret_ref") == LEGACY_VAULT_KEY),
+            None,
+        )
+        if row is None:
+            self.methods.ensure_legacy()
+            row = next(
+                r for r in self._store.list_git_credentials(self._principal_id)
+                if r["method"] == METHOD_PAT and r.get("secret_ref") == LEGACY_VAULT_KEY
+            )
+        else:
+            # A new value is a new credential as far as its account goes.
+            self._store.update_git_credential(
+                row["credential_id"], status="unverified", account_id=None, account_login=None,
+                last_error=None,
+            )
+        self._store.select_git_credential(self._principal_id, row["credential_id"])
+        self._record("git_credential_stored", {"source": "vault", "credential_id": row["credential_id"]})
 
     def forget_token(self) -> None:
+        from raiker.github.credentials import LEGACY_VAULT_KEY, METHOD_PAT
+
         with contextlib.suppress(Exception), self._store.connect() as connection:
             connection.execute(
                 "DELETE FROM connector_credentials WHERE principal_id=? AND connector_id=?",
                 (self._principal_id, CREDENTIAL_KEY),
             )
+        for row in self._store.list_git_credentials(self._principal_id):
+            if row["method"] == METHOD_PAT and row.get("secret_ref") == LEGACY_VAULT_KEY:
+                self._store.delete_git_credential(row["credential_id"])
         revoked = self._store.revoke_git_credential_grants(self._principal_id)
+        self._journal(GIT_CREDENTIAL_FORGET, CREDENTIAL_KEY)
         self._record("git_credential_forgotten", {"grants_revoked": revoked})
 
-    def _token(self) -> str:
-        """The stored token, falling back to the legacy environment variable.
-
-        The fallback keeps an existing deployment working across this change; it
-        is reported as ``environment`` by :meth:`status` so the owner can see
-        which one they are on rather than guessing.
-        """
-        with contextlib.suppress(Exception):
-            stored = self._vault().get(self._principal_id, CREDENTIAL_KEY)
-            if stored and stored.get("token"):
-                return str(stored["token"]).strip()
-        import os
-
-        return os.environ.get(LEGACY_TOKEN_ENV, "").strip()
+    def selected_credential(self) -> dict[str, Any] | None:
+        return self.methods.selected()
 
     def token_configured(self) -> bool:
-        return bool(self._token())
+        """Whether a credential is selected and could be lent — asked without reading it."""
+        return self.methods.selected() is not None
+
+    def selected_method(self) -> str | None:
+        row = self.methods.selected()
+        return str(row["method"]) if row else None
 
     def token_source(self) -> str:
-        with contextlib.suppress(Exception):
-            stored = self._vault().get(self._principal_id, CREDENTIAL_KEY)
-            if stored and stored.get("token"):
-                return "vault"
-        import os
-
-        return "environment" if os.environ.get(LEGACY_TOKEN_ENV, "").strip() else "none"
+        """``vault``, ``environment`` or ``none`` as before, or the selected method's name."""
+        method = self.selected_method()
+        if method is None:
+            return "none"
+        return {"pat": "vault", "environment": "environment"}.get(method, method)
 
     # ── grants ───────────────────────────────────────────────────────────
     def grant(
@@ -334,6 +383,7 @@ class GitCredentialBroker:
                 "Store a GitHub token before approving git commands "
                 "(Settings → Git credential).",
             )
+        selected = self.methods.selected() or {}
         row = self._store.create_git_credential_grant(
             principal_id=self._principal_id,
             scope=scope,
@@ -343,6 +393,10 @@ class GitCredentialBroker:
             operation=(operation or None),
             repository=(repository or None),
             branch=(branch or None),
+            # A grant lends the credential it was made for, not whichever one is
+            # selected later (DEC-21b-H: methods are never interchangeable).
+            credential_id=selected.get("credential_id"),
+            account_id=selected.get("account_id"),
         )
         view = GrantView.from_row({**row, "uses": 0})
         self._record(
@@ -357,6 +411,7 @@ class GitCredentialBroker:
 
     def revoke(self) -> int:
         revoked = self._store.revoke_git_credential_grants(self._principal_id)
+        self._journal(GIT_GRANT_REVOKE, self._principal_id)
         if revoked:
             self._record("git_grant_revoked", {"grants_revoked": revoked})
         return revoked
@@ -395,6 +450,17 @@ class GitCredentialBroker:
                 "git_grant_other_session",
                 "The credential was lent for another conversation. Approve it for this one.",
             )
+        selected = self.methods.selected() or {}
+        if grant.credential_id and grant.credential_id != selected.get("credential_id"):
+            raise GitCredentialError(
+                "git_grant_other_credential",
+                "The approval was for a different credential than the one now selected.",
+            )
+        if grant.account_id and selected.get("account_id") and grant.account_id != selected["account_id"]:
+            raise GitCredentialError(
+                "git_account_mismatch",
+                "The selected credential now belongs to a different GitHub account.",
+            )
         wanted = {"operation": operation, "repository": repository, "branch": branch}
         for bound in GRANT_BOUNDS:
             granted = getattr(grant, bound)
@@ -411,9 +477,13 @@ class GitCredentialBroker:
         # `credential_*` rather than `token_*`: the API redactor masks any field
         # whose *key* contains "token", which is the right blunt instrument to
         # keep. Renaming the field is cheaper than punching a hole in it.
+        selected = self.methods.selected()
         return {
-            "credential_configured": self.token_configured(),
+            "credential_configured": selected is not None,
             "credential_source": self.token_source(),
+            "credential_method": str(selected["method"]) if selected else None,
+            "credential_id": str(selected["credential_id"]) if selected else None,
+            "account_login": selected.get("account_login") if selected else None,
             "grant": grant.as_dict() if grant else None,
             "last_used": self._last_use(),
             "scopes": sorted(GRANT_SCOPES),
@@ -459,38 +529,53 @@ class GitCredentialBroker:
         repository or branch it was narrowed to. The legacy
         ``RAIKER_GITHUB_TOKEN`` is lent under exactly the same rule (GH-13).
         """
+        from raiker.github.credentials import METHOD_SSH, CredentialMethodError
+
         grant = self.covering_grant(
             session_id=session_id, operation=operation, repository=repository, branch=branch
         )
-        token = self._token()
-        if not token:
+        selected = self.methods.selected()
+        if selected is None:
             raise GitCredentialError(
                 "git_token_not_configured",
-                "No GitHub token is stored. Add one in Settings → Git credential.",
+                "No GitHub credential is selected. Add one in Settings → Git credential.",
             )
+        try:
+            if selected["method"] == METHOD_SSH:
+                token = ""
+                environment = self.methods.ssh_environment(selected)
+            else:
+                token = self.methods.secret(selected, verify=True)
+                environment = {}
+        except CredentialMethodError as exc:
+            raise GitCredentialError(exc.reason, exc.message) from None
         from raiker.context.redaction import forget_secret, remember_secret
 
-        remember_secret(token)
+        if token:
+            remember_secret(token)
         try:
-            # git reads the helper from config we pass per-invocation; the
-            # token itself is only ever in the variable above. The entries are
-            # host-scoped, so a command that wanders to another address is not
-            # offered this credential at all.
-            config = credential_config(RUNTIME_TOKEN_VAR)
-            environment = {RUNTIME_TOKEN_VAR: token, "GIT_CONFIG_COUNT": str(len(config))}
-            for index, entry in enumerate(config):
-                key, _, value = entry.partition("=")
-                environment[f"GIT_CONFIG_KEY_{index}"] = key
-                environment[f"GIT_CONFIG_VALUE_{index}"] = value
+            if token:
+                # git reads the helper from config we pass per-invocation; the
+                # token itself is only ever in the variable above. The entries
+                # are host-scoped, so a command that wanders to another address
+                # is not offered this credential at all.
+                config = credential_config(RUNTIME_TOKEN_VAR)
+                environment = {RUNTIME_TOKEN_VAR: token, "GIT_CONFIG_COUNT": str(len(config))}
+                for index, entry in enumerate(config):
+                    key, _, value = entry.partition("=")
+                    environment[f"GIT_CONFIG_KEY_{index}"] = key
+                    environment[f"GIT_CONFIG_VALUE_{index}"] = value
             self._record(
                 "git_credential_lent",
                 {
                     "grant_id": grant.grant_id, "scope": grant.scope,
-                    "source": self.token_source(), "session_id": session_id,
+                    "source": self.token_source(), "credential_id": selected["credential_id"],
+                    "account_id": selected.get("account_id"), "session_id": session_id,
                     "operation": operation, "repository": repository, "branch": branch,
                 },
             )
             yield environment
         finally:
             self._store.consume_git_credential_grant(grant.grant_id, operation)
-            forget_secret(token)
+            if token:
+                forget_secret(token)

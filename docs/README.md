@@ -3,6 +3,12 @@
 Raiker's documentation is organized by audience and purpose. Start with the
 user guide unless you are implementing, reviewing, or auditing the runtime.
 
+**Product identity:** Raiker serves an individual owner as a local-first personal
+AI agent. Chat, coding, memory, tasks and approved tools belong to that one
+personal experience. Goal-level autonomy is being delivered in stages; see
+[implementation status](architecture/IMPLEMENTATION_STATUS.md) before claiming
+that a proposed workflow has shipped.
+
 ## Use Raiker
 
 The **[user guide](guide/README.md)** explains installation, model setup,

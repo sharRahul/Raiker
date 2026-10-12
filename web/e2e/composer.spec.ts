@@ -800,7 +800,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
   const modelTabs = ["models", "add", "runtime", "usage"] as const;
   const settingsSections = [
     "notification", "personalisation", "security", "privacy", "account",
-    "web-access", "git-credential", "runtime",
+    "web-access", "github", "runtime",
   ] as const;
   const settingsLabels: Record<string, string> = {
     general: "General",
@@ -810,7 +810,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     privacy: "Privacy",
     account: "Account",
     "web-access": "Web access",
-    "git-credential": "Git credential",
+    github: "GitHub",
     runtime: "Runtime configuration",
   };
   const states = [

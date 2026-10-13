@@ -1,12 +1,15 @@
 # Raiker
 
-Raiker is a local-first AI assistant and coding agent. Chat, repository work,
-tools, approvals, permissions, and audit records run through one governed local
-runtime, whether the model is local, on your private network, or hosted.
+Raiker is a **local-first personal autonomous AI agent** in staged development.
+Its working foundation combines a personal AI assistant, a coding/build agent,
+and an extensible, owner-governed runtime. Chat, repository work, tools,
+approvals, permissions, and audit records share that runtime whether the chosen
+model runs locally, on a private network, or through a hosted provider.
 
-Raiker's accepted direction is a **personal autonomous agent**: durable goals,
-personal context, bounded proactive work and verified outcomes, while retaining
-coding and user-owned model choice. Existing features and planned expansion are
+The personal-agent direction adds durable goals, personal context, bounded
+proactive work and verified outcomes while retaining coding and user-owned model
+choice. These goal-level capabilities are planned and must not be described as
+shipped until implemented and tested. Existing features and planned expansion are
 separated in the [personal-agent architecture](docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 and [delivery plan](docs/plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
 This direction does not mean every proposed workflow is available today.

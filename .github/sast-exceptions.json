@@ -896,6 +896,14 @@
       "owner": "Raiker maintainers",
       "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
       "expires": "2027-04-10"
+    },
+    {
+      "path": "scripts/live_channel_reply_harness.py",
+      "rule": "S106",
+      "fingerprint": "0634fe002d048859",
+      "owner": "Raiker maintainers",
+      "reason": "The owner's free-text confirmation phrase a capability change records as intent, passed by a live-round harness; not a credential",
+      "expires": "2027-04-13"
     }
   ]
 }

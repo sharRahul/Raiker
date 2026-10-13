@@ -3432,6 +3432,15 @@
             "title": "Reply",
             "type": "string"
           },
+          "reply_delivery": {
+            "enum": [
+              "delivered",
+              "held",
+              "failed"
+            ],
+            "title": "Reply Delivery",
+            "type": "string"
+          },
           "routed": {
             "title": "Routed",
             "type": "boolean"
@@ -3897,6 +3906,17 @@
             ],
             "title": "Failed At"
           },
+          "held_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held At"
+          },
           "kind": {
             "enum": [
               "message",
@@ -4029,6 +4049,17 @@
               }
             ],
             "title": "Session Id"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
           }
         },
         "required": [
@@ -4050,6 +4081,66 @@
           "created_at"
         ],
         "title": "ChannelReceipt",
+        "type": "object"
+      },
+      "ChannelReplySent": {
+        "description": "BUG-315 — a held reply the owner sent: whether it went, never its text.",
+        "properties": {
+          "channel_type": {
+            "title": "Channel Type",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "delivered": {
+            "title": "Delivered",
+            "type": "boolean"
+          },
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "sent_bytes": {
+            "title": "Sent Bytes",
+            "type": "integer"
+          },
+          "signed": {
+            "title": "Signed",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "receipt_id",
+          "held",
+          "delivered"
+        ],
+        "title": "ChannelReplySent",
         "type": "object"
       },
       "ChannelRouteScope": {
@@ -4078,6 +4169,7 @@
           "reply_path": {
             "enum": [
               "returned_to_caller",
+              "sent_to_owner_chat",
               "kept_in_raiker",
               "none"
             ],
@@ -9275,6 +9367,10 @@
             ],
             "title": "Repo Label"
           },
+          "works_in": {
+            "title": "Works In",
+            "type": "string"
+          },
           "writable_root": {
             "anyOf": [
               {
@@ -9290,6 +9386,7 @@
         "required": [
           "project_id",
           "project_name",
+          "works_in",
           "repo_id",
           "repo_label",
           "repo_kind",
@@ -19409,6 +19506,10 @@
             ],
             "title": "Cost Currency"
           },
+          "estimated_requests": {
+            "title": "Estimated Requests",
+            "type": "integer"
+          },
           "input_tokens": {
             "title": "Input Tokens",
             "type": "integer"
@@ -19467,6 +19568,7 @@
           "requests",
           "turns",
           "compactions",
+          "estimated_requests",
           "known_cost",
           "cost_currency",
           "unpriced_models",
@@ -30755,6 +30857,46 @@
           }
         },
         "summary": "Mark Channel Delivery Reviewed"
+      }
+    },
+    "/api/channels/deliveries/{receipt_id}/send": {
+      "post": {
+        "description": "Send a reply that was held because it carries sensitive information (BUG-315).",
+        "operationId": "send_held_channel_reply_api_channels_deliveries__receipt_id__send_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "title": "Receipt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelReplySent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Held Channel Reply"
       }
     },
     "/api/channels/pairings": {

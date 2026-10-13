@@ -197,6 +197,62 @@ def test_a_purge_since_the_backup_is_purged_from_the_restore(tmp_path: Path) -> 
     assert copy._row("SELECT 1 FROM approved_memory WHERE memory_id = ?", (memory.memory_id,)) is None  # noqa: SLF001
 
 
+def test_a_project_and_a_picture_deleted_since_the_backup_stay_deleted(tmp_path: Path) -> None:
+    # BUG-324 — the journal had three kinds; a project deleted, or a picture
+    # removed for good, after the backup came back with a restore.
+    store = SQLiteStore(tmp_path)
+    store.create_project("proj_gone", "Gone", "projects/gone")
+    store.create_project("proj_kept", "Kept", "projects/kept")
+    store.save_attachment(
+        attachment_id="att_pic",
+        kind="generated_image",
+        filename="pic.png",
+        media_type="image/png",
+        sha256="pic",
+        data=b"\x89PNG\r\n\x1a\n" + b"\x00" * 32,
+        owner_principal_id="principal_owner",
+    )
+    store.record_image_generation(
+        generation_id="img_gone",
+        owner_principal_id="principal_owner",
+        profile_id="openai-hosted",
+        provider="openai",
+        model="gpt-image-1",
+        prompt="a lighthouse",
+        size="1024x1024",
+        status="ok",
+        attachment_id="att_pic",
+        media_type="image/png",
+        byte_size=40,
+        source_generation_id=None,
+        kind="create",
+    )
+    record = create_backup(store.connect(), tmp_path)
+    assert store.delete_project_with_orphanage("proj_gone", owner_principal_id="principal_owner")
+    assert store.set_image_generation_deleted("img_gone", owner_principal_id="principal_owner", deleted=True)
+    assert store.purge_image_generation("img_gone", owner_principal_id="principal_owner")
+    kinds = {(entry.kind, entry.object_id) for entry in read_deletions(tmp_path)}
+    assert {("project_delete", "proj_gone"), ("image_purge", "img_gone")} <= kinds
+    assert "lighthouse" not in journal_path(tmp_path).read_text()
+
+    restored = restore_backup(tmp_path, record.backup_id)
+    assert restored.deletions_applied["project_delete"] == 1
+    assert restored.deletions_applied["image_purge"] == 1
+    copy = SQLiteStore(restored.path)
+    assert copy.load_project("proj_gone") is None
+    assert copy.load_project("proj_kept") is not None
+    assert copy._row("SELECT 1 FROM image_generations WHERE generation_id = 'img_gone'") is None  # noqa: SLF001
+    assert copy._row("SELECT 1 FROM attachments WHERE attachment_id = 'att_pic'") is None  # noqa: SLF001
+    assert not journal_path(restored.path).exists()
+
+
+def test_undoing_a_half_created_project_is_not_journalled(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    store.create_project("proj_undo", "Undo", "projects/undo")
+    assert store.delete_project_with_orphanage("proj_undo", journal=False)
+    assert read_deletions(tmp_path) == []
+
+
 # ── BUG-323 / DEC-24 step 6: restoring in place ─────────────────────────────
 
 

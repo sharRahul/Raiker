@@ -177,7 +177,9 @@ the host next starts — goes on the channel's **Deliveries to review** list and
 on Home's *Needs your attention*. Raiker never sends one again on its own: fix
 what stopped it and send again from whatever asked, or check the channel first
 if the outcome is unknown. **Mark reviewed** takes it off the list and changes
-nothing else.
+nothing else. A reply **held** because it carries sensitive information is on
+the same list with **Send to chat** and **Discard**; Discard sends nothing and the
+answer stays in its conversation.
 
 All of these are set
 outside the app and all five are real — they are below the channels because
@@ -209,6 +211,20 @@ the update at the edge and everything after that is the ordinary channel path.
 An update that is not a message — a reaction, a poll answer, someone joining —
 is acknowledged and dropped rather than refused, because Telegram retries
 anything it does not get a `2xx` for and retrying a join forever helps nobody.
+
+**Your own message is answered over Telegram.** When you write to Raiker on a
+*New turn* or *Side question* route, the answer goes back to your chat once the
+turn finishes — sent as its own governed delivery with its own receipt, so the
+capability, a paused channel, the egress allowlist and the 4,096-character limit
+still decide, and nothing is asked of you for an ordinary answer. An answer that
+carries **sensitive information** — something Raiker would mask (a key, a token,
+a private key, an email address) or a credential- or secret-like sentence — is
+**held** instead: it waits on **Deliveries to review** with **Read it**, **Send
+to chat** and **Discard**, and nothing is sent until you choose. A held reply is
+not lost at a restart and not trimmed with old activity. Another allowed
+sender's side question gets no reply over the channel, and a turn still waiting
+on an approval sends nothing until it finishes in Raiker. The message's own
+receipt says whether its reply was delivered, held, or did not go.
 
 **The sender allowlist is Telegram user ids**, as strings: the numeric `id` on
 `message.from`, not a @username. A username can be changed by its owner; an id

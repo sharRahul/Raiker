@@ -169,8 +169,10 @@ alternative would be worse.
   line, and removed from every log, error and captured output for as long as the
   loan lasts. An agent pushes without a per-step approval only under a
   repository delegation you made, re-checked before each step. HTTPS and SSH
-  GitHub.com remotes only; it never forces and never deletes a branch. Open:
-  BUG-337, BUG-338, BUG-339. See the
+  GitHub.com remotes only; it never forces and never deletes a branch. A local
+  branch or commit on a GitHub repository answers to the same delegation, and a
+  delegated push asks GitHub whose repository it is first (FIXED-898,
+  FIXED-899). Open: BUG-339. See the
   [GitHub connection specification](GITHUB_CONNECTION_SPEC.md).
 - **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
   and `web_search` work on a fresh install: there is no list to fill in first,

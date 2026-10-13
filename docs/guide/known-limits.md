@@ -111,9 +111,6 @@ you and checked against the GitHub account it claims. What is still limited:
 - **Signing in with GitHub** needs the official Raiker GitHub App, which is not
   registered yet; until it is, *Connect GitHub* appears only on a self-hosted
   install configured with its own App (Settings → GitHub → Advanced).
-- A **delegation's branch pattern** limits where the agent pushes, not yet where
-  it commits locally (BUG-337), and its repository is checked against Raiker's
-  last *Refresh from GitHub* rather than asked of GitHub at each step (BUG-338).
 - The **issue-to-pull-request routine** has its template and authority plan, but
   scheduled routines cannot yet run its write steps unattended (BUG-339).
 - Only GitHub.com; other forges and GitHub Enterprise are not supported.

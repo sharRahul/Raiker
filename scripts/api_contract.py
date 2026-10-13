@@ -288,6 +288,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/capability-modes/{capability}/deny"),
         ("POST", "/api/channels/deliver-test"),
         ("POST", "/api/channels/deliveries/{receipt_id}/reviewed"),
+        ("POST", "/api/channels/deliveries/{receipt_id}/send"),
         ("POST", "/api/channels/pairings"),
         ("POST", "/api/channels/{connector_id}/approval-response"),
         ("POST", "/api/channels/{connector_id}/inbound"),

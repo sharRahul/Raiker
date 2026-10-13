@@ -35,6 +35,10 @@ class UsageTotals:
     requests: int = 0
     turns: int = 0
     compactions: int = 0
+    # BUG-333 — how many of ``requests`` are estimates rather than the
+    # provider's own count. Counted in the totals all the same: a stopped call
+    # the provider billed is spend, and a limit that skipped it would under-read.
+    estimated_requests: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -79,11 +83,14 @@ class ModelUsageLedger:
         profile_id: str | None = None,
         request_kind: str = "turn",
         recorded_at: str | None = None,
+        estimated: bool = False,
     ) -> bool:
         """Append one turn's counts. Returns False when there is nothing to record.
 
         A provider that reported no usage writes no row at all, so a missing
         count never becomes a zero that later reads would present as "free".
+        ``estimated`` marks a row Raiker worked out itself (BUG-333) rather than
+        one the provider reported; it is never read back as settled.
         """
         if request_kind not in {"turn", "compaction", "readiness"}:
             raise ValueError("invalid_model_usage_request_kind")
@@ -115,8 +122,8 @@ class ModelUsageLedger:
                 INSERT INTO model_usage_ledger (
                   usage_id, owner_principal_id, session_id, provider, model,
                   input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-                  recorded_at, profile_id, request_kind
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  recorded_at, profile_id, request_kind, estimated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     new_id("usage_"),
@@ -131,6 +138,7 @@ class ModelUsageLedger:
                     _utc_timestamp(recorded_at),
                     profile_id,
                     request_kind,
+                    1 if estimated else 0,
                 ),
             )
         return True
@@ -151,6 +159,7 @@ class ModelUsageLedger:
                         requests=int(row[7] or 0),
                         turns=int(row[8] or 0),
                         compactions=int(row[9] or 0),
+                        estimated_requests=int(row[10] or 0),
                     ),
                 )
                 for row in cursor.fetchall()
@@ -162,7 +171,8 @@ class ModelUsageLedger:
                SUM(cache_read_tokens), SUM(cache_write_tokens),
                COUNT(*),
                SUM(CASE WHEN request_kind = 'turn' THEN 1 ELSE 0 END),
-               SUM(CASE WHEN request_kind = 'compaction' THEN 1 ELSE 0 END)
+               SUM(CASE WHEN request_kind = 'compaction' THEN 1 ELSE 0 END),
+               SUM(estimated)
         FROM model_usage_ledger
         WHERE owner_principal_id = ?{extra}
         GROUP BY profile_id, provider, model
@@ -265,6 +275,7 @@ def sum_totals(rows: list[ModelUsageRow]) -> UsageTotals:
         requests=sum(row.totals.requests for row in rows),
         turns=sum(row.totals.turns for row in rows),
         compactions=sum(row.totals.compactions for row in rows),
+        estimated_requests=sum(row.totals.estimated_requests for row in rows),
     )
 
 

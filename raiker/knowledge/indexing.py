@@ -143,8 +143,13 @@ class ManagedFileIndexer:
         """
         if self.store.get_managed_file(file_id, owner_principal_id) is None:
             raise ManagedFileError("managed_file_not_found")
+        from raiker.storage.deletion_journal import MANAGED_FILE_RETIRE, record_deletion
+
         self.store.retire_managed_file_chunks(file_id, owner_principal_id)
-        return self.files.delete_file(file_id, owner_principal_id)
+        record = self.files.delete_file(file_id, owner_principal_id)
+        # BUG-324 — outside the database, so a restore honours it.
+        record_deletion(self.store.paths.workspace_root, MANAGED_FILE_RETIRE, file_id, owner_principal_id)
+        return record
 
     def resolve_path(self, record: ManagedFileRecord, owner_principal_id: str) -> Path:
         """The contained on-disk path of *record*, re-validated on every read.

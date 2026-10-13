@@ -892,7 +892,7 @@ Read C2 and C3 by their completed row-level records: connector writes retain
 exact-effect approval, and durable memory remains governed. They are not still
 open owner-policy choices merely because an older pillar summary says so.
 For C10, separate shipped background notifications and inbound routing from
-the unimplemented outbound Telegram reply path in BUG-315. For C12, retain
+the outbound Telegram reply path — BUG-315, closed 2026-10-13 as [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315). For C12, retain
 DEC-20's single-owner scope until a multi-principal architecture is chosen.
 
 **Reason and alternatives.** Reopening settled choices duplicates work; treating
@@ -911,7 +911,7 @@ scenario has live evidence.
 **Acceptance and references.** Future work must demonstrate connector effect
 binding, memory scope, channel delivery receipts and the selected execution
 boundary independently. Read [BUG-315/316 decision statements](TO_BE_FIXED.md#decision-statements-added-2026-10-05)
-for the unresolved choices; [DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen)
+(both closed 2026-10-13 by the owner's decisions, FIXED-888 and FIXED-890); [DEC-20](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-20--defer-multi-user-and-paired-device-expansion-until-explicitly-chosen)
 for collaboration scope; and
 [FIXED-620](FIXED_ITEMS.md#fixed-620--code-ran-with-this-machines-network-and-nothing-said-so)
 for the recorded B20 policy. This addendum changes no completion status.

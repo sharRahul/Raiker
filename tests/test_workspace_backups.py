@@ -152,7 +152,9 @@ def test_the_routes_need_an_owner_and_say_what_they_did(tmp_path: Path, monkeypa
     assert "--workspace" in restored["command"]
     # The owner's own folder, not `[REDACTED_SECRET]`: a backup id inside a path
     # reads as a token to the secret redactor.
-    assert restored["path"].endswith(f".raiker/restores/{backup_id}")
+    # Compared as a path: Windows answers with its own separators and the
+    # long-path prefix (BUG-330).
+    assert Path(restored["path"]).parts[-3:] == (".raiker", "restores", backup_id)
     assert "REDACTED" not in restored["command"]
     assert client.post(f"/api/backups/{backup_id}/restore", headers=headers).status_code == 409
     assert client.delete(f"/api/backups/{backup_id}", headers=headers).status_code == 200

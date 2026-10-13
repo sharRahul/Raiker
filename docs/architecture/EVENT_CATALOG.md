@@ -84,6 +84,9 @@ human authorizer, runtime authority, or other literal actor.
 | `repository_delegation_refused` | A push or GitHub write that would otherwise have run unprompted was sent to the owner instead: no delegation covered it, or the one that did no longer held (credential, account, installation or repository changed) |
 | `repository_delegation_revoked` | The owner revoked a delegation, and every share narrowed from it |
 | `channel_delivery_reviewed` | The owner marked a failed or outcome-unknown outbound delivery reviewed (DEC-14 step 7); what happened to it is unchanged and nothing is sent |
+| `channel_reply_delivered` | A routed Telegram turn's answer to the owner's own message was sent back to their chat through the governed channel executor (BUG-315); receipt id and the message it answers, never the text |
+| `channel_reply_failed` | That reply was refused on the way — a closed gate, a paused channel, the egress allowlist, the reply limit — with the reason; nothing is retried on its own |
+| `channel_reply_held` | That reply carried sensitive information and was held on *Deliveries to review* until the owner sends or discards it; nothing was sent |
 | `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |
 | `brain_source_folder_revoked` | That access was withdrawn; every source indexed under the folder is removed with it |

@@ -1422,6 +1422,208 @@ class RuntimeControlService:
             return mapped
         return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})
 
+    # ── BUG-315: a channel turn's answer goes back over the channel ──────
+
+    @staticmethod
+    def channel_reply_is_sensitive(text: str) -> bool:
+        """Whether a reply carries what the owner asked to see before it is sent.
+
+        Owner decision (2026-10-13): a reply to the owner's own message is sent
+        without asking *unless there is sensitive information in it*. Sensitive
+        is what Raiker already treats as such elsewhere: anything the redaction
+        pass would mask (keys, tokens, private keys, email addresses) and
+        anything the memory policy classifies as credential- or secret-like.
+        """
+        from raiker.context.redaction import redact_text
+        from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+
+        if redact_text(text)[1]:
+            return True
+        return classify_memory_sensitivity(text) in {
+            MemorySensitivity.CREDENTIAL_LIKE,
+            MemorySensitivity.SECRET_LIKE,
+        }
+
+    def deliver_channel_reply(
+        self,
+        acting_principal_id: str | None,
+        *,
+        connector_id: str,
+        text: str,
+        reply_to_receipt_id: str,
+        session_id: str,
+        turn_id: str,
+    ) -> ControlResult:
+        """Send a routed turn's answer back to the owner over the channel it came on.
+
+        Called by the inbound route for the owner's own message once its turn
+        has finished. The owner sent the message, so the answer goes back
+        without a second question — through the governed channel executor all
+        the same, so the capability gate, a paused channel, the egress
+        allowlist and the channel's reply limit each still refuse it. An answer
+        carrying sensitive information is *held*: an outbound receipt that waits
+        on *Deliveries to review* for the owner's Send, with nothing sent.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing_by_connector(connector_id)
+        pairing_id = str(pairing.get("pairing_id") or "") if pairing is not None else ""
+        if self.channel_reply_is_sensitive(text):
+            receipt_id = new_id("act_")
+            self._store.insert_channel_receipt(
+                receipt_id=receipt_id,
+                connector_id=connector_id,
+                pairing_id=pairing_id or None,
+                direction="outbound",
+                kind="message",
+                stages={"held_at": utc_now()},
+                reason_code="reply_held_sensitive",
+                session_id=session_id,
+                turn_id=turn_id,
+                reply_to_receipt_id=reply_to_receipt_id,
+            )
+            self._writer.append(make_event(
+                session_id=session_id,
+                turn_id=turn_id,
+                event_type="channel_reply_held",
+                actor="control_service",
+                payload={
+                    "receipt_id": receipt_id,
+                    "connector_id": connector_id,
+                    "reply_to": reply_to_receipt_id,
+                    "reason_code": "reply_held_sensitive",
+                },
+            ))
+            return ControlResult(
+                ok=True, data={"receipt_id": receipt_id, "held": True, "delivered": False}
+            )
+        return self._send_channel_reply(
+            principal,
+            connector_id=connector_id,
+            text=text,
+            receipt_id=new_id("act_"),
+            session_id=session_id,
+            turn_id=turn_id,
+            reply_to_receipt_id=reply_to_receipt_id,
+        )
+
+    def send_held_channel_reply(
+        self, acting_principal_id: str | None, receipt_id: str
+    ) -> ControlResult:
+        """The owner's Send on a reply held for sensitive information (BUG-315).
+
+        The text is read again from the conversation the reply belongs to —
+        receipts hold no message text — and sent through the same governed path
+        as any reply, under the held receipt.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        receipt = self._store.load_channel_receipt(receipt_id)
+        if (
+            receipt is None
+            or not receipt.get("held_at")
+            or receipt.get("delivered_at")
+            or receipt.get("reviewed_at")
+        ):
+            return ControlResult(ok=False, reason_code="unknown_held_reply")
+        turn = self._store.load_turn(str(receipt.get("turn_id") or ""))
+        text = str((turn or {}).get("summary") or "")
+        if turn is None or not text.strip():
+            return ControlResult(ok=False, reason_code="held_reply_text_unavailable")
+        return self._send_channel_reply(
+            principal,
+            connector_id=str(receipt["connector_id"]),
+            text=text,
+            receipt_id=receipt_id,
+            session_id=str(receipt.get("session_id") or ""),
+            turn_id=str(receipt.get("turn_id") or ""),
+            reply_to_receipt_id=str(receipt.get("reply_to_receipt_id") or ""),
+        )
+
+    def _send_channel_reply(
+        self,
+        principal: Principal,
+        *,
+        connector_id: str,
+        text: str,
+        receipt_id: str,
+        session_id: str,
+        turn_id: str,
+        reply_to_receipt_id: str,
+    ) -> ControlResult:
+        action = GovernedAction(
+            action_id=receipt_id,
+            principal_id=principal.principal_id,
+            action_type="external_channel_runtime",
+            tool_or_service_name="external_channel_runtime",
+            arguments={"connector_id": connector_id, "text": text},
+            risk_level=RiskLevelValue.MEDIUM,
+            session_id=session_id,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        now = utc_now()
+        if self._store.load_channel_receipt(receipt_id) is None:
+            # Refused before the executor wrote one (a closed gate): the
+            # delivery still has its record, and says why.
+            self._store.insert_channel_receipt(
+                receipt_id=receipt_id,
+                connector_id=connector_id,
+                pairing_id=None,
+                direction="outbound",
+                kind="message",
+                stages={"queued_at": now, "failed_at": now},
+                reason_code=mapped.reason_code,
+            )
+        with self._store.connect() as connection:
+            connection.execute(
+                """UPDATE channel_receipts
+                      SET session_id = COALESCE(session_id, ?),
+                          turn_id = COALESCE(turn_id, ?),
+                          reply_to_receipt_id = COALESCE(reply_to_receipt_id, ?)
+                    WHERE receipt_id = ?""",
+                (session_id or None, turn_id or None, reply_to_receipt_id or None, receipt_id),
+            )
+        if reply_to_receipt_id:
+            # The message it answers says its reply went, or that it did not.
+            self._store.advance_channel_receipt(
+                reply_to_receipt_id,
+                stages=(
+                    {"reply_queued_at": now, "delivered_at": now}
+                    if mapped.ok
+                    else {"reply_queued_at": now}
+                ),
+            )
+        self._writer.append(make_event(
+            session_id=session_id or "channels",
+            turn_id=turn_id or None,
+            event_type="channel_reply_delivered" if mapped.ok else "channel_reply_failed",
+            actor="control_service",
+            payload={
+                "receipt_id": receipt_id,
+                "connector_id": connector_id,
+                "reply_to": reply_to_receipt_id or None,
+                "reason_code": mapped.reason_code,
+            },
+        ))
+        if not mapped.ok:
+            return mapped
+        return ControlResult(
+            ok=True,
+            data={
+                "receipt_id": receipt_id,
+                "held": False,
+                "delivered": True,
+                **dict(result.artifacts or {}),
+            },
+        )
+
     def export_audit_log(
         self,
         acting_principal_id: str | None,

@@ -21,6 +21,7 @@ const weekly = {
         requests: 4,
         turns: 3,
         compactions: 1,
+        estimated_requests: 0,
         known_cost: "0.0125",
         cost_currency: "USD",
         unpriced_models: [],
@@ -75,6 +76,24 @@ describe("ProviderUsagePanel", () => {
     expect(screen.getByText("Advisory Raiker control — not a provider subscription limit.")).toBeInTheDocument();
   });
 
+  it("says when a total includes stopped requests Raiker estimated", async () => {
+    // BUG-333 — counted in the totals, and never passed off as the provider's.
+    const estimated = structuredClone(weekly);
+    estimated.providers[0].observed.estimated_requests = 1;
+    stubFetch({ "GET /api/models/weekly-usage": estimated });
+    render(ProviderUsagePanel);
+    expect(
+      await screen.findByText(/Includes 1 stopped request estimated by Raiker/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not mention estimates when every count is the provider's", async () => {
+    stubFetch({ "GET /api/models/weekly-usage": weekly });
+    render(ProviderUsagePanel);
+    await screen.findByText("1,000 tokens");
+    expect(screen.queryByText(/estimated by Raiker/)).toBeNull();
+  });
+
   it("saves an owner token budget and reloads the rolling view", async () => {
     const mock = stubFetch({
       "GET /api/models/weekly-usage": weekly,
@@ -115,6 +134,7 @@ describe("ProviderUsagePanel", () => {
               turns: 1,
               requests: 1,
               compactions: 0,
+              estimated_requests: 0,
               known_cost: null,
               cost_currency: null,
             },

@@ -381,8 +381,8 @@ def test_the_route_scope_says_what_the_receiver_does(workspace: Path, owner: str
     ).ok
     assert scope()["thread_mapping"] == "new_conversation_each_message"
     assert scope()["starts_work"] == "owner_only"
-    # Telegram gets nothing back over the channel: the answer stays in Raiker.
-    assert scope()["reply_path"] == "kept_in_raiker"
+    # BUG-315 — the answer to the owner's own message goes back to their chat.
+    assert scope()["reply_path"] == "sent_to_owner_chat"
 
 
 def test_the_surface_reports_the_gate_the_owner_actually_set(

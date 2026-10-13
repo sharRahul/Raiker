@@ -91,6 +91,30 @@ end contract.
 
 ## What blocks a public first release
 
+> **Implementation status, 2026-10-13. Fourteen ledger items closed, three by
+> the owner's decisions of the same day.** DEC-14 steps 7–8: the answer to the
+> owner's own Telegram message goes back over Telegram through the governed
+> sender, and one carrying sensitive information is held for the owner to send
+> or discard ([FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315), was BUG-315). DEC-13: an answer-shape instruction no
+> longer hides the memory a question is about, with a bounded two-thirds
+> fallback ([FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313), was BUG-313). DEC-04/DEC-06 step 1: Build says where work
+> is *filed* and where it *works* ([FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316), was BUG-316). DEC-24 step 2: a
+> stopped stream from a provider that counts only at the end records a marked
+> estimate ([FIXED-891](FIXED_ITEMS.md#fixed-891--a-stopped-openai-compatible-stream-recorded-no-usage-was-bug-333)); DEC-12 step 6: a run's spend survives its approval
+> pause ([FIXED-892](FIXED_ITEMS.md#fixed-892--a-routine-runs-spend-was-counted-again-from-zero-after-an-approval-pause-was-bug-325)); DEC-24 step 5: project, picture and managed-file deletions
+> are journalled for restore ([FIXED-893](FIXED_ITEMS.md#fixed-893--deleting-a-project-or-a-picture-was-not-journalled-so-a-restore-brought-it-back-was-bug-324)). DEC-08: setup asks for an
+> identity-linked key's workspace instead of calling it connected ([FIXED-894](FIXED_ITEMS.md#fixed-894--setup-called-an-identity-linked-anthropic-key-connected-and-offered-models-it-could-not-list-was-bug-332)),
+> draws its step before the providers answer ([FIXED-895](FIXED_ITEMS.md#fixed-895--setups-model-step-waited-on-every-providers-check-before-it-showed-anything-was-bug-331)), and composers
+> describe a searched model as itself ([FIXED-896](FIXED_ITEMS.md#fixed-896--a-model-chosen-by-search-was-judged-by-the-defaults-readiness-and-window-was-bug-314)). DEC-18: no import cycle
+> ([FIXED-897](FIXED_ITEMS.md#fixed-897--importing-the-runtime-orchestrator-first-failed-on-a-circular-import-was-bug-326)) and one provider-connection controller ([FIXED-900](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319)). DEC-21b-J and
+> -G: a local branch or commit answers to a repository delegation
+> ([FIXED-898](FIXED_ITEMS.md#fixed-898--a-standing-git-writes-decision-covered-local-branches-and-commits-without-a-delegation-was-bug-337)) and a delegated push asks GitHub whose repository it is
+> ([FIXED-899](FIXED_ITEMS.md#fixed-899--a-delegations-repository-identity-was-checked-against-the-last-discovery-not-asked-of-github-was-bug-338)). The live round — the owner's identity-linked Anthropic key with
+> its workspace ID, typed into setup — ran real Haiku 5.5 turns for the first
+> time since 2026-10-10, and found [FIXED-902](FIXED_ITEMS.md#fixed-902--a-project-name-already-in-use-was-answered-as-a-refusal) and [FIXED-903](FIXED_ITEMS.md#fixed-903--a-message-whose-reply-did-not-go-read-as-though-no-reply-was-tried). RR-AUTHORITY-01,
+> RR-INSTALL-01, RR-DESIGN-01, RR-VERIFY-01 and the decision records' other
+> steps remain open.
+>
 > **Decision status, 2026-10-12. DEC-21b amended — no longer waiting on an
 > OAuth client ID.** The owner replaced the GitHub.com OAuth-application
 > prerequisite with a hybrid architecture: an operator-registered GitHub App for
@@ -236,7 +260,7 @@ end contract.
 > large-view refactors closed as [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it), [FIXED-745](FIXED_ITEMS.md#fixed-745--chats-view-owned-its-file-pane-recall-strip-and-continuity-actions) and [FIXED-746](FIXED_ITEMS.md#fixed-746--builds-view-owned-its-approval-review-and-source-ledger):
 > each page's state machines now have one owner apiece, with behaviour
 > unchanged (UX-MODEL-01's connection-lifecycle remainder is
-> [BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page)).
+> [BUG-319](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319)).
 > Four decision-record steps beyond the §3 rows closed with them: DEC-06 step 1,
 > Build's boundary as one server-issued view ([FIXED-740](FIXED_ITEMS.md#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run)); DEC-07 step 4's compare
 > and revert-as-new-version ([FIXED-743](FIXED_ITEMS.md#fixed-743--going-back-to-an-earlier-picture-meant-generating-it-again)); the stdio half of DEC-25 ([FIXED-741](FIXED_ITEMS.md#fixed-741--a-local-mcp-servers-output-was-held-in-memory-in-full-before-anything-measured-it)); and
@@ -785,7 +809,7 @@ client state.
 > **2026-10-04 — every row in this table is closed.** UX-MODEL-01 closed as
 > [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it) (Runtime tab, advanced routing, the two dialogs and the brand table
 > out of the page); the shared connection-lifecycle service it also asks for is
-> [BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page).
+> [BUG-319](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319).
 > The same day, by the owner's decision, Ollama stopped shipping a model and is
 > offered when running, with the chosen model watched ([FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default) to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking)).
 >
@@ -795,7 +819,7 @@ client state.
 > reset now clears the surface's stored preference so it holds across a reload.
 > Proving it live found [FIXED-723](FIXED_ITEMS.md#fixed-723--a-model-chosen-by-search-was-shown-as-the-default)
 > (a searched model shown as the default) and filed
-> [BUG-314](TO_BE_FIXED.md#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window).
+> [BUG-314](FIXED_ITEMS.md#fixed-896--a-model-chosen-by-search-was-judged-by-the-defaults-readiness-and-window-was-bug-314).
 > UX-MODEL-01, -02, -04 and -05 remain as written.
 
 ### Current strengths
@@ -1013,7 +1037,7 @@ Show counts and trends without exposing content to telemetry:
 > ledger keeping received, accepted, queued, processed, reply queued, delivered
 > and failed apart. The live round found and fixed three more (FIXED-719 to
 > FIXED-721, the last a crash on every routed Telegram message) and filed
-> [BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).
+> [BUG-315](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315).
 > Of the security and reliability contract below, durable inbound idempotency,
 > attachment limits, the delivery retry ledger and one-click containment remain
 > DEC-14 work that no row of this table names.
@@ -1632,6 +1656,10 @@ reader passes.
 
 ## DEC-04 — Make Project continuity explicit and typed
 
+> **2026-10-13.** Step 4's "filing and retrieval scope remain separate" holds on
+> Build's composer: *Filed in* the project, *works in* the workspace every
+> relative path resolves against ([FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316), closes BUG-316).
+>
 **Decision:** Every Project action that opens Chat, Build, Design or Tasks must
 send a typed work intent. Organizational filing and retrieval scope remain
 separate fields.
@@ -1769,6 +1797,13 @@ without orphan blobs.
 
 ## DEC-08 — Make model selection a readiness journey
 
+> **2026-10-13.** Step 2: setup's recommendation follows what the provider
+> said, not a stored key — an identity-linked key is recommended as needing its
+> workspace ID, with the field focused ([FIXED-894](FIXED_ITEMS.md#fixed-894--setup-called-an-identity-linked-anthropic-key-connected-and-offered-models-it-could-not-list-was-bug-332)); the step is drawn before the
+> providers answer ([FIXED-895](FIXED_ITEMS.md#fixed-895--setups-model-step-waited-on-every-providers-check-before-it-showed-anything-was-bug-331)). Step 5: a model reached by search is described
+> as itself ([FIXED-896](FIXED_ITEMS.md#fixed-896--a-model-chosen-by-search-was-judged-by-the-defaults-readiness-and-window-was-bug-314)). Step 1's connection lifecycle is one controller shared
+> with setup ([FIXED-900](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319)).
+>
 > **2026-10-11.** Step 6's "record why fallback occurred" closed as [FIXED-852](FIXED_ITEMS.md#fixed-852--a-turn-a-fallback-model-answered-did-not-say-why):
 > the fallback event names the candidate that failed and its reason, and the
 > turn timeline says so.
@@ -1916,6 +1951,9 @@ cleanup tests for every supported runtime type.
 
 ## DEC-12 — Define Tasks as a durable scheduler and run history
 
+> **2026-10-13.** Step 6's per-run cost limit now meters the whole run across
+> an approval pause ([FIXED-892](FIXED_ITEMS.md#fixed-892--a-routine-runs-spend-was-counted-again-from-zero-after-an-approval-pause-was-bug-325)).
+>
 > **2026-10-11 (second round).** Step 4's "reuse its idempotency key where the
 > destination supports it" closed for webhook deliveries as [FIXED-869](FIXED_ITEMS.md#fixed-869--a-webhook-delivery-carried-nothing-a-receiver-could-deduplicate-by).
 >
@@ -1999,6 +2037,11 @@ delivery failure and owner cancellation.
 
 ## DEC-13 — Give Memory one explicit lifecycle and review policy
 
+> **2026-10-13.** Recall: words about the shape of the answer no longer have to
+> be in a memory, and when the strict match finds nothing a bounded fallback
+> admits a record holding two thirds of the content words (owner decision,
+> [FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313)).
+>
 > **2026-10-11 (second round).** Step 3 closed as [FIXED-874](FIXED_ITEMS.md#fixed-874--nothing-said-which-memories-most-needed-the-owners-look-or-why): review priority is the
 > sum of named, weighted reasons (retention, sensitivity, verification and
 > provenance, conflict, use), a pin lowering it without exempting anything, and
@@ -2044,6 +2087,13 @@ permanent deletion and backup behavior.
 
 ## DEC-14 — Make Messaging a guided, durable channel service
 
+> **2026-10-13.** Steps 7–8 for Telegram: the answer to the owner's own message
+> is a governed outbound delivery with its own receipt; one carrying sensitive
+> information (the redaction and memory-sensitivity checks) is held on
+> *Deliveries to review* with **Send to chat** and **Discard** (owner decision,
+> [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315), closes BUG-315). A real bot's delivered message is still owed —
+> the round had no Telegram account.
+>
 > **2026-10-11 (second round).** Step 7 is complete: the platform's own message id
 > ([FIXED-866](FIXED_ITEMS.md#fixed-866--a-delivered-message-had-no-reference-to-what-the-platform-accepted)), the dead-letter review of failed and unknown deliveries
 > ([FIXED-867](FIXED_ITEMS.md#fixed-867--a-delivery-that-failed-was-a-line-in-recent-activity-and-nothing-asked-anyone-to-look)) and a delivery a stopped host left queued settled as
@@ -2301,6 +2351,10 @@ workspace preservation; artifact diff/reproducibility and malware-signing checks
 
 ## DEC-18 — Decompose large UI modules around domain contracts
 
+> **2026-10-13.** Models' and setup's connection lifecycle moved into
+> `providerConnections.ts` ([FIXED-900](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319)); every module now imports on its own,
+> held by CI ([FIXED-897](FIXED_ITEMS.md#fixed-897--importing-the-runtime-orchestrator-first-failed-on-a-circular-import-was-bug-326)).
+>
 **Decision:** Refactor the largest Svelte views without changing behavior first.
 Do not combine extraction with redesign unless a vertically complete user
 outcome requires it.
@@ -2782,6 +2836,13 @@ explicit amendment to these decisions.
 
 #### DEC-21b amendment 2026-10-12 — Hybrid GitHub authentication
 
+> **2026-10-13.** DEC-21b-J: a local branch or commit on a GitHub repository runs
+> unprompted only under a delegation whose branch pattern covers it
+> ([FIXED-898](FIXED_ITEMS.md#fixed-898--a-standing-git-writes-decision-covered-local-branches-and-commits-without-a-delegation-was-bug-337), was BUG-337). DEC-21b-G: before a
+> delegated push or pull request the router asks GitHub for the repository by
+> name, reusing a clean answer for a minute; a changed id, removed access or an
+> unreachable GitHub parks the step ([FIXED-899](FIXED_ITEMS.md#fixed-899--a-delegations-repository-identity-was-checked-against-the-last-discovery-not-asked-of-github-was-bug-338), was BUG-338).
+
 **Amendment record.** Rahul Sharma, acting as product owner, instructed this
 amendment on 2026-10-12 and set its decisions (A–Q below) as mandatory; this
 record finalises them. Roles under §13.9: product owner — decisions; security
@@ -3004,6 +3065,11 @@ names. This review supplies neither legal clearance nor exhaustive parity proof.
 
 ## 13.6 DEC-24 — Operational recovery, budgets and diagnostics
 
+> **2026-10-13.** Step 2: estimated usage is separate from settled usage — a
+> stopped OpenAI-compatible stream records a marked estimate every limit counts
+> ([FIXED-891](FIXED_ITEMS.md#fixed-891--a-stopped-openai-compatible-stream-recorded-no-usage-was-bug-333), closes BUG-333). Step 5: project, picture and managed-file
+> deletions are journalled and replayed into a restore ([FIXED-893](FIXED_ITEMS.md#fixed-893--deleting-a-project-or-a-picture-was-not-journalled-so-a-restore-brought-it-back-was-bug-324), closes BUG-324).
+>
 > **2026-10-11 (second round).** Step 2's "cancelled calls that a provider still bills"
 > closed for Anthropic as [FIXED-872](FIXED_ITEMS.md#fixed-872--a-streamed-answer-the-owner-stopped-was-billed-and-counted-as-free); providers that report usage only at the
 > end of a stream are BUG-333.

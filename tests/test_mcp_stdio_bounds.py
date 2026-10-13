@@ -30,8 +30,10 @@ def _run(code: str, tmp_path: Path, **kwargs: object):  # type: ignore[no-untype
 
 def test_an_ordinary_session_reads_everything_it_was_sent(tmp_path: Path) -> None:
     session = _run(
-        "import sys; line = sys.stdin.readline(); sys.stdout.write(line); "
-        "sys.stderr.write('note')",
+        # Bytes, not text: a text-mode stdout writes "\r\n" on Windows (BUG-330),
+        # and an MCP server speaks bytes on the wire.
+        "import sys; line = sys.stdin.buffer.readline(); sys.stdout.buffer.write(line); "
+        "sys.stdout.buffer.flush(); sys.stderr.write('note')",
         tmp_path,
         timeout=20,
     )
@@ -58,7 +60,7 @@ def test_a_flood_on_stderr_is_drained_and_only_its_tail_kept(tmp_path: Path) -> 
     # Five megabytes on stderr would fill a pipe nobody read and hang the
     # server before it answered; draining it is what lets the answer through.
     session = _run(
-        "import sys\nsys.stderr.write('e' * 5_000_000 + 'END')\nsys.stdout.write('ok\\n')",
+        "import sys\nsys.stderr.write('e' * 5_000_000 + 'END')\nsys.stdout.buffer.write(b'ok\\n')",
         tmp_path,
         timeout=30,
         stderr_tail=64,

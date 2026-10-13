@@ -1892,8 +1892,12 @@ async def create_project(
         attach_writable=body.attach_writable,
     )
     if not result.ok:
-        # An attachment the owner asked for and the server refused is a bad
-        # request about that folder, not a claim they may not create projects.
+        # A name another project already has is a conflict with that project,
+        # not a refusal of the owner's right to make one (found by the
+        # 2026-10-13 live round). An attachment the owner asked for and the
+        # server refused is a bad request about that folder.
+        if result.reason_code in {"duplicate_project_name", "duplicate_project_root"}:
+            raise refusal(status.HTTP_409_CONFLICT, result.reason_code)
         raise refusal(status.HTTP_400_BAD_REQUEST
                 if body.attach_path is not None
                 else status.HTTP_403_FORBIDDEN, result.reason_code)

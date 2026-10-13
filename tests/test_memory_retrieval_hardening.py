@@ -132,3 +132,47 @@ def test_chunk_text_still_overlaps_normally() -> None:
         "ghij",
         "j",
     ]
+
+
+# ── BUG-313 — an instruction in the prompt must not stop recall ──
+
+def test_an_answer_shape_instruction_does_not_hide_the_memory(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    target = _write(store, tmp_path, "My favourite tea is Assam with a splash of oat milk.")
+    _write(store, tmp_path, "The build uses Vite.")
+    for query in (
+        "What is my favourite tea? Answer in one sentence.",
+        "What is my favourite tea? Reply briefly.",
+        "What is my favourite tea?",
+    ):
+        rows = store.search_approved_memory(query, scope="project:x", limit=5)
+        assert [row["memory_id"] for row in rows] == [target], query
+
+
+def test_the_fallback_admits_two_thirds_of_the_words_and_no_fewer(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    target = _write(store, tmp_path, "My favourite tea is Assam with a splash of oat milk.")
+    # Three content words, two of them in the memory: the strict AND finds
+    # nothing, and two of three is the owner's two-thirds.
+    rows = store.search_approved_memory("favourite tea brand", scope="project:x", limit=5)
+    assert [row["memory_id"] for row in rows] == [target]
+    assert rows[0]["recall_match"] == "partial"
+    # Four words, two in the memory: half is not two thirds.
+    assert store.search_approved_memory("favourite tea brand caffeine", scope="project:x", limit=5) == []
+    # An unrelated two-word overlap of a longer question recalls nothing.
+    assert store.search_approved_memory("favourite coffee shop downtown", scope="project:x", limit=5) == []
+    # A single word never takes the fallback: "the" alone, or one stray match.
+    assert store.search_approved_memory("the", scope="project:x", limit=5) == []
+    assert store.search_approved_memory("milk", scope="project:x", limit=5) != []
+
+
+def test_the_fallback_keeps_every_eligibility_condition(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    _write(store, tmp_path, "My favourite tea is Assam with a splash of oat milk.")
+    assert store.search_approved_memory("favourite tea brand", scope="project:other", limit=5) == []
+    assert (
+        store.search_approved_memory(
+            "favourite tea brand", scope="project:x", limit=5, owner_principal_id="principal_someone_else"
+        )
+        == []
+    )

@@ -937,6 +937,9 @@ class ExtensionStore:
         # DEC-14 step 7 — settled at the next start for a delivery the host
         # stopped in the middle of: it may or may not have arrived.
         "outcome_unknown_at",
+        # BUG-315 — a reply held for the owner because it carries sensitive
+        # information. It is not failed and not sent; it waits for Send.
+        "held_at",
     )
     #: Rows kept per connector. Receipts are a recent-activity ledger; the
     #: audit log is the permanent record.
@@ -955,6 +958,9 @@ class ExtensionStore:
         routing_mode: str | None = None,
         stages: dict[str, str] | None = None,
         reason_code: str | None = None,
+        session_id: str | None = None,
+        turn_id: str | None = None,
+        reply_to_receipt_id: str | None = None,
     ) -> None:
         values: dict[str, Any] = {
             "receipt_id": receipt_id,
@@ -966,6 +972,9 @@ class ExtensionStore:
             "conversation_scope": conversation_scope,
             "routing_mode": routing_mode,
             "reason_code": reason_code,
+            "session_id": session_id,
+            "turn_id": turn_id,
+            "reply_to_receipt_id": reply_to_receipt_id,
             "created_at": utc_now(),
         }
         for stage, at in (stages or {}).items():
@@ -978,11 +987,15 @@ class ExtensionStore:
                 f"INSERT INTO channel_receipts ({columns}) VALUES ({marks})",  # noqa: S608 - keys are fixed above
                 tuple(values.values()),
             )
+            # A reply still held for the owner is not recent activity to trim:
+            # it is the only way to send it (BUG-315).
             connection.execute(
                 """DELETE FROM channel_receipts
                    WHERE connector_id = ? AND receipt_id NOT IN (
                      SELECT receipt_id FROM channel_receipts WHERE connector_id = ?
-                     ORDER BY created_at DESC, rowid DESC LIMIT ?)""",
+                     ORDER BY created_at DESC, rowid DESC LIMIT ?)
+                   AND NOT (held_at IS NOT NULL AND delivered_at IS NULL
+                            AND failed_at IS NULL AND reviewed_at IS NULL)""",
                 (connector_id, connector_id, self.CHANNEL_RECEIPTS_KEPT),
             )
 
@@ -1095,7 +1108,8 @@ class ExtensionStore:
         arrive, or may not have, and that the owner has not marked reviewed."""
         sql = (
             "SELECT * FROM channel_receipts WHERE direction = 'outbound' "
-            "AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL) "
+            "AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL "
+            "     OR (held_at IS NOT NULL AND delivered_at IS NULL)) "
             "AND reviewed_at IS NULL"
         )
         params: list[Any] = []
@@ -1113,7 +1127,8 @@ class ExtensionStore:
             row = connection.execute(
                 """SELECT reviewed_at FROM channel_receipts
                     WHERE receipt_id = ? AND direction = 'outbound'
-                      AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL)""",
+                      AND (failed_at IS NOT NULL OR outcome_unknown_at IS NOT NULL
+                           OR held_at IS NOT NULL)""",
                 (receipt_id,),
             ).fetchone()
             if row is None:

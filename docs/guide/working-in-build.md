@@ -90,8 +90,13 @@ allowed to do and it changes from turn to turn. The repository and the project
 are in the context line, because a turn that may edit files or run a command has
 to say where — and that is a fact to read, not a control to operate.
 
+The composer names two different things: **Filed in** the project — where the
+conversation is kept — and **works in** the workspace folder every relative read,
+write and command starts from. A managed project's own folder is not where
+commands start, and the line does not pretend it is.
+
 Open the context line and it reads as one boundary, in the order that decides
-where a turn's work lands: **Project → Repository → Runs on → Model**. The model
+where a turn's work lands: **Filed in → Works in → Repository → Runs on → Model**. The model
 entry says whether it is your default or this work's own choice, and names a
 fallback that would answer instead rather than letting it stand in silently.
 The line never guesses a fact it could not read — an environment that could not
@@ -270,7 +275,11 @@ branch), how long, and how many actions. Neither a standing grant nor setting
 **Git push** to *always allow* is enough on its own. Merging, deleting a branch
 and changing workflows are never delegated. Before each step the delegation is
 checked again — credential, account, installation and repository — and if
-anything changed, the step waits for you.
+anything changed, the step waits for you. Before a push or a pull request Raiker
+also asks GitHub whose repository it is now (once a minute at most); a
+repository transferred, re-created or out of reach makes the step wait. On a
+repository with a GitHub remote, creating a branch and committing follow the same
+rule: an agent does them unprompted only on a branch a delegation covers.
 
 ## Reading the repository
 

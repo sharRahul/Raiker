@@ -103,6 +103,14 @@ Both paths use the same eligibility rules. A recalled result carries source and
 trust information so the answer can say where it came from. Use **View source**
 on a memory, or inspect the source chips on a reply, to check the evidence.
 
+Recall matches the words of your question that carry meaning. Words about the
+*shape of the answer* — "answer in one sentence", "reply briefly", "in bullets"
+— are instructions to the model, not something a memory says, so they are not
+required. When nothing holds every remaining word, Raiker looks once more and
+accepts a memory that holds at least two thirds of them (never fewer than two),
+with the same owner, scope, expiry and sensitivity rules as always; a single
+stray word never recalls anything.
+
 The first path leaves nothing to click, because it is not a tool call — so a
 settled answer in Chat carries a collapsed **Remembered *n*** strip naming the
 memories that turn was actually given. **Correct** and **Forget** on a row are

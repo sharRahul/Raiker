@@ -1,6 +1,6 @@
 # GitHub Connection Specification
 
-> **Status: Architecture Accepted / Implementation Partly Delivered — 2026-10-12.** The code-backed §18 inventory confirms sign-in, credential methods, GitHub App flow, repository delegations and the Settings journey as implemented in stated scopes; BUG-337/338/339 and real-GitHub RR-38…RR-41 evidence remain open. The managed App needs operator registration and a trusted credential service. Do not interpret implemented-against-stand-ins as externally verified.
+> **Status: Architecture Accepted / Implementation Partly Delivered — 2026-10-12.** The code-backed §18 inventory confirms sign-in, credential methods, GitHub App flow, repository delegations and the Settings journey as implemented in stated scopes; BUG-339 and real-GitHub RR-38…RR-41 evidence remain open; BUG-337 and BUG-338 closed on 2026-10-13 as FIXED-898 and FIXED-899. The managed App needs operator registration and a trusted credential service. Do not interpret implemented-against-stand-ins as externally verified.
 > This document holds the protocol and contract detail behind the
 > [DEC-21b amendment](../plans/RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication).
 > The decision record owns *what was decided and why*; this specification owns
@@ -606,9 +606,9 @@ GitHub itself — that is RR-38…RR-41.
 | Two owners never share a credential | Implemented | `tests/test_github_app_operations.py` — GH-44 |
 | API connector on the shared broker | Implemented | `GithubConnectorService._borrow`; [FIXED-885](../plans/FIXED_ITEMS.md#fixed-885--an-agents-push-looked-for-a-credential-of-its-own-not-the-owners) — GH-56 |
 | Repository-bound delegation; standing grants and modes excluded from pushes and GitHub writes | Implemented | [FIXED-886](../plans/FIXED_ITEMS.md#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github) — GH-50 |
-| …and from local branch and commit | **Partial** | [BUG-337](../plans/TO_BE_FIXED.md#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation) |
+| …and from local branch and commit | **Implemented** 2026-10-13 | [BUG-337](../plans/FIXED_ITEMS.md#fixed-898--a-standing-git-writes-decision-covered-local-branches-and-commits-without-a-delegation-was-bug-337) |
 | Risk classes for the twelve operations | Implemented | `raiker/github/delegations.py` `OPERATION_RISKS`; Settings → GitHub → Permissions — GH-51 |
-| Resume revalidation before each consequential step | Implemented against Raiker's records; **Partial** against GitHub | [BUG-338](../plans/TO_BE_FIXED.md#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step) — GH-52 |
+| Resume revalidation before each consequential step | **Implemented** 2026-10-13 — Raiker's records every step, GitHub before a push or pull request | [BUG-338](../plans/FIXED_ITEMS.md#fixed-899--a-delegations-repository-identity-was-checked-against-the-last-discovery-not-asked-of-github-was-bug-338) — GH-52 |
 | Child agents never exceed the parent's delegation | Implemented | `DelegationService.narrow`; `DELEGABLE_TOOLS` read-only — GH-53 |
 | Provider receipts | Implemented — pushed ref read back; PR number and URL recorded | `read_back_ref` — GH-54 |
 | Issue-to-PR routine | **Partial** — template and authority plan; no runner | [BUG-339](../plans/TO_BE_FIXED.md#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) — GH-55 |

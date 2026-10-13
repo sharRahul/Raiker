@@ -314,6 +314,62 @@ describe("MessagingView", () => {
     );
   });
 
+  // BUG-315 — a reply held because it carries sensitive information is sent
+  // only by the owner; Discard sends nothing.
+  it("offers Send to chat and Discard for a reply held for sensitive information", async () => {
+    const held = {
+      receipt_id: "act_held",
+      direction: "outbound" as const,
+      kind: "message" as const,
+      sender_role: null,
+      conversation_scope: null,
+      routing_mode: null,
+      session_id: "sess_7",
+      received_at: null,
+      accepted_at: null,
+      queued_at: null,
+      processed_at: null,
+      reply_queued_at: null,
+      delivered_at: null,
+      failed_at: null,
+      held_at: "2026-10-13T10:00:00Z",
+      turn_id: "turn_7",
+      reason_code: "reply_held_sensitive",
+      created_at: "2026-10-13T10:00:00Z",
+    };
+    const on = {
+      ...channelsView().profiles[0],
+      linked: true,
+      enabled: true,
+      pairing_id: "chp_1",
+      display_label: "Webhooks",
+      sender_count: 1,
+      senders: ["ops"],
+      deliveries_to_review: [held],
+    };
+    const fetchMock = stubFetch({
+      "GET /api/channels": channelsView({ profiles: [on] }),
+      "POST /api/channels/deliveries/act_held/send": {
+        ok: true, receipt_id: "act_held", held: false, delivered: true,
+      },
+    });
+    render(MessagingView);
+    const list = await screen.findByRole("region", { name: "Webhooks deliveries to review" });
+    expect(within(list).getByText(/Held — it carries sensitive information/)).toBeInTheDocument();
+    expect(within(list).getByRole("link", { name: "Read it" })).toHaveAttribute(
+      "href", "#/new-chat?session=sess_7",
+    );
+    expect(within(list).getByRole("button", { name: "Discard" })).toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: "Mark reviewed" })).toBeNull();
+    await fireEvent.click(within(list).getByRole("button", { name: "Send to chat" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/channels/deliveries/act_held/send"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
   it("a paused channel reads as Paused and offers Resume", async () => {
     stubFetch({
       "GET /api/channels": channelsView({

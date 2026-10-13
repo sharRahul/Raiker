@@ -824,7 +824,16 @@ class AgentGateway:
             user=owner_user_metadata(self.store, self.tool_broker.principal_id),
             prompt=PromptPayload(
                 text=str(row["prompt_text"]),
-                metadata={"resumed_from_approval": approval_id},
+                metadata={
+                    "resumed_from_approval": approval_id,
+                    # BUG-325 — the run's spend before it paused, so its cost
+                    # limit meters the whole run and not each leg afresh.
+                    **(
+                        {"spent_before_pause": options_raw["spent_before_pause"]}
+                        if isinstance(options_raw.get("spent_before_pause"), dict)
+                        else {}
+                    ),
+                },
             ),
             options=PromptOptions(
                 planning_mode=str(options_raw.get("planning_mode", "auto")),

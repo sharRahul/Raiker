@@ -192,7 +192,9 @@ class ProjectService:
                 project_id, attach_path, acting_principal_id, writable=attach_writable
             )
             if not attached.ok:
-                self.store.delete_project_with_orphanage(project_id)
+                # Undoing a project that never finished being created is not
+                # an owner's deletion, so nothing is journalled for it.
+                self.store.delete_project_with_orphanage(project_id, journal=False)
                 return attached
             return ControlResult(
                 ok=True,
@@ -356,7 +358,9 @@ class ProjectService:
         )
         if root.kind == "managed" and root.missing:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        if not self.store.delete_project_with_orphanage(project_id):
+        if not self.store.delete_project_with_orphanage(
+            project_id, owner_principal_id=str(acting_principal_id)
+        ):
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         if root.kind == "managed" and root.path is not None:
             try:

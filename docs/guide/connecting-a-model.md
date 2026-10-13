@@ -325,6 +325,13 @@ you. Most keys need nothing there, which is why it is not on the front of the
 dialog. You can add one to a connection you already saved without re-pasting the
 key: fill in only the workspace and press **Connect**.
 
+First-run setup asks the provider before it recommends it: a stored key that
+lists nothing is never called *connected*. With an identity-linked key the
+recommendation reads **Anthropic needs its workspace ID**, and **Add the
+workspace ID** puts the cursor in that field; once it is added the provider's
+models are listed and you choose your default from them. The setup step itself
+appears at once; the providers fill in as they answer.
+
 If the provider then says it does not recognise the workspace, that is a
 different message with a different fix — check the id against the one in the
 console. Raiker never repeats the "add a workspace" ask for a value you have
@@ -431,8 +438,12 @@ flight.
 
 A turn you stop part-way through is still billed for what the provider had
 counted, and is recorded that way: Anthropic says what the input cost as soon as
-the answer starts. OpenAI-compatible providers report usage only when the
-answer ends, so a turn stopped on one of those is not yet counted.
+the answer starts. OpenAI-compatible providers (OpenAI, OpenRouter, Ollama)
+report usage only when the answer ends, so a turn stopped on one of those is
+recorded as an **estimate** — the request and the text already shown, at about
+four characters a token. It counts against every limit, because the provider
+billed it, and Usage says *Includes n stopped requests estimated by Raiker* so it
+is never read as the provider's own figure.
 
 Spend is the providers' own token counts priced with the rates Models shows.
 A model with no known price is not counted and is named under the limit, so you

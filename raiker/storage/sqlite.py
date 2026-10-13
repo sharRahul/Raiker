@@ -71,6 +71,13 @@ _SEARCH_STOPWORDS = frozenset({
     "want", "was", "wasn", "way", "well", "were", "what", "when", "where",
     "which", "while", "who", "whom", "whose", "why", "will", "with", "won",
     "would", "you", "your", "yours",
+}) | frozenset({
+    # BUG-313 — the same failure from a different vocabulary: words about the
+    # *shape of the answer* ("Answer in one sentence", "reply briefly") are an
+    # instruction to the model, never something a memory says, so requiring
+    # them stopped recall finding the very memory the question asked about.
+    "answer", "reply", "respond", "sentence", "sentences", "briefly",
+    "concisely", "paragraph", "paragraphs", "bullet", "bullets",
 })
 
 _CONNECTION_CACHE_LIMIT_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_LIMIT"

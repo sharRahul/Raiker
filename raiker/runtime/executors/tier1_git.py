@@ -70,6 +70,36 @@ class GitWriteExecutor:
         label = self._repository(root)
         return "" if label == "." else f" in {label}"
 
+    def repository_target(self, action: GovernedAction, principal: Principal) -> dict[str, Any] | None:
+        """The GitHub repository and branch this branch or commit is on (BUG-337).
+
+        Branch and commit are the specification's other two delegable
+        operations (§8.2), so the router holds them to the same rule as a push:
+        unprompted only under a repository delegation whose branch pattern
+        covers them. A repository with no GitHub remote has nothing to delegate
+        and keeps the capability's decision mode, as before.
+        """
+        from raiker.runtime.git_credential import repository_key
+        from raiker.tools.git import github_remote_url
+
+        if action.action_type == "git_branch":
+            operation = "branch"
+            branch = str(action.arguments.get("name", "")).strip() or None
+        elif action.action_type == "git_commit":
+            operation = "commit"
+            branch = None
+        else:
+            return None
+        root = self._repo_root(principal)
+        remote_url = github_remote_url(root)
+        if not remote_url:
+            return None
+        if operation == "commit":
+            from raiker.tools.git import current_branch
+
+            branch = current_branch(root) or None
+        return {"repository": repository_key(remote_url), "operation": operation, "branch": branch}
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = action.action_type
         try:

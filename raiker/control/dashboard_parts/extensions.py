@@ -875,11 +875,13 @@ def _channel_route_scope(channel_type: str, pairing: dict[str, Any] | None) -> C
     else:
         starts = "owner_only"
     telegram = channel_type == "telegram"
-    reply: Literal["returned_to_caller", "kept_in_raiker", "none"]
+    reply: Literal["returned_to_caller", "sent_to_owner_chat", "kept_in_raiker", "none"]
     if mode in {"record_only", "interrupt"}:
         reply = "none"
     else:
-        reply = "kept_in_raiker" if telegram else "returned_to_caller"
+        # BUG-315 — on Telegram the answer to the owner's own message goes back
+        # to their chat; a reply carrying sensitive information waits for them.
+        reply = "sent_to_owner_chat" if telegram else "returned_to_caller"
     return {
         "conversation_scope": "direct_and_group" if telegram else "endpoint",
         "mention_required": False,
@@ -914,6 +916,8 @@ def _channel_receipt(row: dict[str, Any]) -> ChannelReceipt:
         "provider_message_id": row.get("provider_message_id"),
         "outcome_unknown_at": row.get("outcome_unknown_at"),
         "reviewed_at": row.get("reviewed_at"),
+        "held_at": row.get("held_at"),
+        "turn_id": row.get("turn_id"),
     }
 
 

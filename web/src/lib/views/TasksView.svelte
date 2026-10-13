@@ -58,9 +58,14 @@
   import { newIdempotencyKey } from "../idempotency";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
   import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
-  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
+  import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
-  import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import {
+    activeComposerProfile,
+    blocksSending,
+    openModelSetup,
+    readinessForSelection,
+  } from "../modelReadiness.svelte";
 
   let {
     projectId = null,
@@ -253,9 +258,9 @@
   }
 
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
-  const activeProfile = $derived(
-    profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile,
-  );
+  // BUG-314 — the bound pair as the picker reads it, so a searched model is
+  // described as itself and not as the default.
+  const activeProfile = $derived(activeComposerProfile(profiles, modelProfile, model, allProfiles()));
   const modelReadiness = $derived(readinessForSelection(activeProfile, catalogueChoices(profiles, modelCatalogues()).length));
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a

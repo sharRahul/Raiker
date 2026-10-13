@@ -367,6 +367,40 @@ def _failed_delivery(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/channels/deliveries/act_contract/reviewed"
 
 
+def _held_reply(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    """BUG-315 — a Telegram reply held for sensitive information, sent by the owner."""
+    from raiker.storage.sqlite import SQLiteStore
+
+    _channel_gate_open(ws)
+    pairing_id = _channel_pairing(ws, "channel.telegram", "4242")
+    store = SQLiteStore(ws)
+    store.set_channel_pairing_routing(
+        pairing_id, routing_mode="new_turn", target_session_id=None,
+        owner_sender_id="4242", approval_relay_enabled=False,
+    )
+    store.create_session("sess_held", str(ws))
+    store.insert_turn("sess_held", "turn_held", "what is my email?")
+    store.complete_turn("turn_held", "completed", "It is owner@example.com.")
+    store.insert_channel_receipt(
+        receipt_id="act_held", connector_id="channel.telegram", pairing_id=pairing_id,
+        direction="outbound", kind="message", stages={"held_at": utc_now()},
+        reason_code="reply_held_sensitive", session_id="sess_held", turn_id="turn_held",
+    )
+    return "/api/channels/deliveries/act_held/send"
+
+
+def _telegram_send(monkeypatch: Any) -> None:
+    monkeypatch.setenv("RAIKER_TELEGRAM_BOT_TOKEN", "123456:contract")
+    monkeypatch.setenv("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "api.telegram.org")
+    monkeypatch.setattr(
+        "raiker.runtime.executors.channels.post_url",
+        lambda _url, body, **_kw: {
+            "sent_bytes": len(body), "status": 200,
+            "body": b'{"ok": true, "result": {"message_id": 9}}',
+        },
+    )
+
+
 def _on_pairing(suffix: str, body: Any = None) -> Seed:
     def seed(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
         path = f"/api/channels/pairings/{_channel_pairing(ws)}{suffix}"
@@ -563,6 +597,7 @@ CASES: Cases = {
     ("DELETE", "/api/channels/pairings/{pairing_id}"): _on_pairing(""),
     ("POST", "/api/channels/deliver-test"): patched(_deliver_test, _fake_channel_host),
     ("POST", "/api/channels/deliveries/{receipt_id}/reviewed"): _failed_delivery,
+    ("POST", "/api/channels/deliveries/{receipt_id}/send"): patched(_held_reply, _telegram_send),
     ("POST", "/api/channels/{connector_id}/inbound"): patched(_inbound, _inbound_secret),
     ("POST", "/api/channels/{connector_id}/telegram"): patched(_telegram, _inbound_secret),
     ("POST", "/api/channels/{connector_id}/approval-response"): patched(_approval_response, _inbound_secret),

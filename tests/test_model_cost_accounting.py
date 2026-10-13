@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -219,7 +220,7 @@ class TestLedger:
         self, store: SQLiteStore
     ) -> None:
         ledger = ModelUsageLedger(store)
-        common = {
+        common: dict[str, Any] = {
             "owner_principal_id": "p1",
             "session_id": "s1",
             "provider": "openai",
@@ -262,7 +263,7 @@ class TestLedger:
 
     def test_compaction_counts_as_usage_but_not_as_a_user_turn(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
-        common = {
+        common: dict[str, Any] = {
             "owner_principal_id": "p1",
             "session_id": "s1",
             "provider": "anthropic",

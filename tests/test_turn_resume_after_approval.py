@@ -595,3 +595,73 @@ class TestSuspensionData:
         assert recorded["status"] == "not_executed"
         assert recorded["executed"] is False
         assert len({rejected["status"], executed["status"], recorded["status"]}) == 3
+
+
+# ── BUG-325 — a run's spend survives its approval pause ──────────────────────
+
+
+def test_a_parked_run_carries_its_spend_and_the_resumed_turn_meters_from_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from decimal import Decimal
+
+    from raiker.models.pricing import ModelPrice
+
+    price = ModelPrice(
+        input_per_mtok=Decimal("1"), output_per_mtok=Decimal("1"), currency="USD", source="owner"
+    )
+    monkeypatch.setattr("raiker.tasks.cost_limit.resolve_price", lambda *_a, **_k: price)
+    router = ScriptedRouter([
+        ModelResponse(
+            text="Writing it.",
+            tool_calls=[_write_call()],
+            usage={"input_tokens": 400_000, "output_tokens": 0},
+        )
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    base = _envelope("Write the quarterly report to report.md")
+    envelope = PromptEnvelope(
+        **{**base.__dict__, "options": PromptOptions(max_tool_calls=10, max_cost_usd=0.5)}
+    )
+    response = asyncio.run(
+        orchestrator.ahandle(envelope, identity=_identity_for(tmp_path, orchestrator, envelope))
+    )
+    assert response.approval is not None
+    row = SQLiteStore(tmp_path).load_suspended_turn(str(response.approval["approval_id"]))
+    assert row is not None
+    options = json.loads(str(row["options_json"]))
+    # $0.40 of a $0.50 limit spent before the pause.
+    assert options["spent_before_pause"] == {"total": "0.4", "unpriced": []}
+
+    # The continuation runs on a new orchestrator, as a real resume does; it
+    # starts from the $0.40, so one more $0.40 response crosses the limit.
+    resumed = PromptEnvelope(
+        **{
+            **envelope.__dict__,
+            "prompt": PromptPayload(
+                text=envelope.prompt.text,
+                metadata={"spent_before_pause": options["spent_before_pause"]},
+            ),
+        }
+    )
+    fresh = _orchestrator(tmp_path, ScriptedRouter([ModelResponse(text="unused")]))
+    fresh._seed_spend(resumed)  # noqa: SLF001
+    spend = fresh._turn_spend[resumed.turn_id]  # noqa: SLF001
+    assert spend.total == Decimal("0.4")
+    spend.add(price, "m", {"input_tokens": 400_000})
+    assert fresh._cost_limit_reached(resumed) is not None  # noqa: SLF001
+
+
+def test_a_malformed_spend_snapshot_seeds_nothing(tmp_path: Path) -> None:
+    orchestrator = _orchestrator(tmp_path, ScriptedRouter([ModelResponse(text="x")]))
+    base = _envelope("x")
+    for snapshot in ({"total": "not a number"}, {"total": "-1"}, "0.4", None):
+        envelope = PromptEnvelope(
+            **{
+                **base.__dict__,
+                "prompt": PromptPayload(text="x", metadata={"spent_before_pause": snapshot}),
+                "options": PromptOptions(max_cost_usd=1.0),
+            }
+        )
+        orchestrator._seed_spend(envelope)  # noqa: SLF001
+        assert envelope.turn_id not in orchestrator._turn_spend  # noqa: SLF001

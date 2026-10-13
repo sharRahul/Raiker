@@ -59,6 +59,9 @@ export function testReason(code: string | null | undefined): string {
   if (value === "loop_echo") return "it repeated one of Raiker's own replies, so it was not answered again";
   if (value === "loop_repeated")
     return "the same message arrived a third time in ten minutes, so it was not answered again";
+  // BUG-315 — a reply held for the owner rather than sent.
+  if (value === "reply_held_sensitive")
+    return "the reply carries sensitive information, so it waits for you to send it";
   if (value === "channel_owner_sender_required") return "only you can start work on this route";
   if (value === "channel_target_session_required") return "the route has no conversation";
   if (value.startsWith("turn_"))
@@ -207,6 +210,8 @@ export function routeScopeFacts(scope: RouteScope): { label: string; value: stri
       value:
         scope.reply_path === "returned_to_caller"
           ? "Returned in the response to the caller's request."
+          : scope.reply_path === "sent_to_owner_chat"
+            ? "Sent back to your chat when you message Raiker. A reply that carries sensitive information waits on Deliveries to review until you send it."
           : scope.reply_path === "kept_in_raiker"
             ? "Kept in Raiker — nothing is sent back over this channel."
             : "None.",
@@ -270,6 +275,9 @@ export function receiptConversationHref(receipt: Receipt): string | null {
 /** Where a receipt stopped, when it stopped short. */
 export function receiptOutcome(receipt: Receipt): string {
   if (receipt.failed_at) return `Failed: ${testReason(receipt.reason_code)}`;
+  // BUG-315 — held, not failed and not sent.
+  if (receipt.held_at && !receipt.delivered_at)
+    return "Held — it carries sensitive information, so nothing was sent";
   // DEC-14 step 7 — settled at start for a delivery the host stopped mid-send.
   if (receipt.outcome_unknown_at)
     return "Outcome unknown — Raiker stopped while sending it. It was not sent again.";
@@ -282,7 +290,10 @@ export function receiptOutcome(receipt: Receipt): string {
       ? `Delivered · the channel's id for it is ${receipt.provider_message_id}`
       : "Delivered";
   }
-  if (receipt.delivered_at) return "Answered and returned to the caller";
+  if (receipt.delivered_at) return "Answered — the reply was delivered";
+  // BUG-315 — a reply was tried and did not go; Deliveries to review says why.
+  if (receipt.processed_at && receipt.reply_queued_at)
+    return "Answered — the reply did not go; see Deliveries to review";
   if (receipt.processed_at) return "Processed — no reply sent over the channel";
   if (receipt.queued_at) return "Waiting — queued for work";
   return "Recorded — the route starts nothing";
@@ -294,6 +305,8 @@ export function receiptOutcome(receipt: Receipt): string {
  * again by whatever asked for it, and an unknown one may already have arrived.
  */
 export function reviewAdvice(receipt: Receipt): string {
+  if (receipt.held_at && !receipt.delivered_at && !receipt.failed_at)
+    return "Read it in its conversation, then send it to your chat or discard it.";
   if (receipt.outcome_unknown_at)
     return "Check the channel before sending it again — it may already be there.";
   if (receipt.kind === "test_delivery") return "Fix what stopped it, then send another test.";

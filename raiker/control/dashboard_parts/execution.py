@@ -15,6 +15,7 @@ import json
 import os
 import re
 from dataclasses import asdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from raiker.contracts.ids import new_id, utc_now
@@ -125,6 +126,10 @@ class ExecutionService:
         return {
             "project_id": project["project_id"] if project is not None else None,
             "project_name": project["name"] if project is not None else None,
+            # BUG-316 — the path authority resolves every relative path against
+            # the workspace root (`PathAuthority._resolve`), and an attached
+            # project's folder is an extra allowed root, not the start folder.
+            "works_in": Path(self.store.paths.workspace_root).resolve().name or "this workspace",
             "repo_id": repo.repo_id if repo is not None else None,
             "repo_label": repo.label if repo is not None else None,
             "repo_kind": cast(Any, repo.kind) if repo is not None else None,

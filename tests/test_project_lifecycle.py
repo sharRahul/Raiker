@@ -194,7 +194,7 @@ class TestDeletion:
     ) -> None:
         project_id = service.create_project("Alpha", OWNER).data["project_id"]
         folder = workspace / ".raiker" / "projects" / "alpha"
-        (folder / "notes.md").write_text("hello\n", encoding="utf-8")
+        (folder / "notes.md").write_bytes(b"hello\n")  # six bytes on every platform (BUG-330)
         (folder / "sub").mkdir()
         (folder / "sub" / "data.bin").write_bytes(b"\x00" * 10)
         service.store.create_session("sess_a", str(workspace))

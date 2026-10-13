@@ -471,9 +471,10 @@ class ChannelRouteScope(TypedDict):
     #: Who may make a message start or steer work under this route.
     starts_work: Literal["nobody", "owner_only", "any_allowed_sender"]
     bot_loop_protection: Literal["bot_messages_ignored", "echo_and_repeat_refused"]
-    #: Where an answer goes: back in the response to the caller, or nowhere —
-    #: it stays in Raiker's conversation.
-    reply_path: Literal["returned_to_caller", "kept_in_raiker", "none"]
+    #: Where an answer goes: back in the response to the caller, back to the
+    #: owner's chat (BUG-315; held when it carries sensitive information), or
+    #: nowhere — it stays in Raiker's conversation.
+    reply_path: Literal["returned_to_caller", "sent_to_owner_chat", "kept_in_raiker", "none"]
 
 
 class ChannelReceipt(TypedDict):
@@ -504,6 +505,10 @@ class ChannelReceipt(TypedDict):
     outcome_unknown_at: NotRequired[str | None]
     #: When the owner marked a failed or unknown delivery reviewed.
     reviewed_at: NotRequired[str | None]
+    #: BUG-315 — a reply held because it carries sensitive information, waiting
+    #: for the owner's Send; and the turn whose answer it carries.
+    held_at: NotRequired[str | None]
+    turn_id: NotRequired[str | None]
 
 
 class ChannelProfile(TypedDict):

@@ -909,6 +909,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-885](#fixed-885--an-agents-push-looked-for-a-credential-of-its-own-not-the-owners) | Medium | Build / Git push / GitHub connector | Fixed 2026-10-12 — found building ADD-27 GH-50 |
 | [FIXED-886](#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github) | High | Governance / Git and GitHub writes | Fixed 2026-10-12 (ADD-27 GH-50) |
 | [FIXED-887](#fixed-887--checking-a-github-app-installation-credential-could-not-succeed) | Low | Settings → GitHub | Fixed 2026-10-12 — found building the GitHub routes |
+| [FIXED-888](#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315) | Medium | Messaging / Telegram | Fixed 2026-10-13 (was BUG-315) |
+| [FIXED-889](#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313) | Medium | Memory / recall | Fixed 2026-10-13 (was BUG-313) |
+| [FIXED-890](#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316) | Medium | Build / Projects | Fixed 2026-10-13 (was BUG-316) |
+| [FIXED-891](#fixed-891--a-stopped-openai-compatible-stream-recorded-no-usage-was-bug-333) | Low | Models / usage | Fixed 2026-10-13 (was BUG-333) |
+| [FIXED-892](#fixed-892--a-routine-runs-spend-was-counted-again-from-zero-after-an-approval-pause-was-bug-325) | Low | Tasks / cost limit | Fixed 2026-10-13 (was BUG-325) |
+| [FIXED-893](#fixed-893--deleting-a-project-or-a-picture-was-not-journalled-so-a-restore-brought-it-back-was-bug-324) | Low | Storage / restore | Fixed 2026-10-13 (was BUG-324) |
+| [FIXED-894](#fixed-894--setup-called-an-identity-linked-anthropic-key-connected-and-offered-models-it-could-not-list-was-bug-332) | Low | First run / Models | Fixed 2026-10-13 (was BUG-332) |
+| [FIXED-895](#fixed-895--setups-model-step-waited-on-every-providers-check-before-it-showed-anything-was-bug-331) | Low | First run / Models | Fixed 2026-10-13 (was BUG-331) |
+| [FIXED-896](#fixed-896--a-model-chosen-by-search-was-judged-by-the-defaults-readiness-and-window-was-bug-314) | Low | Composers / models | Fixed 2026-10-13 (was BUG-314) |
+| [FIXED-897](#fixed-897--importing-the-runtime-orchestrator-first-failed-on-a-circular-import-was-bug-326) | Low | Maintainability | Fixed 2026-10-13 (was BUG-326) |
+| [FIXED-898](#fixed-898--a-standing-git-writes-decision-covered-local-branches-and-commits-without-a-delegation-was-bug-337) | Low | Build / Git writes | Fixed 2026-10-13 (was BUG-337) |
+| [FIXED-899](#fixed-899--a-delegations-repository-identity-was-checked-against-the-last-discovery-not-asked-of-github-was-bug-338) | Low | Build / delegations | Fixed 2026-10-13 (was BUG-338) |
+| [FIXED-900](#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319) | Low | Models / maintainability | Fixed 2026-10-13 (was BUG-319) |
+| [FIXED-901](#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330) | Low | Tests / Windows | Fixed 2026-10-13 (BUG-330 stays open for its remainder) |
+| [FIXED-902](#fixed-902--a-project-name-already-in-use-was-answered-as-a-refusal) | Low | Projects / API | Fixed 2026-10-13 — found by the live round |
+| [FIXED-903](#fixed-903--a-message-whose-reply-did-not-go-read-as-though-no-reply-was-tried) | Low | Messaging | Fixed 2026-10-13 — found by the live round |
 
 ---
 
@@ -29502,7 +29518,7 @@ quick list's profiles, found none, and fell back to the default.
 **Fixed.** The picker names the bound model, with the provider taken from its
 profile, and calls it this work's override. The surfaces' own readiness and
 context-window reads still use the quick-list lookup —
-[BUG-314](TO_BE_FIXED.md#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window).
+[BUG-314](FIXED_ITEMS.md#fixed-896--a-model-chosen-by-search-was-judged-by-the-defaults-readiness-and-window-was-bug-314).
 
 **Evidence.** `ModelPicker.test.ts` — *names a model chosen by search*; live
 capture 11.
@@ -30093,7 +30109,7 @@ a half-made sequence; model details and the model picker are their own
 dialogs; the sign-in brand facts are `providerBrands.ts`. Overview, My models
 and Usage were already components. The page is 2,523 lines. What stays in it is
 the Add tab's connection lifecycle and sign-in dialog — see
-[BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page).
+[BUG-319](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319).
 
 **Evidence.** The 127 Models tests unchanged and green; `controllers.test.ts`;
 live captures 15–17 (fallback saved and removed, details dialog, 390 px).
@@ -31363,7 +31379,7 @@ step 6's per-run cost limit.**
 with `PUT /api/tasks/{id}/run-limit` and **Will it run?**'s *Cost limit per
 run*. The scheduler hands it to the turn as `PromptOptions.max_cost_usd`, and
 the limit survives an approval pause (the spend counted before the pause does
-not — [BUG-325](TO_BE_FIXED.md#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause)). Each model response is priced from the
+not — [BUG-325](FIXED_ITEMS.md#fixed-892--a-routine-runs-spend-was-counted-again-from-zero-after-an-approval-pause-was-bug-325)). Each model response is priced from the
 provider's own token counts with the rate the Models page shows; the turn
 checks its spend at the safe boundary where Stop is read, **before** asking the
 model again, so the overrun is at most the response that crossed it. A
@@ -32958,3 +32974,195 @@ error, not a pass.
 
 **Evidence.** The `POST /api/github/credentials/{credential_id}/check` and
 installation cases in `tests/test_api_contract_responses.py`.
+
+---
+
+## FIXED-888 — A Telegram turn's answer never went back over Telegram (was BUG-315)
+
+**Severity: Medium. Area: Messaging / Telegram. Status: Fixed 2026-10-13 (was BUG-315). DEC-14 steps 7–8. Owner decision 2026-10-13: a reply to the owner's own message is sent without asking, unless it carries sensitive information.**
+
+**Observed.** A Telegram message on a *New turn* or *Side question* route ran a governed turn and the answer went back in the HTTP response to Telegram's webhook call, which Telegram ignores. The owner read every answer only in Raiker.
+
+**Fixed.** When the owner's own Telegram message finishes its turn, the inbound route hands the answer to `RuntimeControlService.deliver_channel_reply`, which sends it through the governed `external_channel_runtime` executor as the owner — so the capability gate, a paused channel, the egress allowlist and the 4,096-character limit all still decide. An answer that the redaction pass would mask (keys, tokens, private keys, email addresses) or that the memory policy classes as credential- or secret-like is **held** instead: an outbound receipt with `held_at`, `reason_code = reply_held_sensitive`, the turn it carries and the message it answers, never the text. *Deliveries to review* offers **Read it**, **Send to chat** (`POST /api/channels/deliveries/{receipt_id}/send`, which re-reads the text from the conversation and sends it under the same receipt) and **Discard** (the existing *reviewed* mark). A held reply is not settled *outcome unknown* at start and is not trimmed with old receipts. The route now says *Sent back to your chat when you message Raiker*; another sender's message and a turn still waiting on an approval send nothing. Migration RAIKER-2110 adds `held_at`, `turn_id` and `reply_to_receipt_id`; events `channel_reply_delivered`, `channel_reply_failed`, `channel_reply_held`.
+
+**Evidence.** `tests/test_channel_telegram_reply.py` (7), a contract case for the send route, `MessagingView.test.ts`, `channelSetup.test.ts`. Live: a real Anthropic turn answered the owner's Telegram update and the send left through the governed path — Telegram refused the round's placeholder bot token, which the receipt names — and an answer carrying an email address was held with Send to chat and Discard ([05](../screenshots/2026-10-13-ledger-round/05-messaging-held-and-failed-replies.png), [06](../screenshots/2026-10-13-ledger-round/06-route-says-replies-go-back.png), [07](../screenshots/2026-10-13-ledger-round/07-messaging-review-390-dark.png)). A real bot's delivered message is not proved: this host has no Telegram account.
+
+---
+
+## FIXED-889 — An instruction in the prompt stopped recall finding the memory it asked about (was BUG-313)
+
+**Severity: Medium. Area: Memory / recall. Status: Fixed 2026-10-13 (was BUG-313). Owner decision 2026-10-13: a bounded fallback admits a memory holding two thirds of the question's content words.**
+
+**Observed.** *What is my favourite tea? Answer in one sentence.* recalled nothing: the full-text match is an AND over every content word, so *answer* and *sentence* had to be in the memory.
+
+**Fixed.** Words about the shape of the answer (*answer*, *reply*, *respond*, *sentence(s)*, *briefly*, *concisely*, *paragraph(s)*, *bullet(s)*) join the stopwords the strict match ignores. When the strict match still finds nothing, `search_approved_memory` asks the index again with the words OR-ed, reads a bounded candidate set in the index's own ranking, and admits a record only when it holds at least two thirds of the content words and never fewer than two; such a row carries `recall_match = "partial"`. Every eligibility condition — owner, scope, expiry, validity, supersession, sensitivity — is the same query's.
+
+**Evidence.** `tests/test_memory_retrieval_hardening.py` (3 new): the tea sentence and *Reply briefly* recall it; two of three words do, two of four and an unrelated overlap do not; another scope or owner never does. Live: a real Haiku 5.5 turn asked the original sentence, was given the memory and answered *Your favourite tea is Assam with a splash of oat milk.* ([03](../screenshots/2026-10-13-ledger-round/03-recall-despite-the-instruction.png)).
+
+---
+
+## FIXED-890 — Build's "Working in" named a project whose folder Build does not work in (was BUG-316)
+
+**Severity: Medium. Area: Build / Projects. Status: Fixed 2026-10-13 (was BUG-316). Owner decision 2026-10-13: the recommended relabel — no change to filesystem authority or command cwd.**
+
+**Observed.** The composer said **Working in *project*** and the boundary inspector named the project first, while every relative read, write and command resolves against the workspace root.
+
+**Fixed.** The server's boundary view (`GET /api/build/boundary`) carries `works_in`, the folder relative paths resolve against. The composer reads **Filed in *project* · works in *workspace***, and the inspector lists *Filed in* then *Works in — reads, writes and commands start here* before repository, environment and model.
+
+**Evidence.** `tests/test_build_boundary.py`, `BuildView.test.ts` (2). Live: *Filed in Garden planner · works in live-ws* ([04](../screenshots/2026-10-13-ledger-round/04-build-filed-in-and-works-in.png)).
+
+---
+
+## FIXED-891 — A stopped OpenAI-compatible stream recorded no usage (was BUG-333)
+
+**Severity: Low. Area: Models / usage. Status: Fixed 2026-10-13 (was BUG-333). DEC-24 step 2: "separate estimated from settled usage; account for cancelled calls that a provider still bills".**
+
+**Observed.** OpenAI, OpenRouter and Ollama report usage only in a stream's last chunk, so a turn the owner stopped was recorded as nothing and every spending limit read it as free.
+
+**Fixed.** A stopped stream with no provider count records an estimate — the request at four characters a token and the text already shown — in a ledger row marked `estimated` (migration RAIKER-2109). It counts in every total and limit, because the provider billed it; Models → Usage says *Includes N stopped requests estimated by Raiker*. A provider's own count is never marked.
+
+**Evidence.** `tests/test_stopped_stream_usage.py` (3), `ProviderUsagePanel.test.ts` (2). Not exercised live: the round's provider was Anthropic, which reports input usage as the stream opens.
+
+---
+
+## FIXED-892 — A routine run's spend was counted again from zero after an approval pause (was BUG-325)
+
+**Severity: Low. Area: Tasks / cost limit. Status: Fixed 2026-10-13 (was BUG-325). DEC-12 step 6.**
+
+**Observed.** A run parked on an approval was continued on a new orchestrator whose meter started at zero, so a run that paused could spend its limit again after each approval.
+
+**Fixed.** The suspension row keeps the run's metered spend (`spent_before_pause`: total and unpriced models); the resumed turn's meter starts from it. A malformed snapshot seeds nothing rather than failing the resume.
+
+**Evidence.** `tests/test_turn_resume_after_approval.py` (2): $0.40 of a $0.50 limit survives the pause and the next $0.40 response stops the run.
+
+---
+
+## FIXED-893 — Deleting a project or a picture was not journalled, so a restore brought it back (was BUG-324)
+
+**Severity: Low. Area: Storage / restore. Status: Fixed 2026-10-13 (was BUG-324). DEC-24 step 5: deletion tombstones applied after a restore.**
+
+**Observed.** Only forgotten and purged memories, deleted conversations and Git authority were journalled; a project deleted, a picture removed for good or a managed file removed after a backup came back with a restore.
+
+**Fixed.** Three more kinds go in `.raiker/deletions.jsonl` — `project_delete` (with the conversations and tasks filed in it), `image_purge` and `managed_file_retire` — written by the store method that performs the deletion, content-free, and replayed into a restore with journaling off. Undoing a half-created project is not an owner's deletion and is not journalled. A task has no owner-facing delete of its own; it goes with its project or conversation, both journalled.
+
+**Evidence.** `tests/test_lock_screen_recovery.py` (2): a project and a purged picture deleted after the backup stay deleted in the restored copy, and the journal holds no prompt text.
+
+---
+
+## FIXED-894 — Setup called an identity-linked Anthropic key connected and offered models it could not list (was BUG-332)
+
+**Severity: Low. Area: First run / Models. Status: Fixed 2026-10-13 (was BUG-332). DEC-08 step 2: readiness, not a stored key, decides what is recommended.**
+
+**Observed.** With an identity-linked `sk-ant-usr-` key stored, setup recommended *Anthropic is connected — Choose one of its models*, and no model could be chosen.
+
+**Fixed.** The recommendation reads what the provider said when its models were listed (`ProviderMatrix` reports each listing upward) and the stored readiness reason; before a hosted provider is recommended as connected, setup asks it once what it serves. A key that needs its workspace is recommended as **Anthropic needs its workspace ID**, with **Add the workspace ID** opening the providers and focusing that field; another working provider is preferred over it.
+
+**Evidence.** `firstRun.test.ts` (4), `ModelSetupView.test.ts` (2). Live, with the owner's key and workspace ID typed into setup: the recommendation asked for the workspace, the field took focus, and with it Anthropic listed 14 models and Haiku 5.5 became the default ([01](../screenshots/2026-10-13-ledger-round/01-setup-asks-for-the-workspace.png), [02](../screenshots/2026-10-13-ledger-round/02-workspace-added-models-listed.png)).
+
+---
+
+## FIXED-895 — Setup's model step waited on every provider's check before it showed anything (was BUG-331)
+
+**Severity: Low. Area: First run / Models. Status: Fixed 2026-10-13 (was BUG-331). DEC-08.**
+
+**Observed.** The step rendered nothing — *Preparing your setup…* — until both `/api/setup` and the slow `/api/models` answered.
+
+**Fixed.** The step is drawn from `/api/setup` at once; the providers fill in when `/api/models` answers, with *Looking for the providers and runtimes this device can reach…* meanwhile, and a failed provider read says so without losing the step.
+
+**Evidence.** `ModelSetupView.test.ts`: the heading is up while `/api/models` is still pending.
+
+---
+
+## FIXED-896 — A model chosen by search was judged by the default's readiness and window (was BUG-314)
+
+**Severity: Low. Area: Composers / models. Status: Fixed 2026-10-13 (was BUG-314). DEC-08 step 5.**
+
+**Observed.** Chat, Build and Tasks looked the bound pair up in the quick list and fell back to the default, so a searched model's readiness line, Send state and context meter described the default.
+
+**Fixed.** One helper, `activeComposerProfile`, resolves the bound pair the way the picker does (FIXED-723): the provider's profile — from the quick list or the registry — with the bound model. A pair with no observation reads *Checked when you send*, and its context window as unknown rather than the default's. All three composers use it.
+
+**Evidence.** `composerActiveProfile.test.ts` (4).
+
+---
+
+## FIXED-897 — Importing the runtime orchestrator first failed on a circular import (was BUG-326)
+
+**Severity: Low. Area: Maintainability. Status: Fixed 2026-10-13 (was BUG-326). DEC-18.**
+
+**Observed.** `python -c "import raiker.runtime.orchestrator"` failed: `models.connections` → `runtime.executors` → the image executor → `models.connections`, half-loaded.
+
+**Fixed.** The image executor imports `get_model_connection` where it uses it. `tests/test_module_import_isolation.py` imports every one of the 534 modules under `raiker` in a fresh interpreter (batched, in parallel) so the next cycle fails CI.
+
+**Evidence.** The new test fails with the old import and passes with the fix.
+
+---
+
+## FIXED-898 — A standing *Git writes* decision covered local branches and commits without a delegation (was BUG-337)
+
+**Severity: Low. Area: Build / Git writes. Status: Fixed 2026-10-13 (was BUG-337). DEC-21b-J: delegated autonomy is repository- and branch-bound.**
+
+**Observed.** Since GH-50 a push and a GitHub write ran unprompted only under a covering delegation; creating a branch and committing still followed the decision mode and standing grants alone.
+
+**Fixed.** `GitWriteExecutor.repository_target` names the GitHub repository (the branch's upstream remote, else `origin`, else the only remote) and the branch — the one named for a branch, the checked-out one for a commit — so the router applies the delegation rule to both. A repository with no GitHub remote keeps the decision mode, since there is nothing to delegate.
+
+**Evidence.** `tests/test_repository_delegations.py` (3) against a real repository: allow mode alone no longer branches for an agent, a `raiker/*` delegation covers `raiker/feature` and not `hotfix`.
+
+---
+
+## FIXED-899 — A delegation's repository identity was checked against the last discovery, not asked of GitHub (was BUG-338)
+
+**Severity: Low. Area: Build / delegations. Status: Fixed 2026-10-13 (was BUG-338). DEC-21b-G: identity re-checked before consequential operations.**
+
+**Observed.** The router re-validated a delegation against Raiker's own records only, so a repository transferred or re-created since the last refresh was not seen until the next.
+
+**Fixed.** Before a delegated push or pull request the router asks GitHub (`GET /repos/{owner}/{name}`) with the delegation's credential; a clean answer is reused for 60 seconds per delegation so a burst of steps asks once, while the local checks run on every step. A different id is `repository_identity_changed`, a 403/404 `repository_access_removed`, and GitHub out of reach `github_unreachable` — each parks the step for the owner.
+
+**Evidence.** `tests/test_repository_delegations.py` (2): one question for two pushes, the third refused when the id changed; an unreachable GitHub blocks the step.
+
+---
+
+## FIXED-900 — The Models page's connection lifecycle lived in the page (was BUG-319)
+
+**Severity: Low. Area: Models / maintainability. Status: Fixed 2026-10-13 (was BUG-319). DEC-18 / UX-MODEL-01's remainder.**
+
+**Observed.** Models and first-run setup each implemented storing a credential, adding a workspace, removing it and listing a catalogue, and each read a refusal its own way.
+
+**Fixed.** `web/src/lib/providerConnections.ts` owns those operations and their interpretation (`saveConnection`, `saveWorkspace`, `removeConnection`, `listCatalogue`, `refusedForWorkspace`); `ModelsView` and `ProviderMatrix` call it and keep only their own presentation. Behaviour unchanged.
+
+**Evidence.** `providerConnections.test.ts` (5); the Models, setup and matrix suites (93) unchanged.
+
+---
+
+## FIXED-901 — Three tests assumed Linux newlines and separators (part of BUG-330)
+
+**Severity: Low. Area: Tests / Windows. Status: Fixed 2026-10-13 (BUG-330 stays open for its remainder). Test portability.**
+
+**Observed.** The MCP stdio stand-in wrote text-mode `\r\n` on Windows, a fixture's `write_text("hello\n")` was seven bytes there, and a restore path was compared with `/`.
+
+**Fixed.** The stand-in writes bytes, the fixture writes bytes, and the path is compared as a `Path`.
+
+**Evidence.** The three files pass on Linux; the Windows run is BUG-330's remaining evidence.
+
+---
+
+## FIXED-902 — A project name already in use was answered as a refusal
+
+**Severity: Low. Area: Projects / API. Status: Fixed 2026-10-13 — found by the live round. §13.9: `forbidden` and `conflict` are separate answers.**
+
+**Observed.** `POST /api/projects` with a name another project has answered `403 duplicate_project_name`, as though the owner may not create projects.
+
+**Fixed.** A duplicate name or root is `409`.
+
+**Evidence.** `tests/test_projects.py`.
+
+---
+
+## FIXED-903 — A message whose reply did not go read as though no reply was tried
+
+**Severity: Low. Area: Messaging. Status: Fixed 2026-10-13 — found by the live round. UX-MSG-06: each stage of a message is its own fact.**
+
+**Observed.** After BUG-315's change, the owner's message whose reply Telegram refused still read *Processed — no reply sent over the channel*.
+
+**Fixed.** It reads *Answered — the reply did not go; see Deliveries to review*, and a delivered one *Answered — the reply was delivered*.
+
+**Evidence.** `channelSetup.test.ts`.

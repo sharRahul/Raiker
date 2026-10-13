@@ -255,7 +255,8 @@ while the database will not open. A missing `app.key` is not something a backup
 can fix — every backup needs that key.
 
 **What you deleted stays deleted.** Forgetting or permanently deleting a memory,
-and deleting a conversation, are also recorded in `.raiker/deletions.jsonl` —
+deleting a conversation or a project, removing a Design picture for good and
+removing a managed file are also recorded in `.raiker/deletions.jsonl` —
 the kind, the id and the time, never the content. Either restore applies the
 deletions made after the backup was taken, so restoring an older backup does not
 bring back something you removed since.

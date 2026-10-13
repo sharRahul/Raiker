@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import fnmatch
 import re
+import threading
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -65,6 +67,19 @@ OPERATION_RISKS: tuple[OperationRisk, ...] = (
     OperationRisk("delete_repository", "Delete a repository", "none", "not_offered", False, None),
 )
 RISK_BY_OPERATION: dict[str, OperationRisk] = {row.operation: row for row in OPERATION_RISKS}
+#: BUG-338 — how long GitHub's clean answer about one delegation's repository
+#: is reused, so a burst of delegated steps asks once.
+REMOTE_CHECK_SECONDS = 60.0
+_REMOTE_CHECKS: dict[tuple[str, str], float] = {}
+_REMOTE_CHECKS_LOCK = threading.Lock()
+
+
+def reset_remote_checks() -> None:
+    """Forget every cached answer (tests, and a credential change)."""
+    with _REMOTE_CHECKS_LOCK:
+        _REMOTE_CHECKS.clear()
+
+
 DELEGABLE_OPERATIONS: frozenset[str] = frozenset(row.operation for row in OPERATION_RISKS if row.delegable)
 #: Operations that land on a branch and so need the delegation's branch pattern.
 BRANCH_OPERATIONS: frozenset[str] = frozenset({"branch", "commit", "push"})
@@ -358,7 +373,9 @@ class DelegationService:
         return True
 
     # ── revalidation (GH-52) ────────────────────────────────────────────
-    def revalidate(self, row: dict[str, Any], *, http: GitHubHttp | None = None) -> list[str]:
+    def revalidate(
+        self, row: dict[str, Any], *, http: GitHubHttp | None = None, reuse_recent: bool = False
+    ) -> list[str]:
         """Everything that no longer holds for *row*; empty when all of it does.
 
         Checked: the delegation itself; the credential it was made with — still
@@ -400,10 +417,33 @@ class DelegationService:
         elif repository_id:
             problems.append("repository_access_removed")
         if http is not None and credential is not None and not problems:
-            problems.extend(self._remote_identity(row, credential, http))
+            problems.extend(self._remote_identity(row, credential, http, reuse_recent=reuse_recent))
         return problems
 
-    def _remote_identity(self, row: dict[str, Any], credential: dict[str, Any], http: GitHubHttp) -> list[str]:
+    def _remote_identity(
+        self, row: dict[str, Any], credential: dict[str, Any], http: GitHubHttp, *, reuse_recent: bool
+    ) -> list[str]:
+        """GitHub's own answer about the repository, asked at most once a minute per delegation.
+
+        BUG-338 — a burst of delegated steps asks once; an answer that found
+        something wrong is not kept, so the next step asks again. Only a clean
+        answer is reused, and only for this short window: the local checks above
+        (revoked, expired, credential switched) run on every step regardless.
+        """
+        key = (self._principal_id, str(row["delegation_id"]))
+        now = time.monotonic()
+        if reuse_recent:
+            with _REMOTE_CHECKS_LOCK:
+                cached = _REMOTE_CHECKS.get(key)
+                if cached is not None and cached > now:
+                    return []
+        problems = self._ask_github(row, credential, http)
+        if not problems:
+            with _REMOTE_CHECKS_LOCK:
+                _REMOTE_CHECKS[key] = now + REMOTE_CHECK_SECONDS
+        return problems
+
+    def _ask_github(self, row: dict[str, Any], credential: dict[str, Any], http: GitHubHttp) -> list[str]:
         from raiker.github.credentials import METHOD_SSH, CredentialMethodError
         from raiker.github.http import GitHubHttpError
         from raiker.runtime.git_credential import GitCredentialBroker
@@ -414,7 +454,12 @@ class DelegationService:
         try:
             token = methods.secret(credential, verify=True, repository=str(row["repository"]), operation="fetch")
             response = http.get_json(f"https://api.github.com/repos/{_full_name(str(row['repository']))}", token=token)
-        except (CredentialMethodError, GitHubHttpError) as exc:
+        except GitHubHttpError as exc:
+            # Could not reach GitHub: the step is blocked and the owner decides,
+            # rather than running on an identity nobody could confirm.
+            reason = str(exc.reason)
+            return ["github_unreachable"] if reason.startswith("github_unreachable") else [reason]
+        except CredentialMethodError as exc:
             return [getattr(exc, "reason", "credential_unavailable")]
         if response.status in (403, 404):
             return ["repository_access_removed"]

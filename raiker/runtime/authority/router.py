@@ -1029,8 +1029,20 @@ class RuntimeAuthority:
         )
         if row is None:
             return None, ["delegation_required"], service
-        problems = service.revalidate(row)
+        # BUG-338 — a push or a pull request is checked against GitHub itself:
+        # the repository still exists by that name and still has the id the
+        # delegation was made for. A local branch or commit is not, since it
+        # reaches nothing on GitHub.
+        operation = str(target.get("operation") or "")
+        http = self._delegation_http() if operation in {"push", "pull_request"} else None
+        problems = service.revalidate(row, http=http, reuse_recent=True)
         return (None, problems, service) if problems else (row, [], service)
+
+    def _delegation_http(self) -> Any:
+        """The client revalidation asks GitHub with (BUG-338); tests replace it."""
+        from raiker.github.http import GitHubHttp
+
+        return GitHubHttp()
 
     def repository_delegation_available(self, action: GovernedAction, principal: Principal) -> bool:
         """Whether a write would run under a delegation now — spending nothing."""

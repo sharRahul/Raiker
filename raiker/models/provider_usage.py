@@ -44,6 +44,7 @@ class ObservedUsageView(TypedDict):
     requests: int
     turns: int
     compactions: int
+    estimated_requests: int
     known_cost: str | None
     cost_currency: str | None
     unpriced_models: list[str]
@@ -136,6 +137,7 @@ class ProviderUsageRow:
                 "requests": self.observed.requests,
                 "turns": self.observed.turns,
                 "compactions": self.observed.compactions,
+                "estimated_requests": self.observed.estimated_requests,
                 "known_cost": str(self.known_cost) if self.known_cost is not None else None,
                 "cost_currency": self.cost_currency,
                 "unpriced_models": list(self.unpriced_models),

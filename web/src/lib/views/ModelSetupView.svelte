@@ -11,8 +11,10 @@
    * have used the product once. `firstRun.ts` holds the ordering and the
    * wording; this file draws it.
    */
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { api } from "../api";
+  import { providerName } from "../format";
+  import { listCatalogue } from "../providerConnections";
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { modelName } from "../modelPresentation";
   import { drawsImages } from "../modelReadiness.svelte";
@@ -55,19 +57,34 @@
     };
   }
 
+  /**
+   * BUG-331 — the step is drawn from `/api/setup` at once. `/api/models` asks
+   * every provider and local runtime and is the slow read (seconds with a
+   * dozen local models), so the providers fill in when it answers instead of
+   * the whole screen reading *Preparing your setup…* until it does.
+   */
+  let profilesLoading = $state(true);
+
   async function load() {
     try {
-      let view;
-      [setup, view] = await Promise.all([api.setup(), api.models()]);
-      profiles = view.profiles;
+      setup = await api.setup();
       backupTarget = setup.backup_target ?? "";
+    } catch {
+      error = "Setup could not be loaded.";
+      profilesLoading = false;
+      return;
+    }
+    try {
+      const view = await api.models();
+      profiles = view.profiles;
       // A model the owner already chose — here earlier, or as the global model
       // on Models before coming back — is a choice, not "decide later". Without
       // this the step offered only "Decide later" and Ready then claimed no
       // model was set up while Chat answered with one.
-      const chosen = !setup.model_deferred && setup.selected_model ? setup.selected_model : view.current_model;
+      const chosen =
+        setup && !setup.model_deferred && setup.selected_model ? setup.selected_model : view.current_model;
       if (chosen) picked = modelName(chosen);
-      if (!setup.selected_model && view.current_profile_id && view.current_model) {
+      if (setup && !setup.selected_model && view.current_profile_id && view.current_model) {
         setup = await api.updateSetup(body({
           selected_profile_id: view.current_profile_id,
           selected_model: view.current_model,
@@ -75,7 +92,9 @@
         }));
       }
     } catch {
-      error = "Setup could not be loaded.";
+      error = "The providers could not be listed. Reload to try again, or decide later.";
+    } finally {
+      profilesLoading = false;
     }
   }
 
@@ -265,10 +284,58 @@
   // access as `never`. The parameter carries the declared type instead.
   const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
   const stage = $derived(visibleStage(stageOf(setup)));
-  const recommended = $derived(recommendedPath(profiles));
+  /** BUG-332 — what each provider said when its models were last listed here. */
+  let catalogueRefusals = $state<Record<string, string | null>>({});
+  const candidate = $derived(recommendedPath(profiles, catalogueRefusals));
+  /**
+   * BUG-332 — a stored key is a claim, not a connection. Before a hosted
+   * provider is recommended as connected, it is asked once what it serves; an
+   * identity-linked key with no workspace answers that it needs one, and the
+   * recommendation says so instead of offering models nobody can list.
+   */
+  const unconfirmed = $derived(
+    candidate !== null &&
+      candidate.action === "choose" &&
+      !(candidate.profileId in catalogueRefusals) &&
+      profiles.find((profile) => profile.profile_id === candidate.profileId)?.off_machine === true,
+  );
+  const recommended = $derived(unconfirmed ? null : candidate);
+  let confirming = $state<string | null>(null);
+  $effect(() => {
+    if (!unconfirmed || candidate === null || confirming === candidate.profileId) return;
+    const profileId = candidate.profileId;
+    confirming = profileId;
+    void listCatalogue(profileId).then((outcome) => {
+      catalogueRefusals = {
+        ...catalogueRefusals,
+        [profileId]: outcome.ok
+          ? outcome.list.status === "available"
+            ? null
+            : (outcome.list.reason_code ?? "provider_unavailable")
+          : (outcome.reasonCode ?? "provider_unreachable"),
+      };
+    });
+  });
+
+  /** Open the providers and put the cursor in the field the recommendation names. */
+  async function addWorkspace() {
+    const label = recommended ? `${providerName(recommended.provider)} workspace ID` : "";
+    showAllProviders = true;
+    // The field appears once the row has asked its provider again, so look for
+    // it for a moment rather than once.
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await tick();
+      const field = document.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+      if (field) {
+        field.focus();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
   /** The full matrix opens by itself only when there is nothing to recommend. */
   let showAllProviders = $state(false);
-  const allProvidersOpen = $derived(showAllProviders || recommended === null);
+  const allProvidersOpen = $derived(showAllProviders || (recommended === null && !unconfirmed));
 
   onMount(load);
 </script>
@@ -317,30 +384,43 @@
              is no step in between where models are kept or withheld. -->
         <p>Connect a provider or a runtime once. Every compatible model it serves becomes available in Chat, Build and Design, and you choose which one answers by default.</p>
       </header>
-      {#if recommended !== null}
+      {#if profilesLoading || unconfirmed}
+        <!-- BUG-331 — the step is here; the providers are still answering. -->
+        <p class="note providers-loading" role="status" aria-live="polite">
+          {unconfirmed && candidate
+            ? `Asking ${providerName(candidate.provider)} what it serves…`
+            : "Looking for the providers and runtimes this device can reach…"}
+        </p>
+      {:else if recommended !== null}
         <!-- FIRST-05 — the easiest true path first, the matrix on request. -->
         <div class="recommended">
           <p class="eyebrow">Recommended</p>
           <strong>{recommended.label}</strong>
           <span>{recommended.detail}</span>
-          {#if !allProvidersOpen && picked === null}
+          {#if recommended.action === "workspace" && picked === null}
+            <!-- BUG-332 — the one thing that stands between this key and its
+                 models, with the field it names focused. -->
+            <button class="primary choose" onclick={() => void addWorkspace()}>Add the workspace ID</button>
+          {:else if !allProvidersOpen && picked === null}
             <!-- The recommendation asks for a model; the picker that answers it
                  is in the providers below, so it opens them. -->
             <button class="primary choose" onclick={() => (showAllProviders = true)}>Choose a model</button>
           {/if}
         </div>
       {/if}
-      {#if !allProvidersOpen}
+      {#if !profilesLoading && !unconfirmed && !allProvidersOpen}
         <div class="actions">
           <button class="quiet" onclick={() => (showAllProviders = true)}>Other options</button>
         </div>
       {/if}
-      {#if allProvidersOpen}
+      {#if !profilesLoading && !unconfirmed && allProvidersOpen}
         <ProviderMatrix
           {profiles}
           {chatProfiles}
           onchanged={() => void loadProfiles()}
           onselected={(profileId, model) => void chooseModel(profileId, model)}
+          oncatalogue={(profileId, reasonCode) =>
+            (catalogueRefusals = { ...catalogueRefusals, [profileId]: reasonCode })}
         />
       {/if}
       {#if picked !== null}

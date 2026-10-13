@@ -31,6 +31,14 @@
   import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { detectionNotice, onReturnToApp } from "../returnAndDetect";
   import { setModels } from "../models.svelte";
+  import {
+    connectionRefusal,
+    listCatalogue,
+    refusedForWorkspace,
+    removeConnection,
+    saveConnection as storeConnection,
+    type ConnectionRefusal,
+  } from "../providerConnections";
   import { modelDecisions } from "../surfaceModel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
@@ -394,13 +402,13 @@
       // Email is captured for a friendlier sign-in feel but only the API key
       // and optional endpoint are stored server-side (the backend vault has no
       // email field). Keeping it in the UI only avoids sending unused PII.
-      await api.saveModelConnection(
-        profileId,
-        signInEndpoint.trim(),
-        signInApiKey.trim(),
-        signInAdminApiKey.trim(),
-        signInWorkspaceId.trim(),
-      );
+      const outcome = await storeConnection(profileId, {
+        endpoint: signInEndpoint,
+        apiKey: signInApiKey,
+        adminApiKey: signInAdminApiKey,
+        workspaceId: signInWorkspaceId,
+      });
+      if (!outcome.ok) throw outcome;
       signInApiKey = "";
       signInAdminApiKey = "";
       signInWorkspaceId = "";
@@ -415,18 +423,18 @@
       detailsFor = null;
       await load();
     } catch (e) {
-      signInGuidance =
-        e instanceof ApiError ? providerErrorGuidance(e.reasonCode) : null;
+      // BUG-319 — the refusal is read the way setup reads it.
+      const refusal = isConnectionRefusal(e) ? e : connectionRefusal(e);
+      signInGuidance = refusal.guidance;
       // BUG-274 — the remediation names a field, so open the section holding
       // it. An answer that says "add the workspace ID" while the box is folded
       // away is the same dead end the old copy was.
-      if (signInGuidance?.code?.startsWith("provider_workspace") === true)
-        signInAdvanced = true;
+      if (refusal.workspaceRefused) signInAdvanced = true;
       signInError =
         signInGuidance !== null
           ? null
-          : e instanceof ApiError
-            ? `Could not connect (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : refusal.status !== null
+            ? `Could not connect (${refusal.status}${refusal.reasonCode ? `: ${refusal.reasonCode}` : ""})`
             : "Could not connect";
     } finally {
       signInSaving = false;
@@ -445,15 +453,16 @@
     disconnecting = { ...disconnecting, [id]: true };
     testResults = without(testResults, id);
     try {
-      await api.saveModelConnection(id, "", "");
+      if (!(await removeConnection(id)).ok) {
+        testResults = {
+          ...testResults,
+          [id]: `Could not disconnect ${name}. The saved credential was left unchanged.`,
+        };
+        return;
+      }
       await load();
       testResults = { ...testResults, [id]: `${name} connection removed.` };
       onchanged?.();
-    } catch {
-      testResults = {
-        ...testResults,
-        [id]: `Could not disconnect ${name}. The saved credential was left unchanged.`,
-      };
     } finally {
       disconnecting = without(disconnecting, id);
     }
@@ -611,14 +620,15 @@
           : `Raiker could not check ${providerName(profile.provider)}.`;
       }
     } else {
-      try {
-        const list = await api.providerModels(id);
-        message = testNote(profile, list);
-        noteWorkspaceRefusal(id, list.reason_code);
-      } catch (e) {
-        message = throttled(e)
-          ? THROTTLED
-          : `Raiker could not reach ${providerName(profile.provider)}.`;
+      const outcome = await listCatalogue(id);
+      if (outcome.ok) {
+        message = testNote(profile, outcome.list);
+        noteWorkspaceRefusal(id, outcome.list.reason_code);
+      } else {
+        message =
+          outcome.status === 429
+            ? THROTTLED
+            : `Raiker could not reach ${providerName(profile.provider)}.`;
       }
     }
     testing = without(testing, id);
@@ -649,8 +659,12 @@
 
   /** Remember a governed workspace refusal against the card that got it. */
   function noteWorkspaceRefusal(profileId: string, reasonCode: string | null | undefined) {
-    if ((reasonCode ?? "").startsWith("provider_workspace"))
+    if (refusedForWorkspace(reasonCode))
       workspaceRefused = { ...workspaceRefused, [profileId]: true };
+  }
+
+  function isConnectionRefusal(value: unknown): value is ConnectionRefusal {
+    return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === false;
   }
 
   // A short chip label for the exact readiness state, so a card says what a
@@ -679,13 +693,12 @@
     selectError = null;
     pickerLoading = true;
     try {
-      pickerList = normalizePickerList(await api.providerModels(profileId));
+      const outcome = await listCatalogue(profileId);
+      pickerList = outcome.ok ? normalizePickerList(outcome.list) : null; // manual entry still works
       // The same governed code the Test button reads. Opening the picker is how
       // most owners meet this refusal, so it has to offer the field that fixes
       // it too — otherwise the answer depends on which button you pressed.
-      noteWorkspaceRefusal(profileId, pickerList?.reason_code);
-    } catch {
-      pickerList = null; // manual entry still works
+      noteWorkspaceRefusal(profileId, outcome.ok ? pickerList?.reason_code : outcome.reasonCode);
     } finally {
       pickerLoading = false;
     }

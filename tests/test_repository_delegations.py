@@ -510,3 +510,127 @@ def test_a_scheduled_run_creates_no_authority_and_parks_when_its_delegation_ends
     assert plan["blocked_needs_owner"] is True and "delegation_revoked" in plan["delegation_problems"]
     assert {s["decision"] for s in plan["steps"] if s["operation"] != "read"} == {"asks"}
     assert len(DelegationService(store, OWNER).delegations(include_ended=True)) == before
+
+
+# ── BUG-337: a local branch and commit answer to the same rule ──────────
+
+
+def _git_repo(ws: Path, remote: str | None) -> None:
+    import subprocess
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=ws, check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "owner@example.invalid")
+    git("config", "user.name", "Owner")
+    (ws / "README.md").write_text("demo\n", encoding="utf-8")
+    git("add", "README.md")
+    git("commit", "-q", "-m", "first")
+    if remote is not None:
+        git("remote", "add", "origin", remote)
+
+
+def _git_writes(ws: Path, mode: str = "always_allow") -> RuntimeAuthority:
+    _enable(ws, "git_write_execution", mode)
+    store = SQLiteStore(ws)
+    return RuntimeAuthority(store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store))
+
+
+def _branch(name: str) -> Any:
+    return governed_action("git_branch", principal_id="p_ai", arguments={"name": name}, risk_level="medium")
+
+
+def test_a_branch_on_a_github_repository_needs_a_delegation_that_covers_it(ws: Path) -> None:
+    _git_repo(ws, "https://github.com/acme/demo.git")
+    authority = _git_writes(ws)
+    store = SQLiteStore(ws)
+    # Allow mode alone no longer creates a branch for an agent on a GitHub repository.
+    assert authority.route_action(_branch("raiker/feature"), _agent(store)).decision == "needs_approval"
+    _delegate(ws, operations=["branch", "commit"])
+    assert authority.route_action(_branch("raiker/feature"), _agent(store)).decision == "allow"
+    # The pattern limits where the agent branches.
+    assert authority.route_action(_branch("hotfix"), _agent(store)).decision == "needs_approval"
+
+
+def test_the_executor_names_the_repository_and_the_branch_a_commit_lands_on(ws: Path) -> None:
+    from raiker.runtime.executors.tier1_git import GitWriteExecutor
+
+    _git_repo(ws, "git@github.com:Acme/Demo.git")
+    executor = GitWriteExecutor(ws, SQLiteStore(ws))
+    commit = governed_action("git_commit", principal_id="p_ai", arguments={"message": "x"}, risk_level="medium")
+    assert executor.repository_target(commit, _agent()) == {
+        "repository": REPO, "operation": "commit", "branch": "main",
+    }
+
+
+def test_a_repository_with_no_github_remote_keeps_the_decision_mode(ws: Path) -> None:
+    from raiker.runtime.executors.tier1_git import GitWriteExecutor
+
+    _git_repo(ws, None)
+    assert GitWriteExecutor(ws, SQLiteStore(ws)).repository_target(_branch("x"), _agent()) is None
+    _git_repo_remote = "https://gitlab.example.com/acme/demo.git"
+    import subprocess
+
+    subprocess.run(["git", "remote", "add", "origin", _git_repo_remote], cwd=ws, check=True)
+    assert GitWriteExecutor(ws, SQLiteStore(ws)).repository_target(_branch("x"), _agent()) is None
+    authority = _git_writes(ws)
+    assert authority.route_action(_branch("anything"), _agent(SQLiteStore(ws))).decision == "allow"
+
+
+# ── BUG-338: the router asks GitHub before a delegated push ─────────────
+
+
+def test_a_delegated_push_asks_github_once_per_burst_and_stops_when_it_moved(
+    ws: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.github.delegations import reset_remote_checks
+
+    _discovered(ws)
+    stub = _StubPush()
+    authority = _authority(ws, stub)
+    _delegate(ws)
+    asked: list[str] = []
+    answer = {"id": 900}
+
+    def github(method: str, url: str, headers: Mapping[str, str], body: bytes | None) -> tuple[int, Mapping[str, str], bytes]:
+        asked.append(url)
+        return 200, {}, json.dumps({"id": answer["id"]}).encode()
+
+    monkeypatch.setattr(RuntimeAuthority, "_delegation_http", lambda _self: GitHubHttp(github))
+    monkeypatch.setattr(
+        "raiker.github.credentials.CredentialMethods.secret",
+        lambda _self, _credential, **_kw: TOKEN,
+    )
+    store = SQLiteStore(ws)
+    assert authority.route_action(_push("raiker/a"), _agent(store)).decision == "allow"
+    assert authority.route_action(_push("raiker/b"), _agent(store)).decision == "allow"
+    assert asked == ["https://api.github.com/repos/acme/demo"]  # one question for the burst
+
+    reset_remote_checks()
+    answer["id"] = 901  # transferred and re-created since discovery
+    parked = authority.route_action(_push("raiker/c"), _agent(store))
+    assert parked.decision == "needs_approval" and len(stub.ran) == 2
+    refused = _payloads(ws, "repository_delegation_refused")
+    assert refused and refused[0]["problems"] == ["repository_identity_changed"]
+
+
+def test_github_out_of_reach_blocks_the_step_for_the_owner(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from raiker.github.http import GitHubHttpError
+
+    _discovered(ws)
+    stub = _StubPush()
+    authority = _authority(ws, stub)
+    _delegate(ws)
+
+    def offline(*_args: object) -> tuple[int, Mapping[str, str], bytes]:
+        raise GitHubHttpError("github_unreachable:URLError")
+
+    monkeypatch.setattr(RuntimeAuthority, "_delegation_http", lambda _self: GitHubHttp(offline))
+    monkeypatch.setattr(
+        "raiker.github.credentials.CredentialMethods.secret",
+        lambda _self, _credential, **_kw: TOKEN,
+    )
+    result = authority.route_action(_push("raiker/a"), _agent(SQLiteStore(ws)))
+    assert result.decision == "needs_approval" and stub.ran == []
+    assert _payloads(ws, "repository_delegation_refused")[0]["problems"] == ["github_unreachable"]

@@ -168,12 +168,41 @@ describe("first-run setup", () => {
         chat_profiles: [],
       },
       "GET /api/model-library": { roots: [], models: [] },
+      // BUG-332 — asked once before it is recommended as connected.
+      "GET /api/models/openrouter-policy-gated/provider-models": {
+        status: "available", models: ["openai/gpt-4o-mini"], reason_code: null,
+      },
     });
     render(ModelSetupView);
 
     expect(await screen.findByText(/OpenRouter is connected/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Choose a model" }));
     expect(screen.queryByRole("button", { name: "Other options" })).not.toBeInTheDocument();
+  });
+
+  it("does not call a stored key that lists nothing connected (BUG-332)", async () => {
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": {
+        profiles: [
+          profile({
+            profile_id: "anthropic-hosted", provider: "anthropic", local_only: false,
+            requires_network: true, endpoint_kind: "remote_hosted", off_machine: true,
+            connection_configured: true, configured: true,
+          }),
+        ],
+        chat_profiles: [],
+      },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/anthropic-hosted/provider-models": {
+        status: "unavailable", models: [], reason_code: "provider_workspace_required",
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByText("Anthropic needs its workspace ID")).toBeInTheDocument();
+    expect(screen.queryByText(/Anthropic is connected/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Add the workspace ID" })).toBeInTheDocument();
   });
 
   it("lets model setup be deferred", async () => {
@@ -606,3 +635,33 @@ describe("first-run setup", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("BUG-331 — the model step does not wait on every provider", () => {
+  it("shows the step from setup at once and the providers when they answer", async () => {
+    let answerModels: (value: unknown) => void = () => {};
+    const models = new Promise((resolve) => (answerModels = resolve));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        if (url.includes("/api/setup")) return { ok: true, status: 200, json: async () => required } as Response;
+        if (url.includes("/api/models")) {
+          await models;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ profiles: REGISTRY, current_profile_id: null, current_model: null }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({}) } as Response;
+      }),
+    );
+    render(ModelSetupView);
+    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    expect(screen.getByText(/Looking for the providers and runtimes/)).toBeInTheDocument();
+    expect(screen.queryByText("Preparing your setup…")).toBeNull();
+    answerModels(null);
+    await waitFor(() => expect(screen.queryByText(/Looking for the providers and runtimes/)).toBeNull());
+  });
+});
+

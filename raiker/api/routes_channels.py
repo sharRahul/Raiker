@@ -37,6 +37,7 @@ from raiker.api.wire.channels import (
     ChannelInboundAccepted,
     ChannelPaired,
     ChannelPausedSet,
+    ChannelReplySent,
     ChannelRoutingSet,
     ChannelSendersSet,
     ChannelTestDelivered,
@@ -292,6 +293,8 @@ def _channel_result(result: Any) -> dict[str, Any]:
         # DEC-14 step 3 — the channel's state stands in the way until a test
         # to its destination is delivered.
         raise refusal(status.HTTP_409_CONFLICT, reason)
+    if reason == "unknown_held_reply":
+        raise refusal(status.HTTP_404_NOT_FOUND, reason)
     if (
         reason.startswith("unknown_connector")
         or reason.startswith("unknown_channel_pairing")
@@ -483,6 +486,24 @@ async def mark_channel_delivery_reviewed(
     if not result.ok:
         raise refusal(status.HTTP_404_NOT_FOUND, result.reason_code)
     answer = cast(ChannelDeliveryReviewed, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.post("/api/channels/deliveries/{receipt_id}/send")
+async def send_held_channel_reply(
+    receipt_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Send a reply that was held because it carries sensitive information (BUG-315)."""
+    answer = cast(
+        ChannelReplySent,
+        _channel_result(
+            _service(request).control.send_held_channel_reply(
+                auth_data[0].principal_id, receipt_id
+            )
+        ),
+    )
     return serialize_dto(answer)
 
 
@@ -907,6 +928,31 @@ async def _handle_inbound(
     )
     _settle_receipt(store, channel_message_id, routed, channel_type=channel_type)
     _remember_reply(connector_id, str(routed.get("reply") or ""))
+    if (
+        channel_type == "telegram"
+        and is_owner
+        and routed.get("routed")
+        and routed.get("reply")
+        and routed.get("turn_id")
+        and str(routed.get("status") or "") == "completed"
+    ):
+        # BUG-315 — the answer to the owner's own message goes back to their
+        # chat (owner decision, 2026-10-13), held instead when it carries
+        # sensitive information. Telegram ignores a webhook's response body,
+        # so without this the owner read the answer only in Raiker.
+        reply = _service(request).control.deliver_channel_reply(
+            str(pairing.get("paired_by") or ""),
+            connector_id=connector_id,
+            text=str(routed["reply"]),
+            reply_to_receipt_id=channel_message_id,
+            session_id=str(routed.get("session_id") or ""),
+            turn_id=str(routed["turn_id"]),
+        )
+        routed["reply_delivery"] = (
+            "held" if reply.ok and reply.data.get("held")
+            else "delivered" if reply.ok
+            else "failed"
+        )
     answer = cast(ChannelInboundAccepted, {
         "ok": True,
         "channel_message_id": channel_message_id,

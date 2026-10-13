@@ -479,6 +479,11 @@ EVENT_TYPES = {
     "channel_paused",
     "channel_resumed",
     "channel_delivery_reviewed",
+    # BUG-315 — a channel turn's answer sent back to the owner's chat, refused
+    # on the way, or held because it carries sensitive information.
+    "channel_reply_delivered",
+    "channel_reply_failed",
+    "channel_reply_held",
     "mcp_server_secret_set",
     "mcp_server_secret_removed",
     # ADD-27 GH-14 — the Git credential's decisions, metadata only.

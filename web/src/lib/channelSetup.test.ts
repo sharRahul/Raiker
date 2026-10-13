@@ -155,6 +155,12 @@ describe("receipts", () => {
     expect(receiptOutcome(receipt)).toMatch(/no reply sent/);
   });
 
+  it("says when a reply was tried and did not go (BUG-315)", () => {
+    const receipt = { ...base, queued_at: "t", processed_at: "t", reply_queued_at: "t" };
+    expect(receiptOutcome(receipt)).toBe("Answered — the reply did not go; see Deliveries to review");
+    expect(receiptOutcome({ ...receipt, delivered_at: "t" })).toBe("Answered — the reply was delivered");
+  });
+
   it("names the sender by role and a refusal by its reason", () => {
     const refused = {
       ...base,

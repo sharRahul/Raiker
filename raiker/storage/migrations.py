@@ -4497,6 +4497,31 @@ CREATE TABLE IF NOT EXISTS repository_delegations (
 CREATE INDEX IF NOT EXISTS idx_repository_delegations_principal ON repository_delegations(principal_id);
 """
 
+# BUG-333 / DEC-24 step 2 — "separate estimated from settled usage". A stopped
+# stream from a provider that reports usage only in its final chunk (OpenAI,
+# OpenRouter, Ollama) has said nothing, yet the input was sent and billed. Such
+# a row is written as an estimate from the request and the text already shown,
+# and says so: every limit counts it, and nothing presents it as settled.
+MODEL_USAGE_ESTIMATES_MIGRATION_ID = "RAIKER-2109-model-usage-estimates"
+
+MODEL_USAGE_ESTIMATES_SQL = """
+ALTER TABLE model_usage_ledger ADD COLUMN estimated INTEGER NOT NULL DEFAULT 0;
+"""
+
+# BUG-315 — a Telegram turn's answer goes back over Telegram (owner decision,
+# 2026-10-13: a reply to the owner's own message is sent without asking, unless
+# it carries sensitive information, which is held for the owner to send). A
+# held reply is an outbound receipt that waits: ``held_at`` says so, and the
+# receipt names the turn whose answer it carries and the message it answers —
+# never the text, which stays in the conversation.
+CHANNEL_REPLY_HOLDS_MIGRATION_ID = "RAIKER-2110-channel-reply-holds"
+
+CHANNEL_REPLY_HOLDS_SQL = """
+ALTER TABLE channel_receipts ADD COLUMN held_at TEXT;
+ALTER TABLE channel_receipts ADD COLUMN turn_id TEXT;
+ALTER TABLE channel_receipts ADD COLUMN reply_to_receipt_id TEXT;
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4751,6 +4776,8 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(GIT_PUSH_BINDINGS_MIGRATION_ID, GIT_PUSH_BINDINGS_SQL),
     Migration(GIT_GRANT_BOUNDS_MIGRATION_ID, GIT_GRANT_BOUNDS_SQL),
     Migration(GITHUB_CONNECTION_MIGRATION_ID, GITHUB_CONNECTION_SQL),
+    Migration(MODEL_USAGE_ESTIMATES_MIGRATION_ID, MODEL_USAGE_ESTIMATES_SQL),
+    Migration(CHANNEL_REPLY_HOLDS_MIGRATION_ID, CHANNEL_REPLY_HOLDS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

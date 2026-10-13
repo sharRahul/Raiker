@@ -80,6 +80,18 @@ export interface RecommendedPath {
   provider: string;
   label: string;
   detail: string;
+  /**
+   * BUG-332 — what the recommendation asks for. ``choose`` is a model from a
+   * provider that works; ``workspace`` is the one field an identity-linked key
+   * still needs before its provider can list anything.
+   */
+  action: "choose" | "workspace";
+}
+
+/** True when a provider's last answer was that the key needs its workspace named. */
+function needsWorkspace(profile: ModelProfile, refusals: Readonly<Record<string, string | null>>): boolean {
+  const code = refusals[profile.profile_id] ?? profile.readiness_reason_code ?? "";
+  return code.startsWith("provider_workspace");
 }
 
 /**
@@ -91,7 +103,16 @@ export interface RecommendedPath {
  * connected is next. When neither holds there is no recommendation to make, and
  * inventing one would be a screen guessing on the owner's behalf.
  */
-export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | null {
+export function recommendedPath(
+  profiles: ModelProfile[],
+  /**
+   * BUG-332 — what each provider said when its models were last listed on this
+   * screen (`null` when it listed them). A stored key is not a working
+   * connection: an identity-linked Anthropic key is stored, and lists nothing
+   * until its workspace is named.
+   */
+  refusals: Readonly<Record<string, string | null>> = {},
+): RecommendedPath | null {
   // REM-MODEL-01 — the recommendation passes through the one reachability
   // answer, so a runtime this machine is running but whose last check found no
   // model, or a connected account whose key was rejected, is not offered as the
@@ -118,10 +139,17 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
       } here`,
       detail:
         "It needs no account and no API key, and its models never leave this device.",
+      action: "choose",
     };
   }
   const connected = profiles.find(
-    (profile) => profile.connection_configured === true && isReachableProfile(profile),
+    (profile) =>
+      profile.connection_configured === true &&
+      isReachableProfile(profile) &&
+      !needsWorkspace(profile, refusals) &&
+      // A provider that refused its listing for any other reason is not the
+      // easiest path either; its row says why.
+      !refusals[profile.profile_id],
   );
   if (connected) {
     return {
@@ -129,6 +157,23 @@ export function recommendedPath(profiles: ModelProfile[]): RecommendedPath | nul
       provider: connected.provider,
       label: `${providerName(connected.provider)} is connected`,
       detail: "Choose one of its models as your default, or connect another provider.",
+      action: "choose",
+    };
+  }
+  const waiting = profiles.find(
+    (profile) => profile.connection_configured === true && needsWorkspace(profile, refusals),
+  );
+  if (waiting) {
+    const name = providerName(waiting.provider);
+    return {
+      profileId: waiting.profile_id,
+      provider: waiting.provider,
+      label: `${name} needs its workspace ID`,
+      detail:
+        `This key is identity-linked, so it acts inside one ${name} workspace. Add that ` +
+        "workspace ID — it is in the console beside the key — and its models are listed. " +
+        "Or connect another provider.",
+      action: "workspace",
     };
   }
   return null;

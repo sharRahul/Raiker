@@ -30,6 +30,15 @@
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
   import { providerErrorGuidance, unreachableProviderNote } from "../providerErrors";
+  import {
+    connectionRefusal,
+    listCatalogue,
+    refusedForWorkspace,
+    removeConnection,
+    saveConnection,
+    saveWorkspace,
+    type ConnectionRefusal,
+  } from "../providerConnections";
   import Icon from "./Icon.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
   import AvailableModels from "../views/models/AvailableModels.svelte";
@@ -39,6 +48,7 @@
     chatProfiles = [],
     onselected,
     onchanged,
+    oncatalogue,
   }: {
     /** Every profile the registry publishes, from `GET /api/models`. */
     profiles: ModelProfile[];
@@ -54,6 +64,12 @@
     onselected?: (profileId: string, model: string) => void;
     /** Something that changes the model view was saved. */
     onchanged?: () => void;
+    /**
+     * BUG-332 — what a provider said when its models were listed: `null` when
+     * it listed them, else its reason code. Setup's recommendation reads it, so
+     * it cannot call a key that lists nothing "connected".
+     */
+    oncatalogue?: (profileId: string, reasonCode: string | null) => void;
   } = $props();
 
   /** The models kept offered for one profile, from the caller's snapshot. */
@@ -193,7 +209,9 @@
     failure = drop(failure, row.profileId);
     note = drop(note, row.profileId);
     try {
-      const answer = await api.providerModels(row.profileId);
+      const outcome = await listCatalogue(row.profileId);
+      if (!outcome.ok) throw outcome;
+      const answer = outcome.list;
       // A catalogue is keyed by model id in the dropdown, so a provider that
       // lists the same id twice would crash the render and freeze this row on
       // "Asking…". One id is one model: de-duplicate, keeping the provider's own
@@ -205,6 +223,10 @@
       // provider answered, and what it said was no. The field has to be raised
       // from there too, not only from a thrown error (BUG-274).
       noteWorkspaceRefusalCode(row, list.reason_code);
+      oncatalogue?.(
+        row.profileId,
+        list.status === "available" ? null : (list.reason_code ?? "provider_unavailable"),
+      );
       if (list.status === "available" && list.models.length > 0) {
         // Pre-select the pinned model when the provider still serves it, so the
         // dropdown opens on the owner's own choice rather than on the provider's
@@ -219,16 +241,16 @@
       // A bare reason code is not an answer (FIXED-01). The same guidance the
       // key path already used says what happened and what to do about it, and
       // falls back to the code only when there is nothing better to say.
-      const guidance =
-        error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
-      noteWorkspaceRefusal(row, error);
+      const refusal = isRefusal(error) ? error : connectionRefusal(error);
+      if (refusal.workspaceRefused) wantsWorkspace = set(wantsWorkspace, row.profileId, true);
+      oncatalogue?.(row.profileId, refusal.reasonCode ?? "provider_unreachable");
       failure = set(
         failure,
         row.profileId,
-        guidance
-          ? `${guidance.message} ${guidance.fix}`
-          : error instanceof ApiError && error.reasonCode
-            ? `${row.label} could not be listed (${error.reasonCode}).`
+        refusal.guidance
+          ? `${refusal.guidance.message} ${refusal.guidance.fix}`
+          : refusal.reasonCode
+            ? `${row.label} could not be listed (${refusal.reasonCode}).`
             : `${row.label} could not be reached from this device.`,
       );
     } finally {
@@ -237,16 +259,12 @@
   }
 
   /** Raise the workspace field on the row the provider asked it of (BUG-274). */
-  function noteWorkspaceRefusal(row: Row, error: unknown) {
-    noteWorkspaceRefusalCode(
-      row,
-      error instanceof ApiError ? (error.reasonCode ?? null) : null,
-    );
+  function noteWorkspaceRefusalCode(row: Row, reasonCode: string | null) {
+    if (refusedForWorkspace(reasonCode)) wantsWorkspace = set(wantsWorkspace, row.profileId, true);
   }
 
-  function noteWorkspaceRefusalCode(row: Row, reasonCode: string | null) {
-    if ((reasonCode ?? "").startsWith("provider_workspace"))
-      wantsWorkspace = set(wantsWorkspace, row.profileId, true);
+  function isRefusal(value: unknown): value is ConnectionRefusal {
+    return typeof value === "object" && value !== null && (value as { ok?: unknown }).ok === false;
   }
 
   /**
@@ -257,26 +275,26 @@
    * but the workspace, and the catalogue read that follows is the proof it
    * worked.
    */
-  async function saveWorkspace(row: Row) {
+  async function addWorkspace(row: Row) {
     const value = (workspaceId[row.profileId] ?? "").trim();
     if (value === "") return;
     busy = set(busy, row.profileId, "saving");
     failure = drop(failure, row.profileId);
     try {
-      await api.saveModelConnection(row.profileId, "", "", "", value);
+      const outcome = await saveWorkspace(row.profileId, value);
+      if (!outcome.ok) {
+        failure = set(
+          failure,
+          row.profileId,
+          outcome.guidance
+            ? `${outcome.guidance.message} ${outcome.guidance.fix}`
+            : `${row.label} would not accept that workspace ID.`,
+        );
+        return;
+      }
       wantsWorkspace = drop(wantsWorkspace, row.profileId);
       onchanged?.();
       await detect(row);
-    } catch (error) {
-      const guidance =
-        error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
-      failure = set(
-        failure,
-        row.profileId,
-        guidance
-          ? `${guidance.message} ${guidance.fix}`
-          : `${row.label} would not accept that workspace ID.`,
-      );
     } finally {
       busy = drop(busy, row.profileId);
     }
@@ -314,7 +332,11 @@
     failure = drop(failure, row.profileId);
     note = drop(note, row.profileId);
     try {
-      await api.saveModelConnection(row.profileId, (endpoint[row.profileId] ?? "").trim(), key);
+      const outcome = await saveConnection(row.profileId, {
+        endpoint: endpoint[row.profileId] ?? "",
+        apiKey: key,
+      });
+      if (!outcome.ok) throw outcome;
       // The value is gone from this page the moment it is stored; the row can
       // only ever report that a credential exists.
       apiKey = set(apiKey, row.profileId, "");
@@ -333,14 +355,14 @@
         note = drop(note, row.profileId);
       }
     } catch (error) {
-      const guidance = error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
-      noteWorkspaceRefusal(row, error);
+      const refusal = isRefusal(error) ? error : connectionRefusal(error);
+      if (refusal.workspaceRefused) wantsWorkspace = set(wantsWorkspace, row.profileId, true);
       failure = set(
         failure,
         row.profileId,
-        (guidance ? `${guidance.message} ${guidance.fix}` : null) ??
-          (error instanceof ApiError && error.reasonCode
-            ? `${row.label} refused the credential (${error.reasonCode}).`
+        (refusal.guidance ? `${refusal.guidance.message} ${refusal.guidance.fix}` : null) ??
+          (refusal.reasonCode
+            ? `${row.label} refused the credential (${refusal.reasonCode}).`
             : `${row.label} would not accept that credential.`),
       );
     } finally {
@@ -491,21 +513,22 @@
     failure = drop(failure, row.profileId);
     note = drop(note, row.profileId);
     try {
-      await api.saveModelConnection(row.profileId, url, "");
+      const outcome = await saveConnection(row.profileId, { endpoint: url });
+      if (!outcome.ok) {
+        failure = set(
+          failure,
+          row.profileId,
+          (outcome.guidance ? `${outcome.guidance.message} ${outcome.guidance.fix}` : null) ??
+            (outcome.reasonCode
+              ? `That endpoint was refused (${outcome.reasonCode}).`
+              : "That endpoint was refused."),
+        );
+        return;
+      }
       note = set(note, row.profileId, "Endpoint saved. Asking it what it serves…");
       onchanged?.();
       await detect(row);
       if (catalogue[row.profileId]?.status === "available") note = drop(note, row.profileId);
-    } catch (error) {
-      const guidance = error instanceof ApiError ? providerErrorGuidance(error.reasonCode) : null;
-      failure = set(
-        failure,
-        row.profileId,
-        (guidance ? `${guidance.message} ${guidance.fix}` : null) ??
-          (error instanceof ApiError && error.reasonCode
-            ? `That endpoint was refused (${error.reasonCode}).`
-            : "That endpoint was refused."),
-      );
     } finally {
       busy = drop(busy, row.profileId);
     }
@@ -520,14 +543,15 @@
       return;
     busy = set(busy, row.profileId, "saving");
     try {
-      await api.saveModelConnection(row.profileId, "", "");
+      if (!(await removeConnection(row.profileId)).ok) {
+        failure = set(failure, row.profileId, `The ${row.label} credential could not be removed.`);
+        return;
+      }
       catalogue = drop(catalogue, row.profileId);
       choice = drop(choice, row.profileId);
       stored = set(stored, row.profileId, false);
       note = set(note, row.profileId, `${row.label} credential removed.`);
       onchanged?.();
-    } catch {
-      failure = set(failure, row.profileId, `The ${row.label} credential could not be removed.`);
     } finally {
       busy = drop(busy, row.profileId);
     }
@@ -929,7 +953,7 @@
               onkeydown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  void saveWorkspace(row);
+                  void addWorkspace(row);
                 }
               }}
             />
@@ -939,7 +963,7 @@
             type="button"
             disabled={busy[row.profileId] !== undefined ||
               !(workspaceId[row.profileId] ?? "").trim()}
-            onclick={() => void saveWorkspace(row)}
+            onclick={() => void addWorkspace(row)}
           >
             {busy[row.profileId] === "saving" ? "Saving…" : "Add workspace"}
           </button>

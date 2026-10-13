@@ -98,6 +98,47 @@ carries a tier that says which one a round ran.
 
 ---
 
+## 2026-10-13 — A real Anthropic turn with its workspace, replies back over Telegram, and recall past an instruction
+
+**Tier:** Targeted. **Build:** `main` at `b018683` plus this run's working tree.
+**Host:** `raiker-web` on Linux, a workspace reset with
+`scripts/reset_live_workspace.py`, served with `RAIKER_CHANNEL_INBOUND_SECRET`,
+`RAIKER_CHANNEL_EGRESS_ALLOWLIST=api.telegram.org` and a
+`RAIKER_TELEGRAM_BOT_TOKEN` Telegram does not know, driven by Playwright
+(`web/e2e/round-2026-10-13-live.spec.ts`, four tests, all passing) against the
+built web app. The host was restarted once, keeping its workspace, to load a
+route change the round itself prompted (FIXED-902).
+
+**Providers.** The owner's identity-linked Anthropic key (`sk-ant-usr-…`) and,
+for the first time, its workspace ID were typed into first-run setup the way an
+owner does; neither appears in any capture, source or log committed. Anthropic
+listed 14 models and **Haiku 5.5** answered every turn — the first real
+Anthropic turns since the 2026-10-10 round asked for the workspace ID.
+Telegram's side was the spec posting updates as Telegram's servers would: this
+host has no Telegram account, so the outbound send is proved to leave through
+the governed path and to be refused by Telegram, not to arrive. The channel was
+paired and turned on with `scripts/live_channel_reply_harness.py` (turning a
+channel on needs a delivered test, which a placeholder bot cannot give).
+
+**What it proved** (captures `01`–`07`, each in the folder's `manifest.json`):
+
+| Step | Evidence |
+|---|---|
+| FIXED-894 | With only the key, setup recommended **Anthropic needs its workspace ID**, never *connected*; **Add the workspace ID** focused the field ([01](../screenshots/2026-10-13-ledger-round/01-setup-asks-for-the-workspace.png)) |
+| FIXED-894 | With the workspace ID added: *14 models from Anthropic.*, *Anthropic is connected*, and **Use Haiku 5.5** made it the default ([02](../screenshots/2026-10-13-ledger-round/02-workspace-added-models-listed.png)). Before the fix, reloading with a stored key read *Anthropic is connected* — reproduced at the start of the round |
+| FIXED-889 | *What is my favourite tea? Answer in one sentence.* — the sentence the 2026-10-02 round found recalled nothing — was given the imported memory (**Remembered 1**) and answered *Your favourite tea is Assam with a splash of oat milk.* ([03](../screenshots/2026-10-13-ledger-round/03-recall-despite-the-instruction.png)) |
+| FIXED-890 | Build's composer: *Filed in Garden planner · works in live-ws* ([04](../screenshots/2026-10-13-ledger-round/04-build-filed-in-and-works-in.png)) |
+| FIXED-888 | An owner update *Say hello in exactly five words.* ran a real turn (`status: completed`) and its answer was sent through `external_channel_runtime`: `reply_delivery: failed`, the receipt *Failed: the destination could not be reached* — Telegram refusing the placeholder token. An answer containing an email address came back `held`: *Held — it carries sensitive information, so nothing was sent* with **Read it**, **Send to chat** and **Discard** ([05](../screenshots/2026-10-13-ledger-round/05-messaging-held-and-failed-replies.png)); the route reads *Sent back to your chat when you message Raiker* ([06](../screenshots/2026-10-13-ledger-round/06-route-says-replies-go-back.png)); **Discard** sent nothing and took it off the list; 390 wide, dark ([07](../screenshots/2026-10-13-ledger-round/07-messaging-review-390-dark.png)) |
+| — | No 5xx from any `/api/` call in the round |
+
+**What it found.** `POST /api/projects` with a name already in use answered 403,
+as though the owner could not create projects (FIXED-902, now 409); and the
+owner's message whose reply Telegram refused still read *no reply sent over the
+channel* (FIXED-903). Not proved live: a real bot's delivered message (no
+Telegram account), the estimated-usage row (FIXED-891 needs an OpenAI-compatible
+provider; Anthropic counts as the stream opens), and FIXED-892, FIXED-893 and
+FIXED-896 to FIXED-901, which are held by their tests.
+
 ## 2026-10-11 (second) — Deliveries that say what became of them, a feed of what waits, and a secret for one server
 
 **Tier:** Targeted. **Build:** `main` at `9f4de0a` plus this run's working tree.
@@ -794,7 +835,7 @@ The owner's Ollama decision (FIXED-737 to FIXED-739) and FIXED-740 to FIXED-749.
 
 **Filed:** [BUG-318](TO_BE_FIXED.md#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama)
 (the Ollama journey still wants a run against a real Ollama) and
-[BUG-319](TO_BE_FIXED.md#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page)
+[BUG-319](FIXED_ITEMS.md#fixed-900--the-models-pages-connection-lifecycle-lived-in-the-page-was-bug-319)
 (UX-MODEL-01's connection-lifecycle remainder).
 
 **What it could not prove.** A real Ollama model's answer (BUG-318), and the
@@ -869,7 +910,7 @@ left the list below the scrolled history). Captures:
   local slots and an unconnected profile — and now lists what is set up
   (FIXED-726).
 
-**Filed:** [BUG-316](TO_BE_FIXED.md#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in)
+**Filed:** [BUG-316](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316)
 (Build says *Working in* a project whose folder it does not work in) and
 [BUG-317](FIXED_ITEMS.md#fixed-782--builds-decision-was-offered-twice-one-card-over-the-other)
 (the approval toast covers Build's own decision card).
@@ -957,7 +998,7 @@ defect: `enableCapability` matched *Search capabilities* inside FIXED-708's
 copied the selector now match exactly.
 
 **What it did not prove.** A reply delivered back over Telegram — there is none
-([BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram));
+([BUG-315](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315));
 a real Telegram bot (updates were posted to the receiver directly, with the
 inbound secret); a remote MCP server; and the evidence line's source and
 approval counts (FIXED-724), since no turn here used a tool.
@@ -1084,7 +1125,7 @@ FIXED-694). An archive pressed while the page's first reads were still
 arriving could be overwritten on screen by them; the page now lets only its
 newest reload write. Filed: asking *What is my favourite tea? Answer in one
 sentence.* recalled nothing, because the lexical leg needs every content word
-in the record ([BUG-313](TO_BE_FIXED.md#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about)).
+in the record ([BUG-313](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313)).
 
 **What it did not prove.** An observation captured by a tool turn — the
 round's turns read no files, so **Observed** read 0 — and a semantic recall

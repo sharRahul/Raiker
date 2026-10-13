@@ -6,7 +6,8 @@ sent and billed, part of the answer generated and billed, and every spending
 limit read the turn as free. Anthropic says what the input cost as the stream
 opens; that is now passed on at once, and a stopped (or failed) stream records
 whatever the provider had counted. A provider that reports nothing until the
-end has said nothing, and nothing is invented for it.
+end has said nothing yet, so its stopped call is recorded as an *estimate* —
+marked as one, counted by every limit, never shown as settled (BUG-333).
 """
 
 from __future__ import annotations
@@ -87,12 +88,27 @@ def test_a_stopped_stream_records_what_the_provider_had_counted(
     assert totals.input_tokens == 1200 and totals.cache_read_tokens == 300
 
 
-def test_a_provider_that_said_nothing_yet_records_nothing(
+def test_a_provider_that_said_nothing_yet_is_recorded_as_an_estimate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # BUG-333 — OpenAI-compatible streams count usage only in their last chunk.
+    # The prompt was sent and billed, so the stop records an estimate from the
+    # request and the text already shown — marked as one, never a zero row.
     session_id, events = _stream(tmp_path, early_usage=False, monkeypatch=monkeypatch)
 
     final = events[-1].response  # type: ignore[attr-defined]
     assert final is not None and final.status == "stopped"
-    # No invented zero row: a missing count stays missing.
-    assert ModelUsageLedger(SQLiteStore(tmp_path)).session_usage("principal_owner", session_id) == []
+    rows = ModelUsageLedger(SQLiteStore(tmp_path)).session_usage("principal_owner", session_id)
+    assert len(rows) == 1
+    totals = rows[0].totals
+    assert totals.estimated_requests == 1 and totals.requests == 1
+    assert totals.input_tokens > 0 and totals.output_tokens > 0
+    assert totals.cache_read_tokens == 0
+
+
+def test_a_providers_own_count_is_not_marked_as_an_estimate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session_id, _events = _stream(tmp_path, early_usage=True, monkeypatch=monkeypatch)
+    rows = ModelUsageLedger(SQLiteStore(tmp_path)).session_usage("principal_owner", session_id)
+    assert rows[0].totals.estimated_requests == 0

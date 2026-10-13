@@ -638,18 +638,51 @@
                       </span>
                       <span class="note">{receiptOutcome(receipt)}</span>
                       <span class="note">{reviewAdvice(receipt)}</span>
-                      <span>
-                        <button
-                          type="button"
-                          class="btn btn-sm"
-                          disabled={channelBusy !== null}
-                          onclick={() =>
-                            void runChannelAction(
-                              `review:${receipt.receipt_id}`,
-                              () => api.markChannelDeliveryReviewed(receipt.receipt_id),
-                              "Marked reviewed. It stays in the channel's record as it was.",
-                            )}
-                        >Mark reviewed</button>
+                      <span class="review-actions">
+                        {#if receipt.held_at && !receipt.delivered_at && !receipt.failed_at}
+                          <!-- BUG-315 — a reply held because it carries sensitive
+                               information: the owner reads it in its
+                               conversation, then sends it or discards it. -->
+                          {#if receiptConversationHref(receipt)}
+                            <a class="btn btn-sm btn-ghost" href={receiptConversationHref(receipt)}
+                              >Read it</a
+                            >
+                          {/if}
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-primary"
+                            disabled={channelBusy !== null}
+                            onclick={() =>
+                              void runChannelAction(
+                                `send:${receipt.receipt_id}`,
+                                () => api.sendHeldChannelReply(receipt.receipt_id),
+                                "Sent to your chat.",
+                              )}
+                          >Send to chat</button>
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            disabled={channelBusy !== null}
+                            onclick={() =>
+                              void runChannelAction(
+                                `review:${receipt.receipt_id}`,
+                                () => api.markChannelDeliveryReviewed(receipt.receipt_id),
+                                "Discarded. Nothing was sent; the answer stays in its conversation.",
+                              )}
+                          >Discard</button>
+                        {:else}
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            disabled={channelBusy !== null}
+                            onclick={() =>
+                              void runChannelAction(
+                                `review:${receipt.receipt_id}`,
+                                () => api.markChannelDeliveryReviewed(receipt.receipt_id),
+                                "Marked reviewed. It stays in the channel's record as it was.",
+                              )}
+                          >Mark reviewed</button>
+                        {/if}
                       </span>
                     </li>
                   {/each}
@@ -868,6 +901,7 @@
   .route-scope dd { margin: 0; color: var(--text-2); }
   .receipts { margin-top: var(--space-2); }
   .review-list h3 { color: var(--warn-text); }
+  .review-actions { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); }
   .receipts h3 { margin: 0 0 0.3rem; font-size: var(--text-sm); color: var(--text-2); }
   .receipts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
   .receipts li { display: grid; gap: 0.15rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }

@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.deletion_journal import IMAGE_PURGE, record_deletion
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -197,7 +198,7 @@ class AttachmentStore:
             return cursor.rowcount == 1
 
     def purge_image_generation(
-        self: SQLiteStore, generation_id: str, *, owner_principal_id: str
+        self: SQLiteStore, generation_id: str, *, owner_principal_id: str, journal: bool = True
     ) -> bool:
         """Remove a picture that is already in Recently deleted, with its bytes.
 
@@ -233,7 +234,10 @@ class AttachmentStore:
                     "DELETE FROM attachments WHERE attachment_id = ? AND owner_principal_id = ?",
                     (attachment_id, owner_principal_id),
                 )
-            return True
+        if journal:
+            # BUG-324 — outside the database, so a restore honours it.
+            record_deletion(self.paths.workspace_root, IMAGE_PURGE, generation_id, owner_principal_id)
+        return True
 
     def revert_image_generation(
         self: SQLiteStore,

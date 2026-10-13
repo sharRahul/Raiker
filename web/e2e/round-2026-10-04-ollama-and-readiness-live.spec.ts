@@ -228,7 +228,7 @@ test("Build's boundary line is the server's, and names a hosted model as leaving
   await page.getByRole("button", { name: "Add to this turn" }).first().click();
   await page.getByRole("menuitem", { name: "Work in a project" }).click();
   await page.getByLabel("Project for this build").selectOption({ label: PROJECT_NAME });
-  await expect(page.getByText(`Working in ${PROJECT_NAME}`)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(`Filed in ${PROJECT_NAME}`)).toBeVisible({ timeout: 30_000 });
   await boundaryRead;
   await chooseModelForTurn(page, /Haiku 4\.5/, "Build composer");
 

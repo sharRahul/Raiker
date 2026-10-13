@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import time
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import replace
@@ -69,6 +70,7 @@ from raiker.runtime.conversation_compaction import (
     ContextCompactionStore,
     ConversationCompactor,
     compacted_conversation_messages,
+    estimate_message_tokens,
 )
 from raiker.runtime.conversation_history import (
     ConversationHistoryUnavailable,
@@ -745,6 +747,10 @@ class RuntimeOrchestrator:
                     "reasoning_effort": envelope.options.reasoning_effort,
                     "max_tool_calls": envelope.options.max_tool_calls,
                     "max_cost_usd": envelope.options.max_cost_usd,
+                    # BUG-325 — what the run has spent so far rides with it, so
+                    # the turn resumed on a new orchestrator after the decision
+                    # meters the whole run rather than starting again at zero.
+                    "spent_before_pause": self._spend_snapshot(envelope),
                     # BUG-70 — the turn's own posture rides with it, so a turn
                     # parked in Plan mode resumes in Plan mode rather than
                     # picking up whatever the standing modes say hours later.
@@ -1084,6 +1090,7 @@ class RuntimeOrchestrator:
         usage: dict[str, int],
         *,
         request_kind: str = "turn",
+        estimated: bool = False,
     ) -> None:
         """Mirror this turn's token counts into the queryable usage ledger.
 
@@ -1110,6 +1117,7 @@ class RuntimeOrchestrator:
                 usage=usage,
                 profile_id=profile_id,
                 request_kind=request_kind,
+                estimated=estimated,
             )
         except Exception:  # noqa: BLE001 - accounting never breaks a completed turn
             return
@@ -1140,6 +1148,38 @@ class RuntimeOrchestrator:
         except Exception:  # noqa: BLE001 - an unreadable price is an unpriced response
             price = None
         spend.add(price, model, usage)
+
+    def _spend_snapshot(self, envelope: PromptEnvelope) -> dict[str, Any] | None:
+        """This turn's metered spend, as the suspension row keeps it (BUG-325)."""
+        spend = self._turn_spend.get(envelope.turn_id)
+        if spend is None:
+            return None
+        return {"total": str(spend.total), "unpriced": sorted(spend.unpriced)}
+
+    def _seed_spend(self, envelope: PromptEnvelope) -> None:
+        """Resume a run's meter from what it had spent before it paused (BUG-325).
+
+        A malformed snapshot is no seed rather than a failed resume: the limit
+        still meters everything from here on, as it did before this fix.
+        """
+        from decimal import Decimal, InvalidOperation
+
+        from raiker.tasks.cost_limit import TurnSpend
+
+        snapshot = envelope.prompt.metadata.get("spent_before_pause")
+        if envelope.options.max_cost_usd is None or not isinstance(snapshot, Mapping):
+            return
+        try:
+            total = Decimal(str(snapshot.get("total", "0")))
+        except (InvalidOperation, ValueError):
+            return
+        if not total.is_finite() or total < 0:
+            return
+        unpriced = snapshot.get("unpriced")
+        self._turn_spend[envelope.turn_id] = TurnSpend(
+            total=total,
+            unpriced={str(model) for model in unpriced} if isinstance(unpriced, list) else set(),
+        )
 
     def _spend_limit_reached(self) -> tuple[float, Any] | None:
         """DEC-24 step 2 — ``(limit, spent)`` when the owner's 24-hour limit is reached.
@@ -2098,6 +2138,22 @@ class RuntimeOrchestrator:
                     # invented in its place.
                     if usage:
                         self._record_usage(envelope, provider, model, summarize_model_usage(usage))
+                    else:
+                        # BUG-333 — OpenAI, OpenRouter and Ollama count usage
+                        # only in a stream's last chunk, which a stopped stream
+                        # never reaches. The prompt was sent and billed all the
+                        # same, so it is estimated from the request and the text
+                        # already shown, and recorded *as* an estimate.
+                        self._record_usage(
+                            envelope,
+                            provider,
+                            model,
+                            {
+                                "input_tokens": estimate_message_tokens(messages),
+                                "output_tokens": math.ceil(len("".join(text_parts)) / 4),
+                            },
+                            estimated=True,
+                        )
                     # Any half-streamed tool call is discarded rather than
                     # reconstructed: the owner stopped the turn, so nothing the
                     # model was in the middle of asking for should run.
@@ -2472,6 +2528,7 @@ class RuntimeOrchestrator:
         been made.
         """
         self._open_turn(stream, envelope)
+        self._seed_spend(envelope)
         try:
             machine = RuntimeStateMachine()
             self._state(machine, envelope, "NORMALISED")

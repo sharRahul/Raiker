@@ -791,7 +791,7 @@ describe("Build project requirement", () => {
     stubFetch(baseRoutes());
     await renderBuildWithProject();
 
-    expect(await screen.findByText(/working in/i)).toBeVisible();
+    expect(await screen.findByText(/filed in/i)).toBeVisible();
     expect(sendButton()).toBeDisabled();
   });
 
@@ -1157,6 +1157,7 @@ function boundaryView(over: Record<string, unknown> = {}) {
   return {
     project_id: "proj_1",
     project_name: "Alpha",
+    works_in: "workspace",
     repo_id: null,
     repo_label: null,
     repo_kind: null,
@@ -1218,11 +1219,26 @@ describe("the execution boundary Build names", () => {
     const labels = within(inspector)
       .getAllByRole("term")
       .map((term) => term.textContent?.trim());
-    const order = ["Project", "Repository", "Runs on", "Model"].map((label) => labels.indexOf(label));
+    const order = ["Filed in", "Works in", "Repository", "Runs on", "Model"].map((label) =>
+      labels.indexOf(label),
+    );
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((left, right) => left - right));
     expect(within(inspector).getByText(/may write in projects\/app/)).toBeInTheDocument();
     expect(within(inspector).getByText(/your default|chosen for this work/)).toBeInTheDocument();
+  });
+
+  it("says the project files the work and names the folder it runs in", async () => {
+    // BUG-316 — "Working in <project>" promised a folder the turn never used:
+    // a managed project's commands run at the workspace root.
+    stubFetch(baseRoutes({ "GET /api/build/boundary": boundaryView({ works_in: "my-workspace" }) }));
+    await renderBuildWithProject();
+    await waitFor(() =>
+      expect(
+        document.querySelector(".project-boundary")?.textContent?.replace(/\s+/g, " ").trim(),
+      ).toBe("Filed in Landing page · works in my-workspace"),
+    );
+    expect(screen.queryByText(/Working in/)).toBeNull();
   });
 
   it("says when the model leaves this machine", async () => {

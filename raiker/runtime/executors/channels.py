@@ -222,6 +222,13 @@ class _DeliveryReceipt:
     ) -> None:
         self._store = store
         self._id = action.action_id
+        if store.load_channel_receipt(action.action_id) is not None:
+            # BUG-315 — a held reply the owner chose to send is delivered under
+            # the receipt it was held on, so the review list's row and the
+            # delivery are one record rather than two.
+            store.advance_channel_receipt(action.action_id, stages={"queued_at": utc_now()})
+            self._written = True
+            return
         try:
             store.insert_channel_receipt(
                 receipt_id=action.action_id,

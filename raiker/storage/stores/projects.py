@@ -16,6 +16,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.deletion_journal import PROJECT_DELETE, record_deletion
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -508,8 +509,19 @@ class ProjectStore:
         counts["descendants"] = max(len(self.subtree_project_ids(project_id)) - 1, 0)
         return counts
 
-    def delete_project_with_orphanage(self: SQLiteStore, project_id: str) -> bool:
-        """Hard-delete project; archive descendants + reparent to NULL with orphaned/ path."""
+    def delete_project_with_orphanage(
+        self: SQLiteStore,
+        project_id: str,
+        *,
+        journal: bool = True,
+        owner_principal_id: str | None = None,
+    ) -> bool:
+        """Hard-delete project; archive descendants + reparent to NULL with orphaned/ path.
+
+        ``journal`` records the deletion outside the database (BUG-324), so a
+        restore from an older backup does not bring the project back; the
+        replay itself and the undo of a half-created project pass ``False``.
+        """
         with self.connect() as conn:
             row = conn.execute(
                 "SELECT path FROM projects WHERE project_id = ?", (project_id,)
@@ -565,6 +577,8 @@ class ProjectStore:
             conn.execute("DELETE FROM managed_files WHERE project_id = ?", (project_id,))
             # 3) Hard delete target (project_contexts cascades via ON DELETE CASCADE)
             conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        if journal:
+            record_deletion(self.paths.workspace_root, PROJECT_DELETE, project_id, owner_principal_id)
         return True
 
     def get_ancestor_contexts(

@@ -36,6 +36,50 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
 }
 
 /**
+ * BUG-314 — the profile a composer is about to send with, as the bound pair says.
+ *
+ * Chat, Build and Tasks each looked the bound `(profile, model)` up in the quick
+ * list and fell back to the default, so a model reached through **Search all
+ * models** — which is not in the quick list — was described by the default's
+ * readiness and context window while the turn named the searched model. The
+ * pair is resolved the way the picker resolves it (FIXED-723): the provider's
+ * profile with the bound model. Raiker holds no observation for a pair it has
+ * not checked, so it reads as *checked when you send*, and its context window
+ * as unknown rather than the default's.
+ */
+export function activeComposerProfile(
+  quickList: readonly ModelProfile[],
+  profileId: string,
+  model: string,
+  registry: readonly ModelProfile[] = [],
+): ModelProfile | null {
+  const selected = quickList.find((profile) => profile.selected) ?? null;
+  const exact = quickList.find(
+    (profile) => profile.profile_id === profileId && (!model || profile.model === model),
+  );
+  if (exact) return exact;
+  if (!profileId || !model) return selected;
+  const base =
+    quickList.find((profile) => profile.profile_id === profileId) ??
+    registry.find((profile) => profile.profile_id === profileId);
+  if (!base) return selected;
+  return {
+    ...base,
+    model,
+    selected: false,
+    ready: false,
+    readiness_state: "not_configured",
+    readiness_reason_code: "model_not_checked",
+    readiness_summary: "Checked when you send.",
+    readiness_remediation: "Raiker checks this model before the turn runs.",
+    readiness_checked_at: null,
+    readiness_expires_at: null,
+    context_window_tokens: null,
+    context_window_source: null,
+  };
+}
+
+/**
  * The readiness of whatever the surface currently has selected.
  *
  * The no-selection case is two different situations, and saying the same thing

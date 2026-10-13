@@ -94,9 +94,14 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
+  import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
-  import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import {
+    activeComposerProfile,
+    blocksSending,
+    openModelSetup,
+    readinessForSelection,
+  } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
     inputModeForDraft,
@@ -320,9 +325,9 @@
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
   const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
-  const activeProfile = $derived(
-    profiles.find((p) => p.profile_id === modelProfile && (!model || p.model === model)) ?? selectedProfile,
-  );
+  // BUG-314 — the bound pair as the picker reads it, so a searched model is
+  // described as itself and not as the default.
+  const activeProfile = $derived(activeComposerProfile(profiles, modelProfile, model, allProfiles()));
   const modelReadiness = $derived(readinessForSelection(activeProfile, catalogueChoices(profiles, modelCatalogues()).length));
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a

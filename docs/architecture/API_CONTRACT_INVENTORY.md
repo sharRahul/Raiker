@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**403 operations: 390 verified, 0 eligible, 0 deferred, 13 special.**
+**404 operations: 391 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -79,6 +79,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/channels` |  | ChannelsView | verified | declared ChannelsView |
 | POST | `/api/channels/deliver-test` | ChannelTestDeliveryRequest | ChannelTestDelivered | verified | declared by cast |
 | POST | `/api/channels/deliveries/{receipt_id}/reviewed` |  | ChannelDeliveryReviewed | verified | declared by cast |
+| POST | `/api/channels/deliveries/{receipt_id}/send` |  | ChannelReplySent | verified | declared by cast |
 | POST | `/api/channels/pairings` | PairChannelRequest | ChannelPaired | verified | declared by cast |
 | DELETE | `/api/channels/pairings/{pairing_id}` |  | ChannelUnpaired | verified | declared by cast |
 | PUT | `/api/channels/pairings/{pairing_id}/destination` | ChannelDestinationRequest | ChannelDestinationSet | verified | declared by cast |

@@ -236,6 +236,19 @@ def seed_account() -> SeedAccount:
 
 
 @pytest.fixture(autouse=True)
+def _no_github_revalidation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """BUG-338 — a delegated push asks GitHub about its repository; no test may.
+
+    A test that exercises that question supplies its own transport.
+    """
+    from raiker.github.delegations import reset_remote_checks
+    from raiker.runtime.authority.router import RuntimeAuthority
+
+    reset_remote_checks()
+    monkeypatch.setattr(RuntimeAuthority, "_delegation_http", lambda _self: None)
+
+
+@pytest.fixture(autouse=True)
 def _fresh_channel_loop_guard() -> None:
     """Each test starts with no remembered channel traffic (DEC-14 step 9).
 

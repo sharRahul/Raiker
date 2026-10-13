@@ -107,7 +107,12 @@ class ExecutionBoundaryView(TypedDict):
     """
 
     project_id: str | None
+    #: Where the conversation is *filed* (BUG-316). Not where work happens: a
+    #: project's folder is not the folder commands start in.
     project_name: str | None
+    #: BUG-316 — the folder a turn's relative reads, writes and commands resolve
+    #: against, by name: this workspace, whichever project the work is filed in.
+    works_in: str
     repo_id: str | None
     repo_label: str | None
     repo_kind: Literal["local", "github"] | None

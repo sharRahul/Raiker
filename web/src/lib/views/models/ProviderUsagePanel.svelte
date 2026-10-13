@@ -228,6 +228,16 @@
                   · {number(row.observed.compactions)} compaction{row.observed.compactions === 1 ? "" : "s"}
                 {/if}
               </p>
+              <!-- BUG-333 — a stopped stream from a provider that counts only at
+                   the end is recorded as an estimate. It is in the totals (the
+                   provider billed it), and it says so rather than passing as
+                   the provider's own count. -->
+              {#if row.observed.estimated_requests > 0}
+                <p class="quiet">
+                  Includes {counted(row.observed.estimated_requests, "stopped request")} estimated by
+                  Raiker — the provider reports usage only when an answer finishes.
+                </p>
+              {/if}
               {#if row.observed.known_cost !== null}
                 <p class="cost">
                   {metricValue(row.observed.known_cost, row.observed.cost_currency ?? "USD")}

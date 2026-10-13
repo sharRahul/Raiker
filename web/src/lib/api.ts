@@ -321,6 +321,8 @@ export const api = {
   // DEC-14 step 7 — take a failed or unknown delivery off the review list.
   // Nothing is sent again; what happened to it is unchanged.
   markChannelDeliveryReviewed: (receiptId: string) => contract.markChannelDeliveryReviewed(receiptId),
+  // BUG-315 — the owner sends a reply held because it carries sensitive information.
+  sendHeldChannelReply: (receiptId: string) => contract.sendHeldChannelReply(receiptId),
   setChannelDestination: (pairingId: string, delivery_url: string | null, revision?: string | null) =>
     contract.setChannelDestination(pairingId, { delivery_url, expected_revision: revision ?? null }),
   // DEC-02 — everything waiting on the owner, read from each subsystem's record.

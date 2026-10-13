@@ -54,10 +54,19 @@ GIT_CREDENTIAL_FORGET = "git_credential_forget"
 GIT_GRANT_REVOKE = "git_grant_revoke"
 #: A repository delegation the owner revoked (ADD-27 GH-50).
 DELEGATION_REVOKE = "repository_delegation_revoke"
+#: A project the owner deleted (BUG-324), with the conversations and tasks
+#: filed in it. A database backup cannot bring back a managed folder's bytes
+#: either way; the replay keeps the rows gone.
+PROJECT_DELETE = "project_delete"
+#: A Design picture removed for good from Recently deleted (BUG-324).
+IMAGE_PURGE = "image_purge"
+#: A managed file the owner removed from a project's or the owner's files (BUG-324).
+MANAGED_FILE_RETIRE = "managed_file_retire"
 
 KINDS = (
     MEMORY_FORGET, MEMORY_PURGE, SESSION_DELETE,
     GIT_CREDENTIAL_FORGET, GIT_GRANT_REVOKE, DELEGATION_REVOKE,
+    PROJECT_DELETE, IMAGE_PURGE, MANAGED_FILE_RETIRE,
 )
 
 
@@ -184,4 +193,21 @@ def reapply_deletions(store: SQLiteStore, deletions: list[Deletion]) -> dict[str
             )
             if revoked_delegations:
                 applied[DELEGATION_REVOKE] += 1
+        elif entry.kind == PROJECT_DELETE:
+            if store.delete_project_with_orphanage(entry.object_id, journal=False):
+                applied[PROJECT_DELETE] += 1
+        elif entry.kind == IMAGE_PURGE:
+            # Removing for good is only ever the second step, so a picture the
+            # backup still held as live is put away first, then removed.
+            store.set_image_generation_deleted(
+                entry.object_id, owner_principal_id=entry.owner, deleted=True
+            )
+            if store.purge_image_generation(
+                entry.object_id, owner_principal_id=entry.owner, journal=False
+            ):
+                applied[IMAGE_PURGE] += 1
+        elif entry.kind == MANAGED_FILE_RETIRE:
+            store.retire_managed_file_chunks(entry.object_id, entry.owner)
+            if store.retire_managed_file(entry.object_id, entry.owner):
+                applied[MANAGED_FILE_RETIRE] += 1
     return applied

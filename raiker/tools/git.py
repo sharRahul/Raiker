@@ -636,6 +636,32 @@ def _remote_url(root: Path, remote: str) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
+def github_remote_url(root: Path) -> str:
+    """The GitHub remote this repository's work goes to, or ``""`` when it has none.
+
+    The current branch's upstream remote, else ``origin``, else the only remote
+    — and only when that remote's push URL is on GitHub. Local and offline: it
+    reads the repository's own configuration (BUG-337).
+    """
+    from raiker.runtime.git_credential import repository_key
+
+    names = _remote_names(root)
+    if not names:
+        return ""
+    branch = current_branch(root)
+    upstream = _upstream_remote(root, branch) if branch else ""
+    if upstream in names:
+        remote = upstream
+    elif "origin" in names:
+        remote = "origin"
+    elif len(names) == 1:
+        remote = names[0]
+    else:
+        return ""
+    url = _remote_url(root, remote)
+    return url if url and repository_key(url).startswith("github.com/") else ""
+
+
 def _upstream_remote(root: Path, branch: str) -> str:
     """The remote *branch* already tracks, or ``""`` when it tracks nothing."""
     proc = _git(

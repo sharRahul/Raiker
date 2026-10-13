@@ -1400,9 +1400,30 @@ class MemoryStore:
             sql += " AND m.owner_principal_id = ?"
             params.append(owner_principal_id)
         sql += f" ORDER BY {ordering} LIMIT ?"
-        params.append(limit)
-        rows = self._rows(sql, params)
-        return [dict(row) for row in rows]
+        rows = [dict(row) for row in self._rows(sql, [*params, limit])]
+        if rows or len(terms) < 2:
+            return rows
+        # BUG-313 — the strict match asks every content word to be in the
+        # memory, so "What is my favourite tea? Answer in one sentence." needs
+        # *answer* and *sentence* in a memory about tea, and recalls nothing.
+        # Only when that finds nothing, ask again with the words OR-ed and keep
+        # a candidate only if it holds at least two thirds of them (the owner's
+        # threshold, 2026-10-13) — never fewer than two — in the order the index
+        # ranked them. Every eligibility condition above is the same query's;
+        # the candidate read is bounded, so the fallback costs one more indexed
+        # read and never a scan.
+        params[0] = " OR ".join(terms)
+        candidates = self._rows(sql, [*params, min(max(limit * 5, 25), 200)])
+        needed = max(2, -(-2 * len(terms) // 3))
+        admitted: list[dict[str, Any]] = []
+        for row in candidates:
+            record = dict(row)
+            if _covered_terms(record, terms) >= needed:
+                record["recall_match"] = "partial"
+                admitted.append(record)
+                if len(admitted) >= limit:
+                    break
+        return admitted
 
     def delete_approved_memory(
         self: SQLiteStore,
@@ -1849,3 +1870,14 @@ def _import_batch_row(row: dict[str, Any]) -> dict[str, Any]:
         "memory_ids": [str(memory_id) for memory_id in memory_ids],
         "undo_details": json.loads(undo) if undo else None,
     }
+
+
+def _covered_terms(record: dict[str, Any], terms: list[str]) -> int:
+    """How many of *terms* the record's indexed columns hold as whole words.
+
+    Read the way the index's default tokenizer reads them: case-folded runs of
+    letters and digits, so what counts here is what the ``MATCH`` matched.
+    """
+    indexed = f"{record.get('text') or ''} {record.get('tags_json') or ''}"
+    words = set("".join(c if c.isalnum() else " " for c in indexed).lower().split())
+    return sum(1 for term in set(terms) if term in words)

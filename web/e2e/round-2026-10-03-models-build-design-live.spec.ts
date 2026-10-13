@@ -200,7 +200,7 @@ async function chooseBuildProject(page: Page) {
   const picker = page.getByLabel("Project for this build");
   await expect(picker).toBeVisible({ timeout: 30_000 });
   await picker.selectOption({ label: PROJECT_NAME });
-  await expect(page.getByText(`Working in ${PROJECT_NAME}`)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(`Filed in ${PROJECT_NAME}`)).toBeVisible({ timeout: 30_000 });
   // BUG-292 — a Build turn names its own model.
   await chooseModelForTurn(page, /Haiku 4\.5/, "Build composer");
 }

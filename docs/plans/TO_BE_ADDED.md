@@ -1117,8 +1117,8 @@ tested against a stand-in GitHub (`tests/github_fakes.py`), with the
 as the per-requirement record. Done: GH-10…GH-25, GH-31…GH-37, GH-40…GH-44,
 GH-50…GH-54, GH-56, and GH-19 (Settings → GitHub, live screenshots in
 `docs/screenshots/2026-10-12-github-connection/`). Partial: GH-50 for local
-branch and commit ([BUG-337](TO_BE_FIXED.md#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation)),
-GH-52 against GitHub itself ([BUG-338](TO_BE_FIXED.md#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step)),
+branch and commit ([BUG-337](FIXED_ITEMS.md#fixed-898--a-standing-git-writes-decision-covered-local-branches-and-commits-without-a-delegation-was-bug-337)),
+GH-52 against GitHub itself ([BUG-338](FIXED_ITEMS.md#fixed-899--a-delegations-repository-identity-was-checked-against-the-last-discovery-not-asked-of-github-was-bug-338)),
 GH-55 has its template but no runner ([BUG-339](TO_BE_FIXED.md#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner)).
 External: GH-30 (official App registration) and the live evidence RR-38…RR-41,
 which needs consented test accounts. Deferred by the decision: Wave 5.

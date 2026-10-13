@@ -63,6 +63,21 @@ class ChannelDeliveryReviewed(TypedDict):
     reviewed_at: str
 
 
+class ChannelReplySent(TypedDict):
+    """BUG-315 — a held reply the owner sent: whether it went, never its text."""
+
+    ok: bool
+    receipt_id: str
+    held: bool
+    delivered: bool
+    connector_id: NotRequired[str]
+    channel_type: NotRequired[str]
+    sent_bytes: NotRequired[int]
+    status: NotRequired[int]
+    signed: NotRequired[bool]
+    provider_message_id: NotRequired[str | None]
+
+
 class ChannelTestDelivered(TypedDict):
     """One governed test delivery: sizes and status, never the text sent."""
 
@@ -89,6 +104,10 @@ class InboundRoute(TypedDict):
     turn_id: NotRequired[str]
     status: NotRequired[str]
     reply: NotRequired[str]
+    #: BUG-315 — what became of the answer on Telegram: sent back to the
+    #: owner's chat, held for the owner because it carries sensitive
+    #: information, or refused (the receipt says why).
+    reply_delivery: NotRequired[Literal["delivered", "held", "failed"]]
 
 
 class ChannelInboundAccepted(InboundRoute):

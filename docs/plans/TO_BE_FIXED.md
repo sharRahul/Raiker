@@ -84,21 +84,8 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — the same egress limit as [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host); since [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) a live round has a second thing to prove — that turning **Image generation** off refuses a generation |
 | [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more), reconfirmed 2026-09-13 with three keys |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
-| [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about) | Medium | Memory / recall | Open — a question carrying an instruction ("Answer in one sentence") recalls nothing, because the lexical leg needs every content word in the record |
-| [BUG-314](#bug-314--a-model-chosen-by-search-is-judged-by-the-defaults-readiness-and-window) | Low | Composers / models | Open — Chat, Build and Tasks look the chosen pair up among the quick list, so a model reached by search is judged by the default's readiness and context window until the server checks it |
-| [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram) | Medium | Messaging / Telegram | Open — a routed Telegram message runs its turn and the answer stays in Raiker; the page now says so (FIXED-711, FIXED-712), but nothing delivers it |
-| [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in) | Medium | Build / Projects | Open — Build says *Working in <project>*, while its reads, writes and commands are relative to the workspace and the project's own folder is protected |
 | [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
-| [BUG-319](#bug-319--the-models-pages-connection-lifecycle-still-lives-in-the-page) | Low | Models / maintainability | Open — UX-MODEL-01 split the tabs and dialogs out; the Add tab's connection lifecycle and sign-in dialog are still the page's own state |
-| [BUG-324](#bug-324--deleting-a-project-a-task-or-a-picture-is-not-journalled-so-a-restore-brings-it-back) | Low | Storage / restore | Open — FIXED-802 journals forgotten and purged memories and deleted conversations; a project, task or Design picture deleted after a backup still comes back with a restore |
-| [BUG-325](#bug-325--a-routine-runs-spend-is-counted-again-from-zero-after-an-approval-pause) | Low | Tasks / cost limit | Open — a run's spend is counted per orchestrator, and a run continued after an approval starts counting again |
-| [BUG-326](#bug-326--importing-the-runtime-orchestrator-first-fails-on-a-circular-import) | Low | Maintainability | Open — `import raiker.runtime.orchestrator` on its own fails on a `models.connections` ↔ `runtime.executors` cycle; every entry point imports something else first |
-| [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open — CRLF fixtures, a `\\?\` path prefix and a receipt race; not caused by a code change |
-| [BUG-331](#bug-331--setups-model-step-waits-on-every-providers-check-before-it-shows-anything) | Low | First run / Models | Open — found 2026-10-11; about five seconds of *Preparing your setup…* on a reload |
-| [BUG-332](#bug-332--setup-calls-an-identity-linked-anthropic-key-connected-and-offers-models-it-cannot-list) | Low | First run / Models | Open — found 2026-10-11; the key is stored, the workspace ID is missing, and the recommendation says *choose one of its models* |
-| [BUG-333](#bug-333--a-stopped-openai-compatible-stream-records-no-usage) | Low | Models / usage | Open — found 2026-10-11 closing FIXED-872; those providers report usage only when the stream ends |
-| [BUG-337](#bug-337--a-standing-git-writes-decision-still-covers-local-branches-and-commits-without-a-delegation) | Low | Build / Git writes | Open — found 2026-10-12 building GH-50; pushes and GitHub writes need a delegation, local branch and commit do not yet |
-| [BUG-338](#bug-338--a-delegations-repository-identity-is-checked-against-the-last-discovery-not-asked-of-github-at-each-step) | Low | Build / delegations | Open — found 2026-10-12 building GH-52; the router re-checks Raiker's records, not GitHub, before each delegated step |
+| [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open remainder — the three fixture assumptions closed as [FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330); the lease reclaim's double write and one timing-dependent test need a Windows run |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
@@ -791,105 +778,6 @@ output kept, and fix what the first complete dump names.
 **Required user-interface outcome.** None; test harness only unless the dump
 names product code.
 
-## BUG-313 — An instruction in the prompt stops recall finding the memory it asks about
-
-**Severity: Medium. Area: Memory / recall. Status: Open — raised 2026-10-02, found by this run's live round.**
-
-**Observed.** With the approved memory *My favourite tea is Assam with a splash
-of oat milk.*, a real Anthropic turn asked *What is my favourite tea? Answer in
-one sentence.* was given no memory — no **Remembered** strip, and the answer
-said it had no information. *What is my favourite tea?* recalls it.
-
-**Root cause.** `SQLiteStore._match_terms` keeps every non-stopword of three or
-more letters and `_match_expression` joins them as an implicit **AND**, so
-`favourite tea answer one sentence` requires *answer*, *one* and *sentence* in
-the record. BUG-243 dropped function words for the same reason; instruction
-words about the *shape of the answer* are the same failure from a different
-vocabulary. On a default install the vector leg is the lexical hashing
-fallback, which does not rescue it.
-
-**Proposed fix (needs the owner's decision on ranking).** When the full AND
-finds nothing, retry with the longest prefix-free subsets that do match, or run
-an OR query ranked by `bm25()` and admit a row only when it matches a stated
-share of the content terms. Either changes which memories reach a model's
-context, which is why it is not done in passing; the acceptance test is the
-sentence above recalling the tea memory while *the* alone, or an unrelated
-two-word overlap, still recalls nothing.
-
-**Required user-interface outcome.** None new: the **Remembered** strip and the
-memory's *Turns it was given to* (FIXED-691) show it working once fixed.
-
----
-
-## BUG-314 — A model chosen by search is judged by the default's readiness and window
-
-**Severity: Low. Area: Composers / models. Status: Open — raised 2026-10-03, found
-while fixing FIXED-723.**
-
-**Observed.** Chat, Build and Tasks each derive `activeProfile` as the quick-list
-profile whose id *and* model match the bound pair, falling back to the global
-default. A model reached through **Search all models** is not in that list, so
-the composer's readiness line, *Send* gating and context-window meter describe
-the default while the turn names the searched model. The server's readiness gate
-still judges the pair actually sent, so no turn runs on an unchecked model; what
-is wrong is what the composer says before Send.
-
-**Proposed fix.** Derive the active pair the way the picker now does (provider
-from the profile, model from the binding) in one shared helper, and read its
-readiness by `(profile_id, model)`; a pair with no observation reads as *checked
-when you send* rather than as the default's state.
-
-**Required user-interface outcome.** After choosing a searched model, the
-context line and readiness strip name that model, and Send's state is that
-model's.
-
----
-
-## BUG-315 — A Telegram turn's answer never goes back over Telegram
-
-**Severity: Medium. Area: Messaging / Telegram. Status: Open — raised 2026-10-03.**
-
-**Observed.** A Telegram message on a *New turn* or *Side question* route runs a
-governed turn, and the answer is returned in the HTTP response to Telegram's
-webhook call, which Telegram ignores. The owner reads the answer only in Raiker.
-Since FIXED-711 and FIXED-712 the page says so — *Replies: kept in Raiker* and
-*Processed — no reply sent over the channel* — rather than implying a reply.
-
-**Why it is not fixed in passing.** Delivering it is a new outbound path:
-`external_channel_runtime` has one entry path today (the owner's control plane,
-`entry_paths.py`), and a reply sent on the router's initiative needs its own
-entry, its own receipt stage (*reply queued → delivered*), the DEC-14 retry
-ledger with deduplication, and a decision on whether a reply waits for the
-owner's approval mode.
-
-**Required user-interface outcome.** A routed Telegram message's receipt reaches
-*delivered*, and *What this route does* says replies go back to the chat.
-
----
-
-## BUG-316 — Build's "Working in" names a project whose folder Build does not work in
-
-**Severity: Medium. Area: Build / Projects. Status: Open — raised 2026-10-03 by
-the live round.**
-
-**Observed.** The first closed-loop attempt (UX-BUILD-04) put its module and
-test in the new project's own folder and told the model to run them "in this
-project". The command ran at the workspace root and could not find the file. A
-managed project's root is `.raiker/projects/<slug>`, which is a protected
-workspace path, and a managed project's path authority is the workspace itself
-(`authority_for_project`): Build reads, writes and runs commands relative to the
-workspace whichever project is chosen. Meanwhile the composer says **Working in
-*project***, and the boundary inspector names the project first.
-
-**Why it is not fixed in passing.** Either the wording changes — the project is
-where the conversation is *filed*, and the repository (or the workspace) is
-where the work happens — or a managed project gains a working folder commands
-start in, with the authority and checkpoint rules that implies. That is DEC-04
-and DEC-06 step 1's server-issued boundary, and it is the owner's choice which.
-
-**Required user-interface outcome.** What the composer and the boundary say a
-turn works in is the folder its reads, writes and commands are relative to.
-
 ---
 
 ## BUG-318 — The Ollama journey is proven against a loopback stand-in, not a real Ollama
@@ -914,75 +802,6 @@ Ollama desktop app and at least two pulled models — including one the app
 serves while `ollama` is not on PATH — with a real answer to the Chat turn.
 
 ---
-
-## BUG-319 — The Models page's connection lifecycle still lives in the page
-
-**Severity: Low (maintainability). Area: Models. Status: Open — the remainder
-of UX-MODEL-01, recorded 2026-10-04.**
-
-**Observed.** [FIXED-744](FIXED_ITEMS.md#fixed-744--the-models-page-owned-every-state-machine-on-it)
-split `ModelsView.svelte` by tab and dialog. UX-MODEL-01 also asks for
-connection lifecycle and global selection in shared stores or services; the
-Add tab's sign-in dialog, saving and disconnecting a credential, the provider
-test, and the global selection are still the page's own state, about 2,500
-lines with the provider sections they drive.
-
-**Proposed fix.** A `ProviderConnections` controller (sign-in, save, test,
-disconnect, workspace refusal) shared by Models and first-run setup, which
-today implements the same lifecycle a second time in `ProviderMatrix.svelte`.
-Behaviour unchanged; the two surfaces' tests are the characterization suite.
-
-## BUG-324 — Deleting a project, a task or a picture is not journalled, so a restore brings it back
-
-**Severity: Low. Area: Storage / restore. Status: Open — recorded 2026-10-05 by
-the (fifth) round's work on FIXED-802.**
-
-**Observed.** [FIXED-802](FIXED_ITEMS.md#fixed-802--a-restore-brought-back-what-had-been-deleted-since-the-backup)
-journals three kinds of deletion — a forgotten memory, a purged memory and a
-deleted conversation — and replays them into a restore. A project, a task, an
-attachment or a Design picture deleted after the backup was taken is not
-journalled, so restoring that backup brings it back.
-
-**Proposed fix.** Journal each owner-initiated permanent deletion through the
-store method that performs it (kind, id, owner, time — no content), and replay
-it with journaling off, as FIXED-802 does. A project deletion that removed
-managed files cannot recreate them from a database backup either way; the
-replay only has to keep the row deleted.
-
----
-
-## BUG-325 — A routine run's spend is counted again from zero after an approval pause
-
-**Severity: Low. Area: Tasks / cost limit. Status: Open — recorded 2026-10-05
-with FIXED-804.**
-
-**Observed.** [FIXED-804](FIXED_ITEMS.md#fixed-804--one-run-of-a-routine-had-no-cost-limit-of-its-own)
-meters a run's spend on the orchestrator that runs the turn. A routine run that
-parks on an approval and is continued is resumed on a new orchestrator: the
-limit rides with the turn, the spend before the pause does not, so a run that
-pauses can spend up to its limit again after each approval.
-
-**Proposed fix.** Seed the meter on resume from the usage ledger's rows for the
-run's thread since the run started (FIXED-810 made those rows include cached
-tokens), so the boundary check sees the whole run.
-
----
-
-## BUG-326 — Importing the runtime orchestrator first fails on a circular import
-
-**Severity: Low. Area: Maintainability. Status: Open — found 2026-10-05 while
-building FIXED-804; pre-existing.**
-
-**Observed.** `python -c "import raiker.runtime.orchestrator"` fails:
-`raiker.models.connections` imports `runtime.connector_ecosystem`, which imports
-`runtime.executors`, whose image executor imports
-`models.connections.get_model_connection` while that module is half-loaded.
-Every real entry point (the app, the CLI, the tests) happens to import
-something that breaks the cycle first, so nothing ships broken; a new script or
-test that imports the orchestrator first does.
-
-**Proposed fix.** Move the image executor's `get_model_connection` import into
-the function that uses it, and add an import-each-module-alone test.
 
 ## BUG-330 — Five tests fail on Windows and pass on Linux CI
 
@@ -1017,117 +836,16 @@ behaviour.
 failed once under full-suite load (`mcp_remote_unreachable`) and passed alone —
 a timing dependency worth the same look.
 
-**Proposed fix.** Write fixtures with `newline="
+**2026-10-13.** The three fixture assumptions are fixed as
+[FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330) — the stand-in writes bytes, the fixture
+writes bytes, the restore path is compared as a `Path`. What stays open is the
+lease reclaim's double write and the redirect test's timing, both of which need
+a Windows run to trace; this host has none.
+
+**Proposed fix (remainder).** Write fixtures with `newline="
 "` / bytes, compare paths
 through `Path`, and trace the lease reclaim's double write on Windows. Consider
 a Windows job for the Python suite.
-
-## BUG-331 — Setup's model step waits on every provider's check before it shows anything
-
-**Severity: Low. Area: First run / Models. Status: Open — found 2026-10-11 in
-the live round.**
-
-**Observed.** Reloading `#/model-setup` with one hosted provider connected and
-twelve Ollama models served showed *Preparing your setup…* for about five
-seconds before the step appeared. The view loads `/api/setup` and `/api/models`
-together and renders nothing until both answer; the models read is the slow
-one.
-
-**Effect.** A blank first-run screen for seconds reads as a hang. Nothing is
-lost and the step is correct once it appears.
-
-**Proposed fix.** Render the step from `/api/setup` at once and fill the
-provider rows as `/api/models` answers, with each row's own loading state;
-measure where `/api/models` spends the time (local runtime probes, catalogue
-reads) before deciding whether any of it belongs in the background.
-
-## BUG-332 — Setup calls an identity-linked Anthropic key connected and offers models it cannot list
-
-**Severity: Low. Area: First run / Models. Status: Open — found 2026-10-11 in
-the live round.**
-
-**Observed.** With the identity-linked `sk-ant-usr-…` key entered through
-setup's Anthropic field, the model step's recommendation read *Anthropic is
-connected — Choose one of its models as your default*. **Choose a model** opened
-the Anthropic row, which correctly said the key needs its workspace ID before
-it can act; no model could be chosen. The row explains the key correctly, as
-the 2026-10-10 round also found; only the recommendation disagrees.
-
-**Effect.** The first thing the step recommends cannot be done. The owner has
-to read the row below to learn why.
-
-**Proposed fix.** Derive the recommendation from the connection's readiness,
-not from a stored key: a connection whose last check is
-`anthropic_workspace_required` recommends *Add the workspace ID* with the
-field focused, and offers another provider beside it.
-
-**Owner input needed for the live check.** The workspace ID for the supplied
-key, so a round can prove an Anthropic turn end to end.
-
-## BUG-333 — A stopped OpenAI-compatible stream records no usage
-
-**Severity: Low. Area: Models / usage. Status: Open — found 2026-10-11 closing
-FIXED-872.**
-
-**Observed.** FIXED-872 records what a provider had counted when the owner
-stops a streamed turn. Anthropic says the input cost as the stream opens.
-OpenAI, OpenRouter and Ollama report usage only in the final chunk
-(`stream_options.include_usage`), so a turn stopped before it is still recorded
-as nothing.
-
-**Effect.** Every spending limit under-counts a stopped turn on those providers
-by the prompt it was sent and the part of the answer it produced.
-
-**Proposed fix.** On a stopped stream with no provider count, record the input
-as an *estimate* from the request (marked as such in the ledger so it is never
-read as settled), and reconcile it if the provider's usage endpoint later
-reports the call. Requires an `estimated` column and a decision on whether
-estimated spend counts against the owner-wide limit (DEC-24 step 2 says to
-separate estimated from settled usage).
-
-## BUG-337 — A standing *Git writes* decision still covers local branches and commits without a delegation
-
-**Severity: Low. Area: Build / Git writes. Status: Open — found 2026-10-12
-building ADD-27 GH-50.**
-
-**Observed.** Since GH-50 a push and a GitHub write run without a per-step
-approval only under a repository delegation that covers them
-([FIXED-886](FIXED_ITEMS.md#fixed-886--a-standing-grant-or-allow-mode-alone-let-an-agent-push-or-write-to-github)). Creating a local branch and
-committing on it (`git_write_execution`) are the specification's other two
-delegable operations (§8.2), and they still follow the capability's decision
-mode and any standing grant alone.
-
-**Effect.** Small: neither leaves the machine, and the push that would carry
-them off still needs a delegation or an approval. But an owner reading
-*Delegations* could expect a branch pattern to limit where the agent commits,
-and it does not yet.
-
-**Proposed fix.** Give `GitWriteExecutor` a `repository_target` (the selected
-repository's origin, the branch named or current) so the router applies the
-same rule; a repository with no GitHub remote keeps today's behaviour, since
-there is no repository to delegate.
-
-## BUG-338 — A delegation's repository identity is checked against the last discovery, not asked of GitHub at each step
-
-**Severity: Low. Area: Build / delegations. Status: Open — found 2026-10-12
-building ADD-27 GH-52.**
-
-**Observed.** `DelegationService.revalidate` re-checks the delegation, the
-credential, the account, the installation and the repository id before every
-delegated step. The repository id and installation are compared with what
-Raiker last discovered (`github_repositories`, `github_installations`). It asks
-GitHub (`GET /repos/{owner}/{name}`) only when the caller passes a client, and
-the router does not.
-
-**Effect.** A repository transferred or deleted and re-created since the last
-*Refresh from GitHub* is not seen until the next refresh — the push itself still
-goes only to the bound remote, and the installation token is still narrowed to
-the recorded id, so authority is not redirected; the step just is not refused
-as early as §9 asks.
-
-**Proposed fix.** Pass the broker's client to `revalidate` from the router for
-pushes and pull requests, with a short per-delegation cache so a burst of steps
-asks once; treat *could not reach GitHub* as *blocked — needs owner*.
 
 ## BUG-339 — The issue-to-pull-request routine has a template and no runner
 
@@ -1155,103 +873,13 @@ a proposed choice, not an owner approval or a verified fix. The original BUG
 entries retain their status and acceptance evidence.
 
 ### BUG-313 — Bounded recall fallback
-**Decision — recommended; ranking choice pending owner acceptance.** Keep the
-strict lexical query first. On no match, prefer a bounded OR/BM25 candidate
-query with a minimum content-term coverage rule over enumerating progressively
-smaller subsets. Apply existing owner, project, active-revision, suppression and
-retrieval-budget checks before any candidate reaches model context. Do not use
-an unrestricted OR match or silently add a model call to rewrite every query.
-
-**Reason and alternatives.** All-term matching makes answer-format instructions
-part of the factual question. A ranked fallback can recover relevant facts;
-subset enumeration can grow combinatorially and makes query cost harder to
-bound. A permissive OR alone trades missing memories for unrelated disclosure.
-The exact coverage threshold remains a measured choice, not an invented
-production constant.
-
-**Code review.** `MemoryStore.search_approved_memory` already ranks FTS5
-matches with `bm25()` and uses recency on FTS4; this recommendation changes
-candidate matching, not the existence of ranking. Preserve the FTS4 fallback
-and disclose its weaker ordering, or explicitly decide a supported-engine
-change before requiring BM25. `retrieve_hybrid_memory` merges lexical, vector
-and graph evidence and re-reads active approved records: changing lexical
-matching must not bypass those final eligibility checks.
-References: [memory store](../../raiker/storage/stores/memory.py),
-[search-engine posture](../../raiker/storage/sqlite.py).
-
-**Acceptance and consequence.** Compare strict matching and the proposed
-fallback on the tea example, instruction variants, unrelated two-word overlaps,
-stopword-only queries, cross-owner/project records, forgotten records and large
-corpora. Record recall quality, false positives and query cost before choosing
-the threshold. Preserve provenance in the Remembered strip. No data migration
-is intended; an index/schema change would require its own migration decision.
-References: [BUG-313](#bug-313--an-instruction-in-the-prompt-stops-recall-finding-the-memory-it-asks-about),
-[retrieval service](../../raiker/memory/retrieval.py),
-[existing retrieval hardening tests](../../tests/test_memory_retrieval_hardening.py).
+**Closed 2026-10-13 as [FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
 
 ### BUG-315 — Reply delivery is a separate governed effect
-**Decision — recommended; outbound approval policy pending owner acceptance.**
-Prepare a reply to the authenticated, paired conversation, then govern delivery
-as its own outbound action. Receiving a message, running a turn or approving a
-tool in that turn does not approve sending its answer. Use the effective
-capability/decision mode; a narrowly scoped standing grant may permit delivery
-only if the owner explicitly created it. Add the automated delivery entry path
-before enabling the sender.
-
-**Reason and alternatives.** The webhook HTTP response is not a delivered
-Telegram message. Unconditional auto-replies would introduce an authority and
-data-disclosure path that the present entry inventory does not describe.
-Forcing an additional prompt even under an applicable owner grant would also
-misrepresent the existing decision-mode contract.
-
-**Code review.** `TelegramAdapter.outbound` already constructs a token-bound
-`sendMessage` request. The missing part is automatic reply orchestration:
-`_route_inbound_message` returns `response.message`, while `_settle_receipt`
-deliberately withholds delivered status for Telegram. Reuse the adapter through
-governed execution; do not add a direct HTTP send inside the inbound route.
-References: [channel adapters](../../raiker/channels/adapters.py),
-[inbound router and receipts](../../raiker/api/routes_channels.py).
-
-**Acceptance and consequence.** Bind the intent to owner, channel, recipient,
-source event and payload; distinguish queued, awaiting approval, delivered,
-failed and outcome-unknown. Exercise revoked grants, duplicate events,
-restart-before/after-send, provider failure and bot-loop protection. Retry
-automatically only when reconciliation or provider deduplication makes it safe.
-Durable outbox/receipt changes need versioned schema and recovery fixtures.
-References: [BUG-315](#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram),
-[DEC-14](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-14--make-messaging-a-guided-durable-channel-service),
-[entry-path registry](../../raiker/runtime/authority/entry_paths.py).
+**Closed 2026-10-13 as [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
 
 ### BUG-316 — Separate filing from execution location
-**Decision — recommended; working-folder policy pending owner acceptance.**
-For the first corrective slice, label the Project as where the conversation is
-filed and show the actual server-resolved repository/workspace as the execution
-location. Do not move commands into a managed Project directory merely to make
-the existing wording true.
-
-**Reason and alternatives.** A wording/projection correction resolves the false
-promise without changing filesystem authority. Making every managed Project a
-working directory changes protected-path handling, command cwd, checkpoints and
-existing task behavior; that is a separate architecture change. FIXED-740 made
-the boundary server-issued but does not itself settle BUG-316's semantics.
-
-**Code review.** `authority_for_project` returns workspace-only authority for
-a managed Project and adds a granted root for an attached Project.
-`PathAuthority._resolve` resolves relative paths against `workspace_root`;
-an additional allowed root does not automatically become command cwd.
-References: [Project root resolver](../../raiker/control/project_roots.py),
-[boundary contract tests](../../tests/test_build_boundary.py).
-
-**Acceptance and consequence.** For a managed Project and an attached repository,
-compare the displayed root with reads, writes and command cwd after selection,
-reload and a slow/out-of-order boundary response. An unavailable boundary must
-say unknown/unavailable. No storage migration is intended for this slice; a
-future Project-root migration must define compatibility and rollback.
-References: [BUG-316](#bug-316--builds-working-in-names-a-project-whose-folder-build-does-not-work-in),
-[DEC-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-04--make-project-continuity-explicit-and-typed),
-[FIXED-740](FIXED_ITEMS.md#fixed-740--builds-boundary-line-was-the-browsers-opinion-of-where-a-turn-would-run),
-[path authority](../../raiker/tools/path_authority.py),
-[turn-boundary tests](../../tests/test_turn_path_authority.py).
+**Closed 2026-10-13 as [FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
 
 ### BUG-226 and BUG-228 — Do not create alternate execution contracts
 **Decision — retained deferral for hooks; recommended convergence for UI.**
@@ -1278,9 +906,9 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 
 | Existing item | What Raiker must demonstrate | Evidence required |
 |---|---|---|
-| BUG-313 | Relevant authorised memory survives instruction-heavy phrasing without broadening recall authority | CR-04: original reproduction plus paraphrases, distractors, another owner/project, expired/deleted records; retrieval IDs, supplied context, labelled relevance scores and a real post-restart answer |
-| BUG-315 | An inbound Telegram request produces an authorised reply to the correct destination or a truthful delivery failure | CR-03: real test-account round trip, exact outbound approval/grant, destination message ID/readback, denied send, timeout, lost ACK and restart behavior; a processed receipt cannot stand in for delivery |
-| BUG-316 | Build's displayed project and effective filesystem/command root have explicit, consistent semantics | CR-08/10: attached and managed project fixtures, actual cwd/resolved paths, confined read/write/command outcomes and UI explanation; no silent widening of granted roots |
+| BUG-313 (closed, [FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313)) | Relevant authorised memory survives instruction-heavy phrasing without broadening recall authority | CR-04: original reproduction plus paraphrases, distractors, another owner/project, expired/deleted records; retrieval IDs, supplied context, labelled relevance scores and a real post-restart answer |
+| BUG-315 (closed for the product path, [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315); a real bot's delivered message still owed) | An inbound Telegram request produces an authorised reply to the correct destination or a truthful delivery failure | CR-03: real test-account round trip, exact outbound approval/grant, destination message ID/readback, denied send, timeout, lost ACK and restart behavior; a processed receipt cannot stand in for delivery |
+| BUG-316 (closed, [FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316)) | Build's displayed project and effective filesystem/command root have explicit, consistent semantics | CR-08/10: attached and managed project fixtures, actual cwd/resolved paths, confined read/write/command outcomes and UI explanation; no silent widening of granted roots |
 | BUG-194 | Claimed execution modes have observable lifecycle, stop and recovery behavior | CR-01/07/11: actual foreground/interactive/background/remote modes where supported, process and durable-state evidence, cancellation and reattachment after restart; label unsupported modes |
 | BUG-318 | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
 | BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |

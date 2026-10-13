@@ -78,6 +78,9 @@ def test_with_a_project_and_no_model_the_model_link_stops_it(
     body = _boundary(client, headers, project_id)
     assert body["project_id"] == project_id
     assert body["project_name"] == "Alpha"
+    # BUG-316 — the project files the work; reads, writes and commands resolve
+    # against the workspace, and the boundary says which folder that is.
+    assert body["works_in"] == "ws"
     assert body["environment_name"]
     assert body["refusal"]["step"] == "model"
     assert body["refusal"]["action_href"] == "#/models"

@@ -712,6 +712,7 @@ export type ChannelInboundAccepted = {
   turn_id?: string;
   status?: string;
   reply?: string;
+  reply_delivery?: "delivered" | "held" | "failed";
   ok: boolean;
   channel_message_id: string;
   trust_level: "owner" | "untrusted";
@@ -805,6 +806,22 @@ export type ChannelReceipt = {
   provider_message_id?: string | null;
   outcome_unknown_at?: string | null;
   reviewed_at?: string | null;
+  held_at?: string | null;
+  turn_id?: string | null;
+};
+
+/** BUG-315 — a held reply the owner sent: whether it went, never its text. */
+export type ChannelReplySent = {
+  ok: boolean;
+  receipt_id: string;
+  held: boolean;
+  delivered: boolean;
+  connector_id?: string;
+  channel_type?: string;
+  sent_bytes?: number;
+  status?: number;
+  signed?: boolean;
+  provider_message_id?: string | null;
 };
 
 /** UX-MSG-05 — what the stored route actually does, stated by the server. */
@@ -814,7 +831,7 @@ export type ChannelRouteScope = {
   thread_mapping: "none" | "one_conversation" | "new_conversation_each_message";
   starts_work: "nobody" | "owner_only" | "any_allowed_sender";
   bot_loop_protection: "bot_messages_ignored" | "echo_and_repeat_refused";
-  reply_path: "returned_to_caller" | "kept_in_raiker" | "none";
+  reply_path: "returned_to_caller" | "sent_to_owner_chat" | "kept_in_raiker" | "none";
 };
 
 /** Owner-selected route. An inbound payload cannot override these fields. */
@@ -1835,6 +1852,7 @@ export type EventView = {
 export type ExecutionBoundaryView = {
   project_id: string | null;
   project_name: string | null;
+  works_in: string;
   repo_id: string | null;
   repo_label: string | null;
   repo_kind: "local" | "github" | null;
@@ -3707,6 +3725,7 @@ export type ObservedUsageView = {
   requests: number;
   turns: number;
   compactions: number;
+  estimated_requests: number;
   known_cost: string | null;
   cost_currency: string | null;
   unpriced_models: string[];
@@ -5629,6 +5648,8 @@ export const contract = {
     call<ChannelTestDelivered>("POST", "/api/channels/deliver-test", { body }),
   markChannelDeliveryReviewed: (receiptId: string) =>
     call<ChannelDeliveryReviewed>("POST", `/api/channels/deliveries/${encodeURIComponent(receiptId)}/reviewed`),
+  sendHeldChannelReply: (receiptId: string) =>
+    call<ChannelReplySent>("POST", `/api/channels/deliveries/${encodeURIComponent(receiptId)}/send`),
   pairChannel: (body: PairChannelRequest) =>
     call<ChannelPaired>("POST", "/api/channels/pairings", { body }),
   unpairChannel: (pairingId: string, query: { expected_revision?: string } = {}) =>

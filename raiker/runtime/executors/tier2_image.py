@@ -35,7 +35,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id
-from raiker.models.connections import get_model_connection
 from raiker.models.endpoint_policy import model_egress_allowlist
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, post_json, post_multipart
@@ -556,6 +555,11 @@ class ImageGenerationExecutor:
         a proposed credential is a credential somebody else chose.
         """
         import os
+
+        # Imported here: ``raiker.models.connections`` reaches this module
+        # through ``runtime.executors``, so a top-level import is a cycle
+        # whenever the orchestrator is the first thing imported (BUG-326).
+        from raiker.models.connections import get_model_connection
 
         owner = self._owner(principal)
         if owner:

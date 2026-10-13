@@ -163,3 +163,48 @@ describe("what first launch says about privacy and permissions", () => {
     expect(PERMISSIONS_NOTE.length).toBeLessThan(200);
   });
 });
+
+describe("BUG-332 — a stored key is not a working connection", () => {
+  const anthropic = profile({
+    profile_id: "anthropic-hosted",
+    provider: "anthropic",
+    local_only: false,
+    off_machine: true,
+    connection_configured: true,
+  });
+
+  it("asks for the workspace ID when the provider said it needs one", () => {
+    const recommended = recommendedPath([anthropic], {
+      "anthropic-hosted": "provider_workspace_required",
+    });
+    expect(recommended?.action).toBe("workspace");
+    expect(recommended?.label).toBe("Anthropic needs its workspace ID");
+  });
+
+  it("reads the stored check too, before anything is listed on this screen", () => {
+    const checked = { ...anthropic, readiness_reason_code: "provider_workspace_required" } as ModelProfile;
+    expect(recommendedPath([checked])?.action).toBe("workspace");
+  });
+
+  it("prefers another provider that does work", () => {
+    const openrouter = profile({
+      profile_id: "openrouter-policy-gated",
+      provider: "openrouter",
+      local_only: false,
+      off_machine: true,
+      connection_configured: true,
+    });
+    const recommended = recommendedPath([anthropic, openrouter], {
+      "anthropic-hosted": "provider_workspace_required",
+    });
+    expect(recommended?.profileId).toBe("openrouter-policy-gated");
+    expect(recommended?.action).toBe("choose");
+  });
+
+  it("says connected once the workspace is named and the models list", () => {
+    expect(recommendedPath([anthropic], { "anthropic-hosted": null })?.label).toBe(
+      "Anthropic is connected",
+    );
+  });
+});
+

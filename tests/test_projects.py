@@ -239,6 +239,15 @@ class TestProjectsApi:
         assert client.put("/api/projects/selection", json={"project_id": None}).status_code == 401
         assert client.post("/api/projects/proj_x/export").status_code == 401
 
+    def test_a_name_another_project_has_is_a_conflict_not_a_refusal(
+        self, client: TestClient
+    ) -> None:
+        headers = self._headers(client)
+        assert client.post("/api/projects", json={"name": "Alpha"}, headers=headers).status_code == 200
+        again = client.post("/api/projects", json={"name": "Alpha"}, headers=headers)
+        assert again.status_code == 409
+        assert again.json()["detail"]["reason_code"] == "duplicate_project_name"
+
     def test_export_returns_direct_project_events_as_ndjson_attachment(
         self, client: TestClient, workspace: Path
     ) -> None:

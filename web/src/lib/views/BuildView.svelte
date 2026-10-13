@@ -148,9 +148,14 @@
     sentenceAround,
     sourcesForTurn,
   } from "../citations";
-  import { chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
+  import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
-  import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import {
+    activeComposerProfile,
+    blocksSending,
+    openModelSetup,
+    readinessForSelection,
+  } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
     inputModeForDraft,
@@ -818,11 +823,22 @@
            * id is already here, so the link can carry it.
            */
           {
-            label: "Project",
+            // BUG-316 — the project is where this conversation is filed, not
+            // the folder its commands start in; that is the next fact.
+            label: "Filed in",
             value: boundary.project_name,
             short: boundary.project_name,
             href: `#/projects?project=${encodeURIComponent(boundary.project_id)}`,
             action: "Open project work",
+          },
+        ]
+      : []),
+    ...(boundary !== null
+      ? [
+          {
+            label: "Works in",
+            value: `${boundary.works_in} — reads, writes and commands start here`,
+            short: boundary.works_in,
           },
         ]
       : []),
@@ -917,11 +933,9 @@
   // Models page connects a provider or selects a model, without a remount.
   const profiles = $derived(chatProfiles());
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
-  const activeProfile = $derived(
-    profiles.find(
-      (profile) => profile.profile_id === modelProfile && (!model || profile.model === model),
-    ) ?? selectedProfile,
-  );
+  // BUG-314 — the bound pair as the picker reads it, so a searched model is
+  // described as itself and not as the default.
+  const activeProfile = $derived(activeComposerProfile(profiles, modelProfile, model, allProfiles()));
   const modelReadiness = $derived(readinessForSelection(activeProfile, catalogueChoices(profiles, modelCatalogues()).length));
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a
@@ -2579,8 +2593,11 @@
             <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
           </p>
         {:else}
+          <!-- BUG-316 — the project files the conversation; the folder work
+               happens in is the server's answer, which is the workspace. -->
           <p class="project-boundary" role="status">
-            Working in <strong>{selectedProject?.name}</strong>
+            Filed in <strong>{selectedProject?.name}</strong>{#if boundary}&#32;·
+              works in <strong>{boundary.works_in}</strong>{/if}
           </p>
         {/if}
       {/snippet}

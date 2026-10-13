@@ -665,12 +665,19 @@ does not enable more capabilities or overwrite owner settings.
 **Acceptance.** New paths must prove owner isolation, effective gate/mode,
 revocation and audit where applicable, and inability to call the executor
 without runtime-issued authority. Test stopping delegated work as well as its
-parent. BUG-315's automatic sender remains a proposed additional entry.
+parent. *2026-10-13:* BUG-315's sender landed on the existing control-plane
+entry rather than a new one ([FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315)): the
+inbound route hands a finished turn's answer to `RuntimeControlService`, which
+builds an `external_channel_runtime` action as the paired owner — the human who
+sent the message — so the capability's gate, a paused channel, the egress
+allowlist and the reply limit apply, and a reply carrying sensitive information
+is held for the owner instead of sent. Only the owner's own message is
+answered; no model argument reaches the send.
 References: [entry registry](../../raiker/runtime/authority/entry_paths.py),
 [inventory tests](../../tests/test_governance_entry_paths.py),
 [GEP-02](#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths),
 [BUG-239](FIXED_ITEMS.md#fixed-544--a-new-account-was-fail-closed-about-reading-its-owners-own-repository),
-[BUG-315](TO_BE_FIXED.md#bug-315--a-telegram-turns-answer-never-goes-back-over-telegram).
+[BUG-315](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315).
 
 ## Competitive operational-control evidence — 2026-10-05
 

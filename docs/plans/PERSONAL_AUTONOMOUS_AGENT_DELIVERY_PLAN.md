@@ -10,6 +10,14 @@ and [ADR](../adr/ADR-0001-personal-autonomous-agent.md) define the decision.
 PAA IDs own new goal/personal-agent delivery work. They do not replace existing
 BUG/ADD/DEC closures or retroactively turn proposals into shipped features.
 
+**Product audience:** one personal owner and their chosen devices, projects,
+models, tools and services. The PAA plan delivers personal goal completion and
+owner-controlled autonomy, not workplace administration, organisational tenancy,
+staff roles or a corporate dashboard. Home-lab and hosted integrations are
+optional resources under that same owner's authority. Do not turn general
+security controls or connector-provider account terminology into enterprise
+product requirements.
+
 Use [PILLAR_MAP](PILLAR_MAP.md) for product dependencies,
 [GOVERNANCE_ENTRY_PATHS](GOVERNANCE_ENTRY_PATHS.md) for authority,
 [competitive evidence](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md)

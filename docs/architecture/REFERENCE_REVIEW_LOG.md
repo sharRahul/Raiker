@@ -948,7 +948,7 @@ is a stored date rather than a derived one.
 | Background task progress | `docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Team UI | `docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/architecture/VISUAL_DESIGN_SPEC.md`, `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` |
 | Agent recursion limits | `docs/architecture/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
-| Enterprise security/governance | `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
+| Agent security and owner-governed auditability | `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 
 ---
 

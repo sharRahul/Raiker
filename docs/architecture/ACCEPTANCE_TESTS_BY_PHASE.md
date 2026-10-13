@@ -201,17 +201,17 @@ Acceptance tests must prove:
 
 ---
 
-## Phase 5: Governed Enterprise/Home-Lab Platform
+## Phase 5: Owner-Governed Personal Agent And Home-Lab Operations
 
 Acceptance tests must prove:
 
-- Managed policy precedence works.
+- Owner-managed policy and decision-mode precedence works.
 - Event integrity checks detect tampering.
 - Signed plugins validate signatures and checksums.
-- Multi-user permissions isolate sessions, approvals, memory, and secrets.
+- Owner sessions, projects, linked devices and execution profiles enforce their intended isolation for approvals, memory and secrets.
 - Audit export includes events, policy decisions, approvals, tool actions, checkpoints, and config versions.
-- Hosted provider budgets block over-limit requests.
-- Enterprise/home-lab deployment config does not weaken local-first defaults.
+- Owner-set hosted provider budgets block over-limit requests.
+- Personal home-lab or owner-selected remote execution configuration does not weaken local-first defaults.
 
 ---
 

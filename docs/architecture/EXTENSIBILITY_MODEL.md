@@ -24,7 +24,7 @@ Every extension, regardless of surface, obeys the same invariant:
 > tool broker, the policy engine, the approval flow, or the event log.
 
 Extensions are **untrusted by default** and become trusted only through explicit scope,
-manifest, pairing, or managed policy.
+manifest, pairing, or owner-approved host policy.
 
 ---
 
@@ -47,7 +47,7 @@ Legend: ✅ implemented · 🔒 phase_scheduled_disabled · 📘 specified_not_i
 When two extensions disagree, the stricter wins, and scope precedence applies (highest first):
 
 ```
-managed (enterprise policy)
+managed (owner-approved host policy)
   > user
   > project (committed)
   > local (gitignored)
@@ -57,6 +57,9 @@ managed (enterprise policy)
 ```
 
 - A lower-scope extension can never override a higher-scope **deny**.
+- `managed` names a policy installed for this owner's Raiker host. It is not a
+  company administrator role and cannot create a new human principal, widen an
+  existing permission, or approve on behalf of the owner.
 - Plugin/skill/channel extensions are advisory unless explicitly granted decision authority.
 - Channels additionally require **sender gating** (pairing + sender allowlist) before any
   inbound content reaches the runtime — an ungated channel is a prompt-injection vector

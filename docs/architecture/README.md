@@ -5,6 +5,12 @@ runtime contracts, security boundaries, implementation status, verification
 requirements, and historical design records. User workflows belong in the
 [user guide](../guide/README.md).
 
+**Scope:** one individual owner, one governed personal-agent runtime, and
+owner-chosen local, home-lab or hosted models and services. Design references to
+host policy, permissions, audit and connectors are personal safeguards, not a
+separate organisation-wide administration product. Proposed autonomous-goal
+features remain staged until the implementation and release evidence exist.
+
 ## Canonical documents
 
 Prefer these when another technical document disagrees:

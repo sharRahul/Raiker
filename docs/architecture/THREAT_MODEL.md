@@ -172,8 +172,8 @@ Phase 1 does not fully implement:
 
 - signed event chains;
 - plugin signatures;
-- managed enterprise policy;
-- multi-user auth;
+- owner-configured host policy;
+- secure remote authentication for the same owner;
 - remote/container sandboxing;
 - external channel pairing;
 - hosted provider billing controls;

@@ -432,7 +432,7 @@ Persistence rules:
 | Phase 2 | Rich local workspace, full terminal/TUI panels, local models, hooks, checkpoints, approved memory | Rich TUI becomes more capable but not primary over other interfaces. |
 | Phase 3 | Desktop, Web, Dashboard, REST, IDE, Apple mobile app, Android mobile app, plugins, graph, semantic memory | Desktop/Web/Mobile/IDE/REST become equal primary implemented clients of the same gateway. |
 | Phase 4 | Channels, Voice, Hotkeys, Browser Extension, Email, Slack, Teams, Discord, Signal, MCP, subagents, remote execution | External interfaces are equal primary when linked and policy-permitted. |
-| Phase 5 | Managed governance, multi-user, signed plugins, audit export, cloud/GPU budgets, enterprise controls | Governance can restrict capabilities by policy but must not create hidden bypass interfaces. |
+| Phase 5 | Owner-controlled governance, personal audit export, signed plugins, and home-lab/cloud/GPU budgets | An owner's permissions apply across clients and connected hosts; there is no separate organisation-level authority or hidden privileged interface. |
 
 ---
 

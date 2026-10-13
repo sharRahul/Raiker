@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "version": "0.0.0",
   "type": "module",
-  "description": "Raiker governed-agent web UI (M1 skeleton). Local-first view/controller over the governed runtime.",
+  "description": "Raiker personal AI agent dashboard: local-first, single-owner Chat, Build and governed automation.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

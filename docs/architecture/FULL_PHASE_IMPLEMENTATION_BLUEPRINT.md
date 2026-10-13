@@ -444,34 +444,40 @@ Requirements:
 
 ---
 
-## Phase 5: Governed Enterprise And Home-Lab Platform
+## Phase 5: Owner-Governed Personal Agent And Home-Lab Control
 
-### Governance
+**Product scope:** this historical phase blueprint is a future personal-agent
+design, not a statement that the features have shipped. Raiker remains an
+individual-owner agent; it does not introduce an organisational admin, employee
+management, or centrally operated tenant platform. The owner may connect home-lab,
+private-network and hosted resources without delegating Raiker-wide authority to
+their service administrators.
 
-- managed policies;
-- role-based access;
-- multi-user sessions;
-- signed plugin trust;
-- audit export;
-- central policy dashboard;
-- security test suite;
-- red-team harness;
-- event log integrity checks.
+### Owner Governance
 
-### Enterprise Dashboard
+- owner-selected capability and decision policies;
+- owner-session authentication and scoped machine/child-agent delegation;
+- owner-controlled local and home-lab host profiles;
+- signed plugin trust with explicit owner review;
+- owner-readable audit export;
+- personal permissions and risk controls;
+- security test suite and adversarial test harness;
+- event-log integrity checks.
+
+### Personal Control Dashboard
 
 Widgets:
 
-- policy compliance;
-- plugin risk;
-- model egress;
-- user approvals;
-- channel trust;
+- capability decisions and current permissions;
+- plugin provenance and risk;
+- model egress and connected providers;
+- pending owner approvals;
+- paired-channel trust;
 - memory governance;
-- eidetic retention and deletion status;
-- security findings;
-- execution spend;
-- audit export status.
+- personal retention and deletion status;
+- security findings and recovery controls;
+- execution spend and owner budgets;
+- audit-export status.
 
 ### Storage
 
@@ -494,13 +500,13 @@ Widgets:
 
 ### Tests
 
-- managed policy overrides project allow;
-- event log tampering detected;
-- audit export complete;
-- signed plugin verification;
-- budget limits stop cloud execution;
-- retention cleanup preserves legal holds/manual checkpoints;
-- managed policies preserve the equal primary interface invariant unless explicitly restricting a capability for all interfaces by policy.
+- an owner-selected host restriction cannot be weakened by a project or plugin allow;
+- event-log tampering is detected;
+- personal audit export is complete;
+- signed plugin verification rejects untrusted code;
+- owner budgets stop cloud execution;
+- retention cleanup respects owner-kept checkpoints and applicable preservation duties;
+- the same owner decision is enforced through every client interface, without a hidden administrative bypass.
 
 ---
 

@@ -4,6 +4,11 @@ This guide explains how to install, configure, use, and safely operate Raiker.
 It is written for people using the web dashboard or terminal client; you do not
 need to understand Raiker's internal architecture first.
 
+Raiker is your local-first **personal AI agent**. One owner controls their model
+connections, memory, Chat and Build work, schedules, extensions, permissions
+and approvals. Advanced, durable autonomous goals are being added in stages;
+[current limitations](known-limits.md) describe what is usable today.
+
 The same task-oriented guide is available in a running Raiker under
 **Utilities → Guide**.
 

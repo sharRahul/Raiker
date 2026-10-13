@@ -182,7 +182,7 @@ Managed remote execution requires:
 - artifact retention;
 - cancellation support;
 - billing event logs;
-- managed policy if multi-user or enterprise;
+- owner-approved host/provider policy for remote execution;
 - no silent fallback from local to cloud.
 
 ---

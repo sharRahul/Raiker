@@ -47,7 +47,7 @@ Legend: ✅ implemented · 🔒 phase_scheduled_disabled · 📘 specified_not_i
 When two extensions disagree, the stricter wins, and scope precedence applies (highest first):
 
 ```
-managed (enterprise policy)
+managed (owner-enforced policy)
   > user
   > project (committed)
   > local (gitignored)

@@ -444,28 +444,28 @@ Requirements:
 
 ---
 
-## Phase 5: Governed Enterprise And Home-Lab Platform
+## Phase 5: Owner-Governed Personal Agent And Home-Lab Operations
 
 ### Governance
 
-- managed policies;
-- role-based access;
-- multi-user sessions;
+- owner-managed policies and delegation limits;
+- owner identity, session and trusted-device boundaries;
+- personal project/workspace isolation;
 - signed plugin trust;
-- audit export;
-- central policy dashboard;
+- owner-readable audit export;
+- one personal control centre for policy, permissions and progress;
 - security test suite;
 - red-team harness;
 - event log integrity checks.
 
-### Enterprise Dashboard
+### Personal Agent Control Centre
 
 Widgets:
 
-- policy compliance;
+- owner-selected safeguards and permission state;
 - plugin risk;
 - model egress;
-- user approvals;
+- owner approvals;
 - channel trust;
 - memory governance;
 - eidetic retention and deletion status;
@@ -494,13 +494,21 @@ Widgets:
 
 ### Tests
 
-- managed policy overrides project allow;
+- owner-managed deny and critical holds cannot be bypassed by project allow;
 - event log tampering detected;
 - audit export complete;
 - signed plugin verification;
 - budget limits stop cloud execution;
 - retention cleanup preserves legal holds/manual checkpoints;
-- managed policies preserve the equal primary interface invariant unless explicitly restricting a capability for all interfaces by policy.
+- owner-managed decisions apply consistently across the supported personal interfaces, without hidden bypasses or a separate administrator surface.
+
+---
+
+**Scope guard:** Phase 5 describes optional personal devices, a home lab,
+self-hosting and remote runners for the same owner. It does not introduce
+organisation tenants, employee administration or an enterprise product tier.
+These items are design targets; implementation and release readiness are tracked
+separately.
 
 ---
 

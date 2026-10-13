@@ -180,6 +180,48 @@ def test_documentation_links_and_anchors_resolve() -> None:
     assert broken == [], "broken documentation links:\n" + "\n".join(broken)
 
 
+def test_personal_agent_positioning_does_not_regress() -> None:
+    """The personal-agent product must not drift into organisation administration.
+
+    Keep third-party names such as GitHub Enterprise and provider organisation
+    APIs where technically accurate. Only reject legacy language that claims
+    Raiker itself is an employer-managed, multi-tenant application.
+    """
+    readme = Path("README.md").read_text(encoding="utf-8")
+    architecture = Path("docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md").read_text(
+        encoding="utf-8"
+    )
+    assert "personal autonomous ai agent" in readme.lower()
+    assert "one individual owner" in architecture.lower()
+
+    product_specs = (
+        "README.md",
+        "docs/architecture/ACCEPTANCE_TESTS_BY_PHASE.md",
+        "docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md",
+        "docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md",
+        "docs/architecture/EXTENSIBILITY_MODEL.md",
+        "docs/architecture/HOOKS_SPEC.md",
+        "docs/architecture/PLUGIN_SYSTEM_SPEC.md",
+        "docs/architecture/SELF_IMPROVEMENT_MODEL.md",
+        "docs/architecture/THREAT_MODEL.md",
+    )
+    outdated_positioning = re.compile(
+        r"enterprise[- /]?(?:dashboard|application|platform|managed|approved)|"
+        r"managed enterprise policy|"
+        r"enterprise-managed controls|"
+        r"central policy dashboard|"
+        r"multi-user sessions;",
+        re.IGNORECASE,
+    )
+    offenders = [
+        str(path)
+        for name in product_specs
+        if (path := Path(name)).exists()
+        and outdated_positioning.search(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == [], f"Personal-agent positioning drift in: {offenders}"
+
+
 def test_relayed_capability_count_is_stated_correctly() -> None:
     """The technical threat model commits to the executor count."""
     from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL

@@ -100,7 +100,7 @@ not auto-enable.
   contradiction or failure lowers it; stale artifacts decay.
 - **Forgetting.** Users can correct or delete any learned artifact; eidetic raw observations are
   retention-bounded.
-- **Managed override.** Enterprise/managed policy can disable self-improvement entirely.
+- **Owner-managed override.** The owner's higher-precedence policy can disable self-improvement entirely.
 
 ---
 

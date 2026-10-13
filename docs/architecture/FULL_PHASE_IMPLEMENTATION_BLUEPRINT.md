@@ -444,35 +444,34 @@ Requirements:
 
 ---
 
-## Phase 5: Owner-Governed Personal Agent And Home-Lab Control
+## Phase 5: Owner-Governed Personal Agent And Home-Lab Operations
 
-**Product scope:** this historical phase blueprint is a future personal-agent
-design, not a statement that the features have shipped. Raiker remains an
-individual-owner agent; it does not introduce an organisational admin, employee
-management, or centrally operated tenant platform. The owner may connect home-lab,
-private-network and hosted resources without delegating Raiker-wide authority to
-their service administrators.
+**Product scope:** this is a future personal-agent blueprint, not a claim that all
+features have shipped. The same individual owner may connect home-lab, private
+network, and hosted resources; no tenant administration or employee management
+system is introduced, and external administrators gain no Raiker-wide authority.
 
 ### Owner Governance
 
-- owner-selected capability and decision policies;
-- owner-session authentication and scoped machine/child-agent delegation;
-- owner-controlled local and home-lab host profiles;
-- signed plugin trust with explicit owner review;
+- owner-managed policies and delegation limits;
+- owner identity, session and trusted-device boundaries;
+- personal project/workspace isolation;
+- signed plugin trust;
 - owner-readable audit export;
-- personal permissions and risk controls;
-- security test suite and adversarial test harness;
-- event-log integrity checks.
+- one personal control centre for policy, permissions and progress;
+- security test suite;
+- red-team harness;
+- event log integrity checks.
 
-### Personal Control Dashboard
+### Personal Agent Control Centre
 
 Widgets:
 
-- capability decisions and current permissions;
-- plugin provenance and risk;
-- model egress and connected providers;
-- pending owner approvals;
-- paired-channel trust;
+- owner-selected safeguards and permission state;
+- plugin risk;
+- model egress;
+- owner approvals;
+- channel trust;
 - memory governance;
 - personal retention and deletion status;
 - security findings and recovery controls;
@@ -500,13 +499,21 @@ Widgets:
 
 ### Tests
 
-- an owner-selected host restriction cannot be weakened by a project or plugin allow;
-- event-log tampering is detected;
-- personal audit export is complete;
-- signed plugin verification rejects untrusted code;
-- owner budgets stop cloud execution;
-- retention cleanup respects owner-kept checkpoints and applicable preservation duties;
-- the same owner decision is enforced through every client interface, without a hidden administrative bypass.
+- owner-managed deny and critical holds cannot be bypassed by project allow;
+- event log tampering detected;
+- audit export complete;
+- signed plugin verification;
+- budget limits stop cloud execution;
+- retention cleanup preserves legal holds/manual checkpoints;
+- owner-managed decisions apply consistently across the supported personal interfaces, without hidden bypasses or a separate administrator surface.
+
+---
+
+**Scope guard:** Phase 5 describes optional personal devices, a home lab,
+self-hosting and remote runners for the same owner. It does not introduce
+organisation tenants, employee administration or an enterprise product tier.
+These items are design targets; implementation and release readiness are tracked
+separately.
 
 ---
 

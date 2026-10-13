@@ -25,6 +25,23 @@ remains authoritative for shipped features, and the
 and acceptance gates. No new goal API, database table, event or browser executor
 is implemented by this documentation change.
 
+## Personal product boundary
+
+Raiker is designed for **one individual owner**, their devices and projects, and
+the services they explicitly connect. Its optional home-lab, private-network
+and hosted model/runner integrations are *execution choices for that owner*, not
+a separate organisational deployment or administration product. Do not add
+team administration, corporate policy consoles, tenant provisioning, managed
+employee accounts or organisational sales requirements to the personal-agent
+roadmap. Those are not prerequisites for durable goals, personal memory,
+proactivity, coding or verified outcomes.
+
+The owner controls profiles, models, permissions, credentials, schedules, audit
+records, retention and Stop. Shared/reachable services still need identity,
+isolation, approval, revocation, budget and audit safeguards. A third-party
+provider's organisational billing or account terminology may be documented when
+technically necessary; it does not change Raiker's product audience.
+
 ## Reference ideas and Raiker adaptations
 
 These are design inspirations from primary documentation checked on 2026-10-07,

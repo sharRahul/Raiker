@@ -24,7 +24,7 @@ Raiker is not:
 12. a hosted-model proxy that silently sends local data to remote providers;
 13. a general malware-analysis or offensive automation platform;
 14. a system where interface richness decides authority;
-15. an organisation-wide administration, tenant-management, or employee-monitoring system.
+15. an organisation-administered or multi-tenant product for managing staff or tenants.
 
 > **Read the operative word.** Several non-goals above forbid *silent*,
 > *ungoverned*, or *unrestricted* behaviour ("silently sends local data",
@@ -34,6 +34,12 @@ Raiker is not:
 > server) — that is *not* a non-goal. What stays out of scope is doing so
 > *silently* or *without monitoring, findings, and an owner stop*. See
 > `docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy".
+
+---
+
+Raiker's intended user is an **individual owner**. Owner-selected local, home-lab,
+private-network and hosted services are deployment and model choices for that
+individual, not a change to the product's personal-agent identity.
 
 ---
 

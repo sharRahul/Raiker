@@ -153,7 +153,7 @@ eleven are refused, blocked or N/A on their own stated grounds rather than
 waiting to be built. `Elicitation` and `ElicitationResult` are the only two that
 could move, and only if the mid-turn question surface they need is built.
 
-Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
+Hooks let the owner, projects, plugins, and skills run controlled logic at lifecycle points in Raiker.
 
 Hooks are powerful and dangerous. They must be explicit, scoped, policy-aware, event-logged, timeout-bounded, and testable.
 
@@ -161,7 +161,7 @@ Hooks are powerful and dangerous. They must be explicit, scoped, policy-aware, e
 
 ## Hook Goals
 
-Raiker hooks must support lifecycle automation, policy enforcement, validation and linting, prompt/context augmentation, notification and telemetry, tool result inspection, async background reactions, plugin/skill-provided behaviour, and enterprise-managed controls.
+Raiker hooks must support lifecycle automation, policy enforcement, validation and linting, prompt/context augmentation, notification and telemetry, tool result inspection, async background reactions, plugin/skill-provided behaviour, and higher-precedence owner-managed controls.
 
 ---
 
@@ -182,7 +182,7 @@ Raiker hooks must support lifecycle automation, policy enforcement, validation a
 
 | Scope | Location | Shareable | Notes |
 |---|---|---:|---|
-| managed | enterprise policy | yes | highest priority |
+| managed | owner-managed local policy | yes | highest priority; retains the existing scope identifier |
 | user | user config | no | applies across projects |
 | project | committed project config | yes | review before committing |
 | local | gitignored project config | no | personal overrides |

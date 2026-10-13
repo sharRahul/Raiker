@@ -88,7 +88,7 @@ The plugin system must support:
 | user | Installed for one user across projects | no |
 | project | Committed plugin reference for project | no, requires trust |
 | local | Project-local gitignored plugin enablement | no |
-| managed | Approved under this owner's configured host policy | only if that policy and owner consent permit it |
+| managed | Plugin reviewed under the owner's higher-precedence local policy | yes only if owner policy enables it |
 | bundled | Shipped with Raiker | yes if built-in and signed |
 
 ---
@@ -473,13 +473,10 @@ Before enabling or updating a plugin, Raiker must show:
 | `local_dev` | Local plugin under development |
 | `project_reviewed` | Reviewed in this repository |
 | `user_trusted` | User explicitly trusted |
-| `managed_trusted` | Reviewed under an owner-selected host policy |
+| `managed_trusted` | Owner-managed trust level (legacy identifier; not organisational administration) |
 | `bundled_trusted` | Shipped/signed with Raiker |
 
-Trust level does not bypass policy by itself. It only affects default enablement and warnings.
-The `managed` scope is a local host-policy designation, not a fleet administrator,
-company approval or separate owner. It cannot silently enable code or grant an
-agent permission the owner did not provide.
+This policy cannot silently enable a plugin or permit an agent to elevate permissions. Trust level does not bypass policy by itself. It only affects default enablement and warnings. The existing `managed` and `managed_trusted` identifiers are compatibility labels for owner-enforced policy/trust, not a separate organisational administrator or multi-tenant product.
 
 ---
 

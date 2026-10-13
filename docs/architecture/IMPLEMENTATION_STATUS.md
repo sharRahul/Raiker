@@ -180,6 +180,12 @@ surface is open, with the invalidation hooks still authoritative over the timer
 
 ## Personal-agent target status — 2026-10-07
 
+**Product scope:** an individual owner's personal autonomous AI agent, with
+optional personal devices, home-lab and owner-selected cloud execution. Security,
+governance and audit controls protect that owner's work; they do not imply a
+multi-tenant organisational application or a corporate administration product.
+The goal-level capabilities below remain staged regardless of positioning.
+
 The [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) is accepted
 as a target. Existing tasks/routines, governed memory, connectors and Chat/Build
 are foundations; they are not evidence of a complete goal-level personal agent.

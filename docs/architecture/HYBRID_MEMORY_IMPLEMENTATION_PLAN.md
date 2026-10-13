@@ -248,12 +248,11 @@ criterion; later stages do not weaken the completed safety rules.
 
 ### Deployment scope
 
-Raiker is a self-hosted, multi-instance application for a single personal
-device or user-owned AI host: laptops, desktops, Macs, local AI devices, and
-optional home NAS hardware. One server may host separate user instances, each
-with an independent workspace, SQLite state, vault key, connectors, models,
-files, folders, accounts, and administrator. An instance must never reveal its
-data to another instance; it is not a shared enterprise service or hosted SaaS.
+Raiker is a self-hosted personal agent for an owner's device or user-owned AI
+host: laptop, desktop, Mac, local AI device, or optional home NAS. An owner may
+run separate instances with independent workspaces, SQLite state, vault keys,
+connectors, models, files and accounts. An instance must not reveal its state to
+another instance; running more than one does not create a shared account service.
 Long-term backup is opt-in: users may keep it local or select a NAS, mounted
 drive, or supported cloud-storage provider. Raiker must encrypt and verify
 those backups, expose their retention/deletion disposition, and never silently
@@ -339,9 +338,9 @@ tie-break (RAIKER-2025). The engine is probed at runtime; a build without FTS5
 falls back to FTS4 and deterministic recency order, and reports which one it
 used.
 Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
-rows are append-only at the SQLite layer. Raiker supports multiple local users
-on one device through separate principals and workspaces, not enterprise
-multi-tenant hosting. User-selected NAS, mounted-drive, and cloud backup
+rows are append-only at the SQLite layer. Raiker's storage enforces principal and workspace isolation wherever separate
+local instances or users exist on a device. This is an isolation boundary, not a
+multi-owner service offering. User-selected NAS, mounted-drive, and cloud backup
 destinations remain pending.
 
 1. Enforce principal and workspace ownership on every memory row, projection,
@@ -350,8 +349,7 @@ destinations remain pending.
    attempts on the same host.
 2. Encrypt durable rows, artifacts, indexes, and backups at rest with a
    per-workspace data key. Define local device-owner/user recovery, key
-   rotation, revocation, and access rules without requiring hosted enterprise
-   KMS or SaaS accounts.
+   rotation, revocation, and access rules without requiring an externally hosted key-management service or SaaS account.
 3. Add an opt-in NAS backup adapter first, then mounted-drive and cloud-provider
    adapters. The catalog must record encrypted snapshots, destination, retention/hold
    deadlines, restore tests, erasure requests, deletion completion, and every

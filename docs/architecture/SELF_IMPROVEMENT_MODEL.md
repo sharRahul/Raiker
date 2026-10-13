@@ -100,7 +100,9 @@ not auto-enable.
   contradiction or failure lowers it; stale artifacts decay.
 - **Forgetting.** Users can correct or delete any learned artifact; eidetic raw observations are
   retention-bounded.
-- **Owner-managed override.** The owner's higher-precedence policy can disable self-improvement entirely.
+- **Owner-controlled disablement.** The owner can disable skill learning or
+  self-improvement through their governed policy; an agent or plugin cannot
+  turn it back on or grant itself a higher role.
 
 ---
 

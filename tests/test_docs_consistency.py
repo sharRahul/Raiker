@@ -307,3 +307,51 @@ def test_the_open_defect_ledger_indexes_every_entry_it_carries() -> None:
 
     missing = sorted(sections - indexed, key=lambda item: int(item.split("-")[1]))
     assert missing == [], f"{path}: entries with no row in the index: {missing}"
+
+
+# Product positioning: a personal agent must not drift back into a hosted
+# organisation/fleet product merely because it has strong governance controls.
+# Service-specific technical language (GitHub Enterprise, provider organisation
+# credentials, competitor managed settings) remains valid in its own context.
+
+def test_public_product_descriptions_identify_one_personal_owner() -> None:
+    expectations = {
+        Path("README.md"): ("personal ai agent", "one owner"),
+        Path("docs/README.md"): ("personal", "individual owner"),
+        Path("docs/guide/README.md"): ("personal ai agent", "one owner"),
+        Path("web/README.md"): ("personal ai agent", "single-owner"),
+        Path("docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md"): (
+            "personal autonomous", "individual owner"
+        ),
+    }
+    for path, terms in expectations.items():
+        content = path.read_text(encoding="utf-8").lower()
+        missing = [term for term in terms if term not in content]
+        assert not missing, f"{path}: missing personal-agent identity {missing}"
+
+
+def test_no_enterprise_product_branding_in_owner_facing_architecture() -> None:
+    """Protect product identity, not mentions of external workplace services."""
+    product_docs = (
+        "README.md",
+        "docs/README.md",
+        "docs/guide/README.md",
+        "web/README.md",
+        "docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md",
+        "docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md",
+        "docs/architecture/EXTENSIBILITY_MODEL.md",
+        "docs/architecture/PLUGIN_SYSTEM_SPEC.md",
+        "docs/architecture/SELF_IMPROVEMENT_MODEL.md",
+    )
+    branding = re.compile(
+        r"\b(?:enterprise[- ](?:application|platform|dashboard|agent)|"
+        r"governed enterprise|enterprise-approved plugin|managed enterprise policy)\b",
+        re.IGNORECASE,
+    )
+    offenders = []
+    for item in product_docs:
+        path = Path(item)
+        content = path.read_text(encoding="utf-8")
+        if match := branding.search(content):
+            offenders.append(f"{path}: {match.group(0)}")
+    assert not offenders, "outdated organisational product branding:\n" + "\n".join(offenders)

@@ -172,8 +172,9 @@ Phase 1 does not fully implement:
 
 - signed event chains;
 - plugin signatures;
-- owner-managed policy across personal devices;
+- owner-managed host policy across personal devices;
 - linked-device and session isolation;
+- secure remote authentication for the same owner;
 - remote/container sandboxing;
 - external channel pairing;
 - hosted provider billing controls;

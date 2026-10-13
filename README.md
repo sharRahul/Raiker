@@ -5,6 +5,7 @@ Its working foundation combines a personal AI assistant, a coding/build agent,
 and an extensible, owner-governed runtime. Chat, repository work, tools,
 approvals, permissions, and audit records share that runtime whether the chosen
 model runs locally, on a private network, or through a hosted provider.
+Raiker is a personal AI agent for one owner; it is not an organisational administration product.
 
 The personal-agent direction adds durable goals, personal context, bounded
 proactive work and verified outcomes while retaining coding and user-owned model

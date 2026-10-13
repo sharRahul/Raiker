@@ -446,7 +446,12 @@ Requirements:
 
 ## Phase 5: Owner-Governed Personal Agent And Home-Lab Operations
 
-### Governance
+**Product scope:** this is a future personal-agent blueprint, not a claim that all
+features have shipped. The same individual owner may connect home-lab, private
+network, and hosted resources; no tenant administration or employee management
+system is introduced, and external administrators gain no Raiker-wide authority.
+
+### Owner Governance
 
 - owner-managed policies and delegation limits;
 - owner identity, session and trusted-device boundaries;
@@ -468,10 +473,10 @@ Widgets:
 - owner approvals;
 - channel trust;
 - memory governance;
-- eidetic retention and deletion status;
-- security findings;
-- execution spend;
-- audit export status.
+- personal retention and deletion status;
+- security findings and recovery controls;
+- execution spend and owner budgets;
+- audit-export status.
 
 ### Storage
 

@@ -1,7 +1,9 @@
 # Raiker Web App (`web`)
 
-The local web app for Raiker's governed agent runtime — a professional, pastel-themed
-view/controller over the existing governed backend, never a privileged interface. It is
+The local web app for Raiker's **single-owner personal AI agent** — a calm,
+accessible view/controller over the existing governed backend, never a privileged
+interface. Its permissions, audit and policy views help the individual owner
+control their agent; they are not an organisation administration console. It is
 single-user and loopback-only: `raiker-web` serves the built SPA and the governed API from one
 `127.0.0.1` origin, and every read and mutation flows through the same contracts, policy engine,
 RuntimeAuthority, and append-only audit log as the terminal client.

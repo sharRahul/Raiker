@@ -476,7 +476,7 @@ Before enabling or updating a plugin, Raiker must show:
 | `managed_trusted` | Owner-managed trust level (legacy identifier; not organisational administration) |
 | `bundled_trusted` | Shipped/signed with Raiker |
 
-Trust level does not bypass policy by itself. It only affects default enablement and warnings. The existing `managed` and `managed_trusted` identifiers are compatibility labels for owner-enforced policy/trust, not a separate organisational administrator or multi-tenant product.
+This policy cannot silently enable a plugin or permit an agent to elevate permissions. Trust level does not bypass policy by itself. It only affects default enablement and warnings. The existing `managed` and `managed_trusted` identifiers are compatibility labels for owner-enforced policy/trust, not a separate organisational administrator or multi-tenant product.
 
 ---
 

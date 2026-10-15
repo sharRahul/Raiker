@@ -230,10 +230,6 @@
 {#if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="overview">
     <div class="head">
-      <!-- One promise, not a paragraph explaining the page to itself. What a
-           read-first surface is, and why nothing here is a colour without a
-           record behind it, is in the guide. -->
-      <p class="page-lead">Every card links to the record it is derived from.</p>
       <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
         <Icon name="refresh" size="sm" /> Refresh
       </button>
@@ -481,9 +477,6 @@
 {:else}
   <div id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications">
     <h2 class="section-h">Notification history</h2>
-    <p class="page-lead">
-      Everything the context-bar bell has raised, newest first. Reading history changes nothing.
-    </p>
     {#if notifications === null}
       <PageState state="loading" title="Loading notifications…" />
     {:else if notifications.length === 0}
@@ -532,7 +525,6 @@
     justify-content: space-between;
     gap: var(--space-3);
   }
-  .head .page-lead { margin: 0; }
   .section-h {
     font-size: var(--text-md);
     margin: 0 0 var(--space-3);

@@ -220,10 +220,42 @@ class TurnSources(TypedDict):
     sources: list[TurnSourceView]
 
 
-class TurnSourceExcerpt(TurnSourceView, SourceExcerptView):
+class TurnSourceExcerpt(TypedDict):
     """One cited source, opened at the passage the turn used (C4)."""
 
+    source_id: str
+    ordinal: int
+    kind: str
+    title: str
+    locator: str
+    tool_name: str
+    detail: str
+    attachment_id: str
+    turn_id: str
+    openable: bool
     ok: bool
+    status: Literal[
+        "resolved",
+        "no_provenance",
+        "source_deleted",
+        "source_changed",
+        "unsupported_source",
+        "not_authorized",
+    ]
+    excerpt: str
+    highlight_start: int
+    highlight_length: int
+    session_id: str
+    truncated: bool
+    resolution_method: Literal[
+        "stored_coordinates",
+        "matching_text",
+        "answer_quote",
+        "recorded_passage",
+        "whole_source",
+        "",
+    ]
+    anchors: NotRequired[list[SourceAnchorView]]
 
 
 class RecalledMemory(TypedDict):

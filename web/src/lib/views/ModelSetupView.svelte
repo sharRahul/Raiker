@@ -517,7 +517,7 @@
   /* Which of the five stages you are on stays in view while the model list
      under it is scrolled. */
   .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
-  .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-family: var(--font-serif); font-size: var(--text-xl); }
+  .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-size: var(--text-xl); }
   ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
   li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }
   li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
@@ -526,7 +526,7 @@
   header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
      the mono face and a little more room under it. */
   .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
-  h2 { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
+  h2 { margin: 0; color: var(--text-1); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
   .choice-list { display: grid; gap: var(--space-2); } .choice-list button { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
   .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }
   .picked { margin: 0; color: var(--accent); font-size: var(--text-sm); font-weight: 650; }

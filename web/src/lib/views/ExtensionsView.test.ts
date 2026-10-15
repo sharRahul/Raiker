@@ -476,7 +476,7 @@ describe("ExtensionsView", () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
     render(ExtensionsView, { props: { tab: "skills" } });
     expect(await screen.findByRole("heading", { name: "Skills" })).toBeInTheDocument();
-    expect(screen.getByText(/grant no capability and run no code/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add a skill/i })).toBeInTheDocument();
   });
 
   it("exposes each tab through the ARIA tabs pattern", async () => {

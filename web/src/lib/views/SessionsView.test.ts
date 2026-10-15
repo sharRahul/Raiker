@@ -282,10 +282,7 @@ describe("SessionsView organisation", () => {
 
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Open Second chat in chat" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Threads" })).toHaveAttribute(
-      "href",
-      "#/search-chat",
-    );
+    expect(screen.getByRole("button", { name: "Refresh sessions" })).toBeInTheDocument();
   });
 
   it("links a session detail to its audit events and checkpoints", async () => {

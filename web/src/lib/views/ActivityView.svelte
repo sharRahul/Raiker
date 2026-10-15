@@ -4,7 +4,6 @@
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
-  import GuideLink from "../components/GuideLink.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
   import SubscriptionLimitStrip from "../components/SubscriptionLimitStrip.svelte";
   import { api, ApiError } from "../api";
@@ -134,11 +133,6 @@
 </script>
 
 <div class="head-row">
-  <!-- BUG-87 — the scope is stated in one line, and only what is true of it;
-       what it *includes* belongs in the guide. -->
-  <p class="page-lead">
-    Every governed step in this account, append-only. <GuideLink route="activity" />
-  </p>
   <div class="head-actions">
     <button
       type="button"

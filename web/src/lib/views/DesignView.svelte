@@ -23,7 +23,6 @@
   import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
   import ComposerContext from "../components/ComposerContext.svelte";
   import Icon from "../components/Icon.svelte";
-  import GuideLink from "../components/GuideLink.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
   // BUG-281 — the research turn already records every page it read; these are
   // what make those records openable here rather than only in the conversation.
@@ -678,12 +677,6 @@
   style={`--surface-gap:${densityGap(surface.density)}`}
 >
   <div class="thread" bind:this={threadEl}>
-    <p class="page-lead">
-      Describe an image and a connected image model draws it. The prompt leaves this
-      machine; the image is stored here.
-      <GuideLink route="design" label="How image generation is governed" />
-    </p>
-
     {#if lifecycleNotice !== null}
       <p class="notice" role="alert">{lifecycleNotice}</p>
     {/if}

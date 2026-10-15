@@ -212,9 +212,6 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    Derived from stored state only — nothing here probes the network or fabricates health.
-  </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh runtime health">
     <Icon name="refresh" size="sm" />
     Refresh

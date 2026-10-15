@@ -158,9 +158,11 @@ describe("type scale", () => {
     expect(display / h1).toBeGreaterThan(1.15);
   });
 
-  it("uses the serif face for display type and only for display type", () => {
-    const rule = /\.display,\s*h1\.display,\s*h2\.display\s*\{[^}]*font-family: var\(--font-serif\)/s;
+  it("uses Manrope for display type and does not retain a serif font policy", () => {
+    const rule = /\.display,\s*h1\.display,\s*h2\.display\s*\{[^}]*font-family: var\(--font-sans\)/s;
     expect(stylesheet).toMatch(rule);
+    expect(stylesheet).not.toContain("Source Serif");
+    expect(stylesheet).not.toContain("--font-serif");
   });
 
   it("drives the headings from the scale instead of hard-coded rem values", () => {

@@ -124,7 +124,7 @@ def _terminate_tree(proc: subprocess.Popen[bytes]) -> None:
     """
     if os.name == "posix":
         with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-            os.killpg(proc.pid, 9)
+            os.killpg(proc.pid, 9)  # type: ignore[attr-defined]  # POSIX-only branch
     with contextlib.suppress(OSError):
         proc.kill()
 

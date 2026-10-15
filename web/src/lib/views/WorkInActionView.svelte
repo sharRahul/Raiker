@@ -145,7 +145,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 </script>
 
 <div class="head-row">
-  <div><p class="page-lead">Live operational view for this Raiker instance. Every task, status, schedule, and assignment comes from stored runtime records.</p>
+  <div>
     {#if view === "floor"}
       <!-- Only said where it is true. On the list there is no movement to
            mistake for work. -->
@@ -329,7 +329,6 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .work-table { width:100%; }
   .row-title { display:block; font-weight:650; }
   .row-detail { display:block; color:var(--text-2); font-size:var(--text-xs); }
-  .page-lead { margin:0; max-width:760px; color:var(--text-2); }
   .truth-note { display:flex; align-items:center; gap:6px; margin:var(--space-2) 0 0; color:var(--text-2); font-size:var(--text-sm); }
 
   /* ── Workstations: cartoon agents at desks ── */

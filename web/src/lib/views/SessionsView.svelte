@@ -189,14 +189,6 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    <!-- REM-SESSIONS — this is the evidence inspector, and saying so is what
-         stops it reading as a second chat history. Threads is where work is
-         resumed; here a conversation is read back with the governed events
-         behind each of its turns. -->
-    Every conversation with the runtime, with its turns and the governed events behind each turn.
-    To pick work back up, use <a href="#/search-chat">Threads</a>.
-  </p>
   <div class="head-actions">
     <label class="tag-filter">
       <span class="sr-only">Filter by tag</span>

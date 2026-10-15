@@ -68,12 +68,10 @@ describe("SkillsView", () => {
     ).toBeInTheDocument();
   });
 
-  it("says a skill grants nothing, so the tab cannot be mistaken for a permission", async () => {
+  it("keeps the Skills destination focused on its available actions", async () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
     render(SkillsView);
-    expect(
-      await screen.findByText(/grant no capability and run no code/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /add a skill/i })).toBeInTheDocument();
   });
 
   it("offers an empty state rather than an empty list", async () => {

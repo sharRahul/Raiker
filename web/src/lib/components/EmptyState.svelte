@@ -78,7 +78,6 @@
     margin: 0;
   }
   .empty-title.serif {
-    font-family: var(--font-serif);
     font-weight: 500;
     font-size: var(--text-xl);
     letter-spacing: var(--tracking-tight);

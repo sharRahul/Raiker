@@ -333,7 +333,6 @@
            this tab for a permission surface has to be corrected on the page
            rather than in a document they may never open. -->
       <h2 id="skills-h" class="sr-only">Skills</h2>
-      <p class="page-lead">Skills grant no capability and run no code.</p>
       <GuideLink section="extensions-and-mcp" label="How skills work" />
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
@@ -770,7 +769,6 @@
     gap: var(--space-3);
   }
   .header h2 { margin: 0 0 0.2rem; }
-  .page-lead { color: var(--text-2); margin: 0 0 0.25rem; max-width: 52rem; }
   .notice { margin-bottom: var(--space-3); }
   /* REM-SKILL-01 — one column, because there is one entry now. It was a
      three-column grid when three forms competed for it. */

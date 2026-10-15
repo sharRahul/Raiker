@@ -1550,7 +1550,6 @@
               {:else}
                 <button type="button" role="menuitem" disabled>Every governed step in this conversation</button>
               {/if}
-              <p class="menu-hint">Each answer's own evidence is under it.</p>
             </div>
             <div role="group" aria-label="Continuity">
               <p class="menu-group" aria-hidden="true">Continuity</p>
@@ -1562,7 +1561,6 @@
                   backgroundWorkOpen = true;
                 }}
               >Background work</button>
-              <p class="menu-hint">Branch, summarise and rewind are under each of your messages.</p>
             </div>
           </div>
         {/if}
@@ -2219,7 +2217,6 @@
   .grouped-menu { min-width: 16rem; }
   .grouped-menu [role="group"] + [role="group"] { border-top: 1px solid var(--border); margin-top: 0.25rem; padding-top: 0.25rem; }
   .menu-group { margin: 0.2rem 0.6rem 0.15rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-  .menu-hint { margin: 0 0.6rem 0.3rem; color: var(--text-3); font-size: var(--text-2xs); }
   .grouped-menu [role="group"] { display: grid; gap: var(--space-1); }
   .conversation-menu .menu a[role="menuitem"] {
     display: block; text-decoration: none; color: var(--text-1); font-size: var(--text-sm);

@@ -1,8 +1,8 @@
 # Personal autonomous-agent target threat model
 
 Status: target design, 2026-10-07; no new capability gate or executor is enabled.
-[Architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) and
-[delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) own scope.
+[Architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) and
+[delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own scope.
 
 ## Assets and adversaries
 

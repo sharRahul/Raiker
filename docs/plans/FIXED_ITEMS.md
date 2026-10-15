@@ -67,10 +67,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-36](#fixed-36--composers-had-no-raiker-owned-english-checking-path) | Medium | Writing quality | Fixed (optional local integration) |
 | [FIXED-37](#fixed-37--connector-operations-and-outbound-bodies-were-invisible-c2) | High | Chat / connector actions | Fixed (C2 inventory and preview) |
 | [FIXED-38](#fixed-38--connector-manifests-can-declare-bounded-operation-scoped-compensation-bug-19) | Medium | Chat / connector compensation | Fixed (was BUG-19) |
-| [FIXED-39](GAP_BUILD_CHAT.md#b4--parallel-tool-calls-are-silently-dropped) | High | Build / parallel tool execution | Fixed (was B4) |
-| [FIXED-40](GAP_BUILD_CHAT.md#c1--first-class-document-output) | High | Chat / document output | Fixed (was C1) |
-| [FIXED-41](GAP_BUILD_CHAT.md#c2--acting-in-the-owners-tools) | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
-| [FIXED-42](GAP_BUILD_CHAT.md#c3--recall-outside-the-current-chat) | High | Chat / cross-work recall | Fixed (was C3) |
+| [FIXED-39](BUILD_WORKSPACE_SPEC.md) | High | Build / parallel tool execution | Fixed (was B4) |
+| [FIXED-40](BUILD_WORKSPACE_SPEC.md) | High | Chat / document output | Fixed (was C1) |
+| [FIXED-41](BUILD_WORKSPACE_SPEC.md) | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
+| [FIXED-42](BUILD_WORKSPACE_SPEC.md) | High | Chat / cross-work recall | Fixed (was C3) |
 | [FIXED-43](#fixed-43--chat-creates-first-class-docx-xlsx-pdf-and-markdown-artifacts-c1) | High | Chat / document output | Fixed (C1 format expansion) |
 | [FIXED-44](#fixed-44--sessions-can-grant-a-bounded-command-feedback-channel-b5) | High | Build / command feedback | Fixed except host network containment (B5) |
 | [FIXED-45](#fixed-45--generated-files-have-a-response-linked-preview-surface-c4c5) | Medium | Chat / file inspector and output | Fixed (C4/C5 validation and presentation) |
@@ -11707,7 +11707,7 @@ was a **caller**: no route, terminal command or model tool constructed a
   `oversize` marked *not restorable* rather than listed as if it would come back.
 
 **No model tool proposes a restore.** That is deliberate and is asserted by the
-enumeration in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md): an agent
+enumeration in [`GOVERNANCE_ENTRY_PATHS.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md): an agent
 cannot rewind the workspace on its own say-so, only a person can ask.
 
 **Interface outcome.** From **Observability → Checkpoints** an owner reads the
@@ -11811,7 +11811,7 @@ same question of it. The answer is different: it enters the same `CommandService
 lifecycle `shell_execution` does — same profile resolution, same measured
 boundary, same receipts, same redaction — so it is an *unused* path, not a
 *weaker* one. It stays recorded in
-[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) §3.5 as the one
+[`GOVERNANCE_ENTRY_PATHS.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) §3.5 as the one
 remaining registered-but-unreachable executor.
 
 **Interface outcome.** **Permissions** no longer offers a `network` gate, and
@@ -12152,7 +12152,7 @@ and answered with no prompt — then the selected model was marked
 ## FIXED-279 — Eight copies of one governance check, and two of them had already drifted
 
 **Severity: Low → Medium once measured. Area: governance architecture. Was
-[GEP-01](GOVERNANCE_ENTRY_PATHS.md), raised 2026-08-23, closed 2026-08-24.**
+[GEP-01](PERSONAL_AUTONOMOUS_AGENT_SPEC.md), raised 2026-08-23, closed 2026-08-24.**
 
 **Observed.** Eight modules read a capability gate directly instead of routing
 through `RuntimeAuthority`, each carrying its own `_ENABLED_GATE_STATES`, its own
@@ -12209,7 +12209,7 @@ while the disagreement does not.
 **Deliberately not changed.** `CapabilityAdmission.runtime_active` reports
 whether the runtime is accepting executions and **nothing consults it**. Whether
 "stop the agent runtime" should also stop a read that leaves the machine is
-[GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths)
+[GEP-02](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 — an owner's decision. Carrying the answer costs nothing and decides nothing;
 acting on it is now a one-line change in one place.
 
@@ -12253,7 +12253,7 @@ scopes.
 ## FIXED-280 — Fifteen capability switches that governed nothing, and one that should have
 
 **Severity: Medium. Area: governance architecture. Was
-[GEP-04](GOVERNANCE_ENTRY_PATHS.md), raised 2026-08-23, closed 2026-08-24.**
+[GEP-04](PERSONAL_AUTONOMOUS_AGENT_SPEC.md), raised 2026-08-23, closed 2026-08-24.**
 
 **Observed.** Forty-five capabilities have a real executor, and therefore a gate,
 and the Capabilities page renders every gate as a switch the owner can hold on or
@@ -12325,7 +12325,7 @@ execution profile (`container_execution_cap`). Adding a second switch in front o
 a choice the owner already made is exactly the wall
 [`SECURITY_AND_POLICY.md`](../architecture/SECURITY_AND_POLICY.md) → "Security Philosophy"
 exists to refuse. The nine with no path keep their gates for the reason
-[§3.5](GOVERNANCE_ENTRY_PATHS.md) keeps its list: the day something reaches one
+[§3.5](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) keeps its list: the day something reaches one
 of them, the gate is what is already there.
 
 **Interface outcome.** On Capabilities, a switch that does not decide whether its
@@ -12360,7 +12360,7 @@ that a switch which means what it says gains no caveat).
 ## FIXED-281 — A skill written in Raiker was not guaranteed to work anywhere else
 
 **Severity: Medium. Area: skills / interoperability. Was
-[ADD-21](TO_BE_ADDED.md) and backlog item 13, raised 2026-08-23, closed
+[ADD-21](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) and backlog item 13, raised 2026-08-23, closed
 2026-08-24.**
 
 **Observed.** `SKILL.md` stopped being one product's convention while Raiker was
@@ -13692,7 +13692,7 @@ leaves `hook_matched`, `hook_executed` and `hook_decision` for
 lifecycle event was additionally driven on Anthropic, OpenAI, OpenRouter and local
 Ollama, so these events are a property of the runtime rather than of one adapter.
 Recorded as the `fixed-305-` round in
-[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md#2026-08-28--the-last-three-lifecycle-hook-events-on-four-providers).
+[`LIVE_TEST_ROUNDS.md`](TESTING.md).
 
 ---
 
@@ -13866,7 +13866,7 @@ assert them separately, which is the distinction this entry restores.
 *may I do this*. A turn facing two readings of an instruction had no way to ask
 *which of these did you mean*, so it picked one and the owner found out
 afterwards. Claude Code has `AskUserQuestion` and MCP has `elicitation` for this
-reason. Raised as [ADD-22](TO_BE_ADDED.md#add-22--a-structured-question-to-the-owner-mid-turn).
+reason. Raised as [ADD-22](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 **The prerequisite, and why it came first.** Scoping this on 2026-08-28 found
 that the approval transport ADD-22 proposed reusing could not carry a question
@@ -14023,7 +14023,7 @@ of the card.
 ## FIXED-311 — Recall was invisible at the moment it was used
 
 **Severity: Medium. Area: Chat / memory / web UI. Closed 2026-08-29 (was
-[C17](GAP_BUILD_CHAT.md#c17--recall-is-invisible)).**
+[C17](BUILD_WORKSPACE_SPEC.md)).**
 
 **Observed.** Ambient recall reaches a turn through the context bundle, not
 through a tool the transcript can cite, so it left nothing to click. The Memory
@@ -14073,7 +14073,7 @@ captured live against a real Anthropic turn.
 ## FIXED-312 — The core act of code review was a route change away
 
 **Severity: Medium. Area: Build / approvals / web UI. Closed 2026-08-29 (was
-[B14](GAP_BUILD_CHAT.md#b14--no-diff-review-surface-in-build)'s review half).**
+[B14](BUILD_WORKSPACE_SPEC.md)'s review half).**
 
 **Observed.** The unified diff behind a proposed write lived only in the
 Approvals inbox, on a different route. Reviewing a change Build had just proposed
@@ -14122,7 +14122,7 @@ itself does not grow: `fullPage` captured the viewport and stopped, and every
 capture of a long page showed the same top of it.
 
 **Why it mattered more than it looked.** These captures are the evidence behind
-the `FIXED-*` entries and the rounds in [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
+the `FIXED-*` entries and the rounds in [`LIVE_TEST_ROUNDS.md`](TESTING.md).
 A screenshot that does not contain the thing it is named for does not fail — it
 is filed, linked and read as proof. That is the same shape as an inert switch:
 not a missing control, but a wrong belief about one.
@@ -14203,7 +14203,7 @@ function-word-only query still searches literally.
 ## FIXED-315 — The one control that makes an agent safe to leave running was in another route
 
 **Severity: Medium. Area: Build / Chat / checkpoints / web UI. Closed 2026-08-29
-(was [B18](GAP_BUILD_CHAT.md#b18--no-checkpoint-or-rewind-control-where-the-work-happens)).**
+(was [B18](BUILD_WORKSPACE_SPEC.md)).**
 
 **Observed.** Every part of the governed rewind already existed.
 `CheckpointRestoreExecutor` has been implemented, registered and classified
@@ -14218,7 +14218,7 @@ id in a list of snapshots, and coming back.
 **Why it mattered.** This is the fifth time this codebase has found the same
 shape — a capability with an executor, a gate, a threat model and a passing
 acceptance suite, and no route to it — and
-[`PILLAR_MAP.md`](PILLAR_MAP.md) ranks checkpoint rewind as the single item that
+[`PILLAR_MAP.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) ranks checkpoint rewind as the single item that
 blocks two pillars. "Undo that turn" is not a convenience: it is the control
 that makes leaving an autonomous agent running a reasonable thing to do, and an
 owner who cannot find it does not have it.
@@ -16036,7 +16036,7 @@ than assuming them: nothing is listening on the round's port — the process exi
 not the HTTP response — the removal is retried briefly because a lagging handle
 is normal, and the directory is read back from the filesystem afterwards. Any of
 the three failing exits non-zero with the reason.
-[`RAIKER_LIVE_MANUAL_TEST_PLAN.md`](RAIKER_LIVE_MANUAL_TEST_PLAN.md) calls it in
+[`RAIKER_LIVE_MANUAL_TEST_PLAN.md`](TESTING.md) calls it in
 place of `rm -rf`, and says that a failure stops the round.
 
 **Guarded.** `tests/test_reset_live_workspace.py` covers the exact shape of the
@@ -16627,7 +16627,7 @@ asking the owner to configure anything.
 **Observed.** `raiker/config/channel-connectors.json` declares ten surfaces and
 `external_channels_enabled` is hardcoded `False`, so there was nowhere for
 Raiker to reach an owner who was not looking at it. The consequence
-[GAP-CHAT C10](GAP_BUILD_CHAT.md#c10--the-assistant-lives-in-one-browser-tab)
+[GAP-CHAT C10](BUILD_WORKSPACE_SPEC.md)
 names is the one that matters: **a scheduled routine ran, finished, and left
 nothing but a card the owner had to think to go and look at.** Nothing in the
 codebase called `insert_notification` for a task — only approvals, integrity
@@ -16963,7 +16963,7 @@ schemas of FIXED-377 surviving the remote path too.
 
 **What is still open** and stays on BUG-234: SSE *streaming* (a bounded session
 reads each response whole), resumability, server-initiated messages, the remote
-OAuth flow itself, MCP Apps ([ADD-24](TO_BE_ADDED.md)), elicitation and
+OAuth flow itself, MCP Apps ([ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)), elicitation and
 `server/discover`. Each is now **named on the card of a server that offers it**
 rather than implied by silence, which is the interface outcome the entry asked
 for.
@@ -22114,7 +22114,7 @@ end through the runtime.
 ## FIXED-493 — The two sections at the top of Permissions named a control and did not offer one
 
 **Severity: High. Area: Permissions / web UI. Status: Fixed 2026-09-13. Closes
-[NEW-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#172-new-perm-01--top-sections-do-not-provide-a-working-shortcut).**
+[NEW-PERM-01](TESTING.md).**
 
 **Observed.** The owner reported that the top of Permissions "is not working".
 It was: **Common permissions** and **Needs your attention** were lists of spans
@@ -22148,7 +22148,7 @@ entry opens the same row), and a live round that folds the group, presses
 ## FIXED-494 — Permissions answered the same question two ways at once
 
 **Severity: High. Area: Permissions / view model. Status: Fixed 2026-09-13.
-Closes [NEW-PERM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#173-new-perm-02--summaries-can-disagree-with-changed-decision-modes).**
+Closes [NEW-PERM-02](TESTING.md).**
 
 **Observed.** The page rendered each capability four times — the segmented
 control, the Common permissions summary, the attention list and the authority
@@ -22190,7 +22190,7 @@ mode through the product's own control and reads the summary, the row and a
 ## FIXED-495 — An unrecognised mode was rendered as the most permissive verdict the table can print
 
 **Severity: Medium. Area: Permissions / honesty. Status: Fixed 2026-09-13.
-Closes [NEW-PERM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#174-new-perm-03--unknown-modes-and-automatic-mode-attention-need-honest-semantics).**
+Closes [NEW-PERM-03](TESTING.md).**
 
 **Observed.** Three separate places where the page stated more than it had been
 told.
@@ -22233,8 +22233,8 @@ summary's own wording back off a running server.
 ## FIXED-496 — "New chat" on a project card opened a chat that belonged to no project
 
 **Severity: Medium. Area: Projects / Chat continuity. Status: Fixed 2026-09-13.
-Closes [RR-PROJECT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
-and the Chat half of [DEC-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-04--make-project-continuity-explicit-and-typed).**
+Closes [RR-PROJECT-01](TESTING.md)
+and the Chat half of [DEC-04](TESTING.md).**
 
 **Observed.** `newChatInProject` set `window.location.hash` and nothing else,
 while **Start in Build** beside it established the project. The comment above it
@@ -22273,7 +22273,7 @@ composer's picker back.
 ## FIXED-497 — A project's header could stand over another project's work
 
 **Severity: Medium. Area: Projects / web UI. Status: Fixed 2026-09-13. Closes
-[NEW-PROJ-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-proj-01--project-detail-and-child-panels-can-resolve-out-of-order).**
+[NEW-PROJ-01](TESTING.md).**
 
 **Observed.** A project home is four independent reads — the detail, the files,
 the tasks and the images — sharing one set of view variables, and every one of
@@ -22307,7 +22307,7 @@ cannot clear a newer selection. Both fail against the previous code.
 ## FIXED-498 — Cancel stayed live while an account was being deleted
 
 **Severity: Medium. Area: Account / irreversible actions. Status: Fixed
-2026-09-13. Closes [NEW-ACCOUNT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-account-01--delete-confirmation-offers-cancel-while-deletion-is-running).**
+2026-09-13. Closes [NEW-ACCOUNT-01](TESTING.md).**
 
 **Observed.** Deleting an account elevates, then deletes. Both are requests, so
 there is a window between pressing the button and the account being gone — and
@@ -22334,7 +22334,7 @@ form returned on refusal, and backing out before submitting still works.
 ## FIXED-499 — Settings said "All changes saved" about an edit it had never sent
 
 **Severity: High. Area: Settings / save concurrency. Status: Fixed 2026-09-13.
-Closes [NEW-SET-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-set-01--settings-can-acknowledge-edits-that-were-never-saved).**
+Closes [NEW-SET-01](TESTING.md).**
 
 **Observed.** `push` snapshotted the settings, awaited the request and then
 cleared the dirty state outright. Everything about that is fine until the owner
@@ -22368,7 +22368,7 @@ that saves through the page and reads the acknowledgement back.
 ## FIXED-500 — Every local MCP server was handed Raiker's whole environment
 
 **Severity: Critical. Area: MCP / secret exposure. Status: Fixed 2026-09-13.
-Closes [RR-MCP-01 / SEC-MCP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#required-mcp-implementation-contract).**
+Closes [RR-MCP-01 / SEC-MCP-01](TESTING.md).**
 
 **Observed.** `raiker/runtime/executors/mcp.py` started local stdio servers with
 `subprocess.Popen(...)` and no `env` argument, which in `subprocess` means
@@ -22411,8 +22411,8 @@ travelled.
 ## FIXED-501 — Raiker knew its owner's authorisation key and not their name
 
 **Severity: High. Area: Identity / prompts. Status: Fixed 2026-09-13. Closes
-[RR-IDENTITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#2-owner-identity-defect)
-and [DEC-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-01--separate-presentation-identity-from-authorization-identity).**
+[RR-IDENTITY-01](TESTING.md)
+and [DEC-01](TESTING.md).**
 
 **Observed.** The owner reported Raiker answering *"The workspace's real owner is
 `principal_user_ac5eb6e5f7620f0d`"*. That sentence is not a literal anywhere in
@@ -22527,8 +22527,8 @@ refusal through them.
 ## FIXED-504 — Five destinations, one label, and the owner's token sent to all of them
 
 **Severity: High. Area: MCP / remote trust and egress. Status: Fixed 2026-09-13.
-Closes [RR-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
-and steps 3–5 of [DEC-15](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-15--put-every-mcp-server-behind-explicit-trust-and-isolation).**
+Closes [RR-MCP-02](TESTING.md)
+and steps 3–5 of [DEC-15](TESTING.md).**
 
 **Observed.** Adding a remote MCP server was one check — the scheme is `http` or
 `https` and the host is non-empty — and the session then went wherever the string
@@ -22630,8 +22630,8 @@ the provider answered a model list as well as a turn.
 ## FIXED-505 — The four capabilities that reach furthest into an owner's accounts explained themselves least
 
 **Severity: Medium. Area: Permissions / capability copy. Status: Fixed
-2026-09-13. Part of [RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
-— the registry half of [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context) step 8.**
+2026-09-13. Part of [RR-AUTHORITY-01](TESTING.md)
+— the registry half of [DEC-16](TESTING.md) step 8.**
 
 **Observed.** DEC-16 step 8 asks for a CI check that every real side-effect
 capability carries, among other things, an owner-facing Permissions description.
@@ -22670,7 +22670,7 @@ description must say it only reads and that what it returns is untrusted.
 ## FIXED-506 — Home reported an unread readiness check as nothing to worry about
 
 **Severity: High. Area: Home / readiness honesty. Status: Fixed 2026-09-14.
-Closes [NEW-HOME-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-home-01--missing-health-data-becomes-zero-issues).**
+Closes [NEW-HOME-01](TESTING.md).**
 
 **Observed.** `WorkbenchView.svelte::load` caught a diagnostics failure and set
 `diagnostics = null`. `runtimeIssues` mapped `null` to **0**. With no approvals
@@ -22729,7 +22729,7 @@ the workspace and proves nothing about the rail. Found by trying it.
 ## FIXED-507 — A stale knowledge graph called itself live, and a failed refresh erased it
 
 **Severity: Medium. Area: Knowledge Map / freshness. Status: Fixed 2026-09-14.
-Closes [NEW-MAP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-01--stale-graph-remains-labelled-live).**
+Closes [NEW-MAP-01](TESTING.md).**
 
 **Observed.** `BrainView.svelte` kept the last graph it managed to load and went
 on labelling it **"Live workspace graph"**, because the label checked only
@@ -22770,7 +22770,7 @@ running host
 ## FIXED-508 — The folder an owner added was not always the folder they reviewed
 
 **Severity: Medium. Area: Knowledge Map / source review. Status: Fixed
-2026-09-14. Closes [NEW-MAP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-02--source-review-responses-are-not-bound-to-the-current-selection).**
+2026-09-14. Closes [NEW-MAP-02](TESTING.md).**
 
 **Observed.** `reviewSource` awaited `reviewBrainSource(sourcePath)` and then
 assigned `sourceReview` unconditionally. The review is a plan for **one** source
@@ -22811,7 +22811,7 @@ leaving an addable one behind.
 ## FIXED-509 — A source review's entry cap bounded its answer and not its work
 
 **Severity: Medium. Area: Knowledge Map / resource bounds. Status: Fixed
-2026-09-14. Closes [NEW-MAP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-map-03--review-entry-cap-does-not-bound-all-traversal-work).**
+2026-09-14. Closes [NEW-MAP-03](TESTING.md).**
 
 **Observed.** `DashboardService.review_brain_source` walked `path.rglob("*")` and
 stopped at `scanned >= 5000` — but `scanned` advanced only on entries it
@@ -22859,7 +22859,7 @@ asserted.
 ## FIXED-510 — A project's pictures could not be opened from the project
 
 **Severity: Low. Area: Projects / Design continuity. Status: Fixed 2026-09-14.
-Closes [NEW-PROJ-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-proj-02--project-images-cannot-open-the-selected-asset-directly).**
+Closes [NEW-PROJ-02](TESTING.md).**
 
 **Observed.** `ProjectsView.svelte` rendered up to eight of a project's images as
 plain `<img>` elements with no per-asset action, under a single generic link to
@@ -22905,8 +22905,8 @@ project to open. The same limit as
 ## FIXED-511 — Threads described a hundred rows and called it a workspace
 
 **Severity: Medium. Area: Threads / work index. Status: Fixed 2026-09-14.
-Closes [NEW-THREAD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#new-thread-01--filters-only-cover-a-truncated-list-and-disappear-during-search),
-and with it [REM-THREAD-01 and REM-THREAD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#threads-tasks-and-projects).
+Closes [NEW-THREAD-01](TESTING.md),
+and with it [REM-THREAD-01 and REM-THREAD-02](TESTING.md).
 The last open finding of §18.5.**
 
 **Observed.** `SearchChatView.svelte` derived its Project choices *and* its
@@ -22976,7 +22976,7 @@ running host and watches the filters stay on screen with a query typed
 ## FIXED-512 — One policy, three sets of words, on one screen
 
 **Severity: Low. Area: Permissions / vocabulary. Status: Fixed 2026-09-14.
-Closes [REM-PERM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions).**
+Closes [REM-PERM-02](TESTING.md).**
 
 **Observed.** Four stored decision-mode values had three owner-facing
 vocabularies, two of them on the same page at the same time:
@@ -23032,8 +23032,8 @@ control below.
 ## FIXED-513 — The Permissions page answered “what am I looking at” twice, and led with neither
 
 **Severity: Medium. Area: Permissions. Status: Fixed 2026-09-14.
-Closes [REM-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions)
-and [REM-PERM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#models-popup-and-permissions).**
+Closes [REM-PERM-01](TESTING.md)
+and [REM-PERM-03](TESTING.md).**
 
 **Observed.** Seven stacked bands stood between arriving at Permissions and
 reaching a permission:
@@ -23109,7 +23109,7 @@ violation in the registry at 390 px or 1440 px (`web/e2e/composer.spec.ts`).
 ## FIXED-514 — First run called an instance ready above a summary that said “Decide later”
 
 **Severity: Medium. Area: First run. Status: Fixed 2026-09-14.
-Closes [REM-LAUNCH-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#launch-unlock-setup-and-home).**
+Closes [REM-LAUNCH-01](TESTING.md).**
 
 **Observed.** The last stage of setup was headed **“Your Raiker is ready”**
 unconditionally. Two lines below it, the same screen's summary could read
@@ -23140,7 +23140,7 @@ prerequisite. `first-launch-live.spec.ts` asserts the deferring run reaches
 ## FIXED-515 — An installation nobody had checked reported itself up to date
 
 **Severity: Medium. Area: Updates. Status: Fixed 2026-09-14.
-Closes [REM-SET-UPDATES](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+Closes [REM-SET-UPDATES](TESTING.md).**
 
 **Observed.** `update_status()` answered a packaged installation with a pinned
 channel that had never contacted it by returning state **`up_to_date`**, with
@@ -23174,8 +23174,8 @@ rewritten to the claims that are now true.
 ## FIXED-516 — A sample server was called “safe”, and defined what normal MCP setup looks like
 
 **Severity: Medium. Area: MCP. Status: Fixed 2026-09-14.
-Closes [REM-MCP-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions)
-and [REM-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions).**
+Closes [REM-MCP-01](TESTING.md)
+and [REM-MCP-02](TESTING.md).**
 
 **Observed.** The MCP page opened with a name field and a template picker whose
 one entry read **“Sample echo server (safe starter)”**. Two problems, and the
@@ -23208,7 +23208,7 @@ scope sentence is shown, and that the string “safe starter” appears nowhere.
 ## FIXED-517 — Design recorded a size it never sent
 
 **Severity: Medium. Area: Design. Status: Fixed 2026-09-14.
-Closes [REM-DESIGN-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#chat-build-and-design).**
+Closes [REM-DESIGN-01](TESTING.md).**
 
 **Observed.** The size select was drawn for every image provider, and the chosen
 value was validated and written to the generation row. Raiker's Gemini request
@@ -23242,7 +23242,7 @@ recorded value; and an older host that omits the field keeps printing it.
 ## FIXED-518 — “Last used” collapsed five events into one word
 
 **Severity: Low. Area: Memory. Status: Fixed 2026-09-14.
-Closes [REM-MEM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#memory-knowledge-map-and-usage).**
+Closes [REM-MEM-02](TESTING.md).**
 
 **Observed.** A memory card's advanced metadata read **“Last used: 3 days ago”**
 or **“Never recalled”**. What the store actually holds is the most recent
@@ -23264,7 +23264,7 @@ it holds.
 ## FIXED-519 — An approval with no diff answered “what would this do?” with a request body
 
 **Severity: Medium. Area: Approvals. Status: Fixed 2026-09-14.
-Closes [REM-APPROVAL](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+Closes [REM-APPROVAL](TESTING.md).**
 
 **Observed.** For a file change or a patch, the approval shows the change
 itself, which is the decision. For everything else — a command, an outbound
@@ -23292,7 +23292,7 @@ including truncation of a value long enough to be a payload wearing a label.
 ## FIXED-520 — Privacy was one toggle under a heading that named the whole subject
 
 **Severity: Medium. Area: Settings / Privacy. Status: Fixed 2026-09-14.
-Closes [REM-SET-PRIVACY](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#settings-pages-and-remaining-destinations).**
+Closes [REM-SET-PRIVACY](TESTING.md).**
 
 **Observed.** Settings → Privacy answered one real question — whether the
 model's working is written to disk (BUG-215) — and nothing else. An owner
@@ -23327,7 +23327,7 @@ Live in `removal-review-permissions-2026-09-14-live.spec.ts`.
 ## FIXED-521 — Build named what a turn would touch, and not where it would run
 
 **Severity: Medium. Area: Build. Status: Fixed 2026-09-14.
-Closes [REM-BUILD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#chat-build-and-design).**
+Closes [REM-BUILD-02](TESTING.md).**
 
 **Observed.** Build's boundary line named the Project, the repository, the
 attachments and the conversation size — everything about *what* a turn touches
@@ -23353,8 +23353,8 @@ the boundary summary, and nothing is claimed when the runtime read fails.
 ## FIXED-522 — Messaging called one object a Channel and a Connector, and led with neither
 
 **Severity: Low. Area: Messaging. Status: Fixed 2026-09-14.
-Closes [REM-MSG-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions)
-and [REM-MSG-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#messaging-mcp-and-extensions).**
+Closes [REM-MSG-01](TESTING.md)
+and [REM-MSG-02](TESTING.md).**
 
 **Observed.** The page opened with five rows of process configuration —
 outbound capability, egress allowlist, HMAC signing, inbound secret, rate limit
@@ -23509,7 +23509,7 @@ routed gate is traced rather than assumed.
 **The invariant moved with it.** `test_every_real_executor_capability_is_classified`
 now asserts the table against `REAL_EXECUTOR_CAPABILITIES | CAPABILITY_GATE_MAP.values()`,
 and a new invariant — **I3c** in
-[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) §5 — asserts that nothing
+[`GOVERNANCE_ENTRY_PATHS.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) §5 — asserts that nothing
 the router can route a decision onto is missing a row. The fallback in
 `gate_is_effective` stays, because a page that will not render is worse than a
 row that fails closed; what changed is that it is now unreachable for anything
@@ -24331,10 +24331,10 @@ conversation**, the card links to it, and Threads lists it under **Routines**.
 
 **Severity: High. Area: governance / Permissions. Status: Fixed 2026-09-15.
 Closes [BUG-293](TO_BE_FIXED.md), and reduces
-[RR-AUTHORITY-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#what-blocks-a-public-first-release)
+[RR-AUTHORITY-01](TESTING.md)
 to its authority-context half.**
 
-**Observed.** [DEC-16](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-16--require-one-opaque-runtime-authority-context)
+**Observed.** [DEC-16](TESTING.md)
 step 8 asks for a CI check that every real side-effect capability carries five
 things. Three were mechanical and two had no home anywhere:
 
@@ -24570,7 +24570,7 @@ errors.
 **Severity: Low. Area: Settings / Activity / Home. Status: Fixed 2026-09-15.
 Closes **REM-SET-GENERAL**, **REM-SET-APPEARANCE**, **REM-ACTIVITY** and
 **REM-HOME-03** of
-[§18.3](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[§18.3](TESTING.md).**
 
 **General** carried three cards of setup teaching: a paragraph on the header, a
 paragraph on each card heading, and a sentence under most controls, several
@@ -25760,7 +25760,7 @@ absolute` back and watching the live assertion report "covered by MAIN".
 ## FIXED-578 — The git credential answered whichever host git happened to ask about
 
 **Severity: Medium. Area: Git credential / web UI. Status: Fixed 2026-09-20.
-Closes [REM-SET-GIT](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+Closes [REM-SET-GIT](TESTING.md).**
 
 **Observed — the page.** Settings → Git credential opened on a password field.
 An owner's first act was to paste a credential, and only afterwards could they
@@ -25819,7 +25819,7 @@ the scope heading's on the rendered page —
 ## FIXED-579 — Deployment configuration looked like policy this page could change
 
 **Severity: Low. Area: Web access / web UI. Status: Fixed 2026-09-20. Closes
-[REM-SET-WEB](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-SET-WEB](TESTING.md).**
 
 **Observed.** Settings → Web access showed *Set outside this app* as a card of
 the same weight as the owner's own rules, immediately below them. It said the
@@ -25849,7 +25849,7 @@ both sources:
 ## FIXED-580 — Runtime configuration taught adapter internals before it guided a target
 
 **Severity: Low. Area: Runtime settings / web UI. Status: Fixed 2026-09-20.
-Closes [REM-SET-RUNTIME](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+Closes [REM-SET-RUNTIME](TESTING.md).**
 
 **Observed.** The page's second card was *Model readiness* — one number, the
 window a readiness check stays good for — above the execution targets, which are
@@ -25875,7 +25875,7 @@ on the rendered page: `docs/screenshots/2026-09-20-p2-rows/05-runtime-advanced.p
 ## FIXED-581 — A turn's own evidence was on another route
 
 **Severity: Medium. Area: Chat / Build / web UI. Status: Fixed 2026-09-20.
-Closes [REM-CHAT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+Closes [REM-CHAT-01](TESTING.md).**
 
 **Observed.** Chat's transcript says what a turn did in the owner's language,
 which is right. What it could not say was anything about **how**: the turn's
@@ -25910,7 +25910,7 @@ produced.
 ## FIXED-582 — Build's workbench closed itself on every reload
 
 **Severity: Low. Area: Build / web UI. Status: Fixed 2026-09-20. Closes
-[REM-BUILD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-BUILD-01](TESTING.md).**
 
 **Observed.** The row asks that the next action decide which inspector is open,
 and that panel state be preserved. The first half already shipped —
@@ -25938,7 +25938,7 @@ and `13-build-workbench-after-reload.png`.
 ## FIXED-583 — First run asked whether a provider was configured, not whether it worked
 
 **Severity: Medium. Area: Models / onboarding. Status: Fixed 2026-09-20. Closes
-[REM-MODEL-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-MODEL-01](TESTING.md).**
 
 **Observed.** The row asks for one profile readiness controller behind
 onboarding, the overview and the composers. `modelReadiness.svelte.ts` already
@@ -25973,7 +25973,7 @@ recommendation names neither of the first two.
 ## FIXED-584 — When work runs and how it runs were one row of chips
 
 **Severity: Low. Area: Tasks / web UI. Status: Fixed 2026-09-20. Closes
-[REM-TASK-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-TASK-01](TESTING.md).**
 
 **Observed.** The task composer offered `Task · Once · Routine · Background`,
 which is two questions wearing one control: two of those chips answer *when*
@@ -26009,7 +26009,7 @@ one side and not the other fails in CI rather than on an owner's calendar. Live:
 ## FIXED-585 — A project was six things stacked in one column
 
 **Severity: Low. Area: Projects / web UI. Status: Fixed 2026-09-20. Closes
-[REM-PROJ-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-PROJ-02](TESTING.md).**
 
 **Observed.** The project detail stacked context, files, sessions, images, tasks
 and checkpoints, all open, every time. Whichever of the six an owner came for,
@@ -26040,7 +26040,7 @@ Live: `docs/screenshots/2026-09-20-p2-rows/10-project-overview.png` and
 ## FIXED-586 — The picture Design had just made went to the top of a list
 
 **Severity: Low. Area: Design / web UI. Status: Fixed 2026-09-20. Closes
-[REM-DESIGN-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions).**
+[REM-DESIGN-02](TESTING.md).**
 
 **Observed.** The row's rule is that the selected artifact and prompt stay
 central and a growing gallery does not push current work away. Design selected
@@ -26068,7 +26068,7 @@ until something tried to send; corrected with the tests.
 ## FIXED-587 — The recall engine's controls were on the page for reading your own memories
 
 **Severity: Low. Area: Memory / settings. Status: Fixed 2026-09-20. Closes
-[REM-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#183-page-by-page-removal-decisions)
+[REM-MEM-03](TESTING.md)
 in part; see [BUG-305](FIXED_ITEMS.md#fixed-592--two-kinds-of-source-and-nowhere-that-answered-what-can-raiker-read)
 for the half that remains.**
 
@@ -26597,7 +26597,7 @@ console refusals**, and this round's own spec asserts that explicitly.
 
 **Severity: Low. Area: Build / Chat / Design / Tasks navigation. Status: Fixed
 2026-09-21. Closes UX-BUILD-05 of the
-[release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+[release-readiness review](TESTING.md).**
 
 **Observed.** Build's context line names the Project the turn runs inside, with
 a link. The link went to `#/projects` — the whole list — so coming back from
@@ -26692,7 +26692,7 @@ state before this change, it names exactly those three.
 ## FIXED-603 — The stop switch could not see the answer it was pressed to stop
 
 **Severity: Medium. Area: Stop switch / governance. Status: Fixed 2026-09-28.
-Closes [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths)
+Closes [GEP-02](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 by the owner's decision.**
 
 **The decision.** GEP-02 had asked since 2026-08-23 whether stop means *accept no
@@ -26917,7 +26917,7 @@ the runtime dependencies `pyproject.toml` declares, and the web workflow runs
 ## FIXED-612 — The architecture named one chokepoint and the code has two
 
 **Severity: Low. Area: Documentation / governance. Status: Fixed 2026-09-28.
-Closes [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture).**
+Closes [GEP-03](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).**
 
 **Observed.** `NESTED_BOUNDARIES_ARCHITECTURE.md` named one non-bypass path for
 every tool, command, memory write and graph query. A read is governed at
@@ -27595,7 +27595,7 @@ adapters went from 1,383 to 1,263 lines, plus 142 in the shared module.
 unchanged apart from where they reached into the old attributes. Live: a real
 turn streamed through Ollama's OpenAI-compatible endpoint, and the readiness
 probe answered *Ollama can reach gpt-oss:20b-cloud* through the same transport
-([the 2026-09-30 round](LIVE_TEST_ROUNDS.md#2026-09-30--ten-optimisation-items-and-a-first-run-that-sends)).
+([the 2026-09-30 round](TESTING.md)).
 
 ---
 
@@ -27873,7 +27873,7 @@ pass.
 ## FIXED-647 — A project's shared files were listed by attachment id
 
 **Severity: Medium. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
-UX-PROJ-04 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+UX-PROJ-04 of the [release-readiness review](TESTING.md).**
 
 **Observed.** A project's shared files were the ids of the attachments its chats
 had carried — `att_…` strings an owner had never seen anywhere else.
@@ -27892,7 +27892,7 @@ live, [shared files by name](../screenshots/2026-10-01-projects-lifecycle/03-sha
 ## FIXED-648 — An archived project had no way back
 
 **Severity: Medium. Area: Projects. Status: Fixed 2026-10-01. Closes UX-PROJ-05
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** **Archive** removed a project from the list and nothing on the page
 could bring it back. Every project picker — Build, Chat, Design, Tasks — went on
@@ -27922,7 +27922,7 @@ account selection clears it*, *restore route*; `projectLifecycle.test.ts`; live,
 ## FIXED-649 — Move offered a flat list that included the project's own subtree
 
 **Severity: Medium. Area: Projects. Status: Fixed 2026-10-01. Closes UX-PROJ-06
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** **Move** was a flat select of every project. Choosing the project
 itself or one of its descendants failed with a generic refusal, and archived
@@ -27966,7 +27966,7 @@ a wildcard*, failing against the previous query; `projectLifecycle.test.ts` —
 ## FIXED-651 — Deleting a managed project's folder took one confirmation and no count
 
 **Severity: High. Area: Projects / destructive actions. Status: Fixed 2026-10-01.
-Closes UX-PROJ-07 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+Closes UX-PROJ-07 of the [release-readiness review](TESTING.md).**
 
 **Observed.** Deleting a managed project removes its folder from disk, its chats,
 tasks and checkpoints. The confirmation said so in general terms and asked
@@ -27995,7 +27995,7 @@ step-up*, *attached delete keeps the ordinary session*;
 ## FIXED-652 — A project's chats were short ids that did not open anything
 
 **Severity: Low. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
-UX-PROJ-08 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+UX-PROJ-08 of the [release-readiness review](TESTING.md).**
 
 **Fixed.** Each row shows the chat's title, last activity, mode and status, and
 is a link that resumes it on the surface that owns it — Chat, Build or Design —
@@ -28011,7 +28011,7 @@ session update*; `ProjectsView.test.ts`; live,
 ## FIXED-653 — Projects called the selected project and the unarchived ones both active
 
 **Severity: Low. Area: Projects / web UI. Status: Fixed 2026-10-01. Closes
-UX-PROJ-09 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#312-projects).**
+UX-PROJ-09 of the [release-readiness review](TESTING.md).**
 
 **Fixed.** *Current project* is the one Work project the composers read — one
 store, one label — shown with **Stop working in it**. *Active* and *Archived*
@@ -28224,7 +28224,7 @@ that already answered in extended form.
 **Evidence.** `tests/test_instance_runtime_lifecycle.py` passing 28 consecutive
 runs on Windows; `test_a_resolve_that_answers_in_extended_form_is_not_read_as_unc`,
 failing against the previous code; live, a second instance created from the lock
-screen ([the round](LIVE_TEST_ROUNDS.md#2026-10-01-second--the-contract-is-derived-where-it-is-verified-and-setup-ends-where-it-was-asked)).
+screen ([the round](TESTING.md)).
 
 ---
 
@@ -28695,7 +28695,7 @@ markdown*, failing against the previous view; live capture 04 of this round.
 ## FIXED-687 — Archive had a route and no button, and four removal words meant four close things
 
 **Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-02](TESTING.md).**
 
 **Observed.** A record could be taken out of recall four ways — **Forget**,
 **Review expiry**, **Delete permanently**, and archiving — and the meanings sat
@@ -28758,7 +28758,7 @@ marked **Expired**, and can be given a later date.
 ## FIXED-689 — Retention was a date on each card and a policy nowhere
 
 **Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-03](TESTING.md).**
 
 **Observed.** Each card said *Review or expiry: No date set* or a relative date.
 Nothing said how many records would lapse soon, how many had gone quiet, or how
@@ -28780,7 +28780,7 @@ and the staleness cases; `MemoryView.test.ts`; live capture
 ## FIXED-690 — Confidence and trust were decimals that read as probabilities
 
 **Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-04](TESTING.md).**
 
 **Observed.** The drawer showed *Confidence 0.75 · Trust 0.75*; proposals and
 relationship proposals showed *97% confidence*. Confidence is the proposing
@@ -28804,7 +28804,7 @@ where a record came from in words*; live capture
 ## FIXED-691 — A memory said when it was last included and never where
 
 **Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-05](TESTING.md).**
 
 **Observed.** The drawer said *Last included in a model's context: 3 days ago*.
 How often, and in which answer, was not said — although the per-turn ledger the
@@ -28846,7 +28846,7 @@ asserts `last_used_at` from a turn's recall alone.
 ## FIXED-693 — Nothing on the Memory page said how a record got there
 
 **Severity: Low. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-06](TESTING.md).**
 
 **Observed.** Observations, suggestions and approved memories lived on different
 tabs, and the Overview's four tiles counted approved, pending, pinned and
@@ -28868,7 +28868,7 @@ captures 06 and 10 (390 px, no horizontal overflow).
 ## FIXED-694 — An import was a count, not a batch that could be reviewed or taken back
 
 **Severity: Medium. Area: Memory. Status: Fixed 2026-10-02.
-Closes [UX-MEM-08](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#39-memory-age-management-and-usage).**
+Closes [UX-MEM-08](TESTING.md).**
 
 **Observed.** BUG-244 had made import say *1 new of 4 · 3 already stored*. It
 did not show which records, could not leave one out, could not see a re-typed
@@ -28900,7 +28900,7 @@ contract cases; `MemoryView.test.ts`; live captures 02, 03 and 08.
 ## FIXED-695 — Permissions answered sixty questions and not the one an owner asks
 
 **Severity: Low. Area: Permissions. Status: Fixed 2026-10-02.
-Closes [UX-PERM-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#31-permissions).**
+Closes [UX-PERM-05](TESTING.md).**
 
 **Observed.** The page says, per capability, whether Raiker may use it and what
 happens when it wants to. An owner arrives asking *can Raiker edit my files?
@@ -28925,7 +28925,7 @@ by goal*; live captures `09-permissions-goals.png` and
 ## FIXED-696 — Daily at 09:00 moved an hour when the clocks changed
 
 **Severity: Medium. Area: Tasks / scheduler. Status: Fixed 2026-10-03.
-Closes [UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks) with FIXED-697 and FIXED-698.**
+Closes [UX-TASK-02](TESTING.md) with FIXED-697 and FIXED-698.**
 
 **Observed.** A routine stored a UTC instant and stepped every cadence by a
 fixed number of seconds from the slot before. The composer read the first run in
@@ -28966,7 +28966,7 @@ Live capture `02-routine-schedule-and-organisation.png`.
 ## FIXED-697 — A routine could not skip the weekend or stop on a date
 
 **Severity: Low. Area: Tasks / scheduler. Status: Fixed 2026-10-03. Part of
-[UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+[UX-TASK-02](TESTING.md).**
 
 **Observed.** The release review names weekdays and end conditions among what a
 recurrence select cannot express. A stand-up routine ran on Saturday, and the
@@ -28991,7 +28991,7 @@ and the route; `TasksView.test.ts`; live capture `03-routine-card-terms.png`.
 ## FIXED-698 — A routine always ran a slot it slept through
 
 **Severity: Low. Area: Tasks / scheduler. Status: Fixed 2026-10-03. Part of
-[UX-TASK-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+[UX-TASK-02](TESTING.md).**
 
 **Observed.** A host that was off at 09:00 claimed the slot when it woke and ran
 it late, whatever the routine was for. That is right for "summarise yesterday"
@@ -29013,7 +29013,7 @@ recognises). A one-off always runs late: skipping it would mean never running it
 ## FIXED-699 — When work runs and how it is organised were one list of fields
 
 **Severity: Low. Area: Tasks. Status: Fixed 2026-10-03.
-Closes [UX-TASK-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+Closes [UX-TASK-03](TESTING.md).**
 
 **Observed.** The details under the task composer were one grid: Title, Repeat,
 Start time, Parent work, Priority and the working method, so the two fields an
@@ -29034,7 +29034,7 @@ in two groups*; live captures 02 and `10-tasks-details-390.png`.
 ## FIXED-700 — Twelve statuses and every surface deciding its own buttons
 
 **Severity: Medium. Area: Tasks / Home / Build. Status: Fixed 2026-10-03.
-Closes [UX-TASK-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+Closes [UX-TASK-05](TESTING.md).**
 
 **Observed.** The runtime has twelve task statuses and each surface decided for
 itself what could be pressed. Home said **Cancel** for a scheduled run and
@@ -29068,7 +29068,7 @@ Run again on finished work*. Live: the scheduled routine read **scheduled** with
 ## FIXED-701 — Delegated work was a second tree to read past
 
 **Severity: Low. Area: Tasks. Status: Fixed 2026-10-03.
-Closes [UX-TASK-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#38-tasks).**
+Closes [UX-TASK-06](TESTING.md).**
 
 **Observed.** Every child of every open task was drawn indented under it, and
 **Parent work** was a select in every composition.
@@ -29135,7 +29135,7 @@ until the model was picked again.
 ## FIXED-705 — More grouped its rows by where they used to sit
 
 **Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
-Closes [UX-SETPOP-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+Closes [UX-SETPOP-04](TESTING.md).**
 
 **Observed.** The More window grouped its destinations under *Work*, *Manage*,
 *Observe* and *Support* — the sidebar groups each had come from — so
@@ -29156,7 +29156,7 @@ capture `07-more-by-purpose.png`.
 ## FIXED-706 — Two search boxes for one question
 
 **Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
-Closes [UX-SETPOP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+Closes [UX-SETPOP-02](TESTING.md).**
 
 **Observed.** More had its own *Find a page or setting* box beside the command
 palette's, two indexes answering "where is that page".
@@ -29175,7 +29175,7 @@ and `08-palette-finds-settings.png`.
 ## FIXED-707 — More was a desktop dialog on a phone
 
 **Severity: Low. Area: Navigation. Status: Fixed 2026-10-03.
-Closes [UX-SETPOP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#36-settings-popup-settings--pages).**
+Closes [UX-SETPOP-03](TESTING.md).**
 
 **Observed.** At 390 wide More was the desktop panel inset by a few pixels, with
 Close at the far corner and nothing saying where you were.
@@ -29193,7 +29193,7 @@ named. Any route change — the browser's Back included — closes it.
 ## FIXED-708 — Permissions led with an engineer's filing
 
 **Severity: Low. Area: Permissions. Status: Fixed 2026-10-03.
-Closes [UX-PERM-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#31-permissions).**
+Closes [UX-PERM-01](TESTING.md).**
 
 **Observed.** FIXED-513 and FIXED-695 gave the page a posture sentence, an
 attention list, goals and a Build preset, but the registry still opened on the
@@ -29215,7 +29215,7 @@ Nothing about enforcement, the rows or the registry changes.
 ## FIXED-709 — A channel offered four equal buttons, and its test could only run after the step it was for
 
 **Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
-Closes [UX-MSG-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+Closes [UX-MSG-03](TESTING.md).**
 
 **Observed.** A paired channel showed **Turn on**, **Send a test delivery**,
 **Routing** and **Unpair** at one weight and a single line naming the next of
@@ -29247,7 +29247,7 @@ local receiver while the channel read *Linked, off*).
 ## FIXED-710 — A test delivery went wherever the test form said
 
 **Severity: Medium. Area: Messaging / egress. Status: Fixed 2026-10-03.
-Closes [UX-MSG-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+Closes [UX-MSG-04](TESTING.md).**
 
 **Observed.** **Send a test delivery** asked for a *Destination URL* and sent the
 test there. It proved that URL was reachable, not that the channel worked; the
@@ -29276,7 +29276,7 @@ local receiver's log.
 ## FIXED-711 — Nothing said what a route did with a group, a thread or a bot
 
 **Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
-Closes [UX-MSG-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+Closes [UX-MSG-05](TESTING.md).**
 
 **Observed.** A route was a mode name. Whether Telegram listened in groups,
 whether a mention was needed, whether messages shared a conversation, who could
@@ -29303,7 +29303,7 @@ never routed*; `channelSetup.test.ts`; live captures 05 and 06.
 ## FIXED-712 — A finished turn and a delivered reply were one unrecorded fact
 
 **Severity: Medium. Area: Messaging. Status: Fixed 2026-10-03.
-Closes [UX-MSG-06](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#310-messaging).**
+Closes [UX-MSG-06](TESTING.md).**
 
 **Observed.** A channel message left events in the audit log and nothing an
 owner could read per channel: whether it was accepted, queued, processed,
@@ -29330,7 +29330,7 @@ beside a refused sender and two tests).
 ## FIXED-713 — An MCP server could be added and run before anything said what it could reach
 
 **Severity: Medium. Area: MCP. Status: Fixed 2026-10-03.
-Closes [UX-MCP-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#311-mcp-servers).**
+Closes [UX-MCP-02](TESTING.md).**
 
 **Observed.** An offer had an **Add server** button and a stored server a **Test**
 button; neither said that a local server runs as the owner's account with the
@@ -29355,7 +29355,7 @@ live capture 07.
 ## FIXED-714 — An MCP card explained itself with tool names
 
 **Severity: Low. Area: MCP. Status: Fixed 2026-10-03.
-Closes [UX-MCP-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#311-mcp-servers).**
+Closes [UX-MCP-03](TESTING.md).**
 
 **Fixed.** Each card leads with a purpose — the offering plugin's description,
 or the server's own sentence about its first described tool, shown as *It says:
@@ -29372,7 +29372,7 @@ plugin or the owner*; `McpView.test.ts`; live capture 08 (after a real Test).
 ## FIXED-715 — A chat filed in a project read as a chat that could see only that project
 
 **Severity: Low. Area: Chat / Projects. Status: Fixed 2026-10-03.
-Closes [UX-CHAT-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+Closes [UX-CHAT-03](TESTING.md).**
 
 **Observed.** The context line named the project and nothing else. Chat's recall
 is owner-wide whatever the project (`RetrievalScope("chat", None)`; only Build
@@ -29390,7 +29390,7 @@ and does not narrow its recall*; live capture 09.
 ## FIXED-716 — Background work was an unlabelled icon
 
 **Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
-Closes [UX-CHAT-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+Closes [UX-CHAT-04](TESTING.md).**
 
 **Fixed.** The toggle reads **Background** with a count of unfinished work and a
 mark when work failed in the last day, and its accessible name says each count
@@ -29407,7 +29407,7 @@ captures 10 and 14.
 ## FIXED-717 — Conversation actions had no shared model
 
 **Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
-Closes [UX-CHAT-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+Closes [UX-CHAT-05](TESTING.md).**
 
 **Fixed.** The conversation menu is three named groups — **Conversation**
 (export, print), **Evidence** (every governed step in the conversation; each
@@ -29423,7 +29423,7 @@ Conversation, Evidence and Continuity*; live capture 10.
 ## FIXED-718 — The picker did not say what was default, and Reset to default did not hold
 
 **Severity: Medium. Area: Models / composers. Status: Fixed 2026-10-03.
-Closes [UX-MODEL-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+Closes [UX-MODEL-03](TESTING.md).**
 
 **Observed.** A composer's model menu listed models with no word for which was
 the global default or whether this surface had overridden it. Choosing the
@@ -29528,7 +29528,7 @@ capture 11.
 ## FIXED-724 — A turn's evidence counted its calls and not its sources or approvals
 
 **Severity: Low. Area: Chat. Status: Fixed 2026-10-03.
-Closes [UX-CHAT-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat) together with
+Closes [UX-CHAT-02](TESTING.md) together with
 [FIXED-581](#fixed-581--a-turns-own-evidence-was-on-another-route).**
 
 **Observed.** FIXED-581 put each turn's evidence under it, collapsed, which is
@@ -29547,7 +29547,7 @@ while closed*. Not exercised by the live round, whose turns used no tool.
 ## FIXED-725 — Readiness was four facts in four places, and nothing said which one stopped the work
 
 **Severity: Medium. Area: Models. Status: Fixed 2026-10-03.
-Closes [UX-MODEL-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+Closes [UX-MODEL-02](TESTING.md).**
 
 **Observed.** "Provider connected", "models discovered", "model selected" and
 "runtime available" were each true or false somewhere — the provider card, the
@@ -29580,7 +29580,7 @@ read *Runs — not checked yet* with **Check it now**; pressing it made the row
 ## FIXED-726 — Choosing between models meant opening each one and remembering the last
 
 **Severity: Medium. Area: Models. Status: Fixed 2026-10-03.
-Closes [UX-MODEL-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+Closes [UX-MODEL-04](TESTING.md).**
 
 **Observed.** Cost, context, privacy and tool support were spread across the
 Overview, model details, Usage and provider cards. DEC-08 step 4 asks for one
@@ -29613,7 +29613,7 @@ overflow).
 ## FIXED-727 — Internal identifiers were still primary labels in four places
 
 **Severity: Low. Area: Models / Design / Memory. Status: Fixed 2026-10-03.
-Closes [UX-MODEL-05](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models) together with
+Closes [UX-MODEL-05](TESTING.md) together with
 [FIXED-530](#fixed-530--the-routing-tab-opened-on-five-force-simulation-constants).**
 
 **Observed.** FIXED-530 moved fallback routing and raw profile ids into Advanced.
@@ -29637,7 +29637,7 @@ expect *Gemini* and *OpenAI*. Live capture 10.
 ## FIXED-728 — Build's boundary named where a turn ran and not what answered it
 
 **Severity: Low. Area: Build. Status: Fixed 2026-10-03.
-Closes [UX-BUILD-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build) together with
+Closes [UX-BUILD-02](TESTING.md) together with
 [FIXED-521](#fixed-521--build-named-what-a-turn-would-touch-and-not-where-it-would-run).**
 
 **Observed.** FIXED-521 (REM-BUILD-02) put *Runs on* beside Project and
@@ -29658,7 +29658,7 @@ environment → model*; live capture 06.
 ## FIXED-729 — On a narrow window, a drawer could sit over the approval a turn was waiting for
 
 **Severity: Medium. Area: Build. Status: Fixed 2026-10-03.
-Closes [UX-BUILD-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build) together with
+Closes [UX-BUILD-03](TESTING.md) together with
 [FIXED-582](#fixed-582--builds-workbench-closed-itself-on-every-reload).**
 
 **Observed.** FIXED-582 (REM-BUILD-01) gave Build one workbench pane with four
@@ -29682,7 +29682,7 @@ fails with the effect disabled. Live capture 09.
 ## FIXED-730 — Build's closed loop was claimed from its parts, not proven end to end
 
 **Severity: Medium. Area: Build. Status: Fixed 2026-10-03.
-Closes [UX-BUILD-04](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+Closes [UX-BUILD-04](TESTING.md).**
 
 **Observed.** UX-BUILD-04 and DEC-06 steps 5–6 ask that release acceptance
 cover edit → test → diagnose → retry → green → summary, including failure and an
@@ -29721,7 +29721,7 @@ approval interrupting it, and the green summary.
 ## FIXED-731 — A generated picture could not be exported, deleted or brought back
 
 **Severity: Medium. Area: Design. Status: Fixed 2026-10-03.
-Closes [UX-DESIGN-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design) together with
+Closes [UX-DESIGN-01](TESTING.md) together with
 [FIXED-491](#fixed-491--design-was-a-one-shot-generator-so-most-of-its-composer-had-nothing-to-reach) and
 [FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in).**
 
@@ -29759,7 +29759,7 @@ removed for good was gone from both lists (captures 12–14).
 ## FIXED-732 — "No project" read as nothing, rather than as a place a picture would go
 
 **Severity: Low. Area: Design. Status: Fixed 2026-10-03.
-Closes [UX-DESIGN-02](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design) together with
+Closes [UX-DESIGN-02](TESTING.md) together with
 [FIXED-492](#fixed-492--a-generated-image-did-not-belong-to-the-project-it-was-made-in).**
 
 **Observed.** FIXED-492 files a picture against the project the composer names
@@ -29779,7 +29779,7 @@ live captures 11 and 12.
 ## FIXED-733 — Research could only reach a picture by being pasted into the prompt
 
 **Severity: Medium. Area: Design. Status: Fixed 2026-10-03.
-Closes [UX-DESIGN-03](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design).**
+Closes [UX-DESIGN-03](TESTING.md).**
 
 **Observed.** FIXED-538 put the pages a research turn read beside its findings.
 Using the findings for a picture meant copying prose into the prompt: no record
@@ -29917,7 +29917,7 @@ model for it until one is chosen.
 Ollama is present with no binary and chooses nothing*; the selection, readiness,
 turn-binding and out-of-box suites rewritten to the contract (no implied model);
 `ProvidersPanel.test.ts` — *names no model to pull until the owner types one*.
-Live: [2026-10-04 round](LIVE_TEST_ROUNDS.md), captures 01–03.
+Live: [2026-10-04 round](TESTING.md), captures 01–03.
 
 ---
 
@@ -29994,7 +29994,7 @@ Live: the stand-in stopped and started under an open Models page, captures
 ## FIXED-740 — Build's boundary line was the browser's opinion of where a turn would run
 
 **Severity: Medium. Area: Build. Status: Fixed 2026-10-04. Closes DEC-06 step 1
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** Build's context line — Project → Repository → Runs on → Model —
 was assembled in the browser from three reads and its own state: the project
@@ -30023,7 +30023,7 @@ the line equal to the server's answer, with a real Anthropic turn after it (10).
 ## FIXED-741 — A local MCP server's output was held in memory in full before anything measured it
 
 **Severity: Medium. Area: MCP / resource bounds. Status: Fixed 2026-10-04. The
-stdio half of DEC-25 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#137-dec-25--enforce-streamed-request-bounds-at-ingress).**
+stdio half of DEC-25 of the [release-readiness review](TESTING.md).**
 
 **Observed.** A stdio MCP session ran through `Popen.communicate()`, which reads
 both pipes to the end before returning. The 200 kB response cap was checked
@@ -30049,7 +30049,7 @@ containment suites unchanged.
 ## FIXED-742 — Every turn told the provider where the owner's encrypted store lives
 
 **Severity: Low. Area: Context / privacy. Status: Fixed 2026-10-04. The
-workspace-metadata row of §13.1 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#131-evidence-and-release-scope-corrections).**
+workspace-metadata row of §13.1 of the [release-readiness review](TESTING.md).**
 
 **Observed.** `ContextGatherer._workspace_summary` put `workspace_root:` and
 `database:` — absolute paths naming the owner's account directory and their
@@ -30067,7 +30067,7 @@ a provider*.
 ## FIXED-743 — Going back to an earlier picture meant generating it again
 
 **Severity: Medium. Area: Design. Status: Fixed 2026-10-04. DEC-07 step 4's
-compare and revert of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#34-design).**
+compare and revert of the [release-readiness review](TESTING.md).**
 
 **Observed.** A picture's versions were a strip of thumbnails. Telling two apart
 meant clicking between them, and the only way back to an earlier one was to
@@ -30095,7 +30095,7 @@ comparison offered for a first version. Live captures 12–14 (390 px included).
 ## FIXED-744 — The Models page owned every state machine on it
 
 **Severity: Medium (maintainability). Area: Models. Status: Fixed 2026-10-04.
-Closes [UX-MODEL-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#35-models).**
+Closes [UX-MODEL-01](TESTING.md).**
 
 **Observed.** `ModelsView.svelte` was 3,292 lines owning discovery, credentials,
 catalogue, selection, pricing and usage, runtime set-up, fallback routing, the
@@ -30119,7 +30119,7 @@ live captures 15–17 (fallback saved and removed, details dialog, 390 px).
 ## FIXED-745 — Chat's view owned its file pane, recall strip and continuity actions
 
 **Severity: Medium (maintainability). Area: Chat. Status: Fixed 2026-10-04.
-Closes [UX-CHAT-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#32-chat).**
+Closes [UX-CHAT-01](TESTING.md).**
 
 **Observed.** `ChatView.svelte` was 2,991 lines coordinating history,
 streaming, citations, the file pane, approvals, memory, project filing, speech
@@ -30141,7 +30141,7 @@ The view is 2,570 lines.
 ## FIXED-746 — Build's view owned its approval review and source ledger
 
 **Severity: Medium (maintainability). Area: Build. Status: Fixed 2026-10-04.
-Closes [UX-BUILD-01](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#33-build).**
+Closes [UX-BUILD-01](TESTING.md).**
 
 **Observed.** `BuildView.svelte` was 3,438 lines, and its `@` mention lookup and
 skill-command read were line-for-line copies of Chat's.
@@ -30211,7 +30211,7 @@ serving.
 ## FIXED-750 — A provider's answer was held in memory in full before anything measured it
 
 **Severity: Medium. Area: Models / resource bounds. Status: Fixed 2026-10-05.
-The outgoing-provider half of DEC-25 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#137-dec-25--enforce-streamed-request-bounds-at-ingress).**
+The outgoing-provider half of DEC-25 of the [release-readiness review](TESTING.md).**
 
 **Observed.** Every hosted adapter read its answer through `ProviderHttpTransport.request`,
 which called `client.request(...)` and so held the whole body before anything
@@ -30286,7 +30286,7 @@ answered `HTTP/1.1 408` with `request_body_too_slow` after 30 seconds.
 ## FIXED-753 — An MCP server could grow new tools and the model was offered them on the next turn
 
 **Severity: High. Area: MCP / authority. Status: Fixed 2026-10-05. Closes DEC-15
-step 10 of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-15--put-every-mcp-server-behind-explicit-trust-and-isolation)
+step 10 of the [release-readiness review](TESTING.md)
 for MCP servers, with CAP-12's "an update cannot silently add grants".**
 
 **Observed.** Every test and every enumerating session replaced a server's
@@ -30346,7 +30346,7 @@ new argument is a change, re-held after a later change, and the purpose line;
 ## FIXED-755 — Leaving Settings dropped an edit that was never saved, and said nothing
 
 **Severity: Medium. Area: Settings. Status: Fixed 2026-10-05. Closes DEC-09 step 5
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-09--clarify-the-settings-popup-and-settings-structure).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** Settings marked an edited section with a dot and offered Save and
 Discard, and a click on any page in the rail unmounted it and took the edit
@@ -30390,7 +30390,7 @@ clock change followed, an unknown zone silent. Live capture 04:
 ## FIXED-757 — A routine that failed every cycle failed every morning for as long as nobody looked
 
 **Severity: Medium. Area: Tasks. Status: Fixed 2026-10-05. Closes DEC-12 step 6
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-12--define-tasks-as-a-durable-scheduler-and-run-history).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** A routine re-arms whatever one cycle did. One whose provider key
 had expired, or whose model had gone, ran and failed on every slot, and the
@@ -30488,7 +30488,7 @@ the turn still *Working…* (the first capture 11 shows it).
 **Severity: High. Area: Storage / recovery. Status: Fixed 2026-10-05. Closes DEC-24
 step 6's "database corruption never causes silent empty-workspace creation" for
 the key, and the *missing key* drill of the
-[release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#136-dec-24--operational-recovery-budgets-and-diagnostics).**
+[release-readiness review](TESTING.md).**
 
 **Observed.** `ensure_app_key` treated "no `.raiker/app.key`" as first use
 whatever else the workspace held. A key file lost beside an existing
@@ -30543,7 +30543,7 @@ with its segments removed, named on Diagnostics, rebuilt, and clean.
 ## FIXED-764 — Stopping a parent task left the work it had delegated running
 
 **Severity: Medium. Area: Tasks. Status: Fixed 2026-10-05. Closes DEC-12 step 7
-of the [release-readiness review](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-12--define-tasks-as-a-durable-scheduler-and-run-history).**
+of the [release-readiness review](TESTING.md).**
 
 **Observed.** A parent is the owner's one handle on what it delegated, and
 pausing or stopping it from Tasks settled the parent's own row only: each child

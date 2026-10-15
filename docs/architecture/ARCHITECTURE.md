@@ -119,7 +119,7 @@ immediately normalized to bounded numbers and cached for five minutes.
 
 ## Personal autonomous-agent direction
 
-The [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds durable goals
+The [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds durable goals
 and a coordinator around existing tasks, not a second runtime. A goal links
 success criteria, context, versioned plans, tasks and effect receipts; each
 executing step enters the ordinary gateway and receives its own machine identity.
@@ -128,5 +128,5 @@ still decide every action. Aggregate budgets, durable claims, pause/Stop,
 restart revalidation and independent completion checks are required.
 
 This is the accepted target, not a shipped goal service. PAA-01/02/08 in the
-[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) own rollout.
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own rollout.
 Local-first hosting and local/private/hosted inference remain separate choices.

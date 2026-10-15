@@ -3,11 +3,14 @@
 Raiker's documentation is organized by audience and purpose. Start with the
 user guide unless you are implementing, reviewing, or auditing the runtime.
 
-**Product identity:** Raiker serves an individual owner as a local-first personal
-AI agent. Chat, coding, memory, tasks and approved tools belong to that one
-personal experience. Goal-level autonomy is being delivered in stages; see
-[implementation status](architecture/IMPLEMENTATION_STATUS.md) before claiming
-that a proposed workflow has shipped.
+**Product identity:** Raiker serves an individual owner as a local-first,
+personalised, all-purpose AI agent. It brings Chat, research, coding, memory,
+tasks, automation and approved tools into one personal experience, helping the
+owner carry an outcome from idea through verified delivery. Its reach is broad,
+but never unlimited: it acts only through the models, services, permissions and
+approvals that are actually available. Goal-level autonomy is being delivered in
+stages; see [implementation status](architecture/IMPLEMENTATION_STATUS.md)
+before claiming that a proposed workflow has shipped.
 
 ## Use Raiker
 
@@ -19,8 +22,8 @@ under **Utilities → Guide**.
 Raiker's personal autonomous-agent direction brings these workflows together
 around durable goals and useful verified outcomes. Start with the
 [current personal-agent workflow](guide/tasks-and-projects.md#using-raiker-as-a-personal-agent),
-then the [target architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-and [staged delivery plan](plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+then the [target architecture](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [staged delivery plan](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 Useful starting points:
 
@@ -40,8 +43,8 @@ Canonical technical references:
 
 | Question | Document |
 |---|---|
-| How should personal-agent UI/UX be implemented? | [UX specification](architecture/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) |
-| How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| How should personal-agent UI/UX be implemented? | [UX specification](plans/PERSONAL_AGENT_UX_SPEC.md) and [task decisions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| How should the personal agent coordinate goals, context and proactive work? | [Personal-agent architecture](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries? | [Security architecture](architecture/SECURITY_ARCHITECTURE.md) |
@@ -63,11 +66,11 @@ Canonical technical references:
 ## Plans, evidence, and history
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
-- [Proposed additions](plans/TO_BE_ADDED.md)
-- [Release acceptance scenarios](plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
-- [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) and
-  [test-round record](plans/LIVE_TEST_ROUNDS.md)
-- [Screenshot evidence](plans/screenshots/README.md)
+- [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+- [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
+- [Live manual test plan](plans/TESTING.md) and
+  [test-round record](plans/TESTING.md)
+- [Screenshot evidence](plans/TESTING.md)
 - [Licensing policy](licensing/LICENSING_POLICY.md) and
   [relicensing audit](licensing/APACHE_2_RELICENSING_AUDIT.md)
 

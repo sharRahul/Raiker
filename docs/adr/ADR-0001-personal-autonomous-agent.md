@@ -18,8 +18,8 @@ durable personal goals, proactive usefulness or reliable cross-service outcomes.
 
 ## Decision
 
-Adopt the [personal-agent specification](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-and [delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+Adopt the [personal-agent specification](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 Add durable goal coordination around existing tasks and ordinary gateway turns.
 Preserve owner-controlled models, local-first operation, machine identity,
 policy/broker authority, monitored security and equal client status. Personal
@@ -62,4 +62,4 @@ remote service, financial domain or model-authored skill.
 
 ## Reference clarification — 2026-10-12
 
-The named personal-agent reference is [Meta Muse](https://ai.meta.com/muse/), launched in September 2026. Do not interpret its separate [Muse Wonder model announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) as implementation or benchmark proof for Raiker. The architecture direction remains accepted; the extended [Meta Muse-specific comparative decisions](../plans/COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md#rcd-10--match-meta-muse-on-finished-personal-goals-not-marketing-features) are recommendations until owner acceptance. No new executor, backend or permission default is accepted by this clarification.
+The named personal-agent reference is [Meta Muse](https://ai.meta.com/muse/), launched in September 2026. Do not interpret its separate [Muse Wonder model announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) as implementation or benchmark proof for Raiker. The architecture direction remains accepted; the extended [Meta Muse-specific comparative decisions](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are recommendations until owner acceptance. No new executor, backend or permission default is accepted by this clarification.

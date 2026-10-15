@@ -532,5 +532,5 @@ forms in an interactive browser. Supported connectors have their own limits,
 and a local reminder or calendar record is not evidence of an external service
 change. Check [Known limits](known-limits.md) before relying on a workflow.
 
-Developers can follow the [architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-and [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+Developers can follow the [architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

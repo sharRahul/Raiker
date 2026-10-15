@@ -1,5 +1,9 @@
 # Design
 
+For the Design product target, structured-canvas requirements and delivery
+boundary, see [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md).
+This guide describes the current shipped image workspace only.
+
 **Design** generates images from a prompt using a hosted image model you have
 connected, keeps what it made in this workspace, and lets you work on one
 picture at a time.

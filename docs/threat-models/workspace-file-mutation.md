@@ -105,4 +105,4 @@ promising a rewind it cannot give.
 - `raiker/runtime/executors/tier1_files.py`, `raiker/tools/filesystem.py`,
   `raiker/checkpoints/capture.py`
 - [`../THREAT_MODEL.md`](../architecture/THREAT_MODEL.md), [`approval-execution-relay.md`](approval-execution-relay.md)
-- [`../BUILD_WORKSPACE_SPEC.md`](../architecture/BUILD_WORKSPACE_SPEC.md)
+- [`../BUILD_WORKSPACE_SPEC.md`](../plans/BUILD_WORKSPACE_SPEC.md)

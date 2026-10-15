@@ -1,19 +1,23 @@
 # Raiker
 
-Raiker is a **local-first personal autonomous AI agent** in staged development.
-Its working foundation combines a personal AI assistant, a coding/build agent,
-and an extensible, owner-governed runtime. Chat, repository work, tools,
-approvals, permissions, and audit records share that runtime whether the chosen
-model runs locally, on a private network, or through a hosted provider.
-Raiker is a personal AI agent for one owner; it is not an organisational administration product.
+Raiker is a **local-first personal autonomous AI agent**: a personalised
+**personal AI agent for one owner**. It is an
+all-purpose partner for thinking, researching, creating, communicating,
+organising, coding, automating, and completing digital work across the models,
+tools, files, projects, and services that owner connects and authorises. Its
+working foundation combines a personal AI assistant, a coding/build agent, and
+an extensible, owner-governed runtime. Chat, repository work, tools, approvals,
+permissions, and audit records share that runtime whether the chosen model runs
+locally, on a private network, or through a hosted provider. Raiker is not an
+organisational administration product.
 
 The personal-agent direction adds durable goals, personal context, bounded
 proactive work and verified outcomes while retaining coding and user-owned model
-choice. These goal-level capabilities are planned and must not be described as
-shipped until implemented and tested. Existing features and planned expansion are
-separated in the [personal-agent architecture](docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-and [delivery plan](docs/plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
-This direction does not mean every proposed workflow is available today.
+choice. Raiker aims to help with the full range of an owner's digital life, but
+it acts only within the capabilities, connected services, and approvals that are
+actually available. Existing features and planned expansion are separated in the
+[personal-agent architecture](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+and [delivery plan](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 Raiker provides two main workspaces:
 

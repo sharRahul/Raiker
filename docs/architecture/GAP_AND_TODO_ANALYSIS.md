@@ -78,7 +78,7 @@ Strict non-allow blocking, role revoke governed, and capability gate per action 
 
 ## Personal-agent expansion backlog
 
-The [PAA delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) owns
+The [PAA delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) owns
 new durable goal, context, proactivity, effect verification, UI and learning
 work. It reuses existing components and preserves all Completed items and
 closed defects. An accepted design is not an implemented goal coordinator or

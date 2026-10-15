@@ -92,4 +92,4 @@ supports exactly three operations; anything else fails closed with
 - `raiker/graph/language_service.py`, `raiker/tools/language_tools.py`,
   `raiker/runtime/executors/tier3_core.py`, `raiker/api/routes_code_files.py`
 - `tests/test_language_intelligence.py`, `tests/test_code_repo_files_api.py`
-- [`../plans/GAP_BUILD_CHAT.md`](../plans/GAP_BUILD_CHAT.md) → B10
+- [`../plans/GAP_BUILD_CHAT.md`](../plans/BUILD_WORKSPACE_SPEC.md) → B10

@@ -6,8 +6,10 @@ requirements, and historical design records. User workflows belong in the
 [user guide](../guide/README.md).
 
 **Scope:** one individual owner, one governed personal-agent runtime, and
-owner-chosen local, home-lab or hosted models and services. Design references to
-host policy, permissions, audit and connectors are personal safeguards, not a
+owner-chosen local, home-lab or hosted models and services. Raiker is designed
+as that owner's all-purpose digital agent: it can reason, create, communicate,
+code, organise and act through connected tools to complete authorised outcomes.
+Host policy, permissions, audit and connectors are personal safeguards, not a
 separate organisation-wide administration product. Proposed autonomous-goal
 features remain staged until the implementation and release evidence exist.
 
@@ -17,7 +19,8 @@ Prefer these when another technical document disagrees:
 
 | Question | Canonical document |
 |---|---|
-| What is the personal-agent target and how does it reuse the runtime? | [Personal autonomous-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| What is the personal-agent target and how does it reuse the runtime? | [Personal autonomous-agent architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| What requirements must Design meet? | [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) |
 | What are the components and governed action flow? | [Architecture](ARCHITECTURE.md) |
 | What is implemented right now? | [Implementation status](IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries and fail-closed controls? | [Security architecture](SECURITY_ARCHITECTURE.md) |
@@ -32,15 +35,16 @@ Historical review passes belong in [Reference review log](REFERENCE_REVIEW_LOG.m
 
 The personal-agent direction is accepted by
 [ADR-0001](../adr/ADR-0001-personal-autonomous-agent.md). Its
-[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md) owns new PAA
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) owns new PAA
 work; existing implementation status and known limits remain authoritative.
 
 ## Product surfaces
 
 | Topic | Document |
 |---|---|
-| Personal-agent journeys, states, decisions and results | [Personal-agent UX](PERSONAL_AGENT_UX_SPEC.md) and [implementation tasks](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) |
-| Build coding workspace | [Build workspace](BUILD_WORKSPACE_SPEC.md) |
+| Personal-agent journeys, states, decisions and results | [Personal-agent UX](../plans/PERSONAL_AGENT_UX_SPEC.md) and [implementation tasks](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) |
+| Build requirements and coding workspace | [Build workspace](../plans/BUILD_WORKSPACE_SPEC.md) |
+| Design requirements and workspace | [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) |
 | Build turn protocol | [Raiker Build process](RAIKER_BUILD_PROCESS.md) |
 | Terminal commands and interactive mode | [Commands and interactive mode](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) |
 | Web dashboard behavior | [Web UI control deck](WEB_UI_CONTROL_DECK_PLAN.md) |
@@ -62,7 +66,7 @@ work; existing implementation status and known limits remain authoritative.
 | Checkpoint capture, restore, resume, and fork | [Checkpointing and rewind](CHECKPOINTING_AND_REWIND_SPEC.md) |
 
 The cross-cutting map of every authority entry path is maintained in
-[Governance entry paths](../plans/GOVERNANCE_ENTRY_PATHS.md).
+[Governance entry paths](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 ## Memory, context, storage, and knowledge
 
@@ -78,7 +82,7 @@ The cross-cutting map of every authority entry path is maintained in
 The 2026-08-11 memory reliability audit closed in full and its plan was removed
 on 2026-09-28; its records are in [`FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md),
 and planned memory work is
-[ADD-25](../plans/TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion).
+[ADD-25](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 ## Models and execution environments
 
@@ -119,7 +123,7 @@ and planned memory work is
 | Pre-commit validation | [Local validation gate](LOCAL_VALIDATION_GATE.md) |
 | Concise feature coverage | [Feature coverage matrix](FEATURE_COVERAGE_MATRIX.md) |
 | Deferred work and open gaps | [Gap and TODO analysis](GAP_AND_TODO_ANALYSIS.md) |
-| Acceptance tests by phase | [Acceptance tests by phase](ACCEPTANCE_TESTS_BY_PHASE.md) |
+| Acceptance tests by phase | [Acceptance tests by phase](../plans/ACCEPTANCE_TESTS_BY_PHASE.md) |
 | Real-provider web-app testing | [Web app live test](WEB_APP_LIVE_TEST.md) |
 
 Browser procedures and dated evidence are stored under [plans](../plans/).

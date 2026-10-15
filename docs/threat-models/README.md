@@ -130,7 +130,7 @@ for a capability added without one, which is how the forty-sixth got its
 document the same day it got its executor.
 
 **A threat model is not the same as a reachable path**, and the 2026-08-24 trace
-([GEP-04](../plans/GOVERNANCE_ENTRY_PATHS.md)) is what made the difference
+([GEP-04](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)) is what made the difference
 checkable: nine of them have a real executor that no product path
 reaches, and five more have their work governed by a control other than their own
 gate. Each keeps its threat model for the reason it keeps its gate — the day

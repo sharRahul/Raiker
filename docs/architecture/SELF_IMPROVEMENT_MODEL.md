@@ -140,7 +140,7 @@ a real verifier, memory writes enabled under governance (currently disabled,
 
 ## Personal-agent workflow learning
 
-PAA-09 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md)
+PAA-09 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 adopts reusable procedural learning inspired by Hermes and Claude skills. It
 begins with an independently verified outcome, proposes a versioned
 instruction-only skill, measures it on fresh fixtures, and requires owner

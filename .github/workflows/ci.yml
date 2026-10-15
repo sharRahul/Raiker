@@ -26,6 +26,15 @@ jobs:
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
+      # Documentation plans are intentionally compact, and historical image
+      # evidence may be pruned. Run the navigability and authority contracts
+      # explicitly: they validate canonical Markdown documents and executable
+      # governance references without requiring removed screenshots.
+      - name: Validate documentation contracts
+        run: |
+          python -m pytest -q tests/test_docs_consistency.py tests/test_governance_entry_paths.py
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
       # RAIKER-2025 — the runtime probe degrades to FTS4 honestly when a build
       # has no FTS5, which is right for a user on an unusual platform and wrong
       # for this repository's own dependency floor. Without this step a wheel

@@ -1,10 +1,13 @@
 # Raiker Web App (`web`)
 
-The local web app for Raiker's **single-owner personal AI agent** — a calm,
-accessible view/controller over the existing governed backend, never a privileged
-interface. Its permissions, audit and policy views help the individual owner
-control their agent; they are not an organisation administration console. It is
-single-user and loopback-only: `raiker-web` serves the built SPA and the governed API from one
+The local web app for Raiker's **single-owner personal AI agent**, personalised
+as an all-purpose workspace — a calm, accessible view/controller over the
+existing governed backend, never a privileged interface. It brings Chat,
+research, Build, Design, memory, tasks and connected tools into one
+owner-controlled workspace. Its permissions,
+audit and policy views help the individual owner control their agent; they are
+not an organisation administration console. It is single-user and loopback-only:
+`raiker-web` serves the built SPA and the governed API from one
 `127.0.0.1` origin, and every read and mutation flows through the same contracts, policy engine,
 RuntimeAuthority, and append-only audit log as the terminal client.
 
@@ -93,7 +96,7 @@ The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the back
 The Build workspace's mode mapping and cadence list are pure modules
 (`src/lib/buildModes.ts`, `src/lib/agentCadence.ts`) so the posture a label
 promises is unit-tested apart from the view. See
-[docs/architecture/BUILD_WORKSPACE_SPEC.md](../docs/architecture/BUILD_WORKSPACE_SPEC.md).
+[docs/architecture/BUILD_WORKSPACE_SPEC.md](../docs/plans/BUILD_WORKSPACE_SPEC.md).
 
 Shared presentational primitives live in `src/lib/components/`: `PageState`,
 `ResponsivePage`, `SessionMenu`, and `ToolControlBoard`. They only render server

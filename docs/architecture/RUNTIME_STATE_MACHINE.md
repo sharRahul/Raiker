@@ -149,7 +149,7 @@ Tests must prove:
 
 ## Proposed goal lifetime is separate
 
-The [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#goal-lifecycle-and-recovery)
+The [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#goal-lifecycle-and-recovery)
 defines draft, ready, running, waiting, paused, completed, partial, failed,
 stopped and archived goal states. These are proposed goal records, not new turn
 states or runtime modes. Existing task phases remain unchanged until an explicit

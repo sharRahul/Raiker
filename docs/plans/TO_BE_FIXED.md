@@ -16,9 +16,9 @@ approvals, audit events, checkpoints, and integrations.
 Governance, observability, policy awareness, control and security are **inherent
 properties** of that runtime, not optional layers added around the agent.
 
-> **Which open work blocks which pillar is in [`PILLAR_MAP.md`](PILLAR_MAP.md),
+> **Which open work blocks which pillar is in [`PILLAR_MAP.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
 > and how an action reaches an executor at all is in
-> [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md).** This preamble is
+> [`GOVERNANCE_ENTRY_PATHS.md`](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).** This preamble is
 > repeated in several plans because each is read on its own; the pillar map is
 > the one place that says what the whole set adds up to.
 
@@ -46,7 +46,7 @@ and are compatible with it:
 # To be fixed
 
 Open defects originally found while executing
-[the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a running
+[the live manual test plan](TESTING.md) against a running
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
@@ -59,7 +59,7 @@ evidence — what was observed, the root cause, and the user-interface outcome t
 had to be true before it could be called closed — but they are no longer mixed in
 with the open work, so this document answers one question: what is left.
 
-[`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md) — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
+[`GAP_BUILD_CHAT.md`](BUILD_WORKSPACE_SPEC.md) — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
 distance between what Build and Chat ship today and what each is meant to be:
 Build as an autonomous coding agent that closes its own loop, Chat as a general
 agentic work assistant that acts across the owner's tools and files. They are
@@ -69,7 +69,7 @@ that proves it, what is missing, and the concrete work.
 Evidence: `screenshots/not-working/` (defects),
 `screenshots/working/` (verified behaviour).
 
-**Only unresolved BUG entries are indexed below.** Closed bugs and completed memory/governance reviews are recorded in [`FIXED_ITEMS.md`](FIXED_ITEMS.md), with historical rationale in Git history. The separate [Build/Chat capability gap ledger](GAP_BUILD_CHAT.md) is not a BUG list.
+**Only unresolved BUG entries are indexed below.** Closed bugs and completed memory/governance reviews are recorded in [`FIXED_ITEMS.md`](FIXED_ITEMS.md), with historical rationale in Git history. The separate [Build/Chat capability gap ledger](BUILD_WORKSPACE_SPEC.md) is not a BUG list.
 
 **Historical ID collision:** `BUG-280` was reused for two unrelated findings. The closed Observability empty-state defect is [FIXED-391](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line); the *open* `BUG-280` row below is the weather/provider live-evidence remainder. Its closed clock sub-scope is [FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here). The closed UI defect is not reopened.
 
@@ -87,6 +87,8 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
 | [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open remainder — the three fixture assumptions closed as [FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330); the lease reclaim's double write and one timing-dependent test need a Windows run |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
+| [BUG-340](#bug-340--a-cloud-ollama-model-is-described-as-never-leaving-the-device) | High | Models / setup / privacy truthfulness | Open — found 2026-10-15 in a real browser round; a cloud-labelled model selected in setup is followed by an unconditional device-only egress claim |
+| [BUG-341](#bug-341--owner-bootstrap-emits-password-form-accessibility-diagnostics) | Medium | Account bootstrap / accessibility | Open — found 2026-10-15 in Chromium; the first-run password fields are not associated with a form and the browser reports incomplete password-form semantics |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -238,7 +240,7 @@ green from configuration or specification alone.
 
 Recorded so the fixes above are read against the right baseline. Re-verified end
 to end on **2026-08-08** against hosted Anthropic (see
-[the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) for the full round):
+[the live manual test plan](TESTING.md) for the full round):
 
 first-run bootstrap and owner sign-in; **all 14 routes and 22 hub tabs with 0
 console errors**; connecting a hosted provider from the web app and pinning a
@@ -446,7 +448,7 @@ following was previously *blocked* by the version pin and is now ordinary work:
 * **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)).**
   Sandboxed server-contributed UI, and the better answer to
   [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract).
-  Carried as [ADD-24](TO_BE_ADDED.md).
+  Carried as [ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 * ~~**Structured tool output and resource links.**~~ **Done 2026-09-04 —
   [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six).**
   Raiker read one of the six shapes a result may carry: the `text` of every
@@ -547,7 +549,7 @@ product having moved, never on the sign-in:
   one first.
 
 All three tests then passed live
-([the second 2026-09-28 round](LIVE_TEST_ROUNDS.md#2026-09-28-second--code-says-where-it-runs-and-three-review-documents-close)).
+([the second 2026-09-28 round](TESTING.md)).
 
 **2026-09-04 — eight more, each re-run against a *used* workspace.**
 `guide-surface`, `review-chat-surface`, `containment-surface`, `visual-refresh`,
@@ -865,21 +867,66 @@ today, not a scheduled one.
 subagent) under the routine's delegation reference, with the plan's decisions as
 its ceiling; live evidence is RR-40 against a consented repository.
 
+## BUG-340 — A cloud Ollama model is described as never leaving the device
+
+**Severity: High. Area: Models / setup / privacy truthfulness. Status: Open —
+found 2026-10-15 in a real browser smoke round.**
+
+**Observed.** On a clean local Raiker workspace, setup detected a running Ollama
+service and listed `GPT oss:20B Cloud` in its model picker. Selecting it
+produced the status `GPT oss:20B Cloud is selected. Next, where model requests
+may travel.` The following setup screen then stated: `Ollama is running here`
+and `its models never leave this device.` Completing setup retained
+`gpt-oss:20b-cloud` as the selected model, and a Chat turn returned
+`RAIKER_E2E_OK` through that model.
+
+**Effect.** A model explicitly labelled Cloud is covered by an unconditional
+device-only egress claim. The owner cannot make an informed decision about where
+their prompt will be processed. This violates the manual plan's requirement
+that the interface state the real destination of model requests.
+
+**Reproduction.** Start `raiker-web` with an empty workspace and a running
+Ollama service that exposes a cloud-labelled chat model. Create the local owner,
+continue through setup, choose that model, and inspect the recommendation shown
+before the privacy step. It claims the model never leaves the device. Complete
+setup and send a bounded Chat prompt to confirm the selected model remains in
+use.
+
+**Required fix and acceptance.** Classify every discovered Ollama model by its
+inference location. Device-only wording may appear only for a known-local model;
+cloud/unknown models must name the external destination or say that Raiker
+cannot verify it. Add a browser regression that selects a cloud-labelled Ollama
+model and rejects device-only wording. Capture the corrected first-run flow and
+an egress trace or provider receipt before closing.
+
+## BUG-341 — Owner bootstrap emits password-form accessibility diagnostics
+
+**Severity: Medium. Area: Account bootstrap / accessibility. Status: Open —
+found 2026-10-15 in Chromium.**
+
+**Observed.** The fresh owner-bootstrap page emitted Chromium DOM diagnostics:
+the password form lacks an associated optional username field and password
+fields are not contained in a form. The account could still be created, but
+these diagnostics indicate that password-manager and browser form semantics are
+incomplete on the mandatory first-run path.
+
+**Reproduction.** Start `raiker-web` with an empty workspace, open the root
+page in Chromium, fill the username, password and confirmation fields, then
+inspect the browser console before submitting. The diagnostics appear on the
+bootstrap screen.
+
+**Required fix and acceptance.** Put the bootstrap controls in a semantic
+`form`, bind labels and autocomplete values appropriate to account creation, and
+verify with the project's accessibility tooling plus Chromium that the password
+form diagnostics no longer occur. Keep the existing keyboard and password
+visibility behavior working.
+
 ## Decision statements added 2026-10-05
 
 **Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.
 These statements supply missing implementation direction. **Recommended** means
 a proposed choice, not an owner approval or a verified fix. The original BUG
 entries retain their status and acceptance evidence.
-
-### BUG-313 — Bounded recall fallback
-**Closed 2026-10-13 as [FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
-
-### BUG-315 — Reply delivery is a separate governed effect
-**Closed 2026-10-13 as [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
-
-### BUG-316 — Separate filing from execution location
-**Closed 2026-10-13 as [FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316).** The owner accepted a decision for it that day; the record there states it, what was built and the evidence. The recommendation that stood here is in Git history.
 
 ### BUG-226 and BUG-228 — Do not create alternate execution contracts
 **Decision — retained deferral for hooks; recommended convergence for UI.**
@@ -897,18 +944,15 @@ per-app grants, message validation, iframe isolation and keyboard access for UI.
 A sandboxed iframe still runs third-party code; the product must describe its
 boundary accurately rather than claim that no browser code runs.
 References: [hook type contract](../../raiker/hooks/contracts.py),
-[ADD-24](TO_BE_ADDED.md#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui),
-[DEC-23](RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#135-dec-23--govern-extension-learning-lifecycle-and-contributed-ui).
+[ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+[DEC-23](TESTING.md).
 
 ## Competitive evidence attached to existing defects — 2026-10-05
 
-**Decision.** Link competitive consequences to existing defects rather than create duplicate BUGs. [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md) supplies the shared thresholds and evidence record. The rows below add acceptance detail; they do not change the current open/closed status above.
+**Decision.** Link competitive consequences to existing defects rather than create duplicate BUGs. [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) supplies the shared thresholds and evidence record. The rows below add acceptance detail; they do not change the current open/closed status above.
 
 | Existing item | What Raiker must demonstrate | Evidence required |
 |---|---|---|
-| BUG-313 (closed, [FIXED-889](FIXED_ITEMS.md#fixed-889--an-instruction-in-the-prompt-stopped-recall-finding-the-memory-it-asked-about-was-bug-313)) | Relevant authorised memory survives instruction-heavy phrasing without broadening recall authority | CR-04: original reproduction plus paraphrases, distractors, another owner/project, expired/deleted records; retrieval IDs, supplied context, labelled relevance scores and a real post-restart answer |
-| BUG-315 (closed for the product path, [FIXED-888](FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315); a real bot's delivered message still owed) | An inbound Telegram request produces an authorised reply to the correct destination or a truthful delivery failure | CR-03: real test-account round trip, exact outbound approval/grant, destination message ID/readback, denied send, timeout, lost ACK and restart behavior; a processed receipt cannot stand in for delivery |
-| BUG-316 (closed, [FIXED-890](FIXED_ITEMS.md#fixed-890--builds-working-in-named-a-project-whose-folder-build-does-not-work-in-was-bug-316)) | Build's displayed project and effective filesystem/command root have explicit, consistent semantics | CR-08/10: attached and managed project fixtures, actual cwd/resolved paths, confined read/write/command outcomes and UI explanation; no silent widening of granted roots |
 | BUG-194 | Claimed execution modes have observable lifecycle, stop and recovery behavior | CR-01/07/11: actual foreground/interactive/background/remote modes where supported, process and durable-state evidence, cancellation and reattachment after restart; label unsupported modes |
 | BUG-318 | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
 | BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |
@@ -917,10 +961,10 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 
 ## Personal-agent direction — 2026-10-07
 
-The owner accepted the [personal-agent architecture](../architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+The owner accepted the [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
 inspired by Meta Muse, Claude.ai, OpenClaw and Hermes Agent. New durable goals,
 context, proactivity, outcome verification and reviewed learning work is owned
-by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Existing items in
+by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). Existing items in
 this ledger keep their status, dependencies and evidence; accepting the target
 does not close a defect or mark an ADD shipped. Browser ADD-23, off-machine
 ADD-11, memory ADD-25 and self-improvement ADD-05/06 retain their own boundaries.

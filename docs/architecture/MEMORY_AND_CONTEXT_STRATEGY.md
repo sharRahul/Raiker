@@ -408,4 +408,4 @@ freshness, sensitivity and scope travel with retrieval. Correction/forget/purge
 must invalidate derived profile and goal-context indexes. Current Chat recall
 is account-wide; project filing is not a retrieval restriction or authority.
 Memory cannot enable a capability or authorise an effect. See
-[personal context](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-context-without-permission-by-memory).
+[personal context](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-context-without-permission-by-memory).

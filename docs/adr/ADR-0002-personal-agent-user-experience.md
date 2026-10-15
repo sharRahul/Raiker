@@ -18,8 +18,8 @@ Chat/Build, task threads and governance logic provide working foundations.
 
 ## Decision
 
-Adopt [the personal-agent UX specification](../architecture/PERSONAL_AGENT_UX_SPEC.md)
-and [UX-01–UX-12 plan](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md).
+Adopt [the personal-agent UX specification](../plans/PERSONAL_AGENT_UX_SPEC.md)
+and [UX-01–UX-12 plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 Use outcome-based intake, a useful Home overview, linked goal/task detail,
 concrete effect approvals, accessible results, inspectable personal context and
 preserved-progress recovery. Retain existing work modes/navigation roles and

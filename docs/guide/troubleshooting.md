@@ -110,5 +110,5 @@ in the process environment.
   the reason and remediation for any readiness check that failed.
 - **Observability → Audit log** — every governed step, filterable.
 - **[To be fixed](../plans/TO_BE_FIXED.md)** — known defects with reproductions.
-- **[Live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — what
+- **[Live manual test plan](../plans/TESTING.md)** — what
   was verified working, with screenshots.

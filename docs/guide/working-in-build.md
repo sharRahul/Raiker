@@ -413,5 +413,5 @@ Reason codes and their fixes are in [Troubleshooting](troubleshooting.md).
 - [Working in Chat](working-in-chat.md) — the assistant surface, and the controls
   the two share
 - [Tasks and projects](tasks-and-projects.md) — scheduling and organising work
-- [`BUILD_WORKSPACE_SPEC.md`](../architecture/BUILD_WORKSPACE_SPEC.md) — the specification
+- [`BUILD_WORKSPACE_SPEC.md`](../plans/BUILD_WORKSPACE_SPEC.md) — the specification
   behind this page

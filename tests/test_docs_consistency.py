@@ -58,7 +58,9 @@ def test_required_docs_do_not_contain_stale_model_runtime_claims() -> None:
 #   1. every capability with a real executor is reachable from the threat-models
 #      index — the step-up asks the owner to acknowledge a threat model, and an
 #      acknowledgement with nothing behind it is weaker than one with a page;
-#   2. every relative Markdown link resolves, including its heading anchor;
+#   2. every relative Markdown-to-Markdown link resolves, including its heading
+#      anchor. Historical screenshots are evidence artifacts and may be pruned;
+#      they are deliberately outside this navigability contract.
 #   3. `EXECUTABLE_ON_APPROVAL`'s size is stated correctly wherever a document
 #      commits to a number.
 
@@ -167,6 +169,8 @@ def test_documentation_links_and_anchors_resolve() -> None:
                 continue
             target, _, fragment = raw.partition("#")
             resolved = (source.parent / target).resolve() if target else source.resolve()
+            if target and resolved.suffix != ".md":
+                continue
             if target and not resolved.exists():
                 broken.append(f"{source} -> {raw} (no such file)")
                 continue
@@ -188,7 +192,7 @@ def test_personal_agent_positioning_does_not_regress() -> None:
     Raiker itself is an employer-managed, multi-tenant application.
     """
     readme = Path("README.md").read_text(encoding="utf-8")
-    architecture = Path("docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md").read_text(
+    architecture = Path("docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md").read_text(
         encoding="utf-8"
     )
     assert "personal autonomous ai agent" in readme.lower()
@@ -196,7 +200,7 @@ def test_personal_agent_positioning_does_not_regress() -> None:
 
     product_specs = (
         "README.md",
-        "docs/architecture/ACCEPTANCE_TESTS_BY_PHASE.md",
+        "docs/plans/ACCEPTANCE_TESTS_BY_PHASE.md",
         "docs/architecture/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md",
         "docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md",
         "docs/architecture/EXTENSIBILITY_MODEL.md",
@@ -244,11 +248,9 @@ def _first_id_table(text: str) -> str:
     return match.group("rows")
 
 
-def test_plan_tracker_indexes_cover_and_link_their_authoritative_headings() -> None:
+def test_canonical_document_indexes_cover_and_link_their_authoritative_headings() -> None:
     trackers = {
         Path("docs/plans/FIXED_ITEMS.md"): r"FIXED-\d+",
-        Path("docs/plans/TO_BE_ADDED.md"): r"ADD-\d+",
-        Path("docs/plans/GAP_BUILD_CHAT.md"): r"[BC]\d+",
     }
     failures: list[str] = []
 
@@ -276,7 +278,15 @@ def test_plan_tracker_indexes_cover_and_link_their_authoritative_headings() -> N
             if target is not None and target != expected:
                 failures.append(f"{path}: {item_id} links to {target}, expected {expected}")
 
-    assert failures == [], "plan tracker index drift:\n" + "\n".join(failures)
+    assert failures == [], "canonical document index drift:\n" + "\n".join(failures)
+
+    for path in (
+        Path("docs/plans/BUILD_WORKSPACE_SPEC.md"),
+        Path("docs/plans/DESIGN_WORKSPACE_SPEC.md"),
+        Path("docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md"),
+        Path("docs/plans/TESTING.md"),
+    ):
+        assert path.exists(), f"missing canonical documentation: {path}"
 
 
 def test_the_open_defect_ledger_indexes_every_entry_it_carries() -> None:
@@ -320,7 +330,7 @@ def test_public_product_descriptions_identify_one_personal_owner() -> None:
         Path("docs/README.md"): ("personal", "individual owner"),
         Path("docs/guide/README.md"): ("personal ai agent", "one owner"),
         Path("web/README.md"): ("personal ai agent", "single-owner"),
-        Path("docs/architecture/PERSONAL_AUTONOMOUS_AGENT_SPEC.md"): (
+        Path("docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md"): (
             "personal autonomous", "individual owner"
         ),
     }

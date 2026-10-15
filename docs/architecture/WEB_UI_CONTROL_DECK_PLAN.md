@@ -9,8 +9,8 @@
 
 ## Personal-agent interaction direction — 2026-10-08
 
-The [personal-agent UX specification](PERSONAL_AGENT_UX_SPEC.md) and
-[UX-01–UX-12 implementation plan](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md)
+The [personal-agent UX specification](../plans/PERSONAL_AGENT_UX_SPEC.md) and
+[UX-01–UX-12 implementation plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 now own target intake, Home, goals/tasks, approvals, background readiness,
 results, personal context, recovery and continuity. Each task records a reason,
 decision, alternatives, dependencies, state behavior and acceptance evidence.
@@ -572,4 +572,4 @@ should answer what is progressing, waiting on the owner, completed, failed and
 due next. Goal detail shows success criteria, plan/tasks, usable artifacts,
 verified receipts, named blockers, budgets and pause/resume/stop. Delivery
 failure is distinct from work failure. Planned controls stay hidden until their
-routes and executors exist. See [the target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+routes and executors exist. See [the target spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

@@ -241,5 +241,5 @@ authority or unreviewed plugin/skill execution. Phase 1 exclusions remain
 historical phase constraints rather than present product-wide bans.
 
 A future isolated browser is ADD-23; off-machine gateway reach remains ADD-11.
-Neither is activated here. The [target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+Neither is activated here. The [target spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 defines one-runtime goal coordination and its stage gates.

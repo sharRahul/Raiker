@@ -83,7 +83,7 @@ No tamper-proof logging is implemented.
 
 ## Personal-agent threat boundary
 
-The [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds long-lived
+The [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) adds long-lived
 goal/intent data around short-lived signed turns. Stale delegation, poisoned
 memory, injected triggers, wrong-account routing, duplicate effects, unbounded
 polling, inherited child authority and silent host/provider changes are target

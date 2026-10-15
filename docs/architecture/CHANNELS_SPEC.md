@@ -557,4 +557,4 @@ sender, account, target and request deduplication. External text cannot enable
 gates, broaden scope or approve an unrelated action. Existing channel approval
 limits remain authoritative. Always-on private hosting and new off-machine
 transport require explicit support/evidence; ADD-11 remains its own proposal.
-See [the personal-agent spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+See [the personal-agent spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

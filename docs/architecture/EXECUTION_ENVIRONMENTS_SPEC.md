@@ -242,4 +242,4 @@ an explicitly selected always-on private host with authenticated reconnect,
 heartbeat and Stop/revoke evidence. It does not enable hosted multi-user service.
 ADD-23/PAA-06 owns isolated browser sessions and bounded actions; the existing
 web fetcher is not an interactive browser or persistent VM. See
-[the target architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+[the target architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

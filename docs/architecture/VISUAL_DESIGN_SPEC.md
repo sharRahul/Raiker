@@ -8,6 +8,12 @@
 > `docs/architecture/WEB_UI_CONTROL_DECK_PLAN.md` decides *what each screen is for*. This
 > document decides *how anything is drawn*, so a contributor can build a new page
 > without inventing a size, a shade, a duration, or a bar.
+>
+> [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) owns the Design product's canvas,
+> asset, agent, brand, export and delivery requirements. This document remains
+> the shared visual-language contract. Its adopted/implemented status applies
+> only to that shared visual-language system, not to planned Design workspace
+> capabilities.
 
 ## Why this exists
 
@@ -379,9 +385,9 @@ seven questions above.
 
 ## Personal-agent interaction work — 2026-10-08
 
-[UX-01–UX-12](../plans/PERSONAL_AGENT_UX_IMPLEMENTATION_PLAN.md) use these existing
+[UX-01–UX-12](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) use these existing
 semantic tokens, local fonts and shared components. The
-[personal-agent UX specification](PERSONAL_AGENT_UX_SPEC.md) owns screen purpose,
+[personal-agent UX specification](../plans/PERSONAL_AGENT_UX_SPEC.md) owns screen purpose,
 state/action behavior and progressive disclosure; this document continues to
 own drawing rules. Improve clarity through layout, hierarchy and useful copy,
 not a new palette or heavy decoration. UX-11 applies keyboard/screen-reader,

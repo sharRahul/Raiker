@@ -115,7 +115,7 @@ inside the workspace or it fails closed, a GitHub `owner/repo` coordinate is
 recorded without any network call, and GitHub content still reaches a turn only
 through the brokered `github_read` tool under the `connector_github_runtime`
 gate. Scheduled agents are ordinary tasks with a cadence; each cycle is one
-discrete governed turn. See [the Build workspace](BUILD_WORKSPACE_SPEC.md).
+discrete governed turn. See [the Build workspace](../plans/BUILD_WORKSPACE_SPEC.md).
 
 **The MCP client negotiates protocol revision `2026-07-28`, and implements a
 subset of it.** `MCP_PROTOCOL_VERSION` (`raiker/runtime/executors/mcp.py`) offers
@@ -186,7 +186,7 @@ governance and audit controls protect that owner's work; they do not imply a
 multi-tenant organisational application or a corporate administration product.
 The goal-level capabilities below remain staged regardless of positioning.
 
-The [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) is accepted
+The [personal-agent architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) is accepted
 as a target. Existing tasks/routines, governed memory, connectors and Chat/Build
 are foundations; they are not evidence of a complete goal-level personal agent.
 
@@ -200,6 +200,6 @@ are foundations; they are not evidence of a complete goal-level personal agent.
 | Goal overview, reviewed learning and optional host continuity | contract_only — no new UI, automatic skill activation or deployment claimed | PAA-07/09/10 |
 
 All new work remains planned in the
-[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md). Its scenario
+[delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md). Its scenario
 status starts at not run; historical live evidence is retained at its original
 scope. No runtime status marker above is upgraded by adopting this direction.

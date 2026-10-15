@@ -723,8 +723,8 @@ either survives a reload — neither is persisted, which is
 
 Historical provider rounds above prove their named scenarios/configurations.
 They are not a full release verdict. Use
-[RR-01–RR-36](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md) and the
-[manual release procedure](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md#24-release-qualification-run)
+[RR-01–RR-36](../plans/TESTING.md) and the
+[manual release procedure](../plans/TESTING.md)
 for a candidate: real streamed work, approval/resume/Stop, goal/task lineage,
 source/destination verification, provider failures, reload/concurrent tabs,
 first-use accessibility and artifact opening. Record browser/client/host/model

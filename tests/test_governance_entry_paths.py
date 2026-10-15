@@ -1,9 +1,9 @@
 """The governance entry paths cannot change without the enumeration changing.
 
-`docs/plans/GOVERNANCE_ENTRY_PATHS.md` enumerates every way an action reaches an
-executor. A document like that is worth exactly as much as the test that stops it
-rotting, because its failure mode is silent: a new path appears beside the
-governed ones, nothing breaks, and the enumeration quietly stops being true.
+`raiker/runtime/authority/entry_paths.py` is the authoritative, executable
+enumeration of every way an action reaches an executor. The personal-agent
+specification owns the product boundary; keeping this enumeration beside the
+runtime prevents a second plan document from silently drifting.
 
 Each invariant here would have caught a defect this repository has actually had.
 I3 in particular is the one whose absence let two egress implementations coexist
@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-ENTRY_PATHS_DOC = Path("docs/plans/GOVERNANCE_ENTRY_PATHS.md")
+ENTRY_PATHS_DOC = Path("raiker/runtime/authority/entry_paths.py")
 
 #: Modules permitted to call `RuntimeAuthority.route_action`. Adding one is an
 #: architectural change: it is a new way for an action to reach an executor.
@@ -258,11 +258,13 @@ def test_i5_a_hook_can_never_grant() -> None:
     assert mixed == "deny", "an `allow` must never override a `deny`"
 
 
-def test_the_entry_path_document_names_both_chokepoints() -> None:
-    """The document is the artefact; these are the two names it cannot lose."""
-    doc = ENTRY_PATHS_DOC.read_text(encoding="utf-8")
-    for required in ("PolicyEngine.review", "RuntimeAuthority.route_action"):
-        assert required in doc, f"{ENTRY_PATHS_DOC} must name {required}"
+def test_the_personal_agent_spec_names_both_chokepoints() -> None:
+    """The product contract must still name the runtime's two chokepoints."""
+    doc = Path("docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md").read_text(
+        encoding="utf-8"
+    )
+    for required in ("PolicyEngine.review", "RuntimeAuthority"):
+        assert required in doc, f"personal-agent specification must name {required}"
 
 
 # ── GEP-04: what each gate actually decides ─────────────────────────────────

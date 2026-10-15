@@ -40,7 +40,7 @@ step-up-verified lifecycle in `RuntimeAuthority.resolve_critical_approval`.
 
 ## Proposed personal-goal contracts
 
-The [target contracts](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#proposed-durable-contracts)
+The [target contracts](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#proposed-durable-contracts)
 define logical Goal, Goal step, Delegation envelope, Standing intent, Personal
 context reference, Effect receipt and Outcome assessment records. PAA-01/02/08
 must supply concrete versioned schemas, owner-scoped migrations and concurrency

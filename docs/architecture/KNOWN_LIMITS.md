@@ -467,11 +467,11 @@ interface outcome that had to be true first — in
 
 ## Personal autonomous-agent scope
 
-Adopting the [personal-agent target](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) does not
+Adopting the [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) does not
 make a dedicated goal coordinator, standing-intent monitor, interactive browser
 or self-activating learned skill available. Existing tasks and schedules require
 the Raiker host to be running; model, integration and executor readiness still
 apply. No general remote availability, goal-level budget guarantee or external
 exactly-once guarantee is claimed. Unknown provider outcomes must remain unknown
 until reconciled. Sensitive-domain exclusions and hosted multi-user deferral
-remain. See [PAA delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_DELIVERY_PLAN.md).
+remain. See [PAA delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

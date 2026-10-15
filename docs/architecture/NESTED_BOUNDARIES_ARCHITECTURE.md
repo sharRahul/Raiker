@@ -280,7 +280,7 @@ it reads or acts.** This used to say there was one non-bypass path that every
 tool, command, plugin action, channel action, memory write, graph query,
 checkpoint restore, model control or execution adapter followed. Measured
 against the code that was not accurate
-([GEP-03](../plans/GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture)),
+([GEP-03](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)),
 and the inaccuracy was an undocumented design rather than a hole:
 
 | Chokepoint | What crosses it | What it applies |
@@ -291,7 +291,7 @@ and the inaccuracy was an undocumented design rather than a hole:
 A read never needs B, because it changes nothing and leaves nothing; an action
 always crosses both. The complete list of paths — which surface originates an
 action, which chokepoints it crosses, and the most it can reach — is
-[`GOVERNANCE_ENTRY_PATHS.md`](../plans/GOVERNANCE_ENTRY_PATHS.md), which is derived
+[`GOVERNANCE_ENTRY_PATHS.md`](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md), which is derived
 from the code and is the document to change when a path is added.
 
 Two properties hold across both. A service a chat tool reaches directly (a

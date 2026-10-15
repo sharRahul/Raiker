@@ -197,4 +197,4 @@ workflow may propose a versioned instruction-only skill with sources, fixtures,
 validators and a tool/permission diff. Evaluation and owner activation precede
 use; revocation/rollback is independent. Executable scripts remain governed
 tools, not implicit skill authority. ADD-05/06/21 retain implementation ownership.
-See [personal-agent learning](PERSONAL_AUTONOMOUS_AGENT_SPEC.md#user-experience-and-learning).
+See [personal-agent learning](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#user-experience-and-learning).

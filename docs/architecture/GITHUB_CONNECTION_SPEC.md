@@ -2,9 +2,9 @@
 
 > **Status: Architecture Accepted / Implementation Partly Delivered — 2026-10-12.** The code-backed §18 inventory confirms sign-in, credential methods, GitHub App flow, repository delegations and the Settings journey as implemented in stated scopes; BUG-339 and real-GitHub RR-38…RR-41 evidence remain open; BUG-337 and BUG-338 closed on 2026-10-13 as FIXED-898 and FIXED-899. The managed App needs operator registration and a trusted credential service. Do not interpret implemented-against-stand-ins as externally verified.
 > This document holds the protocol and contract detail behind the
-> [DEC-21b amendment](../plans/RELEASE_READINESS_PRODUCT_UX_RUNTIME_REVIEW_2026-09-13.md#dec-21b-amendment-2026-10-12--hybrid-github-authentication).
+> [DEC-21b amendment](../plans/TESTING.md).
 > The decision record owns *what was decided and why*; this specification owns
-> *how it must behave*; [ADD-27](../plans/TO_BE_ADDED.md#add-27--a-hybrid-github-connection-that-separates-sign-in-repository-access-credential-and-authority)
+> *how it must behave*; [ADD-27](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 > owns the tasks. Nothing here is implemented unless §18 says so. A real
 > GitHub App registration and live authentication evidence remain
 > prerequisites for calling the managed integration verified.
@@ -667,7 +667,7 @@ recoverable; rollback cannot restore revoked authority; local development works
 without OAuth; self-hosted works without the managed service.
 
 **End-to-end scenarios** are RR-37…RR-41 in
-[release acceptance](../plans/RELEASE_ACCEPTANCE_TEST_SCENARIOS.md#h-github-connection-and-repository-authority--dec-21b).
+[release acceptance](../plans/TESTING.md).
 
 ## 21. External prerequisites and open technical questions
 

@@ -330,7 +330,7 @@ metadata is `status`, `created_at`, `source_turn_count`,
 ## Personal-goal API target
 
 No goal or standing-intent route is added by the
-[personal-agent direction](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). PAA-01/02/07 must
+[personal-agent direction](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md). PAA-01/02/07 must
 specify authenticated owner-scoped create/read/update/control/export/delete
 contracts, optimistic version checks and idempotency before adding routes.
 Publish response models, regenerate OpenAPI/TypeScript/route inventory, and test

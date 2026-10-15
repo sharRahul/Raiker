@@ -168,5 +168,5 @@ owner, goal, plan version, task/run, machine turn, action and receipt, plus
 bounded status/reason/timing/cost metadata. Do not include secrets, private
 reasoning, full personal profiles or connector bodies. Distinguish effect
 confirmation from outcome verification and notification delivery. Proposed
-logical records in the [spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are not current
+logical records in the [spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are not current
 event names; this update registers none.

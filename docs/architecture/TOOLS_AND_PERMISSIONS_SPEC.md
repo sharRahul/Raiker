@@ -39,4 +39,4 @@ clicks and connector calls are classified by resulting effects, not tool names.
 Changed approved arguments require the current governing decision path again;
 revoked authority fails before execution. Existing ask/allow/auto/deny and
 critical actions stay authoritative; Muse defaults are not adopted. PAA-05/06
-and the [target spec](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own new workflows.
+and the [target spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) own new workflows.

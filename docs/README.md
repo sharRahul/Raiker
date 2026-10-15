@@ -45,7 +45,6 @@ Canonical technical references:
 | How does a governed action flow? | [Architecture](architecture/ARCHITECTURE.md) |
 | What is implemented now? | [Implementation status](architecture/IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries? | [Security architecture](architecture/SECURITY_ARCHITECTURE.md) |
-| What can this build not do? | [Known limits](architecture/KNOWN_LIMITS.md) |
 | What does the local API expose? | [API and contracts](architecture/API_AND_CONTRACT_SCHEMAS.md) |
 | How is Raiker verified? | [Verification plan](architecture/VERIFICATION_PLAN.md) |
 

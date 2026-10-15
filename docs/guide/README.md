@@ -10,7 +10,7 @@ organise, code and automate work across their model connections, memory, files,
 projects and approved services. The owner controls schedules, extensions,
 permissions and approvals.
 Advanced, durable autonomous goals are being added in stages; [current
-limitations](known-limits.md) describe what is usable today.
+limitations](../architecture/KNOWN_LIMITS.md) describe what is usable today.
 
 The same task-oriented guide is available in a running Raiker under
 **Utilities → Guide**.
@@ -42,7 +42,7 @@ If this is your first time using Raiker, read these pages in order:
 | Generate images with a connected image model | [Design](design.md) |
 | Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
 | Understand accounts, credentials, audit records, and privacy choices | [Security and privacy](security-and-privacy.md) |
-| Check what is unavailable or deliberately restricted | [Known limits](known-limits.md) |
+| Check what is unavailable or deliberately restricted | [Known limits](../architecture/KNOWN_LIMITS.md) |
 | Resolve a refusal, reason code, blank page, or connection problem | [Troubleshooting](troubleshooting.md) |
 
 ## The two ideas that prevent most confusion

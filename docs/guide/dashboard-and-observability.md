@@ -267,7 +267,7 @@ say so rather than making you wait: choose a folder further in.
 Current semantic recall is limited unless you build a meaning-based index: the
 default vector representation is a feature-hashed bag of tokens, not a
 meaning-aware embedding model, so paraphrases without shared terms can be missed.
-See [Known limits](known-limits.md).
+See [Known limits](../architecture/KNOWN_LIMITS.md).
 
 **Overview → Is the runtime itself healthy?** compares every index and projection memory
 depends on — including the conversation index behind Threads — against the

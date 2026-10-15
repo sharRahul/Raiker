@@ -29,7 +29,7 @@ Raiker provides two main workspaces:
 Raiker is ready for local, single-user use from a source checkout. The web dashboard
 and terminal client are available. Features without a governed executor
 fail closed. Hosted multi-user operation is deferred. Read the
-[current limitations](docs/guide/known-limits.md) before relying on Raiker for
+[current limitations](docs/architecture/KNOWN_LIMITS.md) before relying on Raiker for
 important work.
 
 ## Run
@@ -115,7 +115,7 @@ artifacts are unsigned unless a published release explicitly says otherwise.
   project documentation.
 - **[Architecture reference](docs/architecture/README.md)** — implementation,
   contracts, governance, and design specifications.
-- **[Known limits](docs/guide/known-limits.md)** — important boundaries and
+- **[Known limits](docs/architecture/KNOWN_LIMITS.md)** — important boundaries and
   unavailable features.
 - **[Troubleshooting](docs/guide/troubleshooting.md)** — reason codes and fixes.
 

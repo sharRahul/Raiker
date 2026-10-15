@@ -631,7 +631,7 @@ gates, not assumed:
   commits the remote does not have. It never forces and never deletes a branch,
   and it does nothing at all until the remote's host is on
   `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a GitHub credential is available
-  (see [Known limits](known-limits.md#approvals-and-execution) for why a proposed
+  (see [Known limits](../architecture/KNOWN_LIMITS.md) for why a proposed
   push still needs `RAIKER_GITHUB_TOKEN` today). Unlike a
   commit, this leaves your machine and git cannot take it back — undo it on the
   remote.

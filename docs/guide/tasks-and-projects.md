@@ -530,7 +530,7 @@ available in the current interface.
 Current web access reads and extracts web content; it cannot click or fill
 forms in an interactive browser. Supported connectors have their own limits,
 and a local reminder or calendar record is not evidence of an external service
-change. Check [Known limits](known-limits.md) before relying on a workflow.
+change. Check [Known limits](../architecture/KNOWN_LIMITS.md) before relying on a workflow.
 
 Developers can follow the [architecture](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 and [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

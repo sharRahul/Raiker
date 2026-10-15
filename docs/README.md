@@ -28,7 +28,6 @@ Useful starting points:
 - [Connecting a model](guide/connecting-a-model.md)
 - [Working in Chat](guide/working-in-chat.md)
 - [Working in Build](guide/working-in-build.md)
-- [Known limits](guide/known-limits.md)
 - [Troubleshooting](guide/troubleshooting.md)
 
 ## Understand or develop Raiker

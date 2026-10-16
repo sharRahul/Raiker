@@ -4,33 +4,7 @@ Raiker is a **local-first personal autonomous AI agent**: a personalised
 **personal AI agent for one owner**. It is an
 all-purpose partner for thinking, researching, creating, communicating,
 organising, coding, automating, and completing digital work across the models,
-tools, files, projects, and services that owner connects and authorises. Its
-working foundation combines a personal AI assistant, a coding/build agent, and
-an extensible, owner-governed runtime. Chat, repository work, tools, approvals,
-permissions, and audit records share that runtime whether the chosen model runs
-locally, on a private network, or through a hosted provider. Raiker is not an
-organisational administration product.
-
-The personal-agent direction adds durable goals, personal context, bounded
-proactive work and verified outcomes while retaining coding and user-owned model
-choice. Raiker aims to help with the full range of an owner's digital life, but
-it acts only within the capabilities, connected services, and approvals that are
-actually available. Existing features and planned expansion are separated in the
-[personal-agent architecture](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-and [delivery plan](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
-
-Raiker provides two main workspaces:
-
-- **Chat** for conversations, attachments, research, memory, and approvals.
-- **Build** for repository-aware planning, edits, commands, commits, and pushes.
-
-## Project status
-
-Raiker is ready for local, single-user use from a source checkout. The web dashboard
-and terminal client are available. Features without a governed executor
-fail closed. Hosted multi-user operation is deferred. Read the
-[current limitations](docs/architecture/KNOWN_LIMITS.md) before relying on Raiker for
-important work.
+tools, files, projects, and services that owner connects and authorises. 
 
 ## Run
 

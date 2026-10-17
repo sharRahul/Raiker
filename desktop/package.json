@@ -29,5 +29,6 @@
     "type": "git",
     "url": "https://github.com/sharRahul/Raiker.git"
   },
-  "homepage": "https://github.com/sharRahul/Raiker"
+  "homepage": "https://github.com/sharRahul/Raiker",
+  "desktopName": "raiker.desktop"
 }

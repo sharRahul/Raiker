@@ -62,6 +62,9 @@ class Installation:
     installer_formats: tuple[str, ...]
     install_root: Path
     note: str
+    #: ``"payload"`` for the directory the payload updater swaps, ``"desktop"``
+    #: for a desktop package (DIST-10), which updates through its own installer.
+    distribution: str = "payload"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +78,7 @@ class Installation:
             "installer_formats": list(self.installer_formats),
             "install_root": str(self.install_root),
             "note": self.note,
+            "distribution": self.distribution,
         }
 
 
@@ -161,6 +165,7 @@ def detect_installation(install_root: Path | None = None) -> Installation:
             installer_formats=tuple(str(item) for item in parsed.get("installer_formats", ())),
             install_root=root,
             note="",
+            distribution=str(parsed.get("distribution", "payload")),
         )
     except (OSError, ValueError, KeyError, TypeError):
         return Installation(
@@ -175,7 +180,10 @@ def detect_installation(install_root: Path | None = None) -> Installation:
             install_root=root,
             note=_MALFORMED_NOTE,
         )
-    if parsed.get("schema") != 1 or installation.target not in TARGETS_BY_ID:
+    from raiker.app.desktop_release import DESKTOP_TARGETS_BY_ID
+
+    known = DESKTOP_TARGETS_BY_ID if installation.distribution == "desktop" else TARGETS_BY_ID
+    if parsed.get("schema") != 1 or installation.target not in known:
         return Installation(
             version=UNKNOWN_VERSION,
             target=None,

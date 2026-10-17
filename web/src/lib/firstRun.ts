@@ -24,15 +24,27 @@ import type { ModelProfile } from "./apiTypes";
 import { providerName } from "./format";
 import { isReachableProfile } from "./modelReadiness.svelte";
 
-/** The stages first launch actually shows, in order. */
-export const SETUP_STAGES = ["welcome", "model", "privacy", "finish"] as const;
+/**
+ * The stages first launch actually shows, in order.
+ *
+ * DIST-05/06 add three, each a reading rather than a decision an owner must
+ * understand infrastructure to make: **This device** (what the machine can
+ * run, measured locally), **Permissions** (the governance posture setup leaves
+ * in place — read-only, it grants nothing) and **Check** (each mandatory
+ * component, verified from inside the running host, plus one real request to
+ * the chosen model when there is one).
+ */
+export const SETUP_STAGES = ["welcome", "system", "model", "privacy", "permissions", "verify", "finish"] as const;
 
 export type SetupStage = (typeof SETUP_STAGES)[number];
 
 export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
   welcome: "Welcome",
+  system: "This device",
   model: "Model",
   privacy: "Privacy",
+  permissions: "Permissions",
+  verify: "Check",
   finish: "Ready",
 };
 
@@ -44,7 +56,8 @@ export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
  * that now carries their meaning rather than to a blank screen.
  */
 export function visibleStage(stage: string | null | undefined): SetupStage {
-  if (stage === "model" || stage === "privacy" || stage === "welcome") return stage;
+  const shown: readonly string[] = SETUP_STAGES;
+  if (stage && shown.includes(stage) && stage !== "finish") return stage as SetupStage;
   if (stage === "backup" || stage === "finish") return "finish";
   return "welcome"; // including the retired `account`
 }
@@ -73,6 +86,27 @@ export const PRIVACY_CHOICES = [
  */
 export const PERMISSIONS_NOTE =
   "Raiker starts conservatively and will ask you before it takes a governed action. You can review every permission later.";
+
+/**
+ * The four ways a permission can be decided (capabilityModel's decision
+ * modes), in the owner's words. Shown on the Permissions stage as an
+ * explanation, not a control: finishing setup never changes a mode, and
+ * nothing here is a blanket authorisation for autonomous work.
+ */
+export const DECISION_MODE_COPY = [
+  { mode: "ask", label: "Ask before acting", detail: "Raiker stops and asks you each time. The default for anything that changes something." },
+  { mode: "allow", label: "Allow within a scope you approve", detail: "Raiker may act inside the folders, services or limits you set for that permission." },
+  { mode: "auto", label: "Act automatically within policy", detail: "Raiker acts without asking, still inside every policy limit and audited." },
+  { mode: "deny", label: "Never", detail: "Raiker cannot do it at all, and does not ask." },
+] as const;
+
+/** A check row's state, said in words as well as colour (never colour alone). */
+export const CHECK_STATE_LABELS: Record<"pass" | "warn" | "fail" | "info", string> = {
+  pass: "Ready",
+  warn: "Works, with a limit",
+  fail: "Needs attention",
+  info: "Note",
+};
 
 export interface RecommendedPath {
   /** "" when nothing is detected or connected and the owner must choose. */

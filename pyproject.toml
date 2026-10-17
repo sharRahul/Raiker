@@ -60,6 +60,10 @@ dependencies = [
     # Apple's local MLX runtime. The marker keeps non-Apple installations clean;
     # the UI still explains that MLX serving is available only on Apple silicon.
     "mlx-lm>=0.31.3; platform_system == 'Darwin'",
+    # DIST-08 — the connector vault key in the macOS Keychain or the Linux
+    # Secret Service (raiker/auth/os_keystore.py). Windows uses DPAPI through
+    # ctypes and needs no package.
+    "keyring>=25.6; platform_system != 'Windows'",
 ]
 
 [project.optional-dependencies]

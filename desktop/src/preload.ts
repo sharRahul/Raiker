@@ -29,6 +29,7 @@ const COMMANDS: readonly string[] = [
 const COMMAND_CHANNEL = "raiker:command";
 const TITLE_BAR_CHANNEL = "raiker:title-bar";
 const FOCUS_CHANNEL = "raiker:focus";
+const QUIT_FOR_UPDATE_CHANNEL = "raiker:quit-for-update";
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const bridge = Object.freeze({
@@ -53,6 +54,13 @@ const bridge = Object.freeze({
   /** Bring this window forward — for a clicked notification. */
   focusWindow(): void {
     ipcRenderer.send(FOCUS_CHANNEL);
+  },
+  /**
+   * DIST-10 — close this window so a verified update can start the new version.
+   * It quits only the window; the host is already stopping on its own route.
+   */
+  quitForUpdate(): void {
+    ipcRenderer.send(QUIT_FOR_UPDATE_CHANNEL);
   },
 });
 

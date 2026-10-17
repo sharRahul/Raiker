@@ -441,6 +441,12 @@ def main(argv: list[str] | None = None) -> int:
         from raiker.storage.sqlcipher_probe_worker import run_files
 
         return run_files(Path(raw_args[1]), Path(raw_args[2]))
+    if raw_args[:1] == ["--update-handoff"]:
+        # A frozen host has no `python -m`; the signed-update helper is reached
+        # through the launcher instead (raiker/app/update_handoff.py).
+        from raiker.app.update_handoff import main as handoff_main
+
+        return handoff_main(raw_args[1:])
     args = build_parser().parse_args(raw_args)
     if getattr(args, "command", None):
         return _run_command(args)

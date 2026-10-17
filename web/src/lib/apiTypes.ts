@@ -194,7 +194,10 @@ import type {
   SessionDetail,
   SessionRecall,
   SessionView,
+  SetupCheck,
   SetupState,
+  SetupSystemReadiness,
+  SetupVerification,
   SkillConformance,
   SkillInstalled,
   SkillVerification,
@@ -310,6 +313,8 @@ export type { ModelReadinessView };
 export type { ModelSetupState };
 
 export type { SetupState };
+
+export type { SetupCheck, SetupSystemReadiness, SetupVerification };
 
 export type ModelOperation = ModelOperationView;
 

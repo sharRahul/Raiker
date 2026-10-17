@@ -1,0 +1,402 @@
+# DIST-11 — Raiker's desktop installers, built, installed and tested on each
+# platform's own runner.
+#
+# A package built on one OS is not evidence about another, so every target runs
+# on a native runner and does four things there:
+#
+# 1. builds the frozen host and the desktop package (`scripts/build_desktop_app.py`),
+#    which smoke-tests the frozen host before packaging it;
+# 2. installs the package the way an owner would — NSIS and MSI per-user on
+#    Windows, the .dmg's app into ~/Applications on macOS, the .deb through apt
+#    and the AppImage on Linux — and smoke-tests the *installed* host from a
+#    fresh profile (`python -m raiker.app.desktop_smoke`);
+# 3. opens the installed window, checks it reaches first run, and completes
+#    the whole first-run setup in it (`desktop/e2e/packaged-*-live.spec.ts`);
+# 4. uninstalls it and checks the application is gone and the owner's data is not.
+#
+# The Python on the runner is build tooling and the test harness only. The
+# installed product never uses it: the host is frozen with its own interpreter.
+#
+# Run on pull requests and on main as an unsigned test build; the release
+# workflow calls it with `signed: true` and the signing identities.
+name: Desktop package
+
+on:
+  pull_request:
+    paths: &package_paths
+      - "desktop/**"
+      - "raiker/app/**"
+      - "raiker/auth/**"
+      - "scripts/build_desktop*.py"
+      - "scripts/build_native_runner.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "requirements/**"
+      - ".github/workflows/desktop-package.yml"
+  push:
+    branches: [main]
+    paths: *package_paths
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to stamp into the test build (X.Y.Z)"
+        default: "0.0.0"
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      channel:
+        required: false
+        default: stable
+        type: string
+      signed:
+        description: "Signing identities are configured and must be applied"
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      APPLE_DEVELOPER_ID_CERTIFICATE:
+        required: false
+      APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_NOTARY_ISSUER_ID:
+        required: false
+      APPLE_NOTARY_KEY_ID:
+        required: false
+      APPLE_NOTARY_PRIVATE_KEY:
+        required: false
+      WINDOWS_AUTHENTICODE_CERTIFICATE:
+        required: false
+      WINDOWS_AUTHENTICODE_PASSWORD:
+        required: false
+      LINUX_PACKAGE_SIGNING_KEY:
+        required: false
+      LINUX_PACKAGE_SIGNING_KEY_PASSWORD:
+        required: false
+      RAIKER_RELEASE_SIGNING_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+  VERSION: ${{ inputs.version || '0.0.0' }}
+  SIGNED: ${{ inputs.signed && 'true' || 'false' }}
+
+jobs:
+  web:
+    name: Web assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node
+        # actions/setup-node v5.0.0 (Node 24 runtime)
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+      - name: Upload
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-web-assets
+          path: web/dist
+          retention-days: 3
+
+  package:
+    name: ${{ matrix.target }}
+    needs: web
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        # Mirrors raiker.app.desktop_release.DESKTOP_TARGETS;
+        # tests/test_desktop_release.py fails if the two disagree.
+        include:
+          - { target: windows-x86_64, runner: windows-2022, os: windows }
+          - { target: windows-arm64, runner: windows-11-arm, os: windows }
+          - { target: macos-arm64, runner: macos-14, os: macos }
+          - { target: macos-x86_64, runner: macos-15-intel, os: macos }
+          - { target: linux-x86_64, runner: ubuntu-22.04, os: linux }
+          - { target: linux-arm64, runner: ubuntu-22.04-arm, os: linux }
+    env:
+      RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python (build tooling only)
+        # actions/setup-python v6.2.0 (Node 24 runtime)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set up Node (build tooling only)
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      # GCR-41 — the frozen host is built from the hash-locked set exported from
+      # uv.lock, so two builds of one commit freeze the same dependency bytes.
+      - name: Install the hash-locked build environment
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install --require-hashes --no-deps -r requirements/release-build.txt
+          python -m pip install --no-deps -e .
+      - name: Build the governed-command runner
+        run: |
+          cargo --version
+          python scripts/build_native_runner.py
+      - name: Install Linux packaging tools
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm xvfb libgtk-3-0 libnss3 libasound2 libgbm1 libsecret-1-0
+      - name: Install the shell's dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Download web assets
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: desktop-web-assets
+          path: web/dist
+
+      # ── signing identities, only when the release workflow supplies them ──
+      - name: Prepare the macOS signing identity
+        if: matrix.os == 'macos' && env.SIGNED == 'true'
+        env:
+          APPLE_CERT: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          test -n "$APPLE_CERT" || { echo "refused: signing was required and no Apple identity is configured" >&2; exit 1; }
+          echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          {
+            echo "CSC_LINK=$APPLE_CERT"
+            echo "CSC_KEY_PASSWORD=$APPLE_CERT_PASSWORD"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/notary.p8"
+            echo "APPLE_API_KEY_ID=$NOTARY_KEY_ID"
+            echo "APPLE_API_ISSUER=$NOTARY_ISSUER"
+          } >> "$GITHUB_ENV"
+      - name: Prepare the Authenticode identity
+        if: matrix.os == 'windows' && env.SIGNED == 'true'
+        env:
+          WINDOWS_CERT: ${{ secrets.WINDOWS_AUTHENTICODE_CERTIFICATE }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_AUTHENTICODE_PASSWORD }}
+        run: |
+          test -n "$WINDOWS_CERT" || { echo "refused: signing was required and no Authenticode identity is configured" >&2; exit 1; }
+          {
+            echo "WIN_CSC_LINK=$WINDOWS_CERT"
+            echo "WIN_CSC_KEY_PASSWORD=$WINDOWS_CERT_PASSWORD"
+          } >> "$GITHUB_ENV"
+      - name: Prepare the Linux package signing key
+        if: matrix.os == 'linux' && env.SIGNED == 'true'
+        env:
+          LINUX_KEY: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY }}
+        run: |
+          test -n "$LINUX_KEY" || { echo "refused: signing was required and no Linux signing key is configured" >&2; exit 1; }
+          echo "$LINUX_KEY" | base64 --decode | gpg --batch --import
+
+      - name: Build, smoke-test and package
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          python scripts/build_desktop_app.py \
+            --version "$VERSION" \
+            --target "${{ matrix.target }}" \
+            --channel "${{ inputs.channel || 'stable' }}" \
+            --commit "$GITHUB_SHA" \
+            --out desktop-release \
+            $([ "$SIGNED" = "true" ] && echo --signed)
+          ls -la desktop-release
+
+      - name: Detached-sign the Linux packages
+        if: matrix.os == 'linux' && env.SIGNED == 'true'
+        env:
+          KEY_PASSWORD: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY_PASSWORD }}
+        run: |
+          for package in desktop-release/*.deb desktop-release/*.rpm desktop-release/*.AppImage; do
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$KEY_PASSWORD" --detach-sign --armor "$package"
+          done
+
+      - name: Verify the checksums
+        working-directory: desktop-release
+        run: |
+          if command -v sha256sum >/dev/null; then sha256sum --check SHA256SUMS-*.txt
+          else shasum -a 256 --check SHA256SUMS-*.txt; fi
+
+      # ── install it as an owner would, then test what was installed ──────
+      - name: Install (Windows, NSIS per-user)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem desktop-release\*-setup*.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
+          $root = Join-Path $env:LOCALAPPDATA "Programs\Raiker"
+          if (-not (Test-Path "$root\Raiker.exe")) { throw "Raiker.exe was not installed under $root" }
+          if (-not (Test-Path "$root\Uninstall Raiker.exe")) { throw "the uninstaller was not installed" }
+          $shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Raiker.lnk"
+          if (-not (Test-Path $shortcut)) { throw "no Start menu shortcut at $shortcut" }
+          "APP=$root\Raiker.exe" >> $env:GITHUB_ENV
+          "HOST=$root\resources\host\Raiker.exe" >> $env:GITHUB_ENV
+          "INSTALL_ROOT=$root" >> $env:GITHUB_ENV
+      - name: Install (macOS, from the .dmg)
+        if: matrix.os == 'macos'
+        run: |
+          dmg=$(ls desktop-release/*.dmg | head -1)
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint /Volumes/RaikerInstall
+          mkdir -p "$HOME/Applications"
+          ditto /Volumes/RaikerInstall/Raiker.app "$HOME/Applications/Raiker.app"
+          hdiutil detach /Volumes/RaikerInstall
+          if [ "$SIGNED" = "true" ]; then
+            codesign --verify --deep --strict --verbose=2 "$HOME/Applications/Raiker.app"
+            spctl --assess --type execute --verbose "$HOME/Applications/Raiker.app"
+          fi
+          echo "APP=$HOME/Applications/Raiker.app/Contents/MacOS/Raiker" >> "$GITHUB_ENV"
+          echo "HOST=$HOME/Applications/Raiker.app/Contents/Resources/host/Raiker" >> "$GITHUB_ENV"
+          echo "INSTALL_ROOT=$HOME/Applications/Raiker.app" >> "$GITHUB_ENV"
+      - name: Install (Linux, the .deb through apt)
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get install -y "./$(ls desktop-release/*.deb | head -1)"
+          test -x /opt/Raiker/raiker
+          test -f /usr/share/applications/raiker.desktop
+          echo "APP=/opt/Raiker/raiker" >> "$GITHUB_ENV"
+          echo "HOST=/opt/Raiker/resources/host/Raiker" >> "$GITHUB_ENV"
+          echo "INSTALL_ROOT=/opt/Raiker" >> "$GITHUB_ENV"
+
+      - name: Smoke-test the installed host from a fresh profile
+        run: |
+          python -m raiker.app.desktop_smoke --host "$HOST" \
+            $([ "$SIGNED" = "true" ] && echo --expect-signed || echo --expect-unsigned) \
+            --report "desktop-release/smoke-installed-${{ matrix.target }}.txt"
+
+      - name: Smoke-test the AppImage
+        if: matrix.os == 'linux'
+        run: |
+          appimage=$(ls "$PWD"/desktop-release/*.AppImage | head -1)
+          chmod +x "$appimage"
+          mkdir -p "$RUNNER_TEMP/appimage" && cd "$RUNNER_TEMP/appimage"
+          "$appimage" --appimage-extract >/dev/null
+          python -m raiker.app.desktop_smoke --host "$RUNNER_TEMP/appimage/squashfs-root/resources/host/Raiker" \
+            --report "$GITHUB_WORKSPACE/desktop-release/smoke-appimage-${{ matrix.target }}.txt"
+
+      - name: Open the installed window, reach first run, and complete onboarding
+        working-directory: desktop
+        env:
+          RAIKER_PACKAGED_APP: ${{ env.APP }}
+          RAIKER_DESKTOP_SHOTS: ${{ github.workspace }}/desktop-release
+        run: |
+          export RAIKER_HOME="$RUNNER_TEMP/window-profile"
+          npm run build
+          if [ "${{ matrix.os }}" = "linux" ]; then
+            xvfb-run -a npx playwright test --project=live packaged
+          else
+            npx playwright test --project=live packaged
+          fi
+
+      - name: Uninstall (Windows) and check the data is kept
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:LOCALAPPDATA "Raiker"
+          New-Item -ItemType Directory -Force $data | Out-Null
+          Set-Content -Path "$data\keep-me.txt" -Value "owner data"
+          $p = Start-Process -FilePath "$env:INSTALL_ROOT\Uninstall Raiker.exe" -ArgumentList "/S" -Wait -PassThru
+          Start-Sleep -Seconds 10
+          if (Test-Path "$env:INSTALL_ROOT\Raiker.exe") { throw "the application is still installed" }
+          if (-not (Test-Path "$data\keep-me.txt")) { throw "a silent uninstall removed the owner's data" }
+          "PASS uninstall removed the application and kept $data" | Tee-Object -FilePath "desktop-release\uninstall-${{ matrix.target }}.txt"
+      - name: Install and remove the MSI (Windows x86-64)
+        if: matrix.target == 'windows-x86_64'
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem desktop-release\*.msi | Select-Object -First 1
+          $p = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn /l*v msi-install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content msi-install.log -Tail 50; throw "msiexec /i exited $($p.ExitCode)" }
+          $exe = Get-ChildItem -Path $env:LOCALAPPDATA\Programs -Recurse -Filter Raiker.exe -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'resources\\host' } | Select-Object -First 1
+          if (-not $exe) { throw "the MSI did not install the host" }
+          python -m raiker.app.desktop_smoke --host $exe.FullName --report "desktop-release\smoke-msi-${{ matrix.target }}.txt"
+          if ($LASTEXITCODE -ne 0) { throw "MSI smoke test failed" }
+          $p = Start-Process msiexec.exe -ArgumentList "/x `"$($msi.FullName)`" /qn" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msiexec /x exited $($p.ExitCode)" }
+      - name: Uninstall (macOS) and check the data is kept
+        if: matrix.os == 'macos'
+        run: |
+          data="$HOME/Library/Application Support/Raiker"
+          mkdir -p "$data" && echo "owner data" > "$data/keep-me.txt"
+          rm -rf "$INSTALL_ROOT"
+          test ! -e "$INSTALL_ROOT"
+          test -f "$data/keep-me.txt"
+          echo "PASS removing Raiker.app kept $data" | tee "desktop-release/uninstall-${{ matrix.target }}.txt"
+      - name: Uninstall (Linux) and check the data is kept
+        if: matrix.os == 'linux'
+        run: |
+          data="$HOME/.local/share/raiker"
+          mkdir -p "$data" && echo "owner data" > "$data/keep-me.txt"
+          sudo apt-get remove -y raiker
+          test ! -e /opt/Raiker/raiker
+          test -f "$data/keep-me.txt"
+          echo "PASS apt-get remove removed /opt/Raiker and kept $data" | tee "desktop-release/uninstall-${{ matrix.target }}.txt"
+
+      - name: Upload this target's installers and evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-${{ matrix.target }}
+          path: |
+            desktop-release/*
+            desktop/test-results/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  matrix:
+    name: Release acceptance matrix
+    needs: package
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect the evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: desktop-*
+          path: evidence
+      - name: Summarise
+        run: |
+          {
+            echo "## Desktop packages — ${{ env.VERSION }} (signed: ${{ env.SIGNED }})"
+            echo
+            echo "| Target | Installers | Installed smoke | AppImage/MSI smoke | Window + onboarding | Uninstall keeps data |"
+            echo "|---|---|---|---|---|---|"
+            for dir in evidence/desktop-*; do
+              target=${dir#evidence/desktop-}
+              [ "$target" = "web-assets" ] && continue
+              installers=$(ls "$dir" 2>/dev/null | grep -E '\.(exe|msi|dmg|zip|AppImage|deb|rpm)$' | tr '\n' ' ')
+              verdict() { if [ -f "$1" ] && ! grep -q '^FAIL' "$1"; then echo PASS; elif [ -f "$1" ]; then echo FAIL; else echo "NOT RUN"; fi; }
+              installed=$(verdict "$dir/smoke-installed-$target.txt")
+              extra=$(verdict "$dir/smoke-appimage-$target.txt"); [ "$extra" = "NOT RUN" ] && extra=$(verdict "$dir/smoke-msi-$target.txt")
+              window=$( [ -f "$dir/onboarding-7-home.png" ] && echo PASS || echo "NOT RUN")
+              uninstall=$(verdict "$dir/uninstall-$target.txt")
+              echo "| $target | ${installers:-none} | $installed | $extra | $window | $uninstall |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

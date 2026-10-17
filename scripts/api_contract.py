@@ -395,6 +395,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/security/scan"),
         ("POST", "/api/sessions/{session_id}/compact"),
         ("POST", "/api/setup/backup/create"),
+        ("GET", "/api/setup/system"),
+        ("POST", "/api/setup/verify"),
         ("POST", "/api/skills"),
         ("POST", "/api/skills/build"),
         ("POST", "/api/skills/import"),

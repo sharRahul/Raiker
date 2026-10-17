@@ -38,7 +38,7 @@ const profile = (over: Partial<ModelProfile>): ModelProfile =>
 
 describe("the stages first launch shows", () => {
   it("opens on the product and never asks for an account twice", () => {
-    expect([...SETUP_STAGES]).toEqual(["welcome", "model", "privacy", "finish"]);
+    expect([...SETUP_STAGES]).toEqual(["welcome", "system", "model", "privacy", "permissions", "verify", "finish"]);
     expect(SETUP_STAGES).not.toContain("account");
   });
 
@@ -52,6 +52,9 @@ describe("the stages first launch shows", () => {
     expect(visibleStage("backup")).toBe("finish");
     expect(visibleStage(null)).toBe("welcome");
     expect(visibleStage("model")).toBe("model");
+    expect(visibleStage("system")).toBe("system");
+    expect(visibleStage("verify")).toBe("verify");
+    expect(visibleStage("finish")).toBe("finish");
   });
 });
 

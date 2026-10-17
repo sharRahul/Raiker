@@ -300,6 +300,44 @@ class SetupBackupCreated(TypedDict):
     setup: SetupState
 
 
+class SetupCheck(TypedDict):
+    """One row of the system or installation check (DIST-05, DIST-06)."""
+
+    id: str
+    label: str
+    state: Literal["pass", "warn", "fail", "info"]
+    detail: str
+    remedy: str
+    mandatory: bool
+    data: dict[str, object]
+
+
+class SetupLocalModelAdvice(TypedDict):
+    parameters: str
+    download: str
+    note: str
+
+
+class SetupLocations(TypedDict):
+    data: str
+    models: str
+    backups: str
+
+
+class SetupSystemReadiness(TypedDict):
+    checks: list[SetupCheck]
+    blocking: list[str]
+    ready: bool
+    recommended_local_model: SetupLocalModelAdvice
+    locations: SetupLocations
+
+
+class SetupVerification(TypedDict):
+    checks: list[SetupCheck]
+    failed: list[str]
+    ok: bool
+
+
 class SpeechRuntime(TypedDict):
     runtime: SpeechRuntimeView
     max_audio_bytes: int

@@ -399,6 +399,8 @@ CASES: Cases = {
     ("GET", "/api/setup"): plain("/api/setup"),
     ("PUT", "/api/setup"): plain("/api/setup", {"status": "in_progress", "stage": "model"}),
     ("POST", "/api/setup/backup/create"): _backup,
+    ("GET", "/api/setup/system"): plain("/api/setup/system"),
+    ("POST", "/api/setup/verify"): plain("/api/setup/verify", {}),
     ("GET", "/api/speech/runtime"): plain("/api/speech/runtime"),
     ("PUT", "/api/speech/runtime"): plain(
         "/api/speech/runtime", {"endpoint": "http://127.0.0.1:9", "model": "whisper"}

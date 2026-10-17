@@ -279,6 +279,13 @@ function installIpc(): void {
       height: TITLE_BAR_HEIGHT,
     });
   });
+  ipcMain.on(CHANNELS.quitForUpdate, (event) => {
+    // DIST-10 — the host has handed a verified update to its helper and is
+    // stopping. The new version starts its own window; this one must release
+    // the single-instance lock first, or the new window would only focus it.
+    if (originOf(event.sender) === null) return;
+    setTimeout(() => app.quit(), 1500);
+  });
   ipcMain.on(CHANNELS.focus, (event) => {
     if (originOf(event.sender) === null) return;
     const window = BrowserWindow.fromWebContents(event.sender);

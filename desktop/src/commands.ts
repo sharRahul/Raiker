@@ -32,6 +32,7 @@ export const CHANNELS = {
   command: "raiker:command",
   titleBar: "raiker:title-bar",
   focus: "raiker:focus",
+  quitForUpdate: "raiker:quit-for-update",
 } as const;
 
 /** A `#rrggbb` colour; the only form the title-bar overlay accepts from the page. */

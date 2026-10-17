@@ -261,7 +261,9 @@ def write_checksums(directory: Path, names: list[str], *, name: str = "SHA256SUM
     """Checksums in the format ``sha256sum --check`` reads."""
     lines = [f"{sha256_file(directory / item)}  {item}" for item in sorted(names)]
     path = directory / name
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # LF on every platform: `sha256sum --check` reads a CRLF line's name with
+    # the carriage return on it and reports the file missing (found on Windows).
+    path.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
     return path
 
 

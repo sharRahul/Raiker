@@ -86,6 +86,8 @@ def test_the_installer_config_is_per_user_and_keeps_owner_data() -> None:
     assert config["msi"]["perMachine"] is False
     assert config["mac"]["hardenedRuntime"] is True
     assert set(config["linux"]["target"]) == {"AppImage", "deb", "rpm"}
+    # What an owner types to remove it, and what the updater looks for in dpkg.
+    assert config["deb"]["packageName"] == config["rpm"]["packageName"] == "raiker"
     include = (ROOT / "desktop" / config["nsis"]["include"]).read_text(encoding="utf-8")
     # An update must never ask about, or touch, the owner's data.
     assert "${IfNot} ${isUpdated}" in include
@@ -140,6 +142,7 @@ def test_checksums_are_in_sha256sum_format(tmp_path: Path) -> None:
     path = write_checksums(tmp_path, ["a.deb"], name="SHA256SUMS-linux.txt")
     digest, name = path.read_text(encoding="utf-8").split()
     assert name == "a.deb" and len(digest) == 64
+    assert b"\r" not in path.read_bytes()
 
 
 def test_the_builder_is_pinned_and_an_unsigned_build_cannot_pick_up_an_identity() -> None:

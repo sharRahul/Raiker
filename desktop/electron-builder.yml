@@ -103,6 +103,9 @@ linux:
     entry:
       StartupWMClass: Raiker
 deb:
+  # `raiker`, not package.json's `raiker-desktop`: it is what an owner types to
+  # remove it, and what `raiker/app/desktop_update.py` looks for in dpkg.
+  packageName: raiker
   # The host is frozen with its own interpreter and libraries; what the window
   # needs from the system is what every Electron application needs, plus the
   # Secret Service client libsecret, which stores credentials in the keyring.
@@ -117,6 +120,7 @@ deb:
     - libuuid1
     - libsecret-1-0
 rpm:
+  packageName: raiker
   depends:
     - gtk3
     - libnotify

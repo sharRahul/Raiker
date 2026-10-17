@@ -69,7 +69,7 @@ describe("App shell", () => {
     // Grouped nav with every governed surface reachable.
     const nav = screen.getByRole("navigation", { name: /all navigation/i });
     expect(nav).toBeInTheDocument();
-    for (const label of ["Home", "Chat", "Build", "Design", "Threads", "Tasks", "Projects"]) {
+    for (const label of ["Home", "Chat", "Build", "Design", "Work", "Memory"]) {
       expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // Manage, Observe and Support left the rail for the gear's window. They are
@@ -86,7 +86,7 @@ describe("App shell", () => {
     // the rail and in the top bar's mode switch beside Chat and Build.
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability", "Settings",
-      "Approvals", "Messaging",
+      "Approvals", "Threads", "Tasks", "Projects", "Knowledge Map", "Messaging",
     ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
     }
@@ -94,7 +94,7 @@ describe("App shell", () => {
     const pages = await screen.findByRole("dialog", { name: /^more$/i });
     for (const label of [
       "Permissions", "Models", "Extensions", "Observability",
-      "Approvals", "Messaging",
+      "Approvals",
     ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }

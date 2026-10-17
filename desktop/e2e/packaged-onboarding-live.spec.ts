@@ -3,7 +3,7 @@
  * DIST-05/06 — an owner installs Raiker and completes first-run setup in the
  * installed window, with no terminal, browser or developer tool. The Setup
  * window checks the computer and verifies the installation first, so the
- * in-app wizard asks only what an owner decides: model, privacy, permissions.
+ * in-app wizard asks only what an owner decides: a model and where requests may go.
  *
  * Same inputs as `packaged-live.spec.ts`: RAIKER_PACKAGED_APP names the
  * installed executable and RAIKER_HOME an empty profile. No model credential is
@@ -48,29 +48,21 @@ test("an owner completes first-run setup in the installed window", async () => {
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create a User Account" }).click();
 
-    await expect(page.getByRole("heading", { name: "Meet Raiker" })).toBeVisible({ timeout: 60_000 });
-    await page.screenshot({ path: join(SHOTS, "onboarding-1-welcome.png") });
-    await page.getByRole("button", { name: "Continue" }).click();
-
-    // The installer checked this computer, so setup goes straight to the model.
+    // Quiet UI — no welcome stage, and the installer already checked this
+    // computer: setup opens on the model.
+    await expect(page.getByRole("heading", { name: "Choose how Raiker should think" })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("list", { name: "Setup progress" }).getByText("This device")).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: "Choose how Raiker should think" })).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "onboarding-2-model.png") });
+    await page.screenshot({ path: join(SHOTS, "onboarding-1-model.png") });
     await page.getByRole("button", { name: "Decide later" }).click();
 
     await expect(page.getByRole("heading", { name: "Where may Raiker send model requests?" })).toBeVisible();
     await page.getByRole("button", { name: "Local only" }).click();
 
-    await expect(page.getByRole("heading", { name: "What Raiker may do" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "What Raiker can do for you" })).toBeVisible({ timeout: 30_000 });
-    await page.screenshot({ path: join(SHOTS, "onboarding-3-permissions.png"), fullPage: true });
-    await page.getByRole("button", { name: "Continue" }).click();
-
     await expect(page.getByRole("heading", { name: "Setup saved" })).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "onboarding-4-ready.png") });
+    await page.screenshot({ path: join(SHOTS, "onboarding-2-ready.png") });
     await page.getByRole("button", { name: "Start using Raiker" }).click();
     await expect(page).toHaveURL(/#\/home/);
-    await page.screenshot({ path: join(SHOTS, "onboarding-5-home.png") });
+    await page.screenshot({ path: join(SHOTS, "onboarding-3-home.png") });
   } finally {
     spawnSync(hostPath(), ["quit", "--force"], { encoding: "utf-8", env });
     await app.close();

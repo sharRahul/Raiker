@@ -61,10 +61,21 @@ export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
  */
 export const INSTALLER_STAGES: readonly SetupStage[] = ["system", "verify"];
 
+/**
+ * Stages no installation shows any more (Quiet UI).
+ *
+ * **Welcome** introduced Chat, Build and Design before the owner had seen them,
+ * which the app itself does better a moment later; **Permissions** was a
+ * read-only summary of a page that exists (Permissions) and changed nothing.
+ * Both stay valid stored values, and a row stored on either opens on the stage
+ * that follows it.
+ */
+export const RETIRED_STAGES: readonly SetupStage[] = ["welcome", "permissions"];
+
 /** The stages this installation shows, from its distribution (`installation.json`). */
 export function stagesFor(distribution: string | null | undefined): readonly SetupStage[] {
-  if (distribution !== "desktop") return SETUP_STAGES;
-  return SETUP_STAGES.filter((stage) => !INSTALLER_STAGES.includes(stage));
+  const skipped = distribution === "desktop" ? [...RETIRED_STAGES, ...INSTALLER_STAGES] : RETIRED_STAGES;
+  return SETUP_STAGES.filter((stage) => !skipped.includes(stage));
 }
 
 /** The stage after `stage` on this rail; the last stage is its own next. */
@@ -96,7 +107,7 @@ export function visibleStage(stage: string | null | undefined, stages: readonly 
     const full = SETUP_STAGES.indexOf(stage as SetupStage);
     return SETUP_STAGES.slice(full + 1).find((later) => stages.includes(later)) ?? "finish";
   }
-  return "welcome"; // including the retired `account`
+  return stages[0] ?? "welcome"; // including the retired `account`
 }
 
 /** The two answers to "where may Raiker send model requests?" (FIRST-07). */

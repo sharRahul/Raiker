@@ -78,34 +78,35 @@ const REGISTRY = [
 ];
 
 describe("first-run setup", () => {
-  it("opens on what Raiker is, not on a provider matrix", async () => {
-    // FIRST-02/03 — the account was created on the screen before this one, so a
-    // stage called Account implied a second one to configure; and an owner who
-    // has not met Chat, Build and Design cannot tell what a provider is for.
+  it("opens on the model, with no welcome screen to read first (Quiet UI)", async () => {
+    // FIRST-02 — no Account stage after the account exists. Quiet UI — no
+    // Welcome either: the app introduces Chat, Build and Design itself.
     stubFetch({
       "GET /api/setup": { ...required, stage: "welcome" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/host/update": { installation: { distribution: "desktop", version: "1.0.0" } },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
-    for (const stage of ["Welcome", "Model", "Privacy", "Ready"]) {
-      expect(screen.getByText(stage)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    const rail = screen.getByRole("list", { name: "Setup progress" });
+    for (const stage of ["Model", "Privacy", "Ready"]) {
+      expect(within(rail).getByText(stage)).toBeInTheDocument();
     }
-    expect(screen.queryByText("Account")).not.toBeInTheDocument();
-    expect(screen.queryByText("Backup")).not.toBeInTheDocument();
-    // FIRST-10 — the posture in a sentence, not sixty-six gates to configure.
-    expect(screen.getByText(/starts conservatively/i)).toBeInTheDocument();
+    for (const gone of ["Welcome", "Permissions", "Account", "Backup"]) {
+      expect(within(rail).queryByText(gone)).not.toBeInTheDocument();
+    }
   });
 
-  it("shows a stored account stage as the welcome screen rather than a blank one", async () => {
+  it("shows a stored account stage as the first stage rather than a blank one", async () => {
     stubFetch({
       "GET /api/setup": { ...required, stage: "account" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
+    // A source checkout keeps the device check, so it opens there.
+    expect(await screen.findByRole("heading", { name: "What this computer can run" })).toBeInTheDocument();
   });
 
   it("leads with the easiest working path and keeps the matrix on request", async () => {
@@ -539,7 +540,8 @@ describe("first-run setup", () => {
     expect(
       screen.getByRole("button", { name: /Local, and the providers I connect/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Permissions still govern what Raiker may do/)).toBeInTheDocument();
+    // Quiet UI — the question and its two answers; no paragraph under them.
+    expect(screen.queryByText(/Permissions still govern what Raiker may do/)).not.toBeInTheDocument();
   });
 
   it("finishes into work, with backup recommended rather than required", async () => {
@@ -566,7 +568,8 @@ describe("first-run setup", () => {
     expect(screen.queryByRole("button", { name: "Open Workbench" })).not.toBeInTheDocument();
     // Still offered, and still real: nothing claims a backup until one verifies.
     expect(screen.getByRole("button", { name: "Set up backup" })).toBeInTheDocument();
-    expect(screen.getByText("Recommended")).toBeInTheDocument();
+    // Quiet UI — no summary table restating the choices just made.
+    expect(screen.queryByText("Model requests")).not.toBeInTheDocument();
   });
 
   /*
@@ -596,7 +599,7 @@ describe("first-run setup", () => {
     for (const mode of ["Chat", "Build", "Design"]) {
       expect(screen.getByRole("button", { name: mode })).toBeEnabled();
     }
-    expect(screen.getAllByText("Needs a model to answer with.")).toHaveLength(2);
+    expect(screen.getAllByTitle("Needs a model to answer with.")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Connect an image provider" })).toHaveAttribute(
       "href",
       "#/models?tab=add",
@@ -620,8 +623,8 @@ describe("first-run setup", () => {
     render(ModelSetupView);
 
     await screen.findByRole("heading", { name: "Your Raiker is ready" });
-    expect(screen.queryByText("Needs a model to answer with.")).toBeNull();
-    expect(screen.getByText("Needs a provider that returns images.")).toBeInTheDocument();
+    expect(screen.queryByTitle("Needs a model to answer with.")).toBeNull();
+    expect(screen.getByTitle("Needs a provider that returns images.")).toBeInTheDocument();
   });
 
   it("never calls a deferred backup protected", async () => {
@@ -632,7 +635,7 @@ describe("first-run setup", () => {
     render(ModelSetupView);
 
     await fireEvent.click(await screen.findByRole("button", { name: "Set up backup" }));
-    expect(screen.getByLabelText(/Local, removable, or NAS folder/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Backup folder/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Create and verify backup" }),
     ).toBeInTheDocument();
@@ -653,26 +656,24 @@ const check = (id: string, state: string, extra: Record<string, unknown> = {}) =
 describe("DIST-05 — a desktop installation was checked while it installed", () => {
   const desktopUpdate = { installation: { distribution: "desktop", version: "1.0.0" } };
 
-  it("goes from Welcome straight to Model, with no device or installation stage", async () => {
+  it("asks only model, privacy and done, with no device or installation stage", async () => {
     const fetchMock = stubFetch({
       "GET /api/setup": { ...required, stage: "welcome" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
       "GET /api/host/update": desktopUpdate,
-      "PUT /api/setup": { ...required, status: "in_progress", stage: "model" },
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "privacy", model_deferred: true },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
     const rail = screen.getByRole("list", { name: "Setup progress" });
     await waitFor(() => expect(within(rail).queryByText("This device")).toBeNull());
     expect(within(rail).queryByText("Check")).toBeNull();
-    expect(within(rail).getAllByRole("listitem")).toHaveLength(5);
-    expect(screen.getByText("01 · Welcome")).toBeInTheDocument();
+    expect(within(rail).getAllByRole("listitem")).toHaveLength(3);
 
-    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
     const put = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/api/setup") && init?.method === "PUT");
-    expect(JSON.parse(String(put?.[1]?.body)).stage).toBe("model");
-    expect(await screen.findByText("02 · Model")).toBeInTheDocument();
+    expect(JSON.parse(String(put?.[1]?.body)).stage).toBe("privacy");
   });
 
   it("opens a stored device stage on Model rather than a check that already ran", async () => {
@@ -735,23 +736,17 @@ describe("DIST-05/06 — this device, permissions and the installation check", (
     expect(screen.getByRole("alert")).toHaveTextContent(/does not meet a requirement/);
   });
 
-  it("shows the permission posture read-only and changes no decision mode", async () => {
+  it("opens a stored permissions stage on the stage after it (Quiet UI)", async () => {
+    // Permissions was a read-only copy of the Permissions page; it is not a
+    // setup stage any more, and nothing in setup writes a permission.
     const fetchMock = stubFetch({
       "GET /api/setup": { ...required, status: "in_progress", stage: "permissions" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
-      "GET /api/capability-gates": [
-        { capability: "web_fetch", state: "enabled", runtime_ready: true, decision_mode: "ask" },
-      ],
+      "POST /api/setup/verify": { checks: [], failed: [], ready: true },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "What Raiker may do" })).toBeInTheDocument();
-    expect(screen.getByText(/Finishing setup changes none of this/)).toBeInTheDocument();
-    for (const label of ["Ask before acting", "Allow within a scope you approve", "Act automatically within policy", "Never"]) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
-    await screen.findByRole("list", { name: "What Raiker can do for you" });
-    // Nothing on this stage writes a permission.
+    expect(await screen.findByRole("heading", { name: "Checking your installation" })).toBeInTheDocument();
     const writes = fetchMock.mock.calls.filter(([url, init]) =>
       String(url).includes("capabilit") && (init?.method ?? "GET").toUpperCase() !== "GET",
     );

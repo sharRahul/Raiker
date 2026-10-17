@@ -6,7 +6,7 @@ a transcript records what was said, while durable memory contains only facts
 that passed the memory review path.
 
 Open **Knowledge → Memory** to review proposals, inspect approved memories,
-control recall, and manage retention. Open **Knowledge → Knowledge Map** to see
+control recall, and manage retention. Open **Memory → Map** to see
 approved relationships between governed records.
 
 ## The memory path
@@ -60,7 +60,7 @@ prompt, or bypass an approval gate.
 
 ## The Knowledge Map
 
-**Knowledge → Knowledge Map** shows the records this workspace holds and the
+**Memory → Map** shows the records this workspace holds and the
 approved relationships between them. Everything on it is stored — nothing is
 illustrative, and a workspace that has recorded nothing shows an empty map that
 says so rather than a demonstration graph. Adding a source or having a

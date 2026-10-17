@@ -180,8 +180,15 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       await page.waitForTimeout(500);
       continue;
     }
-    if (heading.startsWith("Meet Raiker")) {
+    if (
+      // Retired stage, still answered: an instance created before Quiet UI.
+      heading.startsWith("Meet Raiker") ||
+      heading.startsWith("What this computer can run") ||
+      heading.startsWith("What Raiker may do")
+    ) {
       await page.getByRole("button", { name: "Continue" }).click();
+    } else if (heading.startsWith("Checking your installation")) {
+      await page.getByRole("button", { name: /^(Continue|Continue anyway)$/ }).click();
     } else if (
       heading.startsWith("Choose how Raiker should think") ||
       // Retired heading, still answered: an instance created before FIRST-04.

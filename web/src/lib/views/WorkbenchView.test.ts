@@ -134,19 +134,11 @@ describe("WorkbenchView", () => {
       "#/new-chat",
     );
     expect(within(start).getByRole("link", { name: /start a build/i })).toHaveAttribute("href", "#/build");
-    // Tasks and Projects are workflow entries rather than Work modes, so they
-    // sit in their own row beneath the three.
-    const organise = screen.getByRole("navigation", { name: "Organise work" });
-    expect(within(organise).getByRole("link", { name: /plan a task or agent/i })).toHaveAttribute("href", "#/tasks");
-    // The board counts the owner's projects rather than naming an "active" one.
-    // No route is scoped by an account-level selection any more, so naming one
-    // here would claim a boundary nothing enforces.
-    expect(within(organise).getByRole("link", { name: /open a project/i })).toHaveAttribute(
-      "href",
-      "#/projects",
-    );
-    expect(within(organise).getByText(/^\d+ projects?$|^None yet$/)).toBeInTheDocument();
-    expect(within(organise).queryByText("Quarterly note")).not.toBeInTheDocument();
+    // Tasks and Projects follow the three modes in the same quiet row, and
+    // open their tabs of Work.
+    expect(within(start).getByRole("link", { name: /plan a task/i })).toHaveAttribute("href", "#/work?tab=tasks");
+    expect(within(start).getByRole("link", { name: /^projects$/i })).toHaveAttribute("href", "#/work?tab=projects");
+    expect(within(start).queryByText("Quarterly note")).not.toBeInTheDocument();
   });
 
   it("offers the three Work modes as peers, Design included", async () => {
@@ -157,17 +149,15 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     const start = await screen.findByRole("navigation", { name: "Start work" });
-    const modes = within(start).getAllByRole("link");
-    expect(modes).toHaveLength(3);
+    const modes = within(start).getAllByRole("link").slice(0, 3);
     expect(modes.map((link) => link.getAttribute("href"))).toEqual([
       "#/new-chat",
       "#/build",
       "#/design",
     ]);
-    // Each says which mode it is by naming what that mode is *about*, which is
-    // the thing that tells an owner which of the three they want.
+    // Quiet UI — each card is its title; no subtitle explains it.
     expect(within(start).getByRole("link", { name: /start a design/i })).toBeInTheDocument();
-    expect(within(start).getByText(/Describe an image a connected model draws/i)).toBeInTheDocument();
+    expect(within(start).queryByText(/Describe an image a connected model draws/i)).not.toBeInTheDocument();
   });
 
   it("separates a run in flight from a standing agent from a scheduled run", async () => {
@@ -247,9 +237,10 @@ describe("WorkbenchView", () => {
     stubFetch(routes());
     render(WorkbenchView);
 
-    expect(
-      await screen.findByText(/Nothing is running, standing, or scheduled/),
-    ).toBeInTheDocument();
+    // Quiet UI — an idle Home says nothing about being idle: the greeting and
+    // the start row are the whole page.
+    expect(await screen.findByRole("heading", { name: "Welcome" })).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing is running, standing, or scheduled/)).not.toBeInTheDocument();
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
     expect(screen.queryByText("Standing agents")).not.toBeInTheDocument();
     expect(screen.queryByText("Scheduled runs")).not.toBeInTheDocument();

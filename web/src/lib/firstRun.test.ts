@@ -62,19 +62,36 @@ describe("the stages first launch shows", () => {
 
   it("does not repeat the checks a desktop installer already ran (DIST-05)", () => {
     const desktop = stagesFor("desktop");
-    expect([...desktop]).toEqual(["welcome", "model", "privacy", "permissions", "finish"]);
-    // A source checkout or server install had no installer step: it keeps both.
-    expect(stagesFor("payload")).toBe(SETUP_STAGES);
-    expect(stagesFor(null)).toBe(SETUP_STAGES);
+    expect([...desktop]).toEqual(["model", "privacy", "finish"]);
+    // A source checkout or server install had no installer step: it keeps the
+    // device and installation checks.
+    const source = stagesFor("payload");
+    expect([...source]).toEqual(["system", "model", "privacy", "verify", "finish"]);
+    expect(stagesFor(null)).toEqual(source);
     // A row stored on a stage this rail skips opens on the stage after it.
     expect(visibleStage("system", desktop)).toBe("model");
     expect(visibleStage("verify", desktop)).toBe("finish");
-    expect(nextStage(desktop, "welcome")).toBe("model");
-    expect(nextStage(desktop, "permissions")).toBe("finish");
-    expect(previousStage(desktop, "finish")).toBe("permissions");
-    expect(nextStage(SETUP_STAGES, "welcome")).toBe("system");
-    expect(previousStage(SETUP_STAGES, "finish")).toBe("verify");
-    expect(previousStage(desktop, "welcome")).toBe("welcome");
+    expect(nextStage(desktop, "model")).toBe("privacy");
+    expect(nextStage(desktop, "privacy")).toBe("finish");
+    expect(previousStage(desktop, "finish")).toBe("privacy");
+    expect(nextStage(source, "privacy")).toBe("verify");
+    expect(previousStage(source, "finish")).toBe("verify");
+    expect(previousStage(desktop, "model")).toBe("model");
+  });
+
+  it("no longer shows Welcome or Permissions (Quiet UI)", () => {
+    // Welcome introduced what the app shows a moment later; Permissions was a
+    // read-only copy of the Permissions page. Rows stored on either open on
+    // the next stage that is shown.
+    for (const distribution of ["desktop", "payload"]) {
+      const shown = stagesFor(distribution);
+      expect(shown).not.toContain("welcome");
+      expect(shown).not.toContain("permissions");
+    }
+    expect(visibleStage("welcome", stagesFor("desktop"))).toBe("model");
+    expect(visibleStage("welcome", stagesFor("payload"))).toBe("system");
+    expect(visibleStage("permissions", stagesFor("desktop"))).toBe("finish");
+    expect(visibleStage(null, stagesFor("desktop"))).toBe("model");
   });
 });
 

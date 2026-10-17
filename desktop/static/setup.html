@@ -19,28 +19,17 @@
 
     <main class="screen" id="welcome" aria-labelledby="welcome-title">
       <img class="mark" src="raiker-mark.png" alt="" width="64" height="64" />
-      <p class="eyebrow">Raiker setup</p>
       <h1 id="welcome-title">Welcome to Raiker</h1>
-      <p class="lead">
-        Your private AI assistant and governed agent. Before it opens, setup checks this computer, prepares encrypted
-        storage and makes sure every part works.
-      </p>
-      <ol class="preview" aria-label="What setup does">
-        <li><span class="preview-n">1</span>Check this computer</li>
-        <li><span class="preview-n">2</span>Prepare encrypted storage</li>
-        <li><span class="preview-n">3</span>Verify the installation</li>
-      </ol>
       <div class="actions">
-        <button class="primary" id="begin" type="button">Finish installing</button>
+        <button class="primary" id="begin" type="button" title="Checks this computer and sets up encrypted storage. Nothing is sent anywhere.">Set up</button>
       </div>
-      <p class="fine">Takes about a minute. Everything is checked on this computer; nothing is sent anywhere.</p>
     </main>
 
     <main class="screen" id="progress" aria-labelledby="progress-title" hidden>
       <header class="progress-head">
         <img class="mark small" src="raiker-mark.png" alt="" width="40" height="40" />
         <div>
-          <h1 id="progress-title">Setting up Raiker</h1>
+          <h1 id="progress-title">Setting up</h1>
           <p class="sub" id="progress-count" aria-live="polite">Starting…</p>
         </div>
       </header>
@@ -65,10 +54,6 @@
     <main class="screen" id="ready" aria-labelledby="ready-title" hidden>
       <div class="seal" aria-hidden="true"><span></span></div>
       <h1 id="ready-title">Raiker is ready</h1>
-      <p class="lead" id="ready-lead">
-        This computer checked out and Raiker is running on it, reachable only from this computer. Next, create the
-        owner account and choose a model.
-      </p>
       <ul class="notes" id="ready-notes" aria-label="Worth knowing" hidden></ul>
       <div class="actions">
         <button class="primary" id="open" type="button">Open Raiker</button>
@@ -86,10 +71,9 @@
         <button class="link" id="quit" type="button">Quit</button>
       </div>
       <details class="raw">
-        <summary>Technical details</summary>
+        <summary>Details</summary>
         <pre id="failed-detail"></pre>
       </details>
-      <p class="fine">Nothing here deletes your conversations or settings.</p>
     </main>
 
     <script src="setup.js"></script>

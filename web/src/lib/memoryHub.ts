@@ -13,7 +13,7 @@
  * the counts on the Overview and the counts on each tab cannot disagree.
  */
 
-export const MEMORY_TABS = ["overview", "memories", "suggestions", "sources", "recall"] as const;
+export const MEMORY_TABS = ["overview", "memories", "suggestions", "sources", "recall", "map"] as const;
 export type MemoryTab = (typeof MEMORY_TABS)[number];
 
 export const MEMORY_TAB_LABELS: Record<MemoryTab, string> = {
@@ -22,6 +22,8 @@ export const MEMORY_TAB_LABELS: Record<MemoryTab, string> = {
   suggestions: "Suggestions",
   sources: "Sources",
   recall: "Recall & indexing",
+  // The Knowledge Map, which was its own page (Quiet UI).
+  map: "Map",
 };
 
 export interface MemoryCounts {

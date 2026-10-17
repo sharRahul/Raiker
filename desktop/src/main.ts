@@ -397,8 +397,10 @@ async function runSetup(): Promise<void> {
     emitSetup({ type: "stage", id, state: "running" });
     setupLog(`${SETUP_STAGES.find((item) => item.id === id)?.title ?? id}…`);
   };
-  const done = (id: StageId, detail: string) => {
-    emitSetup({ type: "stage", id, state: "done", detail });
+  // The log keeps the full sentence; the step itself shows only what is
+  // worth a glance (Quiet UI), such as how many notes the check left.
+  const done = (id: StageId, detail: string, shown = "") => {
+    emitSetup({ type: "stage", id, state: "done", detail: shown });
     setupLog(`  ${detail}`);
   };
   emitSetup({ type: "manifest", stages: SETUP_STAGES });
@@ -414,7 +416,7 @@ async function runSetup(): Promise<void> {
       throw new SetupStageError(`Requirements not met: ${readiness.blocking.join(", ")}`, blockingSummary(readiness));
     }
     const notes = readiness.checks.filter((check) => check.state === "warn").length;
-    done("check", notes === 0 ? "This computer can run Raiker" : `This computer can run Raiker · ${notes} ${notes === 1 ? "note" : "notes"}`);
+    done("check", "This computer can run Raiker", notes === 0 ? "" : `${notes} ${notes === 1 ? "note" : "notes"}`);
 
     begin("start");
     const ready = await startHost(command, join(app.getPath("temp"), `raiker-ready-${process.pid}.json`));

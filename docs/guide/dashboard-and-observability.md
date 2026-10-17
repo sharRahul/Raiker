@@ -11,10 +11,10 @@ tablets, and a full sidebar on wider screens.
 | Home | **Workbench** | Live view of running work, agents, schedules, and decisions that need you |
 | Work | **Chat** | Conversations, attachments, sources, memory, and approvals |
 | Work | **Build** | Repository-aware planning, edits, commands, commits, and pushes |
-| Work | **Threads** | Everything you have going — chats and routines — and a full-text search across it |
-| Work | **Tasks** and **Projects** | One-off, scheduled, repeating, and organized work |
-| Knowledge | **Memory** | Review durable facts Raiker may recall, and approve additions or removals |
-| Knowledge | **Knowledge Map** | Explore indexed sources and the citations connecting them |
+| Work | **Work** → Threads | Everything you have going — chats and routines — and a full-text search across it |
+| Work | **Work** → Tasks, Projects | One-off, scheduled, repeating, and organized work |
+| Work | **Memory** | Review durable facts Raiker may recall, and approve additions or removals |
+| Work | **Memory** → Map | Explore indexed sources and the citations connecting them (the Knowledge Map) |
 | Control | **Approvals** | Inspect proposed actions and decide whether they may proceed |
 | Control | **Permissions** | Capability gates and per-capability decision modes |
 | Control | **Models** | Providers, model readiness, routing, fallback, and pricing |

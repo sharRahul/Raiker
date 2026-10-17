@@ -725,7 +725,7 @@ test("Models opens on what is running the work, not on a filing system", async (
 
 test("new-account Workbench is a board over the work, not a second composer", async ({ page }) => {
   await page.goto("http://raiker.test/#/workbench");
-  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
 
   // The removed box. The Workbench composer could not send anything: it handed
   // the prompt to Chat, Build or Tasks, which re-showed it in that surface's own
@@ -736,9 +736,10 @@ test("new-account Workbench is a board over the work, not a second composer", as
   // "Nothing is running", "No standing agents" and "Nothing is scheduled":
   // three containers explaining an absence one sentence already states. The
   // boards appear when they have something in them.
+  // Quiet UI — an idle Home does not narrate being idle either.
   await expect(
     page.getByText("Nothing is running, standing, or scheduled.", { exact: false }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
     await expect(page.getByRole("heading", { name: group })).toHaveCount(0);
   }
@@ -748,15 +749,10 @@ test("new-account Workbench is a board over the work, not a second composer", as
   // share a row; Tasks and Projects organise work rather than being a place it
   // happens, so they have their own.
   const start = page.getByRole("navigation", { name: "Start work" });
-  for (const action of ["Start a conversation", "Start a build", "Start a design"]) {
+  for (const action of ["Start a conversation", "Start a build", "Start a design", "Plan a task", "Projects"]) {
     await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
   }
-  await expect(start.getByRole("link")).toHaveCount(3);
-
-  const organise = page.getByRole("navigation", { name: "Organise work" });
-  for (const action of ["Plan a task or agent", "Open a project"]) {
-    await expect(organise.getByRole("link", { name: new RegExp(action) })).toBeVisible();
-  }
+  await expect(start.getByRole("link")).toHaveCount(5);
 
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
   await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
@@ -771,22 +767,25 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["workbench", "Home", "operational"],
     ["new-chat", "Chat", "work-surface"],
     ["build", "Build", "work-surface"],
-    ["search-chat", "Threads", "reading"],
-    ["tasks", "Tasks", "operational"],
-    ["projects", "Projects", "operational"],
+    // Quiet UI — Threads, Tasks and Projects are tabs of Work, and the
+    // Knowledge Map a tab of Memory; their old addresses open those tabs.
+    ["work?tab=threads", "Work", "operational"],
+    ["tasks", "Work", "operational"],
+    ["projects", "Work", "operational"],
     ["memory", "Memory", "operational"],
-    ["brain", "Knowledge Map", "operational"],
+    ["brain", "Memory", "operational"],
     ["approvals", "Approvals", "operational"],
     ["capabilities", "Permissions", "operational"],
     ["models?tab=overview", "Models", "operational"],
     ["extensions?tab=connectors", "Extensions", "operational"],
+    ["extensions?tab=channels", "Extensions", "operational"],
     ["extensions?tab=mcp", "Extensions", "operational"],
     ["extensions?tab=skills", "Extensions", "operational"],
     ["extensions?tab=hooks", "Extensions", "operational"],
     ["extensions?tab=plugins", "Extensions", "operational"],
-    // Channels left Extensions for their own destination. Design is a
-    // transcript with a composer, so it takes the same frame as Chat and Build.
-    ["messaging", "Messaging", "workspace"],
+    // Design is a transcript with a composer, so it takes the same frame as
+    // Chat and Build.
+    ["messaging", "Extensions", "operational"],
     ["design", "Design", "work-surface"],
     ["observe?tab=overview", "Observability", "operational"],
     ["observe?tab=sessions", "Observability", "operational"],
@@ -824,10 +823,11 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     const canvas = page.getByTestId("responsive-page");
     await expect(canvas, route).toHaveAttribute("data-layout", layout);
     await expect(page.locator("header .page-title"), route).toHaveText(title);
-    await expect(page.locator("header .page-hint"), route).not.toBeEmpty();
+    // Quiet UI — the title only; its hint is the tooltip.
+    await expect(page.locator("header .page-title"), route).toHaveAttribute("title", /\S/);
 
     const requestedTab = new URLSearchParams(route.split("?", 2)[1] ?? "").get("tab");
-    if (requestedTab && (route.startsWith("models") || route.startsWith("extensions") || route.startsWith("observe"))) {
+    if (requestedTab && (route.startsWith("models") || route.startsWith("extensions") || route.startsWith("observe") || route.startsWith("work"))) {
       await expect(page.locator(`[role="tab"][data-tab="${requestedTab}"]`), route).toHaveAttribute("aria-selected", "true");
     }
     if (requestedTab && route.startsWith("settings")) {

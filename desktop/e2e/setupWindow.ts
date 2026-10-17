@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * DIST-05 — the Setup window a packaged Raiker opens on its first start
- * (src/setup.ts): the owner presses Finish installing, watches this computer
+ * (src/setup.ts): the owner presses Set up, watches this computer
  * checked, the host started and verified, and opens Raiker.
  */
 import { join } from "node:path";
@@ -13,7 +13,7 @@ export async function finishInstalling(app: ElectronApplication, shots: string, 
   await expect(setup).toHaveTitle("Raiker Setup", { timeout: 60_000 });
   await expect(setup.getByRole("heading", { name: "Welcome to Raiker" })).toBeVisible();
   await setup.screenshot({ path: join(shots, `${prefix}-setup-1-welcome.png`) });
-  await setup.getByRole("button", { name: "Finish installing" }).click();
+  await setup.getByRole("button", { name: "Set up" }).click();
 
   // The computer check runs first and lists what it found under its step.
   const found = setup.getByRole("list", { name: "This computer" });

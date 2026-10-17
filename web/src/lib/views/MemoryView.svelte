@@ -12,6 +12,7 @@
   import KnowledgeSources from "../components/KnowledgeSources.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { HUB_TABS } from "../nav";
+  import LazyRoute from "../components/LazyRoute.svelte";
   import {
     MEMORY_TAB_LABELS,
     memoryAttention,
@@ -464,6 +465,13 @@
      on them and what Raiker can recall, not to look at a category. -->
 <TabStrip {tabs} selected={tab} onselect={selectTab} label="Memory sections" />
 
+{#if tab === "map"}
+  <!-- Quiet UI — the Knowledge Map is a tab of Memory, not a page of its own. -->
+  <div id="panel-map" role="tabpanel" aria-labelledby="tab-map">
+    <LazyRoute route="brain" />
+  </div>
+{:else}
+
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
   <Icon name={posture.kind === "proposes" ? "check" : "info"} size="md" />
   <p>{posture.headline}</p>
@@ -874,6 +882,8 @@
       </section>
     {/if}</div></details>
   </div>
+{/if}
+
 {/if}
 
 {#if sourceFor !== null}

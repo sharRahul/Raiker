@@ -86,15 +86,13 @@ anything is installed or any account exists.
    fails it says what in one sentence, with **Try again** and **Open logs**.
 3. **Account** — a local owner account and password. It never leaves your
    computer.
-4. **Welcome** — what Chat, Build and Design are for.
-5. **Model** — connect a local runtime, a home-network endpoint or a hosted
+4. **Model** — connect a local runtime, a home-network endpoint or a hosted
    provider, and choose a default model; or decide later.
-6. **Privacy** — whether model requests stay on this device or may go to the
+5. **Privacy** — whether model requests stay on this device or may go to the
    providers you connect.
-7. **Permissions** — what Raiker can do for you today, read from your actual
-   settings, and the four ways each permission can be decided (*Ask before
-   acting*, *Allow within a scope you approve*, *Act automatically within
-   policy*, *Never*). Finishing setup grants nothing.
+
+Raiker starts conservatively and asks before it takes a governed action, so
+there is no permissions step; review them any time on the Permissions page.
 
 Setup can be left and resumed at any point, and does not appear again once
 complete. Running Raiker from a source checkout has no installer, so there the

@@ -38,14 +38,16 @@ describe("Sidebar navigation", () => {
     expect(active).toHaveAttribute("aria-current", "page");
   });
 
-  it("keeps Core visible and exposes Knowledge as a disclosure", () => {
+  it("is one quiet list of the six places work happens", () => {
     render(Sidebar, { current: "memory" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
-    expect(within(nav).getByRole("link", { name: "Threads" })).toBeVisible();
-    expect(within(nav).getByRole("button", { name: "Knowledge" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(nav).getAllByRole("link").map((a) => a.getAttribute("aria-label")).filter(Boolean)).toEqual([
+      "Home", "Chat", "Build", "Design", "Work", "Memory",
+    ]);
     expect(within(nav).getByRole("link", { name: "Memory" })).toHaveAttribute("aria-current", "page");
-    // Manage was a group here and is not one any more.
-    expect(within(nav).queryByRole("button", { name: "Manage" })).toBeNull();
+    // No disclosure groups, and no subtitle under the name.
+    expect(within(nav).queryByRole("button", { name: "Knowledge" })).toBeNull();
+    expect(within(nav).queryByText("Governed agent")).toBeNull();
   });
 
   // Collapsed used to mean gone. It is a rail now, so every destination the
@@ -57,25 +59,6 @@ describe("Sidebar navigation", () => {
     for (const item of SIDEBAR_GROUPS.flatMap((group) => group.items)) {
       expect(within(nav).getByRole("link", { name: item.label })).toBeInTheDocument();
     }
-  });
-
-  it("toggles and persists an inactive navigation group", async () => {
-    render(Sidebar, { current: "new-chat" });
-    const knowledge = screen.getByRole("button", { name: "Knowledge" });
-    expect(knowledge).toHaveAttribute("aria-expanded", "true");
-    await fireEvent.click(knowledge);
-    expect(knowledge).toHaveAttribute("aria-expanded", "false");
-    expect(localStorage.getItem("raiker.navigation.groups")).not.toContain("knowledge");
-    await fireEvent.click(knowledge);
-    expect(knowledge).toHaveAttribute("aria-expanded", "true");
-    expect(localStorage.getItem("raiker.navigation.groups")).toContain("knowledge");
-  });
-
-  it("does not offer the Knowledge Map in compact navigation", () => {
-    render(Sidebar, { current: "new-chat", compact: true, drawerOpen: true });
-    const nav = screen.getByRole("navigation", { name: "All navigation" });
-    expect(within(nav).queryByRole("link", { name: "Knowledge Map" })).not.toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Memory" })).toBeInTheDocument();
   });
 
   // The rail carried two lines of standing prose: where the workspace

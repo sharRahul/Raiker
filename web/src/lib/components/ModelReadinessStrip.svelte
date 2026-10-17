@@ -23,11 +23,12 @@
   {#if confirming}
     <p class="rechecking" role="status">Checking this model — you can still send.</p>
   {:else}
-    <div class="readiness-strip" role="status">
+    <!-- Quiet UI — the summary and the one button that fixes it; how to fix
+         it is the tooltip here and the whole of the dialog the button opens. -->
+    <div class="readiness-strip" role="status" title={readiness.remediation}>
       <span class="indicator" aria-hidden="true"></span>
       <div class="copy">
         <strong>{readiness.summary}</strong>
-        <span>{readiness.remediation}</span>
         {#if draftPreserved}<span class="draft">Your draft is preserved.</span>{/if}
       </div>
       <button type="button" onclick={() => openModelSetup(null, readiness)}>Set up model</button>

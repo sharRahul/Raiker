@@ -2603,8 +2603,6 @@
       {/snippet}
 
       {#snippet hint()}
-        Shift+Tab changes mode · Enter sends · <code>/</code> for commands ·
-        <code>@</code> to mention a file ·
         <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
           all shortcuts
         </button>

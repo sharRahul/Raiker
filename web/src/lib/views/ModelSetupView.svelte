@@ -16,7 +16,6 @@
   import { providerName } from "../format";
   import { listCatalogue } from "../providerConnections";
   import type {
-    CapabilityGate,
     ModelProfile,
     ModelReadinessView,
     SetupCheck,
@@ -24,14 +23,11 @@
     SetupSystemReadiness,
     SetupVerification,
   } from "../apiTypes";
-  import { goalSummaries } from "../permissionGoals";
   import { modelName } from "../modelPresentation";
   import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
     CHECK_STATE_LABELS,
-    DECISION_MODE_COPY,
-    PERMISSIONS_NOTE,
     PRIVACY_CHOICES,
     recommendedPath,
     nextStage,
@@ -185,7 +181,7 @@
    * authority system, and the old `Local-first` / `Balanced` pair read like one.
    */
   async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
-    await save({ status: "in_progress", stage: "permissions", privacy_mode });
+    await save({ status: "in_progress", stage: after("privacy"), privacy_mode });
   }
 
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
@@ -264,12 +260,8 @@
 
   /** The heading, and the sentence under it, scoped to what is actually set up. */
   const finishHeading = $derived(modelChosen ? "Your Raiker is ready" : "Setup saved");
-  const finishNote = $derived(
-    modelChosen
-      ? "Start where the work is. Everything below stays available in Models, Settings and Permissions."
-      : "You chose to decide about a model later, so Chat and Build have nothing to answer with yet. " +
-        "Everything else is saved, and you can pick a model whenever you want to.",
-  );
+  // Quiet UI — a sentence only when something is missing.
+  const finishNote = $derived(modelChosen ? "" : "Chat and Build have nothing to answer with yet.");
 
   async function createBackup() {
     if (!backupTarget.trim()) return;
@@ -307,9 +299,6 @@
   const stage = $derived(visibleStage(stageOf(setup), stages));
   const after = (current: typeof stage) => nextStage(stages, current);
   const before = (current: typeof stage) => previousStage(stages, current);
-  /** "03 · Model": the number this stage has on this installation's rail. */
-  const numbered = (current: typeof stage, label: string) =>
-    `${String(stages.indexOf(current) + 1).padStart(2, "0")} · ${label}`;
   /** BUG-332 — what each provider said when its models were last listed here. */
   let catalogueRefusals = $state<Record<string, string | null>>({});
   const candidate = $derived(recommendedPath(profiles, catalogueRefusals));
@@ -378,20 +367,6 @@
   }
 
   /*
-   * Permissions — read-only. The goals are said from the same gates the
-   * Permissions page renders, so this stage cannot claim what that page would
-   * not, and nothing on it changes a decision mode.
-   */
-  let gates = $state<CapabilityGate[] | null>(null);
-  let gatesError = $state("");
-  async function loadGates() {
-    gatesError = "";
-    try { gates = await api.capabilityGates(); }
-    catch { gatesError = "The permission summary could not be read. Review it on the Permissions page."; }
-  }
-  const goals = $derived(gates === null ? [] : goalSummaries(gates));
-
-  /*
    * DIST-06 — Check. Every mandatory component from inside the running host,
    * then, when a model is chosen, one real request to it — the same readiness
    * check the Model stage and the Models page take. The request is the owner's
@@ -422,7 +397,6 @@
 
   $effect(() => {
     if (stage === "system" && system === null && systemError === "") void loadSystem();
-    if (stage === "permissions" && gates === null && gatesError === "") void loadGates();
     if (stage === "verify" && verification === null && !verifying && verifyError === "") void runVerification();
   });
 
@@ -466,30 +440,9 @@
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if setup === null}
       <h2 id="setup-title">Preparing your setup…</h2>
-    {:else if stage === "welcome"}
-      <!-- FIRST-03 — the product model before the infrastructure. An owner who
-           has not met Chat, Build and Design cannot tell what a provider choice
-           is for. FIRST-02 — no Account stage: the account was created on the
-           screen before this one. -->
-      <header>
-        <p class="eyebrow">{numbered("welcome", "Welcome")}</p>
-        <h2 id="setup-title">Meet Raiker</h2>
-        <p>Your governed AI workspace for Chat, Build and Design. Two short questions and you are working.</p>
-      </header>
-      <div class="modes">
-        <div class="mode"><Icon name="chat" size="md" /><strong>Chat</strong><span>Think something through, with memory, sources and approvals.</span></div>
-        <div class="mode"><Icon name="code" size="md" /><strong>Build</strong><span>Work on a repository — plan, change, run, review the diff.</span></div>
-        <div class="mode"><Icon name="design" size="md" /><strong>Design</strong><span>Research and generate images against a governed model.</span></div>
-      </div>
-      <p class="note">{PERMISSIONS_NOTE}</p>
-      <div class="actions">
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("welcome") })}>Continue</button>
-      </div>
     {:else if stage === "system"}
       <header>
-        <p class="eyebrow">{numbered("system", "This device")}</p>
         <h2 id="setup-title">What this computer can run</h2>
-        <p>Checked on this computer. Nothing was sent anywhere.</p>
       </header>
       {#if systemError}
         <p class="note" role="alert">{systemError}</p>
@@ -516,12 +469,10 @@
       </div>
     {:else if stage === "model"}
       <header>
-        <p class="eyebrow">{numbered("model", "Model")}</p>
         <h2 id="setup-title">Choose how Raiker should think</h2>
         <!-- FIRST-04 — connect, then discover, then choose a default. What a
              provider serves is discovered once and available everywhere; there
              is no step in between where models are kept or withheld. -->
-        <p>Connect a provider or a runtime once. Every compatible model it serves becomes available in Chat, Build and Design, and you choose which one answers by default.</p>
       </header>
       {#if profilesLoading || unconfirmed}
         <!-- BUG-331 — the step is here; the providers are still answering. -->
@@ -581,12 +532,10 @@
       </div>
     {:else if stage === "privacy"}
       <header>
-        <p class="eyebrow">{numbered("privacy", "Privacy")}</p>
         <!-- FIRST-07 — one question about where content travels. "Local-first"
              and "Balanced" read as a second authority system standing beside
              Permissions, which they are not. -->
         <h2 id="setup-title">Where may Raiker send model requests?</h2>
-        <p>Permissions still govern what Raiker may do. This is only about where your words go.</p>
       </header>
       <div class="choice-list">
         {#each PRIVACY_CHOICES as choice (choice.mode)}
@@ -596,41 +545,9 @@
         {/each}
       </div>
       <div class="actions"><button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button></div>
-    {:else if stage === "permissions"}
-      <header>
-        <p class="eyebrow">{numbered("permissions", "Permissions")}</p>
-        <h2 id="setup-title">What Raiker may do</h2>
-        <p>{PERMISSIONS_NOTE} Finishing setup changes none of this.</p>
-      </header>
-      {#if gatesError}
-        <p class="note" role="alert">{gatesError}</p>
-      {:else if gates === null}
-        <p class="note" role="status" aria-live="polite">Reading your permissions…</p>
-      {:else}
-        <ul class="goals" aria-label="What Raiker can do for you">
-          {#each goals as goal (goal.id)}
-            <li class={`goal ${goal.verdict}`}>{goal.sentence}</li>
-          {/each}
-        </ul>
-      {/if}
-      <div class="modes-explained">
-        <p class="eyebrow">Each permission is decided one of four ways</p>
-        <dl>
-          {#each DECISION_MODE_COPY as mode (mode.mode)}
-            <div><dt>{mode.label}</dt><dd>{mode.detail}</dd></div>
-          {/each}
-        </dl>
-      </div>
-      <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: before("permissions") })}>Back</button>
-        <a class="quiet" href="#/capabilities">Review permissions</a>
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("permissions") })}>Continue</button>
-      </div>
     {:else if stage === "verify"}
       <header>
-        <p class="eyebrow">{numbered("verify", "Check")}</p>
         <h2 id="setup-title">Checking your installation</h2>
-        <p>Each part Raiker needs, checked from inside the app{setup.model_deferred || !setup.selected_model ? "." : ", and one short request to your model."}</p>
       </header>
       {#if verifyError}
         <p class="error" role="alert">{verifyError}</p>
@@ -659,12 +576,11 @@
       </div>
     {:else}
       <header>
-        <p class="eyebrow">{numbered("finish", finishHeading === "Your Raiker is ready" ? "Ready" : "Saved")}</p>
         <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
              up. This said "Your Raiker is ready" above a summary that could read
              "Decide later" on the very next line. -->
         <h2 id="setup-title">{finishHeading}</h2>
-        <p>{finishNote}</p>
+        {#if finishNote}<p>{finishNote}</p>{/if}
       </header>
       <!-- FIRST-09 — finish into work. The three Work modes the welcome screen
            introduced, as the three things to do next — each saying whether it
@@ -677,42 +593,29 @@
               <strong>{action.label}</strong>
             </button>
             {#if !action.ready}
-              <p class="mode-missing">
-                {action.missing}
+              <p class="mode-missing" title={action.missing}>
                 <a href={action.remedy}>{action.remedyLabel}</a>
               </p>
             {/if}
           </div>
         {/each}
       </div>
-      <dl class="summary">
-        <div><dt>Model</dt><dd>{setup.model_deferred ? "Decide later" : setup.selected_model ?? "Not selected"}</dd></div>
-        <div><dt>Model requests</dt><dd>{setup.privacy_mode === "local_first" ? "Local only" : "Local, and connected providers"}</dd></div>
-        <div><dt>Backup</dt><dd>{setup.backup_verified_at ? "Verified" : "Recommended"}</dd></div>
-      </dl>
-      <!-- FIRST-08 — backup is recommended, not a stage that stands between an
-           owner and their first turn. It is still real: nothing claims a backup
-           exists until Raiker has written and verified an encrypted snapshot. -->
-      <div class="optional">
-        <p class="eyebrow">Optional setup</p>
-        {#if setup.backup_verified_at}
-          <p class="note">Backup verified at {setup.backup_target}.</p>
-        {:else if wantsBackup}
-          <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="Full path to a backup folder" /></label>
-          <div class="actions">
-            <button class="quiet" onclick={() => (wantsBackup = false)}>Cancel</button>
-            <button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button>
-          </div>
-        {:else}
-          <div class="actions">
-            <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
-            <a class="quiet" href="#/settings">Review privacy</a>
-            <a class="quiet" href="#/capabilities">Review permissions</a>
-          </div>
-        {/if}
-      </div>
+      {#if setup.backup_verified_at}
+        <p class="note">Backup verified at {setup.backup_target}.</p>
+      {:else if wantsBackup}
+        <!-- FIRST-08 — backup is offered, never a step in the way. Nothing
+             claims a backup exists until an encrypted snapshot is verified. -->
+        <label>Backup folder<input bind:value={backupTarget} placeholder="Full path to a local, removable or NAS folder" /></label>
+        <div class="actions">
+          <button class="quiet" onclick={() => (wantsBackup = false)}>Cancel</button>
+          <button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button>
+        </div>
+      {/if}
       <div class="actions">
         <button class="quiet" onclick={() => save({ stage: before("finish") })}>Back</button>
+        {#if !setup.backup_verified_at && !wantsBackup}
+          <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
+        {/if}
         <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
       </div>
     {/if}
@@ -772,7 +675,7 @@
   /* DIST-05/06 — check rows say their state in words, with colour as a second
      cue. Flat rows on one surface rather than a card per check: a dozen boxed
      rows read as a dozen problems even when every one of them passed. */
-  .checks, .goals { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
   .checks { gap: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
   .check { display: grid; grid-template-columns: .5rem minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--space-3); row-gap: .1rem; padding: .7rem var(--space-4); }
   .check + .check { border-top: 1px solid var(--border); }
@@ -783,11 +686,6 @@
   .check.warn .check-state { color: var(--warning); } .check.fail .check-state { color: var(--danger); }
   .check-detail, .check-remedy { grid-column: 2 / 4; color: var(--text-3); }
   .check-remedy { color: var(--text-1); font-weight: 600; }
-  .goal { padding: var(--space-2) var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
-  .modes-explained dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
-  .modes-explained dl div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); }
-  .modes-explained dd { font-size: var(--text-sm); color: var(--text-2); line-height: 1.45; }
-  .modes-explained dt { text-transform: none; font-family: inherit; font-size: var(--text-sm); color: var(--text-1); font-weight: 650; }
   .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
-  @media (max-width: 760px) { .modes, .start-work { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } .modes-explained dl { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .modes, .start-work { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } }
 </style>

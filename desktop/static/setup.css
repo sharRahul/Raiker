@@ -294,7 +294,8 @@
 }
 
 /* ── Failed ──────────────────────────────────────────────── */
-#failed h1 {
+#failed h1,
+#welcome h1 {
   margin-top: 22px;
 }
 .raw {

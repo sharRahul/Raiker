@@ -12,7 +12,7 @@ const bridge = window.raikerSetup ?? fakeBridge(params.get("fake"));
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["welcome", "progress", "ready", "failed"];
-const TITLES = { install: "Setting up Raiker", update: "Updating Raiker", repair: "Checking Raiker" };
+const TITLES = { install: "Setting up", update: "Updating", repair: "Checking" };
 const ICONS = {
   done: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 10.5l3.2 3.2L15 7"/></svg>',
   failed: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8"/></svg>',
@@ -99,9 +99,9 @@ function showChecks(checks, container) {
     line.title = `${check.label}: ${check.detail}`;
     line.append(el("span", "check-label", check.label), el("span", "check-detail", check.detail));
     row.append(line);
-    if (check.remedy && (check.state === "warn" || check.state === "fail")) {
-      row.append(el("span", "check-remedy", check.remedy));
-    }
+    // A failed requirement says what to do; a note keeps it for the tooltip.
+    if (check.remedy && check.state === "fail") row.append(el("span", "check-remedy", check.remedy));
+    else if (check.remedy && check.state === "warn") line.title = `${line.title} — ${check.remedy}`;
     container.append(row);
   }
   container.hidden = checks.length === 0;
@@ -110,7 +110,7 @@ function showChecks(checks, container) {
 function updateCount() {
   const done = stages.filter((stage) => $(`stage-${stage.id}`)?.dataset.state === "done").length;
   const percent = stages.length ? Math.round((done / stages.length) * 100) : 0;
-  $("progress-count").textContent = `${done} of ${stages.length} steps complete · ${percent}%`;
+  $("progress-count").textContent = `${done} of ${stages.length}`;
   $("bar-fill").style.width = `${percent}%`;
   document.querySelector(".bar").setAttribute("aria-valuenow", String(percent));
 }
@@ -181,9 +181,6 @@ bridge.onEvent((event) => {
         notes.append(note);
       }
       notes.hidden = notes.childElementCount === 0;
-      if (mode !== "install") {
-        $("ready-lead").textContent = "Every part of Raiker was checked and it is running on this computer.";
-      }
       show("ready");
       break;
     }
@@ -193,7 +190,7 @@ bridge.onEvent((event) => {
         const failedChecks = event.stage === "check" ? lastChecks.filter((check) => check.state === "fail") : [];
         // A failed requirement is listed with its remedy; the headline only frames it.
         $("failed-cause").textContent = failedChecks.length
-          ? "This computer doesn't meet Raiker's requirements yet. Fix what's listed below, then try again."
+          ? "This computer doesn't meet Raiker's requirements."
           : String(event.cause ?? "");
         $("failed-detail").textContent = String(event.detail ?? "");
         showChecks(failedChecks, $("failed-checks"));
@@ -242,8 +239,8 @@ function fakeBridge(kind) {
   const script = [
     [300, { type: "manifest", stages: [
       { id: "check", title: "Checking this computer" },
-      { id: "start", title: "Preparing encrypted storage and starting Raiker" },
-      { id: "verify", title: "Verifying the installation" },
+      { id: "start", title: "Starting Raiker" },
+      { id: "verify", title: "Verifying" },
     ] }],
     [100, { type: "stage", id: "check", state: "running" }],
     [200, { type: "log", line: "Checking this computer…" }],
@@ -251,11 +248,11 @@ function fakeBridge(kind) {
     ...(kind === "failure"
       ? [[300, { type: "stage", id: "check", state: "failed", detail: "1 requirement is not met" }],
          [200, { type: "failed", stage: "check", cause: "Raiker needs at least 4 GB of memory.", detail: "blocking: memory" }]]
-      : [[300, { type: "stage", id: "check", state: "done", detail: "Ready · 1 note" }],
+      : [[300, { type: "stage", id: "check", state: "done", detail: "1 note" }],
          [100, { type: "stage", id: "start", state: "running" }],
-         [2600, { type: "stage", id: "start", state: "done", detail: "Running on this computer only" }],
+         [2600, { type: "stage", id: "start", state: "done" }],
          [100, { type: "stage", id: "verify", state: "running" }],
-         [900, { type: "stage", id: "verify", state: "done", detail: "Encrypted store open, fts5 search ready, interface served." }],
+         [900, { type: "stage", id: "verify", state: "done" }],
          [400, { type: "complete" }]]),
   ];
   return {

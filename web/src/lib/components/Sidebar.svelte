@@ -64,7 +64,7 @@
   aria-label="All navigation" aria-hidden={compact && !drawerOpen ? "true" : undefined}
   inert={compact && !drawerOpen} bind:this={navigationElement}>
   <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
-  <a class="brand" href="#/home"><Logo size={30} /><span class="brand-text"><span class="brand-name">Raiker</span><span class="brand-sub">Governed agent</span></span></a>
+  <a class="brand" href="#/home"><Logo size={30} /><span class="brand-text"><span class="brand-name">Raiker</span></span></a>
 
   <div class="navigation-sections">
     {#each SIDEBAR_GROUPS as group (group.id)}
@@ -73,17 +73,15 @@
           <button type="button" class="group-toggle" aria-label={group.label} aria-expanded={isOpen(group)} aria-controls={`navigation-group-${group.id}`} onclick={() => toggleGroup(group)}>
             <span>{group.label}</span><Icon name="chevron-right" size="sm" />
           </button>
-        {:else}<p class="group-label">{group.label}</p>{/if}
+        {:else}<p class="group-label sr-only">{group.label}</p>{/if}
         {#if isOpen(group)}
           <ul id={`navigation-group-${group.id}`}>
             {#each group.items as item (item.id)}
-              {#if !(compact && item.id === "brain")}
                 <li><a href={`#/${item.id}`} class="nav-link" class:active={current === item.id}
                   aria-current={current === item.id ? "page" : undefined} aria-label={item.label} title={item.hint}
                   onclick={() => { if (compact) closeNavigation(false); }}>
                   <Icon name={item.icon} size="lg" filled={current === item.id} /><span>{item.label}</span>
                 </a></li>
-              {/if}
             {/each}
           </ul>
         {/if}
@@ -113,7 +111,6 @@
      spacing the name out until it read as a logotype by force; the mark beside
      it is the identity. */
   .brand-name { font-weight:800; font-size:var(--text-sm); letter-spacing:.14em; text-transform:uppercase; color:var(--text-1); }
-  .brand-sub { font-size:var(--text-2xs); font-weight:600; letter-spacing:normal; color:var(--text-3); }
   .navigation-sections { display:grid; gap:var(--space-2); }
   .group { position:relative; }
   /* A navigation group label in caps at 2xs with .09em tracking is

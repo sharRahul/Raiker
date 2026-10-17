@@ -24,8 +24,8 @@ import { dirname } from "node:path";
 
 export const SETUP_STAGES = [
   { id: "check", title: "Checking this computer" },
-  { id: "start", title: "Preparing encrypted storage and starting Raiker" },
-  { id: "verify", title: "Verifying the installation" },
+  { id: "start", title: "Starting Raiker" },
+  { id: "verify", title: "Verifying" },
 ] as const;
 export type StageId = (typeof SETUP_STAGES)[number]["id"];
 

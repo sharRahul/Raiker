@@ -19,7 +19,7 @@ describe("nav model", () => {
     expect(routeFromHash("")).toBe("home");
     expect(routeFromHash("#/capabilities")).toBe("capabilities");
     expect(routeFromHash("#settings")).toBe("settings");
-    expect(routeFromHash("#/search-chat")).toBe("search-chat");
+    expect(routeFromHash("#/work")).toBe("work");
     expect(routeFromHash("#/nonsense")).toBe("home");
   });
 
@@ -28,17 +28,29 @@ describe("nav model", () => {
       // "Core" named the group after the architecture. "Work"
       // names it after what is in it, in sentence case like every other label.
       ["core", "Work", false],
-      ["knowledge", "Knowledge", true],
       ["manage", "Manage", true],
       ["observe", "Observe", true],
       ["support", "Support", true],
     ]);
   });
 
-  it("keeps Knowledge to what Raiker has stored", () => {
-    // Checkpoints moved to Observe: rewind data is an operational record, not
-    // knowledge the agent recalls.
-    expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual(["memory", "brain"]);
+  it("folds pages that answered one question into one page with tabs (Quiet UI)", () => {
+    // Threads, Tasks and Projects are tabs of Work; the Knowledge Map is a tab
+    // of Memory; Messaging is a tab of Extensions. Every old address still
+    // opens the matching tab.
+    expect(HUB_TABS.work).toEqual(["threads", "tasks", "projects"]);
+    for (const [hash, route, tab] of [
+      ["#/search-chat", "work", "threads"],
+      ["#/tasks?task=t1", "work", "tasks"],
+      ["#/projects?project=p1", "work", "projects"],
+      ["#/brain", "memory", "map"],
+      ["#/messaging", "extensions", "channels"],
+      ["#/channels", "extensions", "channels"],
+    ] as const) {
+      expect(routeFromHash(hash), hash).toBe(route);
+      expect(tabFromHash(hash), hash).toBe(tab);
+    }
+    expect(HUB_TABS.memory).toContain("map");
   });
 
   it("labels the capability gates as Permissions", () => {
@@ -57,20 +69,18 @@ describe("nav model", () => {
       // group, next to Messaging, which is where the channels live.
       "build",
       "design",
-      "search-chat",
-      "tasks",
-      "projects",
+      "work",
+      "memory",
       "approvals",
-      "messaging",
     ]);
   });
 
-  it("uses sentence case for the direct conversation browser", () => {
-    expect(navItem("search-chat").label).toBe("Threads");
+  it("uses sentence case for the work page", () => {
+    expect(navItem("work").label).toBe("Work");
   });
 
   it("consolidates the operational record into one Observe destination", () => {
-    expect(NAV_GROUPS[3].items.map((i) => i.id)).toEqual(["observe"]);
+    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual(["observe"]);
     expect(HUB_TABS.observe).toEqual([
       "overview",
       "sessions",
@@ -85,16 +95,14 @@ describe("nav model", () => {
     // Approvals left this group for Core when Manage moved behind the gear: a
     // decision waiting on you arrives many times a day, while Permissions and
     // Models are configured once.
-    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual([
+    expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
       "capabilities",
       "models",
       "extensions",
     ]);
-    // Channels left Extensions for their own destination; the alias keeps every
-    // link that named the tab working, which is what that map is for.
-    expect(HUB_TABS.extensions).not.toContain("channels");
-    expect(routeFromHash("#/channels")).toBe("messaging");
-    expect(routeFromHash("#/extensions?tab=channels")).toBe("extensions");
+    // Channels are a tab of Extensions again (Quiet UI).
+    expect(routeFromHash("#/channels")).toBe("extensions");
+    expect(tabFromHash("#/extensions?tab=channels")).toBe("channels");
     // Hooks sits with the other extension surfaces rather than under Permissions:
     // a hook is something the owner installs, and it can only ever tighten what
     // Permissions already allows.
@@ -104,6 +112,7 @@ describe("nav model", () => {
       // the MCP category.
       "overview",
       "connectors",
+      "channels",
       "mcp",
       "skills",
       "hooks",
@@ -116,12 +125,9 @@ describe("nav model", () => {
     for (const required of [
       "new-chat",
       "build",
-      "search-chat",
+      "work",
       "memory",
       "approvals",
-      "tasks",
-      "brain",
-      "projects",
       "capabilities",
       "models",
       "extensions",
@@ -140,8 +146,7 @@ describe("nav model", () => {
     // ADD-27 — the old Git credential section opens Settings → GitHub.
     expect(tabFromHash("#/settings?tab=git-credential")).toBe("github");
     expect(tabFromHash("#/activity")).toBe("activity");
-    expect(routeFromHash("#/work")).toBe("observe");
-    expect(tabFromHash("#/work")).toBe("work");
+    expect(tabFromHash("#/observe?tab=work")).toBe("work");
     // Diagnostics was folded into Overview: four of its six cards restated the
     // tiles there from the same object, and the rest is an Overview section now.
     // The route still resolves rather than falling through to the Workbench.
@@ -282,8 +287,8 @@ describe("a hub tab addressed as a path segment", () => {
   });
 
   it("leaves a route with no tabs alone", () => {
-    expect(routeFromHash("#/tasks/anything")).toBe("tasks");
-    expect(tabFromHash("#/tasks/anything")).toBeNull();
+    expect(routeFromHash("#/approvals/anything")).toBe("approvals");
+    expect(tabFromHash("#/approvals/anything")).toBeNull();
   });
 
   it("does not mistake a query-only deep link for a segment", () => {
@@ -344,7 +349,9 @@ describe("projectFromHash", () => {
   });
 
   it("does not change which route the hash selects", () => {
-    expect(routeFromHash("#/projects?project=proj_abc123")).toBe("projects");
+    // Projects is a tab of Work; the project link still opens it.
+    expect(routeFromHash("#/projects?project=proj_abc123")).toBe("work");
+    expect(tabFromHash("#/projects?project=proj_abc123")).toBe("projects");
   });
 });
 

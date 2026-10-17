@@ -91,11 +91,11 @@
     // the room the shell gives it, with a composer on the floor of the page.
     current === "new-chat" || current === "build" || current === "design"
       ? "work-surface" as const
-      : current === "search-chat" || current === "guide"
+      : current === "guide"
         ? "reading" as const
         : current === "models" || current === "extensions" || current === "observe" ||
-            current === "home" || current === "tasks" || current === "projects" ||
-            current === "memory" || current === "brain" || current === "approvals" ||
+            current === "home" || current === "work" ||
+            current === "memory" || current === "approvals" ||
             current === "capabilities"
           ? "operational" as const
           : "workspace" as const,
@@ -395,8 +395,17 @@
           {/if}
           {#if current === "home"}
             <WorkbenchView />
-          {:else if current === "search-chat"}
-            <LazyRoute route="search-chat" />
+          {:else if current === "work"}
+            <LazyRoute
+              route="work"
+              props={{
+                tab: currentTab ?? "threads",
+                sessionId: continuedSessionId,
+                projects,
+                taskId: openTaskId,
+                onchanged: refreshProjects,
+              }}
+            />
           {:else if current === "memory"}
             <LazyRoute route="memory" props={{ tab: currentTab ?? "overview", filter: currentFilter }} />
           {:else if current === "approvals"}
@@ -404,22 +413,10 @@
               route="approvals"
               props={{ sessionId: continuedSessionId }}
             />
-          {:else if current === "tasks"}
-            <LazyRoute
-              route="tasks"
-              props={{ sessionId: continuedSessionId, projects, taskId: openTaskId }}
-            />
-          {:else if current === "brain"}
-            <LazyRoute route="brain" />
           {:else if current === "sessions"}
             <LazyRoute
               route="sessions"
               props={{ sessionId: continuedSessionId }}
-            />
-          {:else if current === "projects"}
-            <LazyRoute
-              route="projects"
-              props={{ onchanged: refreshProjects }}
             />
           {:else if current === "capabilities"}
             <LazyRoute route="capabilities" props={{ principal }} />
@@ -433,8 +430,6 @@
               route="extensions"
               props={{ tab: currentTab ?? "connectors" }}
             />
-          {:else if current === "messaging"}
-            <LazyRoute route="messaging" />
           {:else if current === "design"}
             <LazyRoute route="design" props={{ projects }} />
           {:else if current === "guide"}

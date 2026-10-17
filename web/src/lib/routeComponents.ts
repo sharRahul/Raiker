@@ -22,13 +22,11 @@ import type { Component } from "svelte";
  * emit one stable chunk per route.
  */
 export type LazyRouteId =
-  | "search-chat"
+  | "work"
   | "memory"
   | "approvals"
-  | "tasks"
   | "brain"
   | "sessions"
-  | "projects"
   | "capabilities"
   | "models"
   | "extensions"
@@ -47,14 +45,12 @@ export type RouteComponent = Component<any, any, any>;
 type Loader = () => Promise<{ default: RouteComponent }>;
 
 const LOADERS: Record<LazyRouteId, Loader> = {
-  "search-chat": () => import("./views/SearchChatView.svelte"),
+  work: () => import("./views/WorkView.svelte"),
   guide: () => import("./views/GuideView.svelte"),
   memory: () => import("./views/MemoryView.svelte"),
   approvals: () => import("./views/ApprovalsView.svelte"),
-  tasks: () => import("./views/TasksView.svelte"),
   brain: () => import("./views/BrainView.svelte"),
   sessions: () => import("./views/SessionsView.svelte"),
-  projects: () => import("./views/ProjectsView.svelte"),
   capabilities: () => import("./views/CapabilitiesView.svelte"),
   models: () => import("./views/ModelsView.svelte"),
   extensions: () => import("./views/ExtensionsView.svelte"),

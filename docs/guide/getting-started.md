@@ -51,16 +51,16 @@ unsigned app that was downloaded from the internet.
 The first time you open Raiker — and after each update — a **Raiker Setup**
 window finishes the installation before Raiker itself opens. On a Mac or with
 an AppImage, where copying the app is the whole install, this is the
-installation step.
+installation step. Press **Set up**:
 
 1. **Checking this computer** — operating system, architecture, memory,
    processor, graphics acceleration (never required), free storage, network
    route (no packet is sent), and how provider keys will be protected. Each
    result is listed as it is found; a requirement that is not met stops setup
    and names its fix. Nothing is created yet, so there is nothing to clean up.
-2. **Preparing encrypted storage and starting Raiker** — your encrypted data
+2. **Starting Raiker** — your encrypted data
    folder is created and Raiker starts, reachable only from this computer.
-3. **Verifying the installation** — the encrypted store opens, text search
+3. **Verifying** — the encrypted store opens, text search
    works, and the interface is served.
 
 Each step shows how long it is taking; **Show details** shows the live log,
@@ -365,15 +365,15 @@ is a focused screen of its own, without the app's navigation; a link in it
 sign-in until it is finished. On the desktop app the computer and the
 installation were already checked by the installer and Raiker Setup, so
 **This device** and **Check** appear only when you run Raiker from a source
-checkout.
+checkout. There is no welcome or permissions screen: the app introduces Chat,
+Build and Design itself, and [Permissions](permissions-and-runtime-modes.md)
+is a page you can open any time — finishing setup grants nothing.
 
 | Stage | What it is |
 |---|---|
-| **Welcome** | What Raiker is: Chat, Build and Design. Nothing to configure. |
 | **This device** *(source checkouts only)* | What this computer can run, measured on it and sent nowhere: operating system, architecture, memory, processor, graphics acceleration (never required), free storage, network, how provider keys are protected (Windows Data Protection, macOS Keychain, Linux Secret Service, or a private file), local model runtimes already installed, where your data is kept, and a local model size that will run here. A requirement that is not met is named with its fix. |
 | **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime installed on this machine that already names a model needs no account and no key — checks the model you choose, and keeps the full provider matrix behind **Other options** — or, when the recommendation is a connected account, **Choose a model** opens it. A model you already chose as the default on Models counts as your choice here. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
 | **Privacy** | *Where may Raiker send model requests?* **Local only**, or **Local, and the providers I connect**. This is about where your words travel. [Permissions](permissions-and-runtime-modes.md) governs the actions Raiker may take. |
-| **Permissions** | *What Raiker may do*: one line per goal (edit files, run commands, read web pages, send messages, remember things, run on a schedule) read from your actual settings, and the four ways a permission is decided — *Ask before acting*, *Allow within a scope you approve*, *Act automatically within policy*, *Never*. Nothing here changes a setting, and finishing setup grants nothing. **Review permissions** opens [Permissions](permissions-and-runtime-modes.md). |
 | **Check** *(source checkouts only)* | Raiker checks its own parts from inside: the host, the interface, the encrypted database, the data format, long-term memory storage, the permission registry, the governed command runner and the credential vault — then makes one short request to the model you chose. A part that is not working says how to fix it; **Check again** reruns it. |
 | **Ready** | Finish into **Chat**, **Build** or **Design**, or **Start using Raiker** for the dashboard. The screen says what it actually set up: *Your Raiker is ready* when a model is chosen, and *Setup saved* when you deferred that choice — with each mode naming what it still needs and the page that supplies it. Every mode opens either way; exploring one before connecting a model is how you find out what it is. |
 
@@ -403,11 +403,10 @@ work; everything you set up once lives behind **More** in the top bar.
 
 | Where | Group | Destinations |
 |---|---|---|
-| Sidebar | Work | Home, Chat, Build, Design, Threads, Tasks, Projects |
-| Sidebar | Knowledge | Memory, Knowledge Map |
+| Sidebar | — | Home, Chat, Build, Design, Work, Memory |
 | More | Recent | the last few places you opened, newest first |
 | More | Review | Approvals |
-| More | Connect | Messaging, Models, Extensions |
+| More | Connect | Models, Extensions |
 | More | Settings | Settings itself, Permissions, and every Settings section as a direct link |
 | More | Diagnostics & help | Observability, Guide |
 
@@ -452,16 +451,27 @@ complete record of every conversation *and* every task run, which is why
 **Threads** — the board you pick work up from — lists conversations and the
 threads your routines are advancing, and nothing else.
 
-Four destinations are tabbed:
+**The interface is deliberately quiet.** Pages open with their content, not a
+sentence about it: a page's one-line description is its title's tooltip, the
+way into its guide chapter is the ⓘ icon, and an empty list shows its title
+and the action that fills it. Pages that answered one question are one page
+with tabs — **Work** holds Threads, Tasks and Projects; **Memory** holds the
+Knowledge Map; **Extensions** holds messaging Channels.
+
+Six destinations are tabbed:
 
 | Destination | Tabs |
 |---|---|
+| Work | Threads, Tasks, Projects |
+| Memory | Overview, Memories, Suggestions, Sources, Recall & indexing, Map |
 | Models | Overview, My models, Add model, Runtime & routing, Usage |
-| Extensions | Connectors, MCP servers, Skills, Hooks, Plugins |
+| Extensions | Overview, Connectors, Channels, MCP servers, Skills, Hooks, Plugins |
 | Observability | Overview, Sessions, Activity, Checkpoints, Live work, Notifications |
 | Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Memory engine, Updates |
 
-Old links to the pages these absorbed still resolve and open the right tab, and
+Old links to the pages these absorbed still resolve and open the right tab —
+`#/tasks` opens Work on Tasks, `#/brain` opens Memory on Map, `#/messaging`
+opens Extensions on Channels — and
 so does the path form — `#/extensions/mcp` opens Extensions on MCP servers,
 exactly as `#/extensions?tab=mcp` does.
 

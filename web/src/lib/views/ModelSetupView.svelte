@@ -34,15 +34,20 @@
     PERMISSIONS_NOTE,
     PRIVACY_CHOICES,
     recommendedPath,
+    nextStage,
+    previousStage,
     SETUP_STAGE_LABELS,
-    SETUP_STAGES,
+    stagesFor,
     visibleStage,
   } from "../firstRun";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
   import Icon from "../components/Icon.svelte";
+  import Logo from "../components/Logo.svelte";
   import type { IconName } from "../icons";
 
-  const stages = SETUP_STAGES;
+  /** `desktop` when the installer already checked this computer (DIST-05). */
+  let distribution = $state<string | null>(null);
+  const stages = $derived(stagesFor(distribution));
   const labels = SETUP_STAGE_LABELS;
   let setup: SetupState | null = $state(null);
   let profiles: ModelProfile[] = $state([]);
@@ -78,8 +83,13 @@
 
   async function load() {
     try {
-      setup = await api.setup();
-      backupTarget = setup.backup_target ?? "";
+      // The installation's provenance is a local read; a host that cannot
+      // answer it is treated as one with no installer step, which keeps the
+      // device and installation checks rather than skipping them.
+      const [state, update] = await Promise.all([api.setup(), api.hostUpdate().catch(() => null)]);
+      distribution = update?.installation?.distribution ?? null;
+      setup = state;
+      backupTarget = state.backup_target ?? "";
     } catch {
       error = "Setup could not be loaded.";
       profilesLoading = false;
@@ -294,7 +304,12 @@
   // narrows the `$state(null)` initializer at this position and would type the
   // access as `never`. The parameter carries the declared type instead.
   const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
-  const stage = $derived(visibleStage(stageOf(setup)));
+  const stage = $derived(visibleStage(stageOf(setup), stages));
+  const after = (current: typeof stage) => nextStage(stages, current);
+  const before = (current: typeof stage) => previousStage(stages, current);
+  /** "03 · Model": the number this stage has on this installation's rail. */
+  const numbered = (current: typeof stage, label: string) =>
+    `${String(stages.indexOf(current) + 1).padStart(2, "0")} · ${label}`;
   /** BUG-332 — what each provider said when its models were last listed here. */
   let catalogueRefusals = $state<Record<string, string | null>>({});
   const candidate = $derived(recommendedPath(profiles, catalogueRefusals));
@@ -430,16 +445,22 @@
 {/snippet}
 
 <section class="setup-shell" aria-labelledby="setup-title">
-  <aside class="stage-rail" aria-label="Setup progress">
-    <p class="rail-title">Your Raiker</p>
-    <ol>
+  <!-- A focused sheet, without the app's navigation around it (App.svelte):
+       where you are, how far there is to go, and nothing else competing. -->
+  <header class="setup-top">
+    <span class="setup-brand"><Logo size={28} /><span>Set up Raiker</span></span>
+    <ol class="stage-rail" aria-label="Setup progress">
       {#each stages as railStage, index}
-        <li class:active={stage === railStage} class:done={stages.indexOf(stage) > index}>
-          <span>{index + 1}</span><strong>{labels[railStage]}</strong>
+        <li
+          class:active={stage === railStage}
+          class:done={stages.indexOf(stage) > index}
+          aria-current={stage === railStage ? "step" : undefined}
+        >
+          <span class="seg" aria-hidden="true"></span><strong>{labels[railStage]}</strong>
         </li>
       {/each}
     </ol>
-  </aside>
+  </header>
 
   <div class="setup-content">
     {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -451,7 +472,7 @@
            is for. FIRST-02 — no Account stage: the account was created on the
            screen before this one. -->
       <header>
-        <p class="eyebrow">01 · Welcome</p>
+        <p class="eyebrow">{numbered("welcome", "Welcome")}</p>
         <h2 id="setup-title">Meet Raiker</h2>
         <p>Your governed AI workspace for Chat, Build and Design. Two short questions and you are working.</p>
       </header>
@@ -462,11 +483,11 @@
       </div>
       <p class="note">{PERMISSIONS_NOTE}</p>
       <div class="actions">
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "system" })}>Continue</button>
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("welcome") })}>Continue</button>
       </div>
     {:else if stage === "system"}
       <header>
-        <p class="eyebrow">02 · This device</p>
+        <p class="eyebrow">{numbered("system", "This device")}</p>
         <h2 id="setup-title">What this computer can run</h2>
         <p>Checked on this computer. Nothing was sent anywhere.</p>
       </header>
@@ -490,12 +511,12 @@
         {/if}
       {/if}
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "welcome" })}>Back</button>
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "model" })}>Continue</button>
+        <button class="quiet" onclick={() => save({ stage: before("system") })}>Back</button>
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("system") })}>Continue</button>
       </div>
     {:else if stage === "model"}
       <header>
-        <p class="eyebrow">03 · Model</p>
+        <p class="eyebrow">{numbered("model", "Model")}</p>
         <h2 id="setup-title">Choose how Raiker should think</h2>
         <!-- FIRST-04 — connect, then discover, then choose a default. What a
              provider serves is discovered once and available everywhere; there
@@ -560,7 +581,7 @@
       </div>
     {:else if stage === "privacy"}
       <header>
-        <p class="eyebrow">04 · Privacy</p>
+        <p class="eyebrow">{numbered("privacy", "Privacy")}</p>
         <!-- FIRST-07 — one question about where content travels. "Local-first"
              and "Balanced" read as a second authority system standing beside
              Permissions, which they are not. -->
@@ -574,10 +595,10 @@
           </button>
         {/each}
       </div>
-      <div class="actions"><button class="quiet" onclick={() => save({ stage: "model" })}>Back</button></div>
+      <div class="actions"><button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button></div>
     {:else if stage === "permissions"}
       <header>
-        <p class="eyebrow">05 · Permissions</p>
+        <p class="eyebrow">{numbered("permissions", "Permissions")}</p>
         <h2 id="setup-title">What Raiker may do</h2>
         <p>{PERMISSIONS_NOTE} Finishing setup changes none of this.</p>
       </header>
@@ -601,13 +622,13 @@
         </dl>
       </div>
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button>
+        <button class="quiet" onclick={() => save({ stage: before("permissions") })}>Back</button>
         <a class="quiet" href="#/capabilities">Review permissions</a>
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "verify" })}>Continue</button>
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("permissions") })}>Continue</button>
       </div>
     {:else if stage === "verify"}
       <header>
-        <p class="eyebrow">06 · Check</p>
+        <p class="eyebrow">{numbered("verify", "Check")}</p>
         <h2 id="setup-title">Checking your installation</h2>
         <p>Each part Raiker needs, checked from inside the app{setup.model_deferred || !setup.selected_model ? "." : ", and one short request to your model."}</p>
       </header>
@@ -632,13 +653,13 @@
         {/if}
       {/if}
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "permissions" })}>Back</button>
+        <button class="quiet" onclick={() => save({ stage: before("verify") })}>Back</button>
         <button class="quiet" disabled={verifying} onclick={() => void runVerification()}>Check again</button>
         <button class="primary" disabled={busy || verifying} onclick={() => save({ status: "in_progress", stage: "finish" })}>{mandatoryFailed ? "Continue anyway" : "Continue"}</button>
       </div>
     {:else}
       <header>
-        <p class="eyebrow">07 · {finishHeading === "Your Raiker is ready" ? "Ready" : "Saved"}</p>
+        <p class="eyebrow">{numbered("finish", finishHeading === "Your Raiker is ready" ? "Ready" : "Saved")}</p>
         <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
              up. This said "Your Raiker is ready" above a summary that could read
              "Decide later" on the very next line. -->
@@ -691,7 +712,7 @@
         {/if}
       </div>
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "verify" })}>Back</button>
+        <button class="quiet" onclick={() => save({ stage: before("finish") })}>Back</button>
         <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
       </div>
     {/if}
@@ -699,17 +720,23 @@
 </section>
 
 <style>
-  .setup-shell { width: min(68rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1rem, 4vw, 3rem); }
-  /* Which of the stages you are on stays in view while the model list
-     under it is scrolled. */
-  .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
-  .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-size: var(--text-xl); }
+  /* One focused column. The Setup window before sign-in has the same shape
+     (desktop/static/setup.css), so installing and setting up read as one flow. */
+  .setup-shell { width: min(52rem, 100%); margin: 0 auto; display: grid; align-content: start; gap: clamp(1.5rem, 4vw, 2.5rem); padding: clamp(1rem, 4vw, 2.5rem) clamp(1rem, 4vw, 3rem) var(--space-8, 4rem); }
+  /* Where you are stays in view while the model list under it is scrolled. */
+  .setup-top { position: sticky; top: 0; z-index: 1; display: grid; gap: var(--space-4); padding: var(--space-3) 0; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); }
+  .setup-brand { display: flex; align-items: center; gap: .6rem; color: var(--text-1); font-size: var(--text-sm); font-weight: 750; }
   /* Scoped to the rail: the check and goal lists below are lists too. */
-  .stage-rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-  .stage-rail li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }
-  .stage-rail li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
-  .stage-rail li.active { color: var(--accent); } .stage-rail li.active > span { background: var(--accent); border-color: var(--accent); color: white; } .stage-rail li.done:not(.active) { color: var(--text-2); }
-  .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
+  .stage-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .5rem; }
+  .stage-rail li { display: grid; gap: .45rem; min-width: 0; color: var(--text-3); }
+  .stage-rail li strong { color: inherit; font-size: var(--text-xs); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg { display: block; height: 4px; border-radius: 4px; background: var(--neutral-border); transition: background .3s ease; }
+  .stage-rail li.done .seg { background: var(--accent); }
+  .stage-rail li.active .seg { background: linear-gradient(90deg, var(--accent), var(--brand)); }
+  .stage-rail li.active { color: var(--accent); } .stage-rail li.done:not(.active) { color: var(--text-2); }
+  .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); animation: setup-rise .35s ease both; }
+  @keyframes setup-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .setup-content { animation: none; } }
   header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
      the mono face and a little more room under it. */
   .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
@@ -740,19 +767,25 @@
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
   .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
-  /* DIST-05/06 — check rows say their state in words, with colour as a second cue. */
+  /* DIST-05/06 — check rows say their state in words, with colour as a second
+     cue. Flat rows on one surface rather than a card per check: a dozen boxed
+     rows read as a dozen problems even when every one of them passed. */
   .checks, .goals { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-  .check { display: grid; grid-template-columns: 9rem minmax(0, 1fr); column-gap: var(--space-3); row-gap: .15rem; padding: var(--space-3); border: 1px solid var(--neutral-border); border-left-width: 4px; border-radius: var(--r-md); background: var(--surface); }
-  .check > strong { grid-column: 2; } .check-detail, .check-remedy { grid-column: 2; color: var(--text-2); }
-  .check-state { grid-row: 1 / span 3; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; color: var(--text-3); align-self: start; padding-top: .15rem; }
+  .checks { gap: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+  .check { display: grid; grid-template-columns: .5rem minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--space-3); row-gap: .1rem; padding: .7rem var(--space-4); }
+  .check + .check { border-top: 1px solid var(--border); }
+  .check::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--success); align-self: center; grid-row: 1; }
+  .check.warn::before { background: var(--warning); } .check.fail::before { background: var(--danger); } .check.info::before { background: var(--neutral-border); }
+  .check > strong { grid-column: 2; grid-row: 1; font-size: var(--text-sm); }
+  .check-state { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; color: var(--text-3); }
+  .check.warn .check-state { color: var(--warning); } .check.fail .check-state { color: var(--danger); }
+  .check-detail, .check-remedy { grid-column: 2 / 4; color: var(--text-3); }
   .check-remedy { color: var(--text-1); font-weight: 600; }
-  .check.pass { border-left-color: var(--success); } .check.warn { border-left-color: var(--warning); }
-  .check.fail { border-left-color: var(--danger); } .check.info { border-left-color: var(--neutral-border); }
   .goal { padding: var(--space-2) var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
   .modes-explained dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
   .modes-explained dl div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); }
   .modes-explained dd { font-size: var(--text-sm); color: var(--text-2); line-height: 1.45; }
   .modes-explained dt { text-transform: none; font-family: inherit; font-size: var(--text-sm); color: var(--text-1); font-weight: 650; }
   .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
-  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .modes, .start-work { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } .stage-rail ol { display: flex; min-width: max-content; } .stage-rail li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } .modes-explained dl { grid-template-columns: 1fr; } .check { grid-template-columns: 1fr; } .check > strong, .check-detail, .check-remedy, .check-state { grid-column: 1; grid-row: auto; } }
+  @media (max-width: 760px) { .modes, .start-work { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } .modes-explained dl { grid-template-columns: 1fr; } }
 </style>

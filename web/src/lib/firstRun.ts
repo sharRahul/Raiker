@@ -49,16 +49,53 @@ export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
 };
 
 /**
+ * The stages the installer already covered.
+ *
+ * DIST-05 — a packaged desktop installation checks this computer during
+ * installation (the Windows installer's own page, the Linux package's
+ * pre-install check, and the Setup window every desktop build opens before
+ * Raiker does) and verifies every component before the owner account exists.
+ * Asking again after sign-in would repeat a check the owner has just watched
+ * pass, so those installations skip **This device** and **Check**. A source
+ * checkout or a server install has had no such step and keeps both.
+ */
+export const INSTALLER_STAGES: readonly SetupStage[] = ["system", "verify"];
+
+/** The stages this installation shows, from its distribution (`installation.json`). */
+export function stagesFor(distribution: string | null | undefined): readonly SetupStage[] {
+  if (distribution !== "desktop") return SETUP_STAGES;
+  return SETUP_STAGES.filter((stage) => !INSTALLER_STAGES.includes(stage));
+}
+
+/** The stage after `stage` on this rail; the last stage is its own next. */
+export function nextStage(stages: readonly SetupStage[], stage: SetupStage): SetupStage {
+  const index = stages.indexOf(stage);
+  return stages[Math.min(index + 1, stages.length - 1)] ?? "finish";
+}
+
+/** The stage before `stage` on this rail; the first stage is its own previous. */
+export function previousStage(stages: readonly SetupStage[], stage: SetupStage): SetupStage {
+  const index = stages.indexOf(stage);
+  return stages[Math.max(index - 1, 0)] ?? "welcome";
+}
+
+/**
  * Where a stored setup row lands on today's rail.
  *
  * `account` and `backup` are still valid stored values — an instance part-way
  * through the old wizard must not fail to render — so they resolve to the stage
- * that now carries their meaning rather than to a blank screen.
+ * that now carries their meaning rather than to a blank screen. A stage this
+ * installation does not show (an installer-covered one) resolves to the stage
+ * that follows it.
  */
-export function visibleStage(stage: string | null | undefined): SetupStage {
-  const shown: readonly string[] = SETUP_STAGES;
+export function visibleStage(stage: string | null | undefined, stages: readonly SetupStage[] = SETUP_STAGES): SetupStage {
+  const shown: readonly string[] = stages;
   if (stage && shown.includes(stage) && stage !== "finish") return stage as SetupStage;
   if (stage === "backup" || stage === "finish") return "finish";
+  if (stage && (SETUP_STAGES as readonly string[]).includes(stage)) {
+    const full = SETUP_STAGES.indexOf(stage as SetupStage);
+    return SETUP_STAGES.slice(full + 1).find((later) => stages.includes(later)) ?? "finish";
+  }
   return "welcome"; // including the retired `account`
 }
 

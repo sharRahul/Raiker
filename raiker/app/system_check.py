@@ -314,7 +314,12 @@ def system_readiness(workspace_root: Path) -> dict[str, Any]:
     ))
 
     try:
-        free = shutil.disk_usage(workspace_root if workspace_root.exists() else workspace_root.parent).free
+        # Before the first start the data folder may not exist yet (the
+        # installer asks); measure the nearest folder that does.
+        measured = workspace_root
+        while not measured.exists() and measured.parent != measured:
+            measured = measured.parent
+        free = shutil.disk_usage(measured).free
     except OSError:
         free = None
     if free is None:

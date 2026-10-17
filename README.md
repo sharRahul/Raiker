@@ -67,32 +67,38 @@ them. Full instructions: [Installing Raiker](docs/guide/getting-started.md).
 | Graphics | Not required | An NVIDIA, AMD or Apple-silicon GPU speeds up local models |
 | Network | Not required to install | Needed for hosted providers, web research and connectors |
 
-The **This device** step of setup measures these on your computer, without
-sending anything anywhere, and recommends a local model size that will run.
+These are checked **while Raiker installs**, on your computer and without
+sending anything anywhere: a computer that cannot run Raiker is told so before
+anything is installed or any account exists.
 
-## First-run setup
+## Installing and first run
 
-Setup takes a few minutes and can be left and resumed at any point:
-
-1. **Account** — a local owner account and password. It never leaves your
+1. **The installer checks this computer.** The Windows installer shows a
+   *Checking this computer* page before it copies a file (Windows version,
+   64-bit, memory, free space for the program and for your data); the `.deb`
+   and `.rpm` packages check memory before they unpack. A requirement that is
+   not met stops the install with its fix.
+2. **Raiker Setup finishes the installation** the first time you open Raiker,
+   on every platform (it is the only install step a dragged Mac app or an
+   AppImage has): it checks this computer in full — including credential
+   protection, network and graphics — prepares encrypted storage, starts
+   Raiker and verifies every part, showing each step as it runs. If something
+   fails it says what in one sentence, with **Try again** and **Open logs**.
+3. **Account** — a local owner account and password. It never leaves your
    computer.
-2. **Welcome** — what Chat, Build and Design are for.
-3. **This device** — operating system, architecture, memory, processor,
-   graphics acceleration, free storage, network, credential protection, local
-   model runtimes already installed, and where your data is kept.
-4. **Model** — connect a local runtime, a home-network endpoint or a hosted
+4. **Welcome** — what Chat, Build and Design are for.
+5. **Model** — connect a local runtime, a home-network endpoint or a hosted
    provider, and choose a default model; or decide later.
-5. **Privacy** — whether model requests stay on this device or may go to the
+6. **Privacy** — whether model requests stay on this device or may go to the
    providers you connect.
-6. **Permissions** — what Raiker can do for you today, read from your actual
+7. **Permissions** — what Raiker can do for you today, read from your actual
    settings, and the four ways each permission can be decided (*Ask before
    acting*, *Allow within a scope you approve*, *Act automatically within
    policy*, *Never*). Finishing setup grants nothing.
-7. **Check** — Raiker verifies its own components (database, data format,
-   memory, permissions, command runner, credential vault) and makes one short
-   request to the model you chose.
 
-Once complete, setup does not appear again.
+Setup can be left and resumed at any point, and does not appear again once
+complete. Running Raiker from a source checkout has no installer, so there the
+in-app setup also includes **This device** and **Check** stages.
 
 ## AI providers
 

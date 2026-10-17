@@ -408,6 +408,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     update.add_argument("--channel-name", default="stable", help="Channel name (default: stable).")
 
+    # DIST-05 — the installation-time system check. The desktop shell runs it
+    # before it starts the host for the first time, so a computer that cannot
+    # run Raiker is told so while installing, not after an account exists. The
+    # answer goes to a file: a Windows build has no console to print to.
+    check = sub.add_parser(
+        "system-check", help="Check whether this computer can run Raiker, without starting it."
+    )
+    _add_common(check, preserve_parent=True)
+    check.add_argument("--output", default=None, help="Write the result as JSON to this file.")
+    check.add_argument("--json", action="store_true", help="Print the result as JSON.")
+
     remove = sub.add_parser("uninstall", help="State what removing Raiker takes, and take it.")
     _add_common(remove, preserve_parent=True)
     remove.add_argument(
@@ -565,6 +576,8 @@ def _run_command(args: argparse.Namespace) -> int:
         return _command_desktop(workspace, args.action, activate=not args.no_activate)
     if args.command == "update":
         return _command_update(workspace, args)
+    if args.command == "system-check":
+        return _command_system_check(workspace, output=args.output, as_json=args.json)
     return _command_uninstall(workspace, args)
 
 
@@ -585,6 +598,34 @@ def _command_status(workspace: Path, port: int) -> int:
     else:
         print(f"[raiker] background start: {service.note}")
     return 0
+
+
+def _command_system_check(workspace: Path, *, output: str | None, as_json: bool) -> int:
+    """Measure this computer; exit 1 when a mandatory requirement is not met.
+
+    Nothing is created: the data folder may not exist yet, and free space is
+    then measured on the nearest folder that does.
+    """
+    from raiker.app.system_check import system_readiness
+
+    answer = system_readiness(workspace)
+    text = json.dumps(answer, indent=2, sort_keys=True)
+    if output:
+        target = Path(output)
+        partial = target.with_name(target.name + ".partial")
+        partial.write_text(text + "\n", encoding="utf-8")
+        partial.replace(target)
+    if as_json:
+        print(text)
+    elif not output:
+        marks = {"pass": "ok  ", "warn": "note", "fail": "FAIL", "info": "    "}
+        for check in answer["checks"]:
+            print(f"[raiker] {marks[check['state']]} {check['label']}: {check['detail']}")
+            if check["remedy"] and check["state"] in ("warn", "fail"):
+                print(f"[raiker]        {check['remedy']}")
+        print("[raiker] This computer can run Raiker." if answer["ready"]
+              else "[raiker] This computer cannot run Raiker yet.")
+    return 0 if answer["ready"] else 1
 
 
 def _command_quit(workspace: Path, *, force: bool) -> int:

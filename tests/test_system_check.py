@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -82,3 +83,17 @@ def test_the_installation_check_runs_inside_a_real_host(tmp_path: Path) -> None:
     assert by_id["model"]["state"] == "warn"
     system = client.get("/api/setup/system", headers=headers)
     assert system.status_code == 200 and system.json()["checks"]
+
+
+def test_the_installation_time_check_writes_its_answer_and_creates_nothing(tmp_path: Path) -> None:
+    from raiker.app.launcher import main
+
+    workspace = tmp_path / "not" / "yet" / "created"
+    output = tmp_path / "check.json"
+    code = main(["system-check", "--workspace", str(workspace), "--output", str(output)])
+    answer = json.loads(output.read_text(encoding="utf-8"))
+    assert code == (0 if answer["ready"] else 1)
+    assert {check["id"] for check in answer["checks"]} >= {"os", "arch", "memory", "storage"}
+    storage = next(check for check in answer["checks"] if check["id"] == "storage")
+    assert storage["state"] != "info"  # measured on the nearest existing folder
+    assert not workspace.exists()

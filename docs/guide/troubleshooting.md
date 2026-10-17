@@ -108,6 +108,11 @@ in the process environment.
 
 | What you see | Meaning | Fix |
 |---|---|---|
+| Raiker Setup: *This computer doesn't meet Raiker's requirements yet* | A requirement listed under it is not met (memory, free storage, operating system, architecture) | Do what the listed item says, then **Try again**. Nothing was created, so there is nothing to clean up. |
+| Raiker Setup: *Raiker took too long to start* / *stopped while it was starting* / *Part of Raiker is missing* | The bundled host did not start or verify | **Try again**. If it repeats, **Open logs** (`logs/setup.log`) and reinstall: your data is outside the app and is kept. |
+| Raiker Setup opens by itself on a later start | Raiker did not start, so it is being checked again | Follow the screen. To run the checks on purpose, start Raiker with `--repair`. |
+| Windows installer: a ✖ on *Checking this computer*, and **Next** is greyed out | Memory, or free space for the program or your data, is below the minimum | Free space (or choose another folder with **Back**), or use a computer with at least 4 GB of memory. Nothing has been installed. |
+| `apt`/`dnf`: *Raiker was not installed: this computer does not meet its requirements* | Less than 4 GB of memory | Use a computer with at least 4 GB of memory. |
 | *Raiker's host stopped before it was ready* / *did not become ready* (in the window) | The bundled host could not start | Open Raiker again. If it repeats, reinstall: your data is outside the app and is kept. |
 | *Windows protected your PC* | A test build that is not code-signed | Use a signed release. Only for a build you trust: **More info → Run anyway**. |
 | macOS: *"Raiker" can't be opened* | An unsigned test build downloaded from the internet | Use a signed, notarised release. |

@@ -650,6 +650,42 @@ const check = (id: string, state: string, extra: Record<string, unknown> = {}) =
   ...extra,
 });
 
+describe("DIST-05 — a desktop installation was checked while it installed", () => {
+  const desktopUpdate = { installation: { distribution: "desktop", version: "1.0.0" } };
+
+  it("goes from Welcome straight to Model, with no device or installation stage", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": { ...required, stage: "welcome" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/host/update": desktopUpdate,
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "model" },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Meet Raiker" })).toBeInTheDocument();
+    const rail = screen.getByRole("list", { name: "Setup progress" });
+    await waitFor(() => expect(within(rail).queryByText("This device")).toBeNull());
+    expect(within(rail).queryByText("Check")).toBeNull();
+    expect(within(rail).getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByText("01 · Welcome")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    const put = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/api/setup") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body)).stage).toBe("model");
+    expect(await screen.findByText("02 · Model")).toBeInTheDocument();
+  });
+
+  it("opens a stored device stage on Model rather than a check that already ran", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "system" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/host/update": desktopUpdate,
+    });
+    render(ModelSetupView);
+    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+  });
+});
+
 describe("DIST-05/06 — this device, permissions and the installation check", () => {
   it("says what this device can run, measured locally, without requiring a GPU", async () => {
     stubFetch({

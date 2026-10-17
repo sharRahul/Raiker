@@ -53,6 +53,21 @@ mac:
 dmg:
   title: "Install Raiker ${version}"
   writeUpdateInfo: false
+  # Drag-to-install, on the Setup window's palette (scripts/desktop_installer_art.py).
+  # The @2x image beside it is combined for Retina displays.
+  background: build-resources/dmg-background.png
+  iconSize: 96
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 200
+      type: file
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
 
 win:
   icon: ../raiker/assets/raiker-icon.png
@@ -77,8 +92,12 @@ nsis:
   # (build-resources/installer.nsh) and never removes it during an update.
   deleteAppDataOnUninstall: false
   differentialPackage: false
+  # The "Checking this computer" page and the uninstaller's data question.
   include: build-resources/installer.nsh
   license: ../LICENSE
+  installerSidebar: build-resources/installerSidebar.bmp
+  uninstallerSidebar: build-resources/uninstallerSidebar.bmp
+  installerHeader: build-resources/installerHeader.bmp
 msi:
   artifactName: "${productName}-${version}-${env.RAIKER_TARGET}${env.RAIKER_ARTIFACT_SUFFIX}.${ext}"
   perMachine: false
@@ -119,6 +138,9 @@ deb:
     - libatspi2.0-0
     - libuuid1
     - libsecret-1-0
+  # The system check, before anything is unpacked (relative to desktop/,
+  # where the build script runs electron-builder).
+  fpm: ["--before-install", "build-resources/linux-preinstall.sh"]
 rpm:
   packageName: raiker
   depends:
@@ -131,4 +153,4 @@ rpm:
     - at-spi2-core
     - libuuid
     - libsecret
-  fpm: ["--rpm-rpmbuild-define=_build_id_links none"]
+  fpm: ["--rpm-rpmbuild-define=_build_id_links none", "--before-install", "build-resources/linux-preinstall.sh"]

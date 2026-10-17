@@ -10,10 +10,13 @@
 import { describe, expect, it } from "vitest";
 import type { ModelProfile } from "./apiTypes";
 import {
+  nextStage,
   PERMISSIONS_NOTE,
+  previousStage,
   PRIVACY_CHOICES,
   recommendedPath,
   SETUP_STAGES,
+  stagesFor,
   visibleStage,
 } from "./firstRun";
 
@@ -55,6 +58,23 @@ describe("the stages first launch shows", () => {
     expect(visibleStage("system")).toBe("system");
     expect(visibleStage("verify")).toBe("verify");
     expect(visibleStage("finish")).toBe("finish");
+  });
+
+  it("does not repeat the checks a desktop installer already ran (DIST-05)", () => {
+    const desktop = stagesFor("desktop");
+    expect([...desktop]).toEqual(["welcome", "model", "privacy", "permissions", "finish"]);
+    // A source checkout or server install had no installer step: it keeps both.
+    expect(stagesFor("payload")).toBe(SETUP_STAGES);
+    expect(stagesFor(null)).toBe(SETUP_STAGES);
+    // A row stored on a stage this rail skips opens on the stage after it.
+    expect(visibleStage("system", desktop)).toBe("model");
+    expect(visibleStage("verify", desktop)).toBe("finish");
+    expect(nextStage(desktop, "welcome")).toBe("model");
+    expect(nextStage(desktop, "permissions")).toBe("finish");
+    expect(previousStage(desktop, "finish")).toBe("permissions");
+    expect(nextStage(SETUP_STAGES, "welcome")).toBe("system");
+    expect(previousStage(SETUP_STAGES, "finish")).toBe("verify");
+    expect(previousStage(desktop, "welcome")).toBe("welcome");
   });
 });
 

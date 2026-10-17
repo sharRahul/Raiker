@@ -189,3 +189,35 @@ def test_a_signed_build_checks_its_publishers_channel_unless_the_owner_pinned_on
     plain = dict(signed, update_channel=dict(channel, url="http://updates.example/x.json"))
     (tmp_path / "installation.json").write_text(json.dumps(plain), encoding="utf-8")
     assert bundled_channel_config(tmp_path) is None
+
+
+def test_the_installers_check_this_computer_before_they_install() -> None:
+    """DIST-05 — the system check runs during installation, not after it."""
+    config = yaml.safe_load((ROOT / "desktop/electron-builder.yml").read_text(encoding="utf-8"))
+    include = (ROOT / "desktop" / config["nsis"]["include"]).read_text(encoding="utf-8")
+    # Windows: a page after the folder is chosen, before any file is copied,
+    # with the same floors the app applies; a silent install applies them too.
+    assert "!macro customPageAfterChangeDir" in include
+    assert "Page custom RaikerCheckPage RaikerCheckLeave" in include
+    assert "!define RAIKER_MIN_MEMORY_MB 4096" in include
+    assert "!define RAIKER_MIN_DATA_MB 2048" in include
+    assert "SetErrorLevel 2" in include
+    from raiker.app.system_check import GIB, MIN_FREE_BYTES, MIN_MEMORY_BYTES
+
+    assert MIN_MEMORY_BYTES == 4096 * 1024 * 1024 and MIN_FREE_BYTES == 2048 * 1024 * 1024 == 2 * GIB
+    # Linux packages: a pre-install script with the same memory floor.
+    for fmt in ("deb", "rpm"):
+        fpm = config[fmt]["fpm"]
+        script = fpm[fpm.index("--before-install") + 1]
+        body = (ROOT / "desktop" / script).read_text(encoding="utf-8")
+        assert "min_mb=4096" in body and "exit 1" in body
+
+
+def test_the_installers_carry_raikers_artwork() -> None:
+    config = yaml.safe_load((ROOT / "desktop/electron-builder.yml").read_text(encoding="utf-8"))
+    for key in ("installerSidebar", "uninstallerSidebar", "installerHeader"):
+        assert (ROOT / "desktop" / config["nsis"][key]).is_file(), key
+    background = ROOT / "desktop" / config["dmg"]["background"]
+    assert background.is_file()
+    assert background.with_name(background.stem + "@2x.png").is_file()
+    assert {item.get("path") for item in config["dmg"]["contents"]} >= {"/Applications"}

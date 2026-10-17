@@ -315,6 +315,17 @@
     <div class="desktop-drag-strip" aria-hidden="true"></div>
   {/if}
   <LoginView {onAuthenticated} runtimeState={authState} />
+{:else if current === "model-setup"}
+  <!-- First-run setup is a focused sheet: no navigation, top bar or palette
+       around it, the way the desktop Setup window before sign-in has none.
+       Its own links (Advanced setup, Review permissions) still lead into the
+       app, which then opens with its navigation as usual. -->
+  {#if inDesktopShell()}
+    <div class="desktop-drag-strip" aria-hidden="true"></div>
+  {/if}
+  <main id="main" class="setup-focus" tabindex="-1">
+    <LazyRoute route="model-setup" />
+  </main>
 {:else}
   <div class="app-shell" data-navigation-open={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}>
     <Sidebar
@@ -360,9 +371,7 @@
         <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
         <ResponsivePage layout={pageLayout}>
-          {#if current === "model-setup"}
-            <LazyRoute route="model-setup" />
-          {:else if chatVisited}
+          {#if chatVisited}
             <div hidden={current !== "new-chat"}>
               <ChatView
                 sessionId={current === "new-chat" ? continuedSessionId : null}
@@ -502,6 +511,20 @@
        instead of re-deriving the shell's padding, so they stay correct when the
        padding changes at a breakpoint. */
     --content-h: calc(100dvh - var(--topbar-h) - var(--space-5) * 2);
+  }
+  .setup-focus {
+    height: 100vh;
+    overflow-y: auto;
+    background:
+      radial-gradient(50% 40% at 100% 0%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
+      var(--bg);
+  }
+  .setup-focus:focus-visible {
+    outline: none;
+  }
+  /* Clear of the window controls the desktop shell draws over the top strip. */
+  :global(:root[data-desktop-shell]) .setup-focus {
+    padding-top: calc(var(--topbar-h) - var(--space-3));
   }
   .content:focus-visible {
     outline: 2px solid var(--focus-ring);

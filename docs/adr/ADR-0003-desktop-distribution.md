@@ -258,6 +258,56 @@ acceptance criteria, and references.
 - **Acceptance.** An owner completes onboarding in the installed window on each
   target.
 
+### D7a — The system check runs during installation (DIST-05, revised)
+
+- **Problem.** D7 put the device check and the installation check inside the
+  in-app wizard, after the owner account existed. An owner could install
+  Raiker, create an account, and only then learn the computer could not run
+  it; and a check after sign-in reads as configuration, not installation.
+- **Reference.** Hermes Agent's installer (a separate signed Tauri app) runs a
+  fixed list of named stages with live elapsed time, a hidden-by-default log,
+  one plain sentence on failure with Retry beside it, and a completion receipt;
+  it has no pre-flight check of memory or disk at all.
+- **Alternatives.** *A separate installer application* like Hermes' — Raiker
+  downloads nothing at install time (every dependency is bundled), so a second
+  application would add a signing and update surface for no download it needs
+  to drive. *Checks only in the native installers* — a dragged Mac app and an
+  AppImage have no installer step, and an MSI cannot run custom UI from
+  electron-builder. *Keep D7*.
+- **Choice.** Two layers, both before any account exists. (1) Native
+  pre-install checks where an installer can run code: the NSIS page
+  *Checking this computer* (`customPageAfterChangeDir`: Windows build, 64-bit,
+  memory, free space for the program and the data; a ✖ disables **Next**, a
+  silent install exits 2) and a deb/rpm `--before-install` memory check; the
+  floors are `system_check.py`'s. (2) **Raiker Setup**, a window of the shell
+  shown on the first start of each installed version (`desktop/src/setup.ts`,
+  `desktop/static/setup.*`): *Checking this computer* (the host's new
+  `system-check --output` command, which creates nothing), *Preparing
+  encrypted storage and starting Raiker*, *Verifying the installation*
+  (`/api/health` store + text search, interface served). A receipt in the
+  shell profile records completion per version; a later failed start opens it
+  as a repair; `--repair` forces it. The in-app wizard drops **This device**
+  and **Check** for `distribution: desktop` and keeps them for source and
+  server installs.
+- **Security.** The Setup page is packaged (`default-src 'none'`), has its own
+  preload with two operations (hear progress; ask for one of five named
+  actions), and the shell ignores messages from any other sender. The check
+  sends no packet.
+- **UX.** Hermes' patterns: step list with live timers, *N of M steps
+  complete*, *Show details* log capped at 2,000 lines, failure as one sentence
+  with Try again / Open logs / Quit and "Nothing here deletes your
+  conversations or settings". The in-app wizard is a focused sheet without the
+  app's navigation, with a segmented progress bar; branded NSIS sidebar/header
+  and a drag-to-Applications dmg background share the Setup palette.
+- **Tests.** `desktop/test/setup.test.ts`, `tests/test_system_check.py`
+  (installation-time check creates nothing), `tests/test_desktop_release.py`
+  (installer floors match the app's; artwork present),
+  `web/src/lib/firstRun.test.ts`, `ModelSetupView.test.ts` (DIST-05 desktop
+  block), `desktop/e2e/packaged-*.spec.ts` (Setup window on every target).
+- **Not verified in CI.** The NSIS *Checking this computer* page itself (CI
+  installs silently, which runs the same measurement in `customInit`) and the
+  dmg background as rendered by Finder.
+
 ### D8 — Application updates (DIST-10)
 
 - **Problem.** The signed updater swaps a payload directory; a desktop package

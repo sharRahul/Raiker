@@ -5,9 +5,10 @@
  * Run against an installed or unpacked package — by hand, or by
  * `.github/workflows/desktop-package.yml` on each platform's own runner after it
  * has installed the package: RAIKER_PACKAGED_APP names the executable and
- * RAIKER_HOME an empty workspace. The shell must start the frozen host from `resources/host`, wait
- * for its ready file, and show the owner's first-run screen — no terminal, no
- * browser, no Python on the machine.
+ * RAIKER_HOME an empty workspace. The shell must open its Setup window, check
+ * this computer, start the frozen host from `resources/host`, verify it, and
+ * then show the owner's first-run screen — no terminal, no browser, no Python
+ * on the machine.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
@@ -16,12 +17,14 @@ import { dirname, join } from "node:path";
 
 import { _electron as electron, expect, test } from "@playwright/test";
 
+import { finishInstalling } from "./setupWindow";
+
 const APP = process.env.RAIKER_PACKAGED_APP ?? "";
 const SHOTS = process.env.RAIKER_DESKTOP_SHOTS ?? "test-results";
 
 test("the packaged app starts its bundled host and opens on first run", async () => {
   test.skip(APP === "", "set RAIKER_PACKAGED_APP to a packaged Raiker executable");
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const app = await electron.launch({
     executablePath: APP,
     args: ["--no-sandbox"],
@@ -30,8 +33,8 @@ test("the packaged app starts its bundled host and opens on first run", async ()
       RAIKER_DESKTOP_USER_DATA: mkdtempSync(join(tmpdir(), "raiker-packaged-")),
     },
   });
-  const page = await app.firstWindow();
-  await expect(page.getByLabel("Username")).toBeVisible({ timeout: 150_000 });
+  const page = await finishInstalling(app, SHOTS, "packaged");
+  await expect(page.getByLabel("Username")).toBeVisible({ timeout: 60_000 });
   expect(page.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
   await expect(page.locator("html")).toHaveAttribute("data-desktop-shell", process.platform);
   await page.screenshot({ path: join(SHOTS, "desktop-packaged-first-run.png") });

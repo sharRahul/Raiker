@@ -94,7 +94,13 @@ FunctionEnd
 
 Function RaikerCheckPage
   Call RaikerMeasure
-  !insertmacro MUI_HEADER_TEXT "Checking this computer" "Before anything is installed, Raiker checks that this computer can run it."
+  ; MUI's header title and subtitle (controls 1037 and 1038), set directly:
+  ; electron-builder includes this file before MUI2, so its MUI_HEADER_TEXT
+  ; macro does not exist yet here.
+  GetDlgItem $R6 $HWNDPARENT 1037
+  SendMessage $R6 ${WM_SETTEXT} 0 "STR:Checking this computer"
+  GetDlgItem $R6 $HWNDPARENT 1038
+  SendMessage $R6 ${WM_SETTEXT} 0 "STR:Before anything is installed, Raiker checks that this computer can run it."
   nsDialogs::Create 1018
   Pop $RaikerCheckDialog
   ${If} $RaikerCheckDialog == error

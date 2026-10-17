@@ -13,9 +13,10 @@ row below is for an **unsigned** build.
 ## Matrix
 
 Status as of 2026-10-17. CI evidence: `.github/workflows/desktop-package.yml`,
-[run 39044354934](https://github.com/sharRahul/Raiker/actions/runs/39044354934)
-on commit `6758e64` of PR #235 (every job green; the native targets also passed
-in run 39041854653 on `914b60a`), each target on its own GitHub-hosted runner,
+[run 39051611755](https://github.com/sharRahul/Raiker/actions/runs/39051611755)
+on commit `808409c` of PR #235 (every job green, with the installation-time
+system check and the Raiker Setup window; earlier runs 39044354934 on
+`6758e64` and 39041854653 on `914b60a` passed before them), each target on its own GitHub-hosted runner,
 unsigned, version stamp `0.0.0`. Each target's artifact holds its installers
 and the evidence files named below.
 
@@ -34,10 +35,21 @@ owner registration, setup required, system check with no blocking failure,
 installation check with no failed mandatory component, setup saved, quit,
 restart over the same profile, sign-in and setup progress after restart.
 "Window + onboarding" is `packaged-live.spec.ts` and
-`packaged-onboarding-live.spec.ts` against the installed executable: the window
-starts its bundled host, reaches first run, and an owner registers and walks
-Welcome → This device → Model (Decide later) → Privacy → Permissions → Check
-(no row needing attention) → Setup saved → Home.
+`packaged-onboarding-live.spec.ts` against the installed executable: the
+**Raiker Setup** window opens first (Finish installing → *Checking this
+computer* lists what it found → host started → verified → *Raiker is ready*),
+**Open Raiker** opens the window on first run, and an owner registers and walks
+Welcome → Model (Decide later) → Privacy → Permissions → Setup saved → Home.
+
+**Installation-time checks.** Windows: every NSIS install in CI is silent
+(`/S`), which runs the same memory and free-space measurement in `customInit`
+and installs only when it passes — PASS on both Windows rows. The interactive
+*Checking this computer* page itself is NOT TESTED (no GUI driver for the NSIS
+wizard in CI); it compiles in electron-builder's include order. Linux: the
+`.deb` pre-install check ran and passed in each `apt-get install` (and
+locally: "Raiker: checking this computer before installing … memory: 16093
+MB"). The refusal paths (too little memory or disk) are NOT TESTED on a real
+machine.
 
 **Windows on Arm** — there is no native arm64 package (`cryptography` ships
 no win_arm64 wheel, so the host cannot be frozen there). The x86-64 installer

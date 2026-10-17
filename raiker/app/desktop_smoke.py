@@ -198,6 +198,9 @@ def run(host: Path, *, expect_signed: bool | None = None, keep: bool = False) ->
         assert isinstance(verify, dict)
         failed = [c["id"] for c in verify.get("checks", []) if c.get("state") == "fail"]
         check(not failed, f"installation check has no failed mandatory component {failed}", results)
+        status, guide = _request(f"{url}api/guide", token=token)
+        check(status == 200 and isinstance(guide, dict) and guide.get("available") is True,
+              "the in-app guide is bundled", results)
         status, saved = _request(f"{url}api/setup", method="PUT", token=token,
                                  body={"status": "in_progress", "stage": "model"})
         check(status == 200 and isinstance(saved, dict) and saved.get("stage") == "model",

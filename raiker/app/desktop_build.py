@@ -85,6 +85,10 @@ def pyinstaller_command(
         "pkg_resources",
         "--add-data",
         f"{web_assets}{separator}web",
+        # The in-app Guide reads `docs/guide` beside the package
+        # (`raiker.guide.guide_root`); a frozen host carries it there too.
+        "--add-data",
+        f"{source_root / 'docs' / 'guide'}{separator}docs/guide",
         str(entry),
     ]
 

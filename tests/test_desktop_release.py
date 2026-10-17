@@ -162,6 +162,8 @@ def test_the_frozen_host_carries_the_keyring_backends_where_it_uses_them(tmp_pat
     windows = pyinstaller_command(source_root=tmp_path, web_assets=tmp_path, out_dir=tmp_path, platform_name="win32")
     assert "--copy-metadata" in posix and "keyring" in posix
     assert "keyring" not in windows
+    # The in-app Guide is read from docs/guide beside the frozen package.
+    assert any(part.endswith("docs/guide") for part in posix)
 
 
 def test_a_signed_build_checks_its_publishers_channel_unless_the_owner_pinned_one(tmp_path: Path) -> None:

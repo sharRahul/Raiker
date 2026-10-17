@@ -941,6 +941,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-917](#fixed-917--ci-was-red-on-main-a-stale-api-contract-and-readme-truth-markers) | High | CI / documentation | Fixed 2026-10-17 — found at the start of the round |
 | [FIXED-918](#fixed-918--a-narrow-window-let-the-page-title-run-under-the-mode-switch) | Low | Web UI / top bar | Fixed 2026-10-17 — found in the round |
 | [FIXED-919](#fixed-919--first-run-choose-a-model-took-two-presses-of-two-buttons-with-one-name-was-bug-344) | Low | Models / first-run UX | Fixed 2026-10-17 (was BUG-344) — found in the round |
+| [FIXED-920](#fixed-920--signed-installers-did-not-carry-the-desktop-window-and-needed-a-system-python-was-bug-343) | High | Desktop / release | Fixed 2026-10-17 (was BUG-343) — ADR-0003 |
 
 ---
 
@@ -33374,3 +33375,16 @@ installation cases in `tests/test_api_contract_responses.py`.
 **Fixed.** The recommendation's button asks `ProviderMatrix` to open that provider's picker (`openPickerFor`) as soon as its catalogue is listed — once, so closing the picker does not reopen it. The full list is still there beneath it.
 
 **Evidence.** `ModelSetupView.test.ts` ("opens the providers when the recommendation asks for a model" now also finds the *OpenRouter models* dialog). Live: `desktop-live.spec.ts` from an empty workspace pressed **Choose a model** once and got *Anthropic models* (`desktop-02-choose-model.png`).
+
+---
+
+## FIXED-920 — Signed installers did not carry the desktop window, and needed a system Python (was BUG-343)
+
+**Severity: High (raised as Low). Area: Desktop / release. Status: Fixed 2026-10-17 (was BUG-343) — [ADR-0003](../adr/ADR-0003-desktop-distribution.md), DIST-01 – DIST-12.**
+
+**Observed.** `release.yml` built and signed the browser-launch payload and wrapped it in `.pkg`/`.msi`/`.deb`/AppImage installers whose post-install step ran `python3 -m venv`, so no published installer could install on a machine without Python 3.11. Nothing built, signed or tested the Electron package, and the window had been exercised on Linux only. The audit for this fix also found the release never built the governed-command runner, and that a frozen host could not start its update helper.
+
+**Fixed.** The release product is the desktop package: `scripts/build_desktop_app.py` freezes the host (with the command runner and the in-app guide), writes `installation.json`, smoke-tests the frozen host, and packages it with the pinned electron-builder as NSIS + MSI (Windows), dmg + zip (macOS Apple silicon and Intel), and AppImage + deb + rpm (Linux x86-64 and ARM64). `.github/workflows/desktop-package.yml` builds, installs, smoke-tests, opens the installed window, completes onboarding and uninstalls on each platform's own runner; `release.yml` calls it with the signing identities and publishes `desktop-<channel>.json`. First run gained This device, Permissions and Check stages; the vault key moved to the OS key store; desktop updates verify a signed manifest before installing.
+
+**Evidence.** [Release acceptance matrix](RELEASE_ACCEPTANCE_MATRIX.md): every native target PASS in CI run 39041854653 (commit `914b60a`), including the real Windows and macOS windows this item asked for. Signing with real identities is unexercised until the release owner adds them; the pipeline refuses to publish without them.
+

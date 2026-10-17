@@ -12,21 +12,43 @@ row below is for an **unsigned** build.
 
 ## Matrix
 
-Status as of 2026-10-17. CI evidence comes from `.github/workflows/desktop-package.yml`
-on PR #235; local evidence comes from an Ubuntu 24.04 x86-64 container.
+Status as of 2026-10-17. CI evidence: `.github/workflows/desktop-package.yml`,
+[run 39041854653](https://github.com/sharRahul/Raiker/actions/runs/39041854653)
+on commit `914b60a` of PR #235, each target on its own GitHub-hosted runner,
+unsigned, version stamp `0.0.0`. Each target's artifact holds its installers
+and the evidence files named below.
 
-| Target | Installers | Build | Install | Installed-host smoke | Window + onboarding | Uninstall keeps data | Update | Evidence |
-|---|---|---|---|---|---|---|---|---|
-| linux-x86_64 | AppImage, deb, rpm | PASS | PASS (deb via apt) | PASS (20/20) | PASS | NOT TESTED locally | NOT TESTED | Local container, see [Local evidence](#local-evidence-linux-x86-64) |
-| linux-x86_64 (CI) | AppImage, deb, rpm | see run | see run | see run | see run | see run | NOT TESTED | CI run summary |
-| linux-arm64 | AppImage, deb, rpm | see run | see run | see run | see run | see run | NOT TESTED | CI run summary |
-| windows-x86_64 | setup.exe, msi | see run | see run | see run | see run | see run | NOT TESTED | CI run summary |
-| Windows on Arm (x86-64 package, emulated) | setup.exe | n/a | see run | see run | NOT TESTED | see run | NOT TESTED | CI run summary |
-| macos-arm64 | dmg, zip | see run | see run | see run | see run | see run | NOT TESTED | CI run summary |
-| macos-x86_64 | dmg, zip | see run | see run | see run | see run | see run | NOT TESTED | CI run summary |
+| Target (runner) | Installers | Build + frozen-host smoke | Install | Installed-host smoke | Window + onboarding | Uninstall keeps data | Signed-channel update |
+|---|---|---|---|---|---|---|---|
+| windows-x86_64 (`windows-2022`) | setup.exe, msi | PASS | PASS — NSIS `/S` per user, Start-menu shortcut present; MSI `/qn` per user | PASS (NSIS and MSI) | PASS | PASS — NSIS uninstall; MSI `/x` | NOT TESTED |
+| Windows on Arm (`windows-11-arm`, x86-64 package under emulation) | setup.exe | n/a | see below | see below | NOT TESTED | see below | NOT TESTED |
+| macos-arm64 (`macos-14`) | dmg, zip | PASS | PASS — app copied from the mounted dmg to ~/Applications | PASS | PASS | PASS — app removed, ~/Library/Application Support/Raiker kept | NOT TESTED |
+| macos-x86_64 (`macos-15-intel`) | dmg, zip | PASS | PASS | PASS | PASS | PASS | NOT TESTED |
+| linux-x86_64 (`ubuntu-22.04`) | AppImage, deb, rpm | PASS | PASS — `apt-get install ./…deb` | PASS (deb and AppImage) | PASS | PASS — `apt-get remove raiker`, ~/.local/share/raiker kept | NOT TESTED |
+| linux-arm64 (`ubuntu-22.04-arm`) | AppImage, deb, rpm | PASS | PASS | PASS (deb and AppImage) | PASS | PASS | NOT TESTED |
 
-"see run" rows are filled from the CI run on the PR's head commit; this table
-is updated with the result once that run completes.
+"Installed-host smoke" is `raiker.app.desktop_smoke` from an empty profile:
+provenance (unsigned), ready, health, encrypted store, FTS5, web app served,
+owner registration, setup required, system check with no blocking failure,
+installation check with no failed mandatory component, setup saved, quit,
+restart over the same profile, sign-in and setup progress after restart.
+"Window + onboarding" is `packaged-live.spec.ts` and
+`packaged-onboarding-live.spec.ts` against the installed executable: the window
+starts its bundled host, reaches first run, and an owner registers and walks
+Welcome → This device → Model (Decide later) → Privacy → Permissions → Check
+(no row needing attention) → Setup saved → Home.
+
+**Windows on Arm** — the first run of the emulated job failed before
+installing (it searched the wrong folder of the downloaded artifact); the fix
+is `8f5e0f2` and its result is recorded here when that run completes.
+
+**.rpm** packages are built and checksummed on both Linux runners but are not
+installed in CI (the runners are Debian-based); NOT TESTED beyond `rpm -qp`
+inspection locally (package name `raiker`).
+
+**Not covered by any row:** signed builds (no identities configured),
+Gatekeeper on a quarantined download, SmartScreen, a real model provider, and
+an update through a published signed channel.
 
 ## Local evidence (Linux x86-64)
 

@@ -397,7 +397,9 @@ jobs:
           RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
         run: |
           New-Item -ItemType Directory -Force evidence | Out-Null
-          $setup = Get-ChildItem x64\*-setup*.exe | Select-Object -First 1
+          # The artifact keeps its desktop-release/ folder, so search beneath it.
+          $setup = Get-ChildItem -Path x64 -Recurse -Filter "*-setup*.exe" | Select-Object -First 1
+          if (-not $setup) { Get-ChildItem -Recurse x64 | Select-Object -First 20 FullName; throw "no x86-64 setup.exe in the artifact" }
           $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
           $root = Join-Path $env:LOCALAPPDATA "Programs\Raiker"

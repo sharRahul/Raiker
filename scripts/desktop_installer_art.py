@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Draw the desktop installers' artwork into ``desktop/build-resources/``.
 
 The installers show the same brand as the app's Setup window

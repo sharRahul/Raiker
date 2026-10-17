@@ -722,7 +722,7 @@
 <style>
   /* One focused column. The Setup window before sign-in has the same shape
      (desktop/static/setup.css), so installing and setting up read as one flow. */
-  .setup-shell { width: min(52rem, 100%); margin: 0 auto; display: grid; align-content: start; gap: clamp(1.5rem, 4vw, 2.5rem); padding: clamp(1rem, 4vw, 2.5rem) clamp(1rem, 4vw, 3rem) var(--space-8, 4rem); }
+  .setup-shell { width: min(52rem, 100%); margin: 0 auto; display: grid; align-content: start; gap: clamp(1.5rem, 4vw, 2.5rem); padding: clamp(1rem, 4vw, 2.5rem) clamp(1rem, 4vw, 3rem) var(--space-6); }
   /* Where you are stays in view while the model list under it is scrolled. */
   /* An opaque band the full width of the window, so the model list scrolls
      under it rather than through it. */

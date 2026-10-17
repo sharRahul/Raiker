@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -226,10 +227,16 @@ def _source_notes(checkout: Path | None) -> list[str]:
     a git repository because it happens to live inside it has exceeded what
     "uninstall Raiker" can possibly have meant.
     """
-    notes = [
-        "the Python package itself — remove it with your package manager "
-        "(`pip uninstall raiker`)"
-    ]
+    notes = (
+        # A packaged desktop build is removed by the platform's own uninstaller
+        # (Apps & features, the Applications folder, the package manager).
+        ["the application itself — your system's uninstaller removes it"]
+        if getattr(sys, "frozen", False)
+        else [
+            "the Python package itself — remove it with your package manager "
+            "(`pip uninstall raiker`)"
+        ]
+    )
     if checkout is None:
         return notes
     notes.append(
@@ -299,6 +306,11 @@ def apply_uninstall(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(instance.path, destination, dirs_exist_ok=True)
             done.append(f"Exported {instance.name} to {destination}")
+        # DIST-08 — a removed instance's vault key may live in the OS key store
+        # rather than in its files; it goes with the instance.
+        from raiker.auth.os_keystore import forget_workspace
+
+        forget_workspace(instance.path)
         if instance.disposition == "erase":
             erased = secure_erase(instance.path)
             done.append(f"Overwrote and removed {erased} file(s) under {instance.path}")

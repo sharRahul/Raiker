@@ -1,13 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-# DESK-12 — the desktop application: this shell, with the frozen Raiker host
-# inside it. `python scripts/build_desktop.py --out ../desktop-dist` produces the
-# host (PyInstaller, `desktop-dist/Raiker/`); this file puts it at
-# `resources/host/`, which is where `src/host.ts` starts it from and where
-# `raiker/app/desktop_shell.py` looks for the shell that carries it.
+# DESK-12 / DIST-01 — the desktop application an owner installs: this shell,
+# with the frozen Raiker host inside it, so nothing on the owner's machine needs
+# Python, Node or a terminal (docs/adr/ADR-0003-desktop-distribution.md).
 #
-# Signing identities are not configured here. An unsigned build is named as one
-# (`-unsigned` in artifactName) so it can never be mistaken for a release; the
-# signed pipeline is `.github/workflows/release.yml`.
+# Do not run electron-builder against this file by hand. `scripts/build_desktop_app.py`
+# freezes the host into `desktop-dist/Raiker/`, writes the provenance record the
+# running product reads (`installation.json`), smoke-tests the frozen host, and
+# then calls the pinned electron-builder with the version and the signing
+# switches for this target.
+#
+# Signing identities never appear here. electron-builder reads them from the
+# environment only when the release workflow supplies them (CSC_LINK and
+# friends); an unsigned build is named `-unsigned` so it can never be mistaken
+# for a release.
 appId: org.raiker.desktop
 productName: Raiker
 copyright: Copyright © Raiker contributors
@@ -24,21 +29,128 @@ extraResources:
   - from: ../raiker/assets/raiker-icon.png
     to: raiker-icon.png
 asar: true
-artifactName: "${productName}-${version}-${os}-${arch}-unsigned.${ext}"
+# The release names say what they are: product, version, target (OS and
+# architecture, RAIKER_TARGET) and, for a test build, `-unsigned`
+# (RAIKER_ARTIFACT_SUFFIX). Both are set by the build script, and
+# `raiker/app/desktop_release.py` computes the same names.
+artifactName: "${productName}-${version}-${env.RAIKER_TARGET}${env.RAIKER_ARTIFACT_SUFFIX}.${ext}"
+publish: null
+
 mac:
   category: public.app-category.productivity
   icon: ../raiker/assets/raiker-icon.png
-  target: [dmg]
+  # dmg is what an owner downloads; zip is what the signed updater swaps in.
+  target: [dmg, zip]
   hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  minimumSystemVersion: "12.0"
+  extendInfo:
+    # Voice input asks for the microphone through the window's narrow media
+    # permission; macOS shows this sentence when it asks the owner.
+    NSMicrophoneUsageDescription: Raiker uses the microphone only when you start voice input.
+dmg:
+  title: "Install Raiker ${version}"
+  writeUpdateInfo: false
+  # Drag-to-install, on the Setup window's palette (scripts/desktop_installer_art.py).
+  # The @2x image beside it is combined for Retina displays.
+  background: build-resources/dmg-background.png
+  iconSize: 96
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 200
+      type: file
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
+
 win:
   icon: ../raiker/assets/raiker-icon.png
-  target: [nsis]
+  target: [nsis, msi]
+  # Authenticode applies only when the release workflow provides a
+  # certificate; electron-builder then signs the app and both installers.
+  signtoolOptions:
+    signingHashAlgorithms: [sha256]
+    rfc3161TimeStampServer: http://timestamp.digicert.com
 nsis:
+  artifactName: "${productName}-${version}-${env.RAIKER_TARGET}-setup${env.RAIKER_ARTIFACT_SUFFIX}.${ext}"
   oneClick: false
+  # Per-user: no administrator prompt, no write outside the owner's profile.
   perMachine: false
+  allowElevation: false
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Raiker
+  runAfterFinish: true
+  # Raiker's data is not the shell's: the uninstaller asks about it itself
+  # (build-resources/installer.nsh) and never removes it during an update.
+  deleteAppDataOnUninstall: false
+  differentialPackage: false
+  # The "Checking this computer" page and the uninstaller's data question.
+  include: build-resources/installer.nsh
+  license: ../LICENSE
+  installerSidebar: build-resources/installerSidebar.bmp
+  uninstallerSidebar: build-resources/uninstallerSidebar.bmp
+  installerHeader: build-resources/installerHeader.bmp
+msi:
+  artifactName: "${productName}-${version}-${env.RAIKER_TARGET}${env.RAIKER_ARTIFACT_SUFFIX}.${ext}"
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Raiker
+  runAfterFinish: false
+  # A stable upgrade code lets one MSI replace an earlier one; it never changes.
+  upgradeCode: 6F3B2A18-9C42-4E7D-9E52-2B4F1C8A7D30
+
 linux:
   icon: ../raiker/assets/raiker-icon.png
   executableName: raiker
+  syncDesktopName: true
   category: Utility
-  target: [AppImage, deb]
+  synopsis: Personal autonomous AI assistant and agent
+  description: Raiker is a local-first personal AI assistant and governed autonomous agent for one owner.
+  maintainer: Raiker contributors <raiker-maintainers@users.noreply.github.com>
+  vendor: Raiker contributors
+  target: [AppImage, deb, rpm]
+  desktop:
+    entry:
+      StartupWMClass: Raiker
+deb:
+  # `raiker`, not package.json's `raiker-desktop`: it is what an owner types to
+  # remove it, and what `raiker/app/desktop_update.py` looks for in dpkg.
+  packageName: raiker
+  # The host is frozen with its own interpreter and libraries; what the window
+  # needs from the system is what every Electron application needs, plus the
+  # Secret Service client libsecret, which stores credentials in the keyring.
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+  # The system check, before anything is unpacked (relative to desktop/,
+  # where the build script runs electron-builder).
+  fpm: ["--before-install", "build-resources/linux-preinstall.sh"]
+rpm:
+  packageName: raiker
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - libXtst
+    - xdg-utils
+    - at-spi2-core
+    - libuuid
+    - libsecret
+  fpm: ["--rpm-rpmbuild-define=_build_id_links none", "--before-install", "build-resources/linux-preinstall.sh"]

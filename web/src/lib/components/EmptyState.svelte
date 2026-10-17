@@ -40,8 +40,10 @@
     <span class:wide-title={compactTitle !== null}>{title}</span>
     {#if compactTitle !== null}<span class="compact-title">{compactTitle}</span>{/if}
   </p>
+  <!-- Quiet UI — the title and the action carry an empty state; the sentence
+       under them is kept for screen readers only. -->
   {#if body}
-    <p class="empty-body">{body}</p>
+    <p class="empty-body sr-only">{body}</p>
   {/if}
   {#if action}
     <div class="empty-action">{@render action()}</div>

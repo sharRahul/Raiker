@@ -17,6 +17,7 @@ from typing import Literal
 
 from cryptography.fernet import Fernet
 
+from raiker.auth import os_keystore
 from raiker.auth.secure_io import atomic_write_private
 from raiker.storage.internal_paths import internal_io_path
 
@@ -41,11 +42,27 @@ def _is_valid_fernet(value: str) -> bool:
 
 
 def read_vault_key(workspace_root: str | Path) -> str | None:
+    """The vault key, from the OS key store when the file names one (DIST-08).
+
+    A plain key found while OS protection is enabled is moved into the store
+    on this read, and the file keeps only the reference — after the store has
+    returned the same key. A protected key whose store cannot be read raises
+    :class:`~raiker.auth.os_keystore.KeystoreUnavailableError`; it is never
+    treated as absent, because "absent" would generate a replacement.
+    """
     path = vault_key_path(workspace_root)
     if not path.exists():
         return None
     value = path.read_text(encoding="ascii").strip()
-    return value or None
+    if not value:
+        return None
+    if os_keystore.is_protected(value):
+        return os_keystore.unprotect(value)
+    if _is_valid_fernet(value):
+        reference = os_keystore.protect(Path(workspace_root), value)
+        if reference is not None:
+            atomic_write_private(path, reference.encode("ascii"), exclusive=False)
+    return value
 
 
 def write_vault_key(workspace_root: str | Path, key: str) -> None:
@@ -53,13 +70,26 @@ def write_vault_key(workspace_root: str | Path, key: str) -> None:
     if not _is_valid_fernet(key):
         raise ValueError("connector_vault_key_invalid")
     path = vault_key_path(workspace_root)
+    _forget_previous(path)
+    # The OS key store when it is enabled and answers; otherwise the 0600 file.
+    stored = os_keystore.protect(Path(workspace_root), key) or key
     # Replace atomically at mode 0o600 — the key never touches disk world-readable.
-    atomic_write_private(path, key.encode("ascii"), exclusive=False)
+    atomic_write_private(path, stored.encode("ascii"), exclusive=False)
+
+
+def _forget_previous(path: Path) -> None:
+    try:
+        previous = path.read_text(encoding="ascii").strip()
+    except OSError:
+        return
+    if os_keystore.is_protected(previous):
+        os_keystore.forget(previous)
 
 
 def clear_vault_key(workspace_root: str | Path) -> None:
     path = vault_key_path(workspace_root)
     if path.exists():
+        _forget_previous(path)
         path.unlink()
 
 
@@ -106,8 +136,13 @@ def vault_status(workspace_root: str | Path) -> VaultState:
     """Return 'configured_valid' | 'missing' | 'invalid'.
 
     Reflects the effective key: the environment variable wins, then the file.
+    A protected key whose OS key store cannot be read is ``invalid``: it is
+    present, and nothing can use it until the store answers again.
     """
-    value = effective_vault_key(workspace_root)
+    try:
+        value = effective_vault_key(workspace_root)
+    except os_keystore.KeystoreUnavailableError:
+        return "invalid"
     if value is None:
         return "missing"
     return "configured_valid" if _is_valid_fernet(value) else "invalid"

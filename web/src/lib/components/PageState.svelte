@@ -33,7 +33,9 @@
 >
   {#if state === "loading" && lines === 0}<span class="dot" aria-hidden="true"></span>{/if}
   <strong>{title}</strong>
-  {#if detail}<span class="detail">{detail}</span>{/if}
+  <!-- Quiet UI — an empty state's explanation is for screen readers; an error's
+       detail stays visible, because it is what the owner needs to act on. -->
+  {#if detail}<span class="detail" class:sr-only={state === "empty"}>{detail}</span>{/if}
   {#if state === "loading" && lines > 0}
     <div class="skeleton-rows" aria-hidden="true">
       {#each Array.from({ length: lines }, (_, index) => index) as row (row)}

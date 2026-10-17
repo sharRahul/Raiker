@@ -2108,8 +2108,7 @@
     {/snippet}
 
     {#snippet hint()}
-      Enter sends · Shift+Enter adds a line · <code>/</code> for commands ·
-      <code>@</code> to mention a file ·
+      <!-- Quiet UI — one link; the shortcuts are listed behind it. -->
       <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
         all shortcuts
       </button>

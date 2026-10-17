@@ -15,23 +15,35 @@
   import { api } from "../api";
   import { providerName } from "../format";
   import { listCatalogue } from "../providerConnections";
-  import type { ModelProfile, SetupState } from "../apiTypes";
+  import type {
+    ModelProfile,
+    ModelReadinessView,
+    SetupCheck,
+    SetupState,
+    SetupSystemReadiness,
+    SetupVerification,
+  } from "../apiTypes";
   import { modelName } from "../modelPresentation";
   import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
-    PERMISSIONS_NOTE,
+    CHECK_STATE_LABELS,
     PRIVACY_CHOICES,
     recommendedPath,
+    nextStage,
+    previousStage,
     SETUP_STAGE_LABELS,
-    SETUP_STAGES,
+    stagesFor,
     visibleStage,
   } from "../firstRun";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
   import Icon from "../components/Icon.svelte";
+  import Logo from "../components/Logo.svelte";
   import type { IconName } from "../icons";
 
-  const stages = SETUP_STAGES;
+  /** `desktop` when the installer already checked this computer (DIST-05). */
+  let distribution = $state<string | null>(null);
+  const stages = $derived(stagesFor(distribution));
   const labels = SETUP_STAGE_LABELS;
   let setup: SetupState | null = $state(null);
   let profiles: ModelProfile[] = $state([]);
@@ -67,8 +79,13 @@
 
   async function load() {
     try {
-      setup = await api.setup();
-      backupTarget = setup.backup_target ?? "";
+      // The installation's provenance is a local read; a host that cannot
+      // answer it is treated as one with no installer step, which keeps the
+      // device and installation checks rather than skipping them.
+      const [state, update] = await Promise.all([api.setup(), api.hostUpdate().catch(() => null)]);
+      distribution = update?.installation?.distribution ?? null;
+      setup = state;
+      backupTarget = state.backup_target ?? "";
     } catch {
       error = "Setup could not be loaded.";
       profilesLoading = false;
@@ -164,7 +181,7 @@
    * authority system, and the old `Local-first` / `Balanced` pair read like one.
    */
   async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
-    await save({ status: "in_progress", stage: "finish", privacy_mode });
+    await save({ status: "in_progress", stage: after("privacy"), privacy_mode });
   }
 
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
@@ -243,12 +260,8 @@
 
   /** The heading, and the sentence under it, scoped to what is actually set up. */
   const finishHeading = $derived(modelChosen ? "Your Raiker is ready" : "Setup saved");
-  const finishNote = $derived(
-    modelChosen
-      ? "Start where the work is. Everything below stays available in Models, Settings and Permissions."
-      : "You chose to decide about a model later, so Chat and Build have nothing to answer with yet. " +
-        "Everything else is saved, and you can pick a model whenever you want to.",
-  );
+  // Quiet UI — a sentence only when something is missing.
+  const finishNote = $derived(modelChosen ? "" : "Chat and Build have nothing to answer with yet.");
 
   async function createBackup() {
     if (!backupTarget.trim()) return;
@@ -283,7 +296,9 @@
   // narrows the `$state(null)` initializer at this position and would type the
   // access as `never`. The parameter carries the declared type instead.
   const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
-  const stage = $derived(visibleStage(stageOf(setup)));
+  const stage = $derived(visibleStage(stageOf(setup), stages));
+  const after = (current: typeof stage) => nextStage(stages, current);
+  const before = (current: typeof stage) => previousStage(stages, current);
   /** BUG-332 — what each provider said when its models were last listed here. */
   let catalogueRefusals = $state<Record<string, string | null>>({});
   const candidate = $derived(recommendedPath(profiles, catalogueRefusals));
@@ -339,52 +354,125 @@
   let pickerRequest = $state<string | null>(null);
   const allProvidersOpen = $derived(showAllProviders || (recommended === null && !unconfirmed));
 
+  /*
+   * DIST-05 — This device. Measured by the host, locally; the answer says what
+   * the machine can run and never makes a dedicated GPU a requirement.
+   */
+  let system = $state<SetupSystemReadiness | null>(null);
+  let systemError = $state("");
+  async function loadSystem() {
+    systemError = "";
+    try { system = await api.setupSystem(); }
+    catch { systemError = "This device could not be checked. You can continue and check again from Diagnostics."; }
+  }
+
+  /*
+   * DIST-06 — Check. Every mandatory component from inside the running host,
+   * then, when a model is chosen, one real request to it — the same readiness
+   * check the Model stage and the Models page take. The request is the owner's
+   * act: it runs when this stage opens or when they press Check again.
+   */
+  let verification = $state<SetupVerification | null>(null);
+  let modelCheck = $state<ModelReadinessView | null>(null);
+  let verifying = $state(false);
+  let verifyError = $state("");
+  async function runVerification() {
+    verifying = true;
+    verifyError = "";
+    modelCheck = null;
+    try {
+      verification = await api.verifySetup();
+      const state = setup;
+      if (state && !state.model_deferred && state.selected_profile_id && state.selected_model) {
+        try { modelCheck = await api.checkModelReadiness(state.selected_profile_id, state.selected_model); }
+        catch { modelCheck = null; }
+      }
+    } catch {
+      verifyError = "The installation check could not run. Open Diagnostics for details.";
+    } finally {
+      verifying = false;
+    }
+  }
+  const mandatoryFailed = $derived(verification !== null && verification.failed.length > 0);
+
+  $effect(() => {
+    if (stage === "system" && system === null && systemError === "") void loadSystem();
+    if (stage === "verify" && verification === null && !verifying && verifyError === "") void runVerification();
+  });
+
+  const stateLabel = (check: SetupCheck) => CHECK_STATE_LABELS[check.state];
+
   onMount(load);
 </script>
 
+{#snippet checkList(checks: SetupCheck[], label: string)}
+  <ul class="checks" aria-label={label}>
+    {#each checks as check (check.id)}
+      <li class={`check ${check.state}`}>
+        <span class="check-state">{stateLabel(check)}</span>
+        <strong>{check.label}</strong>
+        <span class="check-detail">{check.detail}</span>
+        {#if check.remedy}<span class="check-remedy">{check.remedy}</span>{/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
 <section class="setup-shell" aria-labelledby="setup-title">
-  <aside class="stage-rail" aria-label="Setup progress">
-    <p class="rail-title">Your Raiker</p>
-    <ol>
+  <!-- A focused sheet, without the app's navigation around it (App.svelte):
+       where you are, how far there is to go, and nothing else competing. -->
+  <header class="setup-top">
+    <span class="setup-brand"><Logo size={28} /><span>Set up Raiker</span></span>
+    <ol class="stage-rail" aria-label="Setup progress">
       {#each stages as railStage, index}
-        <li class:active={stage === railStage} class:done={stages.indexOf(stage) > index}>
-          <span>{index + 1}</span><strong>{labels[railStage]}</strong>
+        <li
+          class:active={stage === railStage}
+          class:done={stages.indexOf(stage) > index}
+          aria-current={stage === railStage ? "step" : undefined}
+        >
+          <span class="seg" aria-hidden="true"></span><strong>{labels[railStage]}</strong>
         </li>
       {/each}
     </ol>
-  </aside>
+  </header>
 
   <div class="setup-content">
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if setup === null}
       <h2 id="setup-title">Preparing your setup…</h2>
-    {:else if stage === "welcome"}
-      <!-- FIRST-03 — the product model before the infrastructure. An owner who
-           has not met Chat, Build and Design cannot tell what a provider choice
-           is for. FIRST-02 — no Account stage: the account was created on the
-           screen before this one. -->
+    {:else if stage === "system"}
       <header>
-        <p class="eyebrow">01 · Welcome</p>
-        <h2 id="setup-title">Meet Raiker</h2>
-        <p>Your governed AI workspace for Chat, Build and Design. Two short questions and you are working.</p>
+        <h2 id="setup-title">What this computer can run</h2>
       </header>
-      <div class="modes">
-        <div class="mode"><Icon name="chat" size="md" /><strong>Chat</strong><span>Think something through, with memory, sources and approvals.</span></div>
-        <div class="mode"><Icon name="code" size="md" /><strong>Build</strong><span>Work on a repository — plan, change, run, review the diff.</span></div>
-        <div class="mode"><Icon name="design" size="md" /><strong>Design</strong><span>Research and generate images against a governed model.</span></div>
-      </div>
-      <p class="note">{PERMISSIONS_NOTE}</p>
+      {#if systemError}
+        <p class="note" role="alert">{systemError}</p>
+      {:else if system === null}
+        <p class="note" role="status" aria-live="polite">Checking this device…</p>
+      {:else}
+        {@render checkList(system.checks, "Device checks")}
+        <div class="recommended">
+          <p class="eyebrow">Local models on this device</p>
+          <strong>About {system.recommended_local_model.parameters} parameters</strong>
+          <span>{system.recommended_local_model.note} A model this size is {system.recommended_local_model.download} to download. Nothing is downloaded unless you choose a model.</span>
+        </div>
+        <dl class="summary">
+          <div><dt>Your data</dt><dd class="path">{system.locations.data}</dd></div>
+          <div><dt>Backups</dt><dd class="path">{system.locations.backups}</dd></div>
+        </dl>
+        {#if !system.ready}
+          <p class="error" role="alert">This device does not meet a requirement above. Raiker may not work correctly until it is fixed.</p>
+        {/if}
+      {/if}
       <div class="actions">
-        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "model" })}>Continue</button>
+        <button class="quiet" onclick={() => save({ stage: before("system") })}>Back</button>
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: after("system") })}>Continue</button>
       </div>
     {:else if stage === "model"}
       <header>
-        <p class="eyebrow">02 · Model</p>
         <h2 id="setup-title">Choose how Raiker should think</h2>
         <!-- FIRST-04 — connect, then discover, then choose a default. What a
              provider serves is discovered once and available everywhere; there
              is no step in between where models are kept or withheld. -->
-        <p>Connect a provider or a runtime once. Every compatible model it serves becomes available in Chat, Build and Design, and you choose which one answers by default.</p>
       </header>
       {#if profilesLoading || unconfirmed}
         <!-- BUG-331 — the step is here; the providers are still answering. -->
@@ -444,12 +532,10 @@
       </div>
     {:else if stage === "privacy"}
       <header>
-        <p class="eyebrow">03 · Privacy</p>
         <!-- FIRST-07 — one question about where content travels. "Local-first"
              and "Balanced" read as a second authority system standing beside
              Permissions, which they are not. -->
         <h2 id="setup-title">Where may Raiker send model requests?</h2>
-        <p>Permissions still govern what Raiker may do. This is only about where your words go.</p>
       </header>
       <div class="choice-list">
         {#each PRIVACY_CHOICES as choice (choice.mode)}
@@ -458,15 +544,43 @@
           </button>
         {/each}
       </div>
-      <div class="actions"><button class="quiet" onclick={() => save({ stage: "model" })}>Back</button></div>
+      <div class="actions"><button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button></div>
+    {:else if stage === "verify"}
+      <header>
+        <h2 id="setup-title">Checking your installation</h2>
+      </header>
+      {#if verifyError}
+        <p class="error" role="alert">{verifyError}</p>
+      {:else if verification === null || verifying}
+        <p class="note" role="status" aria-live="polite">Checking…</p>
+      {:else}
+        {@render checkList(verification.checks, "Installation checks")}
+        {#if modelCheck}
+          <ul class="checks" aria-label="Model request">
+            <li class={`check ${modelCheck.ready ? "pass" : "warn"}`}>
+              <span class="check-state">{modelCheck.ready ? "Ready" : "Not ready"}</span>
+              <strong>Request to {modelName(modelCheck.model)}</strong>
+              <span class="check-detail">{modelCheck.summary}</span>
+              {#if !modelCheck.ready && modelCheck.remediation}<span class="check-remedy">{modelCheck.remediation}</span>{/if}
+            </li>
+          </ul>
+        {/if}
+        {#if mandatoryFailed}
+          <p class="error" role="alert">A required part is not working. <a href="#/diagnostics">Open Diagnostics</a> for the details, or reinstall Raiker.</p>
+        {/if}
+      {/if}
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: before("verify") })}>Back</button>
+        <button class="quiet" disabled={verifying} onclick={() => void runVerification()}>Check again</button>
+        <button class="primary" disabled={busy || verifying} onclick={() => save({ status: "in_progress", stage: "finish" })}>{mandatoryFailed ? "Continue anyway" : "Continue"}</button>
+      </div>
     {:else}
       <header>
-        <p class="eyebrow">04 · {finishHeading === "Your Raiker is ready" ? "Ready" : "Saved"}</p>
         <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
              up. This said "Your Raiker is ready" above a summary that could read
              "Decide later" on the very next line. -->
         <h2 id="setup-title">{finishHeading}</h2>
-        <p>{finishNote}</p>
+        {#if finishNote}<p>{finishNote}</p>{/if}
       </header>
       <!-- FIRST-09 — finish into work. The three Work modes the welcome screen
            introduced, as the three things to do next — each saying whether it
@@ -479,42 +593,29 @@
               <strong>{action.label}</strong>
             </button>
             {#if !action.ready}
-              <p class="mode-missing">
-                {action.missing}
+              <p class="mode-missing" title={action.missing}>
                 <a href={action.remedy}>{action.remedyLabel}</a>
               </p>
             {/if}
           </div>
         {/each}
       </div>
-      <dl class="summary">
-        <div><dt>Model</dt><dd>{setup.model_deferred ? "Decide later" : setup.selected_model ?? "Not selected"}</dd></div>
-        <div><dt>Model requests</dt><dd>{setup.privacy_mode === "local_first" ? "Local only" : "Local, and connected providers"}</dd></div>
-        <div><dt>Backup</dt><dd>{setup.backup_verified_at ? "Verified" : "Recommended"}</dd></div>
-      </dl>
-      <!-- FIRST-08 — backup is recommended, not a stage that stands between an
-           owner and their first turn. It is still real: nothing claims a backup
-           exists until Raiker has written and verified an encrypted snapshot. -->
-      <div class="optional">
-        <p class="eyebrow">Optional setup</p>
-        {#if setup.backup_verified_at}
-          <p class="note">Backup verified at {setup.backup_target}.</p>
-        {:else if wantsBackup}
-          <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="Full path to a backup folder" /></label>
-          <div class="actions">
-            <button class="quiet" onclick={() => (wantsBackup = false)}>Cancel</button>
-            <button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button>
-          </div>
-        {:else}
-          <div class="actions">
-            <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
-            <a class="quiet" href="#/settings">Review privacy</a>
-            <a class="quiet" href="#/capabilities">Review permissions</a>
-          </div>
-        {/if}
-      </div>
+      {#if setup.backup_verified_at}
+        <p class="note">Backup verified at {setup.backup_target}.</p>
+      {:else if wantsBackup}
+        <!-- FIRST-08 — backup is offered, never a step in the way. Nothing
+             claims a backup exists until an encrypted snapshot is verified. -->
+        <label>Backup folder<input bind:value={backupTarget} placeholder="Full path to a local, removable or NAS folder" /></label>
+        <div class="actions">
+          <button class="quiet" onclick={() => (wantsBackup = false)}>Cancel</button>
+          <button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button>
+        </div>
+      {/if}
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button>
+        <button class="quiet" onclick={() => save({ stage: before("finish") })}>Back</button>
+        {#if !setup.backup_verified_at && !wantsBackup}
+          <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
+        {/if}
         <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
       </div>
     {/if}
@@ -522,16 +623,25 @@
 </section>
 
 <style>
-  .setup-shell { width: min(68rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1rem, 4vw, 3rem); }
-  /* Which of the five stages you are on stays in view while the model list
-     under it is scrolled. */
-  .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
-  .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-size: var(--text-xl); }
-  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-  li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }
-  li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
-  li.active { color: var(--accent); } li.active > span { background: var(--accent); border-color: var(--accent); color: white; } li.done:not(.active) { color: var(--text-2); }
-  .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
+  /* One focused column. The Setup window before sign-in has the same shape
+     (desktop/static/setup.css), so installing and setting up read as one flow. */
+  .setup-shell { width: min(52rem, 100%); margin: 0 auto; display: grid; align-content: start; gap: clamp(1.5rem, 4vw, 2.5rem); padding: clamp(1rem, 4vw, 2.5rem) clamp(1rem, 4vw, 3rem) var(--space-6); }
+  /* Where you are stays in view while the model list under it is scrolled. */
+  /* An opaque band the full width of the window, so the model list scrolls
+     under it rather than through it. */
+  .setup-top { position: sticky; top: 0; z-index: 1; display: grid; gap: var(--space-4); padding: var(--space-3) 0 var(--space-4); background: var(--bg); box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax); border-bottom: 1px solid transparent; }
+  .setup-brand { display: flex; align-items: center; gap: .6rem; color: var(--text-1); font-size: var(--text-sm); font-weight: 750; }
+  /* Scoped to the rail: the check and goal lists below are lists too. */
+  .stage-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .5rem; }
+  .stage-rail li { display: grid; gap: .45rem; min-width: 0; color: var(--text-3); }
+  .stage-rail li strong { color: inherit; font-size: var(--text-xs); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg { display: block; height: 4px; border-radius: 4px; background: var(--neutral-border); transition: background .3s ease; }
+  .stage-rail li.done .seg { background: var(--accent); }
+  .stage-rail li.active .seg { background: linear-gradient(90deg, var(--accent), var(--brand)); }
+  .stage-rail li.active { color: var(--accent); } .stage-rail li.done:not(.active) { color: var(--text-2); }
+  .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); animation: setup-rise .35s ease both; }
+  @keyframes setup-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .setup-content { animation: none; } }
   header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
      the mono face and a little more room under it. */
   .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
@@ -562,5 +672,20 @@
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
   .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
-  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .modes, .start-work { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } ol { display: flex; min-width: max-content; } li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } }
+  /* DIST-05/06 — check rows say their state in words, with colour as a second
+     cue. Flat rows on one surface rather than a card per check: a dozen boxed
+     rows read as a dozen problems even when every one of them passed. */
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .checks { gap: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+  .check { display: grid; grid-template-columns: .5rem minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--space-3); row-gap: .1rem; padding: .7rem var(--space-4); }
+  .check + .check { border-top: 1px solid var(--border); }
+  .check::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--success); align-self: center; grid-row: 1; }
+  .check.warn::before { background: var(--warning); } .check.fail::before { background: var(--danger); } .check.info::before { background: var(--neutral-border); }
+  .check > strong { grid-column: 2; grid-row: 1; font-size: var(--text-sm); }
+  .check-state { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; color: var(--text-3); }
+  .check.warn .check-state { color: var(--warning); } .check.fail .check-state { color: var(--danger); }
+  .check-detail, .check-remedy { grid-column: 2 / 4; color: var(--text-3); }
+  .check-remedy { color: var(--text-1); font-weight: 600; }
+  .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
+  @media (max-width: 760px) { .modes, .start-work { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } }
 </style>

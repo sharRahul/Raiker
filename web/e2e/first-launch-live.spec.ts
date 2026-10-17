@@ -41,7 +41,7 @@ async function signInLeavingSetupOpen(page: Page): Promise<void> {
   }
 }
 
-test("first launch teaches Chat, Build and Design before any provider", async ({ page }) => {
+test("first launch asks only what an owner decides", async ({ page }) => {
   test.setTimeout(240_000);
   await signInLeavingSetupOpen(page);
 
@@ -60,23 +60,21 @@ test("first launch teaches Chat, Build and Design before any provider", async ({
   // loading heading, which is not a stage and is not evidence of anything.
   await expect(title).not.toHaveText(/Preparing/, { timeout: 30_000 });
   const heading = ((await title.textContent()) ?? "").trim();
+  // Quiet UI — there is no welcome stage. A source checkout opens on the
+  // device check (no installer ran); a desktop install opens on the model.
   test.skip(
-    !heading.startsWith("Meet Raiker"),
+    !heading.startsWith("What this computer can run") && !heading.startsWith("Choose how Raiker should think"),
     `Setup resumed on "${heading}", so this is not a first run.`,
   );
-
-  // FIRST-03 — the product model, before the infrastructure.
-  for (const mode of ["Chat", "Build", "Design"]) {
-    await expect(page.getByText(mode, { exact: true }).first()).toBeVisible();
+  // FIRST-02 — no Account stage after the account was created; and no
+  // Welcome or Permissions stage either.
+  for (const gone of ["Account", "Backup", "Welcome", "Permissions"]) {
+    await expect(page.locator(".stage-rail")).not.toContainText(gone);
   }
-  // FIRST-10 — the posture in a sentence, not sixty-six gates to configure.
-  await expect(page.getByText(/starts conservatively/i)).toBeVisible();
-  // FIRST-02 — no Account stage after the account was created.
-  await expect(page.locator(".stage-rail")).not.toContainText("Account");
-  await expect(page.locator(".stage-rail")).not.toContainText("Backup");
-  await capture(page, `${SHOTS}/first-run-01-welcome.png`);
-
-  await page.getByRole("button", { name: "Continue" }).click();
+  if (heading.startsWith("What this computer can run")) {
+    await capture(page, `${SHOTS}/first-run-01-device.png`);
+    await page.getByRole("button", { name: "Continue" }).click();
+  }
   await expect(title).toHaveText(/Choose how Raiker should think/, { timeout: 30_000 });
   // FIRST-06 — the Models page is deeper configuration, not the way out.
   await expect(page.getByRole("link", { name: "Advanced setup" })).toBeVisible();
@@ -88,6 +86,10 @@ test("first launch teaches Chat, Build and Design before any provider", async ({
   await capture(page, `${SHOTS}/first-run-03-privacy.png`);
 
   await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+  // A source checkout checks its installation next.
+  if (await page.getByRole("heading", { name: "Checking your installation" }).isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await page.getByRole("button", { name: /^(Continue|Continue anyway)$/ }).click();
+  }
   // REM-LAUNCH-01 — this run deferred the model, so the stage says what it
   // actually did rather than calling the instance ready. The unconditional
   // "Your Raiker is ready" was the defect.

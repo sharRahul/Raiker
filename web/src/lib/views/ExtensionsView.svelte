@@ -32,6 +32,7 @@
   } from "../apiTypes";
   import { relativeTime } from "../format";
   import { HUB_TABS } from "../nav";
+  import LazyRoute from "../components/LazyRoute.svelte";
   import {
     extensionExceptions,
     extensionReach,
@@ -186,6 +187,7 @@
     label: {
       overview: "Overview",
       connectors: "Connectors",
+      channels: "Channels",
       mcp: "MCP servers",
       skills: "Skills",
       hooks: "Hooks",
@@ -584,6 +586,11 @@
 
     <hr />
     <ConnectionsView />
+  </div>
+{:else if tab === "channels"}
+  <!-- Quiet UI — messaging channels are a tab here, not a page of their own. -->
+  <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
+    <LazyRoute route="messaging" />
   </div>
 {:else if tab === "mcp"}
   <div id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp">

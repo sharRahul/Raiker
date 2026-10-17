@@ -277,13 +277,10 @@
        the guide link moved below the start row: they are true, and they are
        not the reason anybody opened this page. -->
   <div class="intro">
-    <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome to your Work Dashboard"}</h2>
+    <!-- Quiet UI — a greeting, and a sentence only when something is wrong. -->
+    <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome"}</h2>
     {#if unavailable}
       <p class="lead">Raiker could not read what is running. Nothing was started or changed.</p>
-    {:else if tasks === null}
-      <p class="lead">Reading what is running…</p>
-    {:else if runningNow.length === 0 && agents.length === 0 && scheduled.length === 0}
-      <p class="lead">Nothing is running, standing, or scheduled. Start a conversation, a build, or a task.</p>
     {/if}
   </div>
 
@@ -297,24 +294,22 @@
     {#each START_WORK as entry (entry.mode)}
       <a class="start-card" href={entry.route}>
         <Icon name={entry.icon} size="md" />
-        <span><strong>{entry.title}</strong><small>{entry.detail}</small></span>
+        <span><strong>{entry.title}</strong></span>
       </a>
     {/each}
-  </nav>
-  <nav class="start-row secondary" aria-label="Organise work">
-    <a class="start-card" href="#/tasks">
-      <Icon name="tasks" size="md" /><span><strong>Plan a task or agent</strong><small>Run once, on a cadence, or in the background</small></span>
+    <a class="start-card" href="#/work?tab=tasks" title="Run once, on a cadence, or in the background">
+      <Icon name="tasks" size="md" /><span><strong>Plan a task</strong></span>
     </a>
-    <a class="start-card" href="#/projects">
-      <Icon name="projects" size="md" /><span><strong>Open a project</strong><small>{projectCount === 0 ? "None yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}</small></span>
+    <a class="start-card" href="#/work?tab=projects" title={projectCount === 0 ? "No projects yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}>
+      <Icon name="projects" size="md" /><span><strong>Projects</strong></span>
     </a>
   </nav>
 
   <div class="refresh-state">
     <GuideLink route="home" />
-    <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}</span>
-    <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}>
-      <Icon name="refresh" size="sm" /> Refresh
+    <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}
+      title={updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}>
+      <Icon name="refresh" size="sm" />
     </button>
   </div>
 
@@ -627,10 +622,7 @@
   /* Three peer Work modes on the first row; the two workflow entries on a
      second, quieter one. Peers share a row; a secondary thing does not sit in
      the same rhythm as the thing it is secondary to. */
-  .start-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-  .start-row.secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--space-3); }
-  .start-row.secondary .start-card { padding: var(--space-2) var(--space-3); }
-  .start-row.secondary strong { font-weight: 600; }
+  .start-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
   .start-card {
     display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
     gap: var(--space-3); padding: var(--space-3) var(--space-4); color: var(--text-1);
@@ -641,7 +633,6 @@
   .start-card:hover { transform: translateY(-1px); border-color: var(--accent-border); }
   .start-card > :first-child { color: var(--accent); }
   .start-card span { display: grid; gap: 0.1rem; min-width: 0; }
-  .start-card small { color: var(--text-3); line-height: 1.35; overflow-wrap: anywhere; }
   @media (prefers-reduced-motion: reduce) {
     .start-card { transition: none; }
     .start-card:hover { transform: none; }
@@ -686,7 +677,7 @@
   .resumes li span { font-size: var(--text-xs); color: var(--text-3); }
   @media (max-width: 63.9rem) {
     .columns { grid-template-columns: 1fr; }
-    .start-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .start-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 40rem) {
     .intro { flex-direction: column; }

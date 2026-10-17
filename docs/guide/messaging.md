@@ -1,6 +1,6 @@
 # Messaging
 
-**Messaging** is where Raiker meets you somewhere other than this browser.
+**Extensions → Channels** (messaging) is where Raiker meets you somewhere other than this browser.
 
 It used to be a tab inside Extensions, next to connectors, MCP servers, skills,
 hooks and plugins. Those are all things the agent *uses*. A channel is the

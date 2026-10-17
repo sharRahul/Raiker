@@ -30,9 +30,10 @@
 </script>
 
 {#if target !== null}
-  <a class="guide-link" href={`#/guide?section=${target.slug}`}>
+  <!-- Quiet UI — an icon with its words as the accessible name and tooltip,
+       so a page opens with its own content rather than a sentence about it. -->
+  <a class="guide-link" href={`#/guide?section=${target.slug}`} aria-label={label ?? target.label} title={label ?? target.label}>
     <Icon name="info" size="sm" />
-    <span>{label ?? target.label}</span>
   </a>
 {/if}
 

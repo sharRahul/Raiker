@@ -18,30 +18,22 @@ export const NAV_GROUPS: NavGroup[] = [
     // describe what you want and a model answers. It was last in the group, next
     // to Messaging, which put a making surface among the plumbing.
     { id: "design", label: "Design", icon: "design", hint: "Create and edit images with a connected model" },
-    // C18 — this destination stopped being only a search. With an empty box it
-    // is the board of everything the owner has going, chats and routine threads
-    // alike; with a query it is the search it always was.
-    { id: "search-chat", label: "Threads", icon: "search", hint: "Everything you have going, and a search across it" },
-    { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
-    { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
-    // Approvals sat under Manage with the setup pages, and it is not one: a
-    // decision waiting on you is the work, arriving many times a day, while
-    // Permissions and Models are configured once and revisited. It moved here
-    // when Manage left the sidebar for the gear.
+    // Quiet UI — Threads, Tasks and Projects were three rail rows for one
+    // question, "what do I have going". They are one page with three tabs now;
+    // their old addresses open the matching tab (ROUTE_ALIASES).
+    { id: "work", label: "Work", icon: "tasks", hint: "Threads, tasks and projects" },
+    // Memory carries the Knowledge Map as a tab, for the same reason.
+    { id: "memory", label: "Memory", icon: "activity", hint: "What Raiker remembers" },
+    // A decision waiting on you is the work, not configuration. It has a
+    // counted button in the top bar; this row is its address.
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
-    // A channel is a place a person reaches Raiker from, which is a different
-    // kind of thing from the connectors, servers and hooks the agent *uses* —
-    // it was a tab inside Extensions and is its own destination now.
-    { id: "messaging", label: "Messaging", icon: "chat", hint: "Channels that reach Raiker from somewhere else" },
-  ] },
-  { id: "knowledge", label: "Knowledge", collapsible: true, items: [
-    { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
-    { id: "brain", label: "Knowledge Map", icon: "map", hint: "Governed workspace relationships and sources" },
   ] },
   { id: "manage", label: "Manage", collapsible: true, items: [
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
-    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, skills, hooks and plugins" },
+    // Messaging channels are a tab here again: a channel is one more thing
+    // Raiker connects to, and its own page was a rarely visited row.
+    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, channels, MCP servers, skills, hooks and plugins" },
   ] },
   { id: "observe", label: "Observe", collapsible: true, items: [
     { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
@@ -68,7 +60,7 @@ export const DEFAULT_ROUTE = "home";
  * changing — a standing sidebar row for each was eight rows of furniture for
  * work that happens on a handful of days.
  */
-export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
+export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core"];
 
 /**
  * The destinations the permanent rail draws. the rail's row budget.
@@ -103,11 +95,8 @@ export const SIDEBAR_ITEM_IDS: string[] = [
   "new-chat",
   "build",
   "design",
-  "search-chat",
-  "tasks",
-  "projects",
+  "work",
   "memory",
-  "brain",
 ];
 
 /**
@@ -169,13 +158,9 @@ export const PRODUCT_AREAS: Record<string, ProductArea> = {
   "new-chat": "work",
   build: "work",
   design: "work",
-  "search-chat": "work",
-  tasks: "work",
-  projects: "work",
+  work: "work",
   memory: "work",
-  brain: "work",
   approvals: "review",
-  messaging: "connect",
   models: "connect",
   extensions: "connect",
   capabilities: "settings",
@@ -212,6 +197,8 @@ export const MORE_GROUPS: { id: ProductArea; label: string; items: NavItem[] }[]
  * link, the sidebar, and the hub's own tab strip all resolve to the same panel.
  */
 export const HUB_TABS: Record<string, string[]> = {
+  // Quiet UI — one page for everything the owner has going.
+  work: ["threads", "tasks", "projects"],
   // Organised by the questions an owner actually arrives with, not
   // by which table the data lives in.
   //
@@ -234,7 +221,7 @@ export const HUB_TABS: Record<string, string[]> = {
   // equal tabs named for *kinds of thing* is a filing system, and nobody
   // arrives here wanting to look at the MCP category: they want to know what
   // Raiker can reach and whether anything they installed is broken.
-  extensions: ["overview", "connectors", "mcp", "skills", "hooks", "plugins"],
+  extensions: ["overview", "connectors", "channels", "mcp", "skills", "hooks", "plugins"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Memory carried approved records, proposals, observations, a document
   // library, two recall controls and an import/export drawer at one visual
@@ -242,7 +229,7 @@ export const HUB_TABS: Record<string, string[]> = {
   // reading all of it. Overview leads for the same reason it does on Extensions
   // and Models: the question people arrive with is "is anything waiting on me,
   // and what does Raiker remember", not "show me the observations category".
-  memory: ["overview", "memories", "suggestions", "sources", "recall"],
+  memory: ["overview", "memories", "suggestions", "sources", "recall", "map"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
@@ -276,11 +263,16 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   activity: { route: "observe", tab: "activity" },
   checkpoints: { route: "observe", tab: "checkpoints" },
   diagnostics: { route: "observe", tab: "overview" },
-  work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
   sessions: { route: "observe", tab: "sessions" },
-  // Channels left Extensions for their own page.
-  channels: { route: "messaging", tab: "" },
+  // Quiet UI — pages folded into a hub keep their addresses.
+  "search-chat": { route: "work", tab: "threads" },
+  threads: { route: "work", tab: "threads" },
+  tasks: { route: "work", tab: "tasks" },
+  projects: { route: "work", tab: "projects" },
+  brain: { route: "memory", tab: "map" },
+  messaging: { route: "extensions", tab: "channels" },
+  channels: { route: "extensions", tab: "channels" },
 };
 
 /**
@@ -427,7 +419,7 @@ const OFF_NAV_ITEMS: NavItem[] = [
     // FIRST-08 — backup left the stages, so the hint stops naming it. Saying a
     // stage exists that the screen does not show is the same defect as a
     // control whose label contradicts what it does.
-    hint: "Meet Raiker, choose a model, and say where requests may travel",
+    hint: "Choose a model",
   },
 ];
 

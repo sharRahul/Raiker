@@ -70,6 +70,7 @@ describe("every page the product navigates to can reach the guide", () => {
       "getting-started",
       "known-limits",
       "managing-the-host",
+      "releasing",
       "security-and-privacy",
     ]);
     const linked = new Set(mappedRoutes().map((route) => guideSectionFor(route)!.slug));

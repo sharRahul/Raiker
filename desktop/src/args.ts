@@ -21,12 +21,15 @@ export interface ShellArgs {
   rejectedUrl: string | null;
   /** The host command from `RAIKER_HOST_COMMAND`, when one was supplied. */
   hostCommand: string[] | null;
+  /** `--repair`: run the Setup window again, as the installer's Repair does. */
+  repair: boolean;
 }
 
 const URL_FLAG = "--raiker-url";
 
 export function parseShellArgs(argv: readonly string[], env: Record<string, string | undefined>): ShellArgs {
   let requested: string | null = null;
+  const repair = argv.includes("--repair");
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === URL_FLAG && index + 1 < argv.length) {
@@ -43,7 +46,7 @@ export function parseShellArgs(argv: readonly string[], env: Record<string, stri
     if (origin === null) rejectedUrl = requested;
     else url = `${origin}/`;
   }
-  return { url, rejectedUrl, hostCommand: parseHostCommand(env.RAIKER_HOST_COMMAND) };
+  return { url, rejectedUrl, hostCommand: parseHostCommand(env.RAIKER_HOST_COMMAND), repair };
 }
 
 /** `RAIKER_HOST_COMMAND` as an argv, or `null` when absent or malformed. */

@@ -58,3 +58,5 @@ win1312-probe/
 
 # DESK-12 — the frozen host and the packaged desktop application are build output.
 /desktop-dist/
+# DIST-01 — the collected installers, manifests and checksums of a desktop build.
+/desktop-release/

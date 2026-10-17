@@ -7,6 +7,16 @@ desktop application: a local host, and since 2026-10-17 its own desktop window
 (an Electron shell in `desktop/`) as the default way to open it. This document
 records the product shape used to distribute it for Windows, macOS, and Linux.
 
+**Since 2026-10-17 the release product is the desktop package** — the window
+with the host frozen inside it, so an owner's machine needs no Python — built,
+installed, smoke-tested, onboarded and uninstalled on each platform's own
+runner. The decisions are in
+[ADR-0003](../adr/ADR-0003-desktop-distribution.md) (DIST-01 – DIST-12),
+the process in [Releasing](../guide/releasing.md), and the per-platform
+evidence in the [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md).
+Where this page describes the payload installers below, that path is retained
+for headless servers and is no longer published.
+
 What exists today (FIXED-88 and FIXED-92 in [to be fixed](../plans/TO_BE_FIXED.md)):
 
 - `raiker-app` starts Raiker with platform-appropriate data locations, a free
@@ -139,7 +149,21 @@ account reset, and device-move flows without requiring a terminal.
 ## Installer and release requirements
 
 The release pipeline — `.github/workflows/release.yml`, started deliberately with
-`workflow_dispatch` — produces reproducible artifacts for:
+`workflow_dispatch` — calls `.github/workflows/desktop-package.yml` and publishes
+the desktop installers (DIST-04):
+
+| Target | Runner | Installers | Signing identity |
+|---|---|---|---|
+| Windows 10/11 x86-64 | `windows-2022` | NSIS `-setup.exe`, `.msi` | Authenticode (electron-builder) |
+| Windows 11 on Arm | `windows-11-arm` (test only) | the x86-64 installer under emulation | — |
+| macOS Apple silicon | `macos-14` | `.dmg`, `.zip` | Developer ID + notarisation |
+| macOS Intel | `macos-15-intel` | `.dmg`, `.zip` | Developer ID + notarisation |
+| Linux x86-64 | `ubuntu-22.04` | AppImage, `.deb`, `.rpm` | GPG detached signatures |
+| Linux ARM64 | `ubuntu-22.04-arm` | AppImage, `.deb`, `.rpm` | GPG detached signatures |
+
+The desktop table lives in `raiker.app.desktop_release.DESKTOP_TARGETS`. The
+payload targets below remain in `raiker.app.release.TARGETS` for the headless
+payload and its updater:
 
 | Target | Runner | Installer | Signing identity |
 |---|---|---|---|
@@ -255,9 +279,9 @@ Every item is implemented; the evidence for each is in
 | DESK-13 | CI for the shell | `.github/workflows/desktop.yml` | FIXED-915 |
 | DESK-14 | Live round against a real host and provider | `desktop/e2e/desktop-live.spec.ts`, `desktop/e2e/packaged-live.spec.ts` | FIXED-916 |
 
-What remains is release work, not window work: the signed pipeline still
-publishes the browser-launch payload, and the window has been exercised on
-Linux only — see [BUG-343](../plans/TO_BE_FIXED.md#bug-343--signed-installers-do-not-yet-carry-the-desktop-window).
+The release work that remained (BUG-343) is done by ADR-0003: the signed
+pipeline publishes the desktop package, and the installed window is opened and
+onboarded on each platform's runner.
 
 ## Deferred
 

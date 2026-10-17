@@ -104,6 +104,28 @@ in the process environment.
 | `RAIKER_WEB_UI_DIR` | Alternative dashboard build directory |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `OLLAMA_API_KEY` | Provider keys, if you prefer the environment over the vault |
 
+## Desktop app
+
+| What you see | Meaning | Fix |
+|---|---|---|
+| Raiker Setup: *This computer doesn't meet Raiker's requirements yet* | A requirement listed under it is not met (memory, free storage, operating system, architecture) | Do what the listed item says, then **Try again**. Nothing was created, so there is nothing to clean up. |
+| Raiker Setup: *Raiker took too long to start* / *stopped while it was starting* / *Part of Raiker is missing* | The bundled host did not start or verify | **Try again**. If it repeats, **Open logs** (`logs/setup.log`) and reinstall: your data is outside the app and is kept. |
+| Raiker Setup opens by itself on a later start | Raiker did not start, so it is being checked again | Follow the screen. To run the checks on purpose, start Raiker with `--repair`. |
+| Windows installer: a ✖ on *Checking this computer*, and **Next** is greyed out | Memory, or free space for the program or your data, is below the minimum | Free space (or choose another folder with **Back**), or use a computer with at least 4 GB of memory. Nothing has been installed. |
+| `apt`/`dnf`: *Raiker was not installed: this computer does not meet its requirements* | Less than 4 GB of memory | Use a computer with at least 4 GB of memory. |
+| *Raiker's host stopped before it was ready* / *did not become ready* (in the window) | The bundled host could not start | Open Raiker again. If it repeats, reinstall: your data is outside the app and is kept. |
+| *Windows protected your PC* | A test build that is not code-signed | Use a signed release. Only for a build you trust: **More info → Run anyway**. |
+| macOS: *"Raiker" can't be opened* | An unsigned test build downloaded from the internet | Use a signed, notarised release. |
+| Windows installer: *Raiker needs Windows 10 version 1809 or newer* / *a 64-bit edition* | Unsupported Windows | Update Windows, or use a supported computer. |
+| This device: **Needs attention** on Memory, Storage, Operating system or Architecture | A minimum requirement is not met | Follow the fix shown on the row. Raiker may not work correctly until it is met. |
+| This device: *Credential protection — private file* | No OS key store is available (common on headless Linux, or when the keyring is locked) | Provider keys are still encrypted. To use the Secret Service, install and unlock GNOME Keyring or KWallet, then restart Raiker. |
+| `vault_keystore_unavailable`, or Check: *The vault key cannot be read* | Your provider keys' protection key is held by the OS key store, which did not answer (locked keyring, different user) | Unlock your keyring (or sign in as the user who set Raiker up) and restart Raiker. Raiker never replaces the key, because a new one could not read your saved keys; if the keyring item is truly lost, reset the vault in Settings and enter your provider keys again. |
+| Check: **Governed command runner** — `native_sandbox_artifact_missing` / `…_digest_mismatch` | The command runner inside the installation is missing or altered | Reinstall Raiker. Chat works meanwhile; Build cannot run commands. |
+| Check: **Data format** — *written by a different Raiker version* | This data was migrated by a newer Raiker | Install that newer version again, or restore the backup taken before the update. |
+| Updates: `desktop_update_manual` | Raiker was installed from a `.deb`, `.rpm` or `.msi`, which your system package manager owns | Download the new release's package and install it over the old one. |
+| Updates: `release_signature_invalid`, `artifact_digest_mismatch`, `release_version_mismatch` | A downloaded update did not match its signed manifest | Nothing was installed. Check the channel URL and key; try again later. |
+| Updates: `channel_url_invalid` | The update channel is not HTTPS, or redirects | Pin a channel host that serves files directly over HTTPS. |
+
 ## Where to look next
 
 - **Observability → Overview** — runtime state, readiness, memory integrity, and

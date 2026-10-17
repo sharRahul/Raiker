@@ -1,91 +1,33 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* The same paper/ink tokens as web/src/app.css, so the first frame matches. */
-:root {
-  color-scheme: light dark;
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --border: #e2e8f0;
-  --text-1: #0f172a;
-  --text-2: #475569;
-  --accent: #365f7d;
-  --danger: #b42318;
-  --brand: #ecd06f;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0d10;
-    --surface: #12161f;
-    --border: #1f242f;
-    --text-1: #e2e8f0;
-    --text-2: #94a3b8;
-    --accent: #7fa7c4;
-    --danger: #f97066;
-  }
-}
-* {
-  box-sizing: border-box;
-}
-html,
-body {
-  height: 100%;
-  margin: 0;
-}
+/* Tokens, fonts and controls come from shell.css, shared with Setup. */
 body {
   display: grid;
   place-items: center;
-  background: var(--bg);
-  color: var(--text-1);
-  font: 15px/1.5 Manrope, "Segoe UI", system-ui, -apple-system, sans-serif;
 }
-.drag {
-  position: fixed;
-  inset: 0 0 auto;
-  height: 56px;
-  -webkit-app-region: drag;
-}
-.card {
-  width: min(440px, calc(100vw - 32px));
-  padding: 32px;
+.status {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(460px, calc(100vw - 32px));
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  animation: rise 0.45s ease both;
 }
-.mark {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 16px;
-  border-radius: 12px;
-  background: var(--brand);
+.status .mark {
+  margin-bottom: 22px;
 }
-h1 {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
+.status h1 {
+  font-size: 1.5rem;
 }
-p {
-  margin: 0;
+.status p {
+  margin: 8px 0 0;
   color: var(--text-2);
   overflow-wrap: anywhere;
 }
 body[data-state="error"] h1 {
   color: var(--danger);
 }
-.spinner {
-  width: 22px;
-  height: 22px;
-  margin: 20px auto 0;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
-}
-@keyframes spin {
-  to {
-    transform: rotate(1turn);
-  }
+.status .spinner {
+  margin-top: 24px;
 }

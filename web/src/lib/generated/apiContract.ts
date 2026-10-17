@@ -2619,6 +2619,7 @@ export type InstallationView = {
   installer_formats: string[];
   install_root: string;
   note: string;
+  distribution: string;
 };
 
 export type InstalledPlugin = {
@@ -4753,10 +4754,33 @@ export type SetupBackupRequest = {
   target: string;
 };
 
+/** One row of the system or installation check (DIST-05, DIST-06). */
+export type SetupCheck = {
+  id: string;
+  label: string;
+  state: "pass" | "warn" | "fail" | "info";
+  detail: string;
+  remedy: string;
+  mandatory: boolean;
+  data: Record<string, unknown>;
+};
+
+export type SetupLocalModelAdvice = {
+  parameters: string;
+  download: string;
+  note: string;
+};
+
+export type SetupLocations = {
+  data: string;
+  models: string;
+  backups: string;
+};
+
 export type SetupState = {
   owner_principal_id: string;
   status: "required" | "in_progress" | "skipped" | "complete";
-  stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
+  stage: "welcome" | "account" | "system" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
   selected_profile_id: string | null;
   selected_model: string | null;
   model_deferred: boolean;
@@ -4770,9 +4794,17 @@ export type SetupState = {
   updated_at: string | null;
 };
 
+export type SetupSystemReadiness = {
+  checks: SetupCheck[];
+  blocking: string[];
+  ready: boolean;
+  recommended_local_model: SetupLocalModelAdvice;
+  locations: SetupLocations;
+};
+
 export type SetupUpdateRequest = {
   status: "required" | "in_progress" | "skipped" | "complete";
-  stage: "welcome" | "account" | "model" | "privacy" | "backup" | "finish";
+  stage: "welcome" | "account" | "system" | "model" | "privacy" | "permissions" | "verify" | "backup" | "finish";
   selected_profile_id?: string | null;
   selected_model?: string | null;
   model_deferred?: boolean;
@@ -4780,6 +4812,12 @@ export type SetupUpdateRequest = {
   backup_mode?: "later" | "local";
   backup_target?: string | null;
   background_service_enabled?: boolean;
+};
+
+export type SetupVerification = {
+  checks: SetupCheck[];
+  failed: string[];
+  ok: boolean;
 };
 
 export type SignInRequest = {
@@ -6224,6 +6262,10 @@ export const contract = {
     call<SetupState>("PUT", "/api/setup", { body }),
   createSetupBackup: (body: SetupBackupRequest) =>
     call<SetupBackupCreated>("POST", "/api/setup/backup/create", { body }),
+  getSetupSystem: () =>
+    request<SetupSystemReadiness>("/api/setup/system"),
+  verifySetup: () =>
+    call<SetupVerification>("POST", "/api/setup/verify"),
   listSkills: () =>
     request<SkillList>("/api/skills"),
   uploadSkill: (body: UploadSkillRequest) =>

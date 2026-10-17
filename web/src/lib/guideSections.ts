@@ -22,6 +22,7 @@ const SECTIONS: Record<string, GuideTarget> = {
   approvals: { slug: "permissions-and-runtime-modes", label: "How approvals work" },
   projects: { slug: "tasks-and-projects", label: "How projects work" },
   tasks: { slug: "tasks-and-projects", label: "How tasks work" },
+  work: { slug: "tasks-and-projects", label: "How threads, tasks and projects work" },
   extensions: { slug: "extensions-and-mcp", label: "How extensions work" },
   messaging: { slug: "messaging", label: "How a channel is governed" },
   design: { slug: "design", label: "How image generation is governed" },

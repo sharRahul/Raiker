@@ -353,7 +353,7 @@ format and counts — never its text.
 nothing else — it carries no list of recent chats and reads none, so nothing you
 have said is fetched to draw it.
 
-**Threads** is the board: everything you have going, pinned first and then
+**Work → Threads** is the board: everything you have going, pinned first and then
 newest — the conversations you started **and** the threads your routines are
 advancing on their own. Each row names the project it sits in and says what it
 is blocked on; a routine's row says how often it runs.

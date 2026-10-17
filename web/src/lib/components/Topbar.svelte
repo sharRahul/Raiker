@@ -127,8 +127,8 @@
        The heading still exists for screen readers and for the document outline;
        it is only visually hidden. Operational pages keep their full header. -->
   <div class="page-id" class:quiet={quietHeader}>
-    <h1 class="page-title">{title}</h1>
-    <p class="page-hint">{hint}</p>
+    <!-- Quiet UI — the title only; the hint is its tooltip. -->
+    <h1 class="page-title" title={hint}>{title}</h1>
   </div>
   <!-- Raiker's product story is Assistant + Agent, and the shell said
        so only by listing two rows among nine. These are modes, not destinations:
@@ -249,7 +249,7 @@
   /* Visually hidden, not removed: the page keeps exactly one h1 and the
      document outline is unchanged. */
   .page-id.quiet{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
-  .page-title{font-size:var(--text-base);margin:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.page-hint{font-size:var(--text-xs);color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .page-title{font-size:var(--text-base);margin:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   /* Navigation and attention on one side of the rule, where the
      workspace runs and how it is stopped on the other. */
   .cluster-rule{width:1px;height:1.35rem;background:var(--border);margin:0 .1rem;flex-shrink:0}
@@ -281,7 +281,7 @@
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:var(--text-xs)}
   @media(max-width:1100px){.palette-key{display:none}}
-  @media(max-width:900px){.page-hint{display:none}}
+
   @media(max-width:720px){
     .topbar{gap:var(--space-2);padding:0 var(--space-3)}
     .page-title{font-size:var(--text-md)}

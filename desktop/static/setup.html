@@ -1,0 +1,81 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- DIST-05 — the last stage of installing Raiker (src/setup.ts). -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raiker Setup</title>
+    <link rel="stylesheet" href="shell.css" />
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body data-screen="welcome">
+    <div class="drag" aria-hidden="true"></div>
+    <div class="backdrop" aria-hidden="true"></div>
+
+    <main class="screen" id="welcome" aria-labelledby="welcome-title">
+      <img class="mark" src="raiker-mark.png" alt="" width="64" height="64" />
+      <h1 id="welcome-title">Welcome to Raiker</h1>
+      <div class="actions">
+        <button class="primary" id="begin" type="button" title="Checks this computer and sets up encrypted storage. Nothing is sent anywhere.">Set up</button>
+      </div>
+    </main>
+
+    <main class="screen" id="progress" aria-labelledby="progress-title" hidden>
+      <header class="progress-head">
+        <img class="mark small" src="raiker-mark.png" alt="" width="40" height="40" />
+        <div>
+          <h1 id="progress-title">Setting up</h1>
+          <p class="sub" id="progress-count" aria-live="polite">Starting…</p>
+        </div>
+      </header>
+      <div class="bar" role="progressbar" aria-labelledby="progress-title" aria-valuemin="0" aria-valuemax="100">
+        <span id="bar-fill"></span>
+      </div>
+      <div class="split">
+        <ol class="stages" id="stages" aria-label="Setup steps"></ol>
+        <section class="log" id="log-pane" aria-label="Live output" hidden>
+          <h2>Live output</h2>
+          <pre id="log" tabindex="0"></pre>
+        </section>
+      </div>
+      <footer class="foot">
+        <button class="link" id="toggle-log" type="button" aria-controls="log-pane" aria-expanded="false">
+          Show details
+        </button>
+        <button class="ghost" id="cancel" type="button">Cancel</button>
+      </footer>
+    </main>
+
+    <main class="screen" id="ready" aria-labelledby="ready-title" hidden>
+      <div class="seal" aria-hidden="true"><span></span></div>
+      <h1 id="ready-title">Raiker is ready</h1>
+      <ul class="notes" id="ready-notes" aria-label="Worth knowing" hidden></ul>
+      <div class="actions">
+        <button class="primary" id="open" type="button">Open Raiker</button>
+      </div>
+    </main>
+
+    <main class="screen" id="failed" aria-labelledby="failed-title" hidden>
+      <img class="mark" src="raiker-mark.png" alt="" width="64" height="64" />
+      <h1 id="failed-title" class="danger">Setup didn't finish</h1>
+      <p class="lead" id="failed-cause"></p>
+      <ul class="checks compact" id="failed-checks" aria-label="Requirements not met" hidden></ul>
+      <div class="actions">
+        <button class="primary" id="retry" type="button">Try again</button>
+        <button class="ghost" id="logs" type="button">Open logs</button>
+        <button class="link" id="quit" type="button">Quit</button>
+      </div>
+      <details class="raw">
+        <summary>Details</summary>
+        <pre id="failed-detail"></pre>
+      </details>
+    </main>
+
+    <script src="setup.js"></script>
+  </body>
+</html>

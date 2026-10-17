@@ -13411,6 +13411,10 @@
             ],
             "title": "Commit"
           },
+          "distribution": {
+            "title": "Distribution",
+            "type": "string"
+          },
           "install_root": {
             "title": "Install Root",
             "type": "string"
@@ -13460,7 +13464,8 @@
           "built_at",
           "installer_formats",
           "install_root",
-          "note"
+          "note",
+          "distribution"
         ],
         "title": "InstallationView",
         "type": "object"
@@ -24401,6 +24406,103 @@
         "title": "SetupBackupRequest",
         "type": "object"
       },
+      "SetupCheck": {
+        "description": "One row of the system or installation check (DIST-05, DIST-06).",
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mandatory": {
+            "title": "Mandatory",
+            "type": "boolean"
+          },
+          "remedy": {
+            "title": "Remedy",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pass",
+              "warn",
+              "fail",
+              "info"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "state",
+          "detail",
+          "remedy",
+          "mandatory",
+          "data"
+        ],
+        "title": "SetupCheck",
+        "type": "object"
+      },
+      "SetupLocalModelAdvice": {
+        "properties": {
+          "download": {
+            "title": "Download",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "parameters": {
+            "title": "Parameters",
+            "type": "string"
+          }
+        },
+        "required": [
+          "parameters",
+          "download",
+          "note"
+        ],
+        "title": "SetupLocalModelAdvice",
+        "type": "object"
+      },
+      "SetupLocations": {
+        "properties": {
+          "backups": {
+            "title": "Backups",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "string"
+          },
+          "models": {
+            "title": "Models",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "models",
+          "backups"
+        ],
+        "title": "SetupLocations",
+        "type": "object"
+      },
       "SetupState": {
         "properties": {
           "background_service_enabled": {
@@ -24519,8 +24621,11 @@
             "enum": [
               "welcome",
               "account",
+              "system",
               "model",
               "privacy",
+              "permissions",
+              "verify",
               "backup",
               "finish"
             ],
@@ -24555,6 +24660,43 @@
           "owner_principal_id"
         ],
         "title": "SetupState",
+        "type": "object"
+      },
+      "SetupSystemReadiness": {
+        "properties": {
+          "blocking": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocking",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/SetupCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "locations": {
+            "$ref": "#/components/schemas/SetupLocations"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "recommended_local_model": {
+            "$ref": "#/components/schemas/SetupLocalModelAdvice"
+          }
+        },
+        "required": [
+          "checks",
+          "blocking",
+          "ready",
+          "recommended_local_model",
+          "locations"
+        ],
+        "title": "SetupSystemReadiness",
         "type": "object"
       },
       "SetupUpdateRequest": {
@@ -24631,8 +24773,11 @@
             "enum": [
               "welcome",
               "account",
+              "system",
               "model",
               "privacy",
+              "permissions",
+              "verify",
               "backup",
               "finish"
             ],
@@ -24655,6 +24800,35 @@
           "stage"
         ],
         "title": "SetupUpdateRequest",
+        "type": "object"
+      },
+      "SetupVerification": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/SetupCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "checks",
+          "failed",
+          "ok"
+        ],
+        "title": "SetupVerification",
         "type": "object"
       },
       "SignInRequest": {
@@ -42132,6 +42306,44 @@
           }
         },
         "summary": "Create Setup Backup"
+      }
+    },
+    "/api/setup/system": {
+      "get": {
+        "description": "DIST-05 — what this machine can do. Local measurements only; no egress.",
+        "operationId": "get_setup_system_api_setup_system_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupSystemReadiness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Setup System"
+      }
+    },
+    "/api/setup/verify": {
+      "post": {
+        "description": "DIST-06 — whether each mandatory component works, checked from inside.\n\nChanges nothing and grants nothing: it reads the store, the permission\nregistry and the packaged components. A model request is the wizard's own\nseparate act (the model readiness check), so this needs no network.",
+        "operationId": "verify_setup_api_setup_verify_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupVerification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Verify Setup"
       }
     },
     "/api/skills": {

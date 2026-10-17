@@ -24,29 +24,90 @@ import type { ModelProfile } from "./apiTypes";
 import { providerName } from "./format";
 import { isReachableProfile } from "./modelReadiness.svelte";
 
-/** The stages first launch actually shows, in order. */
-export const SETUP_STAGES = ["welcome", "model", "privacy", "finish"] as const;
+/**
+ * The stages first launch actually shows, in order.
+ *
+ * DIST-05/06 add three, each a reading rather than a decision an owner must
+ * understand infrastructure to make: **This device** (what the machine can
+ * run, measured locally), **Permissions** (the governance posture setup leaves
+ * in place — read-only, it grants nothing) and **Check** (each mandatory
+ * component, verified from inside the running host, plus one real request to
+ * the chosen model when there is one).
+ */
+export const SETUP_STAGES = ["welcome", "system", "model", "privacy", "permissions", "verify", "finish"] as const;
 
 export type SetupStage = (typeof SETUP_STAGES)[number];
 
 export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
   welcome: "Welcome",
+  system: "This device",
   model: "Model",
   privacy: "Privacy",
+  permissions: "Permissions",
+  verify: "Check",
   finish: "Ready",
 };
+
+/**
+ * The stages the installer already covered.
+ *
+ * DIST-05 — a packaged desktop installation checks this computer during
+ * installation (the Windows installer's own page, the Linux package's
+ * pre-install check, and the Setup window every desktop build opens before
+ * Raiker does) and verifies every component before the owner account exists.
+ * Asking again after sign-in would repeat a check the owner has just watched
+ * pass, so those installations skip **This device** and **Check**. A source
+ * checkout or a server install has had no such step and keeps both.
+ */
+export const INSTALLER_STAGES: readonly SetupStage[] = ["system", "verify"];
+
+/**
+ * Stages no installation shows any more (Quiet UI).
+ *
+ * **Welcome** introduced Chat, Build and Design before the owner had seen them,
+ * which the app itself does better a moment later; **Permissions** was a
+ * read-only summary of a page that exists (Permissions) and changed nothing.
+ * Both stay valid stored values, and a row stored on either opens on the stage
+ * that follows it.
+ */
+export const RETIRED_STAGES: readonly SetupStage[] = ["welcome", "permissions"];
+
+/** The stages this installation shows, from its distribution (`installation.json`). */
+export function stagesFor(distribution: string | null | undefined): readonly SetupStage[] {
+  const skipped = distribution === "desktop" ? [...RETIRED_STAGES, ...INSTALLER_STAGES] : RETIRED_STAGES;
+  return SETUP_STAGES.filter((stage) => !skipped.includes(stage));
+}
+
+/** The stage after `stage` on this rail; the last stage is its own next. */
+export function nextStage(stages: readonly SetupStage[], stage: SetupStage): SetupStage {
+  const index = stages.indexOf(stage);
+  return stages[Math.min(index + 1, stages.length - 1)] ?? "finish";
+}
+
+/** The stage before `stage` on this rail; the first stage is its own previous. */
+export function previousStage(stages: readonly SetupStage[], stage: SetupStage): SetupStage {
+  const index = stages.indexOf(stage);
+  return stages[Math.max(index - 1, 0)] ?? "welcome";
+}
 
 /**
  * Where a stored setup row lands on today's rail.
  *
  * `account` and `backup` are still valid stored values — an instance part-way
  * through the old wizard must not fail to render — so they resolve to the stage
- * that now carries their meaning rather than to a blank screen.
+ * that now carries their meaning rather than to a blank screen. A stage this
+ * installation does not show (an installer-covered one) resolves to the stage
+ * that follows it.
  */
-export function visibleStage(stage: string | null | undefined): SetupStage {
-  if (stage === "model" || stage === "privacy" || stage === "welcome") return stage;
+export function visibleStage(stage: string | null | undefined, stages: readonly SetupStage[] = SETUP_STAGES): SetupStage {
+  const shown: readonly string[] = stages;
+  if (stage && shown.includes(stage) && stage !== "finish") return stage as SetupStage;
   if (stage === "backup" || stage === "finish") return "finish";
-  return "welcome"; // including the retired `account`
+  if (stage && (SETUP_STAGES as readonly string[]).includes(stage)) {
+    const full = SETUP_STAGES.indexOf(stage as SetupStage);
+    return SETUP_STAGES.slice(full + 1).find((later) => stages.includes(later)) ?? "finish";
+  }
+  return stages[0] ?? "welcome"; // including the retired `account`
 }
 
 /** The two answers to "where may Raiker send model requests?" (FIRST-07). */
@@ -73,6 +134,27 @@ export const PRIVACY_CHOICES = [
  */
 export const PERMISSIONS_NOTE =
   "Raiker starts conservatively and will ask you before it takes a governed action. You can review every permission later.";
+
+/**
+ * The four ways a permission can be decided (capabilityModel's decision
+ * modes), in the owner's words. Shown on the Permissions stage as an
+ * explanation, not a control: finishing setup never changes a mode, and
+ * nothing here is a blanket authorisation for autonomous work.
+ */
+export const DECISION_MODE_COPY = [
+  { mode: "ask", label: "Ask before acting", detail: "Raiker stops and asks you each time. The default for anything that changes something." },
+  { mode: "allow", label: "Allow within a scope you approve", detail: "Raiker may act inside the folders, services or limits you set for that permission." },
+  { mode: "auto", label: "Act automatically within policy", detail: "Raiker acts without asking, still inside every policy limit and audited." },
+  { mode: "deny", label: "Never", detail: "Raiker cannot do it at all, and does not ask." },
+] as const;
+
+/** A check row's state, said in words as well as colour (never colour alone). */
+export const CHECK_STATE_LABELS: Record<"pass" | "warn" | "fail" | "info", string> = {
+  pass: "Ready",
+  warn: "Works, with a limit",
+  fail: "Needs attention",
+  info: "Note",
+};
 
 export interface RecommendedPath {
   /** "" when nothing is detected or connected and the owner must choose. */

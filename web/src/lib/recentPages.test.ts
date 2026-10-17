@@ -16,9 +16,9 @@ describe("recent pages (UX-SETPOP-02)", () => {
 
   it("remembers a route once, at its latest visit", () => {
     rememberPage("models");
-    rememberPage("tasks");
+    rememberPage("work");
     rememberPage("models");
-    expect(recentPages("home").map((item) => item.id)).toEqual(["models", "tasks"]);
+    expect(recentPages("home").map((item) => item.id)).toEqual(["models", "work"]);
   });
 
   it("ignores routes that are not destinations", () => {

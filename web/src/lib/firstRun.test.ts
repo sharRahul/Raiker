@@ -10,10 +10,13 @@
 import { describe, expect, it } from "vitest";
 import type { ModelProfile } from "./apiTypes";
 import {
+  nextStage,
   PERMISSIONS_NOTE,
+  previousStage,
   PRIVACY_CHOICES,
   recommendedPath,
   SETUP_STAGES,
+  stagesFor,
   visibleStage,
 } from "./firstRun";
 
@@ -38,7 +41,7 @@ const profile = (over: Partial<ModelProfile>): ModelProfile =>
 
 describe("the stages first launch shows", () => {
   it("opens on the product and never asks for an account twice", () => {
-    expect([...SETUP_STAGES]).toEqual(["welcome", "model", "privacy", "finish"]);
+    expect([...SETUP_STAGES]).toEqual(["welcome", "system", "model", "privacy", "permissions", "verify", "finish"]);
     expect(SETUP_STAGES).not.toContain("account");
   });
 
@@ -52,6 +55,43 @@ describe("the stages first launch shows", () => {
     expect(visibleStage("backup")).toBe("finish");
     expect(visibleStage(null)).toBe("welcome");
     expect(visibleStage("model")).toBe("model");
+    expect(visibleStage("system")).toBe("system");
+    expect(visibleStage("verify")).toBe("verify");
+    expect(visibleStage("finish")).toBe("finish");
+  });
+
+  it("does not repeat the checks a desktop installer already ran (DIST-05)", () => {
+    const desktop = stagesFor("desktop");
+    expect([...desktop]).toEqual(["model", "privacy", "finish"]);
+    // A source checkout or server install had no installer step: it keeps the
+    // device and installation checks.
+    const source = stagesFor("payload");
+    expect([...source]).toEqual(["system", "model", "privacy", "verify", "finish"]);
+    expect(stagesFor(null)).toEqual(source);
+    // A row stored on a stage this rail skips opens on the stage after it.
+    expect(visibleStage("system", desktop)).toBe("model");
+    expect(visibleStage("verify", desktop)).toBe("finish");
+    expect(nextStage(desktop, "model")).toBe("privacy");
+    expect(nextStage(desktop, "privacy")).toBe("finish");
+    expect(previousStage(desktop, "finish")).toBe("privacy");
+    expect(nextStage(source, "privacy")).toBe("verify");
+    expect(previousStage(source, "finish")).toBe("verify");
+    expect(previousStage(desktop, "model")).toBe("model");
+  });
+
+  it("no longer shows Welcome or Permissions (Quiet UI)", () => {
+    // Welcome introduced what the app shows a moment later; Permissions was a
+    // read-only copy of the Permissions page. Rows stored on either open on
+    // the next stage that is shown.
+    for (const distribution of ["desktop", "payload"]) {
+      const shown = stagesFor(distribution);
+      expect(shown).not.toContain("welcome");
+      expect(shown).not.toContain("permissions");
+    }
+    expect(visibleStage("welcome", stagesFor("desktop"))).toBe("model");
+    expect(visibleStage("welcome", stagesFor("payload"))).toBe("system");
+    expect(visibleStage("permissions", stagesFor("desktop"))).toBe("finish");
+    expect(visibleStage(null, stagesFor("desktop"))).toBe("model");
   });
 });
 

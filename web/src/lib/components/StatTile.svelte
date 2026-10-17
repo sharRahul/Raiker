@@ -28,13 +28,15 @@
   } = $props();
 </script>
 
-<article class="tile" data-tone={tone}>
+<!-- Quiet UI — the label, the number and the link are the tile; the sentence
+     explaining it is for screen readers and the tooltip. -->
+<article class="tile" data-tone={tone} title={detail}>
   <p class="label">
     {#if icon}<Icon name={icon} size="sm" />{/if}
     {label}
   </p>
   <strong class="value">{value}</strong>
-  <p class="detail">{detail}</p>
+  <p class="detail sr-only">{detail}</p>
   {#if href}<a class="evidence" {href}>{linkLabel}</a>{/if}
 </article>
 

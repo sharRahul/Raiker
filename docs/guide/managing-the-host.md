@@ -1,9 +1,46 @@
 # Managing the Raiker host
 
 `raiker-app` is the normal way to start and manage a local Raiker instance. It
-chooses an available loopback port, starts the API and dashboard, and opens your
-default browser. If the same instance is already running, it opens that host
-instead of starting another process over the same encrypted workspace.
+chooses an available loopback port, starts the API and dashboard, and opens
+Raiker's desktop window (or your default browser with `--browser`). If the same
+instance is already running, it opens that host instead of starting another
+process over the same encrypted workspace.
+
+## The desktop window
+
+Raiker opens in its own window by default. The window is a thin native shell
+around the same local host the browser talks to, so sign-in, permissions,
+approvals and every governed action work exactly as they do in a browser — the
+window adds a native menu, keyboard shortcuts, notifications and window
+behaviour, and nothing in it can act on your workspace.
+
+| Shortcut (Ctrl on Windows and Linux, ⌘ on macOS) | Opens |
+|---|---|
+| Ctrl/⌘ + N, or Ctrl/⌘ + 2 | Chat |
+| Ctrl/⌘ + Shift + B / Ctrl/⌘ + Shift + D | Build / Design |
+| Ctrl/⌘ + 1, 3, 4 | Home, Tasks, Approvals |
+| Ctrl/⌘ + , | Settings |
+| Ctrl/⌘ + K | Command palette |
+| Ctrl/⌘ + \ | Show or collapse the navigation |
+| F1 | This guide |
+
+- **Closing the window does not stop Raiker.** Scheduled work, reminders and
+  approvals carry on, and the first time you close it Raiker says so. Open it
+  again from your applications menu or the tray; stop the host from **Host** or
+  with `raiker-app quit`.
+- **One window.** Opening Raiker again brings the existing window forward.
+- **It remembers where it was** — size, position and whether it was maximised —
+  and reopens on a visible screen if a monitor has gone.
+- **Links stay safe.** Web links open in your own browser; another Raiker
+  instance on this computer opens in a window of its own; files and other
+  schemes are refused. Only notifications, clipboard writes and microphone
+  input (for voice) can be granted, and only to Raiker itself.
+- **File → Open in browser** opens the same page in your default browser.
+
+If the window is not available — the `desktop/` shell is not built in a source
+checkout, or `RAIKER_DESKTOP_SHELL` names a file that does not exist —
+`raiker-app` prints the reason and opens your browser instead. Headless
+machines and remote hosts keep using `raiker-web` and a browser.
 
 ## Instance data and workspaces
 
@@ -96,10 +133,13 @@ raiker-app desktop uninstall
 
 Everything is written under your own home directory; nothing system-wide is
 touched and nothing asks for elevation. The entry runs `raiker-app`, which
-starts the host if it is not running and opens the dashboard either way.
+starts the host if it is not running and opens its window either way.
 
 While the host is running it also has a system-tray icon carrying its status,
-Open Raiker, Pause or Resume, Restart, and Quit.
+Open Raiker, Pause or Resume, Restart, and Quit. **Open Raiker** opens the
+desktop window. On a machine with no display there is no tray; the host says so
+once and keeps running, and the **Host** control in the window does the same
+jobs.
 
 ## Pause, resume, and stop
 

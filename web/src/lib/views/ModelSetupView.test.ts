@@ -178,6 +178,9 @@ describe("first-run setup", () => {
     expect(await screen.findByText(/OpenRouter is connected/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Choose a model" }));
     expect(screen.queryByRole("button", { name: "Other options" })).not.toBeInTheDocument();
+    // BUG-344 — one press: that provider's picker opens, not a second button.
+    const picker = await screen.findByRole("dialog", { name: "OpenRouter models" });
+    expect(within(picker).getAllByRole("button", { name: /^Use / })).toHaveLength(1);
   });
 
   it("does not call a stored key that lists nothing connected (BUG-332)", async () => {

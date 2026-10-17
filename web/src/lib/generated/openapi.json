@@ -27240,14 +27240,14 @@
           "attachment_id",
           "turn_id",
           "openable",
+          "ok",
           "status",
           "excerpt",
           "highlight_start",
           "highlight_length",
           "session_id",
           "truncated",
-          "resolution_method",
-          "ok"
+          "resolution_method"
         ],
         "title": "TurnSourceExcerpt",
         "type": "object"

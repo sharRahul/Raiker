@@ -5278,6 +5278,7 @@ export type TurnSourceExcerpt = {
   attachment_id: string;
   turn_id: string;
   openable: boolean;
+  ok: boolean;
   status: "resolved" | "no_provenance" | "source_deleted" | "source_changed" | "unsupported_source" | "not_authorized";
   excerpt: string;
   highlight_start: number;
@@ -5286,7 +5287,6 @@ export type TurnSourceExcerpt = {
   truncated: boolean;
   resolution_method: "stored_coordinates" | "matching_text" | "answer_quote" | "recorded_passage" | "whole_source" | "";
   anchors?: SourceAnchorView[];
-  ok: boolean;
 };
 
 /** What one turn read: a label and a locator, never the passage itself (C6). */

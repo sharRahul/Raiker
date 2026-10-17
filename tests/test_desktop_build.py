@@ -22,6 +22,10 @@ def test_windows_desktop_command_bundles_runtime_web_and_tray(tmp_path: Path) ->
     assert str(tmp_path / "web") in joined
     assert "pystray" in joined
     assert "PIL" in joined
+    # The frozen host must carry Raiker's own data files and lazily-resolved
+    # modules, or it stops on its first read of `raiker/config` (DESK-12).
+    assert command[command.index("--collect-data") + 1] == "raiker"
+    assert command[command.index("--collect-submodules") + 1] == "raiker"
 
 
 def test_windows_installer_adds_a_start_menu_shortcut_to_the_frozen_runtime() -> None:

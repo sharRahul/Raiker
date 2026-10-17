@@ -58,12 +58,20 @@ def load_policy(root: Path) -> dict[str, Any]:
     return json.loads((root / "docs/licensing/LICENSE_POLICY.json").read_text(encoding="utf-8"))
 
 
+# The npm projects Raiker ships: the web app, and the desktop window around it.
+NPM_PROJECTS = (("web", "raiker-web"), ("desktop", "raiker-desktop"))
+
+
 def package_lock_components(root: Path) -> list[dict[str, str | None]]:
-    lock = json.loads((root / "web/package-lock.json").read_text(encoding="utf-8"))
     components: list[dict[str, str | None]] = []
-    for location, package in sorted(lock["packages"].items()):
-        name = package.get("name") or (location.rsplit("node_modules/", 1)[-1] if location else "raiker-web")
-        components.append({"name": name, "version": package.get("version"), "license": package.get("license")})
+    for directory, root_name in NPM_PROJECTS:
+        lock_path = root / directory / "package-lock.json"
+        if not lock_path.is_file():
+            continue
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        for location, package in sorted(lock["packages"].items()):
+            name = package.get("name") or (location.rsplit("node_modules/", 1)[-1] if location else root_name)
+            components.append({"name": name, "version": package.get("version"), "license": package.get("license")})
     return components
 
 
@@ -113,7 +121,7 @@ def check_project_files(root: Path) -> list[str]:
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     if project.get("license") != "Apache-2.0":
         errors.append("pyproject.toml must declare Apache-2.0")
-    for relative in (Path("package.json"), Path("web/package.json")):
+    for relative in (Path("package.json"), Path("web/package.json"), Path("desktop/package.json")):
         manifest = json.loads((root / relative).read_text(encoding="utf-8"))
         if manifest.get("license") != "Apache-2.0":
             errors.append(f"{relative} must declare Apache-2.0")

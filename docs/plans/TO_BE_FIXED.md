@@ -88,7 +88,9 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open remainder — the three fixture assumptions closed as [FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330); the lease reclaim's double write and one timing-dependent test need a Windows run |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
 | [BUG-340](#bug-340--a-cloud-ollama-model-is-described-as-never-leaving-the-device) | High | Models / setup / privacy truthfulness | Open — found 2026-10-15 in a real browser round; a cloud-labelled model selected in setup is followed by an unconditional device-only egress claim |
-| [BUG-341](#bug-341--owner-bootstrap-emits-password-form-accessibility-diagnostics) | Medium | Account bootstrap / accessibility | Open — found 2026-10-15 in Chromium; the first-run password fields are not associated with a form and the browser reports incomplete password-form semantics |
+| [BUG-341](#bug-341--owner-bootstrap-emits-password-form-accessibility-diagnostics) | Medium | Account bootstrap / accessibility | Open — found 2026-10-15 in Chromium; re-examined 2026-10-17: the settled form is correct, so the diagnostic comes from a transient render |
+| [BUG-342](#bug-342--raiker-app-joins-a-running-host-that-serves-a-different-workspace) | Medium | Desktop / host lifecycle | Open — found 2026-10-17 in the desktop round |
+| [BUG-343](#bug-343--signed-installers-do-not-yet-carry-the-desktop-window) | Low | Desktop / release | Open — raised 2026-10-17 with DESK-12; release work, not window work |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -920,6 +922,51 @@ bootstrap screen.
 verify with the project's accessibility tooling plus Chromium that the password
 form diagnostics no longer occur. Keep the existing keyboard and password
 visibility behavior working.
+
+**2026-10-17 re-examination.** The diagnostic still appears once on a fresh
+workspace, but the settled markup is already what this entry asks for: all three
+fields are inside one `<form>`, the username field carries
+`autocomplete="username"` and both password fields `new-password`. Isolated
+reproductions — static, inserted after load, disabled then enabled, served over
+HTTP — raise nothing in Chromium 1194, so the message comes from an intermediate
+render on the way to the first-run form (the verifying state or the step switch),
+not from the form itself. Next step: record the DOM at the moment the `Log` entry
+fires (CDP `DOM.setBreakpoint` on insertion) to name that render, then fix it.
+
+## BUG-342 — raiker-app joins a running host that serves a different workspace
+
+**Severity: Medium. Area: Desktop / host lifecycle. Status: Open — found
+2026-10-17 in the desktop round.**
+
+**Observed.** With a host for workspace A on port 8765, starting the packaged
+application (or `raiker-app`) for workspace B joined A's host and opened its
+sign-in page. `choose_port` asks only whether *a* Raiker answers on the
+preferred port, not whose workspace it serves.
+
+**Effect.** No data crosses — B's owner would still need A's credentials — but
+the owner of B is shown the wrong instance, and B's host is never started.
+
+**Proposed fix.** Join only when the running host's recorded workspace
+(`HostControl`) matches the one asked for; otherwise move to the next free port
+as for a non-Raiker listener. Test with two workspaces and one preferred port.
+
+## BUG-343 — Signed installers do not yet carry the desktop window
+
+**Severity: Low. Area: Desktop / release. Status: Open — raised 2026-10-17 with
+DESK-12.**
+
+**Observed.** `desktop/electron-builder.yml` packages the window with the frozen
+host, and an unsigned Linux build passed its live round, but
+`.github/workflows/release.yml` still builds and signs the browser-launch
+payload; nothing signs or notarises the Electron application. The window has
+been exercised on Linux (Xvfb) only; macOS and Windows chrome was checked by
+emulating the bridge's platform in Chromium, not on those systems.
+
+**Proposed fix.** Add a per-target shell step to the release matrix that runs
+the pinned `electron-builder` with the release's signing identities, publishes
+its artifacts through the signed channel index, and runs
+`desktop/e2e/packaged-live.spec.ts` on each runner. Capture the window on a real
+Mac and a real Windows machine before claiming either.
 
 ## Decision statements added 2026-10-05
 

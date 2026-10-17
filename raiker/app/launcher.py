@@ -55,6 +55,7 @@ their own work rather than faked with an unsigned artifact.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import platform
 import secrets
@@ -63,6 +64,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from typing import TextIO, cast
@@ -215,6 +217,60 @@ def open_browser(url: str, os_name: str | None = None) -> bool:
         return False
 
 
+def open_raiker(url: str, os_name: str | None = None, *, browser: bool = False) -> str:
+    """Open Raiker for the owner: its desktop window, else the browser.
+
+    Returns ``"window"``, ``"browser"`` or ``"none"`` and prints what happened,
+    including why the window was not used, so a fallback is never silent.
+    """
+    from raiker.app.desktop_shell import find_shell, launch, unavailable_reason
+
+    if not browser:
+        command = find_shell(url)
+        if command is not None and launch(command):
+            print(f"[raiker] Opened the Raiker window ({command.source}).")
+            return "window"
+        reason = "it could not be started" if command is not None else unavailable_reason()
+        print(f"[raiker] Opening your browser instead of the Raiker window: {reason}.")
+    if open_browser(url, os_name):
+        return "browser"
+    print(f"[raiker] Could not open a window or a browser. Go to {url}")
+    return "none"
+
+
+def write_ready_file(path: Path, url: str, port: int, *, joined: bool) -> None:
+    """Write the desktop shell's ready record atomically."""
+    payload = {"url": url, "port": port, "joined": joined, "pid": os.getpid()}
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def wait_until_ready(port: int, timeout: float = 90.0, interval: float = 0.25) -> bool:
+    """Block until a Raiker answers on *port*, or *timeout* passes."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if raiker_is_running(port, timeout=1.0):
+            return True
+        time.sleep(interval)
+    return False
+
+
+def _announce_when_ready(
+    url: str, port: int, os_name: str, ready_file: Path | None, open_ui: bool, browser: bool
+) -> None:
+    if not wait_until_ready(port):
+        print(f"[raiker] The host did not answer on {url}; not opening a window.", file=sys.stderr)
+        return
+    if ready_file is not None:
+        try:
+            write_ready_file(ready_file, url, port, joined=False)
+        except OSError as error:
+            print(f"[raiker] Could not write {ready_file}: {error}", file=sys.stderr)
+    if open_ui:
+        open_raiker(url, os_name, browser=browser)
+
+
 def _resolve_ui_dir() -> Path | None:
     """The built web app, if this install has one."""
     bundle_root = getattr(sys, "_MEIPASS", None)
@@ -256,14 +312,27 @@ def build_parser() -> argparse.ArgumentParser:
         prog="raiker-app",
         description=(
             "Start Raiker as a desktop application: platform-appropriate data "
-            "directory, a free loopback port, and your default browser. "
+            "directory, a free loopback port, and Raiker's desktop window "
+            "(or your default browser with --browser). "
             "Subcommands control the background host and its removal."
         ),
     )
     _add_common(parser)
     parser.add_argument(
-        "--no-browser", action="store_true", help="Start the host without opening a browser."
+        "--no-browser",
+        action="store_true",
+        help="Start the host without opening the desktop window or a browser.",
     )
+    parser.add_argument(
+        "--browser",
+        action="store_true",
+        help="Open Raiker in your default browser instead of the desktop window.",
+    )
+    # DESK-03 — how the desktop shell learns the URL of a host it started: one
+    # JSON object written once /api/health answers (or straight away when an
+    # already-running host is joined). A file, not stdout: the shell discards
+    # the host's output so that closing the window cannot break its pipe.
+    parser.add_argument("--ready-file", default=None, help=argparse.SUPPRESS)
     parser.add_argument(
         "--print-paths",
         action="store_true",
@@ -404,8 +473,10 @@ def main(argv: list[str] | None = None) -> int:
         # encrypted workspace is a data-integrity problem, and the person who
         # double-clicked the icon wants the app, not a second copy of it.
         print(f"[raiker] Raiker is already running at {url} — opening it.")
-        if not args.no_browser and not open_browser(url, os_name):
-            print(f"[raiker] Could not open a browser. Go to {url}")
+        if args.ready_file:
+            write_ready_file(Path(args.ready_file), url, port, joined=True)
+        if not args.no_browser:
+            open_raiker(url, os_name, browser=args.browser)
         return 0
 
     ui_dir = _resolve_ui_dir()
@@ -428,10 +499,16 @@ def main(argv: list[str] | None = None) -> int:
         loopback_only=True,
     )
 
-    if not args.no_browser:
-        # After the server has had a moment to bind, so the first request is not
-        # a connection refused the owner has to reload past.
-        threading.Timer(1.2, lambda: open_browser(url, os_name)).start()
+    # Once the server answers — not after a guessed delay — open the window and
+    # tell a desktop shell that started this host where it is.
+    ready_file = Path(args.ready_file) if args.ready_file else None
+    if ready_file is not None or not args.no_browser:
+        threading.Thread(
+            target=_announce_when_ready,
+            args=(url, port, os_name, ready_file, not args.no_browser, args.browser),
+            name="raiker-ready",
+            daemon=True,
+        ).start()
 
     import uvicorn
 

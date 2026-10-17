@@ -27,6 +27,7 @@
   import LazyRoute from "./lib/components/LazyRoute.svelte";
   import { prefetchRoutes } from "./lib/routeComponents";
   import { mayLeave } from "./lib/leaveGuard";
+  import { DESKTOP_COMMAND_EVENT, inDesktopShell } from "./lib/desktopShell";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
   // REM-SET-NOTIFY — unread notices belong wherever the owner is. The strip was
@@ -209,12 +210,26 @@
       }
     };
     window.addEventListener("keydown", openPalette);
+    // The desktop window's menu sends the same two shell controls a click or
+    // Ctrl/Cmd+K reaches; routes it handles itself (`desktopShell.ts`).
+    const onDesktopCommand = (event: Event) => {
+      const command = (event as CustomEvent<string>).detail;
+      if (command === "open-palette") {
+        paletteTrigger = document.activeElement as HTMLElement | null;
+        paletteOpen = true;
+      } else if (command === "toggle-navigation") {
+        const trigger = document.querySelector<HTMLElement>(".navigation-toggle");
+        if (trigger !== null) toggleNavigation(trigger);
+      }
+    };
+    window.addEventListener(DESKTOP_COMMAND_EVENT, onDesktopCommand);
     // Warm the split route chunks off the critical path, so the first click on
     // a secondary destination is as instant as it was in the single-chunk build.
     prefetchRoutes();
     return () => {
       window.removeEventListener("hashchange", handler);
       window.removeEventListener("keydown", openPalette);
+      window.removeEventListener(DESKTOP_COMMAND_EVENT, onDesktopCommand);
       navigationQuery?.removeEventListener("change", updateNavigationMode);
     };
   });
@@ -294,6 +309,11 @@
 <a class="skip-link" href="#main">Skip to content</a>
 
 {#if authState !== "ready"}
+  {#if inDesktopShell()}
+    <!-- The desktop window has no native title bar. Before sign-in there is no
+         top bar to drag it by, so this strip is that handle. -->
+    <div class="desktop-drag-strip" aria-hidden="true"></div>
+  {/if}
   <LoginView {onAuthenticated} runtimeState={authState} />
 {:else}
   <div class="app-shell" data-navigation-open={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}>

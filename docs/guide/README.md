@@ -40,6 +40,7 @@ If this is your first time using Raiker, read these pages in order:
 | Add connectors, MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
 | Generate images with a connected image model | [Design](design.md) |
+| Use Raiker's desktop window, its menu and shortcuts | [The desktop window](managing-the-host.md#the-desktop-window) |
 | Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
 | Understand accounts, credentials, audit records, and privacy choices | [Security and privacy](security-and-privacy.md) |
 | Check what is unavailable or deliberately restricted | [Known limits](../architecture/KNOWN_LIMITS.md) |

@@ -49,6 +49,7 @@
     onselected,
     onchanged,
     oncatalogue,
+    openPickerFor = null,
   }: {
     /** Every profile the registry publishes, from `GET /api/models`. */
     profiles: ModelProfile[];
@@ -70,6 +71,12 @@
      * it cannot call a key that lists nothing "connected".
      */
     oncatalogue?: (profileId: string, reasonCode: string | null) => void;
+    /**
+     * BUG-344 — open this profile's model picker as soon as its catalogue is
+     * listed, so setup's "Choose a model" answers in one press instead of
+     * revealing a second button with the same name.
+     */
+    openPickerFor?: string | null;
   } = $props();
 
   /** The models kept offered for one profile, from the caller's snapshot. */
@@ -386,6 +393,15 @@
    * both screens gain anything either one learns.
    */
   let pickerFor = $state<Row | null>(null);
+  // Once per request: closing the picker must not reopen it.
+  let openedPickerFor: string | null = null;
+  $effect(() => {
+    if (openPickerFor === null || openedPickerFor === openPickerFor) return;
+    const row = rows.find((candidate) => candidate.profileId === openPickerFor);
+    if (row === undefined || !isConnected(row) || (catalogue[row.profileId]?.models.length ?? 0) === 0) return;
+    openedPickerFor = openPickerFor;
+    pickerFor = row;
+  });
 
   /**
    * Install a local runtime from here (BUG-262). Setup could detect Ollama and

@@ -79,6 +79,13 @@
      same one you hit at full width, narrow enough to be worth collapsing for. */
   --sidebar-rail-w: 56px;
   --topbar-h: 56px;
+  /* DESK-06 — room the macOS window buttons (close, minimise, zoom) occupy at
+     the window's top-left in Raiker's desktop window. */
+  --desktop-window-buttons-w: 80px;
+  --desktop-window-buttons-h: 28px;
+  /* Width of the Windows/Linux window controls; measured and set by
+     `lib/desktopShell.ts`, zero everywhere else. */
+  --desktop-controls-w: 0px;
   --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-shell: 240ms;
 
@@ -1679,4 +1686,42 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
   align-items: center;
   gap: 0.25rem;
   min-width: 0;
+}
+
+/* ── Desktop window chrome (DESK-06) ──
+   `data-desktop-shell` is set only inside Raiker's desktop window
+   (`lib/desktopShell.ts`). The window has no native title bar: the top bar is
+   where it is dragged from, so everything in it that can be pressed opts back
+   out of the drag region. On Windows and Linux the native window controls sit
+   over the top bar's right end, and `--desktop-controls-w` says how much room
+   they take; on macOS the window buttons sit over the navigation's top-left. */
+:root[data-desktop-shell] .topbar,
+:root[data-desktop-shell] .desktop-drag-strip {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+:root[data-desktop-shell] .topbar :is(a, button, input, select, textarea, label, summary, [role="button"], [role="dialog"], [tabindex]) {
+  -webkit-app-region: no-drag;
+}
+:root[data-desktop-shell="win32"] .topbar,
+:root[data-desktop-shell="linux"] .topbar {
+  padding-right: calc(var(--desktop-controls-w) + var(--space-3));
+}
+:root[data-desktop-shell="darwin"] .sidebar {
+  padding-top: calc(var(--space-4) + var(--desktop-window-buttons-h));
+}
+:root[data-desktop-shell="darwin"] .topbar.compact {
+  padding-left: var(--desktop-window-buttons-w);
+}
+/* Before sign-in there is no top bar: the strip above is the handle, and the
+   sign-in page starts below it so nothing pressable sits under the strip or
+   the window controls. */
+:root[data-desktop-shell] .lock-screen {
+  padding-top: var(--topbar-h);
+}
+.desktop-drag-strip {
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--topbar-h);
+  z-index: var(--z-popover);
 }

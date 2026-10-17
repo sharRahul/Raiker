@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+# DESK-12 — the desktop application: this shell, with the frozen Raiker host
+# inside it. `python scripts/build_desktop.py --out ../desktop-dist` produces the
+# host (PyInstaller, `desktop-dist/Raiker/`); this file puts it at
+# `resources/host/`, which is where `src/host.ts` starts it from and where
+# `raiker/app/desktop_shell.py` looks for the shell that carries it.
+#
+# Signing identities are not configured here. An unsigned build is named as one
+# (`-unsigned` in artifactName) so it can never be mistaken for a release; the
+# signed pipeline is `.github/workflows/release.yml`.
+appId: org.raiker.desktop
+productName: Raiker
+copyright: Copyright © Raiker contributors
+directories:
+  output: release
+  buildResources: build-resources
+files:
+  - dist/**
+  - static/**
+  - package.json
+extraResources:
+  - from: ../desktop-dist/Raiker
+    to: host
+  - from: ../raiker/assets/raiker-icon.png
+    to: raiker-icon.png
+asar: true
+artifactName: "${productName}-${version}-${os}-${arch}-unsigned.${ext}"
+mac:
+  category: public.app-category.productivity
+  icon: ../raiker/assets/raiker-icon.png
+  target: [dmg]
+  hardenedRuntime: true
+win:
+  icon: ../raiker/assets/raiker-icon.png
+  target: [nsis]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: ../raiker/assets/raiker-icon.png
+  executableName: raiker
+  category: Utility
+  target: [AppImage, deb]

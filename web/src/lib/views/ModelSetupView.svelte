@@ -335,6 +335,8 @@
   }
   /** The full matrix opens by itself only when there is nothing to recommend. */
   let showAllProviders = $state(false);
+  /** The provider whose picker the recommendation asked to open (BUG-344). */
+  let pickerRequest = $state<string | null>(null);
   const allProvidersOpen = $derived(showAllProviders || (recommended === null && !unconfirmed));
 
   onMount(load);
@@ -403,8 +405,14 @@
             <button class="primary choose" onclick={() => void addWorkspace()}>Add the workspace ID</button>
           {:else if !allProvidersOpen && picked === null}
             <!-- The recommendation asks for a model; the picker that answers it
-                 is in the providers below, so it opens them. -->
-            <button class="primary choose" onclick={() => (showAllProviders = true)}>Choose a model</button>
+                 is in the providers below, so it opens them — and, BUG-344, that
+                 provider's picker, rather than a second "Choose a model". -->
+            <button
+              class="primary choose"
+              onclick={() => {
+                pickerRequest = recommended?.profileId ?? null;
+                showAllProviders = true;
+              }}>Choose a model</button>
           {/if}
         </div>
       {/if}
@@ -421,6 +429,7 @@
           onselected={(profileId, model) => void chooseModel(profileId, model)}
           oncatalogue={(profileId, reasonCode) =>
             (catalogueRefusals = { ...catalogueRefusals, [profileId]: reasonCode })}
+          openPickerFor={pickerRequest}
         />
       {/if}
       {#if picked !== null}

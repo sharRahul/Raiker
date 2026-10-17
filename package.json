@@ -3,7 +3,7 @@
   "private": true,
   "license": "Apache-2.0",
   "version": "0.0.0",
-  "description": "Raiker's local-first personal AI agent. Root scripts delegate to the governed single-owner web app in web/.",
+  "description": "Raiker's local-first personal AI agent. Root scripts delegate to the governed single-owner web app in web/ and its desktop window in desktop/.",
   "scripts": {
     "dev": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
@@ -12,6 +12,9 @@
     "lint": "npm --prefix web run lint",
     "test": "npm --prefix web run test",
     "test:e2e:mocked": "npm --prefix web run test:e2e:mocked",
-    "test:e2e:live": "npm --prefix web run test:e2e:live"
+    "test:e2e:live": "npm --prefix web run test:e2e:live",
+    "desktop:build": "npm --prefix desktop run build",
+    "desktop:start": "npm --prefix desktop run start",
+    "desktop:test": "npm --prefix desktop run test"
   }
 }

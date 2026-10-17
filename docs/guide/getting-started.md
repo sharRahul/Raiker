@@ -188,6 +188,16 @@ npm --prefix web ci
 npm --prefix web run build
 ```
 
+Then build Raiker's desktop window, which is how `raiker-app` opens Raiker:
+
+```bash
+npm --prefix desktop ci
+npm --prefix desktop run build
+```
+
+Without it Raiker still works: `raiker-app` says the window is not built and
+opens your default browser instead.
+
 ## Run
 
 ```bash
@@ -195,7 +205,11 @@ raiker-app
 ```
 
 `raiker-app` is the primary application command. It starts Raiker on loopback
-and opens the dashboard in your default browser. By default it uses the normal
+and opens it in **Raiker's own desktop window** — a native window with its own
+menu, shortcuts and notifications. Add `--browser` to open your default browser
+instead; if the window is not available, `raiker-app` says why and opens the
+browser for you. See [The desktop window](managing-the-host.md#the-desktop-window).
+By default it uses the normal
 application-data directory for your platform. Passing `--workspace .` instead
 keeps runtime state in `.raiker/` inside the repository. Use the same workspace
 for every lifecycle command, including background startup:
@@ -214,7 +228,7 @@ raiker-app desktop install
 
 That adds a launcher — an entry in the applications menu on Linux, the Start
 Menu on Windows, `~/Applications` on macOS — which starts Raiker if it is not
-running and opens the dashboard. Everything is written under your own home
+running and opens its window. Everything is written under your own home
 directory. `raiker-app desktop uninstall` removes it.
 
 Once Raiker is running it also has a system-tray icon: status, Open Raiker,
@@ -242,7 +256,7 @@ Useful flags:
 | `--workspace PATH` | Where runtime state lives (`.raiker/` inside it). Use a throwaway path to try Raiker without touching a real project. |
 | `--port N` | Bind port (default `8765`). |
 | `--host H` + `--allow-public` | Reach Raiker from another device. Also requires `RAIKER_OWNER_TOKEN` and turns on transport guardrails. Put TLS in front of it. |
-| `--no-browser` | Do not auto-open a browser. |
+| `--no-browser` | Do not auto-open a browser. (`raiker-app --no-browser` opens neither the window nor a browser.) |
 | `--ui-dir PATH` | Serve a dashboard build from elsewhere. |
 
 There is also a terminal client:

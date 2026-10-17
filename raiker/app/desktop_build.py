@@ -33,6 +33,15 @@ def pyinstaller_command(
         "pystray",
         "--collect-all",
         "PIL",
+        # Raiker's own package data — model profiles, the icon, the built-in
+        # skills — is read from beside the modules at start. PyInstaller follows
+        # imports, not data files, so without this the frozen host stopped on its
+        # first read of `raiker/config/model-profiles.json` and never served.
+        "--collect-data",
+        "raiker",
+        # Executors, providers and routes are resolved by name at run time.
+        "--collect-submodules",
+        "raiker",
         "--add-data",
         f"{web_assets}{separator}web",
         str(entry),

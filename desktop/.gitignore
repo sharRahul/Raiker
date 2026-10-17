@@ -1,0 +1,5 @@
+dist/
+dist-test/
+release/
+test-results/
+playwright-report/

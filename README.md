@@ -4,7 +4,14 @@ Raiker is a **local-first personal autonomous AI agent**: a personalised
 **personal AI agent for one owner**. It is an
 all-purpose partner for thinking, researching, creating, communicating,
 organising, coding, automating, and completing digital work across the models,
-tools, files, projects, and services that owner connects and authorises. 
+tools, files, projects, and services that owner connects and authorises. Its
+working foundation combines a personal AI assistant, a coding/build agent, and
+an extensible, owner-governed runtime; goal-level capabilities are planned and
+staged in the [personal-agent architecture](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
+
+Raiker opens in its own desktop window. The desktop app, web dashboard and
+terminal client are available for local, single-owner use; features without a
+governed executor fail closed, and hosted multi-user operation is deferred.
 
 ## Run
 
@@ -19,6 +26,8 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 npm --prefix web ci
 npm --prefix web run build
+npm --prefix desktop ci
+npm --prefix desktop run build
 raiker-app
 ```
 
@@ -29,9 +38,11 @@ version of the same package, it is on an older Python — see
 With [uv](https://github.com/astral-sh/uv), `uv sync --extra dev` installs the
 exact set in `uv.lock` and resolves nothing at all.
 
-`raiker-app` starts Raiker on a loopback address and opens the dashboard in
-your browser. On first run, create the local owner account and connect a model.
-There is no Raiker cloud account.
+`raiker-app` starts Raiker on a loopback address and opens it in Raiker's
+desktop window (`raiker-app --browser` uses your browser instead; without the
+`desktop/` build it falls back to the browser and says why). On first run,
+create the local owner account and connect a model. There is no Raiker cloud
+account.
 
 For Windows instructions, project-local workspaces, explicit server control,
 and uninstall help, see [Getting started](docs/guide/getting-started.md).
@@ -52,6 +63,8 @@ python3 -m venv .venv
 python -m pip install -e ".[dev]"
 npm --prefix web ci
 npm --prefix web run build
+npm --prefix desktop ci
+npm --prefix desktop run build
 raiker-app
 ```
 
@@ -75,6 +88,8 @@ python -m pip install -e ".[dev]"
 export PATH="$(brew --prefix node@20)/bin:$PATH"
 npm --prefix web ci
 npm --prefix web run build
+npm --prefix desktop ci
+npm --prefix desktop run build
 raiker-app
 ```
 

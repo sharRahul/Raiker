@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import threading
-import webbrowser
 from dataclasses import dataclass
 from typing import Any
 
@@ -70,7 +69,12 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
     try:
         import pystray  # type: ignore[import-untyped]
         from PIL import Image, ImageDraw
-    except ImportError:
+    except Exception as error:  # noqa: BLE001 - see below
+        # Not only ImportError: on a machine with no display pystray's X11
+        # backend raises `Xlib.error.DisplayNameError` while importing, and a
+        # daemon thread that dies with a traceback reads as a crashed host. A
+        # host without a tray is still a working host; say so once.
+        print(f"[raiker] No system tray here ({type(error).__name__}); use the Host control instead.")
         return
 
     token = _exchange(base_url, bootstrap_secret)
@@ -97,7 +101,7 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
         state = menu_state(host())
         return (
             pystray.MenuItem(state.status_label, None, enabled=False),
-            pystray.MenuItem("Open Raiker", lambda: webbrowser.open(base_url)),
+            pystray.MenuItem("Open Raiker", lambda: open_window(base_url)),
             pystray.MenuItem(
                 state.pause_label,
                 lambda: post("/api/host/resume" if state.pause_label == "Resume" else "/api/host/pause"),
@@ -107,7 +111,17 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
         )
 
     icon = pystray.Icon("raiker", image, "Raiker", pystray.Menu(items))
-    icon.run()
+    try:
+        icon.run()
+    except Exception as error:  # noqa: BLE001 - a tray backend failure must not read as a host crash
+        print(f"[raiker] The system tray stopped ({type(error).__name__}); use the Host control instead.")
+
+
+def open_window(base_url: str) -> None:
+    """The tray's Open Raiker: the desktop window, or the browser without one."""
+    from raiker.app.launcher import open_raiker
+
+    open_raiker(f"{base_url}/")
 
 
 def _exchange(base_url: str, secret: str) -> str | None:

@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Raiker</title>
+    <link rel="stylesheet" href="status.css" />
+  </head>
+  <body>
+    <div class="drag" aria-hidden="true"></div>
+    <main class="card" aria-live="polite">
+      <div class="mark" aria-hidden="true"></div>
+      <h1 id="title">Raiker</h1>
+      <p id="message"></p>
+      <div id="spinner" class="spinner" role="progressbar" aria-label="Starting Raiker" hidden></div>
+    </main>
+    <script src="status.js"></script>
+  </body>
+</html>

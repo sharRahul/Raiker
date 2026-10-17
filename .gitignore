@@ -55,3 +55,6 @@ docs/plans/screenshots/not-working/
 win1312-probe/
 .raiker-probe-inside.tmp
 .raiker-probe-inside.grandchild
+
+# DESK-12 — the frozen host and the packaged desktop application are build output.
+/desktop-dist/

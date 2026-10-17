@@ -925,6 +925,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-901](#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330) | Low | Tests / Windows | Fixed 2026-10-13 (BUG-330 stays open for its remainder) |
 | [FIXED-902](#fixed-902--a-project-name-already-in-use-was-answered-as-a-refusal) | Low | Projects / API | Fixed 2026-10-13 — found by the live round |
 | [FIXED-903](#fixed-903--a-message-whose-reply-did-not-go-read-as-though-no-reply-was-tried) | Low | Messaging | Fixed 2026-10-13 — found by the live round |
+| [FIXED-904](#fixed-904--raiker-had-no-window-of-its-own-it-opened-as-a-browser-tab) | High | Desktop / application shell | Fixed 2026-10-17 — DESK-01, DESK-02, DESK-05, DESK-11 |
+| [FIXED-905](#fixed-905--a-desktop-shell-had-no-way-to-learn-where-the-host-it-started-was-listening) | Medium | Desktop / host lifecycle | Fixed 2026-10-17 — DESK-03 |
+| [FIXED-906](#fixed-906--a-desktop-window-could-have-become-a-second-ungoverned-browser) | High | Desktop / security | Fixed 2026-10-17 — DESK-04 |
+| [FIXED-907](#fixed-907--the-web-app-had-no-window-chrome-for-a-desktop-window) | Medium | Desktop / web UI | Fixed 2026-10-17 — DESK-06 |
+| [FIXED-908](#fixed-908--the-window-forgot-where-it-was-and-a-second-launch-could-open-a-second-copy) | Low | Desktop / window | Fixed 2026-10-17 — DESK-07 |
+| [FIXED-909](#fixed-909--the-desktop-window-had-no-menu-or-shortcuts-for-raikers-places) | Medium | Desktop / navigation | Fixed 2026-10-17 — DESK-08 |
+| [FIXED-910](#fixed-910--closing-the-window-gave-no-sign-that-raiker-kept-working) | Medium | Desktop / lifecycle | Fixed 2026-10-17 — DESK-09 |
+| [FIXED-911](#fixed-911--a-clicked-desktop-notification-could-not-bring-the-window-forward) | Low | Desktop / notifications | Fixed 2026-10-17 — DESK-10 |
+| [FIXED-912](#fixed-912--there-was-no-way-to-package-the-window-with-the-host) | Medium | Desktop / packaging | Fixed 2026-10-17 — DESK-12 |
+| [FIXED-913](#fixed-913--the-frozen-host-stopped-on-its-first-read-of-its-own-configuration) | High | Desktop / packaging | Fixed 2026-10-17 — found by the DESK-12 round |
+| [FIXED-914](#fixed-914--a-host-on-a-machine-with-no-display-printed-a-traceback-from-its-tray) | Low | Desktop / tray | Fixed 2026-10-17 — found in the round |
+| [FIXED-915](#fixed-915--the-desktop-window-had-no-ci-and-no-licence-check) | Medium | CI / supply chain | Fixed 2026-10-17 — DESK-13 |
+| [FIXED-916](#fixed-916--the-desktop-window-was-proven-against-a-real-host-and-provider) | Medium | Desktop / live evidence | Fixed 2026-10-17 — DESK-14 |
+| [FIXED-917](#fixed-917--ci-was-red-on-main-a-stale-api-contract-and-readme-truth-markers) | High | CI / documentation | Fixed 2026-10-17 — found at the start of the round |
+| [FIXED-918](#fixed-918--a-narrow-window-let-the-page-title-run-under-the-mode-switch) | Low | Web UI / top bar | Fixed 2026-10-17 — found in the round |
+| [FIXED-919](#fixed-919--first-run-choose-a-model-took-two-presses-of-two-buttons-with-one-name-was-bug-344) | Low | Models / first-run UX | Fixed 2026-10-17 (was BUG-344) — found in the round |
 
 ---
 
@@ -33166,3 +33182,195 @@ installation cases in `tests/test_api_contract_responses.py`.
 **Fixed.** It reads *Answered — the reply did not go; see Deliveries to review*, and a delivered one *Answered — the reply was delivered*.
 
 **Evidence.** `channelSetup.test.ts`.
+
+---
+
+## FIXED-904 — Raiker had no window of its own: it opened as a browser tab
+
+**Severity: High. Area: Desktop / application shell. Status: Fixed 2026-10-17 — DESK-01, DESK-02, DESK-05, DESK-11. Owner decision: the desktop window is the default experience.**
+
+**Observed.** `raiker-app` started the host and handed the owner a browser tab. The desktop design kept a native window deferred, so Raiker had no menu, no shortcuts, no window of its own, and a stray tab was the application.
+
+**Fixed.** `desktop/` is an Electron shell (the Hermes Agent desktop app's shape: a window over the agent's own core). It attaches to a running host (`--raiker-url`) or starts the bundled one, and exposes one frozen bridge, `window.raikerDesktop`, with three operations. `raiker/app/desktop_shell.py` finds the window — `RAIKER_DESKTOP_SHELL`, the packaged shell around a frozen host, or `desktop/` in a source checkout — and `raiker-app` opens it by default. `--browser` opens the browser instead; a missing window falls back to the browser *and says why*. The decision and its reasons are recorded in [the desktop design](../architecture/DESKTOP_DISTRIBUTION_DESIGN.md#desktop-window-desk-01desk-14).
+
+**Evidence.** `tests/test_desktop_shell.py` (discovery on three platforms, fallback wording, `--browser`); `desktop/e2e/shell.spec.ts` (bridge shape, frozen, no `require`/`process` in the page); a plain `raiker-app` from a source checkout opened the window on a real X display (`desk-11-raiker-app-window.png`, 2026-10-17 round).
+
+---
+
+## FIXED-905 — A desktop shell had no way to learn where the host it started was listening
+
+**Severity: Medium. Area: Desktop / host lifecycle. Status: Fixed 2026-10-17 — DESK-03.**
+
+**Observed.** `raiker-app` chose its port at run time and announced it only on stdout, and it opened the browser after a fixed 1.2-second timer whether or not the server had bound.
+
+**Fixed.** `raiker-app --ready-file PATH` writes `{url, port, joined, pid}` atomically once `/api/health` answers — or at once when it joins a running host. A file rather than stdout: the shell discards the host's output so closing the window can never break the host's pipe. The window or browser now opens when the host answers, not after a guess.
+
+**Evidence.** `tests/test_desktop_shell.py::test_the_ready_file_is_written_whole`, `…joining_a_running_host_writes_the_ready_file…`, `…readiness_waits_for_the_host…`; `desktop/test/host.test.ts`.
+
+---
+
+## FIXED-906 — A desktop window could have become a second, ungoverned browser
+
+**Severity: High. Area: Desktop / security. Status: Fixed 2026-10-17 — DESK-04. Preventive: the guards shipped with the window.**
+
+**Observed.** Any Electron window that loads a URL can be navigated, open popups, request device permissions and, misconfigured, reach Node.
+
+**Fixed.** The page runs with context isolation, the Chromium sandbox and no Node integration; webviews are refused. Navigation is pinned to the one loopback Raiker origin the window was opened for (`desktop/src/origin.ts`): web links go to the owner's browser, another local Raiker instance gets its own window, and `file:`, `javascript:`, `data:`, custom schemes and credentialled URLs are refused. Only notifications, clipboard writes and audio-only media may be granted, and only to that origin. A non-loopback `--raiker-url` is refused by name.
+
+**Evidence.** `desktop/test/origin.test.ts`; `desktop/e2e/shell.spec.ts` (navigation, permissions, refused address, unreachable host).
+
+---
+
+## FIXED-907 — The web app had no window chrome for a desktop window
+
+**Severity: Medium. Area: Desktop / web UI. Status: Fixed 2026-10-17 — DESK-06. Found in the round: CSS `env(titlebar-area-*)` goes stale after a resize.**
+
+**Observed.** A frameless window needs a draggable title bar and room for the platform's window buttons; a page built for a browser tab has neither.
+
+**Fixed.** In the window `<html data-desktop-shell=…>` makes the top bar the title bar (pressable controls opt out of dragging), reserves room for macOS's traffic lights over the navigation and for Windows/Linux controls at the top bar's end, and colours those controls to the theme. Before sign-in a drag strip takes the top bar's place and the sign-in page starts below it. The controls' width is measured with the Window Controls Overlay API's `geometrychange`: the first round showed Chromium does not re-evaluate `env(titlebar-area-*)` for an existing element on resize, which left 290 px reserved for 113 px of controls.
+
+**Evidence.** `web/src/lib/desktopShell.test.ts`; `desktop-live.spec.ts` asserts the drag regions and a non-zero controls width in a narrow window; screenshots `desktop-03-home.png`, `desktop-07-dark.png`, `desktop-08-narrow.png`, and the emulated macOS captures `mac-02-home.png`, `mac-03-narrow.png`.
+
+---
+
+## FIXED-908 — The window forgot where it was, and a second launch could open a second copy
+
+**Severity: Low. Area: Desktop / window. Status: Fixed 2026-10-17 — DESK-07.**
+
+**Observed.** Without its own state, every launch opened at a default size, and launching again would start another shell.
+
+**Fixed.** Geometry (never workspace data) is kept in the shell's user-data directory and sanitised against the connected displays: a window on an unplugged monitor is re-centred at its size. A single-instance lock brings the existing window forward on relaunch — a dock click, a menu entry, or the tray's Open Raiker.
+
+**Evidence.** `desktop/test/windowState.test.ts`; `desktop/e2e/shell.spec.ts` ("opens where it was closed", "a second launch brings the first window forward").
+
+---
+
+## FIXED-909 — The desktop window had no menu or shortcuts for Raiker's places
+
+**Severity: Medium. Area: Desktop / navigation. Status: Fixed 2026-10-17 — DESK-08.**
+
+**Observed.** A desktop app is expected to have File/Edit/View/Go/Window/Help and keyboard shortcuts; the page had only Ctrl/Cmd+K.
+
+**Fixed.** `desktop/src/menu.ts` builds the menu as data: New chat, Build, Design, Settings, Command palette, Toggle navigation, Home/Chat/Tasks/Approvals, the guide, Open in browser, plus the platform's standard roles. Each Raiker item sends a named command that the preload accepts only from a fixed list and the page answers with the same route or control a click uses. DevTools appear only in an unpackaged build.
+
+**Evidence.** `desktop/test/commands.test.ts` (no duplicate accelerator on any platform, every item sends a known command, preload and web lists match); `desktop/e2e/shell.spec.ts`; `desktop-live.spec.ts` drives Home, Chat, Approvals and the palette through the commands.
+
+---
+
+## FIXED-910 — Closing the window gave no sign that Raiker kept working
+
+**Severity: Medium. Area: Desktop / lifecycle. Status: Fixed 2026-10-17 — DESK-09.**
+
+**Observed.** The host is a service, so closing a window stops nothing — correct, and invisible. The tray's Open Raiker opened a browser tab.
+
+**Fixed.** The first time the window is closed a notification says Raiker is still running and where to quit it, and remembers it said so. On macOS the app stays in the Dock; elsewhere closing the window ends the shell and the host carries on. The tray's **Open Raiker** now opens the desktop window (falling back to the browser).
+
+**Evidence.** `desktop/e2e/shell.spec.ts` ("closing the window says once…"); `raiker/app/tray.py::open_window`.
+
+---
+
+## FIXED-911 — A clicked desktop notification could not bring the window forward
+
+**Severity: Low. Area: Desktop / notifications. Status: Fixed 2026-10-17 — DESK-10.**
+
+**Observed.** `raiseDesktopNotice` called `window.focus()`, which a page in a desktop window cannot use to raise its own window.
+
+**Fixed.** A click routes the page and asks the shell to restore, show and focus the window through the bridge; in a browser nothing changes.
+
+**Evidence.** `web/src/lib/desktopNotice.ts`; the bridge's `focusWindow` is covered by `desktop/e2e/shell.spec.ts`'s bridge-shape test.
+
+---
+
+## FIXED-912 — There was no way to package the window with the host
+
+**Severity: Medium. Area: Desktop / packaging. Status: Fixed 2026-10-17 — DESK-12. Unsigned builds only; signed publication is BUG-343.**
+
+**Observed.** The frozen host and the installers existed; a shell to carry them did not.
+
+**Fixed.** `desktop/electron-builder.yml` places the PyInstaller host at `resources/host/`, where `host.ts` starts it and `desktop_shell.py` looks for the shell around it. Unsigned artifacts are named `-unsigned`. The builder runs pinned through `npx` rather than as a dependency, because its dependency chain carries a `sprintf-js` advisory with no fixed release and `npm audit` must stay clean.
+
+**Evidence.** A Linux `--dir` package built in the round and `desktop/e2e/packaged-live.spec.ts` passed cold: the shell started its bundled host in an empty workspace, waited for the ready file and showed first-run sign-in in ~5 s (`desktop-packaged-first-run.png`), then stopped the host.
+
+---
+
+## FIXED-913 — The frozen host stopped on its first read of its own configuration
+
+**Severity: High. Area: Desktop / packaging. Status: Fixed 2026-10-17 — found by the DESK-12 round.**
+
+**Observed.** The PyInstaller payload from `scripts/build_desktop.py` exited with `FileNotFoundError: …/_internal/raiker/config/model-profiles.json` before serving anything. PyInstaller follows imports, not data files, so model profiles, the icon and the built-in skills were never bundled; no test had started the frozen host.
+
+**Fixed.** The build collects Raiker's package data (`--collect-data raiker`) and its run-time-resolved modules (`--collect-submodules raiker`).
+
+**Evidence.** `tests/test_desktop_build.py`; the rebuilt host wrote its ready file and answered `/api/health`, and the packaged round above passed.
+
+---
+
+## FIXED-914 — A host on a machine with no display printed a traceback from its tray
+
+**Severity: Low. Area: Desktop / tray. Status: Fixed 2026-10-17 — found in the round.**
+
+**Observed.** `_run_native_tray` caught only `ImportError`, but pystray's X11 backend raises `Xlib.error.DisplayNameError` while importing on a display-less machine, so every headless start logged a traceback that read as a crash.
+
+**Fixed.** Any tray start or run failure prints one line — no system tray here; use the Host control — and the host keeps running.
+
+**Evidence.** `tests/test_desktop_shell.py::test_a_host_without_a_display_keeps_running_without_a_tray`; the frozen host's log in the round shows the one line.
+
+---
+
+## FIXED-915 — The desktop window had no CI and no licence check
+
+**Severity: Medium. Area: CI / supply chain. Status: Fixed 2026-10-17 — DESK-13.**
+
+**Observed.** New first-party code and a new npm lockfile would otherwise ship unaudited.
+
+**Fixed.** `.github/workflows/desktop.yml` runs `npm audit`, lint, type-check, the shell's unit tests and the Electron end-to-end suite under Xvfb on every change to `desktop/` or the web bridge. `scripts/licensing_check.py` reads `desktop/package-lock.json` and requires `desktop/package.json` to declare Apache-2.0.
+
+**Evidence.** The workflow's run on the pushing commit; `python scripts/licensing_check.py` passes locally with the desktop components listed.
+
+---
+
+## FIXED-916 — The desktop window was proven against a real host and provider
+
+**Severity: Medium. Area: Desktop / live evidence. Status: Fixed 2026-10-17 — DESK-14.**
+
+**Observed.** Fixture tests prove the shell's contract, not that an owner can use Raiker in it.
+
+**Fixed.** `desktop/e2e/desktop-live.spec.ts` drives the window against a fresh `raiker-app` host: creates the owner, connects Anthropic in first-run setup by pasting the key and — when the provider asks — the workspace ID, chooses Haiku 5.5, completes setup, sends a Chat turn answered by the provider, reaches Home, Approvals and the palette through menu commands, switches theme and narrows the window.
+
+**Evidence.** Passed 2026-10-17 on Linux/Xvfb with a real Anthropic key, from an empty workspace; the answer bubble read `desktop window ready` (`desktop-04-chat-answer.png`). The key was entered through the product and is in no committed file.
+
+---
+
+## FIXED-917 — CI was red on main: a stale API contract and README truth markers
+
+**Severity: High. Area: CI / documentation. Status: Fixed 2026-10-17 — found at the start of the round.**
+
+**Observed.** Four tests failed on `main`: `test_the_generated_contract_files_are_current` (the `TurnSourceExcerpt` field order had moved) and three README truth validators (the project-status paragraph had been removed).
+
+**Fixed.** The contract was regenerated with `python -m scripts.api_contract`, and the README again states the coding/build agent, that goal-level capabilities are planned, what is available (now including the desktop window), what fails closed and that hosted multi-user operation is deferred.
+
+**Evidence.** The four tests pass; CI on the pushing commit.
+
+---
+
+## FIXED-918 — A narrow window let the page title run under the mode switch
+
+**Severity: Low. Area: Web UI / top bar. Status: Fixed 2026-10-17 — found in the round.**
+
+**Observed.** At about 820 px the top bar's title ("Approvals") ran beneath the Chat/Build/Design switch, and the palette's `Ctrl K` chip wrapped onto two lines. Browsers at that width had the same fault.
+
+**Fixed.** The title truncates with an ellipsis and the chip never wraps.
+
+**Evidence.** `desktop-08-narrow.png` before and after.
+
+---
+
+## FIXED-919 — First-run "Choose a model" took two presses of two buttons with one name (was BUG-344)
+
+**Severity: Low. Area: Models / first-run UX. Status: Fixed 2026-10-17 (was BUG-344) — found in the desktop round. Follows [FIXED-894](#fixed-894--setup-called-an-identity-linked-anthropic-key-connected-and-offered-models-it-could-not-list-was-bug-332).**
+
+**Observed.** Once a provider listed its models, setup recommended *Anthropic is connected — choose one of its models as your default*. Its **Choose a model** only revealed the provider list; the owner then had to find Anthropic's card and press a second **Choose a model** to reach the picker.
+
+**Fixed.** The recommendation's button asks `ProviderMatrix` to open that provider's picker (`openPickerFor`) as soon as its catalogue is listed — once, so closing the picker does not reopen it. The full list is still there beneath it.
+
+**Evidence.** `ModelSetupView.test.ts` ("opens the providers when the recommendation asks for a model" now also finds the *OpenRouter models* dialog). Live: `desktop-live.spec.ts` from an empty workspace pressed **Choose a model** once and got *Anthropic models* (`desktop-02-choose-model.png`).

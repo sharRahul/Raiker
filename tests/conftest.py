@@ -236,6 +236,19 @@ def seed_account() -> SeedAccount:
 
 
 @pytest.fixture(autouse=True)
+def _no_desktop_window(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> None:
+    """DESK-11 — no test opens a real Raiker window on the machine running it.
+
+    ``raiker-app`` opens the desktop window by default, and a source checkout
+    with ``desktop/`` built would launch Electron from inside the suite. Pointing
+    the override at a path that does not exist makes every discovery answer
+    "not available"; a test about discovery passes its own environment.
+    """
+    missing = tmp_path_factory.getbasetemp() / "no-desktop-shell"
+    monkeypatch.setenv("RAIKER_DESKTOP_SHELL", str(missing))
+
+
+@pytest.fixture(autouse=True)
 def _no_github_revalidation(monkeypatch: pytest.MonkeyPatch) -> None:
     """BUG-338 — a delegated push asks GitHub about its repository; no test may.
 

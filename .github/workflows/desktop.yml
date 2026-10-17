@@ -1,0 +1,60 @@
+name: Desktop app
+
+# DESK-13 — the desktop window (`desktop/`) is the default way an owner opens
+# Raiker, so it is held to the same bar as the web app: a dependency audit,
+# lint, type-check, unit tests, and an Electron end-to-end suite that drives the
+# real shell against a fixture page on a loopback port. The suite needs no
+# Raiker host and no credential; the `live` project, which drives a real host,
+# stays a local run like the web app's.
+on:
+  pull_request:
+    paths: &desktop_paths
+      - "desktop/**"
+      - "web/src/lib/desktopShell.ts"
+      - ".github/workflows/desktop.yml"
+  push:
+    branches:
+      - main
+    paths: *desktop_paths
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: desktop
+
+jobs:
+  desktop:
+    name: Electron shell
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node
+        # actions/setup-node v5.0.0 (Node 24 runtime)
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit dependencies for known vulnerabilities
+        run: npm audit --audit-level=moderate
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Install the libraries Electron needs on a bare runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+      - name: End-to-end (shell)
+        run: xvfb-run -a npx playwright test --project=shell

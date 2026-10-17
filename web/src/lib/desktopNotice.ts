@@ -19,6 +19,7 @@
  * * **The in-app record is the truth.** Every notice mirrors something that
  *   already exists in Raiker; if this fails for any reason, nothing is lost.
  */
+import { desktopBridge } from "./desktopShell";
 import { uiPrefs } from "./prefs.svelte";
 
 /** True when a notice would actually be shown, so callers can skip the work. */
@@ -57,6 +58,8 @@ export function raiseDesktopNotice(notice: DesktopNotice): boolean {
       // is a request, not a guarantee — a platform that refuses it still leaves
       // the owner with the route set for when they do switch back.
       if (notice.route !== undefined) window.location.hash = notice.route;
+      // In the desktop window a page cannot raise its own window; the shell can.
+      desktopBridge()?.focusWindow();
       window.focus();
       shown.close();
     };

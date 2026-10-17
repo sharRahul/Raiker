@@ -96,11 +96,14 @@ def _target(
 
 #: Every desktop platform, built and smoke-tested on that platform's own runner:
 #: a package built elsewhere is not evidence about the machine it targets.
+#:
+#: Windows on Arm has no native target: `cryptography` publishes no win_arm64
+#: wheel, so the frozen host cannot be built there. Windows 11 on Arm runs the
+#: x86-64 package under its built-in emulation, and `desktop-package.yml`
+#: installs and tests exactly that on an Arm runner.
 DESKTOP_TARGETS: tuple[DesktopTarget, ...] = (
     _target("windows-x86_64", "windows", "x86_64", "windows-2022",
             ("-setup.exe", ".msi"), ("--win", "--x64"), "-setup.exe"),
-    _target("windows-arm64", "windows", "arm64", "windows-11-arm",
-            ("-setup.exe",), ("--win", "--arm64"), "-setup.exe"),
     _target("macos-arm64", "macos", "arm64", "macos-14",
             (".dmg", ".zip"), ("--mac", "--arm64"), ".zip"),
     _target("macos-x86_64", "macos", "x86_64", "macos-15-intel",
@@ -167,11 +170,18 @@ def desktop_record(
     channel: str,
     signed: bool,
     commit: str | None = None,
+    update_channel: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """``installation.json`` for a desktop package.
 
     The payload record, with ``distribution`` saying which updater index this
     installation reads and ``signing.applied`` exactly as true as the build was.
+
+    ``update_channel`` is the publisher's signed desktop channel — its URL and
+    the release public key — so an owner can check for updates from Settings
+    without pinning one in a terminal. It is read only when the owner has not
+    pinned a channel of their own, and nothing is fetched until they press
+    *Check for updates*.
     """
     record = installation_record(
         version=version,
@@ -181,6 +191,8 @@ def desktop_record(
         commit=commit,
     )
     record["distribution"] = DISTRIBUTION
+    if update_channel:
+        record["update_channel"] = dict(update_channel)
     return record
 
 

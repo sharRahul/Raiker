@@ -101,7 +101,7 @@ test("the window shows the Raiker origin with one frozen bridge and no Node", as
     bridge: "object",
     version: 1,
     frozen: true,
-    keys: ["bridgeVersion", "focusWindow", "onCommand", "platform", "setTitleBarColours"],
+    keys: ["bridgeVersion", "focusWindow", "onCommand", "platform", "quitForUpdate", "setTitleBarColours"],
     require: "undefined",
     process: "undefined",
   });

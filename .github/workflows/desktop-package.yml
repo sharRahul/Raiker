@@ -128,7 +128,6 @@ jobs:
         # tests/test_desktop_release.py fails if the two disagree.
         include:
           - { target: windows-x86_64, runner: windows-2022, os: windows }
-          - { target: windows-arm64, runner: windows-11-arm, os: windows }
           - { target: macos-arm64, runner: macos-14, os: macos }
           - { target: macos-x86_64, runner: macos-15-intel, os: macos }
           - { target: linux-x86_64, runner: ubuntu-22.04, os: linux }
@@ -225,6 +224,7 @@ jobs:
             --target "${{ matrix.target }}" \
             --channel "${{ inputs.channel || 'stable' }}" \
             --commit "$GITHUB_SHA" \
+            --channel-url "${{ vars.RAIKER_DESKTOP_CHANNEL_URL }}" \
             --out desktop-release \
             $([ "$SIGNED" = "true" ] && echo --signed)
           ls -la desktop-release
@@ -370,9 +370,56 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # Windows on Arm has no native build (`cryptography` publishes no win_arm64
+  # wheel). Windows 11 on Arm runs x86-64 programs under its built-in
+  # emulation, so the x86-64 installer is installed and tested here, on an Arm
+  # runner, exactly as an owner with an Arm laptop would use it.
+  windows-arm64-emulated:
+    name: windows-arm64 (x86-64 package, emulated)
+    needs: package
+    runs-on: windows-11-arm
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python (test harness only)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Download the x86-64 installers
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: desktop-windows-x86_64
+          path: x64
+      - name: Install, smoke-test and uninstall under emulation
+        shell: pwsh
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          $setup = Get-ChildItem x64\*-setup*.exe | Select-Object -First 1
+          $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
+          $root = Join-Path $env:LOCALAPPDATA "Programs\Raiker"
+          $env:PYTHONPATH = (Get-Location).Path
+          python -m raiker.app.desktop_smoke --host "$root\resources\host\Raiker.exe" --expect-unsigned --report evidence\smoke-installed-windows-arm64.txt
+          if ($LASTEXITCODE -ne 0) { throw "smoke test failed under emulation" }
+          $p = Start-Process -FilePath "$root\Uninstall Raiker.exe" -ArgumentList "/S" -Wait -PassThru
+          Start-Sleep -Seconds 10
+          if (Test-Path "$root\Raiker.exe") { throw "the application is still installed" }
+          "PASS x86-64 package installed, smoke-tested and uninstalled on Windows on Arm" | Tee-Object -FilePath evidence\uninstall-windows-arm64.txt
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-windows-arm64
+          path: evidence/*
+          if-no-files-found: warn
+          retention-days: 14
+
   matrix:
     name: Release acceptance matrix
-    needs: package
+    needs: [package, windows-arm64-emulated]
     if: always()
     runs-on: ubuntu-latest
     steps:

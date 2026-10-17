@@ -41,7 +41,7 @@ def test_the_workflow_matrix_is_the_target_list() -> None:
 
 def test_every_supported_platform_and_architecture_is_a_target() -> None:
     assert {(t.target.os_name, t.target.arch) for t in DESKTOP_TARGETS} == {
-        ("windows", "x86_64"), ("windows", "arm64"),
+        ("windows", "x86_64"),
         ("macos", "arm64"), ("macos", "x86_64"),
         ("linux", "x86_64"), ("linux", "arm64"),
     }
@@ -162,3 +162,25 @@ def test_the_frozen_host_carries_the_keyring_backends_where_it_uses_them(tmp_pat
     windows = pyinstaller_command(source_root=tmp_path, web_assets=tmp_path, out_dir=tmp_path, platform_name="win32")
     assert "--copy-metadata" in posix and "keyring" in posix
     assert "keyring" not in windows
+
+
+def test_a_signed_build_checks_its_publishers_channel_unless_the_owner_pinned_one(tmp_path: Path) -> None:
+    from raiker.app.installation import bundled_channel_config
+
+    key = public_key_of(_key()).hex()
+    channel = {"url": "https://updates.example/desktop-stable.json", "public_key": key, "channel": "stable"}
+    signed = desktop_record(version="1.2.3", target_id="linux-x86_64", channel="stable",
+                            signed=True, update_channel=channel)
+    (tmp_path / "installation.json").write_text(json.dumps(signed), encoding="utf-8")
+    found = bundled_channel_config(tmp_path)
+    assert found is not None and found.url == channel["url"] and found.public_key.hex() == key
+
+    # An unsigned build never updates, so its record is never a trust root.
+    unsigned = desktop_record(version="1.2.3", target_id="linux-x86_64", channel="stable",
+                              signed=False, update_channel=channel)
+    (tmp_path / "installation.json").write_text(json.dumps(unsigned), encoding="utf-8")
+    assert bundled_channel_config(tmp_path) is None
+
+    plain = dict(signed, update_channel=dict(channel, url="http://updates.example/x.json"))
+    (tmp_path / "installation.json").write_text(json.dumps(plain), encoding="utf-8")
+    assert bundled_channel_config(tmp_path) is None

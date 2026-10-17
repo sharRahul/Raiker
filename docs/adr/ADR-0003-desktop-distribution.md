@@ -168,11 +168,18 @@ acceptance criteria, and references.
   | Target | Runner | Installers | Update artifact |
   |---|---|---|---|
   | `windows-x86_64` | `windows-2022` | NSIS `-setup.exe`, `.msi` | `-setup.exe` |
-  | `windows-arm64` | `windows-11-arm` | NSIS `-setup.exe` | `-setup.exe` |
+  | Windows on Arm | `windows-11-arm` (test only) | the x86-64 NSIS installer, under emulation | — |
   | `macos-arm64` | `macos-14` | `.dmg`, `.zip` | `.zip` |
   | `macos-x86_64` | `macos-15-intel` | `.dmg`, `.zip` | `.zip` |
   | `linux-x86_64` | `ubuntu-22.04` | `.AppImage`, `.deb`, `.rpm` | `.AppImage` |
   | `linux-arm64` | `ubuntu-22.04-arm` | `.AppImage`, `.deb`, `.rpm` | `.AppImage` |
+
+  Windows on Arm has no native target: `cryptography` publishes no
+  `win_arm64` wheel and building it needs an OpenSSL toolchain the runner
+  lacks (found by the first CI run). Windows 11 on Arm runs the x86-64
+  package under its built-in emulation, and CI installs, smoke-tests and
+  uninstalls exactly that on a `windows-11-arm` runner. MLX is pinned to
+  Apple silicon only, because it publishes no Intel-Mac wheels.
 
   Names: `Raiker-<version>-<target>[-setup][-unsigned].<ext>`. Windows
   installs per user (`%LOCALAPPDATA%\Programs\Raiker`), never elevates, adds

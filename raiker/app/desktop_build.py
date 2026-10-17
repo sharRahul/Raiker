@@ -78,6 +78,11 @@ def pyinstaller_command(
             if platform_name == "win32"
             else ["--collect-submodules", "keyring", "--copy-metadata", "keyring"]
         ),
+        # Nothing in Raiker uses pkg_resources, and PyInstaller's runtime hook
+        # for it fails against current setuptools on macOS before the host can
+        # start (`pkg_resources has no attribute NullProvider`).
+        "--exclude-module",
+        "pkg_resources",
         "--add-data",
         f"{web_assets}{separator}web",
         str(entry),
@@ -165,7 +170,7 @@ def build_app(argv: list[str] | None = None) -> int:
         write_manifests,
         write_record,
     )
-    from raiker.app.release import _key_from_env
+    from raiker.app.release import _key_from_env, public_key_of
 
     here = current_desktop_target()
     parser = argparse.ArgumentParser(
@@ -180,6 +185,10 @@ def build_app(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-root", default=".")
     parser.add_argument("--web-assets", default="web/dist")
     parser.add_argument("--out", default="desktop-release", help="Where the installers are collected.")
+    parser.add_argument(
+        "--channel-url", default="",
+        help="HTTPS URL of the signed desktop-<channel>.json this build checks by default.",
+    )
     parser.add_argument("--skip-freeze", action="store_true", help="Reuse desktop-dist/Raiker.")
     parser.add_argument("--skip-smoke", action="store_true", help="Do not start the frozen host.")
     args = parser.parse_args(argv)
@@ -199,6 +208,12 @@ def build_app(argv: list[str] | None = None) -> int:
         )
         if code != 0:
             return code
+    release_key = _key_from_env("RAIKER_RELEASE_SIGNING_KEY")
+    update_channel = (
+        {"url": args.channel_url, "public_key": public_key_of(release_key).hex(), "channel": args.channel}
+        if args.channel_url and release_key is not None and args.signed
+        else None
+    )
     write_record(
         host_dir,
         desktop_record(
@@ -207,6 +222,7 @@ def build_app(argv: list[str] | None = None) -> int:
             channel=args.channel,
             signed=bool(args.signed),
             commit=args.commit,
+            update_channel=update_channel,
         ),
     )
     if not args.skip_smoke:
@@ -221,6 +237,12 @@ def build_app(argv: list[str] | None = None) -> int:
 
     desktop = source_root / "desktop"
     shutil.rmtree(desktop / "release", ignore_errors=True)
+    # The shell's own TypeScript, compiled from this checkout: packaging never
+    # reuses a `dist/` left over from another build.
+    npm = shutil.which("npm") or "npm"
+    built = subprocess.run([npm, "run", "build"], cwd=desktop, check=False)  # noqa: S603 - fixed argv
+    if built.returncode != 0:
+        return built.returncode
     npx = shutil.which("npx") or "npx"
     completed = subprocess.run(  # noqa: S603 - pinned tool, fixed argv
         builder_command(target_id=target_id, version=args.version, npx=npx),
@@ -246,7 +268,7 @@ def build_app(argv: list[str] | None = None) -> int:
         target_id=target_id,
         signed=bool(args.signed),
         channel=args.channel,
-        private_key=_key_from_env("RAIKER_RELEASE_SIGNING_KEY"),
+        private_key=release_key,
     )
     published = names + [a.manifest_path.name for a in artifacts] + [
         a.signature_path.name for a in artifacts if a.signature_path is not None

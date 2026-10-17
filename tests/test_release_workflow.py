@@ -107,7 +107,7 @@ def test_release_artifact_actions_are_immutable() -> None:
         )
     ]
 
-    assert len(artifact_uses) == 7
+    assert len(artifact_uses) == 9
     assert all(
         re.fullmatch(r"actions/(?:upload|download)-artifact@[0-9a-f]{40}", use)
         for use in artifact_uses

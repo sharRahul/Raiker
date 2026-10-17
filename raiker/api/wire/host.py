@@ -85,6 +85,8 @@ class InstallationView(TypedDict):
     installer_formats: list[str]
     install_root: str
     note: str
+    #: DIST-10 — ``payload`` or ``desktop``: which updater this installation takes.
+    distribution: str
 
 
 class UpdateChannelView(TypedDict):

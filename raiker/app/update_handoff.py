@@ -49,6 +49,16 @@ def apply_after_host_exit(
     channel = read_channel_config(root)
     if channel is None:
         return 2
+    if installation.distribution == "desktop":
+        # DIST-10 — a desktop package is replaced by its own installer, which
+        # also starts Raiker again; there is no launcher to restart here.
+        from raiker.app.updater import download_and_apply_desktop
+
+        try:
+            download_and_apply_desktop(root, status=status, config=channel, installation=installation)
+        except Exception:  # noqa: BLE001 - nothing was replaced; the old install still runs
+            return 2
+        return 0
     try:
         download_and_apply(
             root,
@@ -77,12 +87,18 @@ def launcher_command() -> list[str]:
     return [sys.executable, "-m", "raiker.app.launcher"]
 
 
+#: The launcher's hidden first argument that runs this module. A frozen host
+#: has no ``-m``: its executable *is* the launcher, so the handoff is reached
+#: through it (``raiker/app/launcher.py``).
+FROZEN_ENTRY = "--update-handoff"
+
+
 def start_update_handoff(workspace: str | Path, *, parent_pid: int) -> None:
     """Start the updater independently of the web host's process group."""
+    entry = [FROZEN_ENTRY] if getattr(sys, "frozen", False) else ["-m", "raiker.app.update_handoff"]
     command = [
         sys.executable,
-        "-m",
-        "raiker.app.update_handoff",
+        *entry,
         "--workspace",
         str(Path(workspace)),
         "--parent-pid",

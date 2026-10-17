@@ -1,9 +1,56 @@
 # Getting started
 
-## Requirements
+## Install the desktop app
+
+Raiker is a desktop application for Windows, macOS and Linux. The installer
+carries everything Raiker needs, including its own engine: there is nothing
+else to install first, and no terminal.
+
+1. Download the installer for your computer from the
+   [Raiker releases](https://github.com/sharRahul/Raiker/releases/latest):
+
+   | Your computer | Download | Then |
+   |---|---|---|
+   | Windows 10 (1809+) or 11 | `Raiker-<version>-windows-x86_64-setup.exe` | Open it, choose where to install (your user folder by default), finish. No administrator password is asked for. An `.msi` is also published for managed installs. |
+   | Windows 11 on Arm | the same x86-64 `setup.exe` | Windows runs it under its built-in emulation. |
+   | Mac with Apple silicon / Intel (macOS 12+) | `Raiker-<version>-macos-arm64.dmg` / `-macos-x86_64.dmg` | Open the `.dmg` and drag **Raiker** into **Applications**. |
+   | Ubuntu, Debian | `Raiker-<version>-linux-<arch>.deb` | Open it with Software, or `sudo apt install ./Raiker-….deb`. |
+   | Fedora, openSUSE | `Raiker-<version>-linux-<arch>.rpm` | Open it with Software, or `sudo dnf install ./Raiker-….rpm`. |
+   | Any other Linux desktop | `Raiker-<version>-linux-<arch>.AppImage` | Mark it executable (file properties) and open it. |
+
+2. Open **Raiker** from your applications menu, Start menu or Launchpad.
+3. Create your local account and follow the guided setup ([First run](#first-run)).
+
+**No signed release has been published yet** (2026-10-17). Until one is, the
+installers built by CI for each change are attached to the **Desktop package**
+workflow runs under the repository's **Actions** tab. They are unsigned test
+builds: Windows SmartScreen shows *Windows protected your PC* (choose **More
+info → Run anyway** only if you trust the build), and macOS refuses to open an
+unsigned app that was downloaded from the internet.
+
+### What the installer does and does not do
+
+- Installs the application files only: on Windows into
+  `%LOCALAPPDATA%\Programs\Raiker` for your account, on macOS into
+  Applications, on Linux into `/opt/Raiker`.
+- Adds Start-menu and desktop shortcuts (Windows) or an applications-menu entry
+  (Linux).
+- Refuses an unsupported system with the reason: Windows before 10 1809 or
+  32-bit Windows; the This device step reports macOS before 12, Linux older
+  than glibc 2.35, less than 4 GB of memory or 2 GB of free storage.
+- Downloads nothing, creates no account, connects no model and makes no backup.
+  Those happen in setup, when you choose them.
+
+Your data lives outside the application, in `%LOCALAPPDATA%\Raiker`,
+`~/Library/Application Support/Raiker` or `~/.local/share/raiker`, so
+reinstalling or updating never touches it.
+
+## Run from source
+
+Contributors run Raiker from a source checkout. This needs:
 
 - Python 3.11 or newer
-- Node 20 or newer (to build the dashboard)
+- Node 20 or newer (to build the dashboard and the desktop window)
 - Git
 
 **Check the Python version before anything else**, and check it *inside* the
@@ -15,12 +62,12 @@ installed most recently:
 python --version
 ```
 
-Raiker currently runs from a source checkout; no signed desktop release has
-been published. The dashboard and terminal client support local single-user
-operation. Hosted multi-user, dedicated mobile, and IDE clients are not part of
-the current release.
+The dashboard and terminal client support local single-user operation. Hosted
+multi-user, dedicated mobile, and IDE clients are not part of the current
+release. To build this platform's installers from a checkout, see
+[Releasing](releasing.md#building-installers-locally).
 
-## Install
+### Install from source
 
 ```bash
 git clone https://github.com/sharRahul/Raiker.git
@@ -279,22 +326,25 @@ Two things to know:
   runtime will refuse the turn until you choose one."** That is your next step:
   [Connecting a model](connecting-a-model.md).
 
-### The four screens after the account
+### The screens after the account
 
-Setup runs once and asks two questions.
+Setup runs once. It can be left at any stage and resumes where it stopped.
 
 | Stage | What it is |
 |---|---|
 | **Welcome** | What Raiker is: Chat, Build and Design. Nothing to configure. |
+| **This device** | What this computer can run, measured on it and sent nowhere: operating system, architecture, memory, processor, graphics acceleration (never required), free storage, network, how provider keys are protected (Windows Data Protection, macOS Keychain, Linux Secret Service, or a private file), local model runtimes already installed, where your data is kept, and a local model size that will run here. A requirement that is not met is named with its fix. |
 | **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime installed on this machine that already names a model needs no account and no key — checks the model you choose, and keeps the full provider matrix behind **Other options** — or, when the recommendation is a connected account, **Choose a model** opens it. A model you already chose as the default on Models counts as your choice here. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
 | **Privacy** | *Where may Raiker send model requests?* **Local only**, or **Local, and the providers I connect**. This is about where your words travel. [Permissions](permissions-and-runtime-modes.md) governs the actions Raiker may take. |
+| **Permissions** | *What Raiker may do*: one line per goal (edit files, run commands, read web pages, send messages, remember things, run on a schedule) read from your actual settings, and the four ways a permission is decided — *Ask before acting*, *Allow within a scope you approve*, *Act automatically within policy*, *Never*. Nothing here changes a setting, and finishing setup grants nothing. **Review permissions** opens [Permissions](permissions-and-runtime-modes.md). |
+| **Check** | Raiker checks its own parts from inside: the host, the interface, the encrypted database, the data format, long-term memory storage, the permission registry, the governed command runner and the credential vault — then makes one short request to the model you chose. A part that is not working says how to fix it; **Check again** reruns it. |
 | **Ready** | Finish into **Chat**, **Build** or **Design**, or **Start using Raiker** for the dashboard. The screen says what it actually set up: *Your Raiker is ready* when a model is chosen, and *Setup saved* when you deferred that choice — with each mode naming what it still needs and the page that supplies it. Every mode opens either way; exploring one before connecting a model is how you find out what it is. |
 
 Backup is offered on the last screen as optional setup rather than asked for
 before your first turn, and nothing claims a backup exists until Raiker has
 written and verified an encrypted snapshot. Raiker starts conservatively and asks
 before it takes a governed action, so there is no permissions matrix to fill in
-on first run.
+on first run. Once setup is complete it does not appear again.
 
 ### Unlocking, afterwards
 

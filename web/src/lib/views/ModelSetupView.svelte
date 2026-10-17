@@ -15,11 +15,22 @@
   import { api } from "../api";
   import { providerName } from "../format";
   import { listCatalogue } from "../providerConnections";
-  import type { ModelProfile, SetupState } from "../apiTypes";
+  import type {
+    CapabilityGate,
+    ModelProfile,
+    ModelReadinessView,
+    SetupCheck,
+    SetupState,
+    SetupSystemReadiness,
+    SetupVerification,
+  } from "../apiTypes";
+  import { goalSummaries } from "../permissionGoals";
   import { modelName } from "../modelPresentation";
   import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
+    CHECK_STATE_LABELS,
+    DECISION_MODE_COPY,
     PERMISSIONS_NOTE,
     PRIVACY_CHOICES,
     recommendedPath,
@@ -164,7 +175,7 @@
    * authority system, and the old `Local-first` / `Balanced` pair read like one.
    */
   async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
-    await save({ status: "in_progress", stage: "finish", privacy_mode });
+    await save({ status: "in_progress", stage: "permissions", privacy_mode });
   }
 
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
@@ -339,8 +350,84 @@
   let pickerRequest = $state<string | null>(null);
   const allProvidersOpen = $derived(showAllProviders || (recommended === null && !unconfirmed));
 
+  /*
+   * DIST-05 — This device. Measured by the host, locally; the answer says what
+   * the machine can run and never makes a dedicated GPU a requirement.
+   */
+  let system = $state<SetupSystemReadiness | null>(null);
+  let systemError = $state("");
+  async function loadSystem() {
+    systemError = "";
+    try { system = await api.setupSystem(); }
+    catch { systemError = "This device could not be checked. You can continue and check again from Diagnostics."; }
+  }
+
+  /*
+   * Permissions — read-only. The goals are said from the same gates the
+   * Permissions page renders, so this stage cannot claim what that page would
+   * not, and nothing on it changes a decision mode.
+   */
+  let gates = $state<CapabilityGate[] | null>(null);
+  let gatesError = $state("");
+  async function loadGates() {
+    gatesError = "";
+    try { gates = await api.capabilityGates(); }
+    catch { gatesError = "The permission summary could not be read. Review it on the Permissions page."; }
+  }
+  const goals = $derived(gates === null ? [] : goalSummaries(gates));
+
+  /*
+   * DIST-06 — Check. Every mandatory component from inside the running host,
+   * then, when a model is chosen, one real request to it — the same readiness
+   * check the Model stage and the Models page take. The request is the owner's
+   * act: it runs when this stage opens or when they press Check again.
+   */
+  let verification = $state<SetupVerification | null>(null);
+  let modelCheck = $state<ModelReadinessView | null>(null);
+  let verifying = $state(false);
+  let verifyError = $state("");
+  async function runVerification() {
+    verifying = true;
+    verifyError = "";
+    modelCheck = null;
+    try {
+      verification = await api.verifySetup();
+      const state = setup;
+      if (state && !state.model_deferred && state.selected_profile_id && state.selected_model) {
+        try { modelCheck = await api.checkModelReadiness(state.selected_profile_id, state.selected_model); }
+        catch { modelCheck = null; }
+      }
+    } catch {
+      verifyError = "The installation check could not run. Open Diagnostics for details.";
+    } finally {
+      verifying = false;
+    }
+  }
+  const mandatoryFailed = $derived(verification !== null && verification.failed.length > 0);
+
+  $effect(() => {
+    if (stage === "system" && system === null && systemError === "") void loadSystem();
+    if (stage === "permissions" && gates === null && gatesError === "") void loadGates();
+    if (stage === "verify" && verification === null && !verifying && verifyError === "") void runVerification();
+  });
+
+  const stateLabel = (check: SetupCheck) => CHECK_STATE_LABELS[check.state];
+
   onMount(load);
 </script>
+
+{#snippet checkList(checks: SetupCheck[], label: string)}
+  <ul class="checks" aria-label={label}>
+    {#each checks as check (check.id)}
+      <li class={`check ${check.state}`}>
+        <span class="check-state">{stateLabel(check)}</span>
+        <strong>{check.label}</strong>
+        <span class="check-detail">{check.detail}</span>
+        {#if check.remedy}<span class="check-remedy">{check.remedy}</span>{/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
 
 <section class="setup-shell" aria-labelledby="setup-title">
   <aside class="stage-rail" aria-label="Setup progress">
@@ -375,11 +462,40 @@
       </div>
       <p class="note">{PERMISSIONS_NOTE}</p>
       <div class="actions">
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "system" })}>Continue</button>
+      </div>
+    {:else if stage === "system"}
+      <header>
+        <p class="eyebrow">02 · This device</p>
+        <h2 id="setup-title">What this computer can run</h2>
+        <p>Checked on this computer. Nothing was sent anywhere.</p>
+      </header>
+      {#if systemError}
+        <p class="note" role="alert">{systemError}</p>
+      {:else if system === null}
+        <p class="note" role="status" aria-live="polite">Checking this device…</p>
+      {:else}
+        {@render checkList(system.checks, "Device checks")}
+        <div class="recommended">
+          <p class="eyebrow">Local models on this device</p>
+          <strong>About {system.recommended_local_model.parameters} parameters</strong>
+          <span>{system.recommended_local_model.note} A model this size is {system.recommended_local_model.download} to download. Nothing is downloaded unless you choose a model.</span>
+        </div>
+        <dl class="summary">
+          <div><dt>Your data</dt><dd class="path">{system.locations.data}</dd></div>
+          <div><dt>Backups</dt><dd class="path">{system.locations.backups}</dd></div>
+        </dl>
+        {#if !system.ready}
+          <p class="error" role="alert">This device does not meet a requirement above. Raiker may not work correctly until it is fixed.</p>
+        {/if}
+      {/if}
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: "welcome" })}>Back</button>
         <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "model" })}>Continue</button>
       </div>
     {:else if stage === "model"}
       <header>
-        <p class="eyebrow">02 · Model</p>
+        <p class="eyebrow">03 · Model</p>
         <h2 id="setup-title">Choose how Raiker should think</h2>
         <!-- FIRST-04 — connect, then discover, then choose a default. What a
              provider serves is discovered once and available everywhere; there
@@ -444,7 +560,7 @@
       </div>
     {:else if stage === "privacy"}
       <header>
-        <p class="eyebrow">03 · Privacy</p>
+        <p class="eyebrow">04 · Privacy</p>
         <!-- FIRST-07 — one question about where content travels. "Local-first"
              and "Balanced" read as a second authority system standing beside
              Permissions, which they are not. -->
@@ -459,9 +575,70 @@
         {/each}
       </div>
       <div class="actions"><button class="quiet" onclick={() => save({ stage: "model" })}>Back</button></div>
+    {:else if stage === "permissions"}
+      <header>
+        <p class="eyebrow">05 · Permissions</p>
+        <h2 id="setup-title">What Raiker may do</h2>
+        <p>{PERMISSIONS_NOTE} Finishing setup changes none of this.</p>
+      </header>
+      {#if gatesError}
+        <p class="note" role="alert">{gatesError}</p>
+      {:else if gates === null}
+        <p class="note" role="status" aria-live="polite">Reading your permissions…</p>
+      {:else}
+        <ul class="goals" aria-label="What Raiker can do for you">
+          {#each goals as goal (goal.id)}
+            <li class={`goal ${goal.verdict}`}>{goal.sentence}</li>
+          {/each}
+        </ul>
+      {/if}
+      <div class="modes-explained">
+        <p class="eyebrow">Each permission is decided one of four ways</p>
+        <dl>
+          {#each DECISION_MODE_COPY as mode (mode.mode)}
+            <div><dt>{mode.label}</dt><dd>{mode.detail}</dd></div>
+          {/each}
+        </dl>
+      </div>
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button>
+        <a class="quiet" href="#/capabilities">Review permissions</a>
+        <button class="primary" disabled={busy} onclick={() => save({ status: "in_progress", stage: "verify" })}>Continue</button>
+      </div>
+    {:else if stage === "verify"}
+      <header>
+        <p class="eyebrow">06 · Check</p>
+        <h2 id="setup-title">Checking your installation</h2>
+        <p>Each part Raiker needs, checked from inside the app{setup.model_deferred || !setup.selected_model ? "." : ", and one short request to your model."}</p>
+      </header>
+      {#if verifyError}
+        <p class="error" role="alert">{verifyError}</p>
+      {:else if verification === null || verifying}
+        <p class="note" role="status" aria-live="polite">Checking…</p>
+      {:else}
+        {@render checkList(verification.checks, "Installation checks")}
+        {#if modelCheck}
+          <ul class="checks" aria-label="Model request">
+            <li class={`check ${modelCheck.ready ? "pass" : "warn"}`}>
+              <span class="check-state">{modelCheck.ready ? "Ready" : "Not ready"}</span>
+              <strong>Request to {modelName(modelCheck.model)}</strong>
+              <span class="check-detail">{modelCheck.summary}</span>
+              {#if !modelCheck.ready && modelCheck.remediation}<span class="check-remedy">{modelCheck.remediation}</span>{/if}
+            </li>
+          </ul>
+        {/if}
+        {#if mandatoryFailed}
+          <p class="error" role="alert">A required part is not working. <a href="#/diagnostics">Open Diagnostics</a> for the details, or reinstall Raiker.</p>
+        {/if}
+      {/if}
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: "permissions" })}>Back</button>
+        <button class="quiet" disabled={verifying} onclick={() => void runVerification()}>Check again</button>
+        <button class="primary" disabled={busy || verifying} onclick={() => save({ status: "in_progress", stage: "finish" })}>{mandatoryFailed ? "Continue anyway" : "Continue"}</button>
+      </div>
     {:else}
       <header>
-        <p class="eyebrow">04 · {finishHeading === "Your Raiker is ready" ? "Ready" : "Saved"}</p>
+        <p class="eyebrow">07 · {finishHeading === "Your Raiker is ready" ? "Ready" : "Saved"}</p>
         <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
              up. This said "Your Raiker is ready" above a summary that could read
              "Decide later" on the very next line. -->
@@ -514,7 +691,7 @@
         {/if}
       </div>
       <div class="actions">
-        <button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button>
+        <button class="quiet" onclick={() => save({ stage: "verify" })}>Back</button>
         <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
       </div>
     {/if}
@@ -523,14 +700,15 @@
 
 <style>
   .setup-shell { width: min(68rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1rem, 4vw, 3rem); }
-  /* Which of the five stages you are on stays in view while the model list
+  /* Which of the stages you are on stays in view while the model list
      under it is scrolled. */
   .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
   .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-size: var(--text-xl); }
-  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-  li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }
-  li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
-  li.active { color: var(--accent); } li.active > span { background: var(--accent); border-color: var(--accent); color: white; } li.done:not(.active) { color: var(--text-2); }
+  /* Scoped to the rail: the check and goal lists below are lists too. */
+  .stage-rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+  .stage-rail li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }
+  .stage-rail li > span { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border: 1px solid var(--neutral-border); border-radius: 50%; font-family: var(--font-mono); font-size: var(--text-2xs); }
+  .stage-rail li.active { color: var(--accent); } .stage-rail li.active > span { background: var(--accent); border-color: var(--accent); color: white; } .stage-rail li.done:not(.active) { color: var(--text-2); }
   .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
   header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
      the mono face and a little more room under it. */
@@ -562,5 +740,19 @@
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
   .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
-  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .modes, .start-work { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } ol { display: flex; min-width: max-content; } li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } }
+  /* DIST-05/06 — check rows say their state in words, with colour as a second cue. */
+  .checks, .goals { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .check { display: grid; grid-template-columns: 9rem minmax(0, 1fr); column-gap: var(--space-3); row-gap: .15rem; padding: var(--space-3); border: 1px solid var(--neutral-border); border-left-width: 4px; border-radius: var(--r-md); background: var(--surface); }
+  .check > strong { grid-column: 2; } .check-detail, .check-remedy { grid-column: 2; color: var(--text-2); }
+  .check-state { grid-row: 1 / span 3; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; color: var(--text-3); align-self: start; padding-top: .15rem; }
+  .check-remedy { color: var(--text-1); font-weight: 600; }
+  .check.pass { border-left-color: var(--success); } .check.warn { border-left-color: var(--warning); }
+  .check.fail { border-left-color: var(--danger); } .check.info { border-left-color: var(--neutral-border); }
+  .goal { padding: var(--space-2) var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font-size: var(--text-sm); }
+  .modes-explained dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+  .modes-explained dl div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); }
+  .modes-explained dd { font-size: var(--text-sm); color: var(--text-2); line-height: 1.45; }
+  .modes-explained dt { text-transform: none; font-family: inherit; font-size: var(--text-sm); color: var(--text-1); font-weight: 650; }
+  .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
+  @media (max-width: 760px) { .setup-shell { grid-template-columns: 1fr; } .modes, .start-work { grid-template-columns: 1fr; } .stage-rail { border-right: 0; border-bottom: 1px solid var(--border); padding: 0 0 var(--space-3); overflow-x: auto; } .rail-title { display: none; } .stage-rail ol { display: flex; min-width: max-content; } .stage-rail li { grid-template-columns: auto auto; } .summary { grid-template-columns: 1fr; } .modes-explained dl { grid-template-columns: 1fr; } .check { grid-template-columns: 1fr; } .check > strong, .check-detail, .check-remedy, .check-state { grid-column: 1; grid-row: auto; } }
 </style>

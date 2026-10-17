@@ -90,7 +90,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-340](#bug-340--a-cloud-ollama-model-is-described-as-never-leaving-the-device) | High | Models / setup / privacy truthfulness | Open — found 2026-10-15 in a real browser round; a cloud-labelled model selected in setup is followed by an unconditional device-only egress claim |
 | [BUG-341](#bug-341--owner-bootstrap-emits-password-form-accessibility-diagnostics) | Medium | Account bootstrap / accessibility | Open — found 2026-10-15 in Chromium; re-examined 2026-10-17: the settled form is correct, so the diagnostic comes from a transient render |
 | [BUG-342](#bug-342--raiker-app-joins-a-running-host-that-serves-a-different-workspace) | Medium | Desktop / host lifecycle | Open — found 2026-10-17 in the desktop round |
-| [BUG-343](#bug-343--signed-installers-do-not-yet-carry-the-desktop-window) | Low | Desktop / release | Open — raised 2026-10-17 with DESK-12; release work, not window work |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -949,24 +948,6 @@ the owner of B is shown the wrong instance, and B's host is never started.
 **Proposed fix.** Join only when the running host's recorded workspace
 (`HostControl`) matches the one asked for; otherwise move to the next free port
 as for a non-Raiker listener. Test with two workspaces and one preferred port.
-
-## BUG-343 — Signed installers do not yet carry the desktop window
-
-**Severity: Low. Area: Desktop / release. Status: Open — raised 2026-10-17 with
-DESK-12.**
-
-**Observed.** `desktop/electron-builder.yml` packages the window with the frozen
-host, and an unsigned Linux build passed its live round, but
-`.github/workflows/release.yml` still builds and signs the browser-launch
-payload; nothing signs or notarises the Electron application. The window has
-been exercised on Linux (Xvfb) only; macOS and Windows chrome was checked by
-emulating the bridge's platform in Chromium, not on those systems.
-
-**Proposed fix.** Add a per-target shell step to the release matrix that runs
-the pinned `electron-builder` with the release's signing identities, publishes
-its artifacts through the signed channel index, and runs
-`desktop/e2e/packaged-live.spec.ts` on each runner. Capture the window on a real
-Mac and a real Windows machine before claiming either.
 
 ## Decision statements added 2026-10-05
 

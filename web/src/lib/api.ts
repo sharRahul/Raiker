@@ -203,6 +203,10 @@ export const api = {
     body: Omit<SetupState, "owner_principal_id" | "privacy_acknowledged_at" | "backup_verified_at" | "created_at" | "updated_at">,
   ) => contract.updateSetup(body),
   createSetupBackup: (target: string) => contract.createSetupBackup({ target }),
+  // DIST-05/06 — what this device can do, and whether this installation works.
+  // Both are local reads from inside the host; neither contacts a provider.
+  setupSystem: () => contract.getSetupSystem(),
+  verifySetup: () => contract.verifySetup(),
   modelLibrary: () => contract.getModelLibrary(),
   addModelLibraryRoot: (path: string) => contract.addModelLibraryRoot({ path }),
   removeModelLibraryRoot: (path: string) => contract.removeModelLibraryRoot({ path }),

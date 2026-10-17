@@ -17,6 +17,12 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.30",
     "cryptography>=41",
+    # DIST-04 — cryptography 49+ publishes no Intel-Mac wheel. Built from source
+    # there it links the runner's OpenSSL, which collides with Python's own in
+    # the frozen host (`Symbol not found: _SSL_get0_group_name`). Intel Macs
+    # stay on 48.x, the last line with a universal2 wheel; every other platform
+    # takes the current release.
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     # Pure-Python, local-only PDF text extraction for uploaded document
     # attachments (web-app task 3). No system deps; extraction fails closed if
     # the import is unavailable.
@@ -57,9 +63,14 @@ dependencies = [
     # is an async iterator, so the watcher joins the host's existing lifespan
     # workers directly instead of needing a thread bridged back into the loop.
     "watchfiles>=0.21",
-    # Apple's local MLX runtime. The marker keeps non-Apple installations clean;
+    # Apple's local MLX runtime. The marker keeps non-Apple-silicon installations
+    # clean (MLX publishes no Intel-Mac wheels, DIST-04);
     # the UI still explains that MLX serving is available only on Apple silicon.
-    "mlx-lm>=0.31.3; platform_system == 'Darwin'",
+    "mlx-lm>=0.31.3; platform_system == 'Darwin' and platform_machine == 'arm64'",
+    # DIST-08 — the connector vault key in the macOS Keychain or the Linux
+    # Secret Service (raiker/auth/os_keystore.py). Windows uses DPAPI through
+    # ctypes and needs no package.
+    "keyring>=25.6; platform_system != 'Windows'",
 ]
 
 [project.optional-dependencies]

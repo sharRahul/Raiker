@@ -156,3 +156,70 @@ def download_and_apply(
             recovery_root=recovery_root(workspace_root),
             workspace_generation=workspace_schema_generation(workspace_root),
         )
+
+
+def download_and_apply_desktop(
+    workspace_root: str | Path,
+    *,
+    status: UpdateStatus,
+    config: ChannelConfig,
+    installation: Installation,
+    fetch: Fetcher | None = None,
+    install: object | None = None,
+) -> object:
+    """DIST-10 — fetch the offered desktop installer, verify it, and install it.
+
+    The same bounded fetch and the same schema-1 manifest check as the payload
+    path; what differs is only the last step, which belongs to
+    :mod:`raiker.app.desktop_update`. The download is kept under the workspace's
+    ``updates/`` folder until the installer has taken it, then removed.
+    """
+    from raiker.app.desktop_update import (
+        DesktopInstall,
+        apply_desktop_update,
+        install_kind,
+        verify_downloaded,
+    )
+    from raiker.app.installation import update_root
+
+    if status.available is None:
+        raise UpdateError("no_update_available")
+    target_install = install if isinstance(install, DesktopInstall) else install_kind()
+    if target_install is None:
+        raise UpdateError("desktop_install_unknown")
+    if not target_install.replaces_in_place:
+        raise UpdateError("desktop_update_manual")
+    offered = status.available
+    limit = MAX_ARTIFACT_BYTES
+    if offered.size is not None:
+        if offered.size > MAX_ARTIFACT_BYTES:
+            raise UpdateError("artifact_too_large")
+        limit = offered.size
+    fetcher = fetch or https_fetcher()
+    directory = update_root(workspace_root) / offered.version
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, cap in (
+        (offered.artifact, limit),
+        (offered.manifest, MAX_METADATA_BYTES),
+        (offered.signature, MAX_METADATA_BYTES),
+    ):
+        (directory / name).write_bytes(fetcher(artifact_url(config, name), cap))
+    try:
+        verify_downloaded(
+            artifact=directory / offered.artifact,
+            manifest=directory / offered.manifest,
+            signature=directory / offered.signature,
+            public_key=config.public_key,
+            version=offered.version,
+        )
+    except UpdateError:
+        import shutil
+
+        shutil.rmtree(directory, ignore_errors=True)
+        raise
+    return apply_desktop_update(
+        install=target_install,
+        artifact=directory / offered.artifact,
+        version=offered.version,
+        signed_install=installation.signed,
+    )

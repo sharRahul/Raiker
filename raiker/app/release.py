@@ -614,7 +614,9 @@ def build_provenance(
     artifacts = [
         {"name": entry.name, "sha256": _sha256_file(entry)}
         for entry in published
-        if entry.name.startswith("raiker-") and not entry.name.endswith((".json", ".sig"))
+        # The payload is `raiker-…`; the desktop installers are `Raiker-…` (DIST-01).
+        if entry.name.lower().startswith("raiker-")
+        and not entry.name.endswith((".json", ".sig", ".asc", ".txt"))
     ]
     if not artifacts:
         raise ReleaseError("release_channel_empty")
@@ -732,6 +734,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="What this release changes, shown in Settings -> Updates before it is applied.",
     )
 
+    desktop = sub.add_parser(
+        "desktop-channel",
+        help="Build and sign desktop-<channel>.json over the desktop installers (DIST-10).",
+    )
+    desktop.add_argument("--version", required=True)
+    desktop.add_argument("--channel", default="stable")
+    desktop.add_argument("--dir", required=True, help="Directory holding every target's installers.")
+    desktop.add_argument("--notes", default="")
+
     provenance = sub.add_parser(
         "provenance", help="Write SHA256SUMS and the signed provenance record for a release."
     )
@@ -848,6 +859,29 @@ def _run(args: argparse.Namespace) -> int:
                     "index": index_path.name,
                     "signature": signature_path.name if signature_path else None,
                     "targets": sorted(a.target_id for a in artifacts),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    if args.command == "desktop-channel":
+        from raiker.app.desktop_release import build_desktop_channel, update_artifacts
+
+        directory = Path(args.dir)
+        index_path, signature_path = build_desktop_channel(
+            directory,
+            version=args.version,
+            channel=args.channel,
+            private_key=_key_from_env("RAIKER_RELEASE_SIGNING_KEY"),
+            notes=args.notes or None,
+        )
+        print(
+            json.dumps(
+                {
+                    "index": index_path.name,
+                    "signature": signature_path.name if signature_path else None,
+                    "targets": sorted(a.target_id for a in update_artifacts(directory, args.version)),
                 },
                 indent=2,
             )

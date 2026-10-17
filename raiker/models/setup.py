@@ -8,7 +8,13 @@ from raiker.contracts.views import View
 SetupStatus = Literal["required", "in_progress", "skipped", "complete"]
 ModelSetupStep = Literal["choose_path", "provider", "model", "review", "ready"]
 ModelSetupPath = Literal["provider", "ollama", "lm_studio", "local_gguf", "hugging_face"]
-SetupStage = Literal["welcome", "account", "model", "privacy", "backup", "finish"]
+#: DIST-05/06 add `system` (what this machine can do), `permissions` (the
+#: governance posture, read-only) and `verify` (the installation check). No
+#: column constraint names the stages, so an older build reading one of these
+#: lands on its welcome stage rather than failing.
+SetupStage = Literal[
+    "welcome", "account", "system", "model", "privacy", "permissions", "verify", "backup", "finish"
+]
 PrivacyMode = Literal["local_first", "balanced"]
 BackupMode = Literal["later", "local"]
 

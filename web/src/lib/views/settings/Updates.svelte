@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
   import { api } from "../../api";
+  import { quitDesktopForUpdate } from "../../desktopShell";
   import type { UpdateStatusView } from "../../apiTypes";
   import { clientBuild, clientIsStale, describeBuild } from "../../buildIdentity";
   import { formatBytes } from "../../projectLifecycle";
@@ -89,6 +90,8 @@
           `The verified update helper for ${result.version ?? "this update"} has started. Raiker will close, ` +
           "and the helper verifies the signed bundle before it replaces anything. " +
           "Nothing on this installation has changed yet.";
+        // In the desktop window, step aside so the updated version can open.
+        quitDesktopForUpdate();
       } else if (result.reason_code === "waiting_work") {
         confirm = true;
         notice = "An update would interrupt work in progress. Select Update and restart again to confirm.";

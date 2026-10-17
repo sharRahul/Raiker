@@ -37,6 +37,8 @@ export interface DesktopBridge {
   onCommand(callback: (command: string) => void): () => void;
   setTitleBarColours(background: string, symbol: string): void;
   focusWindow(): void;
+  /** DIST-10 — absent from shells built before it; check before calling. */
+  quitForUpdate?(): void;
 }
 
 declare global {
@@ -166,4 +168,13 @@ export function startDesktopShell(): () => void {
     themeWatch.disconnect();
     scheme?.removeEventListener("change", sync);
   };
+}
+
+/**
+ * DIST-10 — let a verified update replace this window. In a browser, or in a
+ * shell built before the operation existed, this does nothing.
+ */
+export function quitDesktopForUpdate(): void {
+  const bridge = desktopBridge();
+  if (bridge !== null && typeof bridge.quitForUpdate === "function") bridge.quitForUpdate();
 }

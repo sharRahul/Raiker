@@ -21,6 +21,7 @@ function status(partial: Partial<UpdateStatusView> = {}): UpdateStatusView {
       installer_formats: [],
       install_root: "F:\\GitHub\\Raiker",
       note: "",
+      distribution: "payload",
     },
     channel: null,
     available: null,
@@ -47,6 +48,7 @@ const signedPackage = status({
     installer_formats: ["msi"],
     install_root: "C:\\Program Files\\Raiker",
     note: "",
+    distribution: "desktop",
   },
   channel: {
     url: "https://releases.example/stable.json",

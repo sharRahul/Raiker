@@ -639,6 +639,134 @@ describe("first-run setup", () => {
   });
 });
 
+const check = (id: string, state: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  label: id,
+  state,
+  detail: `${id} detail`,
+  remedy: "",
+  mandatory: true,
+  data: {},
+  ...extra,
+});
+
+describe("DIST-05/06 — this device, permissions and the installation check", () => {
+  it("says what this device can run, measured locally, without requiring a GPU", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "system" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/setup/system": {
+        checks: [
+          check("os", "pass", { label: "Operating system", detail: "Ubuntu 24.04" }),
+          check("gpu", "info", { label: "Graphics acceleration", detail: "No dedicated GPU driver found", mandatory: false,
+            remedy: "Optional. Hosted providers and small local models need no GPU." }),
+        ],
+        blocking: [],
+        ready: true,
+        recommended_local_model: { parameters: "3B–8B", download: "about 2–5 GB", note: "Small local models run." },
+        locations: { data: "/home/o/.local/share/raiker", models: "/m", backups: "/b" },
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "What this computer can run" })).toBeInTheDocument();
+    const checks = await screen.findByRole("list", { name: "Device checks" });
+    expect(within(checks).getByText("Ubuntu 24.04")).toBeInTheDocument();
+    // The state is said in words, not colour alone, and a missing GPU is a note.
+    expect(within(checks).getByText("Note")).toBeInTheDocument();
+    expect(within(checks).getByText(/need no GPU/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is downloaded unless you choose a model/)).toBeInTheDocument();
+    expect(screen.getByText("/home/o/.local/share/raiker")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("names a blocking requirement instead of hiding it", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "system" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/setup/system": {
+        checks: [check("memory", "fail", { label: "Memory", detail: "2.0 GB", remedy: "Raiker needs at least 4 GB of memory." })],
+        blocking: ["memory"],
+        ready: false,
+        recommended_local_model: { parameters: "1B–3B", download: "about 1–2 GB", note: "Limited." },
+        locations: { data: "/d", models: "/m", backups: "/b" },
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByText("Raiker needs at least 4 GB of memory.")).toBeInTheDocument();
+    expect(screen.getByText("Needs attention")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/does not meet a requirement/);
+  });
+
+  it("shows the permission posture read-only and changes no decision mode", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "permissions" },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/capability-gates": [
+        { capability: "web_fetch", state: "enabled", runtime_ready: true, decision_mode: "ask" },
+      ],
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "What Raiker may do" })).toBeInTheDocument();
+    expect(screen.getByText(/Finishing setup changes none of this/)).toBeInTheDocument();
+    for (const label of ["Ask before acting", "Allow within a scope you approve", "Act automatically within policy", "Never"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    await screen.findByRole("list", { name: "What Raiker can do for you" });
+    // Nothing on this stage writes a permission.
+    const writes = fetchMock.mock.calls.filter(([url, init]) =>
+      String(url).includes("capabilit") && (init?.method ?? "GET").toUpperCase() !== "GET",
+    );
+    expect(writes).toHaveLength(0);
+  });
+
+  it("checks every mandatory part and makes one request to the chosen model", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": {
+        ...required, status: "in_progress", stage: "verify",
+        selected_profile_id: "ollama-local", selected_model: "llama3.2:3b",
+      },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "POST /api/setup/verify": {
+        checks: [check("database", "pass", { label: "Encrypted database", detail: "Opened and read" })],
+        failed: [],
+        ok: true,
+      },
+      "POST /api/model-readiness/check": {
+        profile_id: "ollama-local", model: "llama3.2:3b", state: "ready", ready: true,
+        summary: "The model answered.", remediation: "", reason_code: "", evidence: {},
+        owner_principal_id: "o", endpoint_fingerprint: "f", checked_at: null, expires_at: null,
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByRole("heading", { name: "Checking your installation" })).toBeInTheDocument();
+    expect(await screen.findByText("Opened and read")).toBeInTheDocument();
+    expect(await screen.findByText("The model answered.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/model-readiness/check"))).toBe(true);
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
+  it("says when a required part failed and still lets the owner continue", async () => {
+    stubFetch({
+      "GET /api/setup": { ...required, status: "in_progress", stage: "verify", model_deferred: true },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "POST /api/setup/verify": {
+        checks: [check("web", "fail", { label: "Application window content", detail: "The interface files are missing", remedy: "Reinstall Raiker." })],
+        failed: ["web"],
+        ok: false,
+      },
+    });
+    render(ModelSetupView);
+
+    expect(await screen.findByText("Reinstall Raiker.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Diagnostics" })).toHaveAttribute("href", "#/diagnostics");
+    expect(screen.getByRole("button", { name: "Continue anyway" })).toBeEnabled();
+  });
+});
+
 describe("BUG-331 — the model step does not wait on every provider", () => {
   it("shows the step from setup at once and the providers when they answer", async () => {
     let answerModels: (value: unknown) => void = () => {};

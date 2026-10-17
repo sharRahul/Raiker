@@ -161,6 +161,36 @@ something to be loud about — and it is in the same place either way.
 
 ## Update and roll back
 
+### The desktop app
+
+A desktop installation reads the signed **desktop** channel
+(`desktop-<channel>.json`, published with each release). Pin it once:
+
+```bash
+raiker-app update --channel-url https://<your channel host>/desktop-stable.json --channel-key <release public key>
+```
+
+Then **Settings → Updates → Check for updates**. An offered update is
+downloaded into Raiker's data folder and checked against its Ed25519-signed
+manifest — file name, version and SHA-256 — before anything runs. Then:
+
+| How Raiker was installed | What **Update and restart** does |
+|---|---|
+| Windows `setup.exe` | Runs the verified installer silently for your account; it replaces the app, keeps your data and opens Raiker again |
+| macOS `.dmg` | Unpacks the verified `.zip` beside `Raiker.app`, checks its code signature (signed builds), swaps it in and keeps `Raiker.app.previous` |
+| Linux AppImage | Replaces the AppImage file atomically and keeps `<name>.previous` |
+| `.deb`, `.rpm`, `.msi` | Says an update is available (`desktop_update_manual`); install the new package with your system's installer |
+
+The window closes itself so the new version can open. Your data is in your
+profile folder, never inside the app, so an update cannot move or remove it,
+and an older Raiker refuses a database a newer one migrated rather than opening
+it. To go back after a macOS or AppImage update, put the `.previous` copy back
+in place of the current one; on Windows, run the previous release's installer.
+The channel host must serve files directly: a URL that redirects (such as a
+GitHub release download link) is refused.
+
+### Payload and source installations
+
 ```bash
 raiker-app update
 raiker-app update --check
@@ -215,6 +245,21 @@ back cannot complete, the command names the `--rollback` that restores it. A
 failed attempt leaves nothing behind that would refuse the next one.
 
 ## Uninstall
+
+### The desktop app
+
+| System | Remove the app | What happens to your data |
+|---|---|---|
+| Windows | **Settings → Apps → Raiker → Uninstall** | The uninstaller asks whether to also remove your Raiker data; **No** is the default. It stops Raiker and removes its start-at-sign-in entry first. A silent uninstall (`/S`) and every update always keep data |
+| macOS | Quit Raiker (Host → Quit), then move **Raiker** from Applications to the Bin | Kept. To remove it too, first use **Settings → Account → Delete my account**, or delete `~/Library/Application Support/Raiker` |
+| Linux | `sudo apt remove raiker`, `sudo dnf remove raiker`, or delete the AppImage | Kept for every user; delete `~/.local/share/raiker` to remove it |
+
+Never removed by any uninstaller: models and runtimes you installed with other
+tools (Ollama, LM Studio, llama.cpp), folders you attached to projects, and
+backups you made to another drive. Removing an instance's data also removes its
+provider-key protection entry from the Keychain or Secret Service.
+
+### From a terminal or a source checkout
 
 Start with a preview:
 

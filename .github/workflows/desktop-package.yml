@@ -403,8 +403,11 @@ jobs:
           $p = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exited $($p.ExitCode)" }
           $root = Join-Path $env:LOCALAPPDATA "Programs\Raiker"
-          $env:PYTHONPATH = (Get-Location).Path
-          python -m raiker.app.desktop_smoke --host "$root\resources\host\Raiker.exe" --expect-unsigned --report evidence\smoke-installed-windows-arm64.txt
+          # Run the stdlib-only smoke script by path: importing the raiker
+          # package would need its dependencies, and cryptography has no
+          # win_arm64 wheel (the reason this target is emulated at all).
+          Copy-Item raiker\app\desktop_smoke.py "$env:RUNNER_TEMP\desktop_smoke.py"
+          python -I "$env:RUNNER_TEMP\desktop_smoke.py" --host "$root\resources\host\Raiker.exe" --expect-unsigned --report evidence\smoke-installed-windows-arm64.txt
           if ($LASTEXITCODE -ne 0) { throw "smoke test failed under emulation" }
           $p = Start-Process -FilePath "$root\Uninstall Raiker.exe" -ArgumentList "/S" -Wait -PassThru
           Start-Sleep -Seconds 10

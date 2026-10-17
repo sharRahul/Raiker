@@ -2619,6 +2619,7 @@ export type InstallationView = {
   installer_formats: string[];
   install_root: string;
   note: string;
+  distribution: string;
 };
 
 export type InstalledPlugin = {

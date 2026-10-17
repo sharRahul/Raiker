@@ -13411,6 +13411,10 @@
             ],
             "title": "Commit"
           },
+          "distribution": {
+            "title": "Distribution",
+            "type": "string"
+          },
           "install_root": {
             "title": "Install Root",
             "type": "string"
@@ -13460,7 +13464,8 @@
           "built_at",
           "installer_formats",
           "install_root",
-          "note"
+          "note",
+          "distribution"
         ],
         "title": "InstallationView",
         "type": "object"

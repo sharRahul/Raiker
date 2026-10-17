@@ -174,7 +174,13 @@ colorama==0.4.6 ; (python_full_version < '0' and platform_machine == 'arm64' and
     # via
     #   tqdm
     #   typer
-cryptography==50.0.1 \
+cryptography==48.0.1 ; platform_machine == 'x86_64' and sys_platform == 'darwin' \
+    --hash=sha256:266f4ee051abb2f725b74ef8072b521ce1feacf685a3364fa6a6b45548db791a \
+    --hash=sha256:3e4a1a3232eef2e6c732827d5722db29a0cc8b27af2a4d865b094cf954be9ca1 \
+    --hash=sha256:4fdc69f8e4316bcf0c8c8ec1f26f285d12e8142d88d96c876a59a03be3f6ae67 \
+    --hash=sha256:f817adc181390bd54f2f700107a7419040fb7c1bdf2fc26f36551a06a68c3345
+    # via raiker
+cryptography==50.0.1 ; platform_machine != 'x86_64' or sys_platform != 'darwin' \
     --hash=sha256:01f41478cf33fc605a6a089cd56d28b45c6c0b45a1928b61797f2621a04bac71 \
     --hash=sha256:05ba322c4da95b262a212c345af888ef2c37c88c0509756ea00a0e6d68850f23 \
     --hash=sha256:16c5ecd954b3330ebfb6605eca4fd952da8bef376551d5cc264534e3770a9ee6 \

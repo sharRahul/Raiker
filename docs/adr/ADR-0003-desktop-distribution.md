@@ -347,5 +347,9 @@ acceptance criteria, and references.
 - `.deb`, `.rpm` and `.msi` installations are updated by installing the new
   package, not in place.
 - The app key is not yet in the OS key store (D6).
+- Intel Macs use `cryptography` 48.x, the last release line with an Intel-Mac
+  wheel; 49+ builds from source there and its OpenSSL collides with Python's
+  in the frozen host (found by CI). Revisit when upstream ships Intel wheels
+  again or Intel Macs leave the supported list.
 - The update channel URL must serve files directly (no redirects), so GitHub
   Release download links cannot be pinned as a channel.

@@ -17,6 +17,12 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.30",
     "cryptography>=41",
+    # DIST-04 — cryptography 49+ publishes no Intel-Mac wheel. Built from source
+    # there it links the runner's OpenSSL, which collides with Python's own in
+    # the frozen host (`Symbol not found: _SSL_get0_group_name`). Intel Macs
+    # stay on 48.x, the last line with a universal2 wheel; every other platform
+    # takes the current release.
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     # Pure-Python, local-only PDF text extraction for uploaded document
     # attachments (web-app task 3). No system deps; extraction fails closed if
     # the import is unavailable.

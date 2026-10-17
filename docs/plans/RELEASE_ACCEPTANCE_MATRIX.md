@@ -13,15 +13,16 @@ row below is for an **unsigned** build.
 ## Matrix
 
 Status as of 2026-10-17. CI evidence: `.github/workflows/desktop-package.yml`,
-[run 39041854653](https://github.com/sharRahul/Raiker/actions/runs/39041854653)
-on commit `914b60a` of PR #235, each target on its own GitHub-hosted runner,
+[run 39044354934](https://github.com/sharRahul/Raiker/actions/runs/39044354934)
+on commit `6758e64` of PR #235 (every job green; the native targets also passed
+in run 39041854653 on `914b60a`), each target on its own GitHub-hosted runner,
 unsigned, version stamp `0.0.0`. Each target's artifact holds its installers
 and the evidence files named below.
 
 | Target (runner) | Installers | Build + frozen-host smoke | Install | Installed-host smoke | Window + onboarding | Uninstall keeps data | Signed-channel update |
 |---|---|---|---|---|---|---|---|
 | windows-x86_64 (`windows-2022`) | setup.exe, msi | PASS | PASS — NSIS `/S` per user, Start-menu shortcut present; MSI `/qn` per user | PASS (NSIS and MSI) | PASS | PASS — NSIS uninstall; MSI `/x` | NOT TESTED |
-| Windows on Arm (`windows-11-arm`, x86-64 package under emulation) | setup.exe | n/a | see below | see below | NOT TESTED | see below | NOT TESTED |
+| Windows on Arm (`windows-11-arm`, x86-64 package under emulation) | setup.exe (x86-64) | n/a — no native build | PASS — NSIS `/S` per user | PASS | NOT TESTED | PASS — NSIS uninstall | NOT TESTED |
 | macos-arm64 (`macos-14`) | dmg, zip | PASS | PASS — app copied from the mounted dmg to ~/Applications | PASS | PASS | PASS — app removed, ~/Library/Application Support/Raiker kept | NOT TESTED |
 | macos-x86_64 (`macos-15-intel`) | dmg, zip | PASS | PASS | PASS | PASS | PASS | NOT TESTED |
 | linux-x86_64 (`ubuntu-22.04`) | AppImage, deb, rpm | PASS | PASS — `apt-get install ./…deb` | PASS (deb and AppImage) | PASS | PASS — `apt-get remove raiker`, ~/.local/share/raiker kept | NOT TESTED |
@@ -38,9 +39,12 @@ starts its bundled host, reaches first run, and an owner registers and walks
 Welcome → This device → Model (Decide later) → Privacy → Permissions → Check
 (no row needing attention) → Setup saved → Home.
 
-**Windows on Arm** — the first run of the emulated job failed before
-installing (it searched the wrong folder of the downloaded artifact); the fix
-is `8f5e0f2` and its result is recorded here when that run completes.
+**Windows on Arm** — there is no native arm64 package (`cryptography` ships
+no win_arm64 wheel, so the host cannot be frozen there). The x86-64 installer
+was installed, smoke-tested from an empty profile and uninstalled on a
+`windows-11-arm` runner under Windows' x64 emulation (evidence
+`smoke-installed-windows-arm64.txt`, `uninstall-windows-arm64.txt`). The
+window tests were not run there.
 
 **.rpm** packages are built and checksummed on both Linux runners but are not
 installed in CI (the runners are Debian-based); NOT TESTED beyond `rpm -qp`

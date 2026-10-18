@@ -248,6 +248,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  windows-lifecycle:
+    # BUG-312 — one local Windows run of this pair ended in a truncated
+    # interpreter crash dump that has not reproduced since. Every other job runs
+    # on Linux, so nothing would catch it again. This runs the pair on Windows
+    # under the fault handler, several times, and keeps every complete dump.
+    name: Windows lifecycle tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Run the pair under the fault handler
+        shell: bash
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+        run: |
+          for run in 1 2 3; do
+            echo "::group::run $run"
+            python -X faulthandler -m pytest -q -p no:cacheprovider               tests/test_instance_runtime_lifecycle.py tests/test_windows_internal_paths.py
+            echo "::endgroup::"
+          done
+
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it
     # is the part that builds the operating-system boundary. It is built and

@@ -29,7 +29,7 @@
   import { setModels } from "../models.svelte";
   import {
     CHECK_STATE_LABELS,
-    PRIVACY_CHOICES,
+    PRIVACY_STATEMENT,
     recommendedPath,
     nextStage,
     previousStage,
@@ -190,12 +190,12 @@
   }
 
   /**
-   * FIRST-07 — the answer is about where content may travel, and it says so.
-   * Permissions still governs what Raiker may do; these two are not a second
-   * authority system, and the old `Local-first` / `Balanced` pair read like one.
+   * FIRST-07 — the step is about where content travels, and it says so.
+   * Permissions still governs what Raiker may do. BUG-345 removed *Local only*,
+   * which nothing enforced, so continuing records the acknowledgement only.
    */
-  async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
-    await save({ status: "in_progress", stage: after("privacy"), privacy_mode });
+  async function acknowledgePrivacy() {
+    await save({ status: "in_progress", stage: after("privacy"), privacy_mode: PRIVACY_STATEMENT.mode });
   }
 
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
@@ -548,10 +548,11 @@
       </div>
     {:else if stage === "privacy"}
       <header>
-        <!-- FIRST-07 — one question about where content travels. "Local-first"
-             and "Balanced" read as a second authority system standing beside
-             Permissions, which they are not. -->
-        <h2 id="setup-title">Where may Raiker send model requests?</h2>
+        <!-- FIRST-07 / BUG-345 — one statement about where content travels.
+             It is not a second authority system beside Permissions, and the
+             unenforced *Local only* answer is gone. -->
+        <h2 id="setup-title">Where your model requests go</h2>
+        <p>{PRIVACY_STATEMENT.detail}</p>
       </header>
       {#if picked !== null && pickedLocation !== null && pickedLocation.kind !== "device"}
         <!-- BUG-340 — the choice below is about the future; the model already
@@ -560,14 +561,10 @@
           {picked} is selected. {inferenceSentence(pickedLocation)} To keep requests on this device, go back and choose a model that runs here.
         </p>
       {/if}
-      <div class="choice-list">
-        {#each PRIVACY_CHOICES as choice (choice.mode)}
-          <button aria-label={choice.label} disabled={busy} onclick={() => choosePrivacy(choice.mode)}>
-            <strong>{choice.label}</strong><span>{choice.detail}</span>
-          </button>
-        {/each}
+      <div class="actions">
+        <button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button>
+        <button class="primary" disabled={busy} onclick={acknowledgePrivacy}>Continue</button>
       </div>
-      <div class="actions"><button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button></div>
     {:else if stage === "verify"}
       <header>
         <h2 id="setup-title">Checking your installation</h2>
@@ -669,8 +666,7 @@
      the mono face and a little more room under it. */
   .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
   h2 { margin: 0; color: var(--text-1); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
-  .choice-list { display: grid; gap: var(--space-2); } .choice-list button { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
-  .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }
+  strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }
   .picked { margin: 0; color: var(--accent); font-size: var(--text-sm); font-weight: 650; }
   /* The three Work modes, drawn the same way in both places they appear: as an
      introduction on the welcome screen and as the first thing to do on the last

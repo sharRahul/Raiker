@@ -4828,7 +4828,7 @@ export type SetupState = {
   selected_profile_id: string | null;
   selected_model: string | null;
   model_deferred: boolean;
-  privacy_mode: "local_first" | "balanced" | null;
+  privacy_mode: "balanced" | null;
   privacy_acknowledged_at: string | null;
   backup_mode: "later" | "local";
   backup_target: string | null;
@@ -4852,7 +4852,7 @@ export type SetupUpdateRequest = {
   selected_profile_id?: string | null;
   selected_model?: string | null;
   model_deferred?: boolean;
-  privacy_mode?: "local_first" | "balanced" | null;
+  privacy_mode?: "balanced" | null;
   backup_mode?: "later" | "local";
   backup_target?: string | null;
   background_service_enabled?: boolean;

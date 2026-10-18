@@ -198,11 +198,9 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       // depends on whether a model was pinned on this screen, and either
       // advances. The model itself is connected through Models afterwards.
       await page.getByRole("button", { name: /^(Decide later|Continue)$/ }).click();
-    } else if (heading.startsWith("Where may Raiker send model requests")) {
-      // The connected-providers answer, because a live round connects a hosted
-      // provider and "Local only" would leave it refused for a reason the spec
-      // is not about.
-      await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+    } else if (heading.startsWith("Where your model requests go")) {
+      // BUG-345 — a statement now, not a choice; Continue acknowledges it.
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
     } else if (heading.startsWith("Choose your privacy boundary")) {
       // Balanced, because a live round connects a hosted provider and
       // local-first would leave it refused for a reason the spec is not about.

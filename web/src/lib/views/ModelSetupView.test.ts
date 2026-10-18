@@ -526,24 +526,26 @@ describe("first-run setup", () => {
     await waitFor(() => expect(dialog).toHaveTextContent(/No model matches/));
   });
 
-  it("asks where model requests may travel, not which authority system to adopt", async () => {
-    // FIRST-07 — `Local-first` and `Balanced` read as a second Permissions.
-    stubFetch({
+  it("states where model requests go and offers no unenforced Local only", async () => {
+    // FIRST-07 — not a second Permissions. BUG-345 — *Local only* was a promise
+    // nothing kept, so the owner removed it; Continue records `balanced`.
+    const calls = stubFetch({
       "GET /api/setup": { ...required, status: "in_progress", stage: "privacy" },
-      "PUT /api/setup": { ...required, status: "in_progress", stage: "finish", privacy_mode: "local_first" },
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "permissions", privacy_mode: "balanced" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
 
-    expect(
-      await screen.findByRole("heading", { name: "Where may Raiker send model requests?" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Local only/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /Local, and the providers I connect/i }),
-    ).toBeInTheDocument();
-    // Quiet UI — the question and its two answers; no paragraph under them.
-    expect(screen.queryByText(/Permissions still govern what Raiker may do/)).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Where your model requests go" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Local only/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing reaches a provider you have not set up/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => {
+      const put = calls.mock.calls.find(
+        ([url, init]) => String(url).endsWith("/api/setup") && (init as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(put && JSON.parse(String((put[1] as RequestInit).body)).privacy_mode).toBe("balanced");
+    });
   });
 
   it("finishes into work, with backup recommended rather than required", async () => {
@@ -554,7 +556,7 @@ describe("first-run setup", () => {
         ...required,
         status: "in_progress",
         stage: "finish",
-        privacy_mode: "local_first",
+        privacy_mode: "balanced",
         selected_model: "claude-sonnet-4",
         selected_profile_id: "p",
       },

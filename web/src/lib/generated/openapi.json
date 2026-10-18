@@ -24808,10 +24808,7 @@
           "privacy_mode": {
             "anyOf": [
               {
-                "enum": [
-                  "local_first",
-                  "balanced"
-                ],
+                "const": "balanced",
                 "type": "string"
               },
               {
@@ -24964,10 +24961,7 @@
           "privacy_mode": {
             "anyOf": [
               {
-                "enum": [
-                  "local_first",
-                  "balanced"
-                ],
+                "const": "balanced",
                 "type": "string"
               },
               {

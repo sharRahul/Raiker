@@ -83,7 +83,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs printed a crash dump; 37 later runs (15 under `-X faulthandler` on 2026-10-18) are clean |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
-| [BUG-345](#bug-345--local-only-is-recorded-and-enforced-nowhere) | Medium | Setup / privacy / model routing | Open — found 2026-10-18 closing BUG-340; **needs an owner decision** on what *Local only* enforces |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -490,6 +489,12 @@ to **twelve** on 2026-09-04, to eleven on 2026-09-21 and to **nine** on
 2026-09-28, then recounted as **ten** on 2026-09-29 under the stricter
 test-body definition below.**
 
+**2026-10-18, later — the seven type a key, so they are owner-run.** Each of
+the seven fills a provider key from `RAIKER_LIVE_*_KEY` into the Models dialog.
+An agent session must not enter a real provider key, so each conversion is
+re-run by the owner with those variables set, or after the specs are taught to
+reuse a connection the owner made through Models.
+
 **2026-10-18 — provider access is no longer the reason to defer the seven.**
 OpenAI, OpenRouter, Anthropic and Ollama each completed a real turn from this
 host while closing [FIXED-944](FIXED_ITEMS.md#fixed-944--all-four-providers-answer-the-owner-identity-question-with-the-chosen-name).
@@ -720,29 +725,15 @@ today, not a scheduled one.
 subagent) under the routine's delegation reference, with the plan's decisions as
 its ceiling; live evidence is RR-40 against a consented repository.
 
-## BUG-345 — *Local only* is recorded and enforced nowhere
-
-**Severity: Medium. Area: Setup / privacy / model routing. Status: Open — found
-2026-10-18 while closing BUG-340. Needs an owner decision.**
-
-**Observed.** First-run setup offers *Local only — Model requests stay on this
-device. Nothing is sent to a provider until you connect one and change this.*
-The choice is stored as `privacy_mode = "local_first"` (`raiker/models/setup.py`)
-and nothing reads it: a turn on a cloud Ollama model, or on a hosted provider
-connected later, is sent exactly as under *Local, and the providers I connect*.
-
-**Effect.** The sentence the owner chose is a promise the runtime does not keep.
-Since FIXED-921 the privacy step names the chosen model's destination beside the
-choice, so the contradiction is visible, but it is not resolved.
-
-**Decision needed.** FIRST-07 says these two choices are *not a second authority
-system* beside Permissions. Either (a) *Local only* becomes a routing rule —
-refuse any model request whose inference location is not the device (FIXED-921's
-`model_locations` and the hosted-model gate already know it) with a remedy that
-names the setting — or (b) the choice is reworded as a preference that changes
-nothing by itself, or removed. (a) keeps the sentence true and is the
-recommendation; it needs the owner's word because it turns a first-run answer
-into an enforced policy.
+**2026-10-18 — narrower than it reads.** A scheduled **Task** already runs a
+governed agent turn (`raiker/tasks/scheduler.py`), and the authority router
+already lets an AI-proposed repository write run unprompted only under a
+covering, re-validated delegation (`_repository_delegation` in
+`raiker/runtime/authority/router.py`); anything uncovered parks for approval.
+What is missing is the binding: creating that Task from the issue-to-PR template
+with the plan's steps as its instructions and `NEVER_IN_ROUTINE` as a refusal,
+plus RR-40's live run, which needs a connected model and a consented GitHub
+repository on this host.
 
 ## Decision statements added 2026-10-05
 

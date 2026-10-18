@@ -92,8 +92,8 @@ async function finishSetup(page: Page): Promise<void> {
   if (await done.isVisible().catch(() => false)) await done.click();
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(title).toHaveText(/Where may Raiker send model requests/, { timeout: 30_000 });
-  await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+  await expect(title).toHaveText(/Where your model requests go/, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "Start using Raiker" }).click();
   await expect(title).toBeHidden({ timeout: 30_000 });
 }

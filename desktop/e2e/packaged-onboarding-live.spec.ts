@@ -55,8 +55,8 @@ test("an owner completes first-run setup in the installed window", async () => {
     await page.screenshot({ path: join(SHOTS, "onboarding-1-model.png") });
     await page.getByRole("button", { name: "Decide later" }).click();
 
-    await expect(page.getByRole("heading", { name: "Where may Raiker send model requests?" })).toBeVisible();
-    await page.getByRole("button", { name: "Local only" }).click();
+    await expect(page.getByRole("heading", { name: "Where your model requests go" })).toBeVisible();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "Setup saved" })).toBeVisible();
     await page.screenshot({ path: join(SHOTS, "onboarding-2-ready.png") });

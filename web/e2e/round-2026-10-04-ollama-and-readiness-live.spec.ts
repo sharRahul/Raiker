@@ -121,7 +121,7 @@ test("a running Ollama is offered on first run, its chosen model is Ready, remem
   await expect(page.getByText("Ollama is running here")).toBeVisible();
   await capture(page, join(SHOTS, "03-setup-model-chosen.png"));
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   // The Check stage takes one real request to the chosen model before Ready.
   await expect(title).toHaveText(/Checking your installation/, { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Check again" })).toBeEnabled({ timeout: 120_000 });

@@ -111,21 +111,19 @@ export function visibleStage(stage: string | null | undefined, stages: readonly 
   return stages[0] ?? "welcome"; // including the retired `account`
 }
 
-/** The two answers to "where may Raiker send model requests?" (FIRST-07). */
-export const PRIVACY_CHOICES = [
-  {
-    mode: "local_first" as const,
-    label: "Local only",
-    detail:
-      "Model requests stay on this device. Nothing is sent to a provider until you connect one and change this.",
-  },
-  {
-    mode: "balanced" as const,
-    label: "Local, and the providers I connect",
-    detail:
-      "Requests may go to providers you have connected. Nothing reaches a provider you have not set up.",
-  },
-];
+/**
+ * Where model requests go, stated rather than asked (FIRST-07, BUG-345).
+ *
+ * Setup used to offer *Local only* beside this, and nothing enforced it: a turn
+ * on a cloud model was sent exactly as under the other answer. The owner chose
+ * to remove the choice, so the step now says what is true. Keeping requests on
+ * this device is done by choosing a model that runs here.
+ */
+export const PRIVACY_STATEMENT = {
+  mode: "balanced" as const,
+  detail:
+    "Requests go only to the model you choose and the providers you connect. Nothing reaches a provider you have not set up. To keep every request on this device, choose a model that runs here.",
+};
 
 /**
  * One sentence about permissions, instead of the matrix (FIRST-10).

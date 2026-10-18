@@ -15,7 +15,9 @@ ModelSetupPath = Literal["provider", "ollama", "lm_studio", "local_gguf", "huggi
 SetupStage = Literal[
     "welcome", "account", "system", "model", "privacy", "permissions", "verify", "backup", "finish"
 ]
-PrivacyMode = Literal["local_first", "balanced"]
+#: BUG-345 — `local_first` (*Local only*) was removed; migration RAIKER-2111
+#: rewrites stored rows, so `balanced` is the one value a row can hold.
+PrivacyMode = Literal["balanced"]
 BackupMode = Literal["later", "local"]
 
 

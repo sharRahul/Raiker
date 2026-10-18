@@ -34,7 +34,7 @@ def test_same_workspace_restart_preserves_owner_state(
         cookies = dict(first.cookies)
         setup = first.put(
             "/api/setup", headers=headers,
-            json={"status": "complete", "stage": "finish", "privacy_mode": "local_first",
+            json={"status": "complete", "stage": "finish", "privacy_mode": "balanced",
                   "selected_profile_id": "ollama-local", "selected_model": "restart-model"},
         )
         assert setup.status_code == 200, setup.text

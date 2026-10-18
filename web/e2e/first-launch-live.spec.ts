@@ -82,13 +82,18 @@ test("first launch asks only what an owner decides", async ({ page }) => {
 
   await page.getByRole("button", { name: /^(Decide later|Continue)$/ }).click();
   // FIRST-07 — a question about where content travels.
-  await expect(title).toHaveText(/Where may Raiker send model requests/, { timeout: 30_000 });
+  await expect(title).toHaveText(/Where your model requests go/, { timeout: 30_000 });
   await capture(page, `${SHOTS}/first-run-03-privacy.png`);
 
-  await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
-  // A source checkout checks its installation next.
-  if (await page.getByRole("heading", { name: "Checking your installation" }).isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await page.getByRole("button", { name: /^(Continue|Continue anyway)$/ }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  // A source checkout checks its installation next. `isVisible` does not wait,
+  // so the stage is waited for: reading it at once raced the save and skipped
+  // the Check stage, leaving the spec waiting for a finish it never reached.
+  await expect(title).not.toHaveText(/Where your model requests go/, { timeout: 30_000 });
+  if ((await title.textContent())?.includes("Checking your installation")) {
+    const proceed = page.getByRole("button", { name: /^(Continue|Continue anyway)$/ });
+    await expect(proceed).toBeEnabled({ timeout: 120_000 });
+    await proceed.click();
   }
   // REM-LAUNCH-01 — this run deferred the model, so the stage says what it
   // actually did rather than calling the instance ready. The unconditional

@@ -968,6 +968,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-944](#fixed-944--all-four-providers-answer-the-owner-identity-question-with-the-chosen-name) | Low | Live evidence / providers | Closed 2026-10-18 — was BUG-290 |
 | [FIXED-945](#fixed-945--design-offered-image-models-from-unconnected-providers) | Medium | Design / Models | Fixed 2026-10-18 — found testing BUG-287 |
 | [FIXED-946](#fixed-946--the-live-sign-in-helper-rejected-the-current-welcome-heading) | Low | Live test harness | Fixed 2026-10-18 — found testing BUG-290 |
+| [FIXED-947](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345) | Medium | Setup / privacy | Fixed 2026-10-18 — was BUG-345; owner chose removal |
+| [FIXED-948](#fixed-948--the-first-launch-live-spec-skipped-the-check-stage-by-reading-it-too-early) | Low | Live test harness | Fixed 2026-10-18 — found verifying FIXED-947 |
 
 ---
 
@@ -33427,7 +33429,7 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Fixed.** `raiker/models/local_service.py` records each served model's location (`device`, or the host Ollama names; a Cloud-named model with no `remote_host` is treated as remote) and `ModelProfileView.model_locations` carries it. One rule, `web/src/lib/inferenceLocation.ts`, decides the wording everywhere: setup's recommendation earns the device claim only when every served model runs here and otherwise names ollama.com; the chosen model's line says where its requests go; the privacy step names the chosen model's destination; the comparison and Models' *Cloud inference* chip use the same rule.
 
-**Evidence.** `tests/test_local_model_service.py`, `inferenceLocation.test.ts`, `firstRun.test.ts`, `modelComparison.test.ts`. Live: `web/e2e/bug-340-ollama-cloud-location-live.spec.ts` on a reset workspace against the real Ollama 0.40.5 on this host — no screen claims the device for the cloud model, and the turn was answered `RAIKER_E2E_OK` by `gpt-oss:20b-cloud` with the runtime's *model request completed* receipt (`docs/screenshots/2026-10-17-bug-340-ollama-cloud/01`–`06`). The *Local only* choice beside it is still unenforced — raised as [BUG-345](TO_BE_FIXED.md#bug-345--local-only-is-recorded-and-enforced-nowhere).
+**Evidence.** `tests/test_local_model_service.py`, `inferenceLocation.test.ts`, `firstRun.test.ts`, `modelComparison.test.ts`. Live: `web/e2e/bug-340-ollama-cloud-location-live.spec.ts` on a reset workspace against the real Ollama 0.40.5 on this host — no screen claims the device for the cloud model, and the turn was answered `RAIKER_E2E_OK` by `gpt-oss:20b-cloud` with the runtime's *model request completed* receipt (`docs/screenshots/2026-10-17-bug-340-ollama-cloud/01`–`06`). The *Local only* choice beside it is still unenforced — raised as [BUG-345](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345).
 
 ---
 
@@ -33804,4 +33806,62 @@ final session proof, so this does not turn an unrelated heading into a pass.
 
 **Evidence.** The focused Playwright live scenario *the owner's chosen name is
 set through the Account page* passed **1/1** against the running Raiker server.
+
+---
+
+## FIXED-947 — *Local only* was a setup answer nothing enforced (was BUG-345)
+
+**Severity: Medium. Area: Setup / privacy. Status: Fixed 2026-10-18 — was
+BUG-345.**
+
+**Observed.** First-run setup offered *Local only — Model requests stay on this
+device.* The answer was stored as `privacy_mode = "local_first"` and nothing
+read it: a turn on a cloud Ollama model, or on a hosted provider connected
+later, was sent exactly as under *Local, and the providers I connect*.
+
+**Decision.** BUG-345 offered enforcing the answer as a routing rule, rewording
+it as a preference, or removing it. The owner chose **removal** on 2026-10-18.
+Keeping requests on the device remains possible the way it always actually
+worked: by choosing a model that runs here, whose destination the step already
+names (FIXED-921 / BUG-340).
+
+**Fixed.**
+
+* The Privacy stage is now a statement, *Where your model requests go*, with
+  **Back** and **Continue**. Continue records the acknowledgement as before.
+* `SetupUpdateRequest.privacy_mode` and `SetupState.privacy_mode` accept only
+  `balanced`; a request carrying `local_first` is refused with 422.
+* Migration `RAIKER-2111-setup-privacy-local-only-removed` rewrites any stored
+  `local_first` row to `balanced` — the behaviour it always had — so no stored
+  answer keeps a promise the runtime never made.
+* The API contract, the getting-started guide and every live spec that drove
+  the old buttons (web first launch, BUG-340, the 2026-10-01 and 2026-10-04
+  rounds, the shared `hosted-provider` setup walker, both desktop specs) follow.
+
+**Evidence.** `tests/test_setup_state.py` adds a refusal test and a migration
+rewrite test (**7/7** with the restart-persistence file). Web unit tests for
+`firstRun`, `ModelSetupView` and `App` pass (**55**, one existing skip); the new
+view test clicks **Continue** and reads `privacy_mode: "balanced"` from the PUT.
+`first-launch-live.spec.ts` passed **1/1** against a fresh `raiker-web`
+workspace, and its `first-run-03-privacy.png` capture was reviewed: heading,
+statement, Back and Continue, consistent with the other stages.
+
+---
+
+## FIXED-948 — The first-launch live spec skipped the Check stage by reading it too early
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-10-18 — found
+verifying FIXED-947.**
+
+**Observed.** After the Privacy stage, `first-launch-live.spec.ts` asked
+`isVisible({ timeout: 5_000 })` whether *Checking your installation* was shown.
+`isVisible` returns at once and ignores its timeout, so the read raced the save,
+returned false, and the spec then waited thirty seconds for *Setup saved* while
+the page sat on the Check stage.
+
+**Fixed.** The spec waits for the title to leave the Privacy stage, then, on the
+Check stage, waits for its **Continue** to be enabled before pressing it.
+
+**Evidence.** The first run against a fresh workspace failed exactly as above;
+after the edit the spec passed **1/1** against a new fresh workspace.
 

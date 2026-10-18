@@ -13,7 +13,7 @@ import {
   nextStage,
   PERMISSIONS_NOTE,
   previousStage,
-  PRIVACY_CHOICES,
+  PRIVACY_STATEMENT,
   recommendedPath,
   SETUP_STAGES,
   stagesFor,
@@ -217,21 +217,15 @@ describe("what the model stage recommends", () => {
 });
 
 describe("what first launch says about privacy and permissions", () => {
-  it("asks about where content travels, not about authority", () => {
-    expect(PRIVACY_CHOICES.map((choice) => choice.label)).toEqual([
-      "Local only",
-      "Local, and the providers I connect",
-    ]);
-    for (const choice of PRIVACY_CHOICES) {
-      expect(choice.detail.toLowerCase()).not.toContain("permission");
-    }
+  it("states where content travels, not an authority", () => {
+    expect(PRIVACY_STATEMENT.detail.toLowerCase()).not.toContain("permission");
+    // BUG-345 — nothing enforced *Local only*, so it is not offered.
+    expect(PRIVACY_STATEMENT.detail).not.toMatch(/Local only/);
+    expect(PRIVACY_STATEMENT.detail).toMatch(/choose a model that runs here/);
   });
 
-  it("keeps the wire values, so a stored privacy mode still means what it did", () => {
-    expect(PRIVACY_CHOICES.map((choice) => choice.mode)).toEqual([
-      "local_first",
-      "balanced",
-    ]);
+  it("records the one wire value the runtime behaves as", () => {
+    expect(PRIVACY_STATEMENT.mode).toBe("balanced");
   });
 
   it("states the posture in one sentence rather than listing the gates", () => {

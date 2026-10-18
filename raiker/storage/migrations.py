@@ -4522,6 +4522,16 @@ ALTER TABLE channel_receipts ADD COLUMN turn_id TEXT;
 ALTER TABLE channel_receipts ADD COLUMN reply_to_receipt_id TEXT;
 """
 
+# BUG-345 — first-run setup offered *Local only* and nothing ever enforced it:
+# a turn on a cloud model was sent exactly as under the other answer. The owner
+# chose to remove the choice rather than turn a first-run answer into a policy,
+# so a stored `local_first` is rewritten to the behaviour it always had.
+SETUP_PRIVACY_MODE_MIGRATION_ID = "RAIKER-2111-setup-privacy-local-only-removed"
+
+SETUP_PRIVACY_MODE_SQL = """
+UPDATE setup_state SET privacy_mode = 'balanced' WHERE privacy_mode = 'local_first';
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4778,6 +4788,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(GITHUB_CONNECTION_MIGRATION_ID, GITHUB_CONNECTION_SQL),
     Migration(MODEL_USAGE_ESTIMATES_MIGRATION_ID, MODEL_USAGE_ESTIMATES_SQL),
     Migration(CHANNEL_REPLY_HOLDS_MIGRATION_ID, CHANNEL_REPLY_HOLDS_SQL),
+    Migration(SETUP_PRIVACY_MODE_MIGRATION_ID, SETUP_PRIVACY_MODE_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

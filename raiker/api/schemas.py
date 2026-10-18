@@ -349,7 +349,7 @@ class SetupUpdateRequest(StrictModelRequest):
     selected_profile_id: str | None = None
     selected_model: str | None = None
     model_deferred: bool = False
-    privacy_mode: Literal["local_first", "balanced"] | None = None
+    privacy_mode: Literal["balanced"] | None = None
     backup_mode: Literal["later", "local"] = "later"
     backup_target: str | None = None
     background_service_enabled: bool = False

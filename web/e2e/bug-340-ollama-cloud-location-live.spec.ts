@@ -84,10 +84,10 @@ test("choosing a cloud Ollama model in setup names ollama.com and never claims t
   await capture(page, join(SHOTS, "03-chosen-cloud-model-says-where-it-runs.png"));
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(title).toHaveText(/Where may Raiker send model requests\?/, { timeout: 30_000 });
+  await expect(title).toHaveText(/Where your model requests go/, { timeout: 30_000 });
   await expect(page.getByRole("note")).toContainText(`${CLOUD_LABEL} is selected. Its requests are sent to ollama.com`);
   await capture(page, join(SHOTS, "04-privacy-step-names-the-chosen-models-destination.png"));
-  await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Past Permissions and Check to the last stage.
   const ready = page.getByRole("heading", { name: "Your Raiker is ready" });

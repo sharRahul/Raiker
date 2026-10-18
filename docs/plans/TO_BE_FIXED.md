@@ -791,18 +791,6 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 [ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
 [DEC-23](TESTING.md).
 
-## Competitive evidence attached to existing defects — 2026-10-05
-
-**Decision.** Link competitive consequences to existing defects rather than create duplicate BUGs. [COMPETITIVE_READINESS_DEMONSTRATION_AND_EVIDENCE.md](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) supplies the shared thresholds and evidence record. The rows below add acceptance detail; they do not change the current open/closed status above.
-
-| Existing item | What Raiker must demonstrate | Evidence required |
-|---|---|---|
-| BUG-194 | Claimed execution modes have observable lifecycle, stop and recovery behavior | CR-01/07/11: actual foreground/interactive/background/remote modes where supported, process and durable-state evidence, cancellation and reattachment after restart; label unsupported modes |
-| BUG-318 (closed as [FIXED-925](FIXED_ITEMS.md#fixed-925--the-ollama-journey-is-now-proven-against-a-real-ollama-was-bug-318)) | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
-| BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |
-
-**Closure rule.** Add a reproducible failing case, implementation reference and executed regression result, plus live evidence where the claim concerns a live user/service path. Reuse earlier valid evidence by link and revision; do not relabel a closed defect open merely because comparative testing is missing. Unrun benchmark work is an evidence gap unless a product failure is reproduced.
-
 ## Personal-agent direction — 2026-10-07
 
 The owner accepted the [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),

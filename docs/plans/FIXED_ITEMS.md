@@ -964,6 +964,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-940](#fixed-940--images-sent-to-an-ollama-vision-model-were-dropped) | Medium | Models / Ollama / vision | Fixed 2026-10-18 — found building FIXED-938 |
 | [FIXED-941](#fixed-941--nothing-said-whether-a-self-hosted-server-could-call-tools) | Medium | Models / local servers | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-942](#fixed-942--the-context-window-override-was-two-browser-prompts-and-did-not-show-once-saved) | Low | Models / context | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-943](#fixed-943--competitive-evidence-is-attached-to-the-existing-execution-ollama-hooks-plugins-and-mcp-defects) | Low | Competitive evidence / regression coverage | Closed 2026-10-18 — BUG-194, BUG-318, BUG-226, BUG-228 and BUG-234 |
 
 ---
 
@@ -33675,4 +33676,66 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** Details carries a **Context window override** form (tokens, reason, **Save override**, **Clear override** when one is set) on the same governed route, and reads the profile from the page's latest view. A turn's context lookup resolves a shared slot's profile id to its provider first, so an override saved for a custom endpoint is the one its turns use.
 
 **Evidence.** `ModelDetailsDialog.test.ts`. Live: 65,536 saved with a reason; the dialog then read *65,536 tokens · Administrator override* (`docs/screenshots/2026-10-18-hermes-providers/11`).
+
+---
+
+## FIXED-943 — Competitive evidence is attached to the existing execution, Ollama, hooks, plugins and MCP defects
+
+**Severity: Low. Area: Competitive evidence / regression coverage. Status: Closed 2026-10-18.**
+
+**Scope.** This closes the evidence exercise added under *Competitive evidence
+attached to existing defects — 2026-10-05*. It does not turn an explicitly
+unsupported capability into a shipped one. BUG-194, BUG-226, BUG-228 and
+BUG-234 remain open for the remainders their entries name. BUG-318 was already
+removed from the open ledger and closed as [FIXED-925](#fixed-925--the-ollama-journey-is-now-proven-against-a-real-ollama-was-bug-318).
+
+**CR-01/07/11 — BUG-194.** The supported local lifecycle was executed through
+`CommandService`: foreground and background execution, durable output, poll,
+wait, input, kill, lease expiry and authenticated restart reattachment. Remote,
+container-persistence, egress and credential paths were exercised against their
+independent supervisors or fixtures. Platform gaps remain labelled as
+unsupported instead of being inferred from configuration. Implementation:
+`raiker/execution/commands/service.py`, `supervisor.py`, `backends/local.py`,
+`backends/container.py` and `raiker/control/views/execution.py`. Regression:
+`test_background_execution.py`, `test_command_supervisor_reattach.py`,
+`test_command_backends.py`, `test_remote_command_backends.py`,
+`test_persistent_command_container.py`, `test_command_egress_policy.py`,
+`test_command_egress_proxy.py` and `test_credential_command_delta.py`; the
+Runtime view tests prove the labels and reset controls.
+
+**CR-02 — BUG-318 / FIXED-925.** A reset Raiker workspace detected the real
+Ollama 0.40.5 service on `127.0.0.1:11434`, listed its served models, selected
+the local `gemma3:1b`, completed readiness and received a real answer. Raiker
+was then stopped and started against the same workspace; the selected model was
+remembered and answered again, proving reconnect to the real service rather
+than to the stand-in. The tool-using and inference-location halves reuse the
+same-date live evidence in [FIXED-926](#fixed-926--a-real-model-read-real-weather-from-open-meteo-was-bug-280)
+and [FIXED-921](#fixed-921--a-cloud-ollama-model-was-described-as-never-leaving-the-device-was-bug-340).
+Implementation: `raiker/models/local_service.py`, `router.py` and
+`web/src/lib/inferenceLocation.ts`. Regression: `test_local_model_service.py`,
+`test_model_router.py` and the first scenario in
+`round-2026-10-04-ollama-and-readiness-live.spec.ts`.
+
+**CR-06 — BUG-226 / BUG-228 / BUG-234.** Independent hook, plugin and MCP
+fixtures exercised discovery, activation/use, changed declarations, revocation
+and removal. `command`, bounded `prompt` and allowlisted `http` hooks remain
+reachable; `mcp_tool` and `agent` are refused at parse time with a visible
+reason. Plugin skills and MCP offers are contributed switched off and disappear
+on revocation; Panels remains visibly unsupported while ADD-24 owns the one UI
+contract. MCP negotiation, streamable HTTP framing/session release, all result
+block shapes, server-initiated requests and resumable event parsing passed; the
+server card names incremental streaming, OAuth, Apps and elicitation when not
+used. Implementation: `raiker/hooks/contracts.py`, `raiker/hooks/handlers/`,
+`raiker/runtime/executors/mcp.py`, `raiker/tools/mcp_schema.py` and the
+Extensions/MCP views. Regression: the hook, plugin-contribution and MCP suites,
+plus `ExtensionsHooks.test.ts`, `ExtensionsView.test.ts`, `McpView.test.ts` and
+`extensionsOverview.test.ts`.
+
+**Executed result.** The focused Python gate covering the five IDs passed
+**433/433**, with eight platform-specific unsupported cases skipped by their
+stated guards. Five focused web test files passed **100/100**. The real-Ollama first
+run passed **1/1**, and the post-Raiker-restart browser check received a second
+non-refusal answer from the remembered `Gemma 3:1B` selection. Existing live
+captures remain linked by FIXED-921, FIXED-925 and FIXED-926; this verification
+did not overwrite them.
 

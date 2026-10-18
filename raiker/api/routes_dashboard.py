@@ -125,6 +125,7 @@ from raiker.api.wire.projects import (
 )
 from raiker.api.wire.sessions import (
     AgentPlan,
+    BuildTurnOutcome,
     CommandGrant,
     CommandGrantRevoked,
     ConversationBranch,
@@ -1016,6 +1017,29 @@ async def search_chat_history(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     return serialize_dto(_service(request).search_sessions(q, auth_data[1].delegated_by_user_id))
+
+
+@router.get("/api/sessions/{session_id}/turns/{turn_id}/outcome")
+async def get_build_turn_outcome(
+    session_id: str,
+    turn_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D01 — whether a turn's change was verified by the project's declared checks.
+
+    Read-only, and read from the runtime's own records, never from the model's
+    account of what it ran.
+    """
+    data = _service(request).build_turn_outcome(
+        session_id, turn_id,
+        user_id=auth_data[1].delegated_by_user_id,
+        owner_principal_id=auth_data[0].principal_id,
+    )
+    if data is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "turn_not_found")
+    answer: BuildTurnOutcome = cast(BuildTurnOutcome, data)
+    return serialize_dto(answer)
 
 
 @router.get("/api/sessions/{session_id}")
@@ -2003,6 +2027,7 @@ async def save_project_context(
         memory_mode=body.memory_mode,
         acting_principal_id=auth_data[0].principal_id,
         expected_revision=body.expected_revision,
+        checks=body.checks,
     )
     if not result.ok:
         raise refusal(

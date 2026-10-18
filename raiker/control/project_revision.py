@@ -33,6 +33,7 @@ def context_revision(context: Mapping[str, Any]) -> str:
             "attachment_ids": list(context.get("attachment_ids") or []),
             "memory_mode": context.get("memory_mode") or "inherit",
             "memory_enabled": bool(context.get("memory_enabled")),
+            "checks": list(context.get("checks") or []),
         }
     )
 

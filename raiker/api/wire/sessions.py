@@ -12,6 +12,28 @@ from raiker.contracts.views import View
 from raiker.control.views.sessions import SessionView, TurnView
 
 
+class BuildCheckRow(TypedDict):
+    """BR-D01 — one declared check, and what the turn's command record says of it."""
+
+    command: str
+    result: Literal["passed", "failed", "not_run", "ran_before_change", "waiting", "unknown"]
+    exit_code: int | None
+    run_id: str | None
+
+
+class BuildTurnOutcome(TypedDict):
+    """BR-D01 — the strongest claim a turn's own records support about its change."""
+
+    turn_id: str
+    project_id: str | None
+    outcome: Literal[
+        "no_change", "completed_verified", "completed_unverified", "failed", "blocked", "outcome_unknown"
+    ]
+    writes: int
+    checks: list[BuildCheckRow]
+    reason: str
+
+
 class ParkedApproval(TypedDict):
     """An unresolved approval a parked turn is waiting on (BUG-34) — metadata only."""
 

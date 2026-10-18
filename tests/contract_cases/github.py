@@ -142,6 +142,11 @@ CASES: Cases = {
     ("PUT", "/api/github/repositories/{repository_id}"): patched(_repository, _github),
     ("POST", "/api/github/delegations"): patched(_delegate, _github),
     ("DELETE", "/api/github/delegations/{delegation_id}"): patched(_revoke, _github),
+    # BUG-339 — a plan with no delegation asks GitHub nothing.
+    ("POST", "/api/github/routines/issue-to-pr"): patched(
+        plain("/api/github/routines/issue-to-pr", {"repository": "octo/demo", "issue_number": 7, "work_branch": "raiker/issue-7"}),
+        _github,
+    ),
     ("PUT", "/api/github/app"): patched(
         plain("/api/github/app", {"client_id": CLIENT_ID, "private_key": {"kind": "vault", "value": _PEM}}),
         _github,

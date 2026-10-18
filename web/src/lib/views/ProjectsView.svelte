@@ -91,8 +91,12 @@
    * is saved.
    */
   let contextBaseline = $state("");
+  // BR-D01 — the project's checks, one command per line, and as they were read.
+  let checksText = $state("");
+  let checksBaseline = $state("");
   const contextDirty = $derived(
-    detail !== null && (detail.context.instructions ?? "") !== contextBaseline,
+    detail !== null &&
+      ((detail.context.instructions ?? "") !== contextBaseline || checksText !== checksBaseline),
   );
   let detailError = $state<string | null>(null);
   /*
@@ -199,11 +203,15 @@
     savingContext = true;
     contextError = null;
     try {
+      detail.context.checks = checksText.split("\n").map((line) => line.trim()).filter(Boolean);
       const saved = await api.saveProjectContext(detail.project.project_id, detail.context);
       // Saved is the new baseline, so the section stops saying it is unsaved —
       // and its revision is what the next save is checked against.
       if (typeof saved?.revision === "string") detail.context.revision = saved.revision;
       contextBaseline = detail.context.instructions ?? "";
+      if (Array.isArray(saved?.checks)) detail.context.checks = saved.checks;
+      checksText = (detail.context.checks ?? []).join("\n");
+      checksBaseline = checksText;
     } catch (e) {
       if (e instanceof ApiError && e.reasonCode === "project_conflict") {
         // §13.2 item 6 — nothing was written, and the owner's text is kept.
@@ -443,6 +451,8 @@
       // A new project opens on its overview, with nothing unsaved.
       detailSection = "overview";
       contextBaseline = loaded.context.instructions ?? "";
+      checksText = (loaded.context.checks ?? []).join("\n");
+      checksBaseline = checksText;
       await loadProjectContext(projectId, seq);
     } catch (e) {
       if (seq !== selectionSeq) return;
@@ -882,6 +892,11 @@
           <span>Instructions</span>
           <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
         </label>
+        <label class="context-field">
+          <span>Checks</span>
+          <textarea class="input context-input checks-input" aria-label="Project checks" bind:value={checksText} placeholder={"pytest -q\nnpm test"}></textarea>
+          <span class="sub">One command per line, at most ten. A Build change is marked <strong>Verified</strong> only when each of these ran exactly as written after the last change and passed.</span>
+        </label>
         <label class="context-field">Project memory
           <select class="input" bind:value={detail.context.memory_mode} aria-label="Project memory setting">
             <option value="inherit">Inherit from parent</option>
@@ -1299,6 +1314,8 @@
   .context-field { display: grid; gap: 0.35rem; color: var(--text-2); font-size: var(--text-sm); }
   .context-field > span { font-weight: 650; }
   .context-input { width: 100%; min-height: 6rem; resize: vertical; }
+  .checks-input { min-height: 4rem; font-family: var(--font-mono); font-size: var(--text-sm); }
+  .context-field > span.sub { font-weight: 400; }
   /* REM-PROJ-02 — the project's counts, so a section is opened deliberately
      rather than to find out whether it holds anything. */
   .section-counts {

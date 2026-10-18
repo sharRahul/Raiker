@@ -333,6 +333,16 @@ class ContextGatherer:
         lines = [f"Project: {project['name']}"]
         if instructions:
             lines.extend(["Project instructions:", instructions])
+        raw_checks = project.get("checks") or []
+        checks = [str(item) for item in raw_checks] if isinstance(raw_checks, (list, tuple)) else []
+        if checks:
+            # BR-D01 — the owner's checks. The turn is recorded as verified only
+            # when each ran, exactly as written, after the last change and passed.
+            lines.append(
+                "Checks the owner declared for this project. After your last file change, "
+                "run each one exactly as written with the command tool, then report its result:"
+            )
+            lines.extend(f"- {check}" for check in checks)
         if memory_enabled:
             memories = list_memory(
                 workspace_root=root,

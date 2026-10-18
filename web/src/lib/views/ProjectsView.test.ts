@@ -451,6 +451,29 @@ describe("ProjectsView context home", () => {
     expect(JSON.parse(String(put?.[1].body))).toMatchObject({ expected_revision: "ctx-a" });
   });
 
+  // BR-D01 — checks are one command per line and are sent as a list.
+  it("saves the project's checks as a list of commands", async () => {
+    await openDetail(
+      routes({
+        "PUT /api/projects/proj_1/context": {
+          ok: true, instructions: "", attachment_ids: [], memory_enabled: false, memory_mode: "inherit",
+          checks: ["pytest -q", "npm test"], revision: "ctx-b",
+        },
+      }),
+    );
+    const checks = await screen.findByLabelText("Project checks");
+    await fireEvent.input(checks, { target: { value: "pytest -q\n\n  npm test  " } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save context" }));
+    await waitFor(() => {
+      const put = (globalThis.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.find(
+        ([url, init]) => String(url).includes("/context") && init?.method === "PUT",
+      );
+      expect(JSON.parse(String(put?.[1].body))).toMatchObject({ checks: ["pytest -q", "npm test"] });
+    });
+    await openSection("Work");
+    expect(screen.queryByText(/unsaved changes/)).not.toBeInTheDocument();
+  });
+
   it("says nothing about unsaved changes when nothing was changed", async () => {
     await openDetail(routes());
     await openSection("Work");

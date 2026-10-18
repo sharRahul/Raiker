@@ -94,6 +94,47 @@ class SessionService:
         turns = tuple(self._turn_view(t) for t in self.store.list_turns(session_id))
         return SessionDetailView(session=self._session_view(row), turns=turns)
 
+    def build_turn_outcome(
+        self: DashboardService,
+        session_id: str,
+        turn_id: str,
+        *,
+        user_id: str | None,
+        owner_principal_id: str,
+    ) -> dict[str, Any] | None:
+        """BR-D01 — what this turn's own records let it claim about its change.
+
+        Reads only: the turn's tool actions, its command runs and the project's
+        declared checks. ``None`` when the session or turn is not this owner's.
+        """
+        from raiker.control.build_outcome import classify_build_turn
+        from raiker.execution.commands.store import CommandStore
+
+        row = self.store.load_session(session_id)
+        if row is None:
+            return None
+        owner = row.get("user_id")
+        if user_id is not None and owner is not None and str(owner) != user_id:
+            return None
+        turn = self.store.load_turn(turn_id)
+        if turn is None or str(turn.get("session_id")) != session_id:
+            return None
+        project_id = row.get("project_id")
+        checks: list[str] = []
+        if project_id:
+            context = self.store.load_effective_project_context(str(project_id), user_id=user_id)
+            checks = [str(item) for item in context.get("checks") or []]
+        runs = [
+            {**run.__dict__, "state": getattr(run.state, "value", run.state)}
+            for run in CommandStore(self.store).list_runs(owner_principal_id, session_id=session_id, limit=500)
+            if run.turn_id == turn_id
+        ]
+        outcome = classify_build_turn(
+            tool_actions=self.store.list_turn_tool_actions(session_id, turn_id),
+            command_runs=runs,
+            checks=checks,
+        )
+        return {"turn_id": turn_id, "project_id": project_id, **outcome}
 
     def build_session_transcript(
         self: DashboardService,

@@ -999,12 +999,15 @@ export const api = {
     contract.deleteProject(id, confirmed ? id : undefined),
   // §13.2 item 6 — the editor's context carries the revision it was read at;
   // one saved elsewhere since is refused 409 `project_conflict`.
+  // BR-D01 — whether a Build turn's change was verified by the project's checks.
+  getBuildTurnOutcome: (sessionId: string, turnId: string) => contract.getBuildTurnOutcome(sessionId, turnId),
   saveProjectContext: (id: string, context: ProjectContext) =>
     contract.saveProjectContext(id, {
       instructions: context.instructions,
       attachment_ids: context.attachment_ids,
       memory_enabled: context.memory_enabled,
       memory_mode: context.memory_mode,
+      checks: context.checks ?? [],
       expected_revision: context.revision || null,
     }),
   // Nested projects/folders: tree, move, archive

@@ -21,6 +21,16 @@ from raiker.storage.deletion_journal import PROJECT_DELETE, record_deletion
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
+
+def _checks(raw: object) -> list[str]:
+    """BR-D01 — a stored checks list, read defensively."""
+    try:
+        values = json.loads(str(raw or "[]"))
+    except (TypeError, ValueError):
+        return []
+    return [str(item) for item in values if isinstance(item, str) and item.strip()] if isinstance(values, list) else []
+
+
 #: A row inside the subtree whose materialised path is the second parameter;
 #: the first is that path's length. A prefix comparison rather than ``LIKE``,
 #: because project ids carry ``_``, which ``LIKE`` reads as "any character".
@@ -174,9 +184,11 @@ class ProjectStore:
                 "attachment_ids": [],
                 "memory_enabled": False,
                 "memory_mode": "inherit",
+                "checks": [],
             }
         row = self._row(
-            "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
+            "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode, checks_json"
+            " FROM project_contexts WHERE project_id = ?",
             (project_id,),
         )
         if row is None:
@@ -185,6 +197,7 @@ class ProjectStore:
                 "attachment_ids": [],
                 "memory_enabled": False,
                 "memory_mode": "inherit",
+                "checks": [],
             }
         try:
             attachment_ids = json.loads(str(row["attachment_ids_json"]))
@@ -195,6 +208,7 @@ class ProjectStore:
             "attachment_ids": [str(item) for item in attachment_ids if isinstance(item, str)],
             "memory_enabled": bool(row["memory_enabled"]),
             "memory_mode": str(row["memory_mode"]),
+            "checks": _checks(row["checks_json"]),
         }
 
     def save_project_context(
@@ -206,7 +220,11 @@ class ProjectStore:
         memory_enabled: bool | None = None,
         memory_mode: str | None = None,
         owner_principal_id: str | None = None,
+        checks: list[str] | None = None,
     ) -> None:
+        if checks is None:
+            # Left out, the stored checks are kept: older editors send no checks.
+            checks = list(self.load_project_context(project_id).get("checks") or [])
         mode = memory_mode or ("enabled" if memory_enabled else "disabled")
         if mode not in {"inherit", "enabled", "disabled"}:
             raise ValueError("invalid_memory_mode")
@@ -218,13 +236,15 @@ class ProjectStore:
             raise ValueError("unknown_project_attachment")
         self._execute(
             """
-            INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, memory_mode, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO project_contexts
+              (project_id, instructions, attachment_ids_json, memory_enabled, memory_mode, checks_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(project_id) DO UPDATE SET
               instructions = excluded.instructions,
               attachment_ids_json = excluded.attachment_ids_json,
               memory_enabled = excluded.memory_enabled,
               memory_mode = excluded.memory_mode,
+              checks_json = excluded.checks_json,
               updated_at = excluded.updated_at
             """,
             (
@@ -233,6 +253,7 @@ class ProjectStore:
                 json.dumps(attachment_ids),
                 int(mode == "enabled"),
                 mode,
+                json.dumps(checks),
                 utc_now(),
             ),
         )
@@ -634,6 +655,10 @@ class ProjectStore:
                     )
             if ancestor.get("memory_mode") in {"enabled", "disabled"}:
                 memory_mode = str(ancestor["memory_mode"])
+        checks: list[str] = []
+        for ancestor in self.get_ancestor_contexts(project_id, user_id=user_id):
+            checks = _checks(ancestor.get("checks_json")) or checks
+        checks = list(own.get("checks") or []) or checks
         own_instructions = str(own.get("instructions") or "").strip()
         if own_instructions:
             instructions.append(own_instructions)
@@ -645,4 +670,6 @@ class ProjectStore:
             "attachment_ids": list(dict.fromkeys(attachment_ids)),
             "memory_enabled": memory_mode == "enabled",
             "memory_mode": memory_mode,
+            # BR-D01 — the nearest folder that declares checks decides them.
+            "checks": checks,
         }

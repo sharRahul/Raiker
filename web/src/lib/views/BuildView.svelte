@@ -46,6 +46,7 @@
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
+  import BuildOutcome from "../components/BuildOutcome.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
@@ -2205,6 +2206,12 @@
                    its state, never a claim about whether anything ran, and the
                    parked case is left to the row and the card that state it. -->
               <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
+            {/if}
+
+            <!-- BR-D01 — what this turn may claim about its change, read from
+                 the runtime's own records against the project's checks. -->
+            {#if !turn.streaming && sessionId && turn.response?.turn_id && turn.response.status !== "needs_approval"}
+              <BuildOutcome sessionId={sessionId} turnId={turn.response.turn_id} />
             {/if}
 
             <!-- C6 — everything this turn actually read, under the answer that

@@ -106,6 +106,9 @@ class ProjectContext(TypedDict):
     attachment_ids: list[str]
     memory_enabled: bool
     memory_mode: Literal["inherit", "enabled", "disabled"]
+    #: BR-D01 — commands a Build turn must run after its last change and pass to
+    #: be recorded as `completed_verified`.
+    checks: list[str]
     #: §13.2 item 6 — saving sends this back; a context changed since is refused.
     revision: str
 

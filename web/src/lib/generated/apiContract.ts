@@ -511,12 +511,30 @@ export type BreachCheckRequest = {
   enabled?: boolean;
 };
 
+/** BR-D01 — one declared check, and what the turn's command record says of it. */
+export type BuildCheckRow = {
+  command: string;
+  result: "passed" | "failed" | "not_run" | "ran_before_change" | "waiting" | "unknown";
+  exit_code: number | null;
+  run_id: string | null;
+};
+
 /** A skill Raiker authored: the name, the trigger description, the body. */
 export type BuildSkillRequest = {
   name: string;
   description: string;
   body: string;
   command_trigger?: string | null;
+};
+
+/** BR-D01 — the strongest claim a turn's own records support about its change. */
+export type BuildTurnOutcome = {
+  turn_id: string;
+  project_id: string | null;
+  outcome: "no_change" | "completed_verified" | "completed_unverified" | "failed" | "blocked" | "outcome_unknown";
+  writes: number;
+  checks: BuildCheckRow[];
+  reason: string;
 };
 
 export type BulkDeleteSessionsRequest = {
@@ -4024,6 +4042,7 @@ export type ProjectContext = {
   attachment_ids: string[];
   memory_enabled: boolean;
   memory_mode: "inherit" | "enabled" | "disabled";
+  checks: string[];
   revision: string;
 };
 
@@ -4033,6 +4052,7 @@ export type ProjectContextSaved = {
   attachment_ids: string[];
   memory_enabled: boolean;
   memory_mode: "inherit" | "enabled" | "disabled";
+  checks: string[];
   revision: string;
 };
 
@@ -4539,6 +4559,7 @@ export type SaveProjectContextRequest = {
   attachment_ids?: string[];
   memory_enabled?: boolean | null;
   memory_mode?: "inherit" | "enabled" | "disabled" | null;
+  checks?: string[] | null;
   expected_revision?: string | null;
 };
 
@@ -6335,6 +6356,8 @@ export const contract = {
     request<TurnSources>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/sources`, query)),
   setSessionTags: (sessionId: string, body: SetSessionTagsRequest) =>
     call<SessionTagsSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/tags`, { body }),
+  getBuildTurnOutcome: (sessionId: string, turnId: string) =>
+    request<BuildTurnOutcome>(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/outcome`),
   getTurnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, query: { quote?: string } = {}) =>
     request<TurnSourceExcerpt>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/sources/${encodeURIComponent(sourceId)}/excerpt`, query)),
   unarchiveSession: (sessionId: string) =>

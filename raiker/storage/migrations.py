@@ -4532,6 +4532,16 @@ SETUP_PRIVACY_MODE_SQL = """
 UPDATE setup_state SET privacy_mode = 'balanced' WHERE privacy_mode = 'local_first';
 """
 
+# BR-D01 — the checks an owner declares for a project. A Build turn that changed
+# files is `completed_verified` only when each of these ran, exactly as written,
+# after its last change and passed; the commands are the owner's, the results are
+# the runtime's own records, so neither half is the model's say-so.
+PROJECT_CHECKS_MIGRATION_ID = "RAIKER-2112-project-checks"
+
+PROJECT_CHECKS_SQL = """
+ALTER TABLE project_contexts ADD COLUMN checks_json TEXT NOT NULL DEFAULT '[]';
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4789,6 +4799,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(MODEL_USAGE_ESTIMATES_MIGRATION_ID, MODEL_USAGE_ESTIMATES_SQL),
     Migration(CHANNEL_REPLY_HOLDS_MIGRATION_ID, CHANNEL_REPLY_HOLDS_SQL),
     Migration(SETUP_PRIVACY_MODE_MIGRATION_ID, SETUP_PRIVACY_MODE_SQL),
+    Migration(PROJECT_CHECKS_MIGRATION_ID, PROJECT_CHECKS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

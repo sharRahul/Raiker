@@ -659,6 +659,9 @@ class SaveProjectContextRequest(StrictRequest):
     # a tri-state override so child folders can inherit their nearest ancestor.
     memory_enabled: bool | None = None
     memory_mode: Literal["inherit", "enabled", "disabled"] | None = None
+    # BR-D01 — the commands a Build turn must run after its last change to be
+    # `completed_verified`. Omitted keeps the stored list.
+    checks: list[str] | None = Field(default=None, max_length=10)
     # §13.2 item 6 — the context revision the editor read; 409 `project_conflict`
     # when it was saved elsewhere since. Omitted by older clients.
     expected_revision: str | None = None

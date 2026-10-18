@@ -381,6 +381,7 @@ class ProjectService:
         memory_mode: str | None = None,
         acting_principal_id: str | None,
         expected_revision: str | None = None,
+        checks: list[str] | None = None,
     ) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -400,6 +401,14 @@ class ProjectService:
         unique_ids = list(dict.fromkeys(item.strip() for item in attachment_ids if item.strip()))
         if len(unique_ids) > 20:
             return ControlResult(ok=False, reason_code="too_many_project_attachments")
+        cleaned_checks: list[str] | None = None
+        if checks is not None:
+            # BR-D01 — each check is one command line the agent must run exactly.
+            cleaned_checks = list(dict.fromkeys(" ".join(item.split()) for item in checks if item.strip()))
+            if len(cleaned_checks) > 10:
+                return ControlResult(ok=False, reason_code="too_many_project_checks")
+            if any(len(item) > 300 for item in cleaned_checks):
+                return ControlResult(ok=False, reason_code="project_check_too_long")
         if any(
             self.store.load_attachment_metadata(
                 attachment_id, owner_principal_id=principal.principal_id
@@ -415,6 +424,7 @@ class ProjectService:
             memory_enabled=memory_enabled,
             memory_mode=memory_mode,
             owner_principal_id=principal.principal_id,
+            checks=cleaned_checks,
         )
         context = self.store.load_project_context(project_id)
         context["revision"] = context_revision(context)

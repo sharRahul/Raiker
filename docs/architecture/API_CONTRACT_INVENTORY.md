@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**410 operations: 397 verified, 0 eligible, 0 deferred, 13 special.**
+**411 operations: 398 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -371,6 +371,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/sessions/{session_id}/rename` | RenameSessionRequest | SessionRenamed | verified | declared SessionRenamed |
 | GET | `/api/sessions/{session_id}/sources` |  | TurnSources | verified | declared TurnSources |
 | PUT | `/api/sessions/{session_id}/tags` | SetSessionTagsRequest | SessionTagsSet | verified | declared SessionTagsSet |
+| GET | `/api/sessions/{session_id}/turns/{turn_id}/outcome` |  | BuildTurnOutcome | verified | declared BuildTurnOutcome |
 | GET | `/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt` |  | TurnSourceExcerpt | verified | declared TurnSourceExcerpt |
 | PUT | `/api/sessions/{session_id}/unarchive` |  | SessionArchived | verified | declared SessionArchived |
 | GET | `/api/settings` |  | SettingsView | verified | declared SettingsView |

@@ -2537,6 +2537,57 @@
         "title": "BreachCheckRequest",
         "type": "object"
       },
+      "BuildCheckRow": {
+        "description": "BR-D01 — one declared check, and what the turn's command record says of it.",
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed",
+              "not_run",
+              "ran_before_change",
+              "waiting",
+              "unknown"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          }
+        },
+        "required": [
+          "command",
+          "result",
+          "exit_code",
+          "run_id"
+        ],
+        "title": "BuildCheckRow",
+        "type": "object"
+      },
       "BuildSkillRequest": {
         "additionalProperties": false,
         "description": "A skill Raiker authored: the name, the trigger description, the body.",
@@ -2571,6 +2622,63 @@
           "body"
         ],
         "title": "BuildSkillRequest",
+        "type": "object"
+      },
+      "BuildTurnOutcome": {
+        "description": "BR-D01 — the strongest claim a turn's own records support about its change.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/BuildCheckRow"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "outcome": {
+            "enum": [
+              "no_change",
+              "completed_verified",
+              "completed_unverified",
+              "failed",
+              "blocked",
+              "outcome_unknown"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "writes": {
+            "title": "Writes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "turn_id",
+          "project_id",
+          "outcome",
+          "writes",
+          "checks",
+          "reason"
+        ],
+        "title": "BuildTurnOutcome",
         "type": "object"
       },
       "BulkDeleteSessionsRequest": {
@@ -20949,6 +21057,13 @@
             "title": "Attachment Ids",
             "type": "array"
           },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
           "instructions": {
             "title": "Instructions",
             "type": "string"
@@ -20976,6 +21091,7 @@
           "attachment_ids",
           "memory_enabled",
           "memory_mode",
+          "checks",
           "revision"
         ],
         "title": "ProjectContext",
@@ -20988,6 +21104,13 @@
               "type": "string"
             },
             "title": "Attachment Ids",
+            "type": "array"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
             "type": "array"
           },
           "instructions": {
@@ -21022,6 +21145,7 @@
           "attachment_ids",
           "memory_enabled",
           "memory_mode",
+          "checks",
           "revision"
         ],
         "title": "ProjectContextSaved",
@@ -23429,6 +23553,21 @@
             },
             "title": "Attachment Ids",
             "type": "array"
+          },
+          "checks": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks"
           },
           "expected_revision": {
             "anyOf": [
@@ -42596,6 +42735,55 @@
           }
         },
         "summary": "Set Session Tags"
+      }
+    },
+    "/api/sessions/{session_id}/turns/{turn_id}/outcome": {
+      "get": {
+        "description": "BR-D01 — whether a turn's change was verified by the project's declared checks.\n\nRead-only, and read from the runtime's own records, never from the model's\naccount of what it ran.",
+        "operationId": "get_build_turn_outcome_api_sessions__session_id__turns__turn_id__outcome_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildTurnOutcome"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Build Turn Outcome"
       }
     },
     "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt": {

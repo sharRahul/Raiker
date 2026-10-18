@@ -128,8 +128,16 @@ def _resume(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
 
 GRANT = {"commands": [["ls"]], "timeout_seconds": 30, "ttl_minutes": 10}
 
+def _turn_outcome(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """BR-D01 — the outcome of the conversation's one turn."""
+    session_id = _session(client, h)
+    turn_id = client.get(f"/api/sessions/{session_id}", headers=h).json()["turns"][0]["turn_id"]
+    return f"/api/sessions/{session_id}/turns/{turn_id}/outcome"
+
+
 CASES: Cases = {
     ("GET", "/api/sessions/{session_id}"): _on_session(""),
+    ("GET", "/api/sessions/{session_id}/turns/{turn_id}/outcome"): _turn_outcome,
     ("GET", "/api/sessions/{session_id}/export/manifest"): _on_session("/export/manifest"),
     ("PUT", "/api/sessions/{session_id}/pin"): _on_session("/pin", {"pinned": True}),
     ("PUT", "/api/sessions/{session_id}/rename"): _on_session("/rename", {"title": "Renamed"}),

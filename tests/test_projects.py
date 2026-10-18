@@ -431,6 +431,7 @@ class TestProjectsApi:
             "attachment_ids": [],
             "memory_enabled": True,
             "memory_mode": "enabled",
+            "checks": [],
         }
         assert revision == saved.json()["revision"]
 

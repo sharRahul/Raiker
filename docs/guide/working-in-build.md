@@ -291,6 +291,21 @@ local checkout and press **Schedule as a Build task**. The task's instructions
 are not its authority: each write still meets the same delegation check, and
 anything it does not cover waits in Approvals.
 
+## Whether a change was checked
+
+A Build turn that changed files says what its own record supports, under the
+answer: **Verified**, **Not verified**, **Checks failed**, **Waiting on a check**
+or **Result unknown**. A turn that changed nothing shows nothing.
+
+The checks are yours. In **Work → Projects**, open the project and write one
+command per line under **Checks** (at most ten), such as `pytest -q` or
+`npm test`, then **Save context**. Build turns in that project are asked to run
+each one exactly as written after their last change. **Verified** means every
+check ran *after* the last change and exited 0, read from Raiker's own command
+record, not from what the model said it did. A check that ran before the last
+change, a command that only looks like it, or no checks at all leaves the
+change **Not verified**; the line lists each check and what happened to it.
+
 ## Reading the repository
 
 **Files** on the Build header opens the connected repository beside the

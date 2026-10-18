@@ -79,6 +79,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
+| [BUG-346](#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model) | Medium | Build / approvals / Ollama | Open — found 2026-10-18 driving BR-D01 live; reproduction below, root cause not yet known |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -494,6 +495,39 @@ schedules that task through Tasks. **What remains is RR-40:** one scheduled run
 against a consented repository with a connected model and a delegation, read
 back as a branch, a commit and a pull request receipt, with a merge never
 attempted unprompted.
+
+## BUG-346 — An accepted Build write failed as an invalid tool call on an Ollama cloud model
+
+**Severity: Medium. Area: Build / approvals / Ollama. Status: Open — found
+2026-10-18 while driving [BR-D01](BUILD_WORKSPACE_SPEC.md) live.**
+
+**Observed.** On a fresh workspace with **File writes** and **Patch apply** on,
+Ollama `gpt-oss:120b-cloud` chosen on Models, and a Build turn in a managed
+project asked to create `notes.txt`, Build showed the proposed one-line diff in
+*Waiting on you*. After **Accept** the turn resumed and its row read
+**Write file notes.txt failed**; the answer said once that the capability still
+required approval, and on a second run that *the requested tool call was
+invalid*. No file was written. Of four runs, two reached the approval, one
+answered with a JSON plan and called no tool, and one met the provider's 402 on
+`deepseek-v4-pro:cloud`. After the turn the composer also said *No readiness
+check exists for this exact model* and disabled **Run**, for a model kept
+through the Ollama picker without **Check**.
+
+**What is known.** The BR-D01 outcome read the turn correctly as `no_change`
+(nothing was written, so nothing was claimed). The resumed call's row stays
+`waiting` in `tool_actions` while the live row says failed, so the resolve
+path's result is what to read first: `routes_approvals` → `approval_outcome`,
+and whether the model's `write_file` arguments as validated at proposal match
+what the executor accepts after approval.
+
+**Proposed fix.** Reproduce with a stub model that proposes a fixed
+`write_file` call so the model is out of the loop; read the resolve response and
+the executor's refusal; fix the mismatch; then add the real-turn half of
+`br-d01-build-outcome-live.spec.ts` (create a file, approve, read **Not
+verified** with the declared check *not run after the last change*).
+
+**Required user-interface outcome.** An accepted write is applied once and the
+row says so, or the card states the exact reason it was not applied.
 
 ## Decision statements added 2026-10-05
 

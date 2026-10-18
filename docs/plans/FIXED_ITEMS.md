@@ -973,6 +973,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-949](#fixed-949--a-windows-only-crash-dump-had-no-ci-job-that-could-catch-it-again-was-bug-312) | Low | Tests / Windows / CI | Closed 2026-10-18 — was BUG-312 |
 | [FIXED-950](#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced) | Low | Tasks / GitHub | Fixed 2026-10-18 — reduces BUG-339; RR-40 evidence open |
 | [FIXED-951](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234) | Low | Hooks / plugins / MCP | Retired 2026-10-18 — BUG-226, BUG-228, BUG-234 |
+| [FIXED-952](#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice) | Medium | Build / verification | Fixed 2026-10-18 — BR-D01 first slice |
 
 ---
 
@@ -33978,4 +33979,50 @@ evidence) and BUG-339 (RR-40).
 "extension or plugin"`), the API contract was regenerated, and the documentation
 link and anchor checks pass with every reference to the three retired anchors
 redirected here (8 links).
+
+---
+
+## FIXED-952 — A Build change read as done whether or not anything checked it (BR-D01, first slice)
+
+**Severity: Medium. Area: Build / verification. Status: Fixed 2026-10-18 — the
+first slice of [BR-D01](BUILD_WORKSPACE_SPEC.md); the rest stays on its row.**
+
+**Observed.** A Build turn that changed files ended on the model's prose. A
+plausible patch, or *I ran the tests and they pass*, was indistinguishable from a
+change something had actually checked, which BR-09 forbids.
+
+**Approach.** Independence comes from two halves the model controls neither of:
+the **commands are the owner's**, declared on the project, and the **results are
+the runtime's**, read from `tool_actions` and `command_runs`. No new execution
+path: the agent runs the checks through the ordinary governed command tools, so
+every policy, grant and approval still applies.
+
+**Fixed.**
+
+* `project_contexts.checks_json` (migration `RAIKER-2112-project-checks`); checks
+  save with the project context under its revision guard, at most ten of 300
+  characters, de-duplicated; the nearest folder that declares checks decides.
+* The project context a Build turn receives lists the checks and asks for each
+  to run exactly as written after the last change.
+* `raiker/control/build_outcome.py` classifies a turn as `no_change`,
+  `completed_verified`, `completed_unverified`, `failed`, `blocked` or
+  `outcome_unknown`, with one row per check: passed, failed, not run, ran before
+  the last change, waiting for approval, or did not finish.
+* `GET /api/sessions/{id}/turns/{turn_id}/outcome`, read-only and owner-scoped.
+* **Projects → Overview → Checks** edits them; Build shows the outcome under
+  each settled turn, in the page's ok/warn/danger tokens, and nothing for a turn
+  that changed nothing. The Build guide documents both.
+* Contract cases for this route and for the BUG-339 issue-to-PR route, whose
+  missing case had turned `main`'s CI red.
+
+**Evidence.** `tests/test_build_outcome.py` (classifier: no change, no checks,
+all passed, hidden failing test, check before the last change, lookalike
+command, timeout, waiting approval, failed write; API: save, keep on an older
+editor, refuse eleven, gatherer text, outcome read, 404) and
+`tests/test_projects.py` pass (**40**); contract responses **401/401**.
+`BuildOutcome.test.ts` and the new `ProjectsView` case pass; full web suite
+**2272** passed. `br-d01-build-outcome-live.spec.ts` passed **1/1** against a
+fresh `raiker-web`, and `01-project-checks.png` was reviewed. Driving a real model
+turn that changes a file found [BUG-346](TO_BE_FIXED.md#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model); in that run the
+outcome read the turn as `no_change`, correctly claiming nothing.
 

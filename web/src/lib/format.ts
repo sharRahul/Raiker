@@ -196,6 +196,14 @@ const PROVIDER_NAMES: Record<string, string> = {
   "chatgpt-codex": "ChatGPT subscription",
   gemini: "Gemini",
   huggingface: "Hugging Face",
+  deepseek: "DeepSeek",
+  groq: "Groq",
+  mistral: "Mistral",
+  xai: "xAI",
+  together: "Together AI",
+  fireworks: "Fireworks",
+  "nvidia-nim": "NVIDIA NIM",
+  cerebras: "Cerebras",
 };
 
 /** "lm-studio" → "LM Studio"; unknown providers pass through unchanged. */

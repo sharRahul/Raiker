@@ -1933,9 +1933,11 @@
           <p class="sg-code">Reason code: <code>{signInGuidance.code}</code></p>
         </div>
       {/if}
+      <!-- The key is stored only here, and it is *sent* — to this provider,
+           with each request. "Never leaves this device" was not true. -->
       <p class="signin-foot">
-        Your key is encrypted in this instance’s vault and never leaves this
-        device.
+        Your key is encrypted in this instance’s vault and is sent only to
+        {signInProfile ? providerName(signInProfile.provider) : "this provider"}, with each request.
       </p>
     </div>
   </div>

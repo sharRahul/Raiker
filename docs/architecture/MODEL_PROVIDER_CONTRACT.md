@@ -169,6 +169,33 @@ reasoning block (Anthropic's `signature_delta`) are not text and must not.
 
 ---
 
+## Provider breadth and resilience: comparison with Hermes Agent (2026-10-18)
+
+The owner asked how [Hermes Agent](https://hermes-agent.nousresearch.com/docs/integrations/providers)
+manages many inference providers and on-device models, and for the same in
+Raiker. Hermes keeps everything in `~/.hermes/config.yaml` with keys in
+`~/.hermes/.env`; Raiker keeps the same decisions in profiles, the encrypted
+vault and governed gates. What each has:
+
+| Hermes Agent | Raiker | Status |
+|---|---|---|
+| OAuth/subscription logins (Nous Portal, Codex, Copilot, Claude Max, …) | ChatGPT subscription through the local Codex client | Partial — others not planned without each vendor's sanctioned third-party flow |
+| ~20 API-key providers | Anthropic, OpenAI, Gemini, OpenRouter, Hugging Face, Ollama Cloud, **DeepSeek, Groq, Mistral, xAI, Together AI, Fireworks, NVIDIA NIM, Cerebras** | Shipped (the eight in bold added 2026-10-18 as ordinary gated profiles) |
+| Local: Ollama, LM Studio, llama.cpp, vLLM, SGLang, custom | Ollama (detected over loopback, per-model location and capabilities), LM Studio, managed llama.cpp and MLX slots, one OpenAI-compatible endpoint | Shipped; Raiker manages llama.cpp/MLX itself, which Hermes does not |
+| Named custom endpoints (`providers:` with `extra_headers`, `extra_body`, `key_cmd`) | One `generic-openai-compatible` profile | Gap — several named endpoints |
+| `fallback_providers`, turn-scoped, auth/404 immediate, 429/5xx after retries | Owner fallback sequence, turn-scoped, one transport retry, capability breaker | Shipped; reset-aware benching across turns is a gap |
+| Credential pools (same-provider key rotation) | One credential per provider | Gap |
+| Auxiliary per-task models (vision, compression, web) with their own fallback | Advisor model; compaction and vision use the turn's model | Gap |
+| Context-length chain (pin → provider → cache → `/models` → … → 128K) | Configured and provider-published facts; Unknown when neither states it | Partial — no pin, no local-server probe |
+| OpenRouter `provider_routing` (`sort`, `only`, `ignore`, `data_collection`) | Not sent | Gap — `data_collection: deny` matters to Raiker's posture |
+| App attribution to OpenRouter | `HTTP-Referer` + `X-Title: Raiker` | Shipped 2026-10-18; Raiker never presents itself as another app |
+| Local tool-calling requirements (llama.cpp `--jinja`, vLLM tool parser, Ollama `num_ctx`) | Ollama models without the `tools` capability are sent no tools; text-JSON tool fallback | Partial |
+
+Every Raiker addition keeps the existing rules: off until the owner connects
+it, the key sent only to that provider's own host, every refusal classified for
+what it is (FIXED-931: a model the provider will not run for Raiker is not a
+rejected key), and nothing a turn can widen.
+
 ## Phase 1 Mock Provider Acceptance *(historical — superseded)*
 
 > **Superseded 2026-08-23.** Items 1–3 describe a `mock` provider that does not

@@ -43,7 +43,8 @@ def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
 
 #: Every provider Raiker knows how to build. The three adapters behind them are
 #: the Anthropic Messages API, the Codex app server, and one OpenAI-compatible
-#: client — OpenAI, Gemini, Ollama Cloud and Hugging Face all speak the latter.
+#: client — OpenAI, Gemini, Ollama Cloud, Hugging Face and the hosted APIs below
+#: all speak the latter.
 _PROVIDER_ALIASES = frozenset(
     {
         "llama-cpp",
@@ -62,6 +63,16 @@ _PROVIDER_ALIASES = frozenset(
         "gemini",
         "anthropic",
         "chatgpt-codex",
+        # OpenAI-compatible hosted APIs, each its own profile so its key,
+        # catalogue, readiness and egress decision stay its own.
+        "deepseek",
+        "groq",
+        "mistral",
+        "xai",
+        "together",
+        "fireworks",
+        "nvidia-nim",
+        "cerebras",
     }
 )
 

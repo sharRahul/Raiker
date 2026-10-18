@@ -413,6 +413,7 @@ _REASON_STEP: dict[str, tuple[str, NextAction]] = {
     "provider_workspace_required": ("connect", {"label": "Add the workspace ID", "target": "add"}),
     "provider_workspace_invalid": ("connect", {"label": "Check the workspace ID", "target": "add"}),
     "provider_model_missing": ("discover", {"label": "Choose an available model", "target": "models"}),
+    "provider_model_refused": ("discover", {"label": "Choose another model", "target": "models"}),
     "local_model_missing": ("discover", {"label": "Download the model", "target": "models"}),
     "model_catalogue_unsupported": ("discover", {"label": "Choose a supported provider", "target": "add"}),
     "local_runtime_unreachable": ("run", {"label": "Start the runtime", "target": "runtime"}),

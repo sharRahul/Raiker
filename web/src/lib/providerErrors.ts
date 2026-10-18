@@ -70,6 +70,13 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     message: "The provider did not recognise the workspace named with this key.",
     fix: "Check the workspace ID on this connection against the one in the provider's console, then connect again.",
   },
+  // The key is valid and the provider will not run this model for Raiker:
+  // OpenRouter offers some models only to apps on its own list. Sending the
+  // owner to rotate a working key was the defect.
+  provider_model_refused: {
+    message: "The provider accepted your key but will not run this model for Raiker.",
+    fix: "Some models are offered only to apps on the provider's own list. Choose another model — your key is fine.",
+  },
   connector_vault_key_unset: {
     message: "There is no vault key, so Raiker cannot encrypt the credential you just entered.",
     fix: "Open Settings → Security & Login, select Generate key, confirm your password and save. Then connect the provider again.",

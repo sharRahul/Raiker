@@ -18,6 +18,7 @@ from raiker.models.exceptions import (
     ProviderConfigurationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
+    ProviderModelRefusedError,
     ProviderPolicyError,
     ProviderQuotaExhaustedError,
     ProviderRateLimitError,
@@ -364,6 +365,11 @@ _FAILURE_RULES: dict[ProbeStage, tuple[_FailureRule, ...]] = {
             "provider_authentication_failed",
             "{label} rejected the saved credential during execution.",
             "Update the provider credential and check again.",
+        ),
+        _FailureRule(
+            (ProviderModelRefusedError,), _S.MODEL_MISSING, "provider_model_refused",
+            "{label} accepted the key but will not run {model} for Raiker.",
+            "Choose another model; this one is offered only to some apps.",
         ),
         _FailureRule(
             (ProviderModelNotFoundError,), _S.MODEL_MISSING, "provider_model_missing",

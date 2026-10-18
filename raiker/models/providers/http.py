@@ -27,6 +27,7 @@ from raiker.models.exceptions import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
+    ProviderModelRefusedError,
     ProviderQuotaExhaustedError,
     ProviderRateLimitError,
     ProviderResponseValidationError,
@@ -34,6 +35,7 @@ from raiker.models.exceptions import (
     ProviderTimeoutError,
     ProviderWorkspaceRequiredError,
     is_quota_exhausted,
+    model_refused,
     needs_workspace_id,
     workspace_id_rejected,
 )
@@ -90,6 +92,8 @@ def provider_status_error(status: int, *, model: str, body: str = "") -> Excepti
         return ProviderWorkspaceRequiredError(f"provider_workspace_required:http_{status}")
     if is_quota_exhausted(status, body):
         return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
+    if model_refused(status, body):
+        return ProviderModelRefusedError(f"provider_model_refused:http_{status}")
     if status in {401, 403}:
         return ProviderAuthenticationError(f"provider_auth_failed:http_{status}")
     if status == 404:

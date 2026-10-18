@@ -952,6 +952,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there) | Low | Settings | Fixed 2026-10-18 — found in the BUG-280 round |
 | [FIXED-929](#fixed-929--select-on-a-connected-openai-or-openrouter-card-was-refused-with-model_required_for_profile) | High | Models / selection | Fixed 2026-10-18 — owner-reported while testing BUG-287 |
 | [FIXED-930](#fixed-930--an-anthropic-workspace-the-key-cannot-use-was-reported-as-a-missing-model) | Medium | Models / Anthropic identity-linked keys | Fixed 2026-10-18 — checked against the live API |
+| [FIXED-931](#fixed-931--openrouter-declining-one-model-for-raiker-was-reported-as-a-rejected-credential) | High | Models / OpenRouter / readiness | Fixed 2026-10-18 — owner-reported |
+| [FIXED-932](#fixed-932--raiker-offered-six-hosted-apis-where-hermes-agent-offers-twenty) | Medium | Models / provider breadth | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-933](#fixed-933--the-key-dialog-said-the-key-never-leaves-this-device) | Low | Models / truthfulness | Fixed 2026-10-18 |
 
 ---
 
@@ -33527,3 +33530,39 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** `workspace_id_rejected` also reads a 404 whose body says a workspace was not found, so it reaches the owner as `provider_workspace_invalid` with *Check the workspace ID*. Anthropic's [authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication) sends every key type as `Authorization: Bearer` and calls `x-api-key` legacy; Raiker now sends Anthropic keys the same way, with `anthropic-workspace-id` only when one is named.
 
 **Evidence.** `tests/test_provider_workspace_named.py`. Live, through Raiker's own provider: the identity-linked key with its workspace listed `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1` and answered a one-token request *OK*; without the workspace the API refused with the missing-workspace message Raiker already classifies; with a wrong workspace it now reports `provider_workspace_invalid:http_404`.
+
+---
+
+## FIXED-931 — OpenRouter declining one model for Raiker was reported as a rejected credential
+
+**Severity: High. Area: Models / OpenRouter / readiness. Status: Fixed 2026-10-18 — reported by the owner.**
+
+**Observed.** With a valid OpenRouter key, the readiness check on `thinkingmachines/inkling:free` said *OpenRouter rejected the saved credential during execution*. The same key answered `openai/gpt-4o-mini` and `openrouter/free`.
+
+**Root cause.** OpenRouter answers that model with HTTP 403 *"… is only available on agentic harnesses"* (`failed_routing_step: "Gate Free Endpoints by Agentic Harness"`): it offers some free models only to apps on its own list. Raiker read every 403 as an authentication failure. Checked live: with honest Raiker attribution the model is still refused; it answers for an app on OpenRouter's list. Raiker does not present itself as another app.
+
+**Fixed.** `ProviderModelRefusedError` (a kind of "cannot execute this model") is raised for a 403 whose body names a routing gate or an "only available" restriction. Readiness says *OpenRouter accepted the key but will not run {model} for Raiker — choose another model*; a turn says the key is fine; the Models next step is **Choose another model**. OpenRouter requests now carry `HTTP-Referer` and `X-Title: Raiker`.
+
+**Evidence.** `tests/test_provider_model_refused.py`. Live through Raiker's provider with the owner's key: `inkling:free` → `provider_model_refused:http_403` with the new sentence; `openrouter/free` → *OK*.
+
+---
+
+## FIXED-932 — Raiker offered six hosted APIs where Hermes Agent offers twenty
+
+**Severity: Medium. Area: Models / provider breadth. Status: Fixed 2026-10-18 — owner request to match Hermes Agent.**
+
+**Fixed.** DeepSeek, Groq, Mistral, xAI, Together AI, Fireworks, NVIDIA NIM and Cerebras ship as ordinary OpenAI-compatible profiles (`<provider>-hosted`), each with its own card, key source, accent colour and brand-neutral mark. They inherit every existing rule: off until the owner connects them, the key sent as a bearer token to that provider's own host only, catalogue, readiness, fallback and spend tracking as for any provider. The comparison and the remaining gaps (named custom endpoints, credential pools, per-task auxiliary models, OpenRouter routing preferences, context-length pin) are in [MODEL_PROVIDER_CONTRACT.md](../architecture/MODEL_PROVIDER_CONTRACT.md#provider-breadth-and-resilience-comparison-with-hermes-agent-2026-10-18).
+
+**Evidence.** `tests/test_hosted_provider_presets.py` (24); each base URL answered from this host on 2026-10-18; Models → Add model shows the cards and the DeepSeek connect dialog (`docs/screenshots/2026-10-18-hermes-providers/`).
+
+---
+
+## FIXED-933 — The key dialog said the key never leaves this device
+
+**Severity: Low. Area: Models / truthfulness. Status: Fixed 2026-10-18.**
+
+**Observed.** Every provider's connect dialog ended *Your key is encrypted in this instance's vault and never leaves this device.* The key is sent to that provider with every request.
+
+**Fixed.** *Your key is encrypted in this instance's vault and is sent only to {provider}, with each request.*
+
+**Evidence.** `ModelsView.test.ts` (70); the DeepSeek dialog capture.

@@ -30,6 +30,18 @@ export interface Brand {
   loginUrl?: string;
   loginLabel?: string;
 }
+/** Where each hosted API issues its keys, and the card's accent colour. */
+const HOSTED_API_KEYS: Record<string, { page: string; tint: string }> = {
+  deepseek: { page: "https://platform.deepseek.com/api_keys", tint: "#4d6bfe" },
+  groq: { page: "https://console.groq.com/keys", tint: "#f55036" },
+  mistral: { page: "https://console.mistral.ai/api-keys", tint: "#fa520f" },
+  xai: { page: "https://console.x.ai", tint: "#111111" },
+  together: { page: "https://api.together.ai/settings/api-keys", tint: "#0f6fff" },
+  fireworks: { page: "https://fireworks.ai/account/api-keys", tint: "#6720ff" },
+  "nvidia-nim": { page: "https://build.nvidia.com", tint: "#76b900" },
+  cerebras: { page: "https://cloud.cerebras.ai", tint: "#f15a29" },
+};
+
 export function brand(provider: string): Brand {
   switch (provider) {
     case "anthropic":
@@ -96,6 +108,27 @@ export function brand(provider: string): Brand {
         hint: "Managed Ollama endpoint key. Create one from your Ollama Cloud account.",
         authMethods: ["apikey"],
       };
+    case "deepseek":
+    case "groq":
+    case "mistral":
+    case "xai":
+    case "together":
+    case "fireworks":
+    case "nvidia-nim":
+    case "cerebras": {
+      // Hermes-style breadth: each is an OpenAI-compatible hosted API that
+      // authenticates with a bearer API key and nothing else.
+      const hosted = HOSTED_API_KEYS[provider];
+      return {
+        tint: hosted.tint,
+        headline: `Connect to ${providerName(provider)}`,
+        credentialLabel: `${providerName(provider)} API key`,
+        hint: `Create a key at ${hosted.page.replace("https://", "")}. ${providerName(provider)} uses API keys only.`,
+        authMethods: ["apikey"],
+        loginUrl: hosted.page,
+        loginLabel: `Get a ${providerName(provider)} key`,
+      };
+    }
     case "openai-compatible":
       return {
         tint: "#0f766e",

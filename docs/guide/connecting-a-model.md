@@ -291,6 +291,23 @@ next turn; the composer chip and provider card both name the chosen model. A car
 that has not got one says nothing on that line — **Select models…** is the offer,
 and the card's connection and readiness lines already say where it stands.
 
+### Which hosted providers there are
+
+Anthropic, OpenAI, Gemini and a ChatGPT subscription lead the **Hosted** section.
+Beside them are eight more OpenAI-compatible APIs, each its own card with its own
+key: **DeepSeek**, **Groq**, **Mistral**, **xAI**, **Together AI**,
+**Fireworks**, **NVIDIA NIM** and **Cerebras**. Each card says where its key is
+issued; each key is sent only to that provider's own API host, as a bearer
+token. **OpenRouter**, **Hugging Face** and **Ollama Cloud** route to many
+models through one key and sit under **Advanced**, with **OpenAI-compatible** for
+a server of your own (vLLM, SGLang, a home-lab host).
+
+A provider can accept your key and still decline one of its models for Raiker:
+OpenRouter offers some free models only to apps on its own list. Raiker says so
+— *the provider will not run this model for Raiker; your key is fine* — and the
+repair is another model, not another key. OpenRouter requests name Raiker as the
+calling app.
+
 ### What is still refused
 
 Consent by configuration is scoped, not a blanket opening:

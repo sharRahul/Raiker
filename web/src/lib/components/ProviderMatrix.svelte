@@ -91,6 +91,14 @@
     "ollama-cloud": "ollama.com → Settings → Keys",
     huggingface: "huggingface.co/settings/tokens",
     gemini: "aistudio.google.com/apikey",
+    deepseek: "platform.deepseek.com/api_keys",
+    groq: "console.groq.com/keys",
+    mistral: "console.mistral.ai/api-keys",
+    xai: "console.x.ai → API keys",
+    together: "api.together.ai/settings/api-keys",
+    fireworks: "fireworks.ai/account/api-keys",
+    "nvidia-nim": "build.nvidia.com → Get API key",
+    cerebras: "cloud.cerebras.ai → API keys",
   };
 
   /** What a local runtime is, in one line, so the row explains itself. */

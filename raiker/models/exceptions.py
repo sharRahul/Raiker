@@ -59,6 +59,17 @@ class ProviderModelNotFoundError(ModelProviderError):
     pass
 
 
+class ProviderModelRefusedError(ProviderModelNotFoundError):
+    """The provider accepted the key and will not run this model for this caller.
+
+    OpenRouter answers 403 *"<model> is only available on agentic harnesses"*
+    for models it offers only to apps on its approved list. The key is valid —
+    other models answer — so reporting it as a rejected credential sends the
+    owner to rotate a key that is fine. It is a kind of "cannot execute this
+    model": the repair is choosing another model.
+    """
+
+
 class ProviderUnsupportedCapabilityError(ModelProviderError):
     pass
 
@@ -91,6 +102,7 @@ _PROVIDER_ERROR_CLASS_CODES: dict[str, str] = {
     "ProviderRateLimitError": "provider_rate_limited",
     "ProviderQuotaExhaustedError": "provider_quota_exhausted",
     "ProviderWorkspaceRequiredError": "provider_workspace_required",
+    "ProviderModelRefusedError": "provider_model_refused",
     "ProviderModelNotFoundError": "model_not_found",
     "ProviderConnectionError": "provider_connection_failed",
     "ProviderConfigurationError": "provider_misconfigured",
@@ -199,6 +211,26 @@ _WORKSPACE_INVALID_MARKERS: tuple[str, ...] = (
     "invalid workspace_id",
     "workspace not found",
 )
+
+
+#: A 403 that refuses the *model*, not the caller. OpenRouter states which
+#: routing step refused it (``failed_routing_step``) and that the model is
+#: "only available" to certain apps; an authentication failure says neither.
+_MODEL_REFUSED_MARKERS: tuple[str, ...] = (
+    "failed_routing_step",
+    "only available on",
+    "only available to",
+    "is not available for your",
+    "not available in your region",
+)
+
+
+def model_refused(status: int, body: str) -> bool:
+    """True when a 403 refuses this model for this caller, not the credential."""
+    if status != 403:
+        return False
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _MODEL_REFUSED_MARKERS)
 
 
 def needs_workspace_id(status: int, body: str) -> bool:
@@ -328,6 +360,11 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
     (
         "provider_authentication_failed",
         "the provider rejected the saved credential. Update the key on Models, then try again.",
+    ),
+    (
+        "provider_model_refused",
+        "the provider will not run this model for Raiker — some models are offered only to "
+        "apps on the provider's own list. Your key is fine; choose another model on Models.",
     ),
     (
         "provider_quota_exhausted",

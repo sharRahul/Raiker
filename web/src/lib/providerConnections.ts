@@ -52,6 +52,8 @@ export interface ConnectionFields {
   apiKey?: string;
   adminApiKey?: string;
   workspaceId?: string;
+  /** The owner's name for a custom endpoint. Display text only. */
+  label?: string;
 }
 
 /** Store (or replace) a provider's credential and endpoint. */
@@ -66,6 +68,7 @@ export async function saveConnection(
       (fields.apiKey ?? "").trim(),
       (fields.adminApiKey ?? "").trim(),
       (fields.workspaceId ?? "").trim(),
+      (fields.label ?? "").trim(),
     );
     return { ok: true };
   } catch (error) {

@@ -285,6 +285,7 @@ class ModelService:
                     (saved_connection or {}).get("routing_data_collection", "")
                 ),
                 routing_sort=str((saved_connection or {}).get("routing_sort", "")),
+                connection_label=str((saved_connection or {}).get("label", "")),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))
                     if profile.raw.get("prompt_cache_ttl")

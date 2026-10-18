@@ -956,6 +956,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-932](#fixed-932--raiker-offered-six-hosted-apis-where-hermes-agent-offers-twenty) | Medium | Models / provider breadth | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-933](#fixed-933--the-key-dialog-said-the-key-never-leaves-this-device) | Low | Models / truthfulness | Fixed 2026-10-18 |
 | [FIXED-934](#fixed-934--openrouter-requests-could-not-be-kept-away-from-providers-that-store-prompts) | Medium | Models / OpenRouter / privacy | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-935](#fixed-935--raiker-had-one-custom-endpoint-and-hermes-agent-has-named-ones) | Medium | Models / custom endpoints | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-936](#fixed-936--a-tool-less-model-behind-a-custom-endpoint-failed-every-turn) | High | Models / turns / custom endpoints | Fixed 2026-10-18 — found in the FIXED-935 round |
 
 ---
 
@@ -33579,4 +33581,26 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** `PUT /api/models/{profile_id}/routing` (OpenRouter only, needs a saved connection) stores `data_collection` (`deny` or account default) and `sort` (price, throughput, latency or default) beside the connection without touching the key; re-pasting the key keeps them. The factory sends them as OpenRouter's `provider` object on every request through that connection, and only OpenRouter's own values ever reach a request. The connected OpenRouter card shows **OpenRouter routing** with both choices. Nothing is denied by default: live, `deny` once left `openrouter/free` with no provider (429), so it is the owner's choice and the card says so.
 
 **Evidence.** `tests/test_openrouter_routing.py` (9), `ModelsView.test.ts` (routing control), contract case for the route. Live through Raiker's provider with the owner's key: `openai/gpt-4o-mini` and `openrouter/free` answered with and without `deny`; with `deny` OpenRouter served `openrouter/free` from Phala instead of Nvidia.
+
+---
+
+## FIXED-935 — Raiker had one custom endpoint, and Hermes Agent has named ones
+
+**Severity: Medium. Area: Models / custom endpoints. Status: Fixed 2026-10-18 — Hermes Agent parity (`providers:` / `custom:<name>`).**
+
+**Fixed.** Four `generic-openai-compatible` slots ship. Each saved connection carries the owner's **Name** for it (`label`, one line, at most 40 characters), stored beside the endpoint and key; naming alone keeps the key and re-pasting the key keeps the name. Models shows the first slot and any slot that is set up, with **+ Add another endpoint** for the next; card titles, the model-picker dialog and the composer's model menu use the name, and each named endpoint is its own group there. The address still decides the gate (loopback none, private network **Home-lab models**, internet **Hosted models**).
+
+**Evidence.** `tests/test_named_custom_endpoints.py` (5), `ModelsView.test.ts`. Live: two endpoints named *Local Ollama API* and *Second box* pointing at this host's Ollama `/v1`, Gemma 3:1B kept on the first, chosen in the composer under its group *Local Ollama API*, answered *Hello!* (`docs/screenshots/2026-10-18-hermes-providers/03`–`07`). The round found that **+ Add another endpoint** opened the dialog for the slot after the one it revealed, fixed before commit, and FIXED-936.
+
+---
+
+## FIXED-936 — A tool-less model behind a custom endpoint failed every turn
+
+**Severity: High. Area: Models / turns / custom endpoints. Status: Fixed 2026-10-18.**
+
+**Observed.** Through a custom OpenAI-compatible endpoint, `gemma3:1b` answered every turn *the provider refused the request … provider_http_error:http_400*. FIXED-927 sends no tools to such a model only for the built-in Ollama profile, whose catalogue says so; a custom endpoint publishes nothing.
+
+**Fixed.** A 400 whose body says the endpoint refuses tools (Ollama, vLLM without auto tool choice, llama.cpp without `--jinja`) is `tool_calls_unsupported`; the router asks again once without tools (streamed or not, only before anything streamed) and remembers the model for the process, so later turns skip the refused attempt. Only ever less authority.
+
+**Evidence.** `tests/test_model_router.py` ("an endpoint that refuses tools is asked again without them"). Live: the FIXED-935 turn answered after the retry.
 

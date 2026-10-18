@@ -457,6 +457,9 @@ class ModelConnectionRequest(StrictRequest):
     # where the key acts, and it is stored beside the key so the pair travels
     # together.
     workspace_id: str | None = None
+    # Hermes Agent's named custom endpoints: the owner's own name for a custom
+    # OpenAI-compatible endpoint ("Home GPU", "Work vLLM"). Display text only.
+    label: str | None = Field(default=None, max_length=40)
 
 
 class ModelRoutingRequest(StrictRequest):

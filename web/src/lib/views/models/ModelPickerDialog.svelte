@@ -9,7 +9,7 @@
    */
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   import type { ModelProfile, ProviderModelList } from "../../apiTypes";
-  import { providerName } from "../../format";
+  import { profileLabel } from "../../format";
   import { providerErrorGuidance } from "../../providerErrors";
   import AvailableModels from "./AvailableModels.svelte";
 
@@ -79,10 +79,10 @@
     <div class="signin-logo">
       <ProviderLogo provider={profile.provider} size={40} />
     </div>
-    <h2 id="picker-title">{providerName(profile.provider)} models</h2>
+    <h2 id="picker-title">{profileLabel(profile)} models</h2>
     {#if loading}
       <p class="picker-note" role="status">
-        Loading models from {providerName(profile.provider)}…
+        Loading models from {profileLabel(profile)}…
       </p>
     {:else if list !== null && list.status === "available" && list.models.length > 0}
       <!-- Each switch is the whole decision: on means this model is offered

@@ -33,10 +33,12 @@ from raiker.models.exceptions import (
     ProviderResponseValidationError,
     ProviderStreamError,
     ProviderTimeoutError,
+    ProviderUnsupportedCapabilityError,
     ProviderWorkspaceRequiredError,
     is_quota_exhausted,
     model_refused,
     needs_workspace_id,
+    tools_unsupported,
     workspace_id_rejected,
 )
 
@@ -92,6 +94,8 @@ def provider_status_error(status: int, *, model: str, body: str = "") -> Excepti
         return ProviderWorkspaceRequiredError(f"provider_workspace_required:http_{status}")
     if is_quota_exhausted(status, body):
         return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
+    if tools_unsupported(status, body):
+        return ProviderUnsupportedCapabilityError(f"tool_calls_unsupported:http_{status}")
     if model_refused(status, body):
         return ProviderModelRefusedError(f"provider_model_refused:http_{status}")
     if status in {401, 403}:

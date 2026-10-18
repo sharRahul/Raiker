@@ -233,6 +233,30 @@ def model_refused(status: int, body: str) -> bool:
     return any(marker in haystack for marker in _MODEL_REFUSED_MARKERS)
 
 
+#: A 400 that refuses the request's *tools*, not the request. Ollama answers
+#: "<model> does not support tools"; vLLM without ``--enable-auto-tool-choice``
+#: and llama.cpp without ``--jinja`` refuse ``tool_choice: auto`` or the tools
+#: field in their own words. Each means: ask again without tools.
+_TOOLS_UNSUPPORTED_MARKERS: tuple[str, ...] = (
+    "does not support tools",
+    "does not support tool",
+    "tools are not supported",
+    "tool use is not supported",
+    "tool calling is not supported",
+    "\"auto\" tool choice requires",
+    "tool_choice is not supported",
+    "tools param requires --jinja",
+)
+
+
+def tools_unsupported(status: int, body: str) -> bool:
+    """True when the endpoint refused the request because it carried tools."""
+    if status != 400:
+        return False
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _TOOLS_UNSUPPORTED_MARKERS)
+
+
 def needs_workspace_id(status: int, body: str) -> bool:
     """True when the provider refused because no workspace was named.
 

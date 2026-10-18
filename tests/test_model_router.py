@@ -77,3 +77,58 @@ def test_a_model_the_local_service_lists_without_tools_is_sent_none(
     assert router._tools_for(profile, "qwen3:8b", tools) == tools
     # A model whose capabilities were not published is not second-guessed.
     assert router._tools_for(profile, "silent:latest", tools) == tools
+
+
+def test_an_endpoint_that_refuses_tools_is_asked_again_without_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A custom endpoint serving a tool-less model answers 400 "does not support tools".
+
+    Raiker cannot know that in advance (only Ollama's own catalogue says so),
+    so the refusal is the signal: the same request goes again without tools,
+    once, and the pair is remembered so later turns skip the refused attempt.
+    """
+    import asyncio
+
+    from raiker.models import router as router_module
+    from raiker.models.contracts import ModelMessage, ModelResponse, ToolSpec
+    from raiker.models.exceptions import ProviderUnsupportedCapabilityError
+    from raiker.models.providers.http import provider_status_error
+
+    refusal = provider_status_error(
+        400, model="gemma3:1b", body='{"error":{"message":"gemma3:1b does not support tools"}}'
+    )
+    assert isinstance(refusal, ProviderUnsupportedCapabilityError)
+
+    sent: list[object] = []
+
+    class _Provider:
+        provider = "openai-compatible"
+        model = "gemma3:1b"
+
+        async def chat(self, request):  # type: ignore[no-untyped-def]
+            sent.append(request.tools)
+            if request.tools:
+                raise refusal
+            return ModelResponse(text="hello")
+
+        async def aclose(self) -> None: ...
+
+    class _Factory:
+        def create(self, _profile):  # type: ignore[no-untyped-def]
+            return _Provider()
+
+    router_module._TOOLLESS_MODELS.clear()
+    router = ModelRouter(ModelProfileRegistry.load())
+    monkeypatch.setattr(router, "_factory", lambda _profile: _Factory())
+    monkeypatch.setattr(router, "_profile", lambda _p, model: router.registry.resolve_profile_id("generic-openai-compatible"))
+    tools = [ToolSpec("read_file", "Read a file")]
+    messages = [ModelMessage("user", "hi")]
+
+    response = asyncio.run(router.achat("openai-compatible", "gemma3:1b", messages, tools))
+    assert response.text == "hello"
+    assert sent == [tools, None]
+    # Remembered: the next turn goes without tools at once.
+    asyncio.run(router.achat("openai-compatible", "gemma3:1b", messages, tools))
+    assert sent == [tools, None, None]
+    router_module._TOOLLESS_MODELS.clear()

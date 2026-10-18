@@ -443,12 +443,14 @@ export const api = {
     apiKey: string,
     adminApiKey = "",
     workspaceId = "",
+    label = "",
   ) =>
     contract.setModelConnection(profileId, {
       endpoint: endpoint || null,
       api_key: apiKey || null,
       admin_api_key: adminApiKey || null,
       workspace_id: workspaceId || null,
+      label: label || null,
     }),
   // OpenRouter routing preferences beside the saved connection; "" is the
   // account default. The key is never sent or touched.

@@ -18,7 +18,7 @@
     ProviderModelList,
   } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
-  import { humanize, providerName, relativeTime } from "../format";
+  import { humanize, providerName, relativeTime, profileLabel } from "../format";
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import {
     providerErrorGuidance,
@@ -312,6 +312,8 @@
   // "workspace not recognised" answer asks them to compare.
   let signInWorkspaceId = $state("");
   let signInEndpoint = $state("");
+  /** Hermes-style named endpoints: the owner's own name for a custom endpoint. */
+  let signInLabel = $state("");
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
@@ -379,6 +381,7 @@
     signInAdminApiKey = "";
     signInWorkspaceId = "";
     signInEndpoint = "";
+    signInLabel = models?.profiles.find((p) => p.profile_id === profileId)?.connection_label ?? "";
     // BUG-274 — a readiness answer that says "add the workspace ID to this
     // connection" has to land on the box, not three clicks away from it.
     signInAdvanced = options.advanced === true;
@@ -408,6 +411,7 @@
         apiKey: signInApiKey,
         adminApiKey: signInAdminApiKey,
         workspaceId: signInWorkspaceId,
+        label: signInLabel,
       });
       if (!outcome.ok) throw outcome;
       signInApiKey = "";
@@ -929,9 +933,35 @@
     const turns = profile.turns_used ?? 0;
     return `${used} model${used === 1 ? "" : "s"} used · ${turns} turn${turns === 1 ? "" : "s"}`;
   }
+  /**
+   * Hermes-style named custom endpoints. Raiker ships four OpenAI-compatible
+   * slots; the first is always offered, the rest only once set up or asked for,
+   * so four identical empty cards never stand in for one choice.
+   */
+  let revealedEndpoints = $state<string[]>([]);
+  const customEndpoints = $derived(
+    (models?.profiles ?? []).filter((profile) => profile.provider === "openai-compatible"),
+  );
+  function endpointShown(profile: ModelProfile): boolean {
+    if (profile.provider !== "openai-compatible") return true;
+    return (
+      customEndpoints[0]?.profile_id === profile.profile_id ||
+      profile.connection_configured ||
+      profile.selected ||
+      revealedEndpoints.includes(profile.profile_id)
+    );
+  }
+  const nextEndpoint = $derived(customEndpoints.find((profile) => !endpointShown(profile)) ?? null);
+  function addEndpoint() {
+    if (nextEndpoint === null) return;
+    // Read once: revealing this slot recomputes `nextEndpoint` to the one after.
+    const profileId = nextEndpoint.profile_id;
+    revealedEndpoints = [...revealedEndpoints, profileId];
+    openSignIn(profileId);
+  }
   function profilesFor(section: "Local" | "Hosted" | "Advanced") {
     return (models?.profiles ?? []).filter(
-      (profile) => sectionFor(profile) === section,
+      (profile) => sectionFor(profile) === section && endpointShown(profile),
     );
   }
   function frameworkProfiles(provider: "llama.cpp" | "mlx") {
@@ -1279,7 +1309,7 @@
                        read as "only this provider is available", which is false —
                        every configured provider stays usable. -->
                         <div class="row-title">
-                          <h3>{providerName(p.provider)}</h3>
+                          <h3>{profileLabel(p)}</h3>
                         </div>
                         <!-- The model line states a fact when there is one and
                              says nothing when there is not; "Select models…"
@@ -1402,7 +1432,7 @@
                           >
                         {/if}
                         <RowOverflow
-                          label={providerName(p.provider)}
+                          label={profileLabel(p)}
                           items={[
                             ...(p.model === "<model>"
                               ? []
@@ -1448,7 +1478,7 @@
                           /></span
                         >
                         <div class="pc-title">
-                          <h3>{providerName(p.provider)}</h3>
+                          <h3>{profileLabel(p)}</h3>
                         </div>
                       </div>
                       <!-- Same rule as the local rows: name the model when one
@@ -1655,7 +1685,7 @@
                              slice E already moved Reconnect and Disconnect into
                              Details for the same reason. -->
                         <RowOverflow
-                          label={providerName(p.provider)}
+                          label={profileLabel(p)}
                           items={[
                             // Everywhere it is not already the visible primary.
                             // Browsing what a provider serves is how an owner
@@ -1747,6 +1777,13 @@
                     </article>
                   {/each}
                 </div>
+                {#if section === "Advanced" && nextEndpoint !== null}
+                  <!-- Hermes-style named endpoints: one more server of your own
+                       (vLLM, SGLang, a home-lab host), with its own name and key. -->
+                  <button type="button" class="btn btn-ghost btn-sm add-endpoint" onclick={addEndpoint}
+                    >+ Add another endpoint</button
+                  >
+                {/if}
               {/if}
             </section>
           {/if}
@@ -1887,6 +1924,19 @@
         {/if}
       {/if}
 
+      {#if signInProfile.provider === "openai-compatible"}
+        <!-- A custom endpoint is its address first: name it, say where it is,
+             then a key if the server wants one. -->
+        <label class="field">
+          <span class="field-label">Name <small>(optional — e.g. Home GPU)</small></span>
+          <input class="input" type="text" maxlength="40" placeholder="OpenAI-compatible" bind:value={signInLabel} />
+        </label>
+        <label class="field">
+          <span class="field-label">Endpoint</span>
+          <input class="input" type="url" placeholder="http://127.0.0.1:8000/v1" bind:value={signInEndpoint} />
+        </label>
+      {/if}
+
       {#if showApiKey}
         <label class="field">
           <span class="field-label">{b.credentialLabel}</span>
@@ -1929,7 +1979,7 @@
       >
         {signInAdvanced ? "Hide advanced" : "Advanced"}
       </button>
-      {#if signInAdvanced}
+      {#if signInAdvanced && signInProfile.provider !== "openai-compatible"}
         <label class="field">
           <span class="field-label"
             >Custom endpoint <small>(leave blank for provider default)</small
@@ -1972,6 +2022,7 @@
             (signInEndpoint.trim() === "" &&
               signInApiKey.trim() === "" &&
               signInWorkspaceId.trim() === "" &&
+              signInLabel.trim() === "" &&
               !signInAdvanced)}
         >
           {signInSaving ? "Connecting…" : "Connect"}
@@ -2603,4 +2654,5 @@
   .pc-routing-sort { display: flex; align-items: center; gap: .5rem; }
   .pc-routing-sort select { flex: 1; min-width: 0; }
   .pc-routing-note { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
+  .add-endpoint { margin-top: .6rem; }
 </style>

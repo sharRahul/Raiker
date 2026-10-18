@@ -2946,9 +2946,13 @@ async def set_model_connection(
             "api_key": body.api_key or "",
             "admin_api_key": body.admin_api_key or "",
             "workspace_id": body.workspace_id or "",
+            "label": body.label or "",
         }.items()
         if value.strip()
     }
+    if "label" in values:
+        # A name is display text: one line, no control characters.
+        values["label"] = " ".join(values["label"].split())[:40]
     # BUG-274 — refused here, where the owner can still see what they typed,
     # rather than at the point a turn needs it. The shape check is a header
     # safety rule, not a guess at the provider's id format.
@@ -2968,15 +2972,17 @@ async def set_model_connection(
     # workspace id, *only* when a connection already exists. Any other
     # combination still replaces, so nothing else silently retains a value the
     # owner thought they had cleared.
-    if set(values) == {"workspace_id"}:
+    if values and set(values) <= {"workspace_id", "label"}:
+        # A workspace or a name on its own completes a saved connection; it
+        # never replaces the key it accompanies (BUG-274).
         existing = get_model_connection(store, session.principal_id, profile_id)
         if existing:
             values = {**existing, **values}
     elif values:
-        # Routing preferences are set on their own route and are not part of
-        # the key dialog; re-pasting a key must not silently reset them.
+        # Routing preferences and the endpoint's name are not re-entered with
+        # the key; re-pasting a key must not silently reset them.
         existing = get_model_connection(store, session.principal_id, profile_id) or {}
-        for key in ("routing_data_collection", "routing_sort"):
+        for key in ("routing_data_collection", "routing_sort", "label"):
             if existing.get(key):
                 values.setdefault(key, existing[key])
     if not values:
@@ -3000,7 +3006,9 @@ async def set_model_connection(
             policy=provider_runtime_policy_from_gates(
                 store, session.principal_id, configuring_profile_id=profile_id
             ),
-            connection={key: value for key, value in values.items() if key != "admin_api_key"},
+            connection={
+                key: value for key, value in values.items() if key not in {"admin_api_key", "label"}
+            },
         ).validate(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:

@@ -17247,6 +17247,18 @@
             ],
             "title": "Endpoint"
           },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "workspace_id": {
             "anyOf": [
               {
@@ -18023,6 +18035,11 @@
             "default": false,
             "title": "Connection Configured",
             "type": "boolean"
+          },
+          "connection_label": {
+            "default": "",
+            "title": "Connection Label",
+            "type": "string"
           },
           "context_window_source": {
             "anyOf": [

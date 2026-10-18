@@ -984,6 +984,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
             api_key: "inference-key",
             admin_api_key: "usage-admin-key",
             workspace_id: null,
+            label: null,
           }),
         }),
       ),
@@ -1058,6 +1059,48 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         model: "local-gguf",
       });
     });
+  });
+
+  it("names custom endpoints and offers one more slot at a time", async () => {
+    const slot = (n: string, over: Partial<ModelProfile> = {}) =>
+      profile({
+        profile_id: `generic-openai-compatible${n}`,
+        provider: "openai-compatible",
+        model: "<model>",
+        local_only: false,
+        endpoint_kind: "loopback",
+        ...over,
+      });
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          slot("", { connection_configured: true, connection_label: "Home GPU" }),
+          slot("-2"),
+          slot("-3"),
+          slot("-4"),
+        ],
+      }),
+      "PUT /api/models/generic-openai-compatible-2/connection": { ok: true, connection_configured: true },
+    });
+    render(ModelsView, { tab: "add" });
+    expect(await screen.findByRole("heading", { name: "Home GPU" })).toBeInTheDocument();
+    // Only the configured slot is drawn; the empty ones wait to be asked for.
+    expect(screen.queryAllByRole("heading", { name: "OpenAI-compatible" })).toHaveLength(0);
+    await fireEvent.click(screen.getByRole("button", { name: "+ Add another endpoint" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText(/^Name/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/^Endpoint/)).toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { name: "OpenAI-compatible" })).toHaveLength(1);
+    // The dialog is for the slot just revealed — the second — not the one after it.
+    await fireEvent.input(within(dialog).getByLabelText(/^Endpoint/), {
+      target: { value: "http://127.0.0.1:8001/v1" },
+    });
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Connect" }));
+    await waitFor(() =>
+      expect(
+        mock.mock.calls.some((c) => String(c[0]).includes("/api/models/generic-openai-compatible-2/connection")),
+      ).toBe(true),
+    );
   });
 
   it("lets a connected OpenRouter card keep requests away from providers that store prompts", async () => {
@@ -1251,6 +1294,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
               api_key: "sk-ant-test",
               admin_api_key: null,
               workspace_id: "wrkspc_01",
+              label: null,
             }),
           }),
         ),
@@ -1381,6 +1425,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
             api_key: null,
             admin_api_key: null,
             workspace_id: null,
+            label: null,
           }),
         }),
       ),

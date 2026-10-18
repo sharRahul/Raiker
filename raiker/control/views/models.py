@@ -96,6 +96,8 @@ class ModelProfileView(View):
     # account default. Not secrets, so the card can show and edit them.
     routing_data_collection: str = ""
     routing_sort: str = ""
+    # The owner's own name for a custom endpoint; "" when none was given.
+    connection_label: str = ""
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None

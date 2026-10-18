@@ -308,6 +308,22 @@ OpenRouter offers some free models only to apps on its own list. Raiker says so
 repair is another model, not another key. OpenRouter requests name Raiker as the
 calling app.
 
+### Servers of your own, by name
+
+**OpenAI-compatible** is any server that speaks the OpenAI API — vLLM, SGLang,
+llama.cpp's server, LM Studio on another machine, Ollama's `/v1`, a home-lab
+host. Its dialog asks for a **Name** (yours to choose: *Home GPU*, *Work vLLM*),
+the **Endpoint**, and a key only if the server wants one. **+ Add another
+endpoint** under the Advanced cards adds a second, third and fourth, each its own
+card with its own address, key, models and readiness, and each shown under its
+name in every model picker. Where the address points decides what it needs:
+this machine needs nothing, a private-network address the **Home-lab models**
+gate, an internet address the **Hosted models** gate.
+
+A server can serve a model that cannot use tools. When it refuses a request for
+carrying tools, Raiker asks again without them and remembers that model, so the
+answer still comes — and that model can read, search and act on nothing.
+
 Once OpenRouter is connected its card carries **OpenRouter routing**, two choices
 that travel with every request: **Only providers that do not store prompts**
 (OpenRouter's `data_collection: deny`) and **Prefer** — OpenRouter's default,

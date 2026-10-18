@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from raiker.contracts.models import ClientMetadata, ModelProfile
 from raiker.events.types import make_event
@@ -22,6 +22,7 @@ from raiker.models.exceptions import (
     ModelProviderError,
     ProviderConfigurationError,
     ProviderPolicyError,
+    ProviderUnsupportedCapabilityError,
 )
 from raiker.models.factory import (
     ModelProviderFactory,
@@ -48,6 +49,16 @@ def _cache_ttl(profile: ModelProfile) -> str | None:
     """Read the profile cache TTL, normalized to a supported value or None."""
     value = str(profile.raw.get("prompt_cache_ttl", "") or "").strip()
     return value if value in _VALID_CACHE_TTLS else None
+
+
+#: (profile_id, model) pairs an endpoint has refused tools for, this process.
+#: Learnt from the refusal itself, so a turn on a tool-less model behind a custom
+#: endpoint costs one refused request once rather than on every turn.
+_TOOLLESS_MODELS: set[tuple[str, str]] = set()
+
+
+def _refused_tools(exc: ProviderUnsupportedCapabilityError) -> bool:
+    return str(exc).startswith("tool_calls_unsupported")
 
 
 class ModelRouter:
@@ -108,7 +119,11 @@ class ModelRouter:
         Sending the turn without tools is the narrower request: the model can
         still answer, and it can call nothing — never more authority, only less.
         """
-        if not tools or not profile.local_only:
+        if not tools:
+            return tools
+        if (profile.profile_id, model) in _TOOLLESS_MODELS:
+            return None
+        if not profile.local_only:
             return tools
         from raiker.models import local_service
 
@@ -183,7 +198,16 @@ class ModelRouter:
             max_tokens=max_tokens,
         )
         try:
-            return await model_provider.chat(request)
+            try:
+                return await model_provider.chat(request)
+            except ProviderUnsupportedCapabilityError as exc:
+                # The endpoint refused the tools, not the request: ask again
+                # without them. Only ever less authority — the model can still
+                # answer, and it can call nothing.
+                if not request.tools or not _refused_tools(exc):
+                    raise
+                _TOOLLESS_MODELS.add((profile.profile_id, request.model))
+                return await model_provider.chat(replace(request, tools=None))
         finally:
             await model_provider.aclose()
 
@@ -233,8 +257,18 @@ class ModelRouter:
             response_schema_name=response_schema_name,
         )
         try:
-            async for event in model_provider.stream_chat(request):
-                yield event
+            started = False
+            try:
+                async for event in model_provider.stream_chat(request):
+                    started = True
+                    yield event
+            except ProviderUnsupportedCapabilityError as exc:
+                # Refused before anything streamed: the same retry as `achat`.
+                if started or not request.tools or not _refused_tools(exc):
+                    raise
+                _TOOLLESS_MODELS.add((profile.profile_id, request.model))
+                async for event in model_provider.stream_chat(replace(request, tools=None)):
+                    yield event
         finally:
             await model_provider.aclose()
 

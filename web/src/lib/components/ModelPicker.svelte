@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ModelDecision, ModelProfile } from "../apiTypes";
-  import { providerName } from "../format";
+  import { profileLabel } from "../format";
   import { modelName } from "../modelPresentation";
   import {
     isChoosableModel,
@@ -157,12 +157,17 @@
       // A provider with nothing choosable is not a choice, so it does not open
       // a group here; setting one up is one action at the end of the menu.
       if (!isChoosableModel(profile)) continue;
-      groups.set(profile.provider, [
-        ...(groups.get(profile.provider) ?? []),
-        profile,
-      ]);
+      // Each named custom endpoint is its own group: four OpenAI-compatible
+      // endpoints are four places a model can run, not one.
+      const key = profile.provider === "openai-compatible" ? profile.profile_id : profile.provider;
+      groups.set(key, [...(groups.get(key) ?? []), profile]);
     }
-    return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
+    return [...groups].map(([key, profiles]) => ({
+      key,
+      provider: profiles[0].provider,
+      label: profileLabel(profiles[0]),
+      profiles,
+    }));
   });
   /**
    * The first published-but-unready profile, or null when every provider is
@@ -391,15 +396,15 @@
           <p class="model-search-summary" role="status">{foundSummary}</p>
         </div>
       {:else}
-      {#each providerGroups as group (group.provider)}
+      {#each providerGroups as group (group.key)}
         <div
           class="model-provider-group"
           role="group"
-          aria-label={`${providerName(group.provider)} models`}
+          aria-label={`${group.label} models`}
         >
           <div class="model-provider-header">
             <ProviderLogo provider={group.provider} />
-            <span>{providerName(group.provider)}</span>
+            <span>{group.label}</span>
           </div>
           {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
             <button

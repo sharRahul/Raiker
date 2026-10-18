@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from urllib.parse import urlparse
 
@@ -298,6 +298,26 @@ class ModelProviderFactory:
             headers=headers,
         )
 
+    def _local_capabilities(self, profile: ModelProfile, endpoint: str, model: str) -> ModelCapabilities:
+        """The profile's capabilities, plus what a local service says this model can do.
+
+        Ollama publishes per-model capabilities. A model it lists with ``vision``
+        accepts images even though the Ollama profile cannot declare that for
+        every model it might serve; without this an image sent to
+        ``gemma4:31b-cloud`` was silently dropped.
+        """
+        capabilities = capabilities_from_profile(profile)
+        if capabilities.supports_vision or not profile.local_only:
+            return capabilities
+        from raiker.models import local_service
+
+        if profile.provider not in local_service.WATCHED_RUNTIMES:
+            return capabilities
+        answer = local_service.liveness(profile.provider, endpoint)
+        if answer is not None and answer.has_capability(model, "vision"):
+            return replace(capabilities, supports_vision=True)
+        return capabilities
+
     def validate(self, profile: ModelProfile, *, require_model: bool = True) -> None:
         """Raise if this profile would not run, and open nothing if it would."""
         self.resolve(profile, require_model=require_model)
@@ -348,7 +368,7 @@ class ModelProviderFactory:
             provider=profile.provider,
             model=resolved.served_model,
             endpoint=endpoint,
-            capabilities=capabilities_from_profile(profile),
+            capabilities=self._local_capabilities(profile, endpoint, resolved.served_model),
             timeout=timeout,
             temperature=float(raw.get("temperature", 0.2)),
             max_tokens=int(raw.get("max_tokens", 1024)),

@@ -332,6 +332,7 @@ export function modelsView(over: Partial<ModelsView> = {}): ModelsView {
     advisor_readiness_remediation: null,
     advisor_readiness_checked_at: null,
     catalogues: {},
+    side_tasks: { summarise: [], vision: [] },
     ...over,
   };
 }

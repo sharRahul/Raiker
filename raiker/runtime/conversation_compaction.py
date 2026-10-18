@@ -383,14 +383,33 @@ class ConversationCompactor:
                 content=f"Conversation to compact:{prior}\n\n{transcript}{additions}",
             ),
         ]
+        # Hermes Agent's auxiliary summarising model: the owner's side-task chain
+        # first, the turn's own model last, so compaction never becomes
+        # impossible because a side model is down.
+        from raiker.models.side_tasks import candidates as side_task_candidates
+
+        chain = side_task_candidates(
+            self.store, owner_principal_id, "summarise", main=(provider, model)
+        )
         try:
-            response = await self.model_router.achat(
-                provider,
-                model,
-                summary_messages,
-                None,
-                reasoning=ReasoningOptions(enabled=False),
-            )
+            response = None
+            last_error: Exception | None = None
+            for candidate_provider, candidate_model in chain:
+                try:
+                    response = await self.model_router.achat(
+                        candidate_provider,
+                        candidate_model,
+                        summary_messages,
+                        None,
+                        reasoning=ReasoningOptions(enabled=False),
+                    )
+                except ModelProviderError as exc:
+                    last_error = exc
+                    continue
+                provider, model = candidate_provider, candidate_model
+                break
+            if response is None:
+                raise last_error or ValueError("compaction_unavailable")
             summary = response.text.strip()
             max_summary_chars = min(16_000, max(1_024, int(capacity_tokens or 4_096)))
             if not summary or len(summary) > max_summary_chars:
@@ -443,6 +462,8 @@ class ConversationCompactor:
                 "estimated_input_tokens_before": record.estimated_input_tokens_before,
                 "estimated_summary_tokens": record.estimated_summary_tokens,
                 "through_turn_id": record.through_turn_id or "",
+                "provider": record.provider,
+                "model": record.model,
             },
         )
         await self._post_compact(

@@ -459,6 +459,9 @@ export const api = {
   // account default. The key is never sent or touched.
   setModelRouting: (profileId: string, dataCollection: "" | "deny", sort: "" | "price" | "throughput" | "latency") =>
     contract.setModelRouting(profileId, { data_collection: dataCollection, sort }),
+  // One side task's ordered model chain (Hermes auxiliary models); [] clears it.
+  setSideTaskModels: (task: "summarise" | "vision", chain: { profile_id: string; model: string }[]) =>
+    contract.setSideTaskModels({ task, chain }),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) => contract.setModelFallback({ profile_ids }),

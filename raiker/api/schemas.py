@@ -501,6 +501,18 @@ class ModelWeeklyBudgetRequest(StrictRequest):
     token_budget: int | None = None
 
 
+class SideTaskModelEntry(StrictRequest):
+    profile_id: str = Field(min_length=1, max_length=120)
+    model: str = Field(min_length=1, max_length=200)
+
+
+class SetSideTaskModelsRequest(StrictRequest):
+    """One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it."""
+
+    task: Literal["summarise", "vision"]
+    chain: list[SideTaskModelEntry] = Field(default_factory=list, max_length=3)
+
+
 class SetModelAdvisorRequest(StrictRequest):
     # Persist (or clear, with null/empty) the user-owned advisor model profile.
     # The strict base rejects unknown fields.

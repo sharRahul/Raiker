@@ -288,6 +288,14 @@ class ConnectionSet(TypedDict):
     connection_configured: bool
 
 
+class SideTaskModelsSet(TypedDict):
+    """One side task's model chain as stored."""
+
+    ok: bool
+    task: str
+    chain: list[dict[str, str]]
+
+
 class RoutingSet(TypedDict):
     """OpenRouter routing preferences as saved; empty strings mean the account default."""
 

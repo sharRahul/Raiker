@@ -217,6 +217,14 @@ class ModelProfileRegistry:
         return list(self.profiles)
 
     def resolve(self, provider: str, model: str) -> ModelProfile:
+        # A profile id in the provider position names one profile exactly. It is
+        # how a turn names one of several slots that share a provider (four
+        # OpenAI-compatible endpoints), which a provider name cannot.
+        by_id = next((profile for profile in self.profiles if profile.profile_id == provider), None)
+        if by_id is not None and by_id.provider != provider:
+            if by_id.model == model or not model or "<" in model or ">" in model:
+                return by_id
+            return profile_with_model(by_id, model)
         normal_provider = _normalize_provider(provider)
         # 1) Exact (provider, model) match wins.
         for profile in self.profiles:
@@ -234,6 +242,20 @@ class ModelProfileRegistry:
                 if profile.provider == normal_provider and _is_placeholder_model(profile.model):
                     return profile_with_model(profile, model)
         raise RegistryError(f"unknown_model_profile:{provider}:{model}")
+
+    def turn_token(self, profile: ModelProfile) -> str:
+        """What a turn calls ``profile`` by: its provider, unless that is ambiguous.
+
+        Several placeholder profiles under one provider (the OpenAI-compatible
+        slots) cannot be told apart by provider name — every lookup would land on
+        the first — so they are named by profile id instead.
+        """
+        shared = [
+            other
+            for other in self.profiles
+            if other.provider == profile.provider and _is_placeholder_model(other.model)
+        ]
+        return profile.profile_id if len({p.profile_id for p in shared}) > 1 else profile.provider
 
     def resolve_profile_id(self, profile_id: str) -> ModelProfile:
         for profile in self.profiles:

@@ -392,6 +392,9 @@ class ModelsView(View):
     # provider policy at call time.
     advisor_profile_id: str | None = None
     advisor_model_gate_state: str = "unknown"
+    # Hermes Agent's auxiliary models: per side task ("summarise", "vision"),
+    # the owner's ordered chain of {"profile_id", "model"} pairs.
+    side_tasks: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     # BUG-82 — the advisor is a second model this runtime calls, chosen in the
     # same UI as the chat model and, until now, never readiness-checked: no
     # probe, no state, no chip, and no row in `GET /api/model-readiness`. An

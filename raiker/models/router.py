@@ -360,9 +360,12 @@ class ModelRouter:
     def supports_vision(self, provider: str, model: str) -> bool:
         """Whether the resolved profile declares image input support, fail-closed."""
         try:
-            return capabilities_from_profile(self._profile(provider, model)).supports_vision
+            profile = self._profile(provider, model)
         except (RegistryError, ValueError):
             return False
+        from raiker.models.side_tasks import model_sees
+
+        return model_sees(profile, model)
 
     def chat(
         self,

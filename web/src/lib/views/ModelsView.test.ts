@@ -1019,7 +1019,9 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     await fireEvent.change(select, {
       target: { value: "raiker-local-llama-cpp" },
     });
-    await fireEvent.click(screen.getByText("Add"));
+    // Scoped: the Side-task models editor on the same tab has Add buttons too.
+    const fallback = screen.getByRole("region", { name: "Model fallback sequence" });
+    await fireEvent.click(within(fallback).getByText("Add"));
     await fireEvent.click(screen.getByText("Save sequence"));
 
     await waitFor(() => {

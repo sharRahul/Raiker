@@ -10,6 +10,7 @@
    */
   import type { ModelProfile, ModelsView as ModelsData } from "../../apiTypes";
   import AdvancedRouting from "./AdvancedRouting.svelte";
+  import SideTaskModels from "./SideTaskModels.svelte";
   import DownloadsPanel from "./DownloadsPanel.svelte";
   import LocalFrameworkRow from "./LocalFrameworkRow.svelte";
   import LocalLibraryPanel from "./LocalLibraryPanel.svelte";
@@ -109,6 +110,7 @@
      something to fold away. What is folded is the tuning, not the
      disclosure. -->
 <AdvancedRouting {models} {revision} {onreload} />
+<SideTaskModels {models} {onreload} />
 
 <!-- Downloads, conversions and pulls are what the
      runtime is *doing*, so they belong to the runtime rather than beside

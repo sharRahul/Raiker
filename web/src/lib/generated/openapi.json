@@ -19007,6 +19007,19 @@
             "title": "Remote Profile Count",
             "type": "integer"
           },
+          "side_tasks": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Side Tasks",
+            "type": "object"
+          },
           "usable_provider_count": {
             "default": 0,
             "title": "Usable Provider Count",
@@ -24327,6 +24340,33 @@
         "title": "SetSessionTagsRequest",
         "type": "object"
       },
+      "SetSideTaskModelsRequest": {
+        "additionalProperties": false,
+        "description": "One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it.",
+        "properties": {
+          "chain": {
+            "items": {
+              "$ref": "#/components/schemas/SideTaskModelEntry"
+            },
+            "maxItems": 3,
+            "title": "Chain",
+            "type": "array"
+          },
+          "task": {
+            "enum": [
+              "summarise",
+              "vision"
+            ],
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "title": "SetSideTaskModelsRequest",
+        "type": "object"
+      },
       "SetSkillActiveRequest": {
         "additionalProperties": false,
         "properties": {
@@ -24940,6 +24980,59 @@
           "ok"
         ],
         "title": "SetupVerification",
+        "type": "object"
+      },
+      "SideTaskModelEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "profile_id": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile_id",
+          "model"
+        ],
+        "title": "SideTaskModelEntry",
+        "type": "object"
+      },
+      "SideTaskModelsSet": {
+        "description": "One side task's model chain as stored.",
+        "properties": {
+          "chain": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Chain",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "task",
+          "chain"
+        ],
+        "title": "SideTaskModelsSet",
         "type": "object"
       },
       "SignInRequest": {
@@ -38767,6 +38860,45 @@
           }
         },
         "summary": "Update Model Setup"
+      }
+    },
+    "/api/model-side-tasks": {
+      "put": {
+        "description": "Set one side task's ordered model chain (human gate-manager only).\n\nHermes Agent's auxiliary models. Choosing a side model grants nothing: each\ncall still goes through provider policy, gates, egress and keys like any\nturn. A vision chain may hold only models that accept images.",
+        "operationId": "set_side_task_models_api_model_side_tasks_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSideTaskModelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SideTaskModelsSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Side Task Models"
       }
     },
     "/api/models": {

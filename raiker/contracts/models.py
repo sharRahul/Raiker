@@ -273,6 +273,7 @@ EVENT_TYPES = {
     # Which of a provider's models the owner keeps offered in every picker. A
     # separate decision from selecting the default, and separately audited.
     "model_available_set_changed",
+    "model_side_task_set",
     "model_capabilities_inspected",
     "reasoning_setting_changed",
     "reasoning_setting_rejected",
@@ -571,6 +572,8 @@ EVENT_TYPES = {
     "action_failed",
     "attachment_image_included",
     "attachment_image_withheld",
+    "attachment_image_described",
+    "attachment_image_description_failed",
     "reminder_delivered",
     "reminder_paused",
     "reminder_cancelled",

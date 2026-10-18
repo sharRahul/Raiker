@@ -118,3 +118,18 @@ def test_where_a_slot_points_decides_which_gate_it_needs() -> None:
         ModelProviderFactory(connection={"endpoint": "http://192.168.1.20:8000/v1"}).resolve(profile)
     with pytest.raises(Exception, match="hosted"):
         ModelProviderFactory(connection={"endpoint": "https://gpu.example.com/v1"}).resolve(profile)
+
+
+def test_a_turn_names_a_shared_slot_by_profile_id_and_reaches_that_slot() -> None:
+    """Every OpenAI-compatible slot ships `<model>`, so a provider name alone
+    resolves to the first slot. A model chosen on the third must run there."""
+    registry = ModelProfileRegistry.load()
+    third = registry.resolve_profile_id(SLOTS[2])
+    token = registry.turn_token(third)
+    assert token == SLOTS[2]
+    resolved = registry.resolve(token, "gemma3:1b")
+    assert resolved.profile_id == SLOTS[2]
+    assert resolved.model == "gemma3:1b"
+    # A provider with one placeholder profile keeps being named by provider.
+    assert registry.turn_token(registry.resolve_profile_id("openai-hosted")) == "openai"
+    assert registry.resolve("openai", "gpt-x").profile_id == "openai-hosted"

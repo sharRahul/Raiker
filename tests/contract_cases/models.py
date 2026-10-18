@@ -372,6 +372,10 @@ CASES: Cases = {
     ("GET", "/api/models/weekly-usage"): plain("/api/models/weekly-usage"),
     ("PUT", "/api/models/{profile_id}/weekly-budget"): _budget,
     ("PUT", "/api/models/{profile_id}/routing"): _routing,
+    ("PUT", "/api/model-side-tasks"): plain(
+        "/api/model-side-tasks",
+        {"task": "summarise", "chain": [{"profile_id": "openai-hosted", "model": "gpt-4o-mini"}]},
+    ),
     ("GET", "/api/models/spend-limit"): plain("/api/models/spend-limit"),
     ("PUT", "/api/models/spend-limit"): plain("/api/models/spend-limit", {"limit_usd": 12.5}),
     ("GET", "/api/models/chatgpt-codex/status"): patched(plain("/api/models/chatgpt-codex/status"), _fake_codex),

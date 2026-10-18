@@ -160,7 +160,7 @@ class AgentGateway:
         # made through the web surface was judged against the first entry in the
         # shipped registry instead of the model about to run the turn.
         self.model_router.active_profile_id = profile.profile_id
-        return (profile.provider, effective_model)
+        return (self.model_registry.turn_token(profile), effective_model)
 
     def _resolve_profile_for_turn(
         self, profile_id: str, model: str | None = None
@@ -206,7 +206,7 @@ class AgentGateway:
             profile.provider, effective_model
         ):
             self.model_registry.register(profile_with_model(profile, effective_model))
-        return (profile.provider, effective_model)
+        return (self.model_registry.turn_token(profile), effective_model)
 
     def _configured_model(self, profile_id: str) -> str | None:
         """The owner's most recent pinned model for one profile, if any.

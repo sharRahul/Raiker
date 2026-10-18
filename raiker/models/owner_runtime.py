@@ -66,7 +66,7 @@ def owner_model_runtime(
             if selected_model and "<" not in selected_model:
                 if selected_model != profile.model:
                     registry.register(profile_with_model(profile, selected_model))
-                selected = (profile.provider, selected_model)
+                selected = (registry.turn_token(profile), selected_model)
         except RegistryError:
             pass
     return router, selected

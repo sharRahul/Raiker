@@ -49,6 +49,7 @@ from raiker.api.schemas import (
     SetSessionPinnedRequest,
     SetSessionProjectRequest,
     SetSessionTagsRequest,
+    SetSideTaskModelsRequest,
     SpendLimitRequest,
     TaskCreateRequest,
     TaskRunLimitRequest,
@@ -100,6 +101,7 @@ from raiker.api.wire.models import (
     PriceSet,
     PricingRefreshed,
     RoutingSet,
+    SideTaskModelsSet,
     SpendLimitView,
     WeeklyBudgetSet,
     WeeklyUsage,
@@ -3076,6 +3078,32 @@ async def set_model_routing(
     )
     saved: RoutingSet = {"ok": True, "data_collection": body.data_collection, "sort": body.sort}
     return serialize_dto(saved)
+
+
+@router.put("/api/model-side-tasks")
+async def set_side_task_models(
+    body: SetSideTaskModelsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set one side task's ordered model chain (human gate-manager only).
+
+    Hermes Agent's auxiliary models. Choosing a side model grants nothing: each
+    call still goes through provider policy, gates, egress and keys like any
+    turn. A vision chain may hold only models that accept images.
+    """
+    session, _principal = auth_data
+    result = _service(request).set_side_task_chain(
+        body.task, [(entry.profile_id, entry.model) for entry in body.chain], session.principal_id
+    )
+    if not result.ok:
+        code = result.reason_code or "side_task_refused"
+        raise refusal(
+            status.HTTP_400_BAD_REQUEST if code.startswith("side_task") else status.HTTP_403_FORBIDDEN,
+            code,
+        )
+    answer: SideTaskModelsSet = {"ok": True, "task": result.data["task"], "chain": result.data["chain"]}
+    return serialize_dto(answer)
 
 
 @router.put("/api/model-advisor")

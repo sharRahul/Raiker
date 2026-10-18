@@ -466,6 +466,7 @@ class ModelService:
                 else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
             ),
             advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
+            side_tasks=self._side_tasks(acting_principal_id),
             **self._advisor_readiness_fields(readiness_service, acting_principal_id),
         )
 
@@ -1653,6 +1654,38 @@ class ModelService:
         await self._check_local_selection(principal.principal_id, profile, resolved_model)
         return ControlResult(
             ok=True, data={"profile_id": profile.profile_id, "model": resolved_model}
+        )
+
+    def _side_tasks(self: DashboardService, principal_id: str | None) -> dict[str, list[dict[str, str]]]:
+        from raiker.models import side_tasks
+
+        if not principal_id:
+            return {task: [] for task in side_tasks.TASKS}
+        return {
+            task: [{"profile_id": profile_id, "model": model} for profile_id, model in chain]
+            for task, chain in side_tasks.load(self.store, principal_id).items()
+        }
+
+    def set_side_task_chain(
+        self: DashboardService, task: str, chain: list[tuple[str, str]], acting_principal_id: str | None
+    ) -> ControlResult:
+        """Store one side task's model chain (human gate-manager only, like the advisor)."""
+        from raiker.models import side_tasks
+
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        try:
+            stored = side_tasks.save(self.store, principal.principal_id, task, chain)
+        except side_tasks.SideTaskError as exc:
+            return ControlResult(ok=False, reason_code=str(exc))
+        self._append_model_event(
+            "model_side_task_set", {"task": task, "count": len(stored)}
+        )
+        return ControlResult(
+            ok=True, data={"task": task, "chain": [{"profile_id": p, "model": m} for p, m in stored]}
         )
 
     async def _check_local_selection(

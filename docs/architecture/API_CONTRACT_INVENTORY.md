@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**407 operations: 394 verified, 0 eligible, 0 deferred, 13 special.**
+**408 operations: 395 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -278,6 +278,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/model-selection` | SetModelSelectionRequest | ModelSelectionSet | verified | declared ModelSelectionSet |
 | GET | `/api/model-setup` |  | ModelSetupState | verified | SQLiteStore.load_model_setup_state |
 | PUT | `/api/model-setup` | ModelSetupUpdateRequest | ModelSetupState | verified | SQLiteStore.save_model_setup_state |
+| PUT | `/api/model-side-tasks` | SetSideTaskModelsRequest | SideTaskModelsSet | verified | declared SideTaskModelsSet |
 | GET | `/api/models` |  | ModelsView | verified | DashboardService.get_models |
 | GET | `/api/models/capacities` |  | ModelCapacities | verified | declared by cast |
 | POST | `/api/models/capacities/refresh` |  | CapacitiesRefreshed | verified | declared by cast |

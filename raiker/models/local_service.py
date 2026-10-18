@@ -90,6 +90,11 @@ class ServiceLiveness:
         """:data:`ON_DEVICE`, a remote host, or ``None`` for a model not served."""
         return dict(self.locations).get(model)
 
+    def has_capability(self, model: str, capability: str) -> bool:
+        """True only when the service published ``capability`` for ``model``."""
+        declared = dict(self.capabilities).get(model)
+        return declared is not None and capability in declared
+
     def declines_tools(self, model: str) -> bool:
         """True only when the service listed ``model`` without the ``tools`` capability.
 

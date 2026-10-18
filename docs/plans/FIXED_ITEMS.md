@@ -959,6 +959,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-935](#fixed-935--raiker-had-one-custom-endpoint-and-hermes-agent-has-named-ones) | Medium | Models / custom endpoints | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-936](#fixed-936--a-tool-less-model-behind-a-custom-endpoint-failed-every-turn) | High | Models / turns / custom endpoints | Fixed 2026-10-18 — found in the FIXED-935 round |
 | [FIXED-937](#fixed-937--one-rate-limited-or-spent-key-ended-the-turn) | Medium | Models / credentials / resilience | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-938](#fixed-938--side-work-had-to-use-the-turns-own-model) | Medium | Models / side tasks | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-939](#fixed-939--a-model-chosen-on-a-second-custom-endpoint-would-run-on-the-first) | High | Models / custom endpoints / routing | Fixed 2026-10-18 — found building FIXED-938 |
+| [FIXED-940](#fixed-940--images-sent-to-an-ollama-vision-model-were-dropped) | Medium | Models / Ollama / vision | Fixed 2026-10-18 — found building FIXED-938 |
 
 ---
 
@@ -33614,4 +33617,38 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** A connection may hold up to three backup keys (`api_key_2`…`api_key_4`), entered under **Advanced** in the connect dialog; backups alone join a saved connection, re-pasting the main key keeps them, `[]` clears them. `raiker/models/credential_pool.py` orders the keys for each request — rested first, benched last — and the router moves a request refused with a rate limit or an empty quota to the next key in the same turn (streamed or not, only before anything streamed), benching the refused key for 60 s or 1 h. Authentication failures are never rotated past. The card shows how many backups are saved and, while a key rests, which key is in use and why. Keys are named only by position; no view, event or sentence carries a value.
 
 **Evidence.** `tests/test_credential_pool.py` (9). A real 429 or empty balance cannot be produced on demand from this host, so the rotation is proven against fake providers raising the classified errors the transport produces.
+
+---
+
+## FIXED-938 — Side work had to use the turn's own model
+
+**Severity: Medium. Area: Models / side tasks. Status: Fixed 2026-10-18 — Hermes Agent parity (`auxiliary.<task>`).**
+
+**Fixed.** `raiker/models/side_tasks.py` keeps, per owner, an ordered chain of up to three models for **summarise** and **vision** (`PUT /api/model-side-tasks`, gate-manager only; the models view returns `side_tasks`). Compaction tries the summarising chain and then the turn's own model, recording which model wrote the summary. When the turn's model cannot see an attached image, the vision chain describes it and the description joins the prompt as text, marked as a description and as untrusted content, with `attachment_image_described` naming the model (`attachment_image_description_failed` per failure); with no chain the image is withheld as before. A vision chain refuses a model that does not accept images. **Runtime & routing → Side-task models** edits both.
+
+**Evidence.** `tests/test_side_task_models.py` (6), `SideTaskModels.test.ts` (2). Live: `gemma3:1b` (no vision) was asked what an attached image says; the vision chain (`gemma4:31b-cloud` through Ollama) described it and `gemma3:1b` answered *BLUE 42*, the text drawn in the image (`docs/screenshots/2026-10-18-hermes-providers/08`–`09`).
+
+---
+
+## FIXED-939 — A model chosen on a second custom endpoint would run on the first
+
+**Severity: High. Area: Models / custom endpoints / routing. Status: Fixed 2026-10-18 — found building FIXED-938, a defect in FIXED-935.**
+
+**Root cause.** A turn names its model as `(provider, model)`. All four OpenAI-compatible slots share the provider and ship `<model>`, so a lookup by provider alone landed on the first slot — its endpoint and key — whenever no slot-specific copy happened to be registered first (two slots serving the same model name, or any path that resolves without registering).
+
+**Fixed.** `ModelProfileRegistry.turn_token` names a profile by its id when its provider is shared by several placeholder profiles, and `resolve` accepts a profile id in the provider position; the gateway and the owner runtime use it.
+
+**Evidence.** `tests/test_named_custom_endpoints.py` ("a turn names a shared slot by profile id and reaches that slot"); gateway, orchestrator, registry, selection and fallback suites pass.
+
+---
+
+## FIXED-940 — Images sent to an Ollama vision model were dropped
+
+**Severity: Medium. Area: Models / Ollama / vision. Status: Fixed 2026-10-18 — found building FIXED-938.**
+
+**Root cause.** The Ollama profile cannot declare vision for every model it may serve, so the provider dropped every image, including for models Ollama lists with `vision` (`gemma4:31b-cloud`), and the turn reported them withheld.
+
+**Fixed.** The liveness probe's per-model capabilities decide it: a model Ollama lists with `vision` accepts images, both in the router's check and in the capabilities the provider is built with.
+
+**Evidence.** The FIXED-938 live round: the vision side model received and read the image.
 

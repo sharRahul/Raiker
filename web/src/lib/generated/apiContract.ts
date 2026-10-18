@@ -3623,6 +3623,7 @@ export type ModelsView = {
   current_model: string | null;
   advisor_profile_id: string | null;
   advisor_model_gate_state: string;
+  side_tasks: Record<string, Record<string, string>[]>;
   advisor_model: string | null;
   advisor_readiness_state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
   advisor_readiness_summary: string | null;
@@ -4731,6 +4732,12 @@ export type SetSessionTagsRequest = {
   tags: string[];
 };
 
+/** One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it. */
+export type SetSideTaskModelsRequest = {
+  task: "summarise" | "vision";
+  chain?: SideTaskModelEntry[];
+};
+
 export type SetSkillActiveRequest = {
   active: boolean;
 };
@@ -4839,6 +4846,18 @@ export type SetupVerification = {
   checks: SetupCheck[];
   failed: string[];
   ok: boolean;
+};
+
+export type SideTaskModelEntry = {
+  profile_id: string;
+  model: string;
+};
+
+/** One side task's model chain as stored. */
+export type SideTaskModelsSet = {
+  ok: boolean;
+  task: string;
+  chain: Record<string, string>[];
 };
 
 export type SignInRequest = {
@@ -6099,6 +6118,8 @@ export const contract = {
     request<ModelSetupState>("/api/model-setup"),
   updateModelSetup: (body: ModelSetupUpdateRequest) =>
     call<ModelSetupState>("PUT", "/api/model-setup", { body }),
+  setSideTaskModels: (body: SetSideTaskModelsRequest) =>
+    call<SideTaskModelsSet>("PUT", "/api/model-side-tasks", { body }),
   getModels: () =>
     request<ModelsView>("/api/models"),
   getModelCapacities: () =>

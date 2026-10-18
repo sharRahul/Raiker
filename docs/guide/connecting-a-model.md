@@ -576,6 +576,24 @@ reason the earlier one gave.
 
 ---
 
+## Side-task models
+
+**Runtime & routing → Side-task models** gives two kinds of side work their own
+model, each an ordered list of up to three you have set up:
+
+- **Summarising** compacts a long conversation. A cheaper or faster model is
+  often the better choice. Raiker tries the list in order and then the turn's own
+  model, so a long conversation can always be compacted.
+- **Vision** describes an attached image when the model answering cannot see.
+  Only models that accept images can be added — for Ollama, that is decided per
+  model from Ollama's own list (for example *Gemma 4:31B Cloud*). The
+  description reaches the turn as text, marked as a description and as untrusted
+  content, and the turn's **Evidence** records which model described it. With no
+  vision model the image is not sent, as before.
+
+Choosing a side model grants nothing: every call still goes through the same
+gates, keys and egress rules as a turn.
+
 ## Advisor model
 
 Under the same **Advanced routing** disclosure: when you run a local model, it

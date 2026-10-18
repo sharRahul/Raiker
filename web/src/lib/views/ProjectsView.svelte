@@ -94,6 +94,7 @@
   // BR-D01 — the project's checks, one command per line, and as they were read.
   let checksText = $state("");
   let checksBaseline = $state("");
+  const CHECKS_PLACEHOLDER = ["pytest -q", "npm test"].join("\n");
   const contextDirty = $derived(
     detail !== null &&
       ((detail.context.instructions ?? "") !== contextBaseline || checksText !== checksBaseline),
@@ -894,7 +895,7 @@
         </label>
         <label class="context-field">
           <span>Checks</span>
-          <textarea class="input context-input checks-input" aria-label="Project checks" bind:value={checksText} placeholder={"pytest -q\nnpm test"}></textarea>
+          <textarea class="input context-input checks-input" aria-label="Project checks" bind:value={checksText} placeholder={CHECKS_PLACEHOLDER}></textarea>
           <span class="sub">One command per line, at most ten. A Build change is marked <strong>Verified</strong> only when each of these ran exactly as written after the last change and passed.</span>
         </label>
         <label class="context-field">Project memory

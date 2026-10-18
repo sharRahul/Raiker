@@ -965,6 +965,9 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-941](#fixed-941--nothing-said-whether-a-self-hosted-server-could-call-tools) | Medium | Models / local servers | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-942](#fixed-942--the-context-window-override-was-two-browser-prompts-and-did-not-show-once-saved) | Low | Models / context | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-943](#fixed-943--competitive-evidence-is-attached-to-the-existing-execution-ollama-hooks-plugins-and-mcp-defects) | Low | Competitive evidence / regression coverage | Closed 2026-10-18 — BUG-194, BUG-318, BUG-226, BUG-228 and BUG-234 |
+| [FIXED-944](#fixed-944--all-four-providers-answer-the-owner-identity-question-with-the-chosen-name) | Low | Live evidence / providers | Closed 2026-10-18 — was BUG-290 |
+| [FIXED-945](#fixed-945--design-offered-image-models-from-unconnected-providers) | Medium | Design / Models | Fixed 2026-10-18 — found testing BUG-287 |
+| [FIXED-946](#fixed-946--the-live-sign-in-helper-rejected-the-current-welcome-heading) | Low | Live test harness | Fixed 2026-10-18 — found testing BUG-290 |
 
 ---
 
@@ -22935,10 +22938,11 @@ when truncated, the scope chip named and unnamed, the asset selecting — read o
 the composer, which says `Enter edits` when an asset is selected and
 `Enter generates` when none is — and an unknown asset selecting nothing.
 
-**What the live round could not do.** The live case skips with its reason: this
-host reaches no image provider, so the workspace holds no picture filed to a
-project to open. The same limit as
-[BUG-290](TO_BE_FIXED.md#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host).
+**What the original live round could not do.** That live case skipped with its
+reason because the host then reached no image provider, so the workspace held
+no picture filed to a project to open. Provider reachability was later closed
+by [FIXED-944](#fixed-944--all-four-providers-answer-the-owner-identity-question-with-the-chosen-name),
+and BUG-287's 2026-10-18 evidence now includes real generated assets on Design.
 
 ---
 
@@ -33738,4 +33742,66 @@ run passed **1/1**, and the post-Raiker-restart browser check received a second
 non-refusal answer from the remembered `Gemma 3:1B` selection. Existing live
 captures remain linked by FIXED-921, FIXED-925 and FIXED-926; this verification
 did not overwrite them.
+
+---
+
+## FIXED-944 — All four providers answer the owner identity question with the chosen name
+
+**Severity: Low. Area: Live evidence / providers. Status: Closed 2026-10-18 — was BUG-290.**
+
+**Observed before the fix.** The original provider round could reach only
+Anthropic. OpenAI and OpenRouter were stopped by the host's egress environment,
+and Ollama was not installed, so the identity contract was real-provider evidence
+for only one of the four requested routes.
+
+**Verified.** The owner entered each hosted-provider key through Raiker's Models
+UI. Anthropic Haiku 4.5, OpenAI GPT-4o Mini and OpenRouter GPT-4o Mini each
+answered the same owner-name question with **Rahul S**, not an internal
+`principal_user_…` identifier. The existing live Ollama scenario asked the same
+question through `gpt-oss:20b-cloud` and also received the chosen name. Browser
+captures for all four answers were reviewed; the Ollama capture remains at
+`docs/screenshots/2026-09-13-release-readiness/identity-answered-by-name-ollama.png`.
+
+**Harness evidence.** `owner-identity-live.spec.ts` keeps the real-turn contract,
+including the assertion that the response contains the chosen name and excludes
+the internal principal identifier. Its chosen-name setup scenario passed live in
+this round after FIXED-946.
+
+---
+
+## FIXED-945 — Design offered image models from unconnected providers
+
+**Severity: Medium. Area: Design / Models. Status: Fixed 2026-10-18 — found testing BUG-287.**
+
+**Observed.** With OpenAI connected and Gemini unconnected, Design's image-model
+picker offered both providers. Choosing the unconnected profile could only lead
+to a missing-credential refusal, despite the page already having enough model
+readiness state to avoid presenting it.
+
+**Fixed.** Design now applies the shared `isReachableProfile` rule before it
+builds the image-model choices. The picker therefore contains image-capable
+profiles only when their local runtime or hosted connection is reachable.
+
+**Evidence.** `DesignView.test.ts` first reproduced the extra Gemini choice, then
+passed with only connected OpenAI offered (**22/22** focused tests). A rebuilt
+live page was inspected and its picker offered only OpenAI. The production web
+build also completed.
+
+---
+
+## FIXED-946 — The live sign-in helper rejected the current Welcome heading
+
+**Severity: Low. Area: Live test harness. Status: Fixed 2026-10-18 — found testing BUG-290.**
+
+**Observed.** `signInAsOwner` accepted **Welcome back** and **Welcome to your Work
+Dashboard**, but the current signed-in home renders the exact heading **Welcome**.
+The shared helper therefore timed out after a successful sign-in before a
+provider scenario could begin.
+
+**Fixed.** The landing-heading expression accepts all three supported forms while
+remaining anchored to the complete accessible name. Navigation is still the
+final session proof, so this does not turn an unrelated heading into a pass.
+
+**Evidence.** The focused Playwright live scenario *the owner's chosen name is
+set through the Account page* passed **1/1** against the running Raiker server.
 

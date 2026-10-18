@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
 import {
+  checkModelReady,
   chooseModelForTurn,
   connectHostedProvider,
   hostedProviderCard,
   openHostedProviders,
-  pressCardAction,
   signInAsOwner,
   useHostedModel,
 } from "./hosted-provider";
@@ -31,8 +31,7 @@ import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./li
  *   1. `raiker-web` on 127.0.0.1:8765
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  *   3. Optionally `RAIKER_LIVE_OPENAI_KEY`, `RAIKER_LIVE_OPENROUTER_KEY` —
- *      entered through the UI too, and asserted to fail *honestly* on a host
- *      whose egress policy refuses them (BUG-290).
+ *      entered through the UI too, with their real readiness result asserted.
  */
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "screenshots", "2026-09-21-static-review-round");
 const OPENAI_KEY = process.env.RAIKER_LIVE_OPENAI_KEY ?? "";
@@ -195,55 +194,27 @@ test("UX-BUILD-05: Build opens the project it is running inside", async ({ page 
 });
 
 /**
- * BUG-290 — the three providers this host cannot reach, entered through the UI.
+ * FIXED-944 — optional providers are entered through the UI and checked live.
  *
- * The egress policy on this machine answers 403 to `CONNECT` for OpenAI,
- * OpenRouter and Ollama Cloud. That is the environment rather than the code,
- * and what the product owes an owner is a remedy they can act on rather than a
- * sentence about a local runtime (FIXED-526, FIXED-590). The key is saved
- * through the UI exactly as the round asks; what is asserted is the honesty of
- * the answer.
+ * The host that originated BUG-290 can now reach OpenAI and OpenRouter. Keep
+ * this historical round useful by asserting the current readiness contract,
+ * not the obsolete expectation that a successful connection must be absent.
  */
 for (const [provider, keyLabel, key] of [
   ["openai", "API key", OPENAI_KEY],
   ["openrouter", "API key", OPENROUTER_KEY],
 ] as const) {
-  test(`BUG-290: ${provider} is connected through the UI and answers honestly`, async ({ page }) => {
+  test(`FIXED-944: ${provider} is connected through the UI and becomes ready`, async ({ page }) => {
     test.skip(key === "", `No key supplied for ${provider} in this round.`);
     await signInAsOwner(page, BASE);
     await connectHostedProvider(page, BASE, provider, keyLabel, key);
 
     const card = await hostedProviderCard(page, BASE, provider);
-    await pressCardAction(page, card, /^Test( connection)?$/);
-    // Whatever it says, it must not be a blank card or a claim that it worked.
-    await expect(card).not.toContainText("Connection verified", { timeout: 120_000 });
-    await capture(page, join(SHOTS, `07-${provider}-unreachable.png`));
+    await checkModelReady(page, card);
+    await expect(card.getByText(/can reach/i).first()).toBeVisible({ timeout: 120_000 });
+    await capture(page, join(SHOTS, `07-${provider}-ready.png`));
   });
 }
-
-/**
- * The fourth provider of the round: an Ollama Cloud model.
- *
- * `ollama.com` is refused by this host's egress policy in the same way, and
- * there is no local Ollama either, so what this proves is
- * [FIXED-590]'s half — a turn that fails names the refusal the runtime named
- * rather than telling the owner to check a local runtime that was never the
- * subject.
- */
-test("BUG-285/BUG-290: an Ollama Cloud model is chosen, and says what stopped it", async ({ page }) => {
-  await signInAsOwner(page, BASE);
-  // The local endpoints live beside the hosted providers on the Add tab.
-  await openHostedProviders(page, BASE);
-  await expect(page.getByRole("heading", { name: "On this device" })).toBeVisible({
-    timeout: 60_000,
-  });
-  const ollama = page.locator(".local-row").filter({ hasText: "Ollama" }).first();
-  await expect(ollama).toBeVisible({ timeout: 60_000 });
-  // The shipped profile already names a cloud model, which is the state a host
-  // with no Ollama is in; the row must say so rather than look configured.
-  await expect(ollama).toContainText(/Ollama/);
-  await capture(page, join(SHOTS, "07-ollama-cloud-unreachable.png"));
-});
 
 /** The catalogue, after the round, so the page inventory stays current. */
 test("the workbench is whole at the end of the round", async ({ page }) => {

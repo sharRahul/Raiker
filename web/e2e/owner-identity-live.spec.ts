@@ -13,7 +13,7 @@
  * the display name is set on the Account page. Nothing is written behind the
  * page's back.
  *
- * Providers this host cannot reach are skipped with the reason rather than
+ * Providers without a supplied key are skipped with the reason rather than
  * faked — a suite that cannot really pass must not report that it did.
  */
 import { expect, test } from "@playwright/test";
@@ -22,7 +22,7 @@ import {
   checkModelReady,
   connectHostedProvider,
   signInAsOwner,
-  } from "./hosted-provider";
+} from "./hosted-provider";
 import { ANTHROPIC_KEY as KEY, ANTHROPIC_MODEL as MODEL, useAnthropic } from "./live";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8768";
@@ -138,7 +138,7 @@ for (const provider of [
 }
 
 /*
- * BUG-290 — the fourth provider: a model served by the local Ollama.
+ * FIXED-944 — the fourth provider: a model served by the local Ollama.
  *
  * Needs no key. The workspace must already have the Ollama model chosen (the
  * BUG-340 first-run round chooses `gpt-oss:20b-cloud`); the turn runs on

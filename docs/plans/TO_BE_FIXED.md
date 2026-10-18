@@ -79,9 +79,8 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced again 2026-09-04; `prompt` closed as FIXED-303 and `http` as [FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two), while `mcp_tool` and `agent` stay refused with their reasons |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven need a provider this host cannot reach ([BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host)) |
-| [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — **no longer an egress limit**: on 2026-10-18 this host reached `api.openai.com`; the round waits on the owner entering an image-capable key through Models |
-| [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open remainder — reduced 2026-10-18: Ollama answered by name; all four providers are reachable now, and OpenAI and OpenRouter wait on the owner entering their keys through Models |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
+| [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs printed a crash dump; 37 later runs (15 under `-X faulthandler` on 2026-10-18) are clean |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
 | [BUG-345](#bug-345--local-only-is-recorded-and-enforced-nowhere) | Medium | Setup / privacy / model routing | Open — found 2026-10-18 closing BUG-340; **needs an owner decision** on what *Local only* enforces |
@@ -488,7 +487,16 @@ of is still named by its own key rather than dropped for not being on a list.
 reduced from twenty-seven to twenty the same day
 ([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)),
 to **twelve** on 2026-09-04, to eleven on 2026-09-21 and to **nine** on
-2026-09-28.**
+2026-09-28, then recounted as **ten** on 2026-09-29 under the stricter
+test-body definition below.**
+
+**2026-10-18 — provider access is no longer the reason to defer the seven.**
+OpenAI, OpenRouter, Anthropic and Ollama each completed a real turn from this
+host while closing [FIXED-944](FIXED_ITEMS.md#fixed-944--all-four-providers-answer-the-owner-identity-question-with-the-chosen-name).
+The seven provider scenarios are still converted only one at a time and re-run,
+as this entry requires. The same round also found that `signInAsOwner` rejected
+the current exact **Welcome** heading; [FIXED-946](FIXED_ITEMS.md#fixed-946--the-live-sign-in-helper-rejected-the-current-welcome-heading)
+repairs that shared precondition without changing the inline-sign-in count.
 
 **2026-09-29 — four more, and two product defects behind them.**
 `composer-parity-and-turn-honesty-live`, `fts5-mem03-bug194-live`,
@@ -521,9 +529,10 @@ this pass: `review-first-run-honesty`, `wizard-workbench-composer` and
 `workbench` must keep their own, and `add-01-container-providers`,
 `add-03-machine-identity-providers`, `bug-29-34`, `bug-36-38-42-43`,
 `bug-69-model-readiness`, `governed-shell-provider-matrix` and
-`review-provider-matrix` each need OpenRouter, OpenAI, Gemini or Ollama, which
-this host cannot reach — so they cannot be re-run here, and the rule below says
-they are not converted blind.
+`review-provider-matrix` each need OpenRouter, OpenAI, Gemini or Ollama. Those
+providers are now reachable here except for Gemini, so these scenarios can be
+converted and re-run in later one-spec passes; the rule below still says they
+are not converted blind.
 
 **2026-09-28 — two more, and the one reverted on 2026-09-04 among them.**
 `review-readiness-probe-live` and `c17-b14-recall-and-inline-diff-live`, run
@@ -582,8 +591,8 @@ described: several still key on the empty-workspace greeting.
 `all-pages-theme`, `observability`, `default-ollama`, `memory-knowledge-context`,
 `memory-semantic` and `memory-vector-index`. That found three pieces of drift
 nothing else would have, including a spec still driving a Vite dev server on port
-5174; they are recorded in FIXED-328. **Nine are left** after the 2026-09-28 pass, and the reason they
-are left is unchanged.
+5174; they are recorded in FIXED-328. **Ten are left** after the 2026-09-29
+recount, and the reason they are left is unchanged.
 
 **Why they were left.** They vary in a way the function-shaped ones did not —
 different bases, different landing routes, some navigating to the route under
@@ -626,11 +635,12 @@ how the evidence behind its FIXED entry is refreshed rather than invalidated.
 closing [BUG-277](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network),
 2026-09-13.**
 
-**Observed.** The lineage runtime and the canvas were built and verified, but
-no picture has been generated or edited through a real provider from this host.
-The egress policy answers 403 to `CONNECT api.openai.com`, and a live generate
-run through the product's own composer refuses with `fetch_failed:URLError`,
-which is the environment rather than the code.
+**Observed.** Before 2026-10-18 the lineage runtime and canvas were verified only
+with controlled transports because the host refused provider egress. That limit
+is gone. A real OpenAI `gpt-image-1` round generated a cobalt-blue mug, edited it
+to an emerald-green mug with a gold rim, and returned all four requested
+variations. The canvas showed six assets, two versions for the edited chain,
+**Edited from** lineage and the four assets under **From the same request**.
 
 **What *was* exercised against the running server.** The governed route, the
 owner-scoped subject resolution, the count bound and its zero case, lineage
@@ -640,60 +650,29 @@ The multipart wire format is proven against a real socket — a live HTTP server
 parses the body with Python's own MIME parser and the image comes back byte for
 byte (`tests/test_multipart_egress.py`).
 
-**What is not known.** What OpenAI's `/v1/images/edits` and Gemini's inline-data
-edit actually return: the response shape on success, how a provider refusal reads
-when the *source* image is the thing refused rather than the prompt, and whether
-a request for four pictures comes back as four images or as one with a count the
-decoder has to split. `_decode_images` handles the shapes the providers document;
-none of them has been seen.
+**What is not known.** The real-provider shape is now known for OpenAI generation,
+edit and four-result variation. Two contracts remain unverified: how a provider
+refusal reads when the *source image itself* is refused, and whether a consented
+research reference reaches the real provider and appears in the inspector's
+**Sent with** list. Design currently edits generated assets; it does not expose
+an arbitrary source-image upload that could honestly manufacture the first case.
 
-**Proposed fix.** One live round against a reachable image provider. Gemini is
-the cheaper route — `generativelanguage.googleapis.com` is reachable from this
-host, so a Gemini API key alone would close it — covering generate, edit,
-variations and a provider refusal of a source image, with the lineage read back
-through `GET /api/images`.
+**Proposed fix.** Add or identify the governed source-image path and exercise a
+real provider refusal against it. Separately, create one consented research
+reference with a reachable search provider, send it with a real image request,
+and read it back under **Sent with**. Keep both as evidence tasks: the successful
+real OpenAI round must not be repeated merely to prove already-observed shapes.
 
-**2026-10-18 — reachable now.** This host reaches `api.openai.com` (HTTP 401 without a key, not a refused tunnel). The live round is unblocked on egress and waits only on an image-capable key entered by the owner through Models; a key pasted into chat is not entered on the owner's behalf.
+**2026-10-18 — real-provider evidence.** The owner entered the image-capable key
+through Models. With **Image generation** off, Design disabled **Generate** and
+named the gate. With it on and no allowed provider host, the attempt became a
+recorded refusal naming the empty allowlist. After `api.openai.com` was allowed,
+generation, edit, lineage and four variations completed and were inspected in
+the running UI. The same pass fixed [FIXED-945](FIXED_ITEMS.md#fixed-945--design-offered-image-models-from-unconnected-providers),
+found because the picker also offered an unconnected Gemini profile.
 
-**Interface outcome that has to be true before this closes.** A picture generated
-through a real provider, edited into a second version, and both shown on the
-canvas as the chain they are — with the captures to prove it.
-
----
-
-## BUG-290 — Three of the four providers this round was given keys for cannot be reached from this host
-
-**Severity: Low. Area: Live evidence / providers. Raised 2026-09-13. The same
-limit as [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more),
-reconfirmed with three fresh keys.**
-
-**Observed.** The 2026-09-13 release-readiness round was given working keys for
-Anthropic, OpenAI and OpenRouter, and asked to use a local Ollama cloud model as
-a fourth. Only Anthropic answered:
-
-| Provider | Outcome on this host |
-|---|---|
-| Anthropic | **Real round trip.** Connected, Haiku 4.5 pinned, readiness confirmed, and a real turn answered — the evidence behind [FIXED-501](FIXED_ITEMS.md#fixed-501--raiker-knew-its-owners-authorisation-key-and-not-their-name). |
-| OpenAI | `connect_rejected` — the egress proxy denies `CONNECT api.openai.com`. |
-| OpenRouter | `connect_rejected` — the egress proxy denies `CONNECT openrouter.ai`. |
-| Ollama (cloud model) | No Ollama on this machine, and no way to install one from here. |
-
-**What was proven anyway.** Raiker's half, for all three. Each key was entered
-through the product's own dialog, each connection was stored, and each readiness
-check reported its own outcome as a sentence rather than as a bare status or a
-wrong diagnosis — which is [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)'s
-rule holding under three more keys. `web/e2e/owner-identity-live.spec.ts` runs all
-three and skips with the reason when a key is absent.
-
-**What is still unverified.** A real turn through OpenAI, OpenRouter or a local
-Ollama cloud model, and therefore the identity block, the citation ledger and the
-tool loop against any provider but Anthropic.
-
-**2026-10-18 — reduced.** Egress is no longer the limit: `api.openai.com`, `openrouter.ai` and `api.anthropic.com` all answer from this host. The Ollama leg is done — `owner-identity-live.spec.ts` *a real turn through Ollama answers with the owner's name* asked `gpt-oss:20b-cloud` and got *"The owner of this workspace is Rahul S."* (`identity-answered-by-name-ollama.png`). OpenAI and OpenRouter remain, and wait on the owner entering their keys through Models; the existing specs then run unchanged.
-
-**Interface outcome that has to be true before this closes.** The same question
-the owner reported — *who is the owner of this workspace* — asked and answered
-through each of the four providers, with a capture of each answer.
+**Interface outcome that has to be true before this closes.** The two remaining
+contracts above are observed through a real provider and shown in the inspector.
 
 ---
 

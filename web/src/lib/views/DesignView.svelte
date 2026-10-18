@@ -46,6 +46,7 @@
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { setWorkProject, workProject } from "../workProject.svelte";
   import { imageCandidates, modelName } from "../modelPresentation";
+  import { isReachableProfile } from "../modelReadiness.svelte";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import type {
     CapabilityGate,
@@ -198,7 +199,7 @@
    * only if it declares a model that draws.
    */
   const imageChoices = $derived(
-    (models?.profiles ?? []).flatMap((profile) =>
+    (models?.profiles ?? []).filter(isReachableProfile).flatMap((profile) =>
       imageCandidates(profile.image_models ?? []).map((model) => ({
         key: `${profile.profile_id}::${model}`,
         profileId: profile.profile_id,

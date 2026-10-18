@@ -225,6 +225,41 @@ describe("the size control says what it decides", () => {
   });
 });
 
+describe("the image model picker names only reachable providers", () => {
+  it("does not offer an unconnected hosted provider", async () => {
+    stubFetch(
+      routes({
+        "GET /api/models": {
+          profiles: [
+            {
+              profile_id: "openai-hosted",
+              provider: "openai",
+              model: "gpt-4o-mini",
+              off_machine: true,
+              connection_configured: true,
+              image_models: ["gpt-image-1"],
+            },
+            {
+              profile_id: "gemini-hosted",
+              provider: "gemini",
+              model: "gemini-2.5-flash",
+              off_machine: true,
+              connection_configured: false,
+              image_models: ["gemini-2.5-flash-image"],
+            },
+          ],
+          selected_profile_id: "openai-hosted",
+        },
+      }),
+    );
+    render(DesignView);
+
+    const picker = await screen.findByLabelText("Image model");
+    expect(picker).toHaveTextContent("OpenAI · GPT Image 1");
+    expect(picker).not.toHaveTextContent("Gemini");
+  });
+});
+
 /**
  * BUG-281 — Design's research findings are text, *and* sources.
  *

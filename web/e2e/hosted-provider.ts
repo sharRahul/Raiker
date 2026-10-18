@@ -635,7 +635,7 @@ export async function signInAsOwner(
     await page.getByRole("button", { name: /unlock|sign in/i }).click();
   }
   const workbench = page.getByRole("heading", {
-    name: /Welcome (back|to your Work Dashboard)/,
+    name: /^Welcome(?: back| to your Work Dashboard)?$/,
   });
   // The wizard is identified by its own heading rather than by a button on one
   // of its stages: a workspace that left setup part-way resumes on the

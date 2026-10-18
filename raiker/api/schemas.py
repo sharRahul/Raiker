@@ -460,6 +460,10 @@ class ModelConnectionRequest(StrictRequest):
     # Hermes Agent's named custom endpoints: the owner's own name for a custom
     # OpenAI-compatible endpoint ("Home GPU", "Work vLLM"). Display text only.
     label: str | None = Field(default=None, max_length=40)
+    # Hermes Agent's credential pools: up to three backup keys tried in order
+    # when the primary is rate limited or out of quota. ``None`` keeps what is
+    # stored; ``[]`` clears them.
+    backup_api_keys: list[str] | None = Field(default=None, max_length=3)
 
 
 class ModelRoutingRequest(StrictRequest):

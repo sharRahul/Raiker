@@ -184,7 +184,7 @@ vault and governed gates. What each has:
 | Local: Ollama, LM Studio, llama.cpp, vLLM, SGLang, custom | Ollama (detected over loopback, per-model location and capabilities), LM Studio, managed llama.cpp and MLX slots, one OpenAI-compatible endpoint | Shipped; Raiker manages llama.cpp/MLX itself, which Hermes does not |
 | Named custom endpoints (`providers:` with `extra_headers`, `extra_body`, `key_cmd`) | Four `generic-openai-compatible` slots, each named by the owner, with its own endpoint, key, catalogue and readiness | Shipped 2026-10-18 (FIXED-935); `extra_headers`/`extra_body`/`key_cmd` not exposed |
 | `fallback_providers`, turn-scoped, auth/404 immediate, 429/5xx after retries | Owner fallback sequence, turn-scoped, one transport retry, capability breaker | Shipped; reset-aware benching across turns is a gap |
-| Credential pools (same-provider key rotation) | One credential per provider | Gap |
+| Credential pools (same-provider key rotation) | Up to three backup keys per connection; 429 benches a key 60 s and an empty quota 1 h, and the request moves to the next key in the same turn | Shipped 2026-10-18 (FIXED-937); bench state is per process |
 | Auxiliary per-task models (vision, compression, web) with their own fallback | Advisor model; compaction and vision use the turn's model | Gap |
 | Context-length chain (pin → provider → cache → `/models` → … → 128K) | Configured and provider-published facts; Unknown when neither states it | Partial — no pin, no local-server probe |
 | OpenRouter `provider_routing` (`sort`, `only`, `ignore`, `data_collection`) | `data_collection: deny` and `sort`, set on the OpenRouter card, saved with the connection | Shipped 2026-10-18 (FIXED-934); `only`/`ignore`/`order` not exposed |

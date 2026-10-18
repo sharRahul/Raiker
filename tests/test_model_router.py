@@ -120,7 +120,7 @@ def test_an_endpoint_that_refuses_tools_is_asked_again_without_them(
 
     router_module._TOOLLESS_MODELS.clear()
     router = ModelRouter(ModelProfileRegistry.load())
-    monkeypatch.setattr(router, "_factory", lambda _profile: _Factory())
+    monkeypatch.setattr(router, "_factory", lambda _profile, _connection=None: _Factory())
     monkeypatch.setattr(router, "_profile", lambda _p, model: router.registry.resolve_profile_id("generic-openai-compatible"))
     tools = [ToolSpec("read_file", "Read a file")]
     messages = [ModelMessage("user", "hi")]

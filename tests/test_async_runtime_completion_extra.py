@@ -157,7 +157,7 @@ def test_models_live_listing_and_policy_redaction(
 
     router = ModelRouter(registry)
 
-    def factory(profile: object | None = None) -> ModelProviderFactory:
+    def factory(profile: object | None = None, connection: object | None = None) -> ModelProviderFactory:
         return ModelProviderFactory(client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
 
     router._factory = factory  # type: ignore[method-assign]

@@ -54,6 +54,8 @@ export interface ConnectionFields {
   workspaceId?: string;
   /** The owner's name for a custom endpoint. Display text only. */
   label?: string;
+  /** Backup keys rotated in on rate limits or empty quota; omit to keep the saved ones. */
+  backupApiKeys?: string[] | null;
 }
 
 /** Store (or replace) a provider's credential and endpoint. */
@@ -69,6 +71,7 @@ export async function saveConnection(
       (fields.adminApiKey ?? "").trim(),
       (fields.workspaceId ?? "").trim(),
       (fields.label ?? "").trim(),
+      fields.backupApiKeys === undefined ? null : fields.backupApiKeys,
     );
     return { ok: true };
   } catch (error) {

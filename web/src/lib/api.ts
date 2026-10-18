@@ -444,6 +444,7 @@ export const api = {
     adminApiKey = "",
     workspaceId = "",
     label = "",
+    backupApiKeys: string[] | null = null,
   ) =>
     contract.setModelConnection(profileId, {
       endpoint: endpoint || null,
@@ -451,6 +452,8 @@ export const api = {
       admin_api_key: adminApiKey || null,
       workspace_id: workspaceId || null,
       label: label || null,
+      // `null` keeps what is stored; `[]` removes every backup key.
+      backup_api_keys: backupApiKeys,
     }),
   // OpenRouter routing preferences beside the saved connection; "" is the
   // account default. The key is never sent or touched.

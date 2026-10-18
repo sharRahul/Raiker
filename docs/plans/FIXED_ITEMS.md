@@ -958,6 +958,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-934](#fixed-934--openrouter-requests-could-not-be-kept-away-from-providers-that-store-prompts) | Medium | Models / OpenRouter / privacy | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-935](#fixed-935--raiker-had-one-custom-endpoint-and-hermes-agent-has-named-ones) | Medium | Models / custom endpoints | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-936](#fixed-936--a-tool-less-model-behind-a-custom-endpoint-failed-every-turn) | High | Models / turns / custom endpoints | Fixed 2026-10-18 — found in the FIXED-935 round |
+| [FIXED-937](#fixed-937--one-rate-limited-or-spent-key-ended-the-turn) | Medium | Models / credentials / resilience | Fixed 2026-10-18 — Hermes Agent parity |
 
 ---
 
@@ -33603,4 +33604,14 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** A 400 whose body says the endpoint refuses tools (Ollama, vLLM without auto tool choice, llama.cpp without `--jinja`) is `tool_calls_unsupported`; the router asks again once without tools (streamed or not, only before anything streamed) and remembers the model for the process, so later turns skip the refused attempt. Only ever less authority.
 
 **Evidence.** `tests/test_model_router.py` ("an endpoint that refuses tools is asked again without them"). Live: the FIXED-935 turn answered after the retry.
+
+---
+
+## FIXED-937 — One rate-limited or spent key ended the turn
+
+**Severity: Medium. Area: Models / credentials / resilience. Status: Fixed 2026-10-18 — Hermes Agent parity (credential pools).**
+
+**Fixed.** A connection may hold up to three backup keys (`api_key_2`…`api_key_4`), entered under **Advanced** in the connect dialog; backups alone join a saved connection, re-pasting the main key keeps them, `[]` clears them. `raiker/models/credential_pool.py` orders the keys for each request — rested first, benched last — and the router moves a request refused with a rate limit or an empty quota to the next key in the same turn (streamed or not, only before anything streamed), benching the refused key for 60 s or 1 h. Authentication failures are never rotated past. The card shows how many backups are saved and, while a key rests, which key is in use and why. Keys are named only by position; no view, event or sentence carries a value.
+
+**Evidence.** `tests/test_credential_pool.py` (9). A real 429 or empty balance cannot be produced on demand from this host, so the rotation is proven against fake providers raising the classified errors the transport produces.
 

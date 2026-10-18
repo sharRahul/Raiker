@@ -98,6 +98,10 @@ class ModelProfileView(View):
     routing_sort: str = ""
     # The owner's own name for a custom endpoint; "" when none was given.
     connection_label: str = ""
+    # Credential pool: how many backup keys are saved (never which), and one
+    # sentence about any key currently benched for a rate limit or quota.
+    backup_key_count: int = 0
+    key_pool_status: str = ""
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None

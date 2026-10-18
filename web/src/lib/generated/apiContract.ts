@@ -3371,6 +3371,7 @@ export type ModelConnectionRequest = {
   admin_api_key?: string | null;
   workspace_id?: string | null;
   label?: string | null;
+  backup_api_keys?: string[] | null;
 };
 
 export type ModelConversionRequestBody = {
@@ -3507,6 +3508,8 @@ export type ModelProfileView = {
   routing_data_collection: string;
   routing_sort: string;
   connection_label: string;
+  backup_key_count: number;
+  key_pool_status: string;
   prompt_cache_ttl: string | null;
   context_window_tokens: number | null;
   context_window_source: string | null;

@@ -314,6 +314,9 @@
   let signInEndpoint = $state("");
   /** Hermes-style named endpoints: the owner's own name for a custom endpoint. */
   let signInLabel = $state("");
+  /** Hermes credential pools: backup keys tried when the primary is throttled or spent. */
+  let signInBackupKeys = $state<string[]>(["", "", ""]);
+  let signInRemoveBackups = $state(false);
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
@@ -382,6 +385,8 @@
     signInWorkspaceId = "";
     signInEndpoint = "";
     signInLabel = models?.profiles.find((p) => p.profile_id === profileId)?.connection_label ?? "";
+    signInBackupKeys = ["", "", ""];
+    signInRemoveBackups = false;
     // BUG-274 — a readiness answer that says "add the workspace ID to this
     // connection" has to land on the box, not three clicks away from it.
     signInAdvanced = options.advanced === true;
@@ -412,6 +417,11 @@
         adminApiKey: signInAdminApiKey,
         workspaceId: signInWorkspaceId,
         label: signInLabel,
+        backupApiKeys: signInRemoveBackups
+          ? []
+          : signInBackupKeys.some((key) => key.trim())
+            ? signInBackupKeys.filter((key) => key.trim())
+            : null,
       });
       if (!outcome.ok) throw outcome;
       signInApiKey = "";
@@ -1734,6 +1744,12 @@
                           {/if}
                         </p>
                       {/if}
+                      {#if (p.backup_key_count ?? 0) > 0}
+                        <p class="pool-line" role="status">
+                          {p.key_pool_status ||
+                            `${p.backup_key_count} backup key${p.backup_key_count === 1 ? "" : "s"} ready for rate limits and empty quota.`}
+                        </p>
+                      {/if}
                       {#if p.provider === "openrouter" && p.connection_configured}
                         <!-- Hermes Agent's provider_routing, as two owner choices.
                              Nothing is denied by default: denying data collection
@@ -1992,6 +2008,29 @@
             bind:value={signInEndpoint}
           />
         </label>
+        {#if showApiKey}
+          <!-- Hermes Agent's credential pools: when the key above is rate
+               limited or out of quota, the request moves to the next key. -->
+          <fieldset class="field backup-keys">
+            <legend class="field-label">Backup keys <small>(optional — tried in order when a key is rate limited or out of quota)</small></legend>
+            {#each [0, 1, 2] as slot (slot)}
+              <input
+                class="input"
+                type="password"
+                autocomplete="new-password"
+                aria-label={`Backup key ${slot + 1}`}
+                placeholder={`Backup key ${slot + 1}`}
+                bind:value={signInBackupKeys[slot]}
+              />
+            {/each}
+            {#if (signInProfile.backup_key_count ?? 0) > 0}
+              <label class="backup-remove">
+                <input type="checkbox" bind:checked={signInRemoveBackups} />
+                Remove the {signInProfile.backup_key_count} saved backup key{signInProfile.backup_key_count === 1 ? "" : "s"}
+              </label>
+            {/if}
+          </fieldset>
+        {/if}
         <!-- BUG-274 — an identity-linked key acts inside one workspace and the
              provider refuses it without the id. Behind Advanced because most
              keys need nothing here; the refusal opens this section itself. -->
@@ -2023,6 +2062,8 @@
               signInApiKey.trim() === "" &&
               signInWorkspaceId.trim() === "" &&
               signInLabel.trim() === "" &&
+              !signInBackupKeys.some((key) => key.trim()) &&
+              !signInRemoveBackups &&
               !signInAdvanced)}
         >
           {signInSaving ? "Connecting…" : "Connect"}
@@ -2655,4 +2696,7 @@
   .pc-routing-sort select { flex: 1; min-width: 0; }
   .pc-routing-note { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
   .add-endpoint { margin-top: .6rem; }
+  .backup-keys { border: 0; padding: 0; margin: 0; display: grid; gap: .4rem; }
+  .backup-remove { display: flex; align-items: center; gap: .4rem; font-size: var(--text-sm); }
+  .pool-line { margin: .4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
 </style>

@@ -176,6 +176,7 @@ class ModelService:
         # so the posture tiles report the answer the enforcing path gives rather
         # than the gate row alone.
         enforced_policy = provider_runtime_policy_from_gates(self.store, acting_principal_id)
+        from raiker.models import credential_pool
         from raiker.models.connections import get_model_connection
         from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
         from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
@@ -286,6 +287,8 @@ class ModelService:
                 ),
                 routing_sort=str((saved_connection or {}).get("routing_sort", "")),
                 connection_label=str((saved_connection or {}).get("label", "")),
+                backup_key_count=credential_pool.backup_count(saved_connection),
+                key_pool_status=credential_pool.describe(profile.profile_id, saved_connection),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))
                     if profile.raw.get("prompt_cache_ttl")

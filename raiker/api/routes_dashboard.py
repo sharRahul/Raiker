@@ -151,6 +151,7 @@ from raiker.models.connections import (
     put_model_connection,
     validated_workspace_id,
 )
+from raiker.models.credential_pool import BACKUP_KEY_FIELDS
 from raiker.models.exceptions import (
     ModelProviderError,
     ProviderConfigurationError,
@@ -2953,6 +2954,7 @@ async def set_model_connection(
     if "label" in values:
         # A name is display text: one line, no control characters.
         values["label"] = " ".join(values["label"].split())[:40]
+    backups = [key.strip() for key in (body.backup_api_keys or []) if key.strip()]
     # BUG-274 — refused here, where the owner can still see what they typed,
     # rather than at the point a turn needs it. The shape check is a header
     # safety rule, not a guess at the provider's id format.
@@ -2972,19 +2974,29 @@ async def set_model_connection(
     # workspace id, *only* when a connection already exists. Any other
     # combination still replaces, so nothing else silently retains a value the
     # owner thought they had cleared.
-    if values and set(values) <= {"workspace_id", "label"}:
-        # A workspace or a name on its own completes a saved connection; it
-        # never replaces the key it accompanies (BUG-274).
+    only_backups = not values and body.backup_api_keys is not None
+    if only_backups or (values and set(values) <= {"workspace_id", "label"}):
+        # A workspace, a name or backup keys on their own complete a saved
+        # connection; they never replace the key they accompany (BUG-274).
         existing = get_model_connection(store, session.principal_id, profile_id)
         if existing:
             values = {**existing, **values}
     elif values:
-        # Routing preferences and the endpoint's name are not re-entered with
-        # the key; re-pasting a key must not silently reset them.
+        # Routing preferences, the endpoint's name and backup keys are not
+        # re-entered with the key; re-pasting a key must not silently reset them.
         existing = get_model_connection(store, session.principal_id, profile_id) or {}
-        for key in ("routing_data_collection", "routing_sort", "label"):
+        kept = ["routing_data_collection", "routing_sort", "label"]
+        if body.backup_api_keys is None:
+            kept.extend(BACKUP_KEY_FIELDS)
+        for key in kept:
             if existing.get(key):
                 values.setdefault(key, existing[key])
+    if values and body.backup_api_keys is not None:
+        for field, key in zip(BACKUP_KEY_FIELDS, [*backups, "", "", ""], strict=False):
+            if key:
+                values[field] = key
+            else:
+                values.pop(field, None)
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         store.invalidate_model_readiness(

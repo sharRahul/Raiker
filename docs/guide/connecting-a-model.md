@@ -308,6 +308,18 @@ OpenRouter offers some free models only to apps on its own list. Raiker says so
 repair is another model, not another key. OpenRouter requests name Raiker as the
 calling app.
 
+### Backup keys
+
+Any provider that takes a key also takes up to three **backup keys**, under
+**Advanced** in its connect dialog. When a key is rate limited or its account is
+out of quota, the same request moves to the next key and the refused one sits
+out — a minute for a rate limit, an hour for an empty balance. The card says how
+many backups are saved and, while one is resting, which key is in use and why.
+Raiker never shows a key back; re-pasting the main key keeps the backups, and
+**Remove the saved backup keys** clears them. Another kind of refusal — a key
+the provider rejects outright — is not rotated past: it is reported, because
+that key needs your attention.
+
 ### Servers of your own, by name
 
 **OpenAI-compatible** is any server that speaks the OpenAI API — vLLM, SGLang,

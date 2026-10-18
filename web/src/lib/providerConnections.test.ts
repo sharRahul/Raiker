@@ -20,7 +20,7 @@ describe("one connection lifecycle", () => {
     const mock = stubFetch({ [PATH]: { ok: true } });
     expect(await saveConnection("anthropic-hosted", { apiKey: "  sk-test  " })).toEqual({ ok: true });
     const body = JSON.parse(String((mock.mock.calls[0][1] as RequestInit).body));
-    expect(body).toEqual({ endpoint: null, api_key: "sk-test", admin_api_key: null, workspace_id: null });
+    expect(body).toEqual({ endpoint: null, api_key: "sk-test", admin_api_key: null, workspace_id: null, label: null, backup_api_keys: null });
   });
 
   it("adds a workspace on its own and removes with nothing", async () => {
@@ -30,7 +30,7 @@ describe("one connection lifecycle", () => {
     const bodies = mock.mock.calls.map((call) => JSON.parse(String((call[1] as RequestInit).body)));
     expect(bodies[0].workspace_id).toBe("wrkspc_1");
     expect(bodies[0].api_key).toBeNull();
-    expect(bodies[1]).toEqual({ endpoint: null, api_key: null, admin_api_key: null, workspace_id: null });
+    expect(bodies[1]).toEqual({ endpoint: null, api_key: null, admin_api_key: null, workspace_id: null, label: null, backup_api_keys: null });
   });
 
   it("reads a refusal the same way for every caller", async () => {

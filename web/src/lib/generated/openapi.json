@@ -17236,6 +17236,21 @@
             ],
             "title": "Api Key"
           },
+          "backup_api_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Api Keys"
+          },
           "endpoint": {
             "anyOf": [
               {
@@ -18021,6 +18036,11 @@
       },
       "ModelProfileView": {
         "properties": {
+          "backup_key_count": {
+            "default": 0,
+            "title": "Backup Key Count",
+            "type": "integer"
+          },
           "billable": {
             "default": false,
             "title": "Billable",
@@ -18092,6 +18112,11 @@
             },
             "title": "Image Models",
             "type": "array"
+          },
+          "key_pool_status": {
+            "default": "",
+            "title": "Key Pool Status",
+            "type": "string"
           },
           "local_only": {
             "title": "Local Only",

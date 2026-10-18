@@ -393,6 +393,7 @@ describe("first-run setup", () => {
             admin_api_key: null,
             workspace_id: "wrkspc_01",
             label: null,
+            backup_api_keys: null,
           }),
         }),
       ),

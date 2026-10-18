@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from raiker.contracts.models import ClientMetadata, ModelProfile
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.models import credential_pool
 from raiker.models.contracts import (
     EmbeddingRequest,
     EmbeddingResponse,
@@ -22,6 +23,8 @@ from raiker.models.exceptions import (
     ModelProviderError,
     ProviderConfigurationError,
     ProviderPolicyError,
+    ProviderQuotaExhaustedError,
+    ProviderRateLimitError,
     ProviderUnsupportedCapabilityError,
 )
 from raiker.models.factory import (
@@ -61,6 +64,10 @@ def _refused_tools(exc: ProviderUnsupportedCapabilityError) -> bool:
     return str(exc).startswith("tool_calls_unsupported")
 
 
+def _bench_reason(exc: Exception) -> str:
+    return "quota_exhausted" if isinstance(exc, ProviderQuotaExhaustedError) else "rate_limited"
+
+
 class ModelRouter:
     def __init__(
         self,
@@ -94,10 +101,24 @@ class ModelRouter:
         self.active_profile_id: str | None = None
         self.reasoning: ReasoningOptions | None = None
 
-    def _factory(self, profile: ModelProfile) -> ModelProviderFactory:
-        connection = (
-            self.connection_resolver(profile.profile_id) if self.connection_resolver else None
-        )
+    def _connection(self, profile: ModelProfile) -> dict[str, str] | None:
+        return self.connection_resolver(profile.profile_id) if self.connection_resolver else None
+
+    def _key_attempts(self, profile: ModelProfile) -> list[tuple[int, dict[str, str] | None]]:
+        """One factory connection per pooled key, rested keys first (Hermes credential pools)."""
+        connection = self._connection(profile)
+        if not connection:
+            return [(1, None)]
+        return [
+            (position, pooled)
+            for position, pooled in credential_pool.attempt_order(profile.profile_id, connection)
+        ]
+
+    def _factory(
+        self, profile: ModelProfile, connection: dict[str, str] | None = None
+    ) -> ModelProviderFactory:
+        if connection is None:
+            connection = self._connection(profile)
         return ModelProviderFactory(
             policy=self.runtime_policy,
             connection=connection,
@@ -184,32 +205,44 @@ class ModelRouter:
         max_tokens: int | None = None,
     ) -> ModelResponse:
         profile = self._profile(provider, model)
-        model_provider = self._factory(profile).create(profile)
-        request = self._request(
-            profile,
-            model_provider.provider,
-            model_provider.model,
-            messages,
-            tools,
-            stream=False,
-            reasoning=reasoning,
-            response_schema=response_schema,
-            response_schema_name=response_schema_name,
-            max_tokens=max_tokens,
-        )
-        try:
+        attempts = self._key_attempts(profile)
+        for attempt, (position, connection) in enumerate(attempts):
+            model_provider = self._factory(profile, connection).create(profile)
+            request = self._request(
+                profile,
+                model_provider.provider,
+                model_provider.model,
+                messages,
+                tools,
+                stream=False,
+                reasoning=reasoning,
+                response_schema=response_schema,
+                response_schema_name=response_schema_name,
+                max_tokens=max_tokens,
+            )
             try:
-                return await model_provider.chat(request)
-            except ProviderUnsupportedCapabilityError as exc:
-                # The endpoint refused the tools, not the request: ask again
-                # without them. Only ever less authority — the model can still
-                # answer, and it can call nothing.
-                if not request.tools or not _refused_tools(exc):
+                try:
+                    response = await model_provider.chat(request)
+                except ProviderUnsupportedCapabilityError as exc:
+                    # The endpoint refused the tools, not the request: ask again
+                    # without them. Only ever less authority — the model can
+                    # still answer, and it can call nothing.
+                    if not request.tools or not _refused_tools(exc):
+                        raise
+                    _TOOLLESS_MODELS.add((profile.profile_id, request.model))
+                    response = await model_provider.chat(replace(request, tools=None))
+                credential_pool.record_use(profile.profile_id, position)
+                return response
+            except (ProviderRateLimitError, ProviderQuotaExhaustedError) as exc:
+                # A spent or throttled key moves the request to the next key.
+                if len(attempts) == 1:
                     raise
-                _TOOLLESS_MODELS.add((profile.profile_id, request.model))
-                return await model_provider.chat(replace(request, tools=None))
-        finally:
-            await model_provider.aclose()
+                credential_pool.bench(profile.profile_id, position, _bench_reason(exc))
+                if attempt == len(attempts) - 1:
+                    raise
+            finally:
+                await model_provider.aclose()
+        raise AssertionError("unreachable: the attempt loop returns or raises")
 
     async def aprobe_model(self, profile: ModelProfile) -> None:
         """Run the smallest real completion that proves a hosted model can execute.
@@ -244,33 +277,45 @@ class ModelRouter:
         response_schema_name: str = "raiker_response",
     ) -> AsyncIterator[ModelStreamEvent]:
         profile = self._profile(provider, model)
-        model_provider = self._factory(profile).create(profile)
-        request = self._request(
-            profile,
-            model_provider.provider,
-            model_provider.model,
-            messages,
-            tools,
-            stream=True,
-            reasoning=reasoning,
-            response_schema=response_schema,
-            response_schema_name=response_schema_name,
-        )
-        try:
+        attempts = self._key_attempts(profile)
+        for attempt, (position, connection) in enumerate(attempts):
+            model_provider = self._factory(profile, connection).create(profile)
+            request = self._request(
+                profile,
+                model_provider.provider,
+                model_provider.model,
+                messages,
+                tools,
+                stream=True,
+                reasoning=reasoning,
+                response_schema=response_schema,
+                response_schema_name=response_schema_name,
+            )
             started = False
             try:
-                async for event in model_provider.stream_chat(request):
-                    started = True
-                    yield event
-            except ProviderUnsupportedCapabilityError as exc:
-                # Refused before anything streamed: the same retry as `achat`.
-                if started or not request.tools or not _refused_tools(exc):
+                try:
+                    async for event in model_provider.stream_chat(request):
+                        started = True
+                        yield event
+                except ProviderUnsupportedCapabilityError as exc:
+                    # Refused before anything streamed: the same retry as `achat`.
+                    if started or not request.tools or not _refused_tools(exc):
+                        raise
+                    _TOOLLESS_MODELS.add((profile.profile_id, request.model))
+                    async for event in model_provider.stream_chat(replace(request, tools=None)):
+                        started = True
+                        yield event
+                credential_pool.record_use(profile.profile_id, position)
+                return
+            except (ProviderRateLimitError, ProviderQuotaExhaustedError) as exc:
+                # Only a key refused before anything streamed can be swapped.
+                if started or len(attempts) == 1:
                     raise
-                _TOOLLESS_MODELS.add((profile.profile_id, request.model))
-                async for event in model_provider.stream_chat(replace(request, tools=None)):
-                    yield event
-        finally:
-            await model_provider.aclose()
+                credential_pool.bench(profile.profile_id, position, _bench_reason(exc))
+                if attempt == len(attempts) - 1:
+                    raise
+            finally:
+                await model_provider.aclose()
 
     async def aembed(self, provider: str, model: str, text: str) -> EmbeddingResponse:
         profile = self._profile(provider, model)

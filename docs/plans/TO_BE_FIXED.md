@@ -81,7 +81,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
-| [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs printed a crash dump; 37 later runs (15 under `-X faulthandler` on 2026-10-18) are clean |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
@@ -678,32 +677,6 @@ found because the picker also offered an unconnected Gemini profile.
 
 **Interface outcome that has to be true before this closes.** The two remaining
 contracts above are observed through a real provider and shown in the inspector.
-
----
-
-## BUG-312 — One Windows test run ended in an interpreter crash dump
-
-**Severity: Low. Area: Tests / Windows. Status: Open — raised 2026-10-01.**
-
-**Observed.** One of 28 consecutive runs of `tests/test_instance_runtime_lifecycle.py`
-with `tests/test_windows_internal_paths.py` on the Windows development host
-ended with a fault-handler dump (`File "<frozen runpy>", line 198 in
-_run_module_as_main`) instead of the pass line. The dump was cut off before its
-first frame, and 22 further runs, each checked for the dump, were clean.
-
-**Likely cause, not confirmed.** A native SQLCipher or sandbox-runner handle
-torn down while a test thread is still exiting; both files start background
-threads.
-
-**Proposed fix.** Run the pair under `-X faulthandler` in a loop with the full
-output kept, and fix what the first complete dump names.
-
-**2026-10-18.** Fifteen further runs of the pair under `-X faulthandler` on Windows 11, each with its
-full output kept: all clean. Still not reproduced; the entry stays open until a complete dump names a
-frame or the suite has a Windows job that would catch it.
-
-**Required user-interface outcome.** None; test harness only unless the dump
-names product code.
 
 ---
 

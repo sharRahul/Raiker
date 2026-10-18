@@ -970,6 +970,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-946](#fixed-946--the-live-sign-in-helper-rejected-the-current-welcome-heading) | Low | Live test harness | Fixed 2026-10-18 — found testing BUG-290 |
 | [FIXED-947](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345) | Medium | Setup / privacy | Fixed 2026-10-18 — was BUG-345; owner chose removal |
 | [FIXED-948](#fixed-948--the-first-launch-live-spec-skipped-the-check-stage-by-reading-it-too-early) | Low | Live test harness | Fixed 2026-10-18 — found verifying FIXED-947 |
+| [FIXED-949](#fixed-949--a-windows-only-crash-dump-had-no-ci-job-that-could-catch-it-again-was-bug-312) | Low | Tests / Windows / CI | Closed 2026-10-18 — was BUG-312 |
 
 ---
 
@@ -33864,4 +33865,32 @@ Check stage, waits for its **Continue** to be enabled before pressing it.
 
 **Evidence.** The first run against a fresh workspace failed exactly as above;
 after the edit the spec passed **1/1** against a new fresh workspace.
+
+---
+
+## FIXED-949 — A Windows-only crash dump had no CI job that could catch it again (was BUG-312)
+
+**Severity: Low. Area: Tests / Windows / CI. Status: Closed 2026-10-18 — was
+BUG-312.**
+
+**Observed.** One of 28 local Windows runs of
+`tests/test_instance_runtime_lifecycle.py` with
+`tests/test_windows_internal_paths.py` ended in a fault-handler dump cut off
+before its first frame. 37 later local runs, 15 of them under
+`-X faulthandler`, were clean. Every Python CI job ran on Linux, so a
+recurrence could only ever be seen by hand.
+
+**Closure condition.** BUG-312 stayed open "until a complete dump names a frame
+or the suite has a Windows job that would catch it". The second half is now
+true.
+
+**Fixed.** `.github/workflows/ci.yml` gains **Windows lifecycle tests**: on
+`windows-latest` it installs the package and runs the pair three times under
+`python -X faulthandler`, so a recurrence fails the push with a complete dump in
+the log instead of disappearing.
+
+**Evidence.** The job passed on its first run, CI run 39163161663 on commit
+`43ec4908`. Locally the pair passed again under `-X faulthandler` (21 tests),
+and the full local suite passed on Windows. If the job ever prints a dump, the
+frame it names is a new defect.
 

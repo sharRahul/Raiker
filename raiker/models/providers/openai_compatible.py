@@ -250,6 +250,10 @@ class AsyncOpenAICompatibleProvider:
     embeddings_path: str = "/v1/embeddings"
     extra_headers: Mapping[str, str] = field(default_factory=dict)
     client: httpx.AsyncClient | None = None
+    #: Provider-specific request fields merged into every chat request, e.g.
+    #: OpenRouter's ``provider`` routing preferences. Never overrides a field
+    #: Raiker sets itself (model, messages, tools, …).
+    extra_body: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # OpenAI reports an exhausted allowance as 429 `insufficient_quota` and
@@ -413,6 +417,8 @@ class AsyncOpenAICompatibleProvider:
                 raise ProviderUnsupportedCapabilityError("tool_calls_unsupported")
             payload["tools"] = [tool.to_openai_tool() for tool in request.tools]
             payload["tool_choice"] = "auto"
+        for key, value in self.extra_body.items():
+            payload.setdefault(key, value)
         if request.response_schema is not None:
             if not self.capabilities.supports_json_schema:
                 raise ProviderUnsupportedCapabilityError("json_schema_unsupported")

@@ -1060,6 +1060,35 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     });
   });
 
+  it("lets a connected OpenRouter card keep requests away from providers that store prompts", async () => {
+    const openrouter = profile({
+      profile_id: "openrouter-policy-gated",
+      provider: "openrouter",
+      model: "openai/gpt-4o-mini",
+      local_only: false,
+      off_machine: true,
+      requires_network: true,
+      endpoint_kind: "remote_hosted",
+      connection_configured: true,
+      configured: true,
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({ profiles: [openrouter] }),
+      "PUT /api/models/openrouter-policy-gated/routing": { ok: true, data_collection: "deny", sort: "" },
+    });
+    render(ModelsView, { tab: "add" });
+    const routing = await screen.findByRole("group", { name: "OpenRouter routing" });
+    const deny = within(routing).getByRole("checkbox", { name: /do not store prompts/ });
+    expect(deny).not.toBeChecked();
+    await fireEvent.click(deny);
+    await waitFor(() => {
+      const put = mock.mock.calls.find((c) => String(c[0]).includes("/routing"));
+      expect(put).toBeTruthy();
+      expect(JSON.parse(put![1]!.body as string)).toEqual({ data_collection: "deny", sort: "" });
+    });
+    expect(await within(routing).findByRole("status")).toHaveTextContent(/some free models may then have none/);
+  });
+
   it("selects the model a connected hosted card shows, not its placeholder", async () => {
     // Reported 2026-10-18: OpenAI and OpenRouter answered **Select** with
     // `model_required_for_profile`, because the card showed the kept model

@@ -450,6 +450,10 @@ export const api = {
       admin_api_key: adminApiKey || null,
       workspace_id: workspaceId || null,
     }),
+  // OpenRouter routing preferences beside the saved connection; "" is the
+  // account default. The key is never sent or touched.
+  setModelRouting: (profileId: string, dataCollection: "" | "deny", sort: "" | "price" | "throughput" | "latency") =>
+    contract.setModelRouting(profileId, { data_collection: dataCollection, sort }),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) => contract.setModelFallback({ profile_ids }),

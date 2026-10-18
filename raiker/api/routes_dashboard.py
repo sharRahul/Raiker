@@ -34,6 +34,7 @@ from raiker.api.schemas import (
     ModelCatalogueRefreshRequest,
     ModelConnectionRequest,
     ModelPriceRequest,
+    ModelRoutingRequest,
     ModelWeeklyBudgetRequest,
     MoveProjectRequest,
     RenameMcpServerRequest,
@@ -98,6 +99,7 @@ from raiker.api.wire.models import (
     ModelSelectionSet,
     PriceSet,
     PricingRefreshed,
+    RoutingSet,
     SpendLimitView,
     WeeklyBudgetSet,
     WeeklyUsage,
@@ -2970,6 +2972,13 @@ async def set_model_connection(
         existing = get_model_connection(store, session.principal_id, profile_id)
         if existing:
             values = {**existing, **values}
+    elif values:
+        # Routing preferences are set on their own route and are not part of
+        # the key dialog; re-pasting a key must not silently reset them.
+        existing = get_model_connection(store, session.principal_id, profile_id) or {}
+        for key in ("routing_data_collection", "routing_sort"):
+            if existing.get(key):
+                values.setdefault(key, existing[key])
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         store.invalidate_model_readiness(
@@ -3002,6 +3011,50 @@ async def set_model_connection(
         session.principal_id, profile_id, reason_code="connection_changed"
     )
     saved: ConnectionSet = {"ok": True, "connection_configured": True}
+    return serialize_dto(saved)
+
+
+@router.put("/api/models/{profile_id}/routing")
+async def set_model_routing(
+    profile_id: str,
+    body: ModelRoutingRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Save OpenRouter routing preferences beside the saved connection.
+
+    Hermes Agent's ``provider_routing``, for the two preferences that matter to
+    an owner: whether a request may reach providers that store prompts, and
+    what to prefer when several serve the model. They describe how this
+    account's requests are routed, so they live with its connection; the key is
+    never re-entered and never touched.
+    """
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    try:
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail={"reason_code": "unknown_model_profile"}) from exc
+    if profile.provider != "openrouter":
+        raise HTTPException(status_code=400, detail={"reason_code": "routing_unsupported_for_provider"})
+    existing = get_model_connection(store, session.principal_id, profile_id)
+    if not existing:
+        raise HTTPException(status_code=409, detail={"reason_code": "connection_required"})
+    values = {
+        key: value
+        for key, value in existing.items()
+        if key not in {"routing_data_collection", "routing_sort"}
+    }
+    if body.data_collection:
+        values["routing_data_collection"] = body.data_collection
+    if body.sort:
+        values["routing_sort"] = body.sort
+    put_model_connection(store, session.principal_id, profile_id, values)
+    # Which providers may serve a model changes what readiness proved.
+    store.invalidate_model_readiness(
+        session.principal_id, profile_id, reason_code="connection_changed"
+    )
+    saved: RoutingSet = {"ok": True, "data_collection": body.data_collection, "sort": body.sort}
     return serialize_dto(saved)
 
 

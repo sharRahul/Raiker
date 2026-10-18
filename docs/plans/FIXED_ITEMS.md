@@ -955,6 +955,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-931](#fixed-931--openrouter-declining-one-model-for-raiker-was-reported-as-a-rejected-credential) | High | Models / OpenRouter / readiness | Fixed 2026-10-18 — owner-reported |
 | [FIXED-932](#fixed-932--raiker-offered-six-hosted-apis-where-hermes-agent-offers-twenty) | Medium | Models / provider breadth | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-933](#fixed-933--the-key-dialog-said-the-key-never-leaves-this-device) | Low | Models / truthfulness | Fixed 2026-10-18 |
+| [FIXED-934](#fixed-934--openrouter-requests-could-not-be-kept-away-from-providers-that-store-prompts) | Medium | Models / OpenRouter / privacy | Fixed 2026-10-18 — Hermes Agent parity |
 
 ---
 
@@ -33566,3 +33567,16 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** *Your key is encrypted in this instance's vault and is sent only to {provider}, with each request.*
 
 **Evidence.** `ModelsView.test.ts` (70); the DeepSeek dialog capture.
+
+---
+
+## FIXED-934 — OpenRouter requests could not be kept away from providers that store prompts
+
+**Severity: Medium. Area: Models / OpenRouter / privacy. Status: Fixed 2026-10-18 — Hermes Agent parity (`provider_routing`).**
+
+**Observed.** OpenRouter routes one model to whichever of several providers it chooses, some of which retain prompts. Hermes Agent lets the owner say `data_collection: deny` and what to prefer; Raiker sent nothing, so the owner had no say.
+
+**Fixed.** `PUT /api/models/{profile_id}/routing` (OpenRouter only, needs a saved connection) stores `data_collection` (`deny` or account default) and `sort` (price, throughput, latency or default) beside the connection without touching the key; re-pasting the key keeps them. The factory sends them as OpenRouter's `provider` object on every request through that connection, and only OpenRouter's own values ever reach a request. The connected OpenRouter card shows **OpenRouter routing** with both choices. Nothing is denied by default: live, `deny` once left `openrouter/free` with no provider (429), so it is the owner's choice and the card says so.
+
+**Evidence.** `tests/test_openrouter_routing.py` (9), `ModelsView.test.ts` (routing control), contract case for the route. Live through Raiker's provider with the owner's key: `openai/gpt-4o-mini` and `openrouter/free` answered with and without `deny`; with `deny` OpenRouter served `openrouter/free` from Phala instead of Nvidia.
+

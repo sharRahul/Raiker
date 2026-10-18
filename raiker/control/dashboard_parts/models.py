@@ -281,6 +281,10 @@ class ModelService:
                 workspace_configured=bool(
                     saved_connection and saved_connection.get("workspace_id")
                 ),
+                routing_data_collection=str(
+                    (saved_connection or {}).get("routing_data_collection", "")
+                ),
+                routing_sort=str((saved_connection or {}).get("routing_sort", "")),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))
                     if profile.raw.get("prompt_cache_ttl")

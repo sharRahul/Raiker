@@ -92,6 +92,10 @@ class ModelProfileView(View):
     connection_configured: bool = False
     usage_admin_configured: bool = False
     workspace_configured: bool = False
+    # OpenRouter routing preferences saved with the connection; "" is the
+    # account default. Not secrets, so the card can show and edit them.
+    routing_data_collection: str = ""
+    routing_sort: str = ""
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None

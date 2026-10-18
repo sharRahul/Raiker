@@ -308,6 +308,13 @@ OpenRouter offers some free models only to apps on its own list. Raiker says so
 repair is another model, not another key. OpenRouter requests name Raiker as the
 calling app.
 
+Once OpenRouter is connected its card carries **OpenRouter routing**, two choices
+that travel with every request: **Only providers that do not store prompts**
+(OpenRouter's `data_collection: deny`) and **Prefer** — OpenRouter's default,
+lowest price, highest throughput or lowest latency. Nothing is denied until you
+tick it: with it ticked, some free models may have no provider left to serve
+them. Re-pasting the key keeps both choices.
+
 ### What is still refused
 
 Consent by configuration is scoped, not a blanket opening:

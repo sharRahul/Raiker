@@ -3503,6 +3503,8 @@ export type ModelProfileView = {
   connection_configured: boolean;
   usage_admin_configured: boolean;
   workspace_configured: boolean;
+  routing_data_collection: string;
+  routing_sort: string;
   prompt_cache_ttl: string | null;
   context_window_tokens: number | null;
   context_window_source: string | null;
@@ -3561,6 +3563,12 @@ export type ModelReadinessView = {
   remediation: string;
   evidence: Record<string, unknown>;
   ready: boolean;
+};
+
+/** OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``). */
+export type ModelRoutingRequest = {
+  data_collection?: "" | "deny";
+  sort?: "" | "price" | "throughput" | "latency";
 };
 
 export type ModelSelectionSet = {
@@ -4464,6 +4472,13 @@ export type RoutineDoctor = {
   state: "ok" | "warn" | "blocked" | "unknown";
   checked_at: string;
   checks: DoctorCheck[];
+};
+
+/** OpenRouter routing preferences as saved; empty strings mean the account default. */
+export type RoutingSet = {
+  ok: boolean;
+  data_collection: string;
+  sort: string;
 };
 
 export type RuntimeModeActivated = {
@@ -6115,6 +6130,8 @@ export const contract = {
     call<PriceSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/price`, { body }),
   listProviderModels: (profileId: string) =>
     request<ProviderModelListView>(`/api/models/${encodeURIComponent(profileId)}/provider-models`),
+  setModelRouting: (profileId: string, body: ModelRoutingRequest) =>
+    call<RoutingSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/routing`, { body }),
   setWeeklyModelBudget: (profileId: string, body: ModelWeeklyBudgetRequest) =>
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
   listNotifications: (query: { unread_only?: boolean } = {}) =>

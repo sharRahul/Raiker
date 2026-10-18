@@ -18296,6 +18296,16 @@
             "title": "Requires Network",
             "type": "boolean"
           },
+          "routing_data_collection": {
+            "default": "",
+            "title": "Routing Data Collection",
+            "type": "string"
+          },
+          "routing_sort": {
+            "default": "",
+            "title": "Routing Sort",
+            "type": "string"
+          },
           "runtime_gate": {
             "anyOf": [
               {
@@ -18532,6 +18542,34 @@
           "ready"
         ],
         "title": "ModelReadinessView",
+        "type": "object"
+      },
+      "ModelRoutingRequest": {
+        "additionalProperties": false,
+        "description": "OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``).\n\n``\"\"`` clears a preference back to the account default. Only values\nOpenRouter defines are accepted, so nothing else reaches a request body.",
+        "properties": {
+          "data_collection": {
+            "default": "",
+            "enum": [
+              "",
+              "deny"
+            ],
+            "title": "Data Collection",
+            "type": "string"
+          },
+          "sort": {
+            "default": "",
+            "enum": [
+              "",
+              "price",
+              "throughput",
+              "latency"
+            ],
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "title": "ModelRoutingRequest",
         "type": "object"
       },
       "ModelSelectionSet": {
@@ -23072,6 +23110,30 @@
           "checks"
         ],
         "title": "RoutineDoctor",
+        "type": "object"
+      },
+      "RoutingSet": {
+        "description": "OpenRouter routing preferences as saved; empty strings mean the account default.",
+        "properties": {
+          "data_collection": {
+            "title": "Data Collection",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "data_collection",
+          "sort"
+        ],
+        "title": "RoutingSet",
         "type": "object"
       },
       "RuntimeModeActivated": {
@@ -39225,6 +39287,56 @@
           }
         },
         "summary": "List Provider Models"
+      }
+    },
+    "/api/models/{profile_id}/routing": {
+      "put": {
+        "description": "Save OpenRouter routing preferences beside the saved connection.\n\nHermes Agent's ``provider_routing``, for the two preferences that matter to\nan owner: whether a request may reach providers that store prompts, and\nwhat to prefer when several serve the model. They describe how this\naccount's requests are routed, so they live with its connection; the key is\nnever re-entered and never touched.",
+        "operationId": "set_model_routing_api_models__profile_id__routing_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRoutingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Model Routing"
       }
     },
     "/api/models/{profile_id}/weekly-budget": {

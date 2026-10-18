@@ -182,6 +182,13 @@ def _budget(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     return "/api/models/anthropic-hosted/weekly-budget", {"token_budget": 100000}
 
 
+def _routing(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
+    from raiker.models.connections import put_model_connection
+
+    put_model_connection(SQLiteStore(ws), OWNER, "openrouter-policy-gated", {"api_key": "sk-or-test"})
+    return "/api/models/openrouter-policy-gated/routing", {"data_collection": "deny", "sort": "price"}
+
+
 class _FakeCodex:
     """A local Codex client already signed in to a ChatGPT subscription."""
 
@@ -364,6 +371,7 @@ CASES: Cases = {
     ("GET", "/api/models"): plain("/api/models"),
     ("GET", "/api/models/weekly-usage"): plain("/api/models/weekly-usage"),
     ("PUT", "/api/models/{profile_id}/weekly-budget"): _budget,
+    ("PUT", "/api/models/{profile_id}/routing"): _routing,
     ("GET", "/api/models/spend-limit"): plain("/api/models/spend-limit"),
     ("PUT", "/api/models/spend-limit"): plain("/api/models/spend-limit", {"limit_usd": 12.5}),
     ("GET", "/api/models/chatgpt-codex/status"): patched(plain("/api/models/chatgpt-codex/status"), _fake_codex),

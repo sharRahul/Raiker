@@ -459,6 +459,17 @@ class ModelConnectionRequest(StrictRequest):
     workspace_id: str | None = None
 
 
+class ModelRoutingRequest(StrictRequest):
+    """OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``).
+
+    ``""`` clears a preference back to the account default. Only values
+    OpenRouter defines are accepted, so nothing else reaches a request body.
+    """
+
+    data_collection: Literal["", "deny"] = ""
+    sort: Literal["", "price", "throughput", "latency"] = ""
+
+
 class ModelCatalogueRefreshRequest(StrictRequest):
     """An owner-requested refresh of known, connected provider catalogues."""
 

@@ -288,6 +288,14 @@ class ConnectionSet(TypedDict):
     connection_configured: bool
 
 
+class RoutingSet(TypedDict):
+    """OpenRouter routing preferences as saved; empty strings mean the account default."""
+
+    ok: bool
+    data_collection: str
+    sort: str
+
+
 class CatalogueRefreshed(TypedDict):
     """One explicit refresh of the connected providers' model lists, provider by provider."""
 

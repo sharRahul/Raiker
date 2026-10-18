@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**406 operations: 393 verified, 0 eligible, 0 deferred, 13 special.**
+**407 operations: 394 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -296,6 +296,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/models/{profile_id}/connection` | ModelConnectionRequest | ConnectionSet | verified | declared ConnectionSet |
 | PUT | `/api/models/{profile_id}/price` | ModelPriceRequest | PriceSet | verified | declared by cast |
 | GET | `/api/models/{profile_id}/provider-models` |  | ProviderModelListView | verified | DashboardService.list_provider_models |
+| PUT | `/api/models/{profile_id}/routing` | ModelRoutingRequest | RoutingSet | verified | declared RoutingSet |
 | PUT | `/api/models/{profile_id}/weekly-budget` | ModelWeeklyBudgetRequest | WeeklyBudgetSet | verified | declared WeeklyBudgetSet |
 | GET | `/api/notifications` |  | NotificationView[] | verified | DashboardService.list_notifications |
 | GET | `/api/notifications/delivery` |  | NotificationDelivery | verified | declared NotificationDelivery |

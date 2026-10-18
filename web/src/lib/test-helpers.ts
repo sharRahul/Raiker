@@ -259,6 +259,8 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     selected: false,
     connection_configured: false,
     model_locations: {},
+    routing_data_collection: "",
+    routing_sort: "",
     usage_admin_configured: false,
     workspace_configured: false,
     prompt_cache_ttl: null,

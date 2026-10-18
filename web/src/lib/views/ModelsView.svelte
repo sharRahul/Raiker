@@ -712,6 +712,30 @@
     selectError = null;
   }
 
+  type RoutingSort = "" | "price" | "throughput" | "latency";
+  let routingBusy = $state(false);
+  let routingNote = $state("");
+  /** Save OpenRouter routing preferences; they apply from the next request. */
+  async function saveRouting(profile: ModelProfile, dataCollection: "" | "deny", sort: RoutingSort) {
+    routingBusy = true;
+    routingNote = "";
+    try {
+      await api.setModelRouting(profile.profile_id, dataCollection, sort);
+      routingNote =
+        dataCollection === "deny"
+          ? "Saved. Requests go only to providers that do not store prompts; some free models may then have none."
+          : "Saved. It applies from the next request.";
+      await load();
+    } catch (e) {
+      routingNote =
+        e instanceof ApiError
+          ? `Could not save routing (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not save routing";
+    } finally {
+      routingBusy = false;
+    }
+  }
+
   async function select(profileId: string, model = "") {
     selecting = true;
     selectError = null;
@@ -1680,6 +1704,42 @@
                           {/if}
                         </p>
                       {/if}
+                      {#if p.provider === "openrouter" && p.connection_configured}
+                        <!-- Hermes Agent's provider_routing, as two owner choices.
+                             Nothing is denied by default: denying data collection
+                             leaves some free models with no provider at all. -->
+                        <fieldset class="pc-routing" aria-label="OpenRouter routing">
+                          <label class="pc-routing-check">
+                            <input
+                              type="checkbox"
+                              checked={p.routing_data_collection === "deny"}
+                              disabled={routingBusy}
+                              onchange={(e) =>
+                                void saveRouting(p, e.currentTarget.checked ? "deny" : "", p.routing_sort as RoutingSort)}
+                            />
+                            Only providers that do not store prompts
+                          </label>
+                          <label class="pc-routing-sort">
+                            <span>Prefer</span>
+                            <select
+                              value={p.routing_sort}
+                              disabled={routingBusy}
+                              onchange={(e) =>
+                                void saveRouting(
+                                  p,
+                                  p.routing_data_collection === "deny" ? "deny" : "",
+                                  e.currentTarget.value as RoutingSort,
+                                )}
+                            >
+                              <option value="">OpenRouter's default</option>
+                              <option value="price">Lowest price</option>
+                              <option value="throughput">Highest throughput</option>
+                              <option value="latency">Lowest latency</option>
+                            </select>
+                          </label>
+                          {#if routingNote}<p class="pc-routing-note" role="status">{routingNote}</p>{/if}
+                        </fieldset>
+                      {/if}
                       {#if isCodexSubscription(p) && codexSubscriptionNotice}
                         <p class="test-result" role="status">{codexSubscriptionNotice}</p>
                       {/if}
@@ -2538,4 +2598,9 @@
       gap: 8px;
     }
   }
+  .pc-routing { border: 1px solid var(--border); border-radius: var(--r-md); padding: .55rem .7rem; margin: .5rem 0 0; display: grid; gap: .45rem; font-size: var(--text-sm); }
+  .pc-routing-check { display: flex; align-items: center; gap: .45rem; }
+  .pc-routing-sort { display: flex; align-items: center; gap: .5rem; }
+  .pc-routing-sort select { flex: 1; min-width: 0; }
+  .pc-routing-note { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
 </style>

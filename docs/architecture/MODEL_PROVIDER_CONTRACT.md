@@ -187,7 +187,7 @@ vault and governed gates. What each has:
 | Credential pools (same-provider key rotation) | One credential per provider | Gap |
 | Auxiliary per-task models (vision, compression, web) with their own fallback | Advisor model; compaction and vision use the turn's model | Gap |
 | Context-length chain (pin → provider → cache → `/models` → … → 128K) | Configured and provider-published facts; Unknown when neither states it | Partial — no pin, no local-server probe |
-| OpenRouter `provider_routing` (`sort`, `only`, `ignore`, `data_collection`) | Not sent | Gap — `data_collection: deny` matters to Raiker's posture |
+| OpenRouter `provider_routing` (`sort`, `only`, `ignore`, `data_collection`) | `data_collection: deny` and `sort`, set on the OpenRouter card, saved with the connection | Shipped 2026-10-18 (FIXED-934); `only`/`ignore`/`order` not exposed |
 | App attribution to OpenRouter | `HTTP-Referer` + `X-Title: Raiker` | Shipped 2026-10-18; Raiker never presents itself as another app |
 | Local tool-calling requirements (llama.cpp `--jinja`, vLLM tool parser, Ollama `num_ctx`) | Ollama models without the `tools` capability are sent no tools; text-JSON tool fallback | Partial |
 

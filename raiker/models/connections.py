@@ -76,3 +76,22 @@ def clear_model_connection(store: SQLiteStore, principal_id: str, profile_id: st
             (principal_id, f"{_PREFIX}{profile_id}"),
         )
     store.forget_provider_catalogue(principal_id, profile_id)
+
+
+# OpenRouter routing preferences (Hermes Agent's ``provider_routing``). Not
+# credentials: they ride with the connection because they describe how this
+# account's requests are routed. Unset means "OpenRouter's account default".
+ROUTING_DATA_COLLECTION = ("deny",)
+ROUTING_SORT = ("price", "throughput", "latency")
+
+
+def openrouter_routing(connection: dict[str, str] | None) -> dict[str, str]:
+    """The ``provider`` object an OpenRouter request carries, from the saved values."""
+    values = connection or {}
+    routing: dict[str, str] = {}
+    if values.get("routing_data_collection") in ROUTING_DATA_COLLECTION:
+        routing["data_collection"] = values["routing_data_collection"]
+    if values.get("routing_sort") in ROUTING_SORT:
+        routing["sort"] = values["routing_sort"]
+    return routing
+

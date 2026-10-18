@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from raiker.contracts.models import ModelProfile
-from raiker.models.connections import validated_workspace_id
+from raiker.models.connections import openrouter_routing, validated_workspace_id
 from raiker.models.contracts import ModelCapabilities
 from raiker.models.endpoint_policy import (
     EndpointPolicy,
@@ -359,4 +359,9 @@ class ModelProviderFactory:
             embeddings_path=str(raw.get("embeddings_path", "/v1/embeddings")),
             extra_headers=headers,
             client=self._client_for(endpoint, timeout),
+            extra_body=(
+                {"provider": routing}
+                if resolved.provider == "openrouter" and (routing := openrouter_routing(self.connection))
+                else {}
+            ),
         )

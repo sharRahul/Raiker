@@ -130,7 +130,8 @@ class TestTheHeaderIsSentOnlyWhenNamed:
             _anthropic_profile()
         )
         assert provider._http.headers["anthropic-workspace-id"] == "wrkspc_01"
-        assert provider._http.headers["x-api-key"] == "sk-test"
+        assert provider._http.headers["Authorization"] == "Bearer sk-test"
+        assert "x-api-key" not in provider._http.headers
 
     def test_a_standard_key_is_not_sent_an_empty_workspace(self) -> None:
         """An empty header is not the same as no header, and would be refused."""
@@ -160,6 +161,20 @@ class TestARejectedIdIsNotAMissingOne:
     @pytest.mark.parametrize("status", [401, 403, 429, 500])
     def test_only_a_400_is_considered(self, status: int) -> None:
         assert workspace_id_rejected(status, INVALID_BODY) is False
+
+    def test_a_workspace_the_key_cannot_use_is_a_404_not_a_missing_model(self) -> None:
+        """Live API, 2026-10-18: a well-formed id the key has no access to."""
+        body = (
+            '{"type":"error","error":{"type":"not_found_error",'
+            '"message":"Workspace `22a87871-1084-49bf-8fcd-e3caa033fbe8` not found."}}'
+        )
+        assert workspace_id_rejected(404, body) is True
+        for mapper in _MAPPERS:
+            exc = mapper(404, model="m", body=body)
+            assert provider_error_code(exc) == "provider_workspace_invalid:http_404"
+        # An ordinary 404 is still a missing model.
+        model_body = '{"error":{"type":"not_found_error","message":"model: claude-x"}}'
+        assert workspace_id_rejected(404, model_body) is False
 
     @pytest.mark.parametrize("mapper", _MAPPERS, ids=["anthropic_messages", "shared"])
     def test_both_providers_raise_the_invalid_code(self, mapper: Any) -> None:

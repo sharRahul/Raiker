@@ -254,7 +254,10 @@ class ModelProviderFactory:
             raise ProviderConfigurationError("hosted_api_key_missing")
         if provider == "anthropic":
             if api_key:
-                headers["x-api-key"] = api_key
+                # Anthropic's authentication guide sends every key type —
+                # workspace, personal and service-account (identity-linked) —
+                # as a bearer token and calls `x-api-key` the legacy header.
+                headers["Authorization"] = f"Bearer {api_key}"
             # BUG-274 — an identity-linked key authenticates only when the
             # request names the workspace it acts in. Optional: a standard
             # console key needs no workspace and must not be sent an empty one,

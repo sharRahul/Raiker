@@ -1051,9 +1051,49 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
           String(c[0]).includes("/api/model-selection"),
       );
       expect(put).toBeTruthy();
+      // The model the card shows is the model selected — never "the
+      // profile's default", which for a placeholder profile is no model.
       expect(JSON.parse(put![1]!.body as string)).toEqual({
         profile_id: "raiker-local-llama-cpp",
-        model: null,
+        model: "local-gguf",
+      });
+    });
+  });
+
+  it("selects the model a connected hosted card shows, not its placeholder", async () => {
+    // Reported 2026-10-18: OpenAI and OpenRouter answered **Select** with
+    // `model_required_for_profile`, because the card showed the kept model
+    // and the button sent none.
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "openai-hosted",
+            provider: "openai",
+            model: "gpt-5.1",
+            local_only: false,
+            off_machine: true,
+            requires_network: true,
+            endpoint_kind: "remote_hosted",
+            connection_configured: true,
+            configured: true,
+          }),
+        ],
+      }),
+      "PUT /api/model-selection": { ok: true, profile_id: "openai-hosted", model: "gpt-5.1" },
+    });
+    render(ModelsView, { tab: "add" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Select" }));
+    await waitFor(() => {
+      const put = mock.mock.calls.find(
+        (c) =>
+          (c[1]?.method ?? "GET").toUpperCase() === "PUT" &&
+          String(c[0]).includes("/api/model-selection"),
+      );
+      expect(put).toBeTruthy();
+      expect(JSON.parse(put![1]!.body as string)).toEqual({
+        profile_id: "openai-hosted",
+        model: "gpt-5.1",
       });
     });
   });

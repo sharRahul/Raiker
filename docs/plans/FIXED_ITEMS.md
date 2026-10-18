@@ -950,6 +950,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-926](#fixed-926--a-real-model-read-real-weather-from-open-meteo-was-bug-280) | Low | Weather / live provider evidence | Fixed 2026-10-18 (was BUG-280 remainder) |
 | [FIXED-927](#fixed-927--a-ready-ollama-model-without-tool-support-failed-every-turn-with-http-400) | High | Models / Ollama / turns | Fixed 2026-10-18 — found in the BUG-318 round |
 | [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there) | Low | Settings | Fixed 2026-10-18 — found in the BUG-280 round |
+| [FIXED-929](#fixed-929--select-on-a-connected-openai-or-openrouter-card-was-refused-with-model_required_for_profile) | High | Models / selection | Fixed 2026-10-18 — owner-reported while testing BUG-287 |
+| [FIXED-930](#fixed-930--an-anthropic-workspace-the-key-cannot-use-was-reported-as-a-missing-model) | Medium | Models / Anthropic identity-linked keys | Fixed 2026-10-18 — checked against the live API |
 
 ---
 
@@ -33499,3 +33501,29 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** It recomputes dirty state from the keys that differ from the server snapshot.
 
 **Evidence.** `SettingsView.test.ts` ("does not call choosing the stored value an unsaved change"); reproduced and re-checked in the browser.
+
+---
+
+## FIXED-929 — Select on a connected OpenAI or OpenRouter card was refused with model_required_for_profile
+
+**Severity: High. Area: Models / selection. Status: Fixed 2026-10-18 — reported by the owner while testing BUG-287.**
+
+**Observed.** With OpenAI and OpenRouter connected and a model kept on each, the card's **Select** answered *Could not select (403: model_required_for_profile:openai-hosted)* and *(…:openrouter-policy-gated)*.
+
+**Root cause.** Both profiles ship the placeholder `<model>`. Once the owner keeps a model, the card shows it and offers **Select** — but all three **Select** buttons on Models (local rows, hosted cards, the Runtime tab) sent the profile id with no model, so the server resolved the placeholder and refused it correctly. The existing test asserted the bug (`model: null`).
+
+**Fixed.** `ModelsView.svelte` sends the model the card shows. The server rule is unchanged: a placeholder is still never selectable.
+
+**Evidence.** `ModelsView.test.ts` — "selects the model a connected hosted card shows, not its placeholder" and the corrected direct-select test (144 Models tests).
+
+---
+
+## FIXED-930 — An Anthropic workspace the key cannot use was reported as a missing model
+
+**Severity: Medium. Area: Models / Anthropic identity-linked keys. Status: Fixed 2026-10-18.**
+
+**Observed.** Checked against the live API with the round's identity-linked key: a well-formed workspace id the key has no access to answers HTTP **404** *Workspace `…` not found.* Raiker read only 400s as workspace refusals, so this became `model_not_found` and sent the owner looking for a model.
+
+**Fixed.** `workspace_id_rejected` also reads a 404 whose body says a workspace was not found, so it reaches the owner as `provider_workspace_invalid` with *Check the workspace ID*. Anthropic's [authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication) sends every key type as `Authorization: Bearer` and calls `x-api-key` legacy; Raiker now sends Anthropic keys the same way, with `anthropic-workspace-id` only when one is named.
+
+**Evidence.** `tests/test_provider_workspace_named.py`. Live, through Raiker's own provider: the identity-linked key with its workspace listed `claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1` and answered a one-token request *OK*; without the workspace the API refused with the missing-workspace message Raiker already classifies; with a wrong workspace it now reports `provider_workspace_invalid:http_404`.

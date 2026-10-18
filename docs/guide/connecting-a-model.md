@@ -324,9 +324,13 @@ Anthropic issues API keys only — there is no account sign-in to connect.
 
 ### An identity-linked key needs its workspace
 
-Some Anthropic keys are **identity-linked**: they authenticate perfectly well and
-act inside one workspace, so the provider refuses any request that does not name
-which. Raiker says so and offers the field rather than telling you to go and find
+Some Anthropic keys are **identity-linked** — a *personal* or *service account*
+key created without being scoped to one workspace (Anthropic's
+[authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication)
+explains the key types). They authenticate perfectly well, but each request must
+name the workspace it acts in, so the provider refuses any request that does not.
+The workspace ID starts `wrkspc_` and is in the **ID** column of **Settings →
+Workspaces** in the Claude Console. Raiker says so and offers the field rather than telling you to go and find
 a different key:
 
 > *This key is identity-linked, so it acts inside one workspace. Add the
@@ -347,8 +351,12 @@ appears at once; the providers fill in as they answer.
 
 If the provider then says it does not recognise the workspace, that is a
 different message with a different fix — check the id against the one in the
-console. Raiker never repeats the "add a workspace" ask for a value you have
-already given.
+console. That covers both a malformed id and a well-formed one your key has no
+access to (Anthropic answers the second with *Workspace not found*). Raiker never
+repeats the "add a workspace" ask for a value you have already given.
+
+Raiker sends every Anthropic key the way that guide does, as a bearer token, with
+the workspace header only when you have named one.
 
 ### Using a ChatGPT subscription instead of a key
 

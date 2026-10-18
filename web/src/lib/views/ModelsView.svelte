@@ -1373,7 +1373,7 @@
                           <button
                             type="button"
                             class="btn btn-sm"
-                            onclick={() => void select(p.profile_id)}
+                            onclick={() => void select(p.profile_id, p.model)}
                             disabled={selecting}>Select</button
                           >
                         {/if}
@@ -1618,7 +1618,7 @@
                           <button
                             type="button"
                             class="btn btn-sm"
-                            onclick={() => void select(p.profile_id)}
+                            onclick={() => void select(p.profile_id, p.model)}
                             disabled={selecting}>Select</button
                           >
                         {/if}
@@ -1733,7 +1733,7 @@
         {selecting}
         ontest={(profile) => void testConnection(profile)}
         ondetails={(profile) => (detailsFor = profile)}
-        onselect={(profile) => void select(profile.profile_id)}
+        onselect={(profile) => void select(profile.profile_id, profile.model)}
       />
     </div>
   {/if}

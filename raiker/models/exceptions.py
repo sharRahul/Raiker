@@ -226,16 +226,28 @@ def needs_workspace_id(status: int, body: str) -> bool:
     )
 
 
+#: A well-formed workspace the key cannot use. Anthropic answers it with
+#: HTTP 404 ``Workspace `<id>` not found.`` — verified against the live API on
+#: 2026-10-18 — and the id sits between the two words, so no literal matches.
+_WORKSPACE_NOT_FOUND = re.compile(r"\bworkspace\b.{0,200}\bnot found\b", re.DOTALL)
+
+
 def workspace_id_rejected(status: int, body: str) -> bool:
     """True when the provider refused the workspace the owner named.
 
     Read under the same rule as :func:`needs_workspace_id`: the body decides the
     classification and nothing from it survives the call, so a message naming an
     organisation cannot reach an event or a readiness record.
+
+    A malformed id is a 400; a well-formed one the key may not use is a 404.
+    Read as a 404 alone, that was reported as ``model_not_found`` and sent the
+    owner looking for a model when the workspace field was what needed fixing.
     """
+    haystack = body.casefold()
+    if status == 404:
+        return bool(_WORKSPACE_NOT_FOUND.search(haystack))
     if status != 400:
         return False
-    haystack = body.casefold()
     return any(marker in haystack for marker in _WORKSPACE_INVALID_MARKERS)
 
 

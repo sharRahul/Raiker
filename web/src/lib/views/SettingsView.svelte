@@ -133,9 +133,11 @@
   function save(patch: Record<string, unknown>) {
     settings = { ...settings, ...patch };
     for (const key of Object.keys(patch)) keySection[key] = active;
-    dirty = true;
-    if (!dirtySections.includes(active)) dirtySections = [...dirtySections, active];
-    saveState = "idle";
+    // Choosing the value already stored is not a change. Marking it one put up
+    // "You have unsaved changes" beside "All changes saved", and the leave guard
+    // then held the owner on a page with nothing to save.
+    recomputeDirty();
+    if (dirty) saveState = "idle";
   }
 
   /** Restate what is still unsaved, from the keys rather than from a flag. */

@@ -942,6 +942,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-918](#fixed-918--a-narrow-window-let-the-page-title-run-under-the-mode-switch) | Low | Web UI / top bar | Fixed 2026-10-17 — found in the round |
 | [FIXED-919](#fixed-919--first-run-choose-a-model-took-two-presses-of-two-buttons-with-one-name-was-bug-344) | Low | Models / first-run UX | Fixed 2026-10-17 (was BUG-344) — found in the round |
 | [FIXED-920](#fixed-920--signed-installers-did-not-carry-the-desktop-window-and-needed-a-system-python-was-bug-343) | High | Desktop / release | Fixed 2026-10-17 (was BUG-343) — ADR-0003 |
+| [FIXED-921](#fixed-921--a-cloud-ollama-model-was-described-as-never-leaving-the-device-was-bug-340) | High | Models / setup / privacy truthfulness | Fixed 2026-10-18 (was BUG-340) — live against a real Ollama |
+| [FIXED-922](#fixed-922--raiker-app-joined-a-host-serving-a-different-workspace-was-bug-342) | Medium | Desktop / host lifecycle | Fixed 2026-10-18 (was BUG-342) — live with two workspaces |
+| [FIXED-923](#fixed-923--owner-bootstrap-emitted-a-password-form-diagnostic-was-bug-341) | Medium | Account bootstrap / accessibility | Fixed 2026-10-18 (was BUG-341) — headed Chromium + axe |
+| [FIXED-924](#fixed-924--a-lapsed-lease-met-an-immutable-receipt-on-windows-and-a-redirect-test-saw-a-reset-was-bug-330) | Low | Tests / Windows / background execution | Fixed 2026-10-18 (was BUG-330 remainder) |
+| [FIXED-925](#fixed-925--the-ollama-journey-is-now-proven-against-a-real-ollama-was-bug-318) | Low | Models / Ollama / evidence | Fixed 2026-10-18 (was BUG-318) — real service, Ollama off PATH |
+| [FIXED-926](#fixed-926--a-real-model-read-real-weather-from-open-meteo-was-bug-280) | Low | Weather / live provider evidence | Fixed 2026-10-18 (was BUG-280 remainder) |
+| [FIXED-927](#fixed-927--a-ready-ollama-model-without-tool-support-failed-every-turn-with-http-400) | High | Models / Ollama / turns | Fixed 2026-10-18 — found in the BUG-318 round |
+| [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there) | Low | Settings | Fixed 2026-10-18 — found in the BUG-280 round |
 
 ---
 
@@ -33388,3 +33396,106 @@ installation cases in `tests/test_api_contract_responses.py`.
 
 **Evidence.** [Release acceptance matrix](RELEASE_ACCEPTANCE_MATRIX.md): every native target PASS in CI run 39041854653 (commit `914b60a`), including the real Windows and macOS windows this item asked for. Signing with real identities is unexercised until the release owner adds them; the pipeline refuses to publish without them.
 
+---
+
+## FIXED-921 — A cloud Ollama model was described as never leaving the device (was BUG-340)
+
+**Severity: High. Area: Models / setup / privacy truthfulness. Status: Fixed 2026-10-18 (was BUG-340).**
+
+**Observed.** First-run setup recommended a running Ollama with *"its models never leave this device"*, and kept saying so after the owner chose `gpt-oss:20b-cloud`, a model Ollama serves from ollama.com. The comparison table placed the same model *On this device*, and Models' own `-cloud` check missed `…:cloud` names.
+
+**Root cause.** The claim was made about the runtime (Ollama runs here), never about the model. Ollama's `/api/tags` already says where each model runs (`remote_host` on cloud models), and nothing read it.
+
+**Fixed.** `raiker/models/local_service.py` records each served model's location (`device`, or the host Ollama names; a Cloud-named model with no `remote_host` is treated as remote) and `ModelProfileView.model_locations` carries it. One rule, `web/src/lib/inferenceLocation.ts`, decides the wording everywhere: setup's recommendation earns the device claim only when every served model runs here and otherwise names ollama.com; the chosen model's line says where its requests go; the privacy step names the chosen model's destination; the comparison and Models' *Cloud inference* chip use the same rule.
+
+**Evidence.** `tests/test_local_model_service.py`, `inferenceLocation.test.ts`, `firstRun.test.ts`, `modelComparison.test.ts`. Live: `web/e2e/bug-340-ollama-cloud-location-live.spec.ts` on a reset workspace against the real Ollama 0.40.5 on this host — no screen claims the device for the cloud model, and the turn was answered `RAIKER_E2E_OK` by `gpt-oss:20b-cloud` with the runtime's *model request completed* receipt (`docs/screenshots/2026-10-17-bug-340-ollama-cloud/01`–`06`). The *Local only* choice beside it is still unenforced — raised as [BUG-345](TO_BE_FIXED.md#bug-345--local-only-is-recorded-and-enforced-nowhere).
+
+---
+
+## FIXED-922 — raiker-app joined a host serving a different workspace (was BUG-342)
+
+**Severity: Medium. Area: Desktop / host lifecycle. Status: Fixed 2026-10-18 (was BUG-342).**
+
+**Observed.** With workspace A's host on 8765, `raiker-app --workspace B` opened A's sign-in page and never started B.
+
+**Root cause.** `choose_port` asked `/api/health` whether *a* Raiker answered, never whose. A second defect hid under it on Windows: `port_is_free` probed with `SO_REUSEADDR`, which there lets a bind succeed over a live listener that set it too.
+
+**Fixed.** `choose_port(preferred, workspace=…)` joins this workspace's own host wherever its `HostControl` record says it is, and otherwise passes over any Raiker on the preferred port like any other listener. `raiker-web` now writes and clears the same host record `raiker-app` does, so a web-started host is still joined rather than doubled. Windows probes with `SO_EXCLUSIVEADDRUSE`.
+
+**Evidence.** `tests/test_app_launcher.py` (two workspaces and one preferred port over real sockets; a workspace's host joined on the port it recorded). Live: with `raiker-web` serving A on 8765, `raiker-app --workspace A` joined 8765 and `raiker-app --workspace B` started on 8766 with its own host record.
+
+---
+
+## FIXED-923 — Owner bootstrap emitted a password-form diagnostic (was BUG-341)
+
+**Severity: Medium. Area: Account bootstrap / accessibility. Status: Fixed 2026-10-18 (was BUG-341).**
+
+**Observed.** A fresh workspace logged *"[DOM] Password forms should have (optionally hidden) username fields"* in Chromium, though the settled form was correct.
+
+**Root cause.** Isolated in headed Chromium (the headless shell runs no password-form audit, which is why earlier isolated reproductions were silent): the sign-in form is drawn before bootstrap status answers, then grows a second password field in place when it does. The same final form drawn at once raises nothing; a form replaced whole raises nothing.
+
+**Fixed.** `LoginView.svelte` draws the credentials form under `{#key registerIntent}`, so the switch from sign-in to registration replaces the form whole. The keyboard path, password visibility and the disabled-while-verifying state are unchanged. The lock screen's `<main>` also gained the `id="main"` its skip link targets.
+
+**Evidence.** `LoginView.test.ts` (19). Headed Chromium on three fresh workspaces: no `[DOM]` diagnostic (three of three reproduced before). axe on the first-run form: 0 violations (was `region`, `skip-link`). Capture: `docs/screenshots/2026-10-17-bug-341-bootstrap/01-first-run-form-no-password-diagnostic.png`.
+
+---
+
+## FIXED-924 — A lapsed lease met an immutable receipt on Windows, and a redirect test saw a reset (was BUG-330)
+
+**Severity: Low. Area: Tests / Windows / background execution. Status: Fixed 2026-10-18 (BUG-330 remainder; the fixture half was [FIXED-901](#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330)).**
+
+**Observed.** On Windows the lease-reclaim test failed ten of ten (`command_receipt_immutable`) and the redirect test two of ten (`mcp_remote_unreachable`).
+
+**Root cause.** `reconcile_leases` killed the process before writing the lease-expired receipt; the run's own watcher saw the exit and finalised first (termination is synchronous on Windows), so the honest receipt could not be written — product behaviour, not a test artefact. The redirect stand-in answered 307 without reading the POST body, and Windows resets a socket closed with unread data.
+
+**Fixed.** `raiker/execution/commands/service.py` writes the receipt first and terminates after; the watcher then finds a terminal run and stands down. The stand-in reads the body as a real server does.
+
+The full Windows run for this round found two more POSIX assumptions, both failing on clean `main` too: an exec-bit assertion on a Linux-only AppImage (`tests/test_desktop_update.py`, now asserted off Windows only) and an unquoted `GIT_EXTERNAL_DIFF` command whose backslashes `sh` ate (`tests/test_local_git_environment.py`, now quoted with forward slashes).
+
+**Evidence.** Windows 11: `tests/test_background_execution.py` six of six; the lease test with `tests/test_mcp_remote_transport_trust.py` twelve of twelve; `tests/test_desktop_update.py` and `tests/test_local_git_environment.py` pass.
+
+---
+
+## FIXED-925 — The Ollama journey is now proven against a real Ollama (was BUG-318)
+
+**Severity: Low. Area: Models / Ollama / evidence. Status: Fixed 2026-10-18 (was BUG-318).**
+
+**Observed.** The 2026-10-04 round had driven detection, choice, readiness and a turn against `scripts/live_ollama_standin.py`, because that host could not download Ollama.
+
+**Evidence.** `round-2026-10-04-ollama-and-readiness-live.spec.ts` first test, brought up to the product (setup's Check stage; a real answer instead of the stand-in's sentence, and a refusal no longer passes as one), against the Ollama desktop app 0.40.5 serving twelve models, with `raiker-web` started on a `PATH` that excludes Ollama's folder: detected as running, `gemma3:1b` chosen and Ready, remembered, and a real answer ("Hello!") in Chat (`docs/screenshots/2026-10-04-ollama-readiness-round/01`–`05`). The round found [FIXED-927](#fixed-927--a-ready-ollama-model-without-tool-support-failed-every-turn-with-http-400). The stop-and-start half still runs only with the stand-in's pidfile; stopping the owner's real Ollama was not done.
+
+---
+
+## FIXED-926 — A real model read real weather from Open-Meteo (was BUG-280)
+
+**Severity: Low. Area: Weather / live provider evidence. Status: Fixed 2026-10-18 (BUG-280 remainder; the clock half was [FIXED-539](#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here)).**
+
+**Evidence.** This host reaches `api.open-meteo.com`. `web/e2e/bug-280-weather-from-a-real-provider-live.spec.ts`, with `gpt-oss:20b-cloud` through the local Ollama: the zone and default place set through Settings, then *"What is today's date … what is the weather here right now?"* answered *"Today is 2026-10-18 (Sunday). The current weather in Edinburgh … Clear sky, 5.5 °C … observed at 2026-10-18T00:15. This reading comes from the Open-Meteo provider"*, with the weather source chip and *Evidence: 1 call · 1 source* (`docs/screenshots/2026-10-17-bug-280-weather/`). The round found [FIXED-928](#fixed-928--choosing-the-value-already-saved-marked-settings-unsaved-and-held-the-owner-there).
+
+---
+
+## FIXED-927 — A Ready Ollama model without tool support failed every turn with HTTP 400
+
+**Severity: High. Area: Models / Ollama / turns. Status: Fixed 2026-10-18 — found in the BUG-318 round.**
+
+**Observed.** `gemma3:1b`, chosen in setup and shown Ready, answered every Chat turn with *"the provider refused the request … provider_http_error:http_400"*.
+
+**Root cause.** Raiker sends the turn's tool list to every Ollama model. Ollama refuses tools for a model it lists without the `tools` capability (`does not support tools`), and the readiness check — a catalogue read — never sends tools, so it said Ready.
+
+**Fixed.** The liveness probe records each model's published `capabilities`; `ModelRouter` sends a turn on a model the service lists without `tools` with no tools at all. That is only ever less authority: the model answers and can call nothing. A model whose capabilities were not published is not second-guessed.
+
+**Evidence.** `tests/test_model_router.py`, `tests/test_local_model_service.py`; the FIXED-925 round answered on `gemma3:1b`.
+
+---
+
+## FIXED-928 — Choosing the value already saved marked Settings unsaved and held the owner there
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-18 — found in the BUG-280 round.**
+
+**Observed.** Re-selecting the stored time zone showed *You have unsaved changes* beside *All changes saved* and an unsaved dot on General, and the leave guard then held the owner on a page with nothing to save.
+
+**Root cause.** `SettingsView.save()` set `dirty = true` for any change event, whatever the value.
+
+**Fixed.** It recomputes dirty state from the keys that differ from the server snapshot.
+
+**Evidence.** `SettingsView.test.ts` ("does not call choosing the stored value an unsaved change"); reproduced and re-checked in the browser.

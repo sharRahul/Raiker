@@ -493,13 +493,23 @@ class CommandService:
                 continue
             with self._lock:
                 handle = self._active.pop(run.run_id, None)
+            current = self.store.load(owner_principal_id, run.run_id)
+            if current is None or current.state in TERMINAL_COMMAND_STATES:
+                if handle is not None:
+                    with contextlib.suppress(Exception):
+                        handle.terminate()
+                continue
+            # BUG-330 — the receipt is written *before* the process is killed.
+            # Killing first let the run's own watcher see the exit and finalise
+            # it with an ordinary receipt (immediately on Windows, where
+            # termination is synchronous), and the lease-expired receipt then
+            # met `command_receipt_immutable`. Written first, the watcher's
+            # `_finalize` finds a terminal run and stands down, and the receipt
+            # names the real reason.
+            self._recover_run(current, reason="command_background_lease_expired")
             if handle is not None:
                 with contextlib.suppress(Exception):
                     handle.terminate()
-            current = self.store.load(owner_principal_id, run.run_id)
-            if current is None or current.state in TERMINAL_COMMAND_STATES:
-                continue
-            self._recover_run(current, reason="command_background_lease_expired")
             reclaimed.append(run.run_id)
         return reclaimed
 

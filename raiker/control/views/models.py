@@ -114,6 +114,11 @@ class ModelProfileView(View):
     # runtimes Raiker can ask over loopback (Ollama). `None` for every other
     # profile, and for one whose endpoint is off-machine: not asked, not "off".
     provider_running: bool | None = None
+    # BUG-340 — where each model the running local service serves is processed:
+    # "device", or the remote host the service itself names. A runtime on this
+    # machine can still serve cloud models, so device-only wording is earned per
+    # model from this map; a model missing from it has an unknown location.
+    model_locations: dict[str, str] = field(default_factory=dict)
     readiness_state: ReadinessState = "not_configured"
     readiness_summary: str = "No readiness check exists for this exact model."
     readiness_reason_code: str = "model_not_checked"

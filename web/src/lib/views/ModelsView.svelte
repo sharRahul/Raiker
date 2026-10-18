@@ -25,6 +25,7 @@
     unreachableProviderNote,
     type ProviderErrorGuidance,
   } from "../providerErrors";
+  import { inferenceLocation } from "../inferenceLocation";
   import { modelName } from "../modelPresentation";
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { isChoosableModel } from "../modelReadiness.svelte";
@@ -891,7 +892,9 @@
   }
 
   function usesCloudInference(profile: ModelProfile): boolean {
-    return profile.provider === "ollama" && profile.model.trim().toLowerCase().endsWith("-cloud");
+    // BUG-340 — the running service's own answer (`remote_host`), with the
+    // model's Cloud name as the fallback; one rule for every surface.
+    return profile.local_only && inferenceLocation(profile, profile.model).kind === "remote";
   }
 
   function usageLine(profile: ModelProfile): string {

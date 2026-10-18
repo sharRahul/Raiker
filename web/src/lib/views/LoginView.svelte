@@ -297,7 +297,7 @@
     <ThemeToggle />
   </header>
 
-  <main class="lock-layout" aria-busy={isVerifying}>
+  <main id="main" class="lock-layout" aria-busy={isVerifying} tabindex="-1">
     <section class="hero">
       <!-- The Raiker governed core: the production rendered icon. Light theme
            shows the floating orb framed by decorative orbit rings; dark theme
@@ -396,6 +396,12 @@
             ? "Set up your Raiker account on this device."
             : "Authenticate to restore interactive control and open the governed workspace."}
         </p>
+        <!-- BUG-341 — a sign-in form and a registration form are different
+             forms, so the switch (bootstrap status answering, or "Create a User
+             Account") draws the new one whole. Growing the sign-in form a second
+             password field in place is what Chromium reported as a password form
+             without a username field; the same final form drawn at once is not. -->
+        {#key registerIntent}
         <form onsubmit={submitCredentials} aria-describedby="privacy-note">
           <label for="username">Username</label>
           <div class="field">
@@ -456,6 +462,7 @@
             {busy ? (registerIntent ? "Creating…" : "Unlocking…") : registerIntent ? "Create a User Account" : "Unlock Raiker"}
           </button>
         </form>
+        {/key}
 
         <!-- On first run there is no account yet, so account-switching, recovery,
              and secondary instance-creation controls have nothing to act on and

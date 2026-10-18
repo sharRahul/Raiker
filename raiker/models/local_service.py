@@ -62,6 +62,10 @@ WATCHED_RUNTIMES: frozenset[str] = frozenset(CATALOGUE_PATHS)
 _LOOPBACK_NAMES = {"localhost"}
 
 
+#: Where a served model's inference happens, when the service runs it itself.
+ON_DEVICE = "device"
+
+
 @dataclass(frozen=True)
 class ServiceLiveness:
     """One answer to "is this service running, and what does it serve"."""
@@ -71,6 +75,30 @@ class ServiceLiveness:
     running: bool
     models: tuple[str, ...]
     checked_at: str
+    #: BUG-340 — where each served model is processed: :data:`ON_DEVICE`, or the
+    #: remote host the service itself names (Ollama's ``remote_host``). A cloud
+    #: model is listed by the local service but its prompts leave the machine,
+    #: so a device-only claim may rest only on this answer, never on the
+    #: service being local.
+    locations: tuple[tuple[str, str], ...] = ()
+    #: What each served model says it can do (Ollama's ``capabilities``), for
+    #: the models whose entry carries the list. A model absent here has not
+    #: said, which is not the same as having said "nothing".
+    capabilities: tuple[tuple[str, frozenset[str]], ...] = ()
+
+    def location_of(self, model: str) -> str | None:
+        """:data:`ON_DEVICE`, a remote host, or ``None`` for a model not served."""
+        return dict(self.locations).get(model)
+
+    def declines_tools(self, model: str) -> bool:
+        """True only when the service listed ``model`` without the ``tools`` capability.
+
+        Ollama refuses a request that carries tools for such a model (HTTP 400,
+        "does not support tools"), so a turn on it must be sent without them.
+        A model whose capabilities were not published is never declined here.
+        """
+        declared = dict(self.capabilities).get(model)
+        return declared is not None and "tools" not in declared
 
 
 def service_root(endpoint: str) -> str | None:
@@ -99,21 +127,50 @@ def service_root(endpoint: str) -> str | None:
     return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
 
-def _catalogue(payload: object) -> tuple[str, ...] | None:
-    """The model names an ``/api/tags`` answer lists, or ``None`` if it is not one."""
+def _remote_host(entry: dict[str, object], name: str) -> str | None:
+    """The host a catalogue entry's inference runs on, or ``None`` when local.
+
+    Ollama marks a cloud model with ``remote_host`` (and ``remote_model``). An
+    older service that predates those fields still names its cloud models
+    ``…-cloud`` or ``…:cloud``; such a model is treated as remote with Ollama's
+    own cloud as the destination, because a device-only claim must be earned,
+    and a name that says Cloud has not earned it.
+    """
+    host = entry.get("remote_host")
+    if isinstance(host, str) and host.strip():
+        parsed = urlsplit(host.strip())
+        return (parsed.hostname or host.strip()).lower()
+    lowered = name.lower()
+    if lowered.endswith("-cloud") or lowered.endswith(":cloud"):
+        return "ollama.com"
+    return None
+
+
+def _catalogue(
+    payload: object,
+) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[str, frozenset[str]], ...]] | None:
+    """Each model an ``/api/tags`` answer lists, where it runs and what it can do.
+
+    ``None`` when the answer is not a catalogue at all.
+    """
     if not isinstance(payload, dict):
         return None
     entries = payload.get("models")
     if not isinstance(entries, list):
         return None
-    names: list[str] = []
+    listed: dict[str, str] = {}
+    abilities: dict[str, frozenset[str]] = {}
     for entry in entries:
         if not isinstance(entry, dict):
             continue
         name = entry.get("name") or entry.get("model")
-        if isinstance(name, str) and name.strip() and name.strip() not in names:
-            names.append(name.strip())
-    return tuple(names)
+        if not isinstance(name, str) or not name.strip() or name.strip() in listed:
+            continue
+        listed[name.strip()] = _remote_host(entry, name.strip()) or ON_DEVICE
+        declared = entry.get("capabilities")
+        if isinstance(declared, list):
+            abilities[name.strip()] = frozenset(str(item) for item in declared)
+    return tuple(listed.items()), tuple(abilities.items())
 
 
 def probe(runtime: str, endpoint: str, *, timeout: float = PROBE_TIMEOUT_SECONDS) -> ServiceLiveness:
@@ -132,11 +189,18 @@ def probe(runtime: str, endpoint: str, *, timeout: float = PROBE_TIMEOUT_SECONDS
         # proxy, which would either refuse it or — worse — answer for it.
         with httpx.Client(timeout=timeout, trust_env=False, follow_redirects=False) as client:
             response = client.get(f"{root}{path}")
-        models = _catalogue(response.json()) if response.status_code == 200 else None
+        listed = _catalogue(response.json()) if response.status_code == 200 else None
     except (httpx.HTTPError, ValueError):
-        models = None
+        listed = None
+    locations, abilities = listed if listed is not None else ((), ())
     return ServiceLiveness(
-        runtime, endpoint, models is not None, models or (), utc_now()
+        runtime,
+        endpoint,
+        listed is not None,
+        tuple(name for name, _ in locations),
+        utc_now(),
+        locations=locations,
+        capabilities=abilities,
     )
 
 

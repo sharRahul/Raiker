@@ -214,6 +214,10 @@ def test_the_real_transport_does_not_follow_a_redirect_itself() -> None:
 
     class _Redirecting(http.server.BaseHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802 - the name the base class dispatches on
+            # Read the request first, as a real server does. Closing a socket
+            # with unread data makes Windows send RST, and the client then saw
+            # a reset (`mcp_remote_unreachable`) instead of the 307 (BUG-330).
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
             self.send_response(307)
             self.send_header("Location", "http://169.254.169.254/latest/meta-data/")
             self.send_header("Content-Length", "0")

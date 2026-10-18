@@ -22,6 +22,7 @@
  */
 import type { ModelProfile } from "./apiTypes";
 import { providerName } from "./format";
+import { remoteDestinations } from "./inferenceLocation";
 import { isReachableProfile } from "./modelReadiness.svelte";
 
 /**
@@ -170,6 +171,28 @@ export interface RecommendedPath {
   action: "choose" | "workspace";
 }
 
+/**
+ * BUG-340 — what a runtime on this machine promises about where prompts go.
+ *
+ * A running Ollama can serve cloud models beside local ones, so "never leave
+ * this device" is said only when the service described every model it serves
+ * as running here. A runtime that described none earns no device claim at all.
+ */
+function runtimeDetail(profile: ModelProfile): string {
+  const locations = Object.values(profile.model_locations ?? {});
+  const remote = remoteDestinations(profile);
+  if (remote.length > 0) {
+    return (
+      "It needs no account and no API key. Models it runs here stay on this device; " +
+      `models marked Cloud send your prompts to ${remote.join(" and ")}.`
+    );
+  }
+  if (locations.length > 0) {
+    return "It needs no account and no API key, and its models never leave this device.";
+  }
+  return "It needs no account and no API key.";
+}
+
 /** True when a provider's last answer was that the key needs its workspace named. */
 function needsWorkspace(profile: ModelProfile, refusals: Readonly<Record<string, string | null>>): boolean {
   const code = refusals[profile.profile_id] ?? profile.readiness_reason_code ?? "";
@@ -219,8 +242,7 @@ export function recommendedPath(
       label: `${providerName(detected.provider)} is ${
         detected.provider_running === true ? "running" : "installed"
       } here`,
-      detail:
-        "It needs no account and no API key, and its models never leave this device.",
+      detail: runtimeDetail(detected),
       action: "choose",
     };
   }

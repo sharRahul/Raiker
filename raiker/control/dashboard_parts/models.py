@@ -125,11 +125,9 @@ class ModelService:
         # `local_service` for why it may never leave the machine.
         from raiker.models import local_service
 
+        services = local_service.owner_services(self.store, acting_principal_id)
         running: dict[str, bool] = {
-            runtime: answer.running
-            for runtime, answer in local_service.owner_services(
-                self.store, acting_principal_id
-            ).items()
+            runtime: answer.running for runtime, answer in services.items()
         }
         for runtime, is_running in running.items():
             if is_running:
@@ -299,6 +297,11 @@ class ModelService:
                     else None
                 ),
                 provider_running=running.get(profile.provider),
+                model_locations=(
+                    dict(services[profile.provider].locations)
+                    if profile.local_only and profile.provider in services
+                    else {}
+                ),
                 readiness_state=(readiness.state.value if readiness else "not_configured"),
                 readiness_summary=(
                     readiness.summary

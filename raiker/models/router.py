@@ -97,6 +97,33 @@ class ModelRouter:
     def _profile(self, provider: str, model: str) -> ModelProfile:
         return self.registry.resolve(provider, model)
 
+    def _tools_for(
+        self, profile: ModelProfile, model: str, tools: Sequence[ToolSpec] | None
+    ) -> Sequence[ToolSpec] | None:
+        """``tools``, unless the local service says this model cannot take them.
+
+        A real Ollama answers HTTP 400 to a request carrying tools for a model
+        it lists without the ``tools`` capability (``gemma3:1b``), so a Chat
+        turn on that model failed outright while its readiness read Ready.
+        Sending the turn without tools is the narrower request: the model can
+        still answer, and it can call nothing — never more authority, only less.
+        """
+        if not tools or not profile.local_only:
+            return tools
+        from raiker.models import local_service
+
+        if profile.provider not in local_service.WATCHED_RUNTIMES:
+            return tools
+        from raiker.models.readiness import effective_endpoint
+
+        connection = (
+            self.connection_resolver(profile.profile_id) if self.connection_resolver else None
+        )
+        answer = local_service.liveness(profile.provider, effective_endpoint(profile, connection))
+        if answer is not None and answer.declines_tools(model):
+            return None
+        return tools
+
     def _request(
         self,
         profile: ModelProfile,
@@ -116,7 +143,7 @@ class ModelRouter:
             provider,
             model,
             messages,
-            tools,
+            self._tools_for(profile, model, tools),
             temperature=float(profile.raw.get("temperature", 0.2)),
             max_tokens=(
                 max_tokens if max_tokens is not None else int(profile.raw.get("max_tokens", 1024))

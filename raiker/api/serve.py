@@ -107,7 +107,17 @@ def main(argv: list[str] | None = None) -> int:
         url = f"http://{args.host}:{args.port}/"
         threading.Timer(1.2, lambda: webbrowser.open(url, new=1)).start()
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    # BUG-342 — record which process serves this workspace, as `raiker-app`
+    # does, so a launch for the same workspace joins this host and a launch for
+    # another one does not mistake it for its own.
+    from raiker.app.host import HostControl
+
+    control = HostControl(Path(args.workspace))
+    control.record_start(pid=os.getpid(), port=args.port)
+    try:
+        uvicorn.run(app, host=args.host, port=args.port)
+    finally:
+        control.clear()
     return 0
 
 

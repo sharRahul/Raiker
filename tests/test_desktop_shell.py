@@ -145,7 +145,7 @@ def test_the_ready_file_is_written_whole(tmp_path: Path) -> None:
 def test_joining_a_running_host_writes_the_ready_file_without_opening_anything(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(launcher, "choose_port", lambda preferred: (preferred, True))
+    monkeypatch.setattr(launcher, "choose_port", lambda preferred, **_: (preferred, True))
     monkeypatch.setattr(launcher, "open_raiker", lambda *a, **k: pytest.fail("opened a window"))
     ready = tmp_path / "ready.json"
     code = launcher.main(

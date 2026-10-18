@@ -16,6 +16,7 @@
  */
 import type { ModelProfile } from "./apiTypes";
 import { readinessLabel, UNPINNED_MODEL } from "./modelReadinessLabels";
+import { inferenceLocation } from "./inferenceLocation";
 
 export const UNKNOWN = "Unknown";
 
@@ -38,6 +39,12 @@ export interface ComparisonRow {
 /** Where a turn on this model runs — the question DEC-08 asks first. */
 export function localityOf(profile: ModelProfile): Locality {
   if (profile.local_only || profile.endpoint_kind === "local_process" || profile.endpoint_kind === "loopback") {
+    // BUG-340 — a local runtime can serve a cloud model (Ollama's `…-cloud`).
+    // The service's own answer decides; a model the watched service did not
+    // describe is Unknown rather than assumed to stay here.
+    const where = inferenceLocation({ ...profile, local_only: true }, profile.model);
+    if (where.kind === "remote") return "Hosted service";
+    if (where.kind === "unknown" && Object.keys(profile.model_locations ?? {}).length > 0) return UNKNOWN;
     return "On this device";
   }
   if (profile.endpoint_kind === "private_network") return "Private server";

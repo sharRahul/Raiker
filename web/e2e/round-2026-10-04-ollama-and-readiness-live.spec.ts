@@ -122,6 +122,10 @@ test("a running Ollama is offered on first run, its chosen model is Ready, remem
   await capture(page, join(SHOTS, "03-setup-model-chosen.png"));
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: /Local, and the providers I connect/ }).click();
+  // The Check stage takes one real request to the chosen model before Ready.
+  await expect(title).toHaveText(/Checking your installation/, { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Check again" })).toBeEnabled({ timeout: 120_000 });
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Your Raiker is ready" })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Start using Raiker" }).click();
   await expect(page.locator("#setup-title")).toBeHidden({ timeout: 30_000 });
@@ -141,7 +145,16 @@ test("a running Ollama is offered on first run, its chosen model is Ready, remem
     timeout: 30_000,
   });
   await sendTurn(page, "Say hello in one line.");
-  await expect(page.getByText(`Hello from ${MODEL}`).first()).toBeVisible({ timeout: 60_000 });
+  if (PIDFILE) {
+    await expect(page.getByText(`Hello from ${MODEL}`).first()).toBeVisible({ timeout: 60_000 });
+  } else {
+    // BUG-318 — a real Ollama answers in its own words; the evidence is that the
+    // chosen model produced an answer at all, through the composer it is pinned in.
+    const answer = page.locator(".message-bubble-raiker").last();
+    await expect(answer).toHaveText(/\S/, { timeout: 180_000 });
+    // A refusal is rendered in the same bubble; it is not an answer.
+    await expect(answer).not.toContainText(/could not finish|provider refused/i);
+  }
   await capture(page, join(SHOTS, "05-chat-answered-by-the-chosen-model.png"));
 
   expect(failures, failures.join("\n")).toEqual([]);

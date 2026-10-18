@@ -258,6 +258,7 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     off_machine: false,
     selected: false,
     connection_configured: false,
+    model_locations: {},
     usage_admin_configured: false,
     workspace_configured: false,
     prompt_cache_ttl: null,

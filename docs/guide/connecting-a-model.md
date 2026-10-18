@@ -108,6 +108,19 @@ The check is a read of Ollama's own model list on this machine. It never leaves
 the machine, never goes through a proxy, and changes nothing — your choice is
 still only ever made by you.
 
+**Ollama running here is not the same as a model running here.** Ollama also
+serves cloud models (names ending `-cloud` or `:cloud`, such as
+`gpt-oss:20b-cloud`), and a prompt to one of those is processed at ollama.com.
+Raiker reads where each model runs from Ollama's own list, so setup, Models and
+the comparison say **runs on this device** only for a model that does, and name
+ollama.com for one that does not. A model Ollama does not describe is treated as
+leaving the device.
+
+Ollama also says which models can use tools. A model listed without that ability
+(`gemma3:1b`, for example) still answers in Chat, but its turns are sent without
+tools, so it cannot read files, search or act; choose a tool-capable model for
+that.
+
 ## Local discovery and acquisition
 
 - **Ollama:** open the official installer from Models and pull a model by exact

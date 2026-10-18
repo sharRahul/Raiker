@@ -64,7 +64,10 @@ def test_status_does_not_see_the_hosts_token(repo: Path, monkeypatch: pytest.Mon
         encoding="utf-8",
     )
     monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_hostTokenThatMustNotLeak000000000000")
-    monkeypatch.setenv("GIT_EXTERNAL_DIFF", f"{sys.executable} {driver}")
+    # Git runs the driver through `sh`, which eats unquoted Windows backslashes.
+    monkeypatch.setenv(
+        "GIT_EXTERNAL_DIFF", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
+    )
     (repo / "a.txt").write_text("b\n", encoding="utf-8")
     run_git(repo, "diff")
     assert seen.read_text(encoding="utf-8") == "absent"

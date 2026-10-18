@@ -24,6 +24,7 @@
     SetupVerification,
   } from "../apiTypes";
   import { modelName } from "../modelPresentation";
+  import { inferenceLocation, inferenceSentence, type InferenceLocation } from "../inferenceLocation";
   import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
@@ -53,6 +54,14 @@
   let error = $state("");
   /** The model this screen just pinned, so the stage can say so before moving on. */
   let picked = $state<string | null>(null);
+  /** BUG-340 — the pinned model's identity, so the screen can say where it runs. */
+  let pickedRef = $state<{ profileId: string; model: string } | null>(null);
+  const pickedLocation = $derived.by((): InferenceLocation | null => {
+    if (pickedRef === null) return null;
+    const ref = pickedRef;
+    const profile = profiles.find((candidate) => candidate.profile_id === ref.profileId);
+    return profile ? inferenceLocation(profile, ref.model) : null;
+  });
 
   function body(update: Partial<SetupState>) {
     if (!setup) throw new Error("setup_not_loaded");
@@ -98,9 +107,13 @@
       // on Models before coming back — is a choice, not "decide later". Without
       // this the step offered only "Decide later" and Ready then claimed no
       // model was set up while Chat answered with one.
-      const chosen =
-        setup && !setup.model_deferred && setup.selected_model ? setup.selected_model : view.current_model;
-      if (chosen) picked = modelName(chosen);
+      const fromSetup = Boolean(setup && !setup.model_deferred && setup.selected_model);
+      const chosen = fromSetup ? setup?.selected_model : view.current_model;
+      const chosenProfile = fromSetup ? setup?.selected_profile_id : view.current_profile_id;
+      if (chosen) {
+        picked = modelName(chosen);
+        if (chosenProfile) pickedRef = { profileId: chosenProfile, model: chosen };
+      }
       if (setup && !setup.selected_model && view.current_profile_id && view.current_model) {
         setup = await api.updateSetup(body({
           selected_profile_id: view.current_profile_id,
@@ -148,6 +161,7 @@
    */
   async function chooseModel(profileId: string, model: string) {
     picked = modelName(model);
+    pickedRef = { profileId, model };
     await save({
       status: "in_progress",
       selected_profile_id: profileId,
@@ -521,7 +535,9 @@
         />
       {/if}
       {#if picked !== null}
-        <p class="picked" role="status">{picked} is selected. Next, where model requests may travel.</p>
+        <p class="picked" role="status">
+          {picked} is selected.{pickedLocation ? ` ${inferenceSentence(pickedLocation)}` : ""} Next, where model requests may travel.
+        </p>
       {/if}
       <div class="actions">
         <!-- FIRST-06 — this is not the way out of an incomplete flow. Everything
@@ -537,6 +553,13 @@
              Permissions, which they are not. -->
         <h2 id="setup-title">Where may Raiker send model requests?</h2>
       </header>
+      {#if picked !== null && pickedLocation !== null && pickedLocation.kind !== "device"}
+        <!-- BUG-340 — the choice below is about the future; the model already
+             chosen has a destination of its own, and the owner sees it here. -->
+        <p class="note" role="note">
+          {picked} is selected. {inferenceSentence(pickedLocation)} To keep requests on this device, go back and choose a model that runs here.
+        </p>
+      {/if}
       <div class="choice-list">
         {#each PRIVACY_CHOICES as choice (choice.mode)}
           <button aria-label={choice.label} disabled={busy} onclick={() => choosePrivacy(choice.mode)}>

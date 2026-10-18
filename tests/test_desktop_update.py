@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -99,7 +100,8 @@ def test_an_appimage_is_replaced_atomically_and_can_be_rolled_back(tmp_path: Pat
     result = apply_desktop_update(install=install, artifact=new, version="1.2.3",
                                   signed_install=False, launch=False)
     assert current.read_bytes() == b"new"
-    assert current.stat().st_mode & 0o111
+    if sys.platform != "win32":  # an AppImage is a Linux artifact; Windows has no exec bit
+        assert current.stat().st_mode & 0o111
     assert result.previous is not None and result.previous.read_bytes() == b"old"
     roll_back_desktop(install)
     assert current.read_bytes() == b"old"

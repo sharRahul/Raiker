@@ -71,7 +71,7 @@ Evidence: `screenshots/not-working/` (defects),
 
 **Only unresolved BUG entries are indexed below.** Closed bugs and completed memory/governance reviews are recorded in [`FIXED_ITEMS.md`](FIXED_ITEMS.md), with historical rationale in Git history. The separate [Build/Chat capability gap ledger](BUILD_WORKSPACE_SPEC.md) is not a BUG list.
 
-**Historical ID collision:** `BUG-280` was reused for two unrelated findings. The closed Observability empty-state defect is [FIXED-391](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line); the *open* `BUG-280` row below is the weather/provider live-evidence remainder. Its closed clock sub-scope is [FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here). The closed UI defect is not reopened.
+**Historical ID collision:** `BUG-280` was reused for two unrelated findings. The closed Observability empty-state defect is [FIXED-391](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line); the weather/provider live-evidence `BUG-280` closed in two halves, the clock as [FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here) and the weather as [FIXED-926](FIXED_ITEMS.md#fixed-926--a-real-model-read-real-weather-from-open-meteo-was-bug-280).
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
@@ -80,16 +80,11 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven need a provider this host cannot reach ([BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host)) |
-| [BUG-280](#bug-280--weather-and-the-environment-clock-are-unmeasured-against-a-real-provider-and-a-real-model) | Low | Weather / live provider evidence | **Open remainder** — clock/model round trip verified in [FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here); external Open-Meteo request still unverified due host egress |
-| [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — the same egress limit as [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host); since [FIXED-542](FIXED_ITEMS.md#fixed-542--every-side-effect-capability-now-says-what-it-would-cost-and-one-of-them-had-no-gate-at-all) a live round has a second thing to prove — that turning **Image generation** off refuses a generation |
-| [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open — the same egress limit as [BUG-273](FIXED_ITEMS.md#fixed-541--three-scenarios-blocked-on-a-key-for-six-rounds-and-on-three-stale-selectors-for-one-more), reconfirmed 2026-09-13 with three keys |
-| [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs of the instance-lifecycle and internal-path tests printed a crash dump; not reproduced since |
-| [BUG-318](#bug-318--the-ollama-journey-is-proven-against-a-loopback-stand-in-not-a-real-ollama) | Low | Models / Ollama / evidence | Open — the 2026-10-04 round could not download Ollama, so detection, choice, the watch and a turn were driven against `scripts/live_ollama_standin.py` |
-| [BUG-330](#bug-330--five-tests-fail-on-windows-and-pass-on-linux-ci) | Low | Tests / Windows | Open remainder — the three fixture assumptions closed as [FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330); the lease reclaim's double write and one timing-dependent test need a Windows run |
+| [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open — **no longer an egress limit**: on 2026-10-18 this host reached `api.openai.com`; the round waits on the owner entering an image-capable key through Models |
+| [BUG-290](#bug-290--three-of-the-four-providers-this-round-was-given-keys-for-cannot-be-reached-from-this-host) | Low | Live evidence / providers | Open remainder — reduced 2026-10-18: Ollama answered by name; all four providers are reachable now, and OpenAI and OpenRouter wait on the owner entering their keys through Models |
+| [BUG-312](#bug-312--one-windows-test-run-ended-in-an-interpreter-crash-dump) | Low | Tests / Windows | Open — one of 28 runs printed a crash dump; 37 later runs (15 under `-X faulthandler` on 2026-10-18) are clean |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open — found 2026-10-12 building GH-55; scheduled routines run read-only subagents, so the template's write steps cannot run unattended |
-| [BUG-340](#bug-340--a-cloud-ollama-model-is-described-as-never-leaving-the-device) | High | Models / setup / privacy truthfulness | Open — found 2026-10-15 in a real browser round; a cloud-labelled model selected in setup is followed by an unconditional device-only egress claim |
-| [BUG-341](#bug-341--owner-bootstrap-emits-password-form-accessibility-diagnostics) | Medium | Account bootstrap / accessibility | Open — found 2026-10-15 in Chromium; re-examined 2026-10-17: the settled form is correct, so the diagnostic comes from a transient render |
-| [BUG-342](#bug-342--raiker-app-joins-a-running-host-that-serves-a-different-workspace) | Medium | Desktop / host lifecycle | Open — found 2026-10-17 in the desktop round |
+| [BUG-345](#bug-345--local-only-is-recorded-and-enforced-nowhere) | Medium | Setup / privacy / model routing | Open — found 2026-10-18 closing BUG-340; **needs an owner decision** on what *Local only* enforces |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -331,9 +326,6 @@ reaching authority the turn did not have.
 refused at parse time rather than accepted and ignored, and the Hooks tab reports
 the file as failed with the reason — so an owner writing one is told, rather than
 believing a guard is in place.
-
----
-
 
 ---
 
@@ -612,66 +604,6 @@ how the evidence behind its FIXED entry is refreshed rather than invalidated.
 
 ---
 
-## BUG-280 — Weather and the environment clock are unmeasured against a real provider and a real model
-
-**Severity: Low. Area: runtime / environment context, weather. Raised while
-implementing ENV-01…05 and WEATHER-01…03.**
-
-**Half of this closed 2026-09-15 as
-[FIXED-539](FIXED_ITEMS.md#fixed-539--a-real-turn-now-answers-from-raikers-clock-and-the-weather-half-still-cannot-be-measured-here).**
-The clock half was measurable the moment a host had a working key: a real
-Anthropic turn names the runtime's date and day, and follows the owner's zone
-when it changes. The spec reads the expectation from `/api/environment` rather
-than hardcoding a date, so it measures agreement between the runtime and the
-model rather than agreement with whatever day it was written on.
-
-**The weather half is still open, and still for the same reason.** Every attempt
-to reach `api.open-meteo.com` from this host is cut by the environment's egress
-policy — verified again on 2026-09-15, `curl` returns no status through the
-proxy's tunnel — so the tool answers `weather_provider_unavailable`, which is the
-correct typed answer to an unreachable provider and is not evidence that a
-reachable one is read correctly. Closing it needs a host with egress, not a
-change to Raiker.
-
-**Observed.** The 2026-09-07 round proved the whole of the environment and
-weather contract against the runtime: the bundle a turn is given, the event it
-records, the precedence, the DST behaviour, the stale-refresh note, and every
-governed refusal. Two halves of it were not measured, and neither is a code gap.
-
-*No model reasoned from the bundle.* The round's key is identity-linked, as the
-previous six were, and this host has no local runtime, so no provider on it can
-complete a turn. The bundle is asserted against the messages the orchestrator
-builds — which is the right place, since it is derived before any provider is
-called — but "the model answered `tomorrow` correctly" is a claim only a real
-turn can support.
-
-*No weather request left the machine.* The provider path is asserted against a
-stand-in that answers as Open-Meteo does, and every governed refusal is asserted
-against the real gate, decision mode and blocklist. What is unmeasured is the
-real HTTP round trip. `api.open-meteo.com` resolves from this host and every
-attempt to reach it — with or without the environment's proxy — is refused with
-`403` by that environment's own egress policy, so the tool returns
-`weather_provider_unavailable`. That is the correct typed answer to an
-unreachable provider; it is not evidence that a reachable one is read correctly.
-
-**Why it was left.** Both need something the round did not have — a working
-provider credential and outbound egress — rather than something Raiker is
-missing. Recording it here is what stops the plan's `Done` reading as a claim
-about evidence that was never taken.
-
-**Proposed check.** On a host with egress and a working model: ask *"what day is
-it, and what is the weather here?"* in Chat, and confirm the answer names today's
-real date in the owner's zone and cites the weather provider with its observation
-time. Then set the timezone to another continent and ask *"what time is it?"*
-again.
-
-**Interface outcome that has to be true before this closes.** A real turn
-answers a relative-time question from the runtime's clock rather than from
-training knowledge, and a real weather answer names its provider and how old the
-reading is.
-
----
-
 ## BUG-287 — The image provider round trip is unverified against a real provider
 
 > **2026-10-03 — and now references.** [FIXED-733](FIXED_ITEMS.md#fixed-733--research-could-only-reach-a-picture-by-being-pasted-into-the-prompt)
@@ -721,6 +653,8 @@ host, so a Gemini API key alone would close it — covering generate, edit,
 variations and a provider refusal of a source image, with the lineage read back
 through `GET /api/images`.
 
+**2026-10-18 — reachable now.** This host reaches `api.openai.com` (HTTP 401 without a key, not a refused tunnel). The live round is unblocked on egress and waits only on an image-capable key entered by the owner through Models; a key pasted into chat is not entered on the owner's behalf.
+
 **Interface outcome that has to be true before this closes.** A picture generated
 through a real provider, edited into a second version, and both shown on the
 canvas as the chain they are — with the captures to prove it.
@@ -755,6 +689,8 @@ three and skips with the reason when a key is absent.
 Ollama cloud model, and therefore the identity block, the citation ledger and the
 tool loop against any provider but Anthropic.
 
+**2026-10-18 — reduced.** Egress is no longer the limit: `api.openai.com`, `openrouter.ai` and `api.anthropic.com` all answer from this host. The Ollama leg is done — `owner-identity-live.spec.ts` *a real turn through Ollama answers with the owner's name* asked `gpt-oss:20b-cloud` and got *"The owner of this workspace is Rahul S."* (`identity-answered-by-name-ollama.png`). OpenAI and OpenRouter remain, and wait on the owner entering their keys through Models; the existing specs then run unchanged.
+
 **Interface outcome that has to be true before this closes.** The same question
 the owner reported — *who is the owner of this workspace* — asked and answered
 through each of the four providers, with a capture of each answer.
@@ -778,77 +714,14 @@ threads.
 **Proposed fix.** Run the pair under `-X faulthandler` in a loop with the full
 output kept, and fix what the first complete dump names.
 
+**2026-10-18.** Fifteen further runs of the pair under `-X faulthandler` on Windows 11, each with its
+full output kept: all clean. Still not reproduced; the entry stays open until a complete dump names a
+frame or the suite has a Windows job that would catch it.
+
 **Required user-interface outcome.** None; test harness only unless the dump
 names product code.
 
 ---
-
-## BUG-318 — The Ollama journey is proven against a loopback stand-in, not a real Ollama
-
-**Severity: Low. Area: Models / Ollama / evidence. Status: Open — raised
-2026-10-04 by the live round.**
-
-**Observed.** [FIXED-737](FIXED_ITEMS.md#fixed-737--an-ollama-model-nobody-chose-was-shipped-as-everyones-default)
-to [FIXED-739](FIXED_ITEMS.md#fixed-739--a-chosen-ollama-model-was-ready-until-somebody-stopped-looking)
-were driven live end to end — detection with no binary on PATH, the choice in
-setup, Ready at once, a Chat turn answered by the chosen model, the service
-stopped and started under an open page — but this host's egress refuses both
-`ollama.com` and GitHub releases, so the service on 11434 was
-`scripts/live_ollama_standin.py`, which serves Ollama's catalogue and
-OpenAI-compatible paths and answers with a fixed sentence. The probe, the
-readiness check and the turn all speak the real protocol; the answers do not
-come from a model.
-
-**Required evidence before this closes.** The same round
-(`round-2026-10-04-ollama-and-readiness-live.spec.ts`) run on a host with the
-Ollama desktop app and at least two pulled models — including one the app
-serves while `ollama` is not on PATH — with a real answer to the Chat turn.
-
----
-
-## BUG-330 — Five tests fail on Windows and pass on Linux CI
-
-**Severity: Low. Area: Tests / Windows. Status: Open — found 2026-10-10 running
-the full suite on Windows 11; the same five fail at `38c9da5` without this
-run's change.**
-
-**Observed.**
-
-- `tests/test_mcp_stdio_bounds.py` (2): the stand-in MCP server writes `
-`
-  on Windows and the tests compare against `
-`.
-- `tests/test_project_lifecycle.py::TestDeletion::test_preview_counts_what_the_delete_removes`:
-  the fixture's `write_text("hello
-")` writes seven bytes on Windows, so the
-  folder is 17 bytes, not 16.
-- `tests/test_workspace_backups.py::test_the_routes_need_an_owner_and_say_what_they_did`:
-  the restore path comes back with the `\\?\` long-path prefix and Windows
-  separators, and the assertion expects `/`.
-- `tests/test_background_execution.py::test_a_lapsed_lease_is_reclaimed_with_an_honest_receipt_not_left_running`:
-  the reclaim writes a receipt that is already final (`command_receipt_immutable`).
-
-**Effect.** The suite is not green on the platform the desktop build ships for;
-CI runs Linux only, so nothing flags it. The first three are fixture
-assumptions; the fourth needs a look, because a receipt race is product
-behaviour.
-
-**2026-10-11.** The full suite on Windows again failed the first three
-(four tests); the lease-reclaim test passed this time, and
-`tests/test_mcp_remote_transport_trust.py::test_the_real_transport_does_not_follow_a_redirect_itself`
-failed once under full-suite load (`mcp_remote_unreachable`) and passed alone —
-a timing dependency worth the same look.
-
-**2026-10-13.** The three fixture assumptions are fixed as
-[FIXED-901](FIXED_ITEMS.md#fixed-901--three-tests-assumed-linux-newlines-and-separators-part-of-bug-330) — the stand-in writes bytes, the fixture
-writes bytes, the restore path is compared as a `Path`. What stays open is the
-lease reclaim's double write and the redirect test's timing, both of which need
-a Windows run to trace; this host has none.
-
-**Proposed fix (remainder).** Write fixtures with `newline="
-"` / bytes, compare paths
-through `Path`, and trace the lease reclaim's double write on Windows. Consider
-a Windows job for the Python suite.
 
 ## BUG-339 — The issue-to-pull-request routine has a template and no runner
 
@@ -868,86 +741,29 @@ today, not a scheduled one.
 subagent) under the routine's delegation reference, with the plan's decisions as
 its ceiling; live evidence is RR-40 against a consented repository.
 
-## BUG-340 — A cloud Ollama model is described as never leaving the device
+## BUG-345 — *Local only* is recorded and enforced nowhere
 
-**Severity: High. Area: Models / setup / privacy truthfulness. Status: Open —
-found 2026-10-15 in a real browser smoke round.**
+**Severity: Medium. Area: Setup / privacy / model routing. Status: Open — found
+2026-10-18 while closing BUG-340. Needs an owner decision.**
 
-**Observed.** On a clean local Raiker workspace, setup detected a running Ollama
-service and listed `GPT oss:20B Cloud` in its model picker. Selecting it
-produced the status `GPT oss:20B Cloud is selected. Next, where model requests
-may travel.` The following setup screen then stated: `Ollama is running here`
-and `its models never leave this device.` Completing setup retained
-`gpt-oss:20b-cloud` as the selected model, and a Chat turn returned
-`RAIKER_E2E_OK` through that model.
+**Observed.** First-run setup offers *Local only — Model requests stay on this
+device. Nothing is sent to a provider until you connect one and change this.*
+The choice is stored as `privacy_mode = "local_first"` (`raiker/models/setup.py`)
+and nothing reads it: a turn on a cloud Ollama model, or on a hosted provider
+connected later, is sent exactly as under *Local, and the providers I connect*.
 
-**Effect.** A model explicitly labelled Cloud is covered by an unconditional
-device-only egress claim. The owner cannot make an informed decision about where
-their prompt will be processed. This violates the manual plan's requirement
-that the interface state the real destination of model requests.
+**Effect.** The sentence the owner chose is a promise the runtime does not keep.
+Since FIXED-921 the privacy step names the chosen model's destination beside the
+choice, so the contradiction is visible, but it is not resolved.
 
-**Reproduction.** Start `raiker-web` with an empty workspace and a running
-Ollama service that exposes a cloud-labelled chat model. Create the local owner,
-continue through setup, choose that model, and inspect the recommendation shown
-before the privacy step. It claims the model never leaves the device. Complete
-setup and send a bounded Chat prompt to confirm the selected model remains in
-use.
-
-**Required fix and acceptance.** Classify every discovered Ollama model by its
-inference location. Device-only wording may appear only for a known-local model;
-cloud/unknown models must name the external destination or say that Raiker
-cannot verify it. Add a browser regression that selects a cloud-labelled Ollama
-model and rejects device-only wording. Capture the corrected first-run flow and
-an egress trace or provider receipt before closing.
-
-## BUG-341 — Owner bootstrap emits password-form accessibility diagnostics
-
-**Severity: Medium. Area: Account bootstrap / accessibility. Status: Open —
-found 2026-10-15 in Chromium.**
-
-**Observed.** The fresh owner-bootstrap page emitted Chromium DOM diagnostics:
-the password form lacks an associated optional username field and password
-fields are not contained in a form. The account could still be created, but
-these diagnostics indicate that password-manager and browser form semantics are
-incomplete on the mandatory first-run path.
-
-**Reproduction.** Start `raiker-web` with an empty workspace, open the root
-page in Chromium, fill the username, password and confirmation fields, then
-inspect the browser console before submitting. The diagnostics appear on the
-bootstrap screen.
-
-**Required fix and acceptance.** Put the bootstrap controls in a semantic
-`form`, bind labels and autocomplete values appropriate to account creation, and
-verify with the project's accessibility tooling plus Chromium that the password
-form diagnostics no longer occur. Keep the existing keyboard and password
-visibility behavior working.
-
-**2026-10-17 re-examination.** The diagnostic still appears once on a fresh
-workspace, but the settled markup is already what this entry asks for: all three
-fields are inside one `<form>`, the username field carries
-`autocomplete="username"` and both password fields `new-password`. Isolated
-reproductions — static, inserted after load, disabled then enabled, served over
-HTTP — raise nothing in Chromium 1194, so the message comes from an intermediate
-render on the way to the first-run form (the verifying state or the step switch),
-not from the form itself. Next step: record the DOM at the moment the `Log` entry
-fires (CDP `DOM.setBreakpoint` on insertion) to name that render, then fix it.
-
-## BUG-342 — raiker-app joins a running host that serves a different workspace
-
-**Severity: Medium. Area: Desktop / host lifecycle. Status: Open — found
-2026-10-17 in the desktop round.**
-
-**Observed.** With a host for workspace A on port 8765, starting the packaged
-application (or `raiker-app`) for workspace B joined A's host and opened its
-sign-in page. `choose_port` asks only whether *a* Raiker answers on the
-preferred port, not whose workspace it serves.
-
-**Effect.** No data crosses — B's owner would still need A's credentials — but
-the owner of B is shown the wrong instance, and B's host is never started.
-
-**Proposed fix.** Join only when the running host's recorded workspace
-(`HostControl`) matches the one asked for; otherwise move to the next free port
-as for a non-Raiker listener. Test with two workspaces and one preferred port.
+**Decision needed.** FIRST-07 says these two choices are *not a second authority
+system* beside Permissions. Either (a) *Local only* becomes a routing rule —
+refuse any model request whose inference location is not the device (FIXED-921's
+`model_locations` and the hosted-model gate already know it) with a remedy that
+names the setting — or (b) the choice is reworded as a preference that changes
+nothing by itself, or removed. (a) keeps the sentence true and is the
+recommendation; it needs the owner's word because it turns a first-run answer
+into an enforced policy.
 
 ## Decision statements added 2026-10-05
 
@@ -982,7 +798,7 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 | Existing item | What Raiker must demonstrate | Evidence required |
 |---|---|---|
 | BUG-194 | Claimed execution modes have observable lifecycle, stop and recovery behavior | CR-01/07/11: actual foreground/interactive/background/remote modes where supported, process and durable-state evidence, cancellation and reattachment after restart; label unsupported modes |
-| BUG-318 | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
+| BUG-318 (closed as [FIXED-925](FIXED_ITEMS.md#fixed-925--the-ollama-journey-is-now-proven-against-a-real-ollama-was-bug-318)) | Supported Ollama setup and tool use work against a real service/model | CR-02: install/version, served model, readiness, tool-using task, restart/reconnect and inference location; existing stand-in results retain only protocol scope |
 | BUG-226 / BUG-228 / BUG-234 | Each claimed hook/plugin/MCP capability has a reachable governed contract | CR-06: independent fixture, install/discover/use/update/revoke/uninstall, unsupported-mode behavior and contribution-to-effect trace |
 
 **Closure rule.** Add a reproducible failing case, implementation reference and executed regression result, plus live evidence where the claim concerns a live user/service path. Reuse earlier valid evidence by link and revision; do not relabel a closed defect open merely because comparative testing is missing. Unrun benchmark work is an evidence gap unless a product failure is reproduced.

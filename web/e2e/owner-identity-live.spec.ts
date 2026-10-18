@@ -136,3 +136,35 @@ for (const provider of [
     await capture(page, `${SHOTS}/${provider.name.toLowerCase()}-connection.png`, card);
   });
 }
+
+/*
+ * BUG-290 — the fourth provider: a model served by the local Ollama.
+ *
+ * Needs no key. The workspace must already have the Ollama model chosen (the
+ * BUG-340 first-run round chooses `gpt-oss:20b-cloud`); the turn runs on
+ * whatever the composer shows, and the spec checks that it is that model.
+ */
+test("a real turn through Ollama answers with the owner's name", async ({ page }) => {
+  test.setTimeout(300_000);
+  const label = process.env.RAIKER_LIVE_OLLAMA_CLOUD_LABEL ?? "GPT oss:20B Cloud";
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/new-chat`);
+  const chosen = page.getByRole("button", { name: `Model for this turn: ${label}` }).first();
+  test.skip(
+    !(await chosen.isVisible({ timeout: 30_000 }).catch(() => false)),
+    `the composer is not on ${label}; run bug-340-ollama-cloud-location-live first`,
+  );
+  const composer = page.getByLabel("Prompt");
+  await composer.fill("Who is the owner of this workspace? Answer in one short sentence.");
+  const send = page.locator("button.send");
+  await expect(send).toBeEnabled({ timeout: 120_000 });
+  await send.click();
+  const answer = page.locator(".message-bubble-raiker").last();
+  await expect(answer).toContainText(/\w/, { timeout: 180_000 });
+  await expect(send).toHaveAttribute("aria-label", "Send", { timeout: 180_000 });
+  // Models emit non-breaking and narrow spaces; compare words, not code points.
+  const text = (await answer.innerText()).replace(/\s+/gu, " ");
+  expect(text).not.toMatch(/principal_user_[0-9a-f]{8}/);
+  expect(text).toContain(OWNER_NAME);
+  await capture(page, `${SHOTS}/identity-answered-by-name-ollama.png`);
+});

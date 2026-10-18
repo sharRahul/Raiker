@@ -18084,6 +18084,13 @@
             "title": "Model",
             "type": "string"
           },
+          "model_locations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Model Locations",
+            "type": "object"
+          },
           "models_used": {
             "default": 0,
             "title": "Models Used",

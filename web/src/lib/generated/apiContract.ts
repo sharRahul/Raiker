@@ -3509,6 +3509,7 @@ export type ModelProfileView = {
   configured: boolean;
   provider_detected: boolean | null;
   provider_running: boolean | null;
+  model_locations: Record<string, string>;
   readiness_state: "not_configured" | "checking" | "ready" | "runtime_missing" | "runtime_stopped" | "model_missing" | "policy_blocked" | "authentication_failed" | "quota_exhausted" | "unreachable" | "unsupported" | "stale" | "configuration_unreadable";
   readiness_summary: string;
   readiness_reason_code: string;

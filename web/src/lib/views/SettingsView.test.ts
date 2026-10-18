@@ -9,7 +9,7 @@ import { resolve } from "node:path";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function stubApi(options: { failPut?: boolean } = {}) {
+function stubApi(options: { failPut?: boolean; stored?: Record<string, unknown> } = {}) {
   const putBodies: unknown[] = [];
   const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -29,7 +29,7 @@ function stubApi(options: { failPut?: boolean } = {}) {
     }
     const bodies: Record<string, unknown> = {
       "/api/settings": {
-        settings: {},
+        settings: options.stored ?? {},
         revision: "rev_0",
         status: { vault: "missing", mfa_enrolled: false, username: "alice" },
       },
@@ -184,6 +184,19 @@ describe("supported-preferences settings", () => {
     await waitFor(() => expect(putBodies.length).toBe(1));
     expect((putBodies[0] as { settings: Record<string, unknown> }).settings["notification.in_app"]).toBe(false);
     await waitFor(() => expect(screen.getByText(/all changes saved/i)).toBeInTheDocument());
+  });
+
+  it("does not call choosing the stored value an unsaved change", async () => {
+    stubApi({ stored: { "notification.in_app": true } });
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+    const toggle = await screen.findByLabelText(/unread notices inside Raiker/i);
+    // There and back again: the draft equals the server, so nothing is unsaved.
+    await fireEvent.click(toggle);
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+    await fireEvent.click(toggle);
+    expect(screen.queryByText(/you have unsaved changes/i)).toBeNull();
+    expect(screen.queryAllByLabelText("Unsaved changes")).toHaveLength(0);
   });
 
   it("rolls back to the last server snapshot when a save fails", async () => {

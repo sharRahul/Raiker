@@ -119,6 +119,67 @@ def test_a_port_held_by_something_else_moves_to_the_next_free_one(
     assert choose_port(DEFAULT_PORT) == (DEFAULT_PORT + 1, False)
 
 
+def _health_server() -> tuple[object, int]:
+    """A loopback server answering ``/api/health`` as a Raiker host does."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Health(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 - stdlib name
+            body = b'{"status": "ok"}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Health)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, int(server.server_address[1])
+
+
+def test_a_host_for_another_workspace_is_not_joined(tmp_path: Path) -> None:
+    """BUG-342 — two workspaces, one preferred port: B starts its own host.
+
+    A's host answers `/api/health` on the preferred port and has recorded
+    itself in A's workspace. A launch for B must move on to a free port instead
+    of opening A's sign-in page; a launch for A joins A.
+    """
+    import os
+
+    from raiker.app.host import HostControl
+
+    server, port = _health_server()
+    try:
+        workspace_a, workspace_b = tmp_path / "a", tmp_path / "b"
+        HostControl(workspace_a).record_start(pid=os.getpid(), port=port)
+
+        chosen, joined = choose_port(port, workspace=workspace_b)
+        assert joined is False
+        assert chosen != port
+        assert choose_port(port, workspace=workspace_a) == (port, True)
+    finally:
+        server.shutdown()  # type: ignore[attr-defined]
+        server.server_close()  # type: ignore[attr-defined]
+
+
+def test_a_workspaces_own_host_is_joined_wherever_it_recorded_itself(tmp_path: Path) -> None:
+    """The record, not the preferred port, says where this workspace's host is."""
+    import os
+
+    from raiker.app.host import HostControl
+
+    server, port = _health_server()
+    try:
+        HostControl(tmp_path).record_start(pid=os.getpid(), port=port)
+        assert choose_port(DEFAULT_PORT, workspace=tmp_path) == (port, True)
+    finally:
+        server.shutdown()  # type: ignore[attr-defined]
+        server.server_close()  # type: ignore[attr-defined]
+
+
 def test_no_free_port_fails_loudly(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("raiker.app.launcher.port_is_free", lambda port, host="127.0.0.1": False)
     monkeypatch.setattr(
@@ -196,7 +257,7 @@ def test_joining_a_running_host_opens_the_browser_and_exits_successfully(
         return True
 
     monkeypatch.setenv("RAIKER_HOME", str(tmp_path / "data"))
-    monkeypatch.setattr("raiker.app.launcher.choose_port", lambda preferred: (preferred, True))
+    monkeypatch.setattr("raiker.app.launcher.choose_port", lambda preferred, **_: (preferred, True))
     monkeypatch.setattr("raiker.app.launcher.open_browser", record)
 
     assert main([]) == 0

@@ -112,6 +112,42 @@ describe("what the model stage recommends", () => {
     expect(recommended?.label).toContain("installed here");
   });
 
+  /**
+   * BUG-340 — a running Ollama listed a cloud model, and setup said its models
+   * never leave this device. The device claim is earned from the service's own
+   * per-model answer.
+   */
+  it("names the cloud destination when the runtime serves a cloud model", () => {
+    const recommended = recommendedPath([
+      profile({
+        profile_id: "ollama-local",
+        provider_detected: true,
+        provider_running: true,
+        configured: true,
+        model_locations: { "llama3:latest": "device", "gpt-oss:20b-cloud": "ollama.com" },
+      }),
+    ]);
+    expect(recommended?.label).toBe("Ollama is running here");
+    expect(recommended?.detail).not.toContain("never leave this device");
+    expect(recommended?.detail).toContain("ollama.com");
+  });
+
+  it("claims the device only when every served model runs on it", () => {
+    const allLocal = recommendedPath([
+      profile({
+        profile_id: "ollama-local",
+        provider_detected: true,
+        configured: true,
+        model_locations: { "llama3:latest": "device" },
+      }),
+    ]);
+    expect(allLocal?.detail).toContain("never leave this device");
+    const undescribed = recommendedPath([
+      profile({ profile_id: "ollama-local", provider_detected: true, configured: true }),
+    ]);
+    expect(undescribed?.detail).not.toContain("never leave this device");
+  });
+
   it("does not recommend an installed runtime that names no model", () => {
     // A managed llama.cpp slot before anything is deployed into it.
     const bare = profile({

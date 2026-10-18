@@ -4,7 +4,11 @@
 chooses an available loopback port, starts the API and dashboard, and opens
 Raiker's desktop window (or your default browser with `--browser`). If the same
 instance is already running, it opens that host instead of starting another
-process over the same encrypted workspace.
+process over the same encrypted workspace. "The same instance" means the same
+workspace: a host for a different workspace on the preferred port is passed over
+and the new one starts on the next free port, so you are never shown another
+workspace's sign-in page. Hosts started with `raiker-web` record themselves the
+same way, so `raiker-app` joins them too.
 
 ## The desktop window
 

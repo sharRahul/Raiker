@@ -141,7 +141,15 @@ def port_is_free(port: int, host: str = LOOPBACK) -> bool:
     has already printed a URL it cannot honour.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # On Windows `SO_REUSEADDR` lets a bind succeed over a live listener
+        # that set it too, which reported an occupied port as free; there the
+        # exclusive-use option is the honest probe. POSIX keeps `SO_REUSEADDR`
+        # so a port in TIME_WAIT is still reported as usable.
+        exclusive = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if exclusive is not None:
+            probe.setsockopt(socket.SOL_SOCKET, exclusive, 1)
+        else:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             probe.bind((host, port))
         except OSError:
@@ -168,16 +176,30 @@ def raiker_is_running(port: int, host: str = LOOPBACK, timeout: float = 1.0) -> 
         return False
 
 
-def choose_port(preferred: int, host: str = LOOPBACK) -> tuple[int, bool]:
+def choose_port(
+    preferred: int, host: str = LOOPBACK, workspace: Path | None = None
+) -> tuple[int, bool]:
     """``(port, already_running)`` for this launch.
 
-    Three outcomes, in order: the preferred port is free and is used; a Raiker
-    is already answering there and is joined; something else holds it and the
-    next free port is taken.
+    Outcomes, in order: this workspace's own host is already running and is
+    joined, on whatever port it recorded; the preferred port is free and is
+    used; a Raiker answering there is joined only when no workspace was named;
+    otherwise the next free port is taken.
+
+    BUG-342 — ``/api/health`` says *a* Raiker answers, never whose workspace it
+    serves, so a host for workspace A on the preferred port was joined by a
+    launch for workspace B and showed B's owner A's sign-in page. The workspace's
+    own host record (:class:`HostControl`, written by every host at start) is
+    the evidence of whose host it is; a Raiker without that record is someone
+    else's, and is passed over like any other listener.
     """
+    if workspace is not None:
+        recorded = HostControl(workspace).record().get("port")
+        if isinstance(recorded, int) and raiker_is_running(recorded, host):
+            return recorded, True
     if port_is_free(preferred, host):
         return preferred, False
-    if raiker_is_running(preferred, host):
+    if workspace is None and raiker_is_running(preferred, host):
         return preferred, True
     for candidate in range(preferred + 1, preferred + 1 + PORT_SCAN_RANGE):
         if port_is_free(candidate, host):
@@ -478,7 +500,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        port, already_running = choose_port(args.port)
+        port, already_running = choose_port(args.port, workspace=workspace)
     except OSError as error:
         print(f"[raiker] {error}", file=sys.stderr)
         return 2

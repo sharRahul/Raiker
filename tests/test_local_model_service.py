@@ -123,6 +123,39 @@ def test_probe_reads_the_catalogue_over_loopback_without_a_proxy(
     assert options["follow_redirects"] is False
 
 
+def test_a_cloud_model_is_located_where_the_service_says_it_runs(
+    real_probe: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-340 — a model the local service lists is not therefore a local model."""
+    recorder = _Recorder(
+        httpx.Response(
+            200,
+            json={
+                "models": [
+                    {"name": "llama3:latest", "size": 4661224676, "capabilities": ["completion"]},
+                    {
+                        "name": "gpt-oss:20b-cloud",
+                        "remote_model": "gpt-oss:20b",
+                        "remote_host": "https://ollama.com:443",
+                    },
+                    # An older service without `remote_host` still names it Cloud.
+                    {"name": "deepseek-v4-pro:cloud"},
+                ]
+            },
+        )
+    )
+    monkeypatch.setattr(local_service.httpx, "Client", recorder.client)
+    answer = local_service.probe("ollama", "http://127.0.0.1:11434/v1")
+    assert answer.models == ("llama3:latest", "gpt-oss:20b-cloud", "deepseek-v4-pro:cloud")
+    assert answer.location_of("llama3:latest") == local_service.ON_DEVICE
+    assert answer.location_of("gpt-oss:20b-cloud") == "ollama.com"
+    assert answer.location_of("deepseek-v4-pro:cloud") == "ollama.com"
+    assert answer.location_of("not-served") is None
+    # What a model can do is the service's word too: no `tools`, no tools.
+    assert answer.declines_tools("llama3:latest") is True
+    assert answer.declines_tools("gpt-oss:20b-cloud") is False
+
+
 @pytest.mark.parametrize(
     "response",
     [

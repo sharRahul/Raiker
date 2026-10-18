@@ -51,6 +51,14 @@ describe("UX-MODEL-04 — the comparison projection", () => {
     expect(localityOf(modelProfile({ local_only: false, endpoint_kind: "mystery" }))).toBe(UNKNOWN);
   });
 
+  it("does not place a local runtime's cloud model on this device (BUG-340)", () => {
+    const served = { "llama3:latest": "device", "gpt-oss:20b-cloud": "ollama.com" };
+    expect(localityOf({ ...local, model: "gpt-oss:20b-cloud", model_locations: served })).toBe("Hosted service");
+    expect(localityOf({ ...local, model: "llama3:latest", model_locations: served })).toBe("On this device");
+    expect(localityOf({ ...local, model: "deepseek-v4-pro:cloud" })).toBe("Hosted service");
+    expect(localityOf({ ...local, model: "not-served", model_locations: served })).toBe(UNKNOWN);
+  });
+
   it("keeps a silence about a capability distinct from a declared no", () => {
     expect(declared(true)).toBe("Yes");
     expect(declared(false)).toBe("No");

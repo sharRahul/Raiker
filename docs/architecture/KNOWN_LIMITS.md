@@ -43,16 +43,20 @@ alternative would be worse.
   **Hooks** are complete against *Raiker's own* event list and partly covered
   against the reference. All twenty events Raiker's format accepts are emitted,
   `PreToolUse`, `PreCompact` and `ConfigChange` decisions are honoured, and
-  `builtin`, `command` and bounded tool-free `prompt` handlers execute with
-  explicit limits; command programs remain resolved
-  inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
+  `builtin`, `command`, bounded tool-free `prompt` and `http` (behind the owner's
+  `RAIKER_HOOK_EGRESS_ALLOWLIST`) handlers execute with explicit limits; command
+  programs remain resolved inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
   at once and is your setting rather than a fourth config file, so a
   `config/hooks.json` that arrived with a repository cannot re-enable itself. Of
-  the five handler types in the reference format, `command` and `prompt` are built
-  and three are not: `http`, `mcp_tool` and `agent` need network, broker and
-  subagent surfaces that are still gated. Claude Code
+  the five handler types in the reference format, `command`, `prompt` and `http`
+  are built. **`mcp_tool` and `agent` are refused at parse time by decision**
+  (2026-10-05, retired from the defect ledger as BUG-226 on 2026-10-18): a hook
+  must not call a tool the originating turn could not call, so each waits for
+  bounded, non-escalating authority, its own resource budget, recursion limits
+  and execution-time revalidation. A rule naming either is reported as failed on
+  the Hooks tab, never accepted and ignored. Claude Code
   [documents all five](https://code.claude.com/docs/en/hooks), so this is a real
-  gap rather than a gap against Raiker's own document. (Raiker's second handler
+  difference from the reference. (Raiker's second handler
   type, `builtin`, is its own in-process code and is not one of the five.)
 
   **Plugins** contribute three of the four kinds the Plugins tab names: hook
@@ -60,9 +64,15 @@ alternative would be worse.
   checked, signature-levelled and recorded first, and each kind needs its own
   declared permission — `event:hook`, `skill:contribute`, `mcp:server` — none of
   which is auto-approved, so you read it in the permission diff before installing.
-  **Panels** are the one kind still unavailable: there is no route, permission or
-  accessibility contract for a page a plugin drew — and that is a gap against
-  Raiker's own `PLUGIN_SYSTEM_SPEC.md`, not against a reference platform, because
+  **Panels are not a plugin contribution, and will not be.** Contributed
+  interface is planned through **MCP Apps**
+  ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)):
+  a `ui://` resource pre-declared by a server the owner added, rendered in a
+  mandatory sandboxed iframe under a per-app permission, its traffic MCP JSON-RPC
+  the audit log already records. Building it needs per-app grants, message
+  validation, iframe isolation and keyboard access, and an honest description of
+  the boundary: a sandboxed iframe still runs third-party code. The plugin-panel
+  defect (BUG-228) was retired on 2026-10-18 as superseded by this plan, and
   [no compared platform ships plugin UI panels](https://code.claude.com/docs/en/plugins-reference).
   **LSP servers** are named in the manifest schema and have no surface at all to
   contribute to.
@@ -89,10 +99,18 @@ alternative would be worse.
   exact owner/target binding, and channel approval responses are separately off,
   exact and single-use. Critical and connector-write approvals remain local.
 
-  Remaining channel-adjacent limits are tracked in
-  [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md) → BUG-226 (the four hook handler types this build refuses),
-  BUG-227 (no LSP surface), BUG-228 (plugin panels) and BUG-229 (a live-spec
-  sign-in that only works on an empty workspace).
+  **MCP: what Raiker does not use of the revision it speaks.** Raiker offers
+  `2026-07-28` and accepts three older revisions; every content-block shape
+  reaches the model, server-initiated requests are answered or refused by name,
+  and event streams are parsed and resumed. Not built: **incremental delivery**
+  and a connection held open between turns (a standing inbound channel needs its
+  own answer to what may arrive unattended); **remote OAuth** (remote servers
+  take an owner token named by `auth_ref`); **MCP Apps** (above);
+  **elicitation** and **sampling** wired to a person (both reach Raiker, are
+  answered `-32601` and named on the server's card); and `server/discover`.
+  A server offering any of these is told so on its card rather than silently
+  degraded. Retired from the defect ledger as BUG-234 on 2026-10-18, its
+  interface outcome having been met by FIXED-378.
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each
@@ -388,10 +406,12 @@ on the shipped build, not estimated.
   [`HOOKS_SPEC.md`](../architecture/HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding)
   assessed as worth reaching: of the eleven left, two are blocked behind a
   mid-turn question surface that does not exist, four do not apply to a
-  single-owner local product, and five were judged of little value. Three handler types run — `command`, bounded
-  tool-free `prompt`, and Raiker's own in-process `builtin` — so two of the five
-  reference types are built. Plugins contribute
-  hook rules, skills and MCP-server offers; panels and LSP servers do not, and
+  single-owner local product, and five were judged of little value. Four handler types run — `command`, bounded
+  tool-free `prompt`, `http` behind an owner egress grant, and Raiker's own
+  in-process `builtin` — so three of the five reference types are built, and
+  `mcp_tool` and `agent` are refused by decision (above). Plugins contribute
+  hook rules, skills and MCP-server offers; panels (contributed UI is MCP Apps')
+  and LSP servers do not, and
   four kinds Claude Code has — subagents, monitors, `bin/` executables, themes —
   Raiker
   [will not add](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused).

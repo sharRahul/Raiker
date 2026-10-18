@@ -84,7 +84,8 @@
 > `Elicitation` and `ElicitationResult`. Of the 5 handler types Raiker builds
 > `command`, bounded tool-free `prompt`, and `http` behind an owner egress grant;
 > `builtin` is Raiker's own in-process code and is not one of the five, and
-> `mcp_tool` and `agent` remain refused at parse time (BUG-226 remainder).
+> `mcp_tool` and `agent` remain refused at parse time by decision — see
+> [KNOWN_LIMITS.md](KNOWN_LIMITS.md#boundaries-raiker-chose).
 >
 > Two places Raiker is deliberately **not** aligned, and will not be:
 > a Raiker hook can return only `deny` or `ask` from an authoritative handler, so

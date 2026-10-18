@@ -19,8 +19,8 @@ Revoking a plugin **deletes** what it contributed rather than flagging it.
 full list this document specifies — commands, subagents, channels, LSP servers,
 monitors, tool adapters, themes, output styles, TUI panels, web/dashboard panels,
 mobile panels, memory adapters, model providers, user-configurable settings and
-policy fragments — is what a plugin *may eventually* provide. Two of them are
-tracked as work (**panels**, BUG-228) and several are
+policy fragments — is what a plugin *may eventually* provide. Panels are not
+(see below; the BUG-228 defect was retired 2026-10-18 in favour of MCP Apps) and several are
 [deliberately refused](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused):
 a plugin-authored executable on a command's `PATH` is plugin code execution with
 an extra step, and a background monitor is a long-running command whose output
@@ -50,8 +50,8 @@ resource is declared ahead of time, so it can be fetched and reviewed before
 anything runs; and the traffic is already the shape the audit log records. If
 Raiker ever renders contributed UI, **this is the route to take, and a
 `panels.json` is the route to drop** — building both would be two contradictory
-UI-contribution models. Raiker's MCP client cannot reach it while pinned to
-protocol revision `2024-11-05`; see
+UI-contribution models. The protocol pin that blocked it was lifted (FIXED-274); the remaining work is
+in [`KNOWN_LIMITS.md`](KNOWN_LIMITS.md#boundaries-raiker-chose) and
 [`REFERENCE_PLATFORM_COMPATIBILITY.md` §2.6](REFERENCE_PLATFORM_COMPATIBILITY.md#26-extensibility--plugins-skills-mcp-channels).
 
 Plugin execution slices are governed/default-ask unless explicitly tightened or disabled by user, project, or managed policy; broader plugin extensions remain deferred/fail-closed.

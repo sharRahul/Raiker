@@ -542,7 +542,12 @@ class ExtensionService:
                 {
                     "kind": "panels",
                     "available": False,
-                    "summary": "Needs a route, permission and accessibility contract that does not exist.",
+                    # BUG-228, retired 2026-10-18 — contributed UI is MCP
+                    # Apps' (a server the owner added), never a plugin's page.
+                    "summary": (
+                        "Not offered by plugins. Interface from an extension is planned "
+                        "through MCP Apps: a server you add, sandboxed, with a permission you grant."
+                    ),
                 },
             ],
         }

@@ -642,7 +642,7 @@ lists what a plugin *may* contribute:
 | Hooks | yes — rules at `plugin` scope, below every scope you control |
 | Skills | yes — instruction text, installed **switched off** and credited to the plugin |
 | MCP servers | yes — a plugin may *offer* one; adding it is your action |
-| Panels | not yet — needs a route, permission and accessibility contract |
+| Panels | not offered — plugins do not draw pages; interface from an extension is planned through MCP Apps (a server you add, sandboxed, with a permission you grant) |
 
 so "provides nothing" and "may not provide anything" read differently.
 

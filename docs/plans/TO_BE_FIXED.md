@@ -76,9 +76,6 @@ Evidence: `screenshots/not-working/` (defects),
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
-| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced again 2026-09-04; `prompt` closed as FIXED-303 and `http` as [FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two), while `mcp_tool` and `agent` stay refused with their reasons |
-| [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) and twice again on 2026-09-05 ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)). The transport conforms, the card names what a server offers and Raiker does not use, every content-block shape reaches the model, a server-initiated request is answered rather than mistaken for a response, and an event stream is read and resumed correctly; **incremental** delivery, remote OAuth, MCP Apps and elicitation's owner-facing half remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
@@ -257,224 +254,6 @@ seven tabs on real data; Settings' sections; theme cycling system → light → 
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
-
----
-
-## BUG-226 — Three of the five hook handler types do not exist
-
-**Severity: Low. Area: hooks / handlers. Status: Open remainder — reduced
-2026-08-28 (FIXED-303).**
-
-**Observed.** The hooks reference Raiker maps itself against documents five
-handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. Before
-FIXED-303, `HANDLER_TYPES` accepted only `command` and Raiker's own `builtin`.
-It now also accepts a bounded `prompt` and, since
-[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two),
-an `http` handler behind a named, revocable egress grant. A rule naming
-`mcp_tool` or `agent` is still refused at parse time, which is the right failure
-until each has a governed resource path.
-
-The title has undercounted twice and is kept as raised. After FIXED-303 three
-remained; after FIXED-380, **two** — `mcp_tool` and `agent`.
-
-**Corrected 2026-08-22.** This entry used to say `command` is the only handler
-type Claude Code's own hooks have, and that the gap was therefore against
-Raiker's own reference document rather than against Claude Code. That was wrong:
-[the Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
-documents and specifies all five — `command`, `http`, `mcp_tool`, `prompt` and
-`agent` — with per-type fields. **This is a real gap against Claude Code.** It
-stays Low because each missing type needs a resource the hook path deliberately
-does not have (below), not because the reference lacks them.
-
-This is the remainder of the hooks gap after BUG-223 — and the *events* are not
-at parity either: Raiker emits seventeen of the thirty-one Claude Code documents.
-See
-[`../REFERENCE_PLATFORM_COMPATIBILITY.md`](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
-
-**Root cause.** Each originally missing type needs a resource the hook path deliberately
-does not have:
-
-* `http` needs egress. A hook has no implicit network access by design, and
-  giving one an outbound request is a capability decision, not a handler type.
-* `mcp_tool` needs the MCP broker inside the hook path, which would let a hook
-  reach a tool the turn's own policy might have refused — the exact inversion the
-  hook model forbids.
-* `agent` needs a multi-turn model loop and tools, which means its own budget,
-  capability set and answer to inherited authority. The single-turn `prompt`
-  case no longer shares that blocker.
-
-**Completed first slice.** FIXED-303 adds `prompt` with a per-handler token
-budget and timeout, the owner-selected governed provider, no tools, no nesting,
-redacted bounded event data and advisory-only output.
-
-**Completed second slice (2026-09-04).**
-[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two)
-adds `http` behind exactly the grant this entry named:
-`RAIKER_HOOK_EGRESS_ALLOWLIST`, empty by default, revoking every `http` rule at
-once when cleared, read live by the Hooks page, and refusing with the host in the
-reason. It sends the same bounded, redacted event body the `prompt` handler
-already sends, from the same function; a remote responder can deny or ask and can
-never permit, and a non-2xx is not a deny.
-
-`mcp_tool` and `agent` stay refused until there is a stated answer to a hook
-reaching authority the turn did not have.
-
-**Not a regression, and visible today.** A rule naming an unsupported type is
-refused at parse time rather than accepted and ignored, and the Hooks tab reports
-the file as failed with the reason — so an owner writing one is told, rather than
-believing a guard is in place.
-
----
-
-## BUG-228 — A plugin panel has no route, permission or accessibility contract
-
-**Severity: Low. Area: plugins / web UI. Status: Open — raised 2026-08-22, split
-out of BUG-221 as the last remaining contribution kind.**
-
-**Observed.** Extensions → Plugins lists four contribution kinds. Three are now
-available (hooks, skills, MCP-server offers). **Panels** is the fourth and reads
-"Not yet — needs a route, permission and accessibility contract that does not
-exist", which is accurate and has been the stated blocker since BUG-221 was
-raised. Splitting it out means BUG-221 can close when the reasoning it carries is
-no longer needed, and this can be worked on its own terms.
-
-**Root cause.** Unlike the other three, there is no existing surface that already
-governs "a page a plugin drew". A hook had an execution model; a skill had a
-validator; an MCP server had a create path. A panel needs all of the following to
-be decided before any code:
-
-* **A route.** Where a plugin's page lives in the hash router, how it is
-  addressed, and what stops two plugins claiming one path.
-* **A rendering boundary.** Raiker renders no third-party code in the browser
-  today, and "no plugin code runs in this browser" is a claim the Plugins tab
-  makes in those words. A panel either breaks that claim or is declarative —
-  a described layout Raiker renders — and that choice decides everything else.
-* **A permission model.** What data a panel may read, and how it asks; a panel
-  that can read the session list is a very different object from one that cannot.
-* **An accessibility contract.** Every other surface meets the same keyboard,
-  contrast and landmark bar. A plugin-supplied page cannot be exempt from it, so
-  it has to be *checkable*, which is easiest if it is declarative.
-
-**Proposed fix.** Take the declarative route: a panel is a described layout from
-a fixed component vocabulary, rendered by Raiker, reading only data the plugin's
-own contributions produced. That keeps "no plugin code runs in this browser"
-literally true, makes the accessibility contract enforceable at render time
-rather than by review, and matches the pattern the other three kinds established.
-
-**Not blocking anything.** No other work depends on this, and the surface already
-states it is unavailable rather than offering a control that does nothing.
-
----
-
-## BUG-234 — The remainder: what Raiker does not use of the MCP revision it now speaks
-
-**Severity: Low (was Medium). Area: MCP / interoperability.
-Status: Open — reduced 2026-08-23, twice on 2026-09-04 (transport, result
-shapes), and twice again on 2026-09-05 (server-initiated requests, event-stream
-framing).**
-
-**Reduced again 2026-09-05, and the first of the two was a defect rather than a
-gap.** Reading this entry's *streaming* bullet led to the code that reads a
-stream, and two things there were wrong rather than merely unbuilt:
-
-* **[FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)
-  — a server that asked Raiker anything could not be connected at all.** Both
-  transports filed every message carrying an `id` into the response map, and a
-  server-initiated request carries an id from the *server's* numbering space.
-  One numbered 1 — the ordinary choice — landed on top of the `initialize`
-  answer, and the connection failed as `mcp_initialize_failed`: Raiker's own
-  request named, and the server blamed for not answering it. Reproduced on
-  unmodified `main`. Direction is read from `method` now, `ping` is answered,
-  and everything else is refused with `-32601` and **named on the card** rather
-  than met with silence.
-* **[FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)
-  — an event stream was read one line at a time.** One event's payload may span
-  several `data:` lines, which is what a server that pretty-prints its JSON-RPC
-  produces; each line was parsed alone, failed, and was dropped. `id:` was
-  dropped too, so the single re-handshake after a dropped session restarted from
-  nothing. There is a real event-stream parser now, and `Last-Event-ID` on the
-  one request that resumes.
-
-Neither closes the *streaming* bullet below, and neither pretends to: Raiker
-still reads a bounded response whole and holds no connection between turns, and
-the card still says so.
-
-**What changed.** Raiker negotiated revision `2024-11-05` for five revisions,
-which meant a server implementing only the current one could not be connected at
-all. It now offers
-[`2026-07-28`](https://modelcontextprotocol.io/specification/versioning), accepts
-`2025-06-18`, `2025-03-26` and `2024-11-05` when a server answers with one, and
-refuses a revision it does not implement rather than continuing on a framing it
-cannot trust. **Extensions → MCP** states the revision each server negotiated.
-Closed as [FIXED-274](FIXED_ITEMS.md).
-
-**Reduced again 2026-09-04**
-([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)).
-The transport now conforms where a real server would have refused it: `Accept`
-carries both framings (a conformant server may answer 406 to a POST offering only
-JSON), a session is released with `DELETE`, a dropped session re-handshakes once,
-and a `401` with `WWW-Authenticate` is named as the OAuth requirement it is
-rather than as a network failure. **The interface outcome below is met**: what a
-connected server offers and Raiker does not use is named on its card.
-
-**What is left.** Negotiating a revision is not implementing it. Each of the
-following was previously *blocked* by the version pin and is now ordinary work:
-
-* **Streamable HTTP streaming.** Raiker's `http` transport is its own bounded
-  JSON-RPC client. It reads an `text/event-stream` answer whole rather than
-  streaming it, and holds no open connection between turns: no incremental
-  delivery. A server that answers this way is **named as such on its card**
-  rather than silently degraded. **Two of the four things this bullet listed are
-  now done** — the framing is read correctly and resumably
-  ([FIXED-412](FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped))
-  and server-initiated messages are answered rather than mis-filed
-  ([FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)).
-  Incremental delivery and a connection that outlives the turn are what is left,
-  and both are a different object from a bounded governed read: a stream held
-  open between turns is a standing inbound channel, and it needs its own answer
-  to what may arrive on it while nobody is looking.
-* **Remote OAuth.** The authorisation flow the current revision defines. Raiker's
-  remote transport takes an owner token from an env var named by `auth_ref`.
-* **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)).**
-  Sandboxed server-contributed UI, and the better answer to
-  [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract).
-  Carried as [ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
-* ~~**Structured tool output and resource links.**~~ **Done 2026-09-04 —
-  [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six).**
-  Raiker read one of the six shapes a result may carry: the `text` of every
-  block. All five block types and `structuredContent` now reach the model, with
-  two rules that are governance rather than formatting — a `resource_link` is
-  *named and never followed*, because a tool result must not cause a read the
-  owner's policy never saw; and an inline image is named by media type and size
-  rather than decoded into the turn.
-* **Elicitation.** Its blocker is gone — the mid-turn question surface shipped as
-  [FIXED-308](FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant)
-  — and it is still not built. What it needs is an answer to *whose* question a
-  server's elicitation is: `ask_owner_question` carries no authority because
-  Raiker's own runtime raised it, and a question a connected server composes is a
-  different object. **The wire half is now in place and deliberately stops
-  short**: since
-  [FIXED-411](FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)
-  an `elicitation/create` reaches Raiker as the request it is, is answered
-  `-32601`, and is named on the server's card — so an owner can see a server
-  asking and see that it was refused. Wiring it to a person is the part that
-  still needs the answer above, and `sampling/createMessage` needs the same one
-  about a turn the owner's policy never reviewed.
-* **`server/discover`.** Not implemented, and not urgent: every server an owner
-  can add today is added by the owner naming it.
-
-**Why Low.** Nothing is broken and nothing is unreachable: every server Raiker
-could talk to before, it can still talk to, and a current-revision server now
-connects. What remains is capability Raiker has chosen not to build yet, stated
-rather than implied.
-
-**Interface outcome that has to be true before this closes.** A connected server
-that offers a `ui://` resource, an SSE stream, or an OAuth authorisation
-requirement is either supported or **named on its card as unsupported** — never
-silently degraded. **Met 2026-09-04 (FIXED-378):** the server's own `initialize`
-capabilities and what its transport was observed doing are stored as feature
-names and rendered as one sentence each, and a capability Raiker has never heard
-of is still named by its own key rather than dropped for not being on a list.
 
 ---
 
@@ -724,13 +503,16 @@ a proposed choice, not an owner approval or a verified fix. The original BUG
 entries retain their status and acceptance evidence.
 
 ### BUG-226 and BUG-228 — Do not create alternate execution contracts
+**Retired from this ledger 2026-10-18** ([FIXED-951](FIXED_ITEMS.md#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234));
+the boundary they describe is kept in [KNOWN_LIMITS.md](../architecture/KNOWN_LIMITS.md#boundaries-raiker-chose).
+
 **Decision — retained deferral for hooks; recommended convergence for UI.**
 Keep `mcp_tool` and `agent` hook types unsupported until each has bounded,
 non-escalating authority, its own resource budget, recursion limits and
-execution-time revalidation. For contributed UI, follow ADD-24's one MCP Apps
+execution-time revalidation. For contributed UI, follow the one MCP Apps
 contract instead of implementing a second `panels.json` renderer. BUG-228 may
-eventually close as superseded only when the replacement scope is accepted and
-its obsolete promises are reconciled; it is not implemented by this note.
+close as superseded once the replacement scope is accepted and its obsolete
+promises are reconciled — both done 2026-10-18.
 
 **Reason and acceptance.** A hook must not call a tool the originating turn
 cannot call. Two contributed-UI models duplicate permission, isolation and
@@ -739,7 +521,7 @@ per-app grants, message validation, iframe isolation and keyboard access for UI.
 A sandboxed iframe still runs third-party code; the product must describe its
 boundary accurately rather than claim that no browser code runs.
 References: [hook type contract](../../raiker/hooks/contracts.py),
-[ADD-24](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
+[MCP Apps in KNOWN_LIMITS](../architecture/KNOWN_LIMITS.md#boundaries-raiker-chose),
 [DEC-23](TESTING.md).
 
 ## Personal-agent direction — 2026-10-07

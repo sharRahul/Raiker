@@ -972,6 +972,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-948](#fixed-948--the-first-launch-live-spec-skipped-the-check-stage-by-reading-it-too-early) | Low | Live test harness | Fixed 2026-10-18 — found verifying FIXED-947 |
 | [FIXED-949](#fixed-949--a-windows-only-crash-dump-had-no-ci-job-that-could-catch-it-again-was-bug-312) | Low | Tests / Windows / CI | Closed 2026-10-18 — was BUG-312 |
 | [FIXED-950](#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced) | Low | Tasks / GitHub | Fixed 2026-10-18 — reduces BUG-339; RR-40 evidence open |
+| [FIXED-951](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234) | Low | Hooks / plugins / MCP | Retired 2026-10-18 — BUG-226, BUG-228, BUG-234 |
 
 ---
 
@@ -13959,7 +13960,7 @@ other's rows, and the answer channel accepts only what was offered. The reviewed
 documentation for Cowork, ChatGPT Work, Codex, OpenClaw, DeepSeek Harness and
 Hermes did not establish that separation. It also gives MCP `elicitation` and the
 `Elicitation` / `ElicitationResult` hook events a surface to land on when
-[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)
+[BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234)
 closes.
 
 **Evidence.** `tests/test_owner_question.py` — 22 tests covering the band, the
@@ -16961,7 +16962,7 @@ said what was there and could not say what any of it took.
 ## FIXED-378 — Raiker spoke the current MCP revision and did not use its transport
 
 **Severity: Low. Area: MCP / interoperability. Status: Fixed 2026-09-04
-(the transport half of [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)).**
+(the transport half of [BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234)).**
 
 **Observed.** FIXED-274 made Raiker offer revision `2026-07-28` and accept three
 older ones. Negotiating a revision is not implementing it, and four things the
@@ -17108,7 +17109,7 @@ credential cannot be typed into a browser field and stored.
 ## FIXED-380 — Three of the five hook handler types did not exist; now two
 
 **Severity: Low. Area: Hooks / handlers. Status: Fixed 2026-09-04 (the `http`
-slice of [BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist)).**
+slice of [BUG-226](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234)).**
 
 **Observed.** [The Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
 documents and specifies five handler types. Raiker shipped `command`, `builtin`
@@ -17513,7 +17514,7 @@ is visible before a collector exists.
 ## FIXED-387 — A tool result had one shape, and the revision defines six
 
 **Severity: Low. Area: MCP / interoperability. Status: Fixed 2026-09-04. Reduces
-[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+[BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234).**
 
 **Observed.** Raiker negotiates the current MCP revision and read exactly one
 thing out of a `tools/call` answer: the `text` field of every content block,
@@ -18794,7 +18795,7 @@ serialisation guard was confirmed to fail when the builder line is removed.
 ## FIXED-411 — A server-initiated request was filed as the answer to Raiker's own
 
 **Severity: High. Area: MCP / interoperability. Status: Fixed 2026-09-05.
-Reduces [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+Reduces [BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234).**
 
 **Observed.** A remote MCP server that answers the handshake correctly and then
 asks Raiker a question — a `ping`, an `elicitation/create`, a
@@ -18858,7 +18859,7 @@ be the wrong trade.
 question the owner is shown, or spend a model turn the owner's policy never
 reviewed. Both are a different authority object from a tool call the owner
 approved, and each needs its own answer before any code — which is what
-[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)
+[BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234)
 still records as open. Until then, "not implemented" is the honest reply.
 
 **A stdio session makes the same distinction and cannot answer.** Every request
@@ -18883,7 +18884,7 @@ above and the stdio half.
 ## FIXED-412 — An event stream was read one line at a time, and the rest was dropped
 
 **Severity: Medium. Area: MCP / interoperability. Status: Fixed 2026-09-05.
-Reduces [BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+Reduces [BUG-234](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234).**
 
 **Observed.** `_parse_jsonrpc_body` treated each `data:` line of a
 `text/event-stream` answer as one complete JSON message and ignored every other
@@ -19075,7 +19076,7 @@ tab cannot gain a broken path form with it.
 everything else.**
 
 **The title says "both" and there are five.** It is kept as raised, the way
-[BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist)
+[BUG-226](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234)
 keeps a count that turned out to be wrong: the entry was opened on the two
 specs whose *names* say they sweep every page, and reading the rest of the
 directory found three more doing the same thing with the same drift. A title
@@ -33934,4 +33935,47 @@ POST body (**7/7**). The new `bug-339-issue-to-pr-routine-live.spec.ts` passed
 **1/1** against a fresh `raiker-web`, and its `routine-plan.png` capture was
 reviewed: each write step reads *Asks you first*, the never-list names merge,
 and **Schedule as a Build task** stays disabled until a project is chosen.
+
+---
+
+## FIXED-951 — Three open entries were decided boundaries or superseded work, not defects (BUG-226, BUG-228, BUG-234)
+
+**Severity: Low. Area: Hooks / plugins / MCP. Status: Retired 2026-10-18 on the
+owner's instruction to remove entries that are no longer valid or relevant.**
+
+Each entry's history stays in Git and in the FIXED entries that reduced it
+(FIXED-274, -303, -378, -380, -387, -411, -412). What each still says is true now
+lives in [`KNOWN_LIMITS.md`](../architecture/KNOWN_LIMITS.md#boundaries-raiker-chose),
+where a deliberate boundary belongs.
+
+* **BUG-226 — hook handler types.** `command`, `prompt` and `http` ship. The
+  remaining `mcp_tool` and `agent` are refused at parse time **by decision**
+  (2026-10-05): a hook must not call a tool its turn could not. The behaviour is
+  correct and visible — the Hooks tab reports such a rule as failed — so this is
+  a boundary, not a defect. `HOOKS_SPEC.md` and `KNOWN_LIMITS.md` say so, and
+  `KNOWN_LIMITS.md` no longer claims `http` is unbuilt.
+* **BUG-228 — plugin panels.** Superseded by the MCP Apps plan, which the
+  2026-10-05 decision named as the one contributed-UI contract. Its obsolete
+  promises are reconciled: the Extensions read models
+  (`web_read_models.py`, `dashboard_parts/extensions.py`) now say plugins do not
+  draw pages and contributed interface is planned through MCP Apps, instead of
+  "needs a route, permission and accessibility contract";
+  `PLUGIN_SYSTEM_SPEC.md` and `REFERENCE_PLATFORM_COMPATIBILITY.md` row 27 mark
+  the panel route retired. The MCP Apps scope (formerly ADD-24, whose document was
+  removed in the plan consolidation, leaving references that pointed nowhere) is
+  now stated in `KNOWN_LIMITS.md`.
+* **BUG-234 — MCP revision remainder.** Its own closing condition — a server
+  offering a `ui://` resource, a stream or OAuth is supported or named on its card
+  as unsupported — was met by FIXED-378. What remained (incremental delivery,
+  remote OAuth, MCP Apps, elicitation and sampling wired to a person,
+  `server/discover`) is unbuilt capability, now listed in `KNOWN_LIMITS.md`.
+
+**Kept open.** BUG-194 (no Docker or Podman daemon on this host for the container
+proofs, and no production signing anchor), BUG-248 and BUG-287 (owner-run live
+evidence) and BUG-339 (RR-40).
+
+**Evidence.** Extension and plugin tests pass after the copy change (`pytest -k
+"extension or plugin"`), the API contract was regenerated, and the documentation
+link and anchor checks pass with every reference to the three retired anchors
+redirected here (8 links).
 

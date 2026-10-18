@@ -57,8 +57,9 @@ _DEFERRED_EXTENSION_KINDS: tuple[dict[str, str], ...] = (
         "kind": "plugin",
         "status": "not_available",
         "detail": (
-            "Plugin-provided panels need a route, permission, and accessibility "
-            "contract before any plugin may render in this application."
+            "Plugins do not draw pages in this application. Interface contributed "
+            "by an extension is planned through MCP Apps: a server you add, in a "
+            "sandbox, under a permission you grant."
         ),
     },
     {

@@ -8,7 +8,7 @@ any such key, which is the right blunt instrument to keep, so the shapes say
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from typing_extensions import TypedDict
 
@@ -78,6 +78,27 @@ class GitHubDelegationView(TypedDict):
     state: str
     parent_delegation_id: str | None
     created_at: str
+
+
+class IssueToPrStepView(TypedDict):
+    step: str
+    label: str
+    operation: str
+    decision: Literal["runs", "runs_under_delegation", "asks"]
+
+
+class IssueToPrRoutineView(TypedDict):
+    """BUG-339 — a plan and the Build task that would carry it out. Starts nothing."""
+
+    repository: str
+    work_branch: str
+    delegation_id: str | None
+    delegation_problems: list[str]
+    steps: list[IssueToPrStepView]
+    never: list[str]
+    blocked_needs_owner: bool
+    title: str
+    description: str
 
 
 class GitHubRiskView(TypedDict):

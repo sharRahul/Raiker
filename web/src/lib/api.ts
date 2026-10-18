@@ -804,6 +804,7 @@ export const api = {
     max_actions: number | null;
   }) => contract.createGithubDelegation({ ...body, note: null }),
   revokeGithubDelegation: (delegationId: string) => contract.revokeGithubDelegation(delegationId),
+  planIssueToPrRoutine: (body: Parameters<typeof contract.planIssueToPrRoutine>[0]) => contract.planIssueToPrRoutine(body),
   configureGithubApp: (body: Parameters<typeof contract.configureGithubApp>[0]) => contract.configureGithubApp(body),
   validateGithubApp: () => contract.validateGithubApp(),
   removeGithubApp: () => contract.removeGithubApp(),

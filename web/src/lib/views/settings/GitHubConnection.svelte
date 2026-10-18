@@ -18,7 +18,9 @@
     GitHubSignInAttempt,
     GitHubAppValidation,
   } from "../../apiTypes";
+  import type { IssueToPrRoutineView, ProjectView } from "../../generated/apiContract";
   import PageState from "../../components/PageState.svelte";
+  import { newIdempotencyKey } from "../../idempotency";
   import GitCredential from "./GitCredential.svelte";
 
   let connection = $state<GitHubConnection | null>(null);
@@ -35,6 +37,22 @@
   let delegationPattern = $state("raiker/*");
   let delegationHours = $state(24);
   let delegationBudget = $state<number | null>(null);
+
+  // BUG-339 — the issue-to-pull-request routine: a plan first, then a Build task.
+  let routineDelegation = $state("");
+  let routineRepo = $state("");
+  let routineIssue = $state<number | null>(null);
+  let routineBranch = $state("");
+  let routineProject = $state("");
+  let routineStart = $state("");
+  let routinePlan = $state<IssueToPrRoutineView | null>(null);
+  let projects = $state<ProjectView[]>([]);
+  let routineKey = newIdempotencyKey();
+  const DECISION_LABEL: Record<string, string> = {
+    runs: "Runs",
+    runs_under_delegation: "Runs under the delegation",
+    asks: "Asks you first",
+  };
 
   let appClientId = $state("");
   let appId = $state("");
@@ -226,6 +244,41 @@
     await run(async () => {
       connection = await api.revokeGithubDelegation(id);
     }, "Delegation revoked, with every share narrowed from it.");
+  }
+
+  function routineRepository(): string {
+    const delegated = connection?.delegations.find((row) => row.delegation_id === routineDelegation);
+    return delegated?.repository ?? routineRepo.trim();
+  }
+
+  async function planRoutine(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!routineIssue) return;
+    await run(async () => {
+      routinePlan = await api.planIssueToPrRoutine({
+        repository: routineRepository(),
+        issue_number: Number(routineIssue),
+        work_branch: routineBranch.trim() || `raiker/issue-${routineIssue}`,
+        delegation_id: routineDelegation || null,
+      });
+      if (!projects.length) projects = (await api.projects()).projects;
+    });
+  }
+
+  async function scheduleRoutine(): Promise<void> {
+    const plan = routinePlan;
+    if (plan === null || !routineProject) return;
+    await run(async () => {
+      await api.createTask({
+        title: plan.title,
+        description: plan.description,
+        surface: "build",
+        project_id: routineProject,
+        ...(routineStart ? { scheduled_at: new Date(routineStart).toISOString() } : {}),
+      }, routineKey);
+      routineKey = newIdempotencyKey();
+      routinePlan = null;
+    }, "Scheduled as a Build task. Its writes run only under the delegation; anything else waits in Approvals.");
   }
 
   async function saveApp(event: SubmitEvent): Promise<void> {
@@ -505,6 +558,62 @@
           Delegate
         </button>
       </form>
+    </div>
+
+    <div class="card">
+      <h3>Issue to pull request</h3>
+      <p class="lead">
+        Hand Raiker one issue to fix on a work branch, as a Build task. You see which
+        steps would run before anything is scheduled. Without a delegation every write
+        asks you; a merge is never part of it.
+      </p>
+      <form class="delegate" onsubmit={planRoutine} data-testid="github-issue-routine">
+        <label class="field-label" for="routine-delegation">Delegation</label>
+        <select id="routine-delegation" class="input" bind:value={routineDelegation}>
+          <option value="">None — every write asks</option>
+          {#each connection.delegations as row (row.delegation_id)}
+            <option value={row.delegation_id}>{row.repository.replace("github.com/", "")} · {row.operations.join(", ")}</option>
+          {/each}
+        </select>
+        {#if !routineDelegation}
+          <label class="field-label" for="routine-repo">Repository to work in</label>
+          <input id="routine-repo" class="input" list="github-repo-names" bind:value={routineRepo} placeholder="owner/name" />
+        {/if}
+        <div class="pair">
+          <label class="field-label" for="routine-issue">Issue</label>
+          <input id="routine-issue" class="input" type="number" min="1" bind:value={routineIssue} placeholder="7" />
+          <label class="field-label" for="routine-branch">Work branch</label>
+          <input id="routine-branch" class="input" bind:value={routineBranch} placeholder={routineIssue ? `raiker/issue-${routineIssue}` : "raiker/issue-7"} />
+        </div>
+        <button class="btn" type="submit" disabled={busy || !routineIssue || !(routineDelegation || routineRepo.trim())}>
+          Show the plan
+        </button>
+      </form>
+      {#if routinePlan}
+        {#if routinePlan.blocked_needs_owner}
+          <p class="detail" role="alert">
+            The delegation no longer holds ({routinePlan.delegation_problems.join(", ").replaceAll("_", " ")}), so every write would ask you.
+          </p>
+        {/if}
+        <ol class="rows" data-testid="github-issue-routine-plan">
+          {#each routinePlan.steps as step (step.step)}
+            <li class="item"><span>{step.label}</span><span class="badge">{DECISION_LABEL[step.decision] ?? step.decision}</span></li>
+          {/each}
+        </ol>
+        <p class="detail">Never: {routinePlan.never.map((word) => word.replaceAll("_", " ")).join(", ")}.</p>
+        <div class="delegate">
+          <label class="field-label" for="routine-project">Project (the repository's local checkout)</label>
+          <select id="routine-project" class="input" bind:value={routineProject}>
+            <option value="">Choose a project</option>
+            {#each projects as project (project.project_id)}<option value={project.project_id}>{project.name}</option>{/each}
+          </select>
+          <label class="field-label" for="routine-start">Start (leave empty for the next scheduler tick)</label>
+          <input id="routine-start" class="input" type="datetime-local" bind:value={routineStart} />
+          <button class="btn btn-primary" type="button" onclick={scheduleRoutine} disabled={busy || !routineProject}>
+            Schedule as a Build task
+          </button>
+        </div>
+      {/if}
     </div>
 
     <div class="card">

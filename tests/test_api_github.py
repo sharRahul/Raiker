@@ -103,6 +103,54 @@ def test_a_delegation_refuses_merge_and_is_listed(api: tuple[TestClient, dict[st
     assert revoked["delegations"] == []
 
 
+def test_the_issue_to_pr_routine_drafts_a_task_and_starts_nothing(
+    api: tuple[TestClient, dict[str, str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-339 — the template becomes a Build task's instructions; its authority stays with the router."""
+    import raiker.api.routes_github as routes
+
+    client, h, _ws = api
+    client.put("/api/git-credential", json={"token": _TOKEN}, headers=h)
+    made = client.post(
+        "/api/github/delegations",
+        json={"repository": "github.com/octo/demo", "operations": ["fetch", "branch", "commit", "push", "pull_request"],
+              "branch_pattern": "raiker/*"},
+        headers=h,
+    ).json()
+    payload = {"repository": "octo/demo", "issue_number": 7, "work_branch": "raiker/issue-7",
+               "delegation_id": made["delegation_id"]}
+    # GitHub is asked whether the repository is still the delegated one; when it
+    # cannot answer, the preview says the routine would park rather than run.
+    unavailable = client.post("/api/github/routines/issue-to-pr", json=payload, headers=h).json()
+    assert unavailable["blocked_needs_owner"] is True and unavailable["delegation_problems"]
+    monkeypatch.setattr(routes, "_routine_http", lambda: None)
+    tasks_before = client.get("/api/tasks", headers=h).json()
+    routine = client.post(
+        "/api/github/routines/issue-to-pr",
+        json=payload,
+        headers=h,
+    )
+    assert routine.status_code == 200, routine.text
+    body = routine.json()
+    assert body["delegation_problems"] == [], body["delegation_problems"]
+    assert body["repository"] == "github.com/octo/demo" and body["blocked_needs_owner"] is False
+    assert {s["decision"] for s in body["steps"] if s["operation"] != "read"} == {"runs_under_delegation"}
+    assert body["title"] == "Issue #7 → pull request (octo/demo)"
+    assert "raiker/issue-7" in body["description"] and "untrusted data" in body["description"]
+    assert "Never delete branch, merge" in body["description"]
+    # A preview: no task, no delegation spent.
+    assert client.get("/api/tasks", headers=h).json() == tasks_before
+    assert client.get("/api/github", headers=h).json()["delegations"][0]["actions_used"] == 0
+
+    undelegated = client.post(
+        "/api/github/routines/issue-to-pr",
+        json={"repository": "octo/demo", "issue_number": 7, "work_branch": "raiker/issue-7"},
+        headers=h,
+    ).json()
+    assert {s["decision"] for s in undelegated["steps"] if s["operation"] != "read"} == {"asks"}
+    assert "asks the owner first" in undelegated["description"]
+
+
 def _signed(body: dict[str, Any], secret: str, event: str = "ping", delivery: str = "d-1") -> tuple[bytes, dict[str, str]]:
     raw = json.dumps(body).encode()
     signature = "sha256=" + hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()

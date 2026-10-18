@@ -281,6 +281,16 @@ repository transferred, re-created or out of reach makes the step wait. On a
 repository with a GitHub remote, creating a branch and committing follow the same
 rule: an agent does them unprompted only on a branch a delegation covers.
 
+**Handing Raiker an issue to fix** (Settings → GitHub → *Issue to pull
+request*): choose a delegation — or none, and every write asks — the issue
+number and a work branch, then **Show the plan**. Each step says whether it
+*Runs*, *Runs under the delegation* or *Asks you first*, and merging, deleting a
+branch, protected branches and workflows are listed as never part of it.
+Nothing is scheduled until you pick the project that holds the repository's
+local checkout and press **Schedule as a Build task**. The task's instructions
+are not its authority: each write still meets the same delegation check, and
+anything it does not cover waits in Approvals.
+
 ## Reading the repository
 
 **Files** on the Build header opens the connected repository beside the

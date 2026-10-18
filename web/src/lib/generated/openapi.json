@@ -13844,6 +13844,150 @@
         "title": "InterruptResult",
         "type": "object"
       },
+      "IssueToPrRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "delegation_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegation Id"
+          },
+          "issue_number": {
+            "exclusiveMinimum": 0.0,
+            "title": "Issue Number",
+            "type": "integer"
+          },
+          "repository": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Repository",
+            "type": "string"
+          },
+          "work_branch": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Work Branch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository",
+          "issue_number",
+          "work_branch"
+        ],
+        "title": "IssueToPrRequest",
+        "type": "object"
+      },
+      "IssueToPrRoutineView": {
+        "description": "BUG-339 — a plan and the Build task that would carry it out. Starts nothing.",
+        "properties": {
+          "blocked_needs_owner": {
+            "title": "Blocked Needs Owner",
+            "type": "boolean"
+          },
+          "delegation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegation Id"
+          },
+          "delegation_problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Delegation Problems",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "never": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Never",
+            "type": "array"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/IssueToPrStepView"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "work_branch": {
+            "title": "Work Branch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repository",
+          "work_branch",
+          "delegation_id",
+          "delegation_problems",
+          "steps",
+          "never",
+          "blocked_needs_owner",
+          "title",
+          "description"
+        ],
+        "title": "IssueToPrRoutineView",
+        "type": "object"
+      },
+      "IssueToPrStepView": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "runs",
+              "runs_under_delegation",
+              "asks"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "label",
+          "operation",
+          "decision"
+        ],
+        "title": "IssueToPrStepView",
+        "type": "object"
+      },
       "IssuedSessionView": {
         "description": "The first-run owner session, with the CSRF token for its cookie.",
         "properties": {
@@ -34451,6 +34595,45 @@
           }
         },
         "summary": "Select Github Repository"
+      }
+    },
+    "/api/github/routines/issue-to-pr": {
+      "post": {
+        "description": "BUG-339 — which steps would run, and the Build task that would run them.\n\nRead-only: the owner schedules the returned task through Tasks, where the\nmodel check and the schedule's terms apply as to any other routine. The\ntask carries instructions, not authority — each write still meets the\nrouter, which runs it only under a covering, re-validated delegation.",
+        "operationId": "plan_issue_to_pr_routine_api_github_routines_issue_to_pr_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueToPrRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueToPrRoutineView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Issue To Pr Routine"
       }
     },
     "/api/github/sign-in": {

@@ -163,6 +163,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/github/repositories/{repository_id}"),
         ("POST", "/api/github/delegations"),
         ("DELETE", "/api/github/delegations/{delegation_id}"),
+        ("POST", "/api/github/routines/issue-to-pr"),
         ("PUT", "/api/github/app"),
         ("POST", "/api/github/app/validate"),
         ("DELETE", "/api/github/app"),

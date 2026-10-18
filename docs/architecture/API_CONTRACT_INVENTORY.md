@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**409 operations: 396 verified, 0 eligible, 0 deferred, 13 special.**
+**410 operations: 397 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -155,6 +155,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/github/discovery` |  | GitHubDiscovery | verified | declared GitHubDiscovery |
 | POST | `/api/github/repositories/refresh` |  | GitHubConnection | verified | _connection |
 | PUT | `/api/github/repositories/{repository_id}` | RepositorySelection | GitHubConnection | verified | _connection |
+| POST | `/api/github/routines/issue-to-pr` | IssueToPrRequest | IssueToPrRoutineView | verified | declared IssueToPrRoutineView |
 | POST | `/api/github/sign-in` | SignInRequest | GitHubSignInAttempt | verified | attempt_view |
 | POST | `/api/github/sign-in/{attempt_id}/cancel` |  | GitHubSignInAttempt | verified | _attempt_call |
 | POST | `/api/github/sign-in/{attempt_id}/poll` |  | GitHubSignInAttempt | verified | _attempt_call |

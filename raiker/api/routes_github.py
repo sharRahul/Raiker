@@ -35,6 +35,7 @@ from raiker.api.wire.github import (
     GitHubDiscovery,
     GitHubSignInAttempt,
     GitHubStates,
+    IssueToPrRoutineView,
     attempt_view,
     credential_view,
     delegation_view,
@@ -436,6 +437,48 @@ async def revoke_github_delegation(
         raise _fail(exc.reason, status.HTTP_404_NOT_FOUND) from None
     connection = _connection(store, session.principal_id)
     return serialize_dto(connection)
+
+
+class IssueToPrRequest(StrictRequest):
+    repository: str = Field(min_length=1, max_length=200)
+    issue_number: int = Field(gt=0)
+    work_branch: str = Field(min_length=1, max_length=200)
+    delegation_id: str | None = Field(default=None, max_length=100)
+
+
+def _routine_http() -> GitHubHttp:
+    """GitHub, asked whether the delegated repository is still the one named (BUG-338)."""
+    return GitHubHttp()
+
+
+@router.post("/api/github/routines/issue-to-pr")
+async def plan_issue_to_pr_routine(
+    body: IssueToPrRequest, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """BUG-339 — which steps would run, and the Build task that would run them.
+
+    Read-only: the owner schedules the returned task through Tasks, where the
+    model check and the schedule's terms apply as to any other routine. The
+    task carries instructions, not authority — each write still meets the
+    router, which runs it only under a covering, re-validated delegation.
+    """
+    from raiker.github.routines import issue_to_pr_task_draft, plan_issue_to_pr
+
+    session, principal = auth_data
+    require_human(principal)
+    repository = body.repository.strip()
+    if not repository.startswith("github.com/"):
+        repository = f"github.com/{repository}"
+    plan = plan_issue_to_pr(
+        _store(request), session.principal_id, repository=repository,
+        work_branch=body.work_branch.strip(), delegation_id=body.delegation_id,
+        http=_routine_http() if body.delegation_id else None,
+    )
+    routine: IssueToPrRoutineView = {
+        **plan,  # type: ignore[typeddict-item]
+        **issue_to_pr_task_draft(plan, issue_number=body.issue_number),
+    }
+    return serialize_dto(routine)
 
 
 # ── a custom GitHub App (Advanced, self-hosted) ─────────────────────────

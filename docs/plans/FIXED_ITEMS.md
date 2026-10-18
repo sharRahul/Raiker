@@ -971,6 +971,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-947](#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345) | Medium | Setup / privacy | Fixed 2026-10-18 — was BUG-345; owner chose removal |
 | [FIXED-948](#fixed-948--the-first-launch-live-spec-skipped-the-check-stage-by-reading-it-too-early) | Low | Live test harness | Fixed 2026-10-18 — found verifying FIXED-947 |
 | [FIXED-949](#fixed-949--a-windows-only-crash-dump-had-no-ci-job-that-could-catch-it-again-was-bug-312) | Low | Tests / Windows / CI | Closed 2026-10-18 — was BUG-312 |
+| [FIXED-950](#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced) | Low | Tasks / GitHub | Fixed 2026-10-18 — reduces BUG-339; RR-40 evidence open |
 
 ---
 
@@ -33893,4 +33894,44 @@ the log instead of disappearing.
 `43ec4908`. Locally the pair passed again under `-X faulthandler` (21 tests),
 and the full local suite passed on Windows. If the job ever prints a dump, the
 frame it names is a new defect.
+
+---
+
+## FIXED-950 — The issue-to-pull-request routine can now be scheduled as a Build task (BUG-339, reduced)
+
+**Severity: Low. Area: Tasks / GitHub. Status: Fixed 2026-10-18 — reduces
+BUG-339; its RR-40 live evidence stays open there.**
+
+**Observed.** `raiker/github/routines.py` could say which steps of the
+issue-to-PR routine would run under a delegation, and nothing could carry them
+out: scheduled routines run read-only subagents.
+
+**Approach.** Hermes Agent's and OpenClaw's scheduled jobs run a full agent turn
+from a stored prompt. Raiker's scheduled **Tasks** already do, and the authority
+router already runs an AI-proposed repository write unprompted only under a
+covering, re-validated delegation, parking anything else for approval. So no
+second runner was built: the template now becomes a Build task.
+
+**Fixed.**
+
+* `issue_to_pr_task_draft` turns a plan into the task's title and instructions:
+  the steps with their decisions, the work branch, the issue as untrusted data,
+  the never-list, stop-and-report on a refusal, receipts at the end.
+* `POST /api/github/routines/issue-to-pr` is read-only and person-only. It
+  returns the plan and the draft, re-validating the delegation against GitHub
+  (BUG-338), and starts nothing.
+* Settings → GitHub → *Issue to pull request* shows the plan with a decision per
+  step and schedules it as a Build task in a chosen project through the
+  existing `POST /api/tasks`, with its idempotency key, model check and
+  schedule terms. The Build guide documents it.
+
+**Evidence.** `tests/test_api_github.py` adds a route test: GitHub unreachable
+makes the preview *blocked*; with a covering delegation every write *runs under
+the delegation*; with none every write *asks*; the preview creates no task and
+spends no delegation action (**50/50** with `test_repository_delegations.py`).
+`GitHubConnection.test.ts` drives preview → project → schedule and reads the
+POST body (**7/7**). The new `bug-339-issue-to-pr-routine-live.spec.ts` passed
+**1/1** against a fresh `raiker-web`, and its `routine-plan.png` capture was
+reviewed: each write step reads *Asks you first*, the never-list names merge,
+and **Schedule as a Build task** stays disabled until a project is chosen.
 

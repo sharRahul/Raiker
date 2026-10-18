@@ -2694,6 +2694,33 @@ export type InterruptResult = {
   duplicate?: boolean;
 };
 
+export type IssueToPrRequest = {
+  repository: string;
+  issue_number: number;
+  work_branch: string;
+  delegation_id?: string | null;
+};
+
+/** BUG-339 — a plan and the Build task that would carry it out. Starts nothing. */
+export type IssueToPrRoutineView = {
+  repository: string;
+  work_branch: string;
+  delegation_id: string | null;
+  delegation_problems: string[];
+  steps: IssueToPrStepView[];
+  never: string[];
+  blocked_needs_owner: boolean;
+  title: string;
+  description: string;
+};
+
+export type IssueToPrStepView = {
+  step: string;
+  label: string;
+  operation: string;
+  decision: "runs" | "runs_under_delegation" | "asks";
+};
+
 /** The first-run owner session, with the CSRF token for its cookie. */
 export type IssuedSessionView = {
   token: string;
@@ -5892,6 +5919,8 @@ export const contract = {
     call<GitHubConnection>("POST", "/api/github/repositories/refresh"),
   selectGithubRepository: (repositoryId: string, body: RepositorySelection) =>
     call<GitHubConnection>("PUT", `/api/github/repositories/${encodeURIComponent(repositoryId)}`, { body }),
+  planIssueToPrRoutine: (body: IssueToPrRequest) =>
+    call<IssueToPrRoutineView>("POST", "/api/github/routines/issue-to-pr", { body }),
   startGithubSignIn: (body: SignInRequest) =>
     call<GitHubSignInAttempt>("POST", "/api/github/sign-in", { body }),
   cancelGithubSignIn: (attemptId: string) =>

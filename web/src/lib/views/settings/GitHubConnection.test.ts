@@ -148,4 +148,54 @@ describe("Settings → GitHub", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Delegate" }));
     expect(await screen.findByText(/never reaches the default branch/)).toBeInTheDocument();
   });
+  it("shows an issue-to-PR plan before scheduling it as a Build task (BUG-339)", async () => {
+    const delegation = {
+      delegation_id: "gdel_1", repository: "github.com/octo/demo", repository_id: null,
+      operations: ["fetch", "branch", "commit", "push", "pull_request"], branch_pattern: "raiker/*",
+      expires_at: "2099-01-01T00:00:00Z", max_actions: null, actions_used: 0, state: "active",
+      parent_delegation_id: null, created_at: "2026-10-18T10:00:00Z",
+    };
+    const plan = {
+      repository: "github.com/octo/demo", work_branch: "raiker/issue-7", delegation_id: "gdel_1",
+      delegation_problems: [], blocked_needs_owner: false,
+      steps: [
+        { step: "read_issue", label: "Read the issue (as untrusted data)", operation: "read", decision: "runs" },
+        { step: "push", label: "Push the work branch", operation: "push", decision: "runs_under_delegation" },
+      ],
+      never: ["delete_branch", "merge", "protected_branch", "workflows"],
+      title: "Issue #7 → pull request (octo/demo)", description: "Work on issue #7…",
+    };
+    const fetch = stubFetch({
+      "GET /api/github": connection({ delegations: [delegation] }),
+      "GET /api/git-credential": GIT_STATUS,
+      "POST /api/github/routines/issue-to-pr": plan,
+      "GET /api/projects": { projects: [{ project_id: "proj_1", name: "demo", root_subpath: "demo", created_at: "x", session_count: 0 }], active_project_id: null },
+      "POST /api/tasks": { task_id: "task_1" },
+    });
+    render(GitHubConnection);
+    const form = await screen.findByTestId("github-issue-routine");
+    await fireEvent.change(within(form).getByLabelText("Delegation"), { target: { value: "gdel_1" } });
+    await fireEvent.input(within(form).getByLabelText("Issue"), { target: { value: "7" } });
+    await fireEvent.click(within(form).getByRole("button", { name: "Show the plan" }));
+
+    const steps = await screen.findByTestId("github-issue-routine-plan");
+    expect(within(steps).getByText("Runs under the delegation")).toBeInTheDocument();
+    expect(screen.getByText(/Never: delete branch, merge/)).toBeInTheDocument();
+    // Nothing is scheduled until the owner chooses a project and says so.
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith("/api/tasks"))).toBe(false);
+    const schedule = screen.getByRole("button", { name: "Schedule as a Build task" });
+    expect(schedule).toBeDisabled();
+    await fireEvent.change(await screen.findByLabelText(/^Project/), { target: { value: "proj_1" } });
+    await fireEvent.click(schedule);
+    await waitFor(() => {
+      const created = fetch.mock.calls.find(([url, init]) => String(url).endsWith("/api/tasks") && (init as RequestInit)?.method === "POST");
+      expect(created).toBeTruthy();
+      const body = JSON.parse(String((created![1] as RequestInit).body));
+      expect(body).toMatchObject({ title: plan.title, description: plan.description, surface: "build", project_id: "proj_1" });
+    });
+    const sent = fetch.mock.calls.find(([url]) => String(url).endsWith("/api/github/routines/issue-to-pr"));
+    expect(JSON.parse(String((sent![1] as RequestInit).body))).toEqual({
+      repository: "github.com/octo/demo", issue_number: 7, work_branch: "raiker/issue-7", delegation_id: "gdel_1",
+    });
+  });
 });

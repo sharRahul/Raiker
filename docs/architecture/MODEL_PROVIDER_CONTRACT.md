@@ -186,10 +186,10 @@ vault and governed gates. What each has:
 | `fallback_providers`, turn-scoped, auth/404 immediate, 429/5xx after retries | Owner fallback sequence, turn-scoped, one transport retry, capability breaker | Shipped; reset-aware benching across turns is a gap |
 | Credential pools (same-provider key rotation) | Up to three backup keys per connection; 429 benches a key 60 s and an empty quota 1 h, and the request moves to the next key in the same turn | Shipped 2026-10-18 (FIXED-937); bench state is per process |
 | Auxiliary per-task models (vision, compression, web) with their own fallback | **Summarising** chain (then the turn's model) and **Vision** chain (image-capable models only) per owner; advisor model | Shipped 2026-10-18 (FIXED-938); web summarisation still uses the turn's model |
-| Context-length chain (pin → provider → cache → `/models` → … → 128K) | Configured and provider-published facts; Unknown when neither states it | Partial — no pin, no local-server probe |
+| Context-length chain (pin → provider → cache → `/models` → … → 128K) | Owner override (Details form, with reason and history) → provider-published facts → configured; Unknown when none states it; the server check reads the serving context from a local server | Shipped 2026-10-18 (FIXED-942); no 128K guess, by design |
 | OpenRouter `provider_routing` (`sort`, `only`, `ignore`, `data_collection`) | `data_collection: deny` and `sort`, set on the OpenRouter card, saved with the connection | Shipped 2026-10-18 (FIXED-934); `only`/`ignore`/`order` not exposed |
 | App attribution to OpenRouter | `HTTP-Referer` + `X-Title: Raiker` | Shipped 2026-10-18; Raiker never presents itself as another app |
-| Local tool-calling requirements (llama.cpp `--jinja`, vLLM tool parser, Ollama `num_ctx`) | Ollama models without the `tools` capability are sent no tools; any endpoint that refuses tools is asked again without them and remembered (FIXED-936); text-JSON tool fallback | Partial |
+| Local tool-calling requirements (llama.cpp `--jinja`, vLLM tool parser, Ollama `num_ctx`) | **Check this server** probes tool calling (native / as text / refused / not called) and serving context and names the setting; Ollama models without `tools` are sent none; an endpoint that refuses tools is asked again without them (FIXED-936); text-JSON fallback | Shipped 2026-10-18 (FIXED-941) |
 
 Every Raiker addition keeps the existing rules: off until the owner connects
 it, the key sent only to that provider's own host, every refusal classified for

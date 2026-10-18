@@ -459,6 +459,9 @@ export const api = {
   // account default. The key is never sent or touched.
   setModelRouting: (profileId: string, dataCollection: "" | "deny", sort: "" | "price" | "throughput" | "latency") =>
     contract.setModelRouting(profileId, { data_collection: dataCollection, sort }),
+  // Is this local or custom server set up for agent work? One tool-calling
+  // probe and the context it is serving; nothing on the server changes.
+  checkModelServer: (profileId: string, model: string) => contract.checkModelServer(profileId, { model }),
   // One side task's ordered model chain (Hermes auxiliary models); [] clears it.
   setSideTaskModels: (task: "summarise" | "vision", chain: { profile_id: string; model: string }[]) =>
     contract.setSideTaskModels({ task, chain }),

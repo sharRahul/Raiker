@@ -4582,6 +4582,22 @@ export type SelectedChoice = {
   source: "surface_default" | "global_default" | "native_default";
 };
 
+/** Whether a local or custom server is set up for agent work (tool calling, context). */
+export type ServerCheck = {
+  ok: boolean;
+  profile_id: string;
+  model: string;
+  tool_calling: string;
+  reason_code: string | null;
+  context_tokens: number | null;
+  advice: string[];
+};
+
+/** The exact model to check on a local or custom server. */
+export type ServerCheckRequest = {
+  model: string;
+};
+
 /** Whether the background host is registered, and what registered it. */
 export type ServiceRegistration = {
   supported: boolean;
@@ -6158,6 +6174,8 @@ export const contract = {
     request<ProviderModelListView>(`/api/models/${encodeURIComponent(profileId)}/provider-models`),
   setModelRouting: (profileId: string, body: ModelRoutingRequest) =>
     call<RoutingSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/routing`, { body }),
+  checkModelServer: (profileId: string, body: ServerCheckRequest) =>
+    call<ServerCheck>("POST", `/api/models/${encodeURIComponent(profileId)}/server-check`, { body }),
   setWeeklyModelBudget: (profileId: string, body: ModelWeeklyBudgetRequest) =>
     call<WeeklyBudgetSet>("PUT", `/api/models/${encodeURIComponent(profileId)}/weekly-budget`, { body }),
   listNotifications: (query: { unread_only?: boolean } = {}) =>

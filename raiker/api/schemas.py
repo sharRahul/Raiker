@@ -501,6 +501,12 @@ class ModelWeeklyBudgetRequest(StrictRequest):
     token_budget: int | None = None
 
 
+class ServerCheckRequest(StrictRequest):
+    """The exact model to check on a local or custom server."""
+
+    model: str = Field(min_length=1, max_length=200)
+
+
 class SideTaskModelEntry(StrictRequest):
     profile_id: str = Field(min_length=1, max_length=120)
     model: str = Field(min_length=1, max_length=200)

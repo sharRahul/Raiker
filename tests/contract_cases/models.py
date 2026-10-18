@@ -372,6 +372,11 @@ CASES: Cases = {
     ("GET", "/api/models/weekly-usage"): plain("/api/models/weekly-usage"),
     ("PUT", "/api/models/{profile_id}/weekly-budget"): _budget,
     ("PUT", "/api/models/{profile_id}/routing"): _routing,
+    # Nothing listens on the slot's default endpoint, so the check answers
+    # "unavailable" without reaching any real server.
+    ("POST", "/api/models/{profile_id}/server-check"): plain(
+        "/api/models/generic-openai-compatible-4/server-check", {"model": "contract-model"}
+    ),
     ("PUT", "/api/model-side-tasks"): plain(
         "/api/model-side-tasks",
         {"task": "summarise", "chain": [{"profile_id": "openai-hosted", "model": "gpt-4o-mini"}]},

@@ -296,6 +296,20 @@ class SideTaskModelsSet(TypedDict):
     chain: list[dict[str, str]]
 
 
+class ServerCheck(TypedDict):
+    """Whether a local or custom server is set up for agent work (tool calling, context)."""
+
+    ok: bool
+    profile_id: str
+    model: str
+    #: native | as_text | not_called | refused | unavailable
+    tool_calling: str
+    reason_code: str | None
+    #: What the server is serving now; None when it does not say (or is not on this machine).
+    context_tokens: int | None
+    advice: list[str]
+
+
 class RoutingSet(TypedDict):
     """OpenRouter routing preferences as saved; empty strings mean the account default."""
 

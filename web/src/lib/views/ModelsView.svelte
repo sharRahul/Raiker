@@ -348,36 +348,6 @@
     models?.profiles.find((p) => p.profile_id === signInFor) ?? null,
   );
 
-  async function configureCapacity(profile: ModelProfile) {
-    const raw = window.prompt(
-      "Exact context capacity in tokens. Leave blank to clear the administrator override.",
-      profile.context_window_tokens?.toString() ?? "",
-    );
-    if (raw === null) return;
-    const tokens = raw.trim() ? Number(raw) : null;
-    if (tokens !== null && (!Number.isInteger(tokens) || tokens < 1024)) {
-      selectError =
-        "Context capacity must be an integer of at least 1,024 tokens.";
-      return;
-    }
-    const reason = window.prompt(
-      "Why is this override needed?",
-      "Verified against the local runtime configuration",
-    );
-    if (reason === null) return;
-    try {
-      await api.setModelCapacity(
-        profile.profile_id,
-        profile.model,
-        tokens,
-        reason,
-      );
-      await load();
-    } catch {
-      selectError = "Could not update context capacity.";
-    }
-  }
-
   function openSignIn(profileId: string, options: { advanced?: boolean } = {}) {
     signInFor = profileId;
     signInApiKey = "";
@@ -1871,14 +1841,16 @@
 
 
 {#if detailsFor}
+  <!-- The profile as last read, not as it was when Details opened: a saved
+       override must show in the dialog that saved it. -->
   <ModelDetailsDialog
-    profile={detailsFor}
+    profile={models?.profiles.find((p) => p.profile_id === detailsFor?.profile_id) ?? detailsFor}
     {capacities}
     disconnecting={disconnecting[detailsFor.profile_id] === true}
     onclose={() => (detailsFor = null)}
     onreconnect={(profile) => openSignIn(profile.profile_id)}
     ondisconnect={(profile) => void disconnectConnection(profile)}
-    onconfigure={(profile) => void configureCapacity(profile)}
+    onchanged={load}
   />
 {/if}
 

@@ -962,6 +962,8 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-938](#fixed-938--side-work-had-to-use-the-turns-own-model) | Medium | Models / side tasks | Fixed 2026-10-18 — Hermes Agent parity |
 | [FIXED-939](#fixed-939--a-model-chosen-on-a-second-custom-endpoint-would-run-on-the-first) | High | Models / custom endpoints / routing | Fixed 2026-10-18 — found building FIXED-938 |
 | [FIXED-940](#fixed-940--images-sent-to-an-ollama-vision-model-were-dropped) | Medium | Models / Ollama / vision | Fixed 2026-10-18 — found building FIXED-938 |
+| [FIXED-941](#fixed-941--nothing-said-whether-a-self-hosted-server-could-call-tools) | Medium | Models / local servers | Fixed 2026-10-18 — Hermes Agent parity |
+| [FIXED-942](#fixed-942--the-context-window-override-was-two-browser-prompts-and-did-not-show-once-saved) | Low | Models / context | Fixed 2026-10-18 — Hermes Agent parity |
 
 ---
 
@@ -33651,4 +33653,26 @@ The full Windows run for this round found two more POSIX assumptions, both faili
 **Fixed.** The liveness probe's per-model capabilities decide it: a model Ollama lists with `vision` accepts images, both in the router's check and in the capabilities the provider is built with.
 
 **Evidence.** The FIXED-938 live round: the vision side model received and read the image.
+
+---
+
+## FIXED-941 — Nothing said whether a self-hosted server could call tools
+
+**Severity: Medium. Area: Models / local servers. Status: Fixed 2026-10-18 — Hermes Agent parity (local-server requirements).**
+
+**Fixed.** `POST /api/models/{profile_id}/server-check` (Ollama, LM Studio, llama.cpp, MLX and OpenAI-compatible profiles only) sends one request with one harmless tool through the same governed provider path a turn uses, with native tool-call parsing only so a text reply is never mistaken for a call, and classifies it native, as text, refused, not called or unavailable. It reads the serving context from a loopback server's own status endpoint (Ollama `/api/ps`, llama.cpp `/props`, LM Studio `/api/v0/models`, vLLM `/v1/models`), never from an off-machine host, and names the setting that fixes each finding. **Details → Check this server** shows it.
+
+**Evidence.** `tests/test_server_check.py` (8), `ModelDetailsDialog.test.ts`. Live against this host's Ollama: `gemma3:1b` refused, `gpt-oss:20b-cloud` native, `qwen2.5-coder:7b` returned as text with 32,768 tokens serving (`docs/screenshots/2026-10-18-hermes-providers/10`).
+
+---
+
+## FIXED-942 — The context-window override was two browser prompts, and did not show once saved
+
+**Severity: Low. Area: Models / context. Status: Fixed 2026-10-18 — Hermes Agent parity (`model.context_length`).**
+
+**Observed.** **Configure exact capacity** asked with two `window.prompt` boxes — the only ones in the product — and the Details dialog kept showing the old capacity after a save, because it held the profile as it was when opened.
+
+**Fixed.** Details carries a **Context window override** form (tokens, reason, **Save override**, **Clear override** when one is set) on the same governed route, and reads the profile from the page's latest view. A turn's context lookup resolves a shared slot's profile id to its provider first, so an override saved for a custom endpoint is the one its turns use.
+
+**Evidence.** `ModelDetailsDialog.test.ts`. Live: 65,536 saved with a reason; the dialog then read *65,536 tokens · Administrator override* (`docs/screenshots/2026-10-18-hermes-providers/11`).
 

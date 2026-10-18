@@ -42,6 +42,7 @@ from raiker.api.schemas import (
     SaveProjectContextRequest,
     SelectCodeRepoRequest,
     SelectProjectRequest,
+    ServerCheckRequest,
     SessionCommandGrantRequest,
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
@@ -101,6 +102,7 @@ from raiker.api.wire.models import (
     PriceSet,
     PricingRefreshed,
     RoutingSet,
+    ServerCheck,
     SideTaskModelsSet,
     SpendLimitView,
     WeeklyBudgetSet,
@@ -3078,6 +3080,63 @@ async def set_model_routing(
     )
     saved: RoutingSet = {"ok": True, "data_collection": body.data_collection, "sort": body.sort}
     return serialize_dto(saved)
+
+
+#: Servers the owner runs: their setup is theirs to fix, so it is worth checking.
+_SELF_HOSTED_PROVIDERS = frozenset({"ollama", "lm-studio", "llama.cpp", "mlx", "openai-compatible"})
+
+
+@router.post("/api/models/{profile_id}/server-check")
+async def check_model_server(
+    profile_id: str,
+    body: ServerCheckRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Is this local or custom server set up for agent work? (Hermes local-server checks)
+
+    One request with one harmless tool, through the same governed provider path
+    a turn uses, and the context a loopback server says it is serving. Nothing
+    on the server is changed.
+    """
+    from raiker.models import server_check
+    from raiker.models.connections import get_model_connection
+    from raiker.models.policy_state import provider_runtime_policy_from_gates
+    from raiker.models.readiness import effective_endpoint
+    from raiker.models.router import ModelRouter
+
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    registry = ModelProfileRegistry.load()
+    try:
+        profile = registry.resolve_profile_id(profile_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail={"reason_code": "unknown_model_profile"}) from exc
+    if profile.provider not in _SELF_HOSTED_PROVIDERS or bool(profile.raw.get("test_only", False)):
+        raise HTTPException(status_code=400, detail={"reason_code": "server_check_self_hosted_only"})
+    model = body.model.strip()
+    if "<" in model:
+        raise HTTPException(status_code=400, detail={"reason_code": "server_check_model_required"})
+    router = ModelRouter(
+        registry,
+        runtime_policy=provider_runtime_policy_from_gates(store, session.principal_id),
+        connection_resolver=lambda pid: get_model_connection(store, session.principal_id, pid),
+    )
+    verdict, reason = await server_check.probe_tool_calling(router, registry.turn_token(profile), model)
+    connection = get_model_connection(store, session.principal_id, profile.profile_id)
+    context = await asyncio.to_thread(
+        server_check.serving_context, profile.provider, effective_endpoint(profile, connection), model
+    )
+    answer: ServerCheck = {
+        "ok": True,
+        "profile_id": profile.profile_id,
+        "model": model,
+        "tool_calling": verdict,
+        "reason_code": reason,
+        "context_tokens": context,
+        "advice": server_check.advice(profile.provider, verdict, context),
+    }
+    return serialize_dto(answer)
 
 
 @router.put("/api/model-side-tasks")

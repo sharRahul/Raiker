@@ -23627,6 +23627,84 @@
         "title": "SelectedChoice",
         "type": "object"
       },
+      "ServerCheck": {
+        "description": "Whether a local or custom server is set up for agent work (tool calling, context).",
+        "properties": {
+          "advice": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Advice",
+            "type": "array"
+          },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "tool_calling": {
+            "title": "Tool Calling",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "profile_id",
+          "model",
+          "tool_calling",
+          "reason_code",
+          "context_tokens",
+          "advice"
+        ],
+        "title": "ServerCheck",
+        "type": "object"
+      },
+      "ServerCheckRequest": {
+        "additionalProperties": false,
+        "description": "The exact model to check on a local or custom server.",
+        "properties": {
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "title": "ServerCheckRequest",
+        "type": "object"
+      },
       "ServiceRegistration": {
         "description": "Whether the background host is registered, and what registered it.",
         "properties": {
@@ -39511,6 +39589,56 @@
           }
         },
         "summary": "Set Model Routing"
+      }
+    },
+    "/api/models/{profile_id}/server-check": {
+      "post": {
+        "description": "Is this local or custom server set up for agent work? (Hermes local-server checks)\n\nOne request with one harmless tool, through the same governed provider path\na turn uses, and the context a loopback server says it is serving. Nothing\non the server is changed.",
+        "operationId": "check_model_server_api_models__profile_id__server_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerCheck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Model Server"
       }
     },
     "/api/models/{profile_id}/weekly-budget": {

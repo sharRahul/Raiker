@@ -308,6 +308,32 @@ OpenRouter offers some free models only to apps on its own list. Raiker says so
 repair is another model, not another key. OpenRouter requests name Raiker as the
 calling app.
 
+### Is your own server set up for agent work?
+
+A model you run yourself — Ollama, LM Studio, llama.cpp, MLX or an
+OpenAI-compatible server — can answer questions and still be unable to act.
+**Details → Check this server** sends it one request with one harmless tool and
+reads the context it is serving, and says which it is:
+
+| Tool calling | What it means | What fixes it |
+|---|---|---|
+| **Works** | The model calls tools natively. | — |
+| **Returned as text** | The server sends the call back as plain text. | Turn on its tool-call parser (vLLM or SGLang `--tool-call-parser`, llama.cpp `--jinja`); for Ollama, choose a model it lists with native tool support. Raiker can still read a JSON call from text. |
+| **Refused** | The server would not accept tools. | vLLM `--enable-auto-tool-choice --tool-call-parser <family>`; llama.cpp `--jinja`; for Ollama, a model it lists with tools. |
+| **Not called** | The model answered without using the tool. | A larger model, or one trained for tool use. |
+
+**Serving context** is what the server says it is serving now, read only from a
+server on this machine. Under 32,768 tokens the check says which setting raises
+it (`OLLAMA_CONTEXT_LENGTH`, llama.cpp `-c`, vLLM `--max-model-len`). Nothing on
+the server is changed.
+
+### Context window override
+
+When a provider does not say how much context a model has, or says something
+wrong, **Details → Context window override** sets it exactly, with the reason you
+give; turns and compaction then use that window, and the override history keeps
+every change. **Clear override** goes back to what the provider reports.
+
 ### Backup keys
 
 Any provider that takes a key also takes up to three **backup keys**, under

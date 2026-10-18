@@ -444,6 +444,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/models/{profile_id}/connection"),
         ("PUT", "/api/models/{profile_id}/routing"),
         ("PUT", "/api/model-side-tasks"),
+        ("POST", "/api/models/{profile_id}/server-check"),
         ("PUT", "/api/models/{profile_id}/price"),
         ("PUT", "/api/models/{profile_id}/weekly-budget"),
         ("GET", "/api/models/spend-limit"),

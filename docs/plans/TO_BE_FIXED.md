@@ -86,7 +86,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
-| [BUG-346](#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model) | Medium | Build / approvals / Ollama | Open — live retry on 2026-10-19 still failed after approval; no file was written |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -524,33 +523,6 @@ passed 1/1 against the isolated running service: the plan named the branch,
 push and pull-request steps as owner approvals, named merge as never allowed,
 and kept scheduling disabled without a selected consented repository. RR-40
 therefore remains open; no external repository was changed in this run.
-
-## BUG-346 — An accepted Build write failed as an invalid tool call on an Ollama cloud model
-
-**Severity:** Medium · **Area:** Build / approvals / Ollama · **Status:** Open
-
-### Observed
-
-On a fresh workspace with **File writes** and **Patch apply** enabled, a Build
-turn using Ollama `gpt-oss:120b-cloud` proposed a one-line file diff. After
-**Accept**, the write row failed with an invalid-tool-call response and the
-file was absent. A 2026-10-19 retry reproduced the same result: the approval
-card appeared, acceptance was recorded, the tool row failed, and no file was
-written.
-
-### What is known
-
-BR-D01 correctly reports `no_change` because the write did not happen. The
-approval resume path and the executor disagree about the `write_file` call;
-the stored tool-action row remains `waiting` while the live row reports
-failure. The run used the existing Ollama Cloud connection and no provider key.
-
-### Proposed fix and acceptance
-
-Reproduce with a stub model that emits a fixed `write_file` call, inspect the
-approval resolve response and executor refusal, then add the real-turn half of
-`br-d01-build-outcome-live.spec.ts`. An accepted write must be applied exactly
-once and the row must say so, or the card must state the exact refusal reason.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

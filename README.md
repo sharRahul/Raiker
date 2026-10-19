@@ -1,6 +1,6 @@
 # Raiker
 
-Raiker is a **local-first personal autonomous AI agent** you install on your
+Raiker is a **personal autonomous AI agent** you install on your
 own computer: a personal AI agent for one owner. It is an all-purpose partner
 for thinking, researching, creating, communicating, organising, coding,
 automating and completing digital work across the models, tools, files,

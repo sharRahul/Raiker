@@ -47,6 +47,9 @@
   let routineStart = $state("");
   let routinePlan = $state<IssueToPrRoutineView | null>(null);
   let projects = $state<ProjectView[]>([]);
+  // BR-02 / BR-D03 — the repository Build is pointed at now is the one the
+  // scheduled task is bound to; its runs happen there or not at all.
+  let buildRepoLabel = $state<string | null>(null);
   let routineKey = newIdempotencyKey();
   const DECISION_LABEL: Record<string, string> = {
     runs: "Runs",
@@ -262,6 +265,12 @@
         delegation_id: routineDelegation || null,
       });
       if (!projects.length) projects = (await api.projects()).projects;
+      try {
+        const repos = await api.codeRepos();
+        buildRepoLabel = repos.repos.find((repo) => repo.repo_id === repos.selected_repo_id)?.label ?? null;
+      } catch {
+        buildRepoLabel = null;
+      }
     });
   }
 
@@ -607,6 +616,15 @@
             <option value="">Choose a project</option>
             {#each projects as project (project.project_id)}<option value={project.project_id}>{project.name}</option>{/each}
           </select>
+          <p class="detail" data-testid="github-issue-routine-repository">
+            {#if buildRepoLabel}
+              Runs in <strong>{buildRepoLabel}</strong> — the repository Build is pointed at now, and only
+              there: a run that finds Build pointed at another repository does not start.
+            {:else}
+              Build is not pointed at a repository. Choose this repository's local checkout in Build first:
+              the task runs only in the repository Build is pointed at when you schedule it.
+            {/if}
+          </p>
           <label class="field-label" for="routine-start">Start (leave empty for the next scheduler tick)</label>
           <input id="routine-start" class="input" type="datetime-local" bind:value={routineStart} />
           <button class="btn btn-primary" type="button" onclick={scheduleRoutine} disabled={busy || !routineProject}>

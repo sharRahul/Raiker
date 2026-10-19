@@ -352,6 +352,20 @@ def _on_repo(suffix: str) -> Seed:
     return seed
 
 
+def _scripted_model_review(monkeypatch: Any) -> None:
+    """A model that reads the patch and answers with one finding, so no provider is reached."""
+    from raiker.models.contracts import ModelResponse
+    from raiker.models.router import ModelRouter
+
+    async def achat(self: Any, *args: Any, **kwargs: Any) -> ModelResponse:
+        return ModelResponse(
+            text='{"findings": [{"path": "main.py", "line": 1, "severity": "low", "confidence": "low", '
+            '"title": "Contract finding", "evidence": "e", "next_step": "n"}]}'
+        )
+
+    monkeypatch.setattr(ModelRouter, "achat", achat)
+
+
 # ── channels ─────────────────────────────────────────────────────────────────
 
 
@@ -602,7 +616,15 @@ CASES: Cases = {
     ("GET", "/api/code/repos/{repo_id}/target"): _on_repo("/target"),
     ("GET", "/api/code/repos/{repo_id}/review"): _on_repo("/review"),
     ("POST", "/api/code/repos/{repo_id}/review"): _on_repo("/review"),
+    ("POST", "/api/code/repos/{repo_id}/review/model"): patched(
+        lambda ws, client, h: (
+            str(_on_repo("/review/model")(ws, client, h)),
+            {"model_profile": "anthropic-hosted", "model": "claude-haiku-5-5"},
+        ),
+        _scripted_model_review,
+    ),
     ("GET", "/api/code/repos/{repo_id}/provenance"): _on_repo("/provenance"),
+    ("GET", "/api/code/repos/{repo_id}/pull-requests"): _on_repo("/pull-requests"),
     ("POST", "/api/code/repos/{repo_id}/worktrees"): _worktree_seed(remove=False),
     ("DELETE", "/api/code/repos/{repo_id}/worktree"): _worktree_seed(remove=True),
     ("GET", "/api/hooks"): plain("/api/hooks"),

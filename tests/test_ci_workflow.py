@@ -42,7 +42,7 @@ def test_every_action_reference_is_pinned_or_local() -> None:
             for step in steps
             if "uses" in step and not _pinned_or_local(step["uses"])
         ]
-    assert len(files) > 4
+    assert len(files) >= 3
     assert unpinned == []
     local = [path for path in files if path.name == "action.yml"]
     for path in local:
@@ -72,7 +72,7 @@ def test_a_dependency_with_a_known_vulnerability_fails_ci() -> None:
             assert _pinned_or_local(step["uses"]), step["uses"]
 
     web = yaml.load(
-        Path(".github/workflows/web.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+        Path(".github/workflows/ci.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
     )
     web_runs = [step.get("run", "") for job in web["jobs"].values() for step in job["steps"]]
     assert any(run.startswith("npm audit") for run in web_runs)

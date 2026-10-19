@@ -930,7 +930,11 @@ export const api = {
   // BR-D04 — the stored review of the current patch (null until asked for),
   // and the request that reviews it. One review per exact patch.
   readCodeRepoReview: (repoId: string) => contract.readCodeRepoReview(repoId),
+  // BR-12 — what GitHub confirmed about the pull requests Raiker opened here.
+  readCodeRepoPullRequests: (repoId: string) => contract.readCodeRepoPullRequests(repoId),
   reviewCodeRepoPatch: (repoId: string) => contract.reviewCodeRepoPatch(repoId),
+  modelReviewCodeRepoPatch: (repoId: string, body: { model_profile?: string | null; model?: string | null }) =>
+    contract.modelReviewCodeRepoPatch(repoId, body),
   // BR-D05 — recent commits, and whether each one's Raiker trailers name a
   // turn this account recorded. Evidence only.
   readCodeRepoProvenance: (repoId: string) => contract.readCodeRepoProvenance(repoId),

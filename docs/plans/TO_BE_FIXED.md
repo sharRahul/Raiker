@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287 and BUG-339, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339 and BUG-347, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -85,7 +85,8 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — rechecked 2026-10-19: Docker Desktop and Ollama are reachable on this host, but the mandatory live bypass/revocation/credential proof and production signing anchor remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
-| [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
+| [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
+| [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -523,6 +524,42 @@ passed 1/1 against the isolated running service: the plan named the branch,
 push and pull-request steps as owner approvals, named merge as never allowed,
 and kept scheduling disabled without a selected consented repository. RR-40
 therefore remains open; no external repository was changed in this run.
+
+---
+
+## BUG-347 — A reverse proxy on the same machine makes every remote request look local
+
+**Severity: Medium. Area: Host / remote access. Status: Open — found
+2026-10-19 writing the README's *Running Raiker under WSL2 or on a VPS*.**
+
+**Observed.** `raiker-web` decides what is local from the socket peer: the
+abuse window exempts a loopback peer's reads (`RateLimitMiddleware._safe_loopback_read`
+in `raiker/api/security.py`), password recovery is allowed only from a loopback
+peer (`raiker/api/routes_recovery.py`), and a host bound to `127.0.0.1` runs
+with `loopback_only=True` — no HSTS, no public-bind guardrails. A reverse proxy
+on the same machine (Caddy, nginx) that forwards to `127.0.0.1:8765` is itself
+the loopback peer, so every request from the internet arrives as a local one.
+
+**Effect.** An owner who follows the common "proxy to localhost" pattern on a
+VPS gets an instance that is public in fact and local by every check Raiker
+makes: recovery is reachable from anywhere, reads skip the rate limit, and the
+public-bind refusal (`--allow-public` with `RAIKER_OWNER_TOKEN`) never fires
+because the bind is loopback. Forwarding headers are deliberately not trusted
+(BUG-88), so the host cannot tell.
+
+**Current mitigation.** The README tells the owner to reach a VPS through an
+SSH tunnel, or to bind Raiker to a private VPN address with `--allow-public`
+and point any proxy at that address, and says *Do not point a reverse proxy at
+`127.0.0.1:8765`*. That is documentation, not a guard.
+
+**Proposed fix.** Decide whether Raiker should (a) refuse to serve when a
+`Forwarded`/`X-Forwarded-For` header arrives on a loopback-only host, with a
+reason naming `--allow-public`, or (b) accept an owner-declared trusted proxy
+address and then apply the public-bind posture to forwarded requests. Either is
+an owner-visible decision about remote access; neither has been made, so this
+stays open rather than being guessed. The required UI outcome: Diagnostics
+names a proxied loopback host as public, and the host's own refusal says what
+to change.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

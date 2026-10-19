@@ -220,3 +220,18 @@ def test_a_task_attempt_names_the_turn_it_ran() -> None:
         ]
     )
     assert attempts[0].session_id == "sess_run" and attempts[0].turn_id == "turn_run"
+
+
+def test_a_finding_that_survives_repair_after_repair_counts_its_reviews() -> None:
+    """BR-11 — a repair that is not converging is visible, not asked for again blindly."""
+    first = with_lifecycle(review_patch(_diff("a.py", "breakpoint()")), None)
+    assert [item["reviews_present"] for item in first["findings"] if item["rule"] == "debug_left_in"] == [1]
+    second = with_lifecycle(review_patch(_diff("a.py", "x = 1", "breakpoint()")), first)
+    third = with_lifecycle(review_patch(_diff("a.py", "x = 2", "breakpoint()")), second)
+    debug = [item for item in third["findings"] if item["rule"] == "debug_left_in"]
+    assert debug[0]["since"] == "still_present" and debug[0]["reviews_present"] == 3
+    # Fixed at last: it is resolved, and a fresh one later starts counting again.
+    fixed = with_lifecycle(review_patch(_diff("a.py", "x = 3")), third)
+    assert "debug_left_in" in {item["rule"] for item in fixed["resolved"]}
+    again = with_lifecycle(review_patch(_diff("a.py", "breakpoint()")), fixed)
+    assert [item["reviews_present"] for item in again["findings"] if item["rule"] == "debug_left_in"] == [1]

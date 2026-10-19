@@ -325,11 +325,14 @@ def review_once(
     repo_id: str,
     diff: str,
     validator: Any = None,
+    attest: Any = None,
 ) -> tuple[dict[str, Any], bool]:
     """The review of this exact patch, and whether it was already stored.
 
     ``validator`` is called with the changed file list and returns extra
     findings (the parse check); it runs only for a patch not reviewed before.
+    ``attest`` (BR-D05) takes the finished review and returns it signed; it
+    runs once, before the review is stored, so what is stored is what was signed.
     """
     fingerprint = patch_fingerprint(diff)
     stored = load_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, fingerprint=fingerprint)
@@ -343,6 +346,8 @@ def review_once(
         review,
         latest_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, exclude=fingerprint),
     )
+    if attest is not None:
+        review = attest(review)
     if not save_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, review=review):
         # Another request stored the same patch first; theirs is the record.
         again = load_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, fingerprint=fingerprint)
@@ -440,26 +445,32 @@ def latest_review(store: Any, *, owner_principal_id: str, repo_id: str, exclude:
 
 
 def with_lifecycle(review: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
-    """Mark each finding ``new`` or ``still_present`` against *previous*, and list what was resolved."""
+    """Mark each finding ``new`` or ``still_present`` against *previous*, and list what was resolved.
+
+    BR-11 — each finding also carries ``reviews_present``: how many reviews in
+    a row have raised it, this one included. A finding that survives repair
+    after repair says so, so the owner can see a repair is not converging
+    instead of asking for the same fix again.
+    """
     if previous is None:
         return {
             **review,
             "previous_fingerprint": None,
             "resolved": [],
-            "findings": [{**item, "since": None} for item in review["findings"]],
+            "findings": [{**item, "since": None, "reviews_present": 1} for item in review["findings"]],
         }
-    remaining: dict[tuple[str, str], int] = {}
+    remaining: dict[tuple[str, str], list[int]] = {}
     for item in previous.get("findings") or []:
         key = (str(item.get("rule")), str(item.get("path") or ""))
-        remaining[key] = remaining.get(key, 0) + 1
+        remaining.setdefault(key, []).append(int(item.get("reviews_present") or 1))
     marked: list[dict[str, Any]] = []
     for item in review["findings"]:
         key = (str(item.get("rule")), str(item.get("path") or ""))
-        if remaining.get(key, 0) > 0:
-            remaining[key] -= 1
-            marked.append({**item, "since": "still_present"})
+        if remaining.get(key):
+            seen = remaining[key].pop(0)
+            marked.append({**item, "since": "still_present", "reviews_present": seen + 1})
         else:
-            marked.append({**item, "since": "new"})
+            marked.append({**item, "since": "new", "reviews_present": 1})
     current: dict[tuple[str, str], int] = {}
     for item in review["findings"]:
         key = (str(item.get("rule")), str(item.get("path") or ""))

@@ -127,6 +127,8 @@ _PREFIXES = {
     "gcred_",
     "ghauth_",
     "deleg_",
+    # BR-12 — what GitHub confirmed about a pull request Raiker opened.
+    "prr_",
 }
 
 

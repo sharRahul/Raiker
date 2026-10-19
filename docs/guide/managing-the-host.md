@@ -315,5 +315,13 @@ It binds to `127.0.0.1:8765` by default. Binding beyond loopback requires both
 network controls in front of any non-loopback deployment. This does not turn
 Raiker into a supported hosted multi-user service.
 
+Running the host this way inside **WSL2** or on a **VPS** you control — a
+systemd unit, an SSH tunnel, or a bind to a private VPN address — is walked
+through in the README's
+[Running Raiker under WSL2 or on a VPS](../../README.md#running-raiker-under-wsl2-or-on-a-vps).
+Do not put a reverse proxy on the same machine in front of a loopback bind:
+Raiker would read every proxied request as a local one
+([BUG-347](../plans/TO_BE_FIXED.md#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local)).
+
 For installation failures or stale dashboard builds, see
 [Troubleshooting](troubleshooting.md).

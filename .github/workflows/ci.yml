@@ -283,7 +283,7 @@ jobs:
         env:
           RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
         run: |
-          python -m pytest -q -p no:cacheprovider tests/test_build_target_and_review.py tests/test_build_provenance_and_worktrees.py tests/test_build_fault_boundaries.py tests/test_build_outcome.py
+          python -m pytest -q -p no:cacheprovider tests/test_build_target_and_review.py tests/test_build_provenance_and_worktrees.py tests/test_build_fault_boundaries.py tests/test_build_outcome.py tests/test_build_cancel_mid_turn.py tests/test_build_task_target.py
 
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it
@@ -317,3 +317,153 @@ jobs:
         run: cargo test --all
       - name: Build and install into the package
         run: python scripts/build_native_runner.py
+
+  web:
+    # GCR-15 — the web client is compiled and its mocked end-to-end suite run on
+    # every change, not only on `web/**`: the backend produces the contracts it
+    # reads, so a route or read-model change is a change to it too.
+    name: Web UI (Node 24)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Node
+        # actions/setup-node v5.0.0 (Node 24 runtime)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (Node 24)
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # CR-12 — a dependency with a published advisory fails the pull request
+      # that would ship it, rather than being found later by hand. Every
+      # package counts, not only runtime ones: the compiler and bundler are
+      # devDependencies here and still decide what the shipped bundle contains.
+      - name: Audit dependencies for known vulnerabilities
+        run: npm audit --audit-level=moderate
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run check
+      - name: Test
+        run: npm run test
+      - name: Build
+        run: npm run build
+      # BUG-41 — the mocked end-to-end suite runs against the build produced by
+      # the step above. It needs no credential and no network: every API call is
+      # answered from a fixture inside the spec. The `live` project, which drives
+      # a real host holding real provider keys, is deliberately not run here —
+      # CI has no key, and a suite that cannot really pass must not report that
+      # it did.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end (mocked)
+        run: npm run test:e2e:mocked
+
+  desktop:
+    # DESK-13 — the desktop window held to the web app's bar: audit, lint,
+    # type-check, unit tests and the Electron end-to-end suite against a fixture
+    # page. No Raiker host and no credential.
+    name: Electron shell
+    defaults:
+      run:
+        working-directory: desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Node
+        # actions/setup-node v5.0.0 (Node 24 runtime)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (Node 24)
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit dependencies for known vulnerabilities
+        run: npm audit --audit-level=moderate
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Install the libraries Electron needs on a bare runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+      - name: End-to-end (shell)
+        run: xvfb-run -a npx playwright test --project=shell
+
+  licensing:
+    name: Licensing and SBOM
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v5.0.1 (Node 24 runtime)
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+        with:
+          fetch-depth: 0
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+      - name: Install the build tool
+        run: python -m pip install --upgrade build
+      - name: Install web dependencies from lockfile
+        run: npm --prefix web ci
+      - name: Validate licences and generate SPDX SBOM
+        run: python scripts/licensing_check.py --sbom artifacts/licensing/raiker.spdx.json
+      # CI-03 — the SBOM is kept with the run that produced it rather than
+      # discarded; a release carries its own, bound to its artifacts.
+      - name: Keep the SBOM with this run
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
+        with:
+          name: sbom-spdx
+          path: artifacts/licensing/raiker.spdx.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build and validate distributions
+        run: |
+          python -m build
+          python scripts/licensing_check.py --dist-dir dist
+
+  build-faults:
+    # BR-D06 — a real `raiker-web` with only the model scripted, killed with
+    # SIGKILL while a Build turn's declared check runs, then started again on the
+    # same workspace (`scripts/build_restart_fault.py`). Two variants: only the
+    # host dies (the check is taken back over and the outcome follows its real
+    # exit), and the host and the check both die (never verified). No credential.
+    name: Build faults (host killed mid-check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Kill the host mid-check and read the outcome
+        run: python scripts/build_restart_fault.py --report build-restart-fault.json
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
+        with:
+          name: build-restart-fault
+          path: build-restart-fault.json
+          if-no-files-found: warn
+          retention-days: 14

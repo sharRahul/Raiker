@@ -402,3 +402,75 @@ def test_a_provider_that_fails_after_a_write_never_verifies(tmp_path: Path) -> N
     )
     assert outcome["outcome"] == "completed_unverified"
     assert outcome["checks"][0]["result"] == "not_run"
+
+
+def _parked(store: Any, tmp_path: Path, repo: dict[str, Any], suffix: str) -> None:
+    from raiker.control.build_target import authority_snapshot
+
+    store.create_session(f"sess_{suffix}", str(tmp_path), user_id=None, origin="build")
+    store.insert_turn(f"sess_{suffix}", f"turn_{suffix}", "Change it")
+    target = describe_target(store, tmp_path, OWNER, repo)
+    record_turn_target(
+        store, owner_principal_id=OWNER, session_id=f"sess_{suffix}", turn_id=f"turn_{suffix}",
+        target={**target, "authority": authority_snapshot(store, OWNER, target)},
+    )
+    with store.connect() as connection:
+        connection.execute(
+            """INSERT INTO suspended_turns (approval_id, session_id, turn_id, request_id, principal_id,
+               action_id, tool_name, call_id, prompt_text, messages_json, options_json, client_json, created_at)
+               VALUES (?, ?, ?, 'req', ?, 'act', 'git_push', 'call', 'x', '[]', '{}', '{}', ?)""",
+            (f"appr_{suffix}", f"sess_{suffix}", f"turn_{suffix}", OWNER, utc_now()),
+        )
+
+
+def test_a_parked_turn_whose_delegation_was_revoked_is_closed_not_resumed(tmp_path: Path) -> None:
+    from raiker.gateway.agent_gateway import AgentGateway, TurnSuspensionError
+
+    store, repo = _selected(tmp_path)
+    _git(tmp_path / "app", "remote", "add", "origin", "https://github.com/acme/widgets.git")
+    delegation = store.create_repository_delegation(
+        principal_id=OWNER, repository="github.com/acme/widgets", operations=["push"], branch_pattern="raiker/*",
+        expires_at="2999-01-01T00:00:00Z", created_by=OWNER,
+    )
+    _parked(store, tmp_path, repo, "d")
+    gateway = AgentGateway(tmp_path, principal_id=OWNER)
+    envelope = _envelope("sess_d", "turn_d")
+    assert gateway._resume_authority_refusal(envelope) is None
+
+    store.revoke_repository_delegation(str(delegation["delegation_id"]), OWNER)
+    assert gateway._resume_authority_refusal(envelope) == "delegation_revoked"
+    with pytest.raises(TurnSuspensionError, match="build_authority_changed"):
+        gateway._refuse_resume_on_drift("appr_d", envelope)
+    with store.connect() as connection:
+        status = connection.execute("SELECT status FROM suspended_turns WHERE approval_id = 'appr_d'").fetchone()[0]
+    assert status == "authority_changed"
+    closed = store.load_turn("turn_d")
+    assert closed is not None and closed["status"] == "failed"
+
+
+def test_a_parked_turn_whose_git_credential_was_replaced_is_closed(tmp_path: Path) -> None:
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    store, repo = _selected(tmp_path)
+    first = store.create_git_credential(principal_id=OWNER, method="token", status="valid", label="one")
+    store.select_git_credential(OWNER, str(first["credential_id"]))
+    _parked(store, tmp_path, repo, "c")
+    gateway = AgentGateway(tmp_path, principal_id=OWNER)
+    envelope = _envelope("sess_c", "turn_c")
+    assert gateway._resume_authority_refusal(envelope) is None
+
+    second = store.create_git_credential(principal_id=OWNER, method="token", status="valid", label="two")
+    store.select_git_credential(OWNER, str(second["credential_id"]))
+    assert gateway._resume_authority_refusal(envelope) == "credential_changed"
+
+
+def test_a_turn_that_started_with_no_delegation_or_credential_never_drifts_on_authority(tmp_path: Path) -> None:
+    from raiker.control.build_target import authority_drift, authority_snapshot
+
+    store, repo = _selected(tmp_path)
+    target = describe_target(store, tmp_path, OWNER, repo)
+    snapshot = authority_snapshot(store, OWNER, target)
+    assert snapshot == {"repository": "", "delegations": [], "credential": None}
+    assert authority_drift(store, OWNER, {"authority": snapshot}) == []
+    # A target recorded before authority was recorded has nothing to compare.
+    assert authority_drift(store, OWNER, target) == []

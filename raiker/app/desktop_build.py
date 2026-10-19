@@ -146,9 +146,9 @@ def builder_command(
 def builder_environment(*, target_id: str, signed: bool, environ: dict[str, str]) -> dict[str, str]:
     """The environment electron-builder runs in.
 
-    Names follow from the target and the signing state. An unsigned build turns
-    off identity discovery outright, so a developer machine with a certificate
-    in its keychain cannot produce a file named as unsigned that is in fact
+    Names follow from the target alone. An unsigned build turns off identity
+    discovery outright, so a developer machine with a certificate in its
+    keychain cannot produce a build whose record says unsigned that is in fact
     signed — or the reverse.
     """
     from raiker.app.desktop_release import suffix

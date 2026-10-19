@@ -1,18 +1,13 @@
 """GCR-15 — the web job runs for the contracts the web client reads.
 
-`.github/workflows/web.yml` used to trigger on `web/**` alone, so a backend-only
-change to an API route or a read DTO could merge without the client ever being
-compiled against it and without the mocked end-to-end suite being run.
+The web job used to live in its own workflow triggered on `web/**` alone, so a
+backend-only change to an API route or a read DTO could merge without the client
+ever being compiled against it and without the mocked end-to-end suite being run.
 
-Half of that closed in the Python job: `scripts/check_api_contract.py` derives a
-field-for-field comparison between the backend dataclasses and the TypeScript
-mirror, so a dropped field fails there (GCR-42 / FIXED-575). What it cannot see
-is everything past the field names — a contract that matches exactly while the
-page reading it no longer builds.
-
-These hold the trigger against the checker's own module list. A DTO module added
-to the checker but not to the trigger is a module whose change can still reach
-`main` without the client being built, and it fails here rather than silently.
+It is now a job in `.github/workflows/ci.yml`, which runs on every pull request
+and every push to `main` with no path filter — so every module the contract
+checker reads, and every route, triggers it by construction. These tests hold
+that: a path filter added back to CI would have to cover the checker's modules.
 """
 
 from __future__ import annotations
@@ -24,7 +19,7 @@ import yaml
 
 from scripts.check_api_contract import DTO_MODULES
 
-WORKFLOW = Path(".github/workflows/web.yml")
+WORKFLOW = Path(".github/workflows/ci.yml")
 
 
 def _workflow() -> dict[str, Any]:
@@ -37,7 +32,15 @@ def _triggers() -> dict[str, list[str]]:
     # honest way to say so; the cast is because the mapping is keyed by that
     # boolean and nothing else in the file is.
     on = cast(dict[Any, Any], _workflow())[True]
-    return {name: list(config["paths"]) for name, config in on.items()}
+    # No `paths` filter means every change triggers it: "**".
+    return {name: list((config or {}).get("paths") or ["**"]) for name, config in on.items()}
+
+
+def _covered(path: str, paths: set[str]) -> bool:
+    if "**" in paths or path in paths:
+        return True
+    parts = path.split("/")
+    return any("/".join(parts[:depth]) + "/**" in paths for depth in range(1, len(parts)))
 
 
 def test_both_triggers_watch_the_same_paths() -> None:
@@ -54,22 +57,17 @@ def test_every_dto_module_the_contract_check_reads_triggers_the_web_job() -> Non
     paths = set(_triggers()["pull_request"])
     for module in DTO_MODULES:
         as_file = f"{module.replace('.', '/')}.py"
-        parts = module.split(".")
-        # Any enclosing package's glob covers the module, `raiker/control/views/**`
-        # as much as `raiker/control/**`.
-        globs = {"/".join(parts[:depth]) + "/**" for depth in range(2, len(parts))}
-        covered = as_file in paths or bool(globs & paths)
-        assert covered, f"{module} can change without the web client being built ({as_file})"
+        assert _covered(as_file, paths), f"{module} can change without the web client being built ({as_file})"
 
 
 def test_the_api_routes_trigger_the_web_job() -> None:
     """The routes are the other half of the contract: names, shapes and status
     codes the client branches on, none of which the field comparison sees."""
-    assert "raiker/api/**" in set(_triggers()["pull_request"])
+    assert _covered("raiker/api/routes_code_files.py", set(_triggers()["pull_request"]))
 
 
 def test_the_web_app_itself_still_triggers_it() -> None:
-    assert "web/**" in set(_triggers()["pull_request"])
+    assert _covered("web/src/App.svelte", set(_triggers()["pull_request"]))
 
 
 def test_the_job_still_compiles_and_runs_the_client() -> None:

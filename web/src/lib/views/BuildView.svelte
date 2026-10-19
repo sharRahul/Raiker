@@ -1562,6 +1562,13 @@
         "This turn was not continued: the folder, repository, branch or environment it started on has changed since. Start a new turn here.";
       return;
     }
+    if (outcome === "authority-changed") {
+      turn.resumeState = null;
+      turn.resumeNote = null;
+      turn.error =
+        "This turn was not continued: a repository delegation it started under was revoked or ran out, or the Git credential it would use was removed or replaced. Check Settings → GitHub, then start a new turn.";
+      return;
+    }
     turn.resumeState = "waiting";
     turn.resumeNote = null;
     turn.error =
@@ -2676,6 +2683,12 @@
         projectId={projectId || null}
         {projects}
         revision={workingTreeRevision}
+        reviewModel={{
+          // The model the composer will use — this work's own choice, else
+          // the default it shows — so a model review reads with the same model.
+          profile: modelProfile || activeProfile?.profile_id || "",
+          model: model || activeProfile?.model || "",
+        }}
         onrepair={(request) => {
           // BR-D04 bounded repair — the request lands in the composer for the
           // owner to read, edit and send. Nothing is sent from here.

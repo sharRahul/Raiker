@@ -310,6 +310,29 @@ class TaskService:
         if max_run_minutes is not None:
             self.store.set_task_run_limit(task.task_id, max_run_minutes)
             task = replace(task, max_run_minutes=max_run_minutes)
+        if surface == "build":
+            # BR-02 / BR-D03 — the repository this task is for is the one Build
+            # is pointed at now. Its cycles run there or not at all.
+            import contextlib
+
+            from raiker.control.build_target import (
+                describe_target,
+                record_task_target,
+                selected_repo,
+            )
+
+            with contextlib.suppress(Exception):
+                record_task_target(
+                    self.store,
+                    owner_principal_id=principal_id,
+                    task_id=task.task_id,
+                    target=describe_target(
+                        self.store,
+                        self.store.paths.workspace_root,
+                        principal_id,
+                        selected_repo(self.store, principal_id),
+                    ),
+                )
         return self._task_view(task)
 
     def set_task_run_limit(

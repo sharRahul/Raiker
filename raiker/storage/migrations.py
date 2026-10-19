@@ -4593,6 +4593,72 @@ CREATE INDEX IF NOT EXISTS idx_patch_reviews_repo
   ON patch_reviews(owner_principal_id, repo_id, created_at DESC);
 """
 
+# BR-D04 — a selected model's review of an exact patch. Stored by the patch
+# fingerprint *and* the model that read it, so asking the same model about the
+# same patch twice returns the stored reading instead of a second one, while a
+# different model, or a changed patch, is a new row.
+PATCH_MODEL_REVIEWS_MIGRATION_ID = "RAIKER-2116-patch-model-reviews"
+
+PATCH_MODEL_REVIEWS_SQL = """
+CREATE TABLE IF NOT EXISTS patch_model_reviews (
+  owner_principal_id TEXT NOT NULL,
+  repo_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  review_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, repo_id, fingerprint, provider, model)
+);
+CREATE INDEX IF NOT EXISTS idx_patch_model_reviews_patch
+  ON patch_model_reviews(owner_principal_id, repo_id, fingerprint, created_at DESC);
+"""
+
+# BR-12 — what GitHub confirmed about a pull request Raiker opened: the
+# repository, branch, head commit, number and URL, read back from GitHub after
+# the create call rather than taken from its response alone.
+PULL_REQUEST_RECEIPTS_MIGRATION_ID = "RAIKER-2117-pull-request-receipts"
+
+PULL_REQUEST_RECEIPTS_SQL = """
+CREATE TABLE IF NOT EXISTS pull_request_receipts (
+  receipt_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  url TEXT NOT NULL,
+  head_branch TEXT NOT NULL,
+  base_branch TEXT NOT NULL,
+  head_sha TEXT NOT NULL,
+  state TEXT NOT NULL,
+  confirmation TEXT NOT NULL,
+  session_id TEXT,
+  turn_id TEXT,
+  action_id TEXT,
+  created_at TEXT NOT NULL,
+  confirmed_at TEXT,
+  UNIQUE (owner_principal_id, repository, number)
+);
+CREATE INDEX IF NOT EXISTS idx_pull_request_receipts_owner
+  ON pull_request_receipts(owner_principal_id, created_at DESC);
+"""
+
+# BR-02 / BR-D03 — the repository a scheduled Build task was set up for. A
+# cycle runs only against that repository; one that finds Build pointed at
+# another is refused rather than run in a checkout nobody scheduled it for.
+BUILD_TASK_TARGETS_MIGRATION_ID = "RAIKER-2118-build-task-targets"
+
+BUILD_TASK_TARGETS_SQL = """
+CREATE TABLE IF NOT EXISTS build_task_targets (
+  task_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  repo_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  identity TEXT NOT NULL,
+  folder TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4854,6 +4920,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(COMMAND_RUN_CWD_MIGRATION_ID, COMMAND_RUN_CWD_SQL),
     Migration(BUILD_TURN_TARGETS_MIGRATION_ID, BUILD_TURN_TARGETS_SQL),
     Migration(PATCH_REVIEWS_MIGRATION_ID, PATCH_REVIEWS_SQL),
+    Migration(PATCH_MODEL_REVIEWS_MIGRATION_ID, PATCH_MODEL_REVIEWS_SQL),
+    Migration(PULL_REQUEST_RECEIPTS_MIGRATION_ID, PULL_REQUEST_RECEIPTS_SQL),
+    Migration(BUILD_TASK_TARGETS_MIGRATION_ID, BUILD_TASK_TARGETS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

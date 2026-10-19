@@ -347,6 +347,13 @@ EVENT_TYPES = {
     # patch was returned. Fingerprint, counts and whether it was reused only —
     # never a line of the patch and never a matched value.
     "patch_review_completed",
+    # BR-D04 — a connected model read an exact patch, or its stored reading of
+    # the same patch was returned. Provider, model, fingerprint and counts only.
+    "patch_model_review_completed",
+    # BR-12 — a pull request Raiker opened was read back from GitHub and its
+    # receipt recorded: repository, number, branch, head commit and whether
+    # GitHub confirmed it. Never a token and never the pull request body.
+    "pull_request_receipt_recorded",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).

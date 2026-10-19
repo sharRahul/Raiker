@@ -11,6 +11,11 @@
    *
    * A folder that has gone is said by the header's own warning; a GitHub
    * coordinate has no checkout, and the chip says so instead of a branch.
+   *
+   * BR-01 — the chip also says what a turn here may do *without asking*: the
+   * repository delegation it would act under (operations, branch pattern,
+   * expiry) or, with none, that every repository write asks first. Merging is
+   * never delegable and the chip says so.
    */
   import { api } from "../api";
   import type { CodeRepoTargetView } from "../generated/apiContract";
@@ -62,6 +67,24 @@
     return target.head ? `${branch} · ${target.head}` : branch;
   });
 
+  const OPERATION: Record<string, string> = {
+    push: "push",
+    branch: "branch",
+    commit: "commit",
+    pull_request: "pull request",
+  };
+
+  const delegations = $derived(target?.authority?.delegations ?? []);
+  const onGitHub = $derived(Boolean(target?.authority?.repository));
+
+  const delegated = $derived.by(() => {
+    if (!onGitHub) return "";
+    if (delegations.length === 0) return "Writes ask you";
+    const first = delegations[0];
+    const operations = first.operations.map((item) => OPERATION[item] ?? item).join(", ");
+    return `Delegated: ${operations}${first.branch_pattern ? ` on ${first.branch_pattern}` : ""}`;
+  });
+
   const detail = $derived.by(() => {
     if (target === null) return "";
     const lines = [
@@ -71,6 +94,21 @@
       `Commands run in: ${target.environment || "unknown"} (${where})`,
       `Target fingerprint: ${target.fingerprint.slice(0, 12)}`,
     ];
+    if (onGitHub) {
+      if (delegations.length === 0) {
+        lines.push("Delegation: none — every push, branch, commit and pull request asks you first");
+      }
+      for (const item of delegations) {
+        const operations = item.operations.map((op) => OPERATION[op] ?? op).join(", ");
+        const left = item.actions_left === null ? "" : `, ${item.actions_left} action${item.actions_left === 1 ? "" : "s"} left`;
+        lines.push(
+          `Delegation: ${operations}${item.branch_pattern ? ` on ${item.branch_pattern}` : ""}` +
+            `${item.allow_pull_request ? ", may open a pull request" : ""}, until ${item.expires_at}${left}`,
+        );
+      }
+      lines.push("Merging is never delegated: it stays with you, on GitHub");
+      if (target.authority && !target.authority.git_credential) lines.push("Git credential: none selected");
+    }
     return lines.join("\n");
   });
 </script>
@@ -87,6 +125,9 @@
     <Icon name="branch" size="sm" />
     <span class="summary">{summary}</span>
     <span class="where" data-placement={target.code_placement}>{where}</span>
+    {#if delegated}
+      <span class="delegated" data-delegated={delegations.length > 0 ? "yes" : "no"}>{delegated}</span>
+    {/if}
   </span>
 {/if}
 
@@ -117,8 +158,19 @@
   .where[data-placement="sandbox"] {
     color: var(--ok);
   }
+  .delegated {
+    padding-left: 0.35rem;
+    border-left: 1px solid var(--neutral-border);
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .delegated[data-delegated="yes"] {
+    color: var(--text-2);
+  }
   @media (max-width: 640px) {
-    .where {
+    .where,
+    .delegated {
       display: none;
     }
   }

@@ -171,6 +171,11 @@ describe("Settings → GitHub", () => {
       "POST /api/github/routines/issue-to-pr": plan,
       "GET /api/projects": { projects: [{ project_id: "proj_1", name: "demo", root_subpath: "demo", created_at: "x", session_count: 0 }], active_project_id: null },
       "POST /api/tasks": { task_id: "task_1" },
+      "GET /api/code/repos": {
+        repos: [{ repo_id: "repo_demo", label: "demo", selected: true }],
+        selected_repo_id: "repo_demo",
+        github_gate_state: "disabled", github_decision_mode: "ask", github_token_configured: false,
+      },
     });
     render(GitHubConnection);
     const form = await screen.findByTestId("github-issue-routine");
@@ -181,6 +186,10 @@ describe("Settings → GitHub", () => {
     const steps = await screen.findByTestId("github-issue-routine-plan");
     expect(within(steps).getByText("Runs under the delegation")).toBeInTheDocument();
     expect(screen.getByText(/Never: delete branch, merge/)).toBeInTheDocument();
+    // BR-02 — the task is bound to the repository Build is pointed at now.
+    expect(await screen.findByTestId("github-issue-routine-repository")).toHaveTextContent(
+      "Runs in demo — the repository Build is pointed at now, and only there",
+    );
     // Nothing is scheduled until the owner chooses a project and says so.
     expect(fetch.mock.calls.some(([url]) => String(url).endsWith("/api/tasks"))).toBe(false);
     const schedule = screen.getByRole("button", { name: "Schedule as a Build task" });

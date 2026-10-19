@@ -41,6 +41,15 @@ class WorkspaceIdentityIssuer:
             private_key_encrypted=app_fernet(self.workspace_root).encrypt(private_seed),
         )
 
+    def issuer_key(self) -> dict[str, Any]:
+        """This workspace's active issuer key record, created on first use.
+
+        The record holds the public key and the encrypted private seed; callers
+        that sign other evidence with it (BR-D05 review attestations) decrypt
+        the seed themselves and never store it.
+        """
+        return self._issuer_key()
+
     def mint(
         self,
         *,

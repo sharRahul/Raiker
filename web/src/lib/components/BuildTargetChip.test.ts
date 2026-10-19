@@ -53,4 +53,46 @@ describe("BuildTargetChip", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByTestId("build-target")).toBeNull();
   });
+
+  it("says what a turn here may do without asking: a delegation, or that writes ask", async () => {
+    stubFetch({
+      [ROUTE]: target({
+        authority: {
+          repository: "github.com/o/app",
+          git_credential: true,
+          delegations: [
+            {
+              delegation_id: "deleg_1",
+              operations: ["push", "pull_request"],
+              branch_pattern: "raiker/*",
+              allow_pull_request: true,
+              expires_at: "2026-10-20T12:00:00Z",
+              actions_left: 3,
+            },
+          ],
+        },
+      }),
+    });
+    const { unmount } = render(BuildTargetChip, { repoId: "repo_1" });
+    const chip = await screen.findByTestId("build-target");
+    expect(chip).toHaveTextContent("Delegated: push, pull request on raiker/*");
+    const title = chip.getAttribute("title") ?? "";
+    expect(title).toContain("may open a pull request, until 2026-10-20T12:00:00Z, 3 actions left");
+    expect(title).toContain("Merging is never delegated");
+    unmount();
+
+    stubFetch({ [ROUTE]: target({ authority: { repository: "github.com/o/app", git_credential: false, delegations: [] } }) });
+    render(BuildTargetChip, { repoId: "repo_1" });
+    const plain = await screen.findByTestId("build-target");
+    expect(plain).toHaveTextContent("Writes ask you");
+    expect(plain.getAttribute("title")).toContain("Git credential: none selected");
+  });
+
+  it("says nothing about delegation for a repository that is not on GitHub", async () => {
+    stubFetch({ [ROUTE]: target({ identity: "folder:app", authority: { repository: null, git_credential: false, delegations: [] } }) });
+    render(BuildTargetChip, { repoId: "repo_1" });
+    const chip = await screen.findByTestId("build-target");
+    expect(chip).not.toHaveTextContent("Writes ask you");
+    expect(chip.getAttribute("title")).not.toContain("Delegation");
+  });
 });

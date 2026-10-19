@@ -291,6 +291,23 @@ local checkout and press **Schedule as a Build task**. The task's instructions
 are not its authority: each write still meets the same delegation check, and
 anything it does not cover waits in Approvals.
 
+**The task runs in one repository.** Point Build at the repository's local
+checkout — or at a worktree made for this issue — *before* you schedule it: the
+plan says *Runs in widget — the repository Build is pointed at now, and only
+there*. Each run checks that Build is still pointed at it. If you have since
+chosen another repository, or none, the run does not start, changes nothing,
+and its history says which repository it was set up for and which Build is
+pointed at now; select the first again to let it run.
+
+**Pull requests Raiker opened** are listed under **Changes → Pull requests**
+with what GitHub itself confirmed. After GitHub accepts a new pull request,
+Raiker reads it back with the same credential: **Confirmed by GitHub** means
+that read returned the number, head branch and base branch Raiker asked for,
+with the head commit it shows; **GitHub answered differently** means it
+returned another branch or number; **Not confirmed** means the read-back
+failed, so only the create response is known. The approval's result says the
+same. A receipt is evidence only; merging stays with you, on GitHub.
+
 ## Whether a change was checked
 
 A Build turn that changed files says what its own record supports, under the
@@ -337,6 +354,13 @@ the folder, the repository's identity (its remote, with any credentials taken
 out), the command environment and the target's fingerprint. A GitHub repository
 reads **GitHub · no checkout**.
 
+On a repository with a GitHub identity, the target also says what a turn here
+may do **without asking you**: **Delegated: push, pull request on raiker/\*** when
+a delegation covers this repository, or **Writes ask you** when none does.
+Hovering lists each delegation's operations, branch pattern, whether it may open
+a pull request, when it ends and how many actions it has left, that merging is
+never delegated, and whether a Git credential is selected.
+
 If the repository's folder has moved or been deleted, the header says so and a
 Build turn **does not start**: the message names the folder and asks you to
 reconnect the repository or choose another. The file and git tools would
@@ -348,6 +372,20 @@ If its folder, repository, branch or environment changed while it waited, it is
 **not continued**: the turn says *This turn was not continued: the folder,
 repository, branch or environment it started on has changed since*, and you
 start a new turn where you are now.
+
+The same check covers the authority the turn started under. A Build turn
+records the delegations on its repository and the Git credential selected when
+it began. If, while it waited, you **revoked** one of those delegations (or it
+expired or ran out of actions), or removed, replaced or invalidated that
+credential, it is **not continued** either — *a repository delegation it started
+under was revoked or ran out, or the Git credential it would use was removed or
+replaced* — and nothing more runs. Check **Settings → GitHub**, then start a new
+turn.
+
+**Stopping a turn** keeps its record. A Build turn you stop is closed as
+**Stopped** at its next safe boundary; the target it started on stays recorded,
+its outcome is judged against that target, and the folder is free at once — a
+turn in another conversation in the same checkout can start straight away.
 
 ### Working on two things at once: worktrees
 
@@ -388,6 +426,13 @@ lines are there and nothing here backs them (anyone can type them, and a commit
 made by another installation has them too). A commit without them is simply a
 commit. These lines are evidence for whoever reads the history; nothing in Raiker
 reads them to decide what may run.
+
+If you sign your own commits, Recent commits also shows Git's verdict on each
+signature: **Signed**, **Signed — key not trusted here**, **Bad signature**,
+**Signed — key expired**, **Signed — key revoked** or **Signed — can't check
+here** (no verifier on this machine). An unsigned commit shows nothing. Raiker
+never signs a commit itself — a signing key that asks for a passphrase would
+stall the approved commit — so this reports your signing, not its own.
 
 ## Reading the repository
 
@@ -465,7 +510,32 @@ last review was of an earlier version.
 **Ask Raiker to fix** on a finding writes a request for exactly that fix into the
 composer — the file, the line, the finding, and *Do not commit, push or merge* —
 for you to read, edit and send. It sends nothing itself, so a repair is one more
-ordinary turn under your modes and approvals.
+ordinary turn under your modes and approvals. When that turn settles and the patch has
+changed, Changes reviews it again **once**, by itself, and says *Reviewed again
+after the repair* — nothing loops, and the next repair is again yours to ask
+for. A finding raised by several reviews in a row says **In 3 reviews in a
+row**, so a repair that is not working is visible before you ask for it again.
+
+**Ask the model to review** (it names the model chosen in the composer, such as
+**Ask Claude Haiku 5.5 to review**) sends the same exact patch to that model and
+shows what it thinks is wrong under **Model review**. Before it is sent, every
+line passes through Raiker's credential redaction and the patch is framed as
+data, not instructions; no tools are offered. Its findings are kept to the files
+the patch changed, are at most **Medium**, and are labelled *These are its
+reading, not checks*: they never make a turn **Verified** or keep one from it.
+The reading is stored for that patch and that model, so asking again shows the
+stored reading instead of asking twice, and a different model or an edited
+patch is a new reading. The request uses your provider connection and is
+audited as `patch_model_review_completed` (which model, which patch, how many
+findings — never the patch or the answer). An answer Raiker cannot read is said
+as such and stores nothing.
+
+**Signed here.** Each stored review — Raiker's own and a model's — is signed
+with this installation's key when it is taken and checked every time it is
+shown. **Signed here** means it is exactly what was taken. If the stored review
+has been changed since, Changes says *This stored review no longer matches the
+signature Raiker made when it was taken … don't rely on these findings*. The
+signature is evidence only; it grants and blocks nothing.
 
 If a declared check passes but the review you took of the current patch has a
 high-severity finding, the turn's outcome stays **Not verified** and says so.

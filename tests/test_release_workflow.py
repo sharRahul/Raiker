@@ -42,7 +42,14 @@ def test_release_workflow_is_manual_and_publishes_only_a_signed_draft() -> None:
     beta = workflow["jobs"]["beta_publish"]
     assert "inputs.channel == 'beta'" in beta["if"]
     assert "inputs.signing == 'skip'" in beta["if"]
-    assert "automatic update" in _step(beta, "Create the unsigned beta draft")["run"]
+    assert "automatic update" in _step(beta, "Create the beta draft")["run"]
+
+    # One installer per platform, chosen by the same function the tests pin,
+    # and nothing else attached to either draft.
+    for job in (publish, beta):
+        assert "select_release_assets.py" in _step(job, "Choose one installer per platform")["run"]
+    assert "assets/Raiker-*" in _step(publish, "Create the draft")["run"]
+    assert "assets/Raiker-*" in _step(beta, "Create the beta draft")["run"]
 
 
 def test_release_workflow_covers_supported_cross_platform_runners() -> None:

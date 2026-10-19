@@ -58,6 +58,22 @@ def with_trailers(message: str, trailers: list[tuple[str, str]]) -> str:
     return f"{message.rstrip()}\n\n{block}\n"
 
 
+#: Git's ``%G?`` letters, in words. ``good`` is a valid signature from a key the
+#: machine trusts; ``untrusted`` is valid but from a key it does not; anything
+#: Git could not check — no gpg/ssh verifier here, a missing key — is
+#: ``unverifiable``, never ``good``.
+_SIGNATURE_STATES = {
+    "G": "good",
+    "U": "untrusted",
+    "B": "bad",
+    "X": "expired",
+    "Y": "expired",
+    "R": "revoked",
+    "E": "unverifiable",
+    "N": "none",
+}
+
+
 def _log(root: Path, limit: int) -> list[dict[str, str]]:
     from raiker.tools.git import _git as git  # the credential-free, hook-free read path
 
@@ -68,6 +84,9 @@ def _log(root: Path, limit: int) -> list[dict[str, str]]:
         "%aI",
         f"%(trailers:key={SESSION_TRAILER},valueonly,separator=%x2C)",
         f"%(trailers:key={TURN_TRAILER},valueonly,separator=%x2C)",
+        # BR-D05 — Git's own verdict on the commit's signature. Raiker never
+        # signs a commit itself; this reports the owner's signing, when there is any.
+        "%G?",
     ]
     try:
         proc = git(root, ["log", f"-n{limit}", f"--format={unit.join(fields)}{record}"], timeout=10)
@@ -78,9 +97,9 @@ def _log(root: Path, limit: int) -> list[dict[str, str]]:
     commits: list[dict[str, str]] = []
     for chunk in proc.stdout.split(record):
         parts = chunk.strip("\n").split(unit)
-        if len(parts) != 5:
+        if len(parts) != 6:
             continue
-        commit, subject, when, session, turn = (part.strip() for part in parts)
+        commit, subject, when, session, turn, signature = (part.strip() for part in parts)
         commits.append(
             {
                 "commit": commit,
@@ -88,6 +107,7 @@ def _log(root: Path, limit: int) -> list[dict[str, str]]:
                 "committed_at": when,
                 "session_id": session.split(",")[0].strip(),
                 "turn_id": turn.split(",")[0].strip(),
+                "signature": _SIGNATURE_STATES.get(signature, "unverifiable"),
             }
         )
     return commits
@@ -118,6 +138,7 @@ def read_provenance(
                 "provenance": provenance,
                 "session_id": session if _SESSION_ID.match(session) else None,
                 "turn_id": turn if _TURN_ID.match(turn) else None,
+                "signature": commit["signature"],
             }
         )
     return rows

@@ -561,6 +561,18 @@ verified** with the declared check *not run after the last change*).
 **Required user-interface outcome.** An accepted write is applied once and the
 row says so, or the card states the exact reason it was not applied.
 
+## 2026-10-19 verification follow-up — five Windows full-suite failures
+
+The focused regression set, documentation contracts, Ruff, mypy, and web checks passed. The complete local Python suite reached 100% but reported five failures on this Windows host:
+
+- `tests/test_bug_308_code_placement.py::TestTheCommandServiceNeverRunsHostCodeUnasked::test_an_ordinary_command_needs_nothing_new` (`pwd` ended in `command_launch_failed`)
+- `tests/test_command_workspace_is_not_global.py::test_no_workspace_still_means_the_process_directory` (expected `SandboxError` was not raised)
+- `tests/test_git_push_path.py::TestProposalFailsClosed::test_not_a_repository` (returned `push_egress_denied` instead of `not_a_git_repository`)
+- `tests/test_git_write_path.py::TestBranchProposal::test_a_non_repository_fails_closed` (returned no `error` object)
+- `tests/test_notification_quiet_hours.py::test_the_os_command_obeys_the_stored_desktop_decision` (configured `true` notifier returned `failed` instead of `sent`)
+
+These are not closed by this documentation/live-test pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
+
 ## Decision statements added 2026-10-05
 
 **Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.

@@ -139,7 +139,7 @@
           <p>Fixed since the last review:</p>
           <ul>
             {#each resolved as item, index (`${item.rule}:${item.path}:${index}`)}
-              <li>{item.title}{#if item.path}{" — "}<code>{item.path}</code>{/if}</li>
+              <li>{item.title}{#if item.path} — <code>{item.path}</code>{/if}</li>
             {/each}
           </ul>
         </div>

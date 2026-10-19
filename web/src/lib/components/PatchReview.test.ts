@@ -89,7 +89,7 @@ describe("PatchReview", () => {
     const asked: string[] = [];
     render(PatchReview, { repoId: "repo_1", onrepair: (text: string) => asked.push(text) });
     expect(await screen.findByText("New")).toBeInTheDocument();
-    expect(screen.getByTestId("patch-review-resolved")).toHaveTextContent("Debugging statement left in");
+    expect(screen.getByTestId("patch-review-resolved")).toHaveTextContent("Debugging statement left in — app/config.py");
     const callsBefore = fetch.mock.calls.length;
     await fireEvent.click(screen.getAllByRole("button", { name: "Ask Raiker to fix" })[0]);
     expect(asked[0]).toContain("in app/config.py at line 2: Possible credential added.");

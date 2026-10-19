@@ -249,7 +249,9 @@ class TestOwnerGatesStillWin:
 
         detail = client.get("/api/approvals/appr_1", headers=headers).json()
         assert detail["executes_on_approval"] is False
-        assert "NOT execute" in detail["metadata_only_notice"]
+        # BUG-346 — the notice names the switch, not only that nothing runs.
+        assert "will not be carried out" in detail["metadata_only_notice"]
+        assert "Approval execution relay" in detail["metadata_only_notice"]
 
         resp = _resolve(client, headers, "appr_1")
         assert resp.status_code == 200

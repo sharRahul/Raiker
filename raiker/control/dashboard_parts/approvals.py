@@ -47,6 +47,26 @@ from raiker.tools.git import (
 if TYPE_CHECKING:
     from raiker.control.dashboard import DashboardService
 
+#: BUG-346 — the names Permissions shows for the switches that can keep an
+#: accepted action from running, so the card names the row the owner will find.
+_GATE_LABELS = {
+    "approval_execution_relay": "Approval execution relay",
+    "file_write_execution": "File writes",
+    "patch_apply_execution": "Patch apply",
+    "shell_execution": "Shell commands",
+    "git_write_execution": "Git writes",
+    "git_push_execution": "Git push",
+    "git_fetch_execution": "Git fetch",
+    "checkpoint_restore_execution": "Checkpoint restore",
+    "task_management_runtime": "Task creation",
+    "memory_write_execution": "Memory store",
+    "memory_forget_execution": "Memory forget",
+}
+
+
+def _gate_label(capability: str) -> str:
+    return _GATE_LABELS.get(capability, capability.replace("_", " ").capitalize())
+
 
 class ApprovalService:
 
@@ -215,8 +235,13 @@ class ApprovalService:
         # not from a constant. A file mutation executes only when the relay and
         # the target capability are both enabled; either gate being off returns
         # this approval to metadata-only, and the notice says so.
-        relays = ApprovalExecutionBridge(self.store).executes_on_resolution(
+        bridge = ApprovalExecutionBridge(self.store)
+        relays = bridge.executes_on_resolution(
             view.tool_name, principal_id, critical=view.critical
+        )
+        # BUG-346 — which owner switch keeps this from running, when one does.
+        blocking_gate = (
+            None if relays or view.critical else bridge.metadata_only_gate(view.tool_name, principal_id)
         )
         if connector_write:
             notice = "Approving this connector write executes this exact action once."
@@ -318,6 +343,15 @@ class ApprovalService:
                     "The previous file contents are checkpointed first, so it can be "
                     "rewound."
                 )
+        elif blocking_gate is not None:
+            # BUG-346 — the generic sentence below was all an owner saw when
+            # Accept would record a write without making it, and they accepted
+            # expecting the file. Name the switch, before the decision.
+            notice = (
+                "Accepting this records your decision only — it will not be carried "
+                f"out, because **{_gate_label(blocking_gate)}** is off in "
+                "Permissions. Turn it on there for an accepted action to run."
+            )
         else:
             notice = (
                 "Approval resolution is metadata-only. Recording a decision does "

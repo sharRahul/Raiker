@@ -758,6 +758,10 @@
               }
             ]
           },
+          "not_executed_reason": {
+            "title": "Not Executed Reason",
+            "type": "string"
+          },
           "proposed_by": {
             "anyOf": [
               {

@@ -162,6 +162,7 @@ export type ApprovalResolved = {
   machine_identity: IdentityView | null;
   execution?: ExecutionSummary;
   connector_result?: ConnectorInvocation;
+  not_executed_reason?: string;
   resume: ResumeHandle;
 };
 

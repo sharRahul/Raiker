@@ -974,6 +974,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-950](#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced) | Low | Tasks / GitHub | Fixed 2026-10-18 — reduces BUG-339; RR-40 evidence open |
 | [FIXED-951](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234) | Low | Hooks / plugins / MCP | Retired 2026-10-18 — BUG-226, BUG-228, BUG-234 |
 | [FIXED-952](#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice) | Medium | Build / verification | Fixed 2026-10-18 — BR-D01 first slice |
+| [FIXED-953](#fixed-953--an-accepted-build-write-wrote-nothing-and-its-row-read-failed-bug-346) | Medium | Build / approvals | Fixed 2026-10-19 — BUG-346 |
 
 ---
 
@@ -34023,6 +34024,94 @@ editor, refuse eleven, gatherer text, outcome read, 404) and
 `BuildOutcome.test.ts` and the new `ProjectsView` case pass; full web suite
 **2272** passed. `br-d01-build-outcome-live.spec.ts` passed **1/1** against a
 fresh `raiker-web`, and `01-project-checks.png` was reviewed. Driving a real model
-turn that changes a file found [BUG-346](TO_BE_FIXED.md#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model); in that run the
+turn that changes a file found [BUG-346](#fixed-953--an-accepted-build-write-wrote-nothing-and-its-row-read-failed-bug-346); in that run the
 outcome read the turn as `no_change`, correctly claiming nothing.
+
+## FIXED-953 — An accepted Build write wrote nothing and its row read failed (BUG-346)
+
+**Severity: Medium. Area: Build / approvals. Status: Fixed 2026-10-19 — closes
+BUG-346, found 2026-10-18 driving [BR-D01](BUILD_WORKSPACE_SPEC.md) live.**
+
+**Observed.** On a fresh workspace with **File writes** and **Patch apply** on,
+Ollama `gpt-oss:120b-cloud` kept through the Models picker, a Build turn proposed
+`write_file notes.txt`. After **Accept** the turn resumed, the row read **Write
+file notes.txt failed**, the model called its call invalid or said the
+capability still needed approval, no file was written, and the proposal's
+`tool_actions` row stayed `approval_required`.
+
+**Root cause.** Not the model and not the arguments: a stub model proposing a
+fixed call, and the real `gpt-oss:120b-cloud` driven in-process, both wrote the
+file when the account was the CLI bootstrap owner. The difference was the
+account. On an account created through first run, an unset gate is read
+fail-closed, and the relay that turns an accepted decision into the effect
+(`approval_execution_relay`) has its own gate that nothing turned on —
+Permissions' **Set up for Build** preset listed file writes, patch apply, git
+writes and checkpoint restore, and not the relay. Accept therefore took the
+metadata-only path, which governance requires, while: the card said only that
+Raiker re-governs before running; the model was told *Raiker records approvals
+for this capability without performing them*; the live row mapped that to
+**failed**; and no code ever moved the proposal's own `tool_actions` row off
+`approval_required`, so BR-D01 read the turn as `no_change`.
+
+**Fixed.** Governance is unchanged — the relay's gate still decides, and its
+unset reading is still off.
+
+* **Set up for Build** now turns on **Approval execution relay** first ("Apply a
+  change once you accept it"), so the owner's one deliberate Build decision makes
+  Accept mean apply. It is still a per-capability, audited transition; no
+  decision mode changes.
+* `ApprovalExecutionBridge.metadata_only_gate` names the switch (the relay, or
+  the target capability) that keeps an otherwise-executable approval from
+  running. The approval detail notice says so before the decision (*Accepting
+  this records your decision only — it will not be carried out, because
+  **Approval execution relay** is off in Permissions*), and Build shows it on the
+  card in *Waiting on you*.
+* The resolve response carries `not_executed_reason: metadata_only:<gate>`; Build
+  says *Accepted, but nothing was applied — … is off in Permissions* instead of
+  *Decision recorded*.
+* The resumed turn's tool result carries the same reason code and a note naming
+  the switch, so the model tells the owner what to turn on rather than calling
+  its call invalid or proposing it again.
+* `SQLiteStore` settles the proposing call's `tool_actions` row when its approval
+  reaches a terminal state: executed → `success`, execution failed → `failed`,
+  denied → `denied`, approved-without-running or expired → `failed`, guarded on
+  `approval_required` so a settled row is never overwritten. BR-D01 now counts an
+  accepted write as a change.
+
+**After-turn readiness.** The *No readiness check exists for this exact model*
+message did not recur: in the fresh-workspace run below the model was kept
+through the picker without **Check**, the gateway's first-use check admitted the
+turn, and after it the composer showed no readiness warning and **Run** enabled
+as soon as text was typed. The spec asserts both.
+
+**Evidence.** `tests/test_bug_346_accepted_build_write.py` (account created
+through `/api/auth/register`, scripted model, real routes): with the Build gates
+and the relay on, Accept writes `notes.txt` once, the resumed turn completes on
+a `success` outcome, the row is `success` and the outcome route reads
+`completed_unverified`; with only File writes and Patch apply on, the card names
+the relay, Accept writes nothing, the response and the model's outcome name
+`metadata_only:approval_execution_relay`, and the row is `failed`; a rejection
+settles the row `denied`. All four failed on `850d42d4` and pass now. The
+approval, resume, relay, broker, capability and checkpoint suites pass, with two
+older asserts updated from the generic sentence to the named gate. Ruff, mypy
+(`raiker apps tests --platform linux`), svelte-check and the web unit suite pass
+(`recentPages.test.ts` fails locally only, under Node 25's built-in
+`localStorage`, untouched here). Live: `br-d01-build-outcome-live.spec.ts`
+passed **2/2** against a `raiker-web` on a workspace reset with
+`scripts/reset_live_workspace.py` — account created through first run,
+`gpt-oss:120b-cloud` kept through the Ollama picker without **Check**, **Set up
+for Build** pressed, a check declared on a new project, then a Build turn whose
+accepted `write_file` wrote `notes.txt` (`hello from Build`, read back from
+disk), its row read **Write file notes.txt done**, and the outcome read **Not
+verified** with `python -m pytest -q` *not run after the last change*. Captures
+`02-set-up-for-build.png`, `03-waiting-on-you.png` and
+`04-accepted-write-not-verified.png` (under
+`docs/screenshots/2026-10-18-br-d01-build-outcome/`, not committed) were
+reviewed. No provider key was typed; the model was the existing Ollama Cloud
+sign-in.
+
+**Not changed here.** A managed project's Build turn still writes the path the
+model names relative to the workspace root (`notes.txt` landed beside the
+project folder, not inside it); the path authority for a managed project is the
+workspace, as before.
 

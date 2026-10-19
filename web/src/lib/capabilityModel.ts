@@ -207,7 +207,7 @@ export function unsetResolutionNote(gate: CapabilityGate): string {
 // The other half of the capability-defaults decision. A fresh account is seeded
 // with the local, reversible baseline the runtime writes at account creation —
 // it never includes anything that writes to the owner's files. Turning Build on
-// means four switches, and finding four rows in a list of sixty-seven is how an
+// means five switches, and finding five rows in a list of sixty-seven is how an
 // owner ends up either giving up or turning on more than they meant to.
 //
 // It is a preset and not a default for one reason: writing to somebody's files
@@ -216,8 +216,17 @@ export function unsetResolutionNote(gate: CapabilityGate): string {
 // own **Turn on** uses, so there is no second, weaker path to enabling a
 // capability, and it changes no decision mode: every one of these still asks.
 
-/** The four capabilities a governed coding loop needs, and what each one is. */
+/**
+ * The capabilities a governed coding loop needs, and what each one is.
+ *
+ * BUG-346 — the relay is the switch that turns an accepted decision into the
+ * change itself. Without it every other row here only lets a turn *propose*:
+ * the owner accepted a write and nothing was written, because on an account the
+ * relay is off until it is turned on. It is listed first because it is the one
+ * that makes Accept mean "apply".
+ */
 export const BUILD_PRESET: readonly { capability: string; what: string }[] = [
+  { capability: "approval_execution_relay", what: "Apply a change once you accept it" },
   { capability: "file_write_execution", what: "Write and edit files in the workspace" },
   { capability: "patch_apply_execution", what: "Apply a reviewed patch" },
   { capability: "git_write_execution", what: "Branch and commit locally" },

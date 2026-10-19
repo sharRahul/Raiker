@@ -174,9 +174,29 @@ class ApprovalExecutionBridge:
             return False
         if executable_capability(tool_name) is None:
             return False
+        return self.metadata_only_gate(tool_name, principal_id) is None
+
+    def metadata_only_gate(self, tool_name: str, principal_id: str | None) -> str | None:
+        """The gate that turns approving this relayable action into a record only.
+
+        BUG-346. A Build owner who had turned on **File writes** accepted a write
+        and nothing was written: on an account the relay's own gate is off until
+        the owner turns it on, so the decision was recorded and the action was
+        not performed — and every surface said only that resolution was
+        "metadata-only". Naming the gate is what lets the card, the decision's
+        result and the model all say the one thing the owner can act on.
+
+        Returns ``None`` when both gates are on, or when *tool_name* is not a
+        relayable capability at all (that is a different "records only").
+        """
+        capability = executable_capability(tool_name)
+        if capability is None:
+            return None
         if self._gate_blocked(RELAY_CAPABILITY, principal_id) is not None:
-            return False
-        return self._gate_blocked(tool_name, principal_id) is None
+            return RELAY_CAPABILITY
+        if self._gate_blocked(tool_name, principal_id) is not None:
+            return capability
+        return None
 
     def execute(
         self,

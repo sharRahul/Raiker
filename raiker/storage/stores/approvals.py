@@ -271,6 +271,8 @@ class ApprovalStore:
             "WHERE approval_id = ? AND status = 'pending'",
             (utc_now(), approval_id),
         )
+        if changed == 1:
+            self._settle_proposed_tool_action(approval_id, "expired")
         return changed == 1
 
     def claim_approval_for_execution(self: SQLiteStore, approval_id: str) -> bool:
@@ -302,7 +304,42 @@ class ApprovalStore:
             "WHERE approval_id = ? AND status = 'executing'",
             (status, resolved_by, utc_now(), approval_id),
         )
+        if changed == 1:
+            self._settle_proposed_tool_action(approval_id, status)
         return changed == 1
+
+    #: BUG-346 — what the proposing call's ``tool_actions`` row becomes once its
+    #: approval is decided. The same three row states the live transcript renders
+    #: (``resumed_call_row_status``): it ran, it was refused, or nothing ran.
+    _SETTLED_ROW_STATUS = {
+        "executed": "success",
+        "execution_failed": "failed",
+        "denied": "denied",
+        # Approved but recorded without being performed, or never decided in
+        # time: either way nothing ran, and the row must not keep saying it
+        # waits on a decision that has been made.
+        "approved": "failed",
+        "expired": "failed",
+    }
+
+    def _settle_proposed_tool_action(self: SQLiteStore, approval_id: str, status: str) -> None:
+        """Close the proposing call's row when its approval reaches a terminal state.
+
+        BUG-346. The row was written ``approval_required`` when the call parked and
+        nothing ever moved it, so a decided — even executed — write still read as
+        waiting, and anything reading the turn's own records (BR-D01's outcome)
+        concluded nothing had changed. Guarded on ``approval_required`` so a row
+        already settled by another path is never overwritten.
+        """
+        settled = self._SETTLED_ROW_STATUS.get(status)
+        if settled is None:
+            return
+        self._execute(
+            "UPDATE tool_actions SET status = ?, completed_at = ? "
+            "WHERE status = 'approval_required' AND action_id = "
+            "(SELECT action_id FROM approvals WHERE approval_id = ?)",
+            (settled, utc_now(), approval_id),
+        )
 
     def release_approval_claim(self: SQLiteStore, approval_id: str) -> bool:
         """Return a claimed approval to ``pending`` (executing → pending).
@@ -559,10 +596,12 @@ class ApprovalStore:
     def resolve_approval(
         self: SQLiteStore, approval_id: str, *, status: str, resolved_by: str, resolved_at: str
     ) -> None:
-        self._execute(
+        changed = self._execute(
             "UPDATE approvals SET status = ?, approved_by = ?, resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
             (status, resolved_by, resolved_at, approval_id),
         )
+        if changed == 1:
+            self._settle_proposed_tool_action(approval_id, status)
 
     def answer_owner_question(
         self: SQLiteStore, approval_id: str, *, answers_json: str, answered_by: str, answered_at: str

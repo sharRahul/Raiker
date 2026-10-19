@@ -298,17 +298,22 @@ baseline never replaces a decision you made.
 
 ### Set up for Build
 
-Building needs four permissions — file writes, patch application, local git
-writes and checkpoint restoration — and finding four rows in a list of
-sixty-seven is how people end up either giving up or turning on more than they
-meant to. **Set up for Build** is those four, offered once.
+Building needs five permissions — the approval execution relay, file writes,
+patch application, local git writes and checkpoint restoration — and finding
+five rows in a list of sixty-seven is how people end up either giving up or
+turning on more than they meant to. **Set up for Build** is those five, offered
+once.
+
+The relay is the one that makes **Accept** mean *apply*. Without it the others
+only let a turn propose: an accepted change is recorded and not carried out, and
+the decision card in Build says so — naming the switch — before you accept.
 
 It is a shortcut through the registry and not a different kind of decision:
-**What this turns on** lists the four before you press anything, each one goes
+**What this turns on** lists the five before you press anything, each one goes
 through the same path the row's own **Turn on** uses, and none of their decision
 modes change — every one of them still asks. Writing to your files is a decision,
 which is why it is offered rather than simply arriving with the account. The
-section disappears once all four are on.
+section disappears once all five are on.
 
 ### Not decided here
 

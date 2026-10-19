@@ -117,6 +117,9 @@ class ApprovalResolved(TypedDict):
     machine_identity: IdentityView | None
     execution: NotRequired[ExecutionSummary]
     connector_result: NotRequired[ConnectorInvocation]
+    #: BUG-346 — present when approving was recorded without running because an
+    #: owner gate is off: ``metadata_only:<capability>`` names that gate.
+    not_executed_reason: NotRequired[str]
     resume: ResumeHandle
 
 

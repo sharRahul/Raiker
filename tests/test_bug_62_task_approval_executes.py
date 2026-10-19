@@ -201,7 +201,9 @@ class TestOwnerControl:
 
         detail = client.get("/api/approvals/appr_1", headers=headers).json()
         assert detail["executes_on_approval"] is False
-        assert "NOT execute" in detail["metadata_only_notice"]
+        # BUG-346 — the notice names the switch that keeps it from running.
+        assert "will not be carried out" in detail["metadata_only_notice"]
+        assert "Task creation" in detail["metadata_only_notice"]
 
         body = _resolve(client, headers, "appr_1").json()
         assert body["executes_action"] is False

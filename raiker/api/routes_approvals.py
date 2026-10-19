@@ -45,6 +45,7 @@ from raiker.runtime.authority.models import Principal
 from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.connector_ecosystem import ConnectorInvoker
 from raiker.runtime.turn_suspension import (
+    METADATA_ONLY_PREFIX,
     TurnSuspensionError,
     approval_outcome,
     deserialize_pending_calls,
@@ -771,6 +772,14 @@ async def resolve_approval(
     proposed_by, approved_by, machine_identity = _approval_attribution(
         request, approval_id, user_id=owner_user_id, principal_id=session.principal_id
     )
+    # BUG-346 — an approval of something Raiker performs on approval, recorded
+    # without running because an owner switch is off. The gate travels with the
+    # decision so the card and the resumed turn can both name it.
+    blocking_gate = (
+        bridge.metadata_only_gate(str(approval_row.get("tool_name", "")), session.principal_id)
+        if body.approve and pending_intent_row is None and not approval_row.get("critical")
+        else None
+    )
     decided: ApprovalResolved = {
         "approval_id": resolution.approval_id,
         "action_id": resolution.action_id,
@@ -792,9 +801,12 @@ async def resolve_approval(
                 executed=False,
                 capability=executable_capability(str(approval_row.get("tool_name", "")))
                 or str(approval_row.get("tool_name", "")),
+                reason_code=f"{METADATA_ONLY_PREFIX}{blocking_gate}" if blocking_gate else None,
             ),
         ),
     }
+    if blocking_gate:
+        decided["not_executed_reason"] = f"{METADATA_ONLY_PREFIX}{blocking_gate}"
     return serialize_dto(decided)
 
 

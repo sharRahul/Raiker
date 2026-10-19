@@ -14,6 +14,13 @@
 import { api, ApiError } from "../../api";
 import type { ApprovalView } from "../../apiTypes";
 import { publishApprovalResolved } from "../../approvalResume";
+import { capabilityLabel } from "../../capabilityModel";
+
+/** BUG-346 — the sentence for `metadata_only:<capability>`, naming the Permissions row. */
+export function recordOnlyReason(reason: string): string {
+  const capability = reason.replace(/^metadata_only:/, "");
+  return `${capabilityLabel(capability)} is off in Permissions. Turn it on there for an accepted action to run.`;
+}
 
 export interface ApprovalDiff {
   diff: string | null;
@@ -38,6 +45,13 @@ export class ApprovalReview {
    * while they are writing it. `undefined` is the resting state.
    */
   edits = $state<Record<string, string | undefined>>({});
+  /**
+   * BUG-346 — per decision, why accepting it would only record it, from the
+   * same detail read as the diff. Absent when Accept applies the change. An
+   * owner who accepted a write and found no file had been told only, in a
+   * sentence on another page, that resolution was "metadata-only".
+   */
+  recordOnly = $state<Record<string, string>>({});
 
   constructor(
     private readonly session: () => string | null,
@@ -51,6 +65,7 @@ export class ApprovalReview {
   reset = () => {
     this.approvals = [];
     this.diffs = {};
+    this.recordOnly = {};
   };
 
   load = async () => {
@@ -73,6 +88,12 @@ export class ApprovalReview {
       wanted.map(async (approval) => {
         try {
           const detail = await api.approval(approval.approval_id);
+          if (!detail.executes_on_approval && detail.metadata_only_notice) {
+            this.recordOnly = {
+              ...this.recordOnly,
+              [approval.approval_id]: detail.metadata_only_notice,
+            };
+          }
           const shows =
             detail.preview_kind === "file_diff" ||
             detail.preview_kind === "patch" ||
@@ -150,7 +171,11 @@ export class ApprovalReview {
               result.execution?.receipt
               ? `Applied once — “${result.execution.receipt.title}” now exists. ${result.execution.receipt.label}.`
               : "Applied once, under a fresh capability, policy and posture check."
-          : "Decision recorded. Raiker re-governs the action before anything runs.";
+          : result.not_executed_reason
+            ? // BUG-346 — accepted, and an owner switch kept it from running.
+              // Name the switch: "decision recorded" alone read as success.
+              `Accepted, but nothing was applied — ${recordOnlyReason(result.not_executed_reason)}`
+            : "Decision recorded. Raiker re-governs the action before anything runs.";
       await this.load();
       // BUG-24 — tell every other tab of this browser immediately, so a Chat
       // window showing the same parked turn continues without a reload. This is
@@ -164,7 +189,10 @@ export class ApprovalReview {
       // B2 — the decision closed the tool call the model was waiting on, so the
       // turn it parked picks up from here instead of costing a re-prompt.
       if (result.resume?.resumable) {
-        await this.resumeTurn(approval.approval_id, approve ? "success" : "rejected");
+        await this.resumeTurn(
+          approval.approval_id,
+          !approve ? "rejected" : result.executes_action ? "success" : "not_executed",
+        );
       }
     } catch (error) {
       /*

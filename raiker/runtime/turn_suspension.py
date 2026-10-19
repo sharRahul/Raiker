@@ -35,6 +35,10 @@ from raiker.models.contracts import ModelImage, ModelMessage, ToolCallProposal
 # that would fail at resume time.
 MAX_SUSPENDED_MESSAGES_BYTES = 4_000_000
 
+#: BUG-346 — the reason code carried when an owner's gate kept an approved,
+#: otherwise-executable action from running: ``metadata_only:<capability>``.
+METADATA_ONLY_PREFIX = "metadata_only:"
+
 
 class TurnSuspensionError(ValueError):
     """The parked state is unusable, so the turn cannot be resumed."""
@@ -294,6 +298,24 @@ def approval_outcome(
             "capability": capability,
             **(artifacts or {}),
             "note": "The owner approved this action and it was executed once.",
+        }
+    if reason_code and reason_code.startswith(METADATA_ONLY_PREFIX):
+        # BUG-346 — the action is one Raiker performs on approval, and an owner
+        # switch kept it from running this time. Saying so stops the model from
+        # reading the outcome as "invalid" or as a reason to propose it again.
+        return {
+            "status": "not_executed",
+            "executed": False,
+            "capability": capability,
+            "reason_code": reason_code,
+            "note": (
+                "The owner approved this action, but it did not run because the "
+                f"owner's permission '{reason_code.removeprefix(METADATA_ONLY_PREFIX)}' "
+                "is off, so approvals for it are recorded without being performed. "
+                "Nothing changed. Do not propose it again in this turn; tell the "
+                "owner it was not applied and that turning that permission on in "
+                "Permissions lets an accepted change apply."
+            ),
         }
     return {
         "status": "not_executed",

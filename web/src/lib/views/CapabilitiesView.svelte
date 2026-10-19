@@ -316,7 +316,7 @@
   /*
    * BUG-239 — the Build setup preset.
    *
-   * The four switches a governed coding loop needs, offered once instead of
+   * The switches a governed coding loop needs, offered once instead of
    * hunted for in a list of sixty-seven. It is not a default: writing to
    * somebody's files is a decision, so the owner sees exactly what it turns on
    * and takes it deliberately.
@@ -792,7 +792,7 @@
 
   {#if !filtering && !presetDone && presetPending.length > 0}
     <!-- BUG-239 — the Build setup preset. One deliberate decision instead of
-         four rows to find, and it shows the four before it takes it: a preset
+         a handful of rows to find, and it shows them before it takes it: a preset
          an owner cannot read before pressing is a permission change they did
          not make. Hidden once every row in it is on, because at that point it
          is a button that would do nothing. -->
@@ -801,8 +801,8 @@
         <div>
           <h2>Set up for Build</h2>
           <p class="preset-lede">
-            Building needs four permissions. Raiker still asks before each
-            change — this turns them on, not off.
+            Building needs {BUILD_PRESET.length} permissions. Raiker still asks
+            before each change — this turns them on, not off.
           </p>
         </div>
         <div class="preset-actions">

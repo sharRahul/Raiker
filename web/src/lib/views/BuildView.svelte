@@ -2280,6 +2280,13 @@
               <p class="decision-meta">
                 {humanize(approval.capability)} · raised {relativeTime(approval.created_at)}
               </p>
+              {#if review.recordOnly[approval.approval_id]}
+                <!-- BUG-346 — said before Accept, not discovered after it: an
+                     owner switch means accepting records the decision only. -->
+                <p class="decision-record-only" role="note" data-testid="decision-record-only">
+                  {review.recordOnly[approval.approval_id].replaceAll("**", "")}
+                </p>
+              {/if}
               {#if review.diffs[approval.approval_id] !== undefined}
                 <!-- B14 — the change, read *and decided* where it was
                      proposed, including accepting part of it. -->
@@ -3081,6 +3088,13 @@
   .decision-title {
     font-size: var(--text-sm);
     font-weight: 650;
+  }
+  .decision-record-only {
+    margin: 0.2rem 0 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-left: 3px solid var(--warning, var(--accent));
+    font-size: var(--text-sm);
+    color: var(--text-2);
   }
   .decision-meta {
     margin: 0.2rem 0 0.5rem;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CapabilityGate } from "./apiTypes";
 import {
   AUTHORITY_MATRIX_ROWS,
+  BUILD_PRESET,
   authorityMatrixGates,
   canDisable,
   canEnable,
@@ -25,6 +26,7 @@ import {
   unsetResolutionNote,
 } from "./capabilityModel";
 import { makeGate } from "./test-helpers";
+import { recordOnlyReason } from "./views/build/approvalReview.svelte";
 
 function gate(partial: Partial<CapabilityGate> = {}): CapabilityGate {
   return makeGate({
@@ -426,5 +428,17 @@ describe("task groups (UX-PERM-01)", () => {
     const gates = [gate("shell_execution"), gate("web_fetch")];
     expect(groupGates(gates, "task").map((group) => group.domain)).toEqual(["Web and research", "System and runtimes"]);
     expect(groupGates(gates, "domain").map((group) => group.domain)).toEqual(["Execution", "Network"]);
+  });
+});
+
+describe("the Build setup preset (BUG-346)", () => {
+  it("turns on the relay, without which Accept only records the decision", () => {
+    expect(BUILD_PRESET.map((row) => row.capability)).toContain("approval_execution_relay");
+  });
+
+  it("names the relay as the switch keeping an accepted change from applying", () => {
+    expect(recordOnlyReason("metadata_only:approval_execution_relay")).toBe(
+      "Approval execution relay is off in Permissions. Turn it on there for an accepted action to run.",
+    );
   });
 });

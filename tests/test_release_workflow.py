@@ -39,6 +39,11 @@ def test_release_workflow_is_manual_and_publishes_only_a_signed_draft() -> None:
     assert "inputs.signing == 'require'" in publish["if"]
     assert "--draft" in _step(publish, "Create the draft")["run"]
 
+    beta = workflow["jobs"]["beta_publish"]
+    assert "inputs.channel == 'beta'" in beta["if"]
+    assert "inputs.signing == 'skip'" in beta["if"]
+    assert "automatic update" in _step(beta, "Create the unsigned beta draft")["run"]
+
 
 def test_release_workflow_covers_supported_cross_platform_runners() -> None:
     assert {
@@ -107,7 +112,7 @@ def test_release_artifact_actions_are_immutable() -> None:
         )
     ]
 
-    assert len(artifact_uses) == 9
+    assert len(artifact_uses) == 10
     assert all(
         re.fullmatch(r"actions/(?:upload|download)-artifact@[0-9a-f]{40}", use)
         for use in artifact_uses

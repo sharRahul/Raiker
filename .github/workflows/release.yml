@@ -81,9 +81,9 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
       - name: Refuse to publish an unsigned build
-        if: inputs.publish && inputs.signing == 'skip'
+        if: inputs.publish && inputs.signing == 'skip' && inputs.channel != 'beta'
         run: |
-          echo "refused: signing=skip produces unsigned artifacts, which must never be published." >&2
+          echo "refused: unsigned artifacts may only be published as a beta draft." >&2
           exit 1
 
   # ── 2. The desktop installers, built, installed and tested per target ─
@@ -267,3 +267,53 @@ jobs:
           NOTES
           gh release create "v${{ inputs.version }}" dist/* \
             --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md
+
+  # Beta distribution can be a deliberate, unsigned download while platform
+  # identities are being provisioned. It never creates a channel index, so an
+  # installed beta cannot silently accept unsigned updates.
+  beta_publish:
+    name: Draft unsigned beta download
+    needs: [plan, desktop]
+    if: always() && inputs.publish && inputs.channel == 'beta' && inputs.signing == 'skip' && needs.plan.result == 'success' && needs.desktop.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Collect unsigned desktop artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: desktop-*
+          path: collected
+      - name: Flatten installer files
+        run: |
+          mkdir -p dist
+          find collected -type f \( \
+            -name 'Raiker-*' -o -name 'SHA256SUMS-*.txt' -o \
+            -name '*.manifest.json' -o -name 'smoke-*.txt' -o -name 'uninstall-*.txt' \
+          \) -exec cp {} dist/ \;
+          test -n "$(find dist -maxdepth 1 -type f -name 'Raiker-*' -print -quit)"
+          ls -la dist
+      - name: Create the unsigned beta draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Beta download and install
+
+          This is an **unsigned beta download**. It is a normal manual install:
+          on macOS, open the `.dmg` and drag `Raiker.app` to Applications. macOS
+          may require Control-click → Open because no Apple Developer ID
+          certificate or notarization was available for this beta.
+
+          Unsigned beta artifacts are not added to Raiker's automatic update
+          channel. Download the artifact for your platform from this draft and
+          verify its SHA-256 file before installing.
+
+          ## Maintainer notes
+
+          NOTES
+          printf '%s\n' "$RELEASE_NOTES" >> notes.md
+          gh release create "v${{ inputs.version }}" dist/* \
+            --draft --title "Raiker ${{ inputs.version }} (beta)" --notes-file notes.md

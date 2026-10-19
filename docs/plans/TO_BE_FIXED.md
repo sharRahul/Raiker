@@ -45,6 +45,13 @@ and are compatible with it:
 
 # To be fixed
 
+## Reading order
+
+1. **Open-defect index** — the table below is the current source of truth for status.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, and BUG-346, in numeric order.
+3. **Verification follow-up** — newly observed failures that still need triage.
+4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
+
 Open defects originally found while executing
 [the live manual test plan](TESTING.md) against a running
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
@@ -79,7 +86,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
-| [BUG-346](#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model) | Medium | Build / approvals / Ollama | Open — found 2026-10-18 driving BR-D01 live; reproduction below, root cause not yet known |
+| [BUG-346](#bug-346--an-accepted-build-write-failed-as-an-invalid-tool-call-on-an-ollama-cloud-model) | Medium | Build / approvals / Ollama | Open — live retry on 2026-10-19 still failed after approval; no file was written |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -520,46 +527,30 @@ therefore remains open; no external repository was changed in this run.
 
 ## BUG-346 — An accepted Build write failed as an invalid tool call on an Ollama cloud model
 
-**Severity: Medium. Area: Build / approvals / Ollama. Status: Open — found
-2026-10-18 while driving [BR-D01](BUILD_WORKSPACE_SPEC.md) live.**
+**Severity:** Medium · **Area:** Build / approvals / Ollama · **Status:** Open
 
-**Observed.** On a fresh workspace with **File writes** and **Patch apply** on,
-Ollama `gpt-oss:120b-cloud` chosen on Models, and a Build turn in a managed
-project asked to create `notes.txt`, Build showed the proposed one-line diff in
-*Waiting on you*. After **Accept** the turn resumed and its row read
-**Write file notes.txt failed**; the answer said once that the capability still
-required approval, and on a second run that *the requested tool call was
-invalid*. No file was written. Of four runs, two reached the approval, one
-answered with a JSON plan and called no tool, and one met the provider's 402 on
-`deepseek-v4-pro:cloud`. After the turn the composer also said *No readiness
-check exists for this exact model* and disabled **Run**, for a model kept
-through the Ollama picker without **Check**.
+### Observed
 
-**2026-10-19 live recheck.** With Docker Desktop and Ollama reachable, a
-fresh isolated workspace selected `gpt-oss:120b-cloud` from the Ollama picker
-and ran the same Build request through the UI. The first turn answered
-**The requested tool call was invalid** without a write. Retrying produced the
-real approval card and its one-line diff; after **Accept**, the tool row became
-**failed** with the same invalid-tool-call answer and the requested file was
-absent from the project. This reproduces BUG-346 on the current revision and
-keeps BR-D01's real-file half blocked. The run used no provider API key; the
-model was the existing Ollama Cloud connection.
+On a fresh workspace with **File writes** and **Patch apply** enabled, a Build
+turn using Ollama `gpt-oss:120b-cloud` proposed a one-line file diff. After
+**Accept**, the write row failed with an invalid-tool-call response and the
+file was absent. A 2026-10-19 retry reproduced the same result: the approval
+card appeared, acceptance was recorded, the tool row failed, and no file was
+written.
 
-**What is known.** The BR-D01 outcome read the turn correctly as `no_change`
-(nothing was written, so nothing was claimed). The resumed call's row stays
-`waiting` in `tool_actions` while the live row says failed, so the resolve
-path's result is what to read first: `routes_approvals` → `approval_outcome`,
-and whether the model's `write_file` arguments as validated at proposal match
-what the executor accepts after approval.
+### What is known
 
-**Proposed fix.** Reproduce with a stub model that proposes a fixed
-`write_file` call so the model is out of the loop; read the resolve response and
-the executor's refusal; fix the mismatch; then add the real-turn half of
-`br-d01-build-outcome-live.spec.ts` (create a file, approve, read **Not
-verified** with the declared check *not run after the last change*).
+BR-D01 correctly reports `no_change` because the write did not happen. The
+approval resume path and the executor disagree about the `write_file` call;
+the stored tool-action row remains `waiting` while the live row reports
+failure. The run used the existing Ollama Cloud connection and no provider key.
 
-**Required user-interface outcome.** An accepted write is applied once and the
-row says so, or the card states the exact reason it was not applied.
+### Proposed fix and acceptance
+
+Reproduce with a stub model that emits a fixed `write_file` call, inspect the
+approval resolve response and executor refusal, then add the real-turn half of
+`br-d01-build-outcome-live.spec.ts`. An accepted write must be applied exactly
+once and the row must say so, or the card must state the exact refusal reason.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

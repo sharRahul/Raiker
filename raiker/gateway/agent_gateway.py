@@ -64,6 +64,12 @@ from raiker.tools.broker import ToolBroker
 # Upper bound on the assistant reply persisted with a turn.
 TURN_SUMMARY_MAX_CHARS = 8000
 
+#: BR-03 — how long a Build turn may show ``running`` before it is treated as
+#: abandoned rather than holding its folder. A real turn streams far inside it;
+#: a host that died mid-turn must not lock the checkout forever.
+_BUILD_TURN_RUNNING_WINDOW = 15 * 60
+
+
 class AgentGateway:
     def __init__(self, workspace_root: str | Path, principal_id: str = "local_user") -> None:
         self.workspace_root = Path(workspace_root).resolve()
@@ -461,6 +467,93 @@ class AgentGateway:
             client=prompt_envelope.client,
         )
 
+    def _concurrent_build_refusal(self, prompt_envelope: PromptEnvelope) -> AgentResponse | None:
+        """BR-03 — one Build turn at a time in one checkout.
+
+        Two conversations writing into the same folder change each other's
+        files and diff without either saying so. While another conversation's
+        Build turn is running against the same folder, a new one is refused and
+        pointed at a worktree, which gives it a folder and branch of its own. A
+        turn parked on an approval is not running; a turn quiet for longer than
+        :data:`_BUILD_TURN_RUNNING_WINDOW` is treated as abandoned, not held.
+        """
+        surface = normalize_prompt_surface(prompt_envelope.prompt.metadata.get("surface", "chat"))
+        if surface != "build":
+            return None
+        try:
+            target = self._current_build_target()
+            if target.get("state") != "ready":
+                return None
+            from raiker.control.build_target import running_turns_on_folder
+
+            others = running_turns_on_folder(
+                self.store,
+                owner_principal_id=self.owner_principal_id,
+                folder=str(target.get("folder") or "."),
+                exclude_session_id=prompt_envelope.session_id,
+                window_seconds=_BUILD_TURN_RUNNING_WINDOW,
+            )
+        except Exception:  # noqa: BLE001 — an unreadable record never blocks the owner
+            return None
+        if not others:
+            return None
+        return AgentResponse(
+            request_id=prompt_envelope.request_id,
+            session_id=prompt_envelope.session_id,
+            turn_id=prompt_envelope.turn_id,
+            status="failed",
+            message=(
+                f"Another Build conversation is still working in {target.get('folder')}, so this "
+                "turn did not start: two turns writing one checkout would change each other's "
+                "files. Wait for it to finish, or create a worktree for this work from the "
+                "repository menu and run it there."
+            ),
+            client=prompt_envelope.client,
+        )
+
+    def _resume_target_refusal(self, envelope: PromptEnvelope) -> str | None:
+        """BR-07 — what moved under a parked Build turn, if anything did.
+
+        A turn recorded the target it started on. Resuming it after the folder,
+        repository, branch or environment changed would continue its plan in a
+        place it never inspected. Returns the moved fields, or ``None``.
+        """
+        from raiker.control.build_target import describe_target, load_turn_target, target_drift
+
+        try:
+            started = load_turn_target(
+                self.store, owner_principal_id=self.owner_principal_id, turn_id=envelope.turn_id
+            )
+            if started is None:
+                return None
+            repo = (
+                self.store.load_code_repo(self.owner_principal_id, str(started["repo_id"]))
+                if started.get("repo_id")
+                else None
+            )
+            drift = target_drift(
+                started, describe_target(self.store, self.workspace_root, self.owner_principal_id, repo)
+            )
+        except Exception:  # noqa: BLE001 — unreadable is not drift
+            return None
+        return ",".join(drift) or None
+
+    def _refuse_resume_on_drift(self, approval_id: str, envelope: PromptEnvelope) -> None:
+        """Close a parked turn whose target moved, instead of continuing it elsewhere."""
+        drift = self._resume_target_refusal(envelope)
+        if drift is None:
+            return
+        if not self.store.claim_suspended_turn(approval_id):
+            raise TurnSuspensionError("suspended_turn_already_resumed")
+        self.store.finalize_suspended_turn(approval_id, status="target_changed")
+        with contextlib.suppress(Exception):
+            self.sessions.close_turn(
+                envelope.turn_id,
+                "failed",
+                f"Not continued: the Build target changed since this turn started ({drift}).",
+            )
+        raise TurnSuspensionError("build_target_changed")
+
     def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
         """Synchronous compatibility boundary used by direct runtime callers."""
         return asyncio.run(self._aprepare_turn(prompt_envelope))
@@ -666,6 +759,8 @@ class AgentGateway:
             return refusal
         if refusal := self._build_target_refusal(prompt_envelope):
             return refusal
+        if refusal := self._concurrent_build_refusal(prompt_envelope):
+            return refusal
         identity = await self._aprepare_turn(prompt_envelope)
         response: AgentResponse | None = None
         try:
@@ -786,6 +881,14 @@ class AgentGateway:
                 kind=FINAL,
                 event_type="build_target_missing",
                 payload={"reason_code": "build_target_missing"},
+                response=refusal,
+            )
+            return
+        if refusal := self._concurrent_build_refusal(prompt_envelope):
+            yield StreamEvent(
+                kind=FINAL,
+                event_type="build_target_busy",
+                payload={"reason_code": "build_target_busy"},
                 response=refusal,
             )
             return
@@ -958,6 +1061,7 @@ class AgentGateway:
         (
             envelope, messages, tool_calls_made, pending_calls, queue_total, resolved_call
         ) = self._restore_suspended_turn(approval_id)
+        self._refuse_resume_on_drift(approval_id, envelope)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
         identity = self._rotate_identity_for_resume(envelope)
@@ -996,6 +1100,7 @@ class AgentGateway:
         (
             envelope, messages, tool_calls_made, pending_calls, queue_total, resolved_call
         ) = self._restore_suspended_turn(approval_id)
+        self._refuse_resume_on_drift(approval_id, envelope)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
         identity = self._rotate_identity_for_resume(envelope)

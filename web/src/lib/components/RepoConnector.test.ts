@@ -233,4 +233,56 @@ describe("RepoConnector", () => {
 
     expect(screen.getByText(/folder is missing/i)).toBeInTheDocument();
   });
+
+  // BR-03 — a worktree per concurrent piece of work, created and removed here.
+  const localRepo = (partial: Record<string, unknown> = {}) => ({
+    repo_id: "repo_1",
+    kind: "local" as const,
+    label: "my-app",
+    selected: true,
+    created_at: "2026-08-08T09:00:00Z",
+    local_subpath: "projects/my-app",
+    local_exists: true,
+    github_owner: null,
+    github_repo: null,
+    branch: null,
+    ...partial,
+  });
+
+  it("creates a task worktree on a raiker/ branch and says where it went", async () => {
+    const fetchMock = stubFetch({
+      "POST /api/code/repos/repo_1/worktrees": {
+        ok: true,
+        repo_id: "repo_2",
+        label: "my-app · fix-login",
+        local_subpath: "projects/my-app.worktrees/fix-login",
+        branch: "raiker/fix-login",
+        base: "abc1234",
+      },
+    });
+    const onchanged = mount({ repos: [localRepo()], selected_repo_id: "repo_1" });
+    await fireEvent.click(screen.getByRole("button", { name: "New worktree from my-app" }));
+    await fireEvent.input(screen.getByLabelText("Worktree name"), { target: { value: "fix-login" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create worktree" }));
+    await waitFor(() => expect(onchanged).toHaveBeenCalled());
+    const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith("/worktrees"));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ name: "fix-login" });
+    expect(await screen.findByText(/Created raiker\/fix-login in projects\/my-app.worktrees\/fix-login/)).toBeInTheDocument();
+  });
+
+  it("explains a refused removal instead of hiding the owner's uncommitted work", async () => {
+    stubFetch({
+      "DELETE /api/code/repos/repo_2/worktree": {
+        __status: 409,
+        detail: { reason_code: "worktree_has_uncommitted_changes" },
+      },
+    });
+    mount({
+      repos: [localRepo({ repo_id: "repo_2", label: "my-app · fix-login", local_subpath: "projects/my-app.worktrees/fix-login" })],
+      selected_repo_id: "repo_2",
+    });
+    expect(screen.queryByRole("button", { name: /New worktree/ })).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Remove worktree my-app · fix-login" }));
+    expect(await screen.findByText(/has uncommitted changes/)).toBeInTheDocument();
+  });
 });

@@ -182,6 +182,86 @@ class CodeService:
         )
         return ControlResult(ok=True, data={"repo_id": repo_id})
 
+    def create_code_worktree(
+        self: DashboardService,
+        repo_id: str,
+        name: str,
+        *,
+        owner_principal_id: str,
+        user_id: str | None = None,
+    ) -> ControlResult:
+        """BR-03 — a task worktree on a new ``raiker/<name>`` branch, connected as its own repository.
+
+        Selection does not move: the owner's current repository stays current,
+        and choosing the worktree is their next, deliberate step.
+        """
+        from raiker.control.build_worktrees import create_worktree
+
+        row = self.store.load_code_repo(owner_principal_id, repo_id)
+        if row is None:
+            return ControlResult(ok=False, reason_code="unknown_repo")
+        if str(row.get("kind", "")) != "local":
+            return ControlResult(ok=False, reason_code="repo_not_checked_out")
+        result = create_worktree(self.workspace_root, str(row.get("local_subpath") or ""), name)
+        if result["status"] != "success":
+            return ControlResult(ok=False, reason_code=str(result["error"]["type"]))
+        new_repo = new_id("repo_")
+        label = f"{row.get('label') or 'repository'} · {result['branch'].removeprefix('raiker/')}"
+        if not self.store.insert_code_repo(
+            repo_id=new_repo,
+            owner_principal_id=owner_principal_id,
+            kind="local",
+            label=label,
+            local_subpath=result["local_subpath"],
+            branch=result["branch"],
+        ):
+            return ControlResult(ok=False, reason_code="repo_already_connected")
+        self._record_repo_event(
+            "code_repo_connected",
+            owner_principal_id,
+            user_id,
+            {
+                "repo_id": new_repo,
+                "kind": "local",
+                "local_subpath": result["local_subpath"],
+                "worktree_of": repo_id,
+                "branch": result["branch"],
+            },
+        )
+        return ControlResult(
+            ok=True,
+            data={
+                "repo_id": new_repo,
+                "label": label,
+                "local_subpath": result["local_subpath"],
+                "branch": result["branch"],
+                "base": result["base"],
+            },
+        )
+
+    def remove_code_worktree(
+        self: DashboardService, repo_id: str, *, owner_principal_id: str, user_id: str | None = None
+    ) -> ControlResult:
+        """Remove a clean task worktree and forget it; its branch and commits stay."""
+        from raiker.control.build_worktrees import remove_worktree
+
+        row = self.store.load_code_repo(owner_principal_id, repo_id)
+        if row is None:
+            return ControlResult(ok=False, reason_code="unknown_repo")
+        if str(row.get("kind", "")) != "local":
+            return ControlResult(ok=False, reason_code="not_a_task_worktree")
+        result = remove_worktree(self.workspace_root, str(row.get("local_subpath") or ""))
+        if result["status"] != "success":
+            return ControlResult(ok=False, reason_code=str(result["error"]["type"]))
+        self.store.delete_code_repo(owner_principal_id, repo_id)
+        self._record_repo_event(
+            "code_repo_disconnected",
+            owner_principal_id,
+            user_id,
+            {"repo_id": repo_id, "worktree_removed": True, "branch_kept": result["branch"]},
+        )
+        return ControlResult(ok=True, data={"repo_id": repo_id, "branch": result["branch"]})
+
     def select_code_repo(self: DashboardService, repo_id: str | None, *, owner_principal_id: str) -> ControlResult:
         """Point the Build workspace at one repository, or at none with ``None``."""
         row = None

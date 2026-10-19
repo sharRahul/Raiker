@@ -99,4 +99,19 @@ describe("BuildOutcome", () => {
       "The branch this turn started on has changed since (it began on main).",
     );
   });
+
+  it("names a high-severity finding on the stored review of the current patch", async () => {
+    stubFetch({
+      [ROUTE]: outcome({
+        outcome: "completed_unverified",
+        reason: "Every check passed, but the review of the current patch has a high-severity finding.",
+        checks: [{ command: "pytest -q", result: "passed", exit_code: 0, run_id: "cmd_1", cwd: "app" }],
+        review: { fingerprint: "f", high: 1, findings: 2 },
+      }),
+    });
+    render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByTestId("build-outcome-review")).toHaveTextContent(
+      "The review of the current patch has 1 high-severity finding — see Changes.",
+    );
+  });
 });

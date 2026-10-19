@@ -51,6 +51,7 @@ from raiker.api.wire.code import (
     CodeRepoChangesView,
     CodeRepoDiagnosticsView,
     CodeRepoFileView,
+    CodeRepoProvenanceView,
     CodeRepoReviewView,
     CodeRepoTargetView,
     PatchReview,
@@ -552,4 +553,37 @@ async def review_code_repo_patch(
         SQLiteStore(_ws(request)), owner_principal_id=principal_id, repo_id=repo_id, diff=diff
     )
     answer = _review_answer(patch_fingerprint(diff), diff, review, reused, None)
+    return serialize_dto(answer)
+
+
+@router.get("/api/code/repos/{repo_id}/provenance")
+async def read_code_repo_provenance(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D05 — recent commits and whether each says, provably, that Raiker made it.
+
+    ``recorded`` means the commit's trailers name a session and turn this
+    account's Raiker holds; ``unrecorded`` means they claim Raiker and nothing
+    here backs them. Evidence only — nothing reads it to decide anything.
+    """
+    from raiker.control.build_provenance import read_provenance  # noqa: PLC0415
+
+    repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
+    root = _repo_root(request, repo)
+    reason: str | None = None
+    commits: list[dict[str, Any]] = []
+    if root is None:
+        reason = "repo_not_checked_out" if str(repo.get("kind")) == "github" else "repo_folder_missing"
+    elif not (root / ".git").exists():
+        reason = "not_a_git_repository"
+    else:
+        commits = read_provenance(
+            SQLiteStore(_ws(request)), root, user_id=auth_data[1].delegated_by_user_id
+        )
+    answer: CodeRepoProvenanceView = {
+        "commits": cast(Any, commits),
+        "reason_code": reason,
+    }
     return serialize_dto(answer)

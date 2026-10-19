@@ -546,6 +546,14 @@ export type BuildTurnOutcome = {
   readback: BuildReadBackRow[];
   target_drift: string[];
   target: BuildTurnTargetSummary | null;
+  review: BuildTurnReviewSummary | null;
+};
+
+/** BR-D04 — the stored review of the patch in the turn's repository now. */
+export type BuildTurnReviewSummary = {
+  fingerprint: string;
+  high: number;
+  findings: number;
 };
 
 /** BR-D02 — where a turn ran: the target it started on. */
@@ -1137,6 +1145,11 @@ export type CodeRepoFileView = {
   reason_code: string;
 };
 
+export type CodeRepoProvenanceView = {
+  commits: CommitProvenance[];
+  reason_code: string | null;
+};
+
 /** The review of the working tree's current patch, if one has been taken. */
 export type CodeRepoReviewView = {
   fingerprint: string;
@@ -1183,6 +1196,22 @@ export type CodeRepoView = {
   github_owner: string | null;
   github_repo: string | null;
   branch: string | null;
+};
+
+/** BR-03 — a task worktree on a new owned branch, connected as its own repository. */
+export type CodeRepoWorktreeCreated = {
+  ok: boolean;
+  repo_id: string;
+  label: string;
+  local_subpath: string;
+  branch: string;
+  base: string;
+};
+
+export type CodeRepoWorktreeRemoved = {
+  ok: boolean;
+  repo_id: string;
+  branch: string;
 };
 
 /** Every repository reference for one account, plus the honest read posture. */
@@ -1300,6 +1329,16 @@ export type CommandStopRequested = {
 export type CommandStopped = {
   ok: boolean;
   run: CommandRunView;
+};
+
+/** BR-D05 — one recent commit, and what its Raiker trailers prove here. */
+export type CommitProvenance = {
+  commit: string;
+  subject: string;
+  committed_at: string;
+  provenance: "recorded" | "unrecorded" | "none";
+  session_id: string | null;
+  turn_id: string | null;
 };
 
 export type CompactConversationRequest = {
@@ -1628,6 +1667,11 @@ export type CostEvent = {
   provider_reference: string | null;
   reason: string | null;
   recorded_at: string;
+};
+
+/** BR-03 — a task worktree on a new ``raiker/<name>`` branch of a connected repository. */
+export type CreateCodeWorktreeRequest = {
+  name: string;
 };
 
 export type CreateMcpServerRequest = {
@@ -5922,12 +5966,18 @@ export const contract = {
     request<CodeRepoDiagnosticsView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/diagnostics`, query)),
   readCodeRepoFile: (repoId: string, query: { path?: string } = {}) =>
     request<CodeRepoFileView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/file`, query)),
+  readCodeRepoProvenance: (repoId: string) =>
+    request<CodeRepoProvenanceView>(`/api/code/repos/${encodeURIComponent(repoId)}/provenance`),
   readCodeRepoReview: (repoId: string) =>
     request<CodeRepoReviewView>(`/api/code/repos/${encodeURIComponent(repoId)}/review`),
   reviewCodeRepoPatch: (repoId: string) =>
     call<CodeRepoReviewView>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/review`),
   readCodeRepoTarget: (repoId: string) =>
     request<CodeRepoTargetView>(`/api/code/repos/${encodeURIComponent(repoId)}/target`),
+  removeCodeWorktree: (repoId: string) =>
+    call<CodeRepoWorktreeRemoved>("DELETE", `/api/code/repos/${encodeURIComponent(repoId)}/worktree`),
+  createCodeWorktree: (repoId: string, body: CreateCodeWorktreeRequest) =>
+    call<CodeRepoWorktreeCreated>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/worktrees`, { body }),
   listCommands: (query: { session_id?: string } = {}) =>
     request<CommandRunList>(withQuery("/api/command-runs", query)),
   getCommand: (runId: string) =>

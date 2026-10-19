@@ -220,3 +220,43 @@ def load_turn_target(store: Any, *, owner_principal_id: str, turn_id: str) -> di
     except (TypeError, ValueError):
         return None
     return value if isinstance(value, dict) else None
+
+
+def running_turns_on_folder(
+    store: Any,
+    *,
+    owner_principal_id: str,
+    folder: str,
+    exclude_session_id: str,
+    window_seconds: int,
+) -> list[str]:
+    """BR-03 — other conversations' Build turns still running against *folder*.
+
+    A turn counts while its row says ``running`` and it started within
+    *window_seconds*: a host that died mid-turn leaves a row that would
+    otherwise hold the folder for ever.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    cutoff = datetime.now(UTC) - timedelta(seconds=window_seconds)
+    with store.connect() as connection:
+        rows = connection.execute(
+            """SELECT b.turn_id, b.session_id, b.target_json, t.created_at
+               FROM build_turn_targets b JOIN turns t ON t.turn_id = b.turn_id
+               WHERE b.owner_principal_id = ? AND b.session_id != ? AND t.status = 'running'""",
+            (owner_principal_id, exclude_session_id),
+        ).fetchall()
+    running: list[str] = []
+    for row in rows:
+        try:
+            started = datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
+            target = json.loads(str(row["target_json"]))
+        except (TypeError, ValueError):
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if started < cutoff or not isinstance(target, dict):
+            continue
+        if target.get("repo_kind") == "local" and str(target.get("folder") or ".") == folder:
+            running.append(str(row["turn_id"]))
+    return running

@@ -166,3 +166,36 @@ class CodeRepoReviewView(TypedDict):
     review: PatchReview | None
     reused: bool
     reason_code: str | None
+
+
+class CommitProvenance(TypedDict):
+    """BR-D05 — one recent commit, and what its Raiker trailers prove here."""
+
+    commit: str
+    subject: str
+    committed_at: str
+    provenance: Literal["recorded", "unrecorded", "none"]
+    session_id: str | None
+    turn_id: str | None
+
+
+class CodeRepoProvenanceView(TypedDict):
+    commits: list[CommitProvenance]
+    reason_code: str | None
+
+
+class CodeRepoWorktreeCreated(TypedDict):
+    """BR-03 — a task worktree on a new owned branch, connected as its own repository."""
+
+    ok: bool
+    repo_id: str
+    label: str
+    local_subpath: str
+    branch: str
+    base: str
+
+
+class CodeRepoWorktreeRemoved(TypedDict):
+    ok: bool
+    repo_id: str
+    branch: str

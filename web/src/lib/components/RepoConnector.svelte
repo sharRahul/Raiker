@@ -191,6 +191,79 @@
     }
   }
 
+  // BR-03 — a worktree per concurrent piece of work: its own folder and a new
+  // `raiker/<name>` branch, connected as its own repository. The server makes
+  // and refuses it; this only names it.
+  let worktreeFor = $state<string | null>(null);
+  let worktreeName = $state("");
+  let worktreeNotice = $state<string | null>(null);
+  // Shown beside the list, where the worktree buttons are, not under the
+  // connect form at the bottom of the panel.
+  let worktreeFailure = $state<string | null>(null);
+
+  function isTaskWorktree(item: CodeRepo): boolean {
+    return item.kind === "local" && (item.local_subpath ?? "").includes(".worktrees/");
+  }
+
+  function worktreeError(e: unknown): string {
+    if (!(e instanceof ApiError)) return "Could not reach the local runtime.";
+    switch (e.reasonCode) {
+      case "branch_exists":
+        return "A branch with that name already exists. Pick another name.";
+      case "branch_in_use":
+        return "That branch is checked out in another worktree.";
+      case "worktree_path_exists":
+        return "A worktree folder with that name already exists.";
+      case "worktree_needs_subfolder_repository":
+        return "This repository is the whole workspace, so a worktree beside it would be outside the workspace.";
+      case "invalid_worktree_name":
+        return "Use lowercase letters, digits, dots, dashes or underscores.";
+      case "not_a_git_repository":
+        return "This folder is not the root of a git repository.";
+      case "repository_has_no_commits":
+        return "The repository has no commits yet, so there is nothing to branch from.";
+      case "worktree_has_uncommitted_changes":
+        return "That worktree has uncommitted changes. Commit or discard them first; nothing was removed.";
+      case "not_a_task_worktree":
+        return "That repository is not a task worktree.";
+      default:
+        return `The worktree could not be changed (${e.reasonCode ?? e.status}).`;
+    }
+  }
+
+  async function createWorktree(target: CodeRepo) {
+    if (busy || !worktreeName.trim()) return;
+    busy = true;
+    worktreeFailure = null;
+    worktreeNotice = null;
+    try {
+      const created = await api.createCodeWorktree(target.repo_id, worktreeName.trim());
+      worktreeNotice = `Created ${created.branch} in ${created.local_subpath}. Choose Use on it to work there.`;
+      worktreeFor = null;
+      worktreeName = "";
+      await onchanged();
+    } catch (e) {
+      worktreeFailure = worktreeError(e);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function removeWorktree(target: CodeRepo) {
+    busy = true;
+    worktreeFailure = null;
+    worktreeNotice = null;
+    try {
+      const removed = await api.removeCodeWorktree(target.repo_id);
+      worktreeNotice = `Removed the worktree. Its branch ${removed.branch} and its commits are kept.`;
+      await onchanged();
+    } catch (e) {
+      worktreeFailure = worktreeError(e);
+    } finally {
+      busy = false;
+    }
+  }
+
   async function disconnect(target: CodeRepo) {
     busy = true;
     error = null;
@@ -253,6 +326,28 @@
                 Use
               </button>
             {/if}
+            {#if isTaskWorktree(item)}
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                disabled={busy}
+                onclick={() => removeWorktree(item)}
+                aria-label={`Remove worktree ${item.label}`}
+              >
+                Remove worktree
+              </button>
+            {:else if item.kind === "local" && item.local_exists}
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                disabled={busy}
+                aria-expanded={worktreeFor === item.repo_id}
+                onclick={() => (worktreeFor = worktreeFor === item.repo_id ? null : item.repo_id)}
+                aria-label={`New worktree from ${item.label}`}
+              >
+                New worktree
+              </button>
+            {/if}
             <button
               type="button"
               class="btn btn-ghost btn-sm"
@@ -263,10 +358,39 @@
               <Icon name="x" size="sm" />
             </button>
           </span>
+          {#if worktreeFor === item.repo_id}
+            <form
+              class="worktree-form"
+              onsubmit={(event) => {
+                event.preventDefault();
+                void createWorktree(item);
+              }}
+            >
+              <label>
+                <span>Branch <code>raiker/</code></span>
+                <input
+                  class="input"
+                  bind:value={worktreeName}
+                  placeholder="fix-login"
+                  aria-label="Worktree name"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </label>
+              <button type="submit" class="btn btn-soft btn-sm" disabled={busy || !worktreeName.trim()}>
+                Create worktree
+              </button>
+              <p class="worktree-hint">
+                A separate folder on a new branch, so this work cannot change another conversation's checkout.
+              </p>
+            </form>
+          {/if}
         </li>
       {/each}
     </ul>
   {/if}
+  {#if worktreeNotice !== null}<p class="worktree-notice" role="status">{worktreeNotice}</p>{/if}
+  {#if worktreeFailure !== null}<p class="error worktree-failure" role="alert">{worktreeFailure}</p>{/if}
 
   {#if codeMap !== null}
     <section class="code-map" aria-label="Code map">
@@ -426,6 +550,36 @@
     border-radius: var(--r-md);
     padding: 0.5rem 0.65rem;
     background: var(--raised);
+  }
+  .repo {
+    flex-wrap: wrap;
+  }
+  .worktree-form {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border);
+  }
+  .worktree-form label {
+    display: grid;
+    gap: 0.2rem;
+    font-size: var(--text-xs);
+    color: var(--text-2);
+    flex: 1 1 12rem;
+  }
+  .worktree-hint,
+  .worktree-notice {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .worktree-notice {
+    margin-top: var(--space-2);
+    color: var(--text-2);
   }
   .repo.selected {
     border-color: var(--accent-border);

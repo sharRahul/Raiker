@@ -69,6 +69,7 @@ _REASONS: dict[str, str] = {
     "outcome_unknown": "A check you declared did not finish, so its result is not known.",
     "readback_missing": "Every check passed, but a file this turn wrote is no longer on disk.",
     "target_changed": "Every check passed, but the folder, repository, branch or environment this turn started on has changed since.",
+    "review_high": "Every check passed, but the review of the current patch has a high-severity finding.",
 }
 
 
@@ -187,13 +188,16 @@ def classify_build_turn(
     expected_cwd: str | None = None,
     readback: Sequence[Mapping[str, Any]] = (),
     target_drift: Sequence[str] = (),
+    review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The outcome a Build turn's own records support, with one row per declared check.
 
     ``expected_cwd`` is the workspace-relative folder a check must run in (the
     selected repository's); ``None`` accepts any folder. ``readback`` is
     :func:`read_back_writes`; ``target_drift`` is the list of target fields that
-    moved since the turn began.
+    moved since the turn began. ``review`` is the stored review of the patch
+    in the working tree now (BR-D04), when one was taken; a high-severity
+    finding on it keeps the turn short of verified.
     """
     actions = list(tool_actions)
     writes = [
@@ -209,6 +213,7 @@ def classify_build_turn(
             "reason": _REASONS["no_change"],
             "readback": [],
             "target_drift": [],
+            "review": None,
         }
 
     runs = sorted(command_runs, key=lambda row: str(row.get("started_at") or row.get("created_at") or ""))
@@ -286,6 +291,8 @@ def classify_build_turn(
             outcome, reason = "completed_unverified", _REASONS["readback_missing"]
         elif target_drift:
             outcome, reason = "completed_unverified", _REASONS["target_changed"]
+        elif review is not None and int((review.get("counts") or {}).get("high") or 0) > 0:
+            outcome, reason = "completed_unverified", _REASONS["review_high"]
     return {
         "outcome": outcome,
         "writes": len(writes),
@@ -293,6 +300,18 @@ def classify_build_turn(
         "reason": reason,
         "readback": [dict(item) for item in readback],
         "target_drift": list(target_drift),
+        "review": _review_summary(review),
+    }
+
+
+def _review_summary(review: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if review is None:
+        return None
+    counts = review.get("counts") or {}
+    return {
+        "fingerprint": str(review.get("fingerprint") or ""),
+        "high": int(counts.get("high") or 0),
+        "findings": len(review.get("findings") or []),
     }
 
 

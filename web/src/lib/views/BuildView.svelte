@@ -1555,6 +1555,13 @@
       turn.resumeNote = null;
       return;
     }
+    if (outcome === "target-changed") {
+      turn.resumeState = null;
+      turn.resumeNote = null;
+      turn.error =
+        "This turn was not continued: the folder, repository, branch or environment it started on has changed since. Start a new turn here.";
+      return;
+    }
     turn.resumeState = "waiting";
     turn.resumeNote = null;
     turn.error =

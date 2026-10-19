@@ -26,6 +26,7 @@ from raiker.api.schemas import (
     ConnectCodeRepoRequest,
     ContainMcpServerRequest,
     ConversationBranchRequest,
+    CreateCodeWorktreeRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
@@ -64,6 +65,8 @@ from raiker.api.wire.code import (
     CodeMapRebuilt,
     CodeRepoDisconnected,
     CodeRepoSelected,
+    CodeRepoWorktreeCreated,
+    CodeRepoWorktreeRemoved,
     GithubRepoConnected,
     LocalRepoConnected,
 )
@@ -1876,6 +1879,64 @@ async def disconnect_code_repo(
     answer = cast(
         CodeRepoDisconnected, {"ok": True, **result.data}
     )
+    return serialize_dto(answer)
+
+
+_WORKTREE_CONFLICTS = frozenset(
+    {"branch_exists", "branch_in_use", "worktree_path_exists", "worktree_has_uncommitted_changes"}
+)
+
+
+def _worktree_refusal(reason: str) -> HTTPException:
+    if reason == "unknown_repo":
+        return refusal(status.HTTP_404_NOT_FOUND, reason)
+    if reason in _WORKTREE_CONFLICTS:
+        return refusal(status.HTTP_409_CONFLICT, reason)
+    return refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, reason)
+
+
+@router.post("/api/code/repos/{repo_id}/worktrees", status_code=status.HTTP_201_CREATED)
+async def create_code_worktree(
+    repo_id: str,
+    body: CreateCodeWorktreeRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-03 — a separate worktree on a new ``raiker/`` branch, for concurrent Build work.
+
+    Creates ``<repo>.worktrees/<name>`` from HEAD and connects it as its own
+    repository. The main checkout is untouched; an existing branch, or one
+    checked out elsewhere, is refused rather than shared.
+    """
+    session, principal = auth_data
+    result = _service(request).create_code_worktree(
+        repo_id,
+        body.name,
+        owner_principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if not result.ok:
+        raise _worktree_refusal(result.reason_code or "worktree_failed")
+    answer = cast(CodeRepoWorktreeCreated, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.delete("/api/code/repos/{repo_id}/worktree")
+async def remove_code_worktree(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Remove a clean task worktree; its branch and commits are kept. Dirty is refused."""
+    session, principal = auth_data
+    result = _service(request).remove_code_worktree(
+        repo_id,
+        owner_principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if not result.ok:
+        raise _worktree_refusal(result.reason_code or "worktree_failed")
+    answer = cast(CodeRepoWorktreeRemoved, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

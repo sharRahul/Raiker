@@ -599,6 +599,12 @@ class BrainSourceUploadRequest(StrictRequest):
     store_copy: bool
 
 
+class CreateCodeWorktreeRequest(StrictRequest):
+    """BR-03 — a task worktree on a new ``raiker/<name>`` branch of a connected repository."""
+
+    name: str = Field(min_length=1, max_length=48)
+
+
 class ConnectCodeRepoRequest(StrictRequest):
     """Reference a repository from the Build workspace.
 

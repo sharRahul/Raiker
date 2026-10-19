@@ -527,12 +527,23 @@ def proposed_commit_snapshot(
 
 
 def create_commit(
-    repo_root: str | Path, message: str, paths: Any = None
+    repo_root: str | Path,
+    message: str,
+    paths: Any = None,
+    *,
+    trailers: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Stage the proposed change set and record one commit. Re-validates first."""
+    """Stage the proposed change set and record one commit. Re-validates first.
+
+    ``trailers`` (BR-D05) are appended as the message's final paragraph. They
+    are provenance only — built by the caller from runtime identifiers — and
+    change nothing about which paths are staged.
+    """
     snapshot = proposed_commit_snapshot(repo_root, message, paths)
     if snapshot["status"] != "success":
         return snapshot
+    from raiker.control.build_provenance import with_trailers
+
     root = resolve_workspace_path(repo_root, ".")
     # Exactly the paths the owner was shown — not `--all`, which would sweep
     # `.raiker/` (the vault key, the audit log, the encrypted store) into the
@@ -551,7 +562,7 @@ def create_commit(
         *_identity_args(root),
         "commit",
         "--message",
-        str(snapshot["message"]),
+        with_trailers(str(snapshot["message"]), list(trailers or [])),
         "--",
         *staging,
     ]
@@ -565,6 +576,7 @@ def create_commit(
         "subject": str(snapshot["subject"]),
         "files": list(snapshot["files"]),
         "file_count": int(snapshot["file_count"]),
+        "trailers": [f"{key}: {value}" for key, value in (trailers or [])],
     }
 
 

@@ -149,8 +149,13 @@ class GitWriteExecutor:
         )
 
     def _commit(self, action: GovernedAction, root: Path) -> ExecutionResult:
+        from raiker.control.build_provenance import provenance_trailers
+
         message = str(action.arguments.get("message", ""))
-        result = create_commit(root, message, action.arguments.get("paths"))
+        # BR-D05 — the conversation the commit came from, as evidence in the
+        # commit itself. Runtime identifiers only; never model-supplied.
+        trailers = provenance_trailers(*self._proposing_turn(action))
+        result = create_commit(root, message, action.arguments.get("paths"), trailers=trailers)
         if result["status"] != "success":
             error = result["error"]
             return ExecutionResult(
@@ -174,8 +179,28 @@ class GitWriteExecutor:
                 "file_count": result["file_count"],
                 "files": [entry["path"] for entry in result["files"]],
                 "repository": self._repository(root),
+                "provenance": list(result.get("trailers") or []),
             },
         )
+
+    def _proposing_turn(self, action: GovernedAction) -> tuple[str, str | None]:
+        """The conversation and turn that proposed this commit.
+
+        An approval resolved from the inbox executes under the inbox's session,
+        so the proposing chat is ``origin_session_id``. The turn is named only
+        when the record says it belongs to that session; a trailer must never
+        pair a session with somebody else's turn.
+        """
+        session = action.origin_session_id or action.session_id
+        turn = action.turn_id
+        if turn and self._store is not None:
+            try:
+                row = self._store.load_turn(turn)
+            except Exception:  # noqa: BLE001 — unprovable is omitted, not guessed
+                row = None
+            if row is None or str(row.get("session_id")) != session:
+                turn = None
+        return session, turn
 
     def _fail(self, action_id: str, reason_code: str) -> ExecutionResult:
         return ExecutionResult(

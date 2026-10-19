@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**414 operations: 401 verified, 0 eligible, 0 deferred, 13 special.**
+**417 operations: 404 verified, 0 eligible, 0 deferred, 13 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -108,9 +108,12 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/code/repos/{repo_id}/changes` |  | CodeRepoChangesView | verified | declared CodeRepoChangesView |
 | GET | `/api/code/repos/{repo_id}/diagnostics` |  | CodeRepoDiagnosticsView | verified | declared CodeRepoDiagnosticsView |
 | GET | `/api/code/repos/{repo_id}/file` |  | CodeRepoFileView | verified | declared CodeRepoFileView |
+| GET | `/api/code/repos/{repo_id}/provenance` |  | CodeRepoProvenanceView | verified | declared CodeRepoProvenanceView |
 | GET | `/api/code/repos/{repo_id}/review` |  | CodeRepoReviewView | verified | _review_answer |
 | POST | `/api/code/repos/{repo_id}/review` |  | CodeRepoReviewView | verified | _review_answer |
 | GET | `/api/code/repos/{repo_id}/target` |  | CodeRepoTargetView | verified | declared CodeRepoTargetView |
+| DELETE | `/api/code/repos/{repo_id}/worktree` |  | CodeRepoWorktreeRemoved | verified | declared by cast |
+| POST | `/api/code/repos/{repo_id}/worktrees` | CreateCodeWorktreeRequest | CodeRepoWorktreeCreated | verified | declared by cast |
 | GET | `/api/command-runs` |  | CommandRunList | verified | declared CommandRunList |
 | GET | `/api/command-runs/{run_id}` |  | CommandRunDetail | verified | declared CommandRunDetail |
 | GET | `/api/command-runs/{run_id}/output` |  | CommandOutput | verified | declared by cast |

@@ -42,6 +42,7 @@
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import PatchReview from "./PatchReview.svelte";
+  import RecentCommits from "./RecentCommits.svelte";
   import { api, ApiError } from "../api";
   import type {
     CodeRepoChangesView,
@@ -253,6 +254,10 @@
             </p>
           {/if}
         {/if}
+      {/if}
+      {#if repoId !== null && changes !== null && !changes.root_missing && changes.reason_code !== "not_a_git_repository"}
+        <!-- BR-D05 — which recent commits Raiker made, read back from them. -->
+        <RecentCommits {repoId} {revision} />
       {/if}
     </div>
   {:else if tab === "preview"}

@@ -156,6 +156,7 @@ class SessionService:
             expected_cwd=expected_cwd,
             readback=read_back_writes(actions, workspace_root),
             target_drift=drift,
+            review=_stored_patch_review(self.store, owner_principal_id, started),
         )
         return {
             "turn_id": turn_id,
@@ -981,6 +982,39 @@ class SessionService:
             can_restore_state=bool(row.get("can_restore_state", 0)),
             can_restore_files=bool(row.get("can_restore_files", 0)),
         )
+
+
+def _stored_patch_review(
+    store: Any, owner_principal_id: str, started: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """BR-D04 — the stored review of the patch in the turn's repository now, if any.
+
+    Only a review the owner already asked for is read; the outcome never runs
+    one. No recorded target, a GitHub coordinate or a clean tree reads ``None``.
+    """
+    from pathlib import Path
+
+    from raiker.review.patch_review import load_review, patch_fingerprint
+    from raiker.tools.git import working_tree_changes, working_tree_diff
+
+    if not started or started.get("repo_kind") != "local" or not started.get("repo_id"):
+        return None
+    root = (Path(store.paths.workspace_root) / str(started.get("folder") or ".")).resolve()
+    if not (root / ".git").exists():
+        return None
+    try:
+        entries = working_tree_changes(root)
+        diff = working_tree_diff(root, entries) if entries else ""
+    except Exception:  # noqa: BLE001 — an unreadable tree is not a finding
+        return None
+    if not diff:
+        return None
+    return load_review(
+        store,
+        owner_principal_id=owner_principal_id,
+        repo_id=str(started["repo_id"]),
+        fingerprint=patch_fingerprint(diff),
+    )
 
 
 def _target_summary(target: dict[str, Any] | None) -> dict[str, Any] | None:

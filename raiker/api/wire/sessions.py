@@ -43,6 +43,14 @@ class BuildTurnTargetSummary(TypedDict):
     fingerprint: str
 
 
+class BuildTurnReviewSummary(TypedDict):
+    """BR-D04 — the stored review of the patch in the turn's repository now."""
+
+    fingerprint: str
+    high: int
+    findings: int
+
+
 class BuildTurnOutcome(TypedDict):
     """BR-D01 — the strongest claim a turn's own records support about its change."""
 
@@ -58,6 +66,7 @@ class BuildTurnOutcome(TypedDict):
     #: Target fields that changed since the turn started; empty when none did.
     target_drift: list[str]
     target: BuildTurnTargetSummary | None
+    review: BuildTurnReviewSummary | None
 
 
 class ParkedApproval(TypedDict):

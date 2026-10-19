@@ -122,6 +122,8 @@ describe("approvalResume — BUG-24", () => {
     // knew one code.
     expect(classifyResumeFailure("suspended_turn_already_resumed")).toBe("continued-elsewhere");
     expect(classifyResumeFailure("suspended_turn_not_found")).toBe("continued-elsewhere");
+    // BR-07 — the Build target moved under a parked turn; it was closed, not continued.
+    expect(classifyResumeFailure("build_target_changed")).toBe("target-changed");
     // No decision has reached the runtime yet: the turn is genuinely still
     // parked, so waiting is the truthful surface, not an error.
     expect(classifyResumeFailure("approval_not_resolved")).toBe("not-yet-resolved");

@@ -310,6 +310,27 @@ def _disconnect_repo(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return f"/api/code/repos/{_local_repo(ws, client, h)}"
 
 
+def _worktree_seed(remove: bool) -> Seed:
+    """A committed repository, and for removal a task worktree created from it."""
+
+    def seed(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+        import subprocess
+
+        repo_id = _local_repo(ws, client, h)
+        root = ws / "projects" / "app"
+        git = ["git", "-c", "user.name=c", "-c", "user.email=c@example.com", "-C", str(root)]
+        subprocess.run([*git, "init", "-q"], check=True)
+        subprocess.run([*git, "add", "."], check=True)
+        subprocess.run([*git, "commit", "-qm", "init"], check=True)
+        if not remove:
+            return (f"/api/code/repos/{repo_id}/worktrees", {"name": "contract"})
+        made = client.post(f"/api/code/repos/{repo_id}/worktrees", json={"name": "contract"}, headers=h)
+        assert made.status_code == 201, made.text
+        return f"/api/code/repos/{made.json()['repo_id']}/worktree"
+
+    return seed
+
+
 # ── files in a repository, hooks, plugins ────────────────────────────────────
 
 
@@ -581,6 +602,9 @@ CASES: Cases = {
     ("GET", "/api/code/repos/{repo_id}/target"): _on_repo("/target"),
     ("GET", "/api/code/repos/{repo_id}/review"): _on_repo("/review"),
     ("POST", "/api/code/repos/{repo_id}/review"): _on_repo("/review"),
+    ("GET", "/api/code/repos/{repo_id}/provenance"): _on_repo("/provenance"),
+    ("POST", "/api/code/repos/{repo_id}/worktrees"): _worktree_seed(remove=False),
+    ("DELETE", "/api/code/repos/{repo_id}/worktree"): _worktree_seed(remove=True),
     ("GET", "/api/hooks"): plain("/api/hooks"),
     ("GET", "/api/plugins"): plain("/api/plugins"),
     ("GET", "/api/channels"): _channels,

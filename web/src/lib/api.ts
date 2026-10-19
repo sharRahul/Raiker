@@ -931,6 +931,13 @@ export const api = {
   // and the request that reviews it. One review per exact patch.
   readCodeRepoReview: (repoId: string) => contract.readCodeRepoReview(repoId),
   reviewCodeRepoPatch: (repoId: string) => contract.reviewCodeRepoPatch(repoId),
+  // BR-D05 — recent commits, and whether each one's Raiker trailers name a
+  // turn this account recorded. Evidence only.
+  readCodeRepoProvenance: (repoId: string) => contract.readCodeRepoProvenance(repoId),
+  // BR-03 — a task worktree on a new `raiker/<name>` branch, and its removal
+  // (clean only; the branch and its commits are kept).
+  createCodeWorktree: (repoId: string, name: string) => contract.createCodeWorktree(repoId, { name }),
+  removeCodeWorktree: (repoId: string) => contract.removeCodeWorktree(repoId),
   // B10 — what a parser sees in the file the owner just opened.
   readCodeRepoDiagnostics: (repoId: string, path: string) =>
     contract.readCodeRepoDiagnostics(repoId, { path }),

@@ -339,6 +339,52 @@ reconnect the repository or choose another. The file and git tools would
 otherwise fall back to the workspace root, which is not the repository you
 pointed Build at.
 
+A turn that is waiting for your approval is checked again before it continues.
+If its folder, repository, branch or environment changed while it waited, it is
+**not continued**: the turn says *This turn was not continued: the folder,
+repository, branch or environment it started on has changed since*, and you
+start a new turn where you are now.
+
+### Working on two things at once: worktrees
+
+Two Build conversations writing into one checkout would change each other's
+files. So while another conversation's Build turn is running in the same folder,
+a new one does not start and says why. Give the second piece of work its own
+folder instead:
+
+1. Open the repository menu on the Build header and press **New worktree** on
+   the repository.
+2. Name it — `fix-login`, say. Raiker creates `<repository>.worktrees/fix-login`
+   on a new branch `raiker/fix-login` from the current commit, and connects it as
+   its own repository. Your main checkout does not move.
+3. Press **Use** on the new entry. The header now shows `raiker/fix-login`, and
+   that conversation's turns, Changes and outcome are the worktree's.
+
+An existing branch, or one already checked out somewhere, is refused rather than
+shared. **Remove worktree** removes the folder only when it has no uncommitted
+changes — otherwise nothing is removed and it says so — and always keeps the
+branch and its commits.
+
+A turn that has shown *running* for more than fifteen minutes is treated as
+abandoned (a host that stopped mid-turn), so it never holds a folder for ever.
+
+### Which commits Raiker made
+
+A commit Raiker records on your approval ends with two lines naming the
+conversation and turn it came from:
+
+```
+Raiker-Session: sess_…
+Raiker-Turn: turn_…
+```
+
+**Changes → Recent commits** reads them back. **Made in Raiker** means the turn
+they name is one this Raiker recorded; **Says Raiker — no record here** means the
+lines are there and nothing here backs them (anyone can type them, and a commit
+made by another installation has them too). A commit without them is simply a
+commit. These lines are evidence for whoever reads the history; nothing in Raiker
+reads them to decide what may run.
+
 ## Reading the repository
 
 **Files** on the Build header opens the connected repository beside the
@@ -402,6 +448,9 @@ finding with its severity, the file and line, what was found and what to do:
 - added text that tells a model to ignore its instructions or reveal its prompt —
   issue and repository text is data, never an instruction to Raiker;
 - source changed with no test change.
+
+If a declared check passes but the review you took of the current patch has a
+high-severity finding, the turn's outcome stays **Not verified** and says so.
 
 The review is kept for that exact patch, identified by its fingerprint. Opening
 Changes again on the same patch shows **Reviewed** with the same findings rather

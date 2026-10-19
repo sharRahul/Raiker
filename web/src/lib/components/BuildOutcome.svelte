@@ -95,6 +95,11 @@
         {/each}
       </ul>
     {/if}
+    {#if outcome.review && outcome.review.high > 0}
+      <p class="review-note" data-testid="build-outcome-review">
+        The review of the current patch has {outcome.review.high} high-severity finding{outcome.review.high === 1 ? "" : "s"} — see Changes.
+      </p>
+    {/if}
     {#if drift.length}
       <p class="drift" data-testid="build-target-drift">
         The {drift.join(", ")} this turn started on has changed since{outcome.target?.branch ? ` (it began on ${outcome.target.branch})` : ""}.
@@ -134,5 +139,6 @@
   .hint { margin-top: var(--space-1); color: var(--text-3); }
   .readback li[data-state="missing"] { color: var(--danger); }
   .drift { margin-top: var(--space-1); color: var(--warn); }
+  .review-note { margin-top: var(--space-1); color: var(--danger); }
   .where { margin-top: var(--space-1); color: var(--text-3); }
 </style>

@@ -2711,6 +2711,16 @@
             "title": "Reason",
             "type": "string"
           },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuildTurnReviewSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "target": {
             "anyOf": [
               {
@@ -2746,9 +2756,34 @@
           "reason",
           "readback",
           "target_drift",
-          "target"
+          "target",
+          "review"
         ],
         "title": "BuildTurnOutcome",
+        "type": "object"
+      },
+      "BuildTurnReviewSummary": {
+        "description": "BR-D04 — the stored review of the patch in the turn's repository now.",
+        "properties": {
+          "findings": {
+            "title": "Findings",
+            "type": "integer"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "high": {
+            "title": "High",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "high",
+          "findings"
+        ],
+        "title": "BuildTurnReviewSummary",
         "type": "object"
       },
       "BuildTurnTargetSummary": {
@@ -5674,6 +5709,34 @@
         "title": "CodeRepoFileView",
         "type": "object"
       },
+      "CodeRepoProvenanceView": {
+        "properties": {
+          "commits": {
+            "items": {
+              "$ref": "#/components/schemas/CommitProvenance"
+            },
+            "title": "Commits",
+            "type": "array"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          }
+        },
+        "required": [
+          "commits",
+          "reason_code"
+        ],
+        "title": "CodeRepoProvenanceView",
+        "type": "object"
+      },
       "CodeRepoReviewView": {
         "description": "The review of the working tree's current patch, if one has been taken.\n\n``fingerprint`` is the current patch's; ``review`` is null until the owner\nasks for one. ``reused`` says the stored review of this same patch was\nreturned instead of a second, duplicate set of findings.",
         "properties": {
@@ -5943,6 +6006,68 @@
           "created_at"
         ],
         "title": "CodeRepoView",
+        "type": "object"
+      },
+      "CodeRepoWorktreeCreated": {
+        "description": "BR-03 — a task worktree on a new owned branch, connected as its own repository.",
+        "properties": {
+          "base": {
+            "title": "Base",
+            "type": "string"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "local_subpath": {
+            "title": "Local Subpath",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "repo_id",
+          "label",
+          "local_subpath",
+          "branch",
+          "base"
+        ],
+        "title": "CodeRepoWorktreeCreated",
+        "type": "object"
+      },
+      "CodeRepoWorktreeRemoved": {
+        "properties": {
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "repo_id": {
+            "title": "Repo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "repo_id",
+          "branch"
+        ],
+        "title": "CodeRepoWorktreeRemoved",
         "type": "object"
       },
       "CodeReposView": {
@@ -6530,6 +6655,64 @@
           "run"
         ],
         "title": "CommandStopped",
+        "type": "object"
+      },
+      "CommitProvenance": {
+        "description": "BR-D05 — one recent commit, and what its Raiker trailers prove here.",
+        "properties": {
+          "commit": {
+            "title": "Commit",
+            "type": "string"
+          },
+          "committed_at": {
+            "title": "Committed At",
+            "type": "string"
+          },
+          "provenance": {
+            "enum": [
+              "recorded",
+              "unrecorded",
+              "none"
+            ],
+            "title": "Provenance",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "required": [
+          "commit",
+          "subject",
+          "committed_at",
+          "provenance",
+          "session_id",
+          "turn_id"
+        ],
+        "title": "CommitProvenance",
         "type": "object"
       },
       "CompactConversationRequest": {
@@ -8162,6 +8345,23 @@
           "recorded_at"
         ],
         "title": "CostEvent",
+        "type": "object"
+      },
+      "CreateCodeWorktreeRequest": {
+        "additionalProperties": false,
+        "description": "BR-03 — a task worktree on a new ``raiker/<name>`` branch of a connected repository.",
+        "properties": {
+          "name": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateCodeWorktreeRequest",
         "type": "object"
       },
       "CreateMcpServerRequest": {
@@ -33377,6 +33577,46 @@
         "summary": "Read Code Repo File"
       }
     },
+    "/api/code/repos/{repo_id}/provenance": {
+      "get": {
+        "description": "BR-D05 — recent commits and whether each says, provably, that Raiker made it.\n\n``recorded`` means the commit's trailers name a session and turn this\naccount's Raiker holds; ``unrecorded`` means they claim Raiker and nothing\nhere backs them. Evidence only — nothing reads it to decide anything.",
+        "operationId": "read_code_repo_provenance_api_code_repos__repo_id__provenance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoProvenanceView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Code Repo Provenance"
+      }
+    },
     "/api/code/repos/{repo_id}/review": {
       "get": {
         "description": "BR-D04 — the stored review of the current patch, if one was taken.",
@@ -33493,6 +33733,96 @@
           }
         },
         "summary": "Read Code Repo Target"
+      }
+    },
+    "/api/code/repos/{repo_id}/worktree": {
+      "delete": {
+        "description": "Remove a clean task worktree; its branch and commits are kept. Dirty is refused.",
+        "operationId": "remove_code_worktree_api_code_repos__repo_id__worktree_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoWorktreeRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Code Worktree"
+      }
+    },
+    "/api/code/repos/{repo_id}/worktrees": {
+      "post": {
+        "description": "BR-03 — a separate worktree on a new ``raiker/`` branch, for concurrent Build work.\n\nCreates ``<repo>.worktrees/<name>`` from HEAD and connects it as its own\nrepository. The main checkout is untouched; an existing branch, or one\nchecked out elsewhere, is refused rather than shared.",
+        "operationId": "create_code_worktree_api_code_repos__repo_id__worktrees_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCodeWorktreeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoWorktreeCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Code Worktree"
       }
     },
     "/api/command-runs": {

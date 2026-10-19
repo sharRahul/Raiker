@@ -997,6 +997,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-955](#fixed-955--a-build-turn-named-a-repository-not-the-target-it-ran-against-br-d02-first-slice) | Medium | Build / execution target | Fixed 2026-10-19 — BR-D02 first slice |
 | [FIXED-956](#fixed-956--a-patch-was-shown-never-reviewed-and-every-look-was-a-new-look-br-d04-first-slice) | Medium | Build / review | Fixed 2026-10-19 — BR-D04 first slice |
 | [FIXED-957](#fixed-957--nothing-proved-an-injected-fault-could-not-read-as-verified-br-d06-first-slice) | Low | Build / testing | Fixed 2026-10-19 — BR-D06 first slice |
+| [FIXED-958](#fixed-958--a-commit-raiker-made-could-not-say-so-and-nothing-could-check-a-claim-that-it-did-br-d05-first-slice) | Medium | Build / provenance | Fixed 2026-10-19 — BR-D05 first slice |
+| [FIXED-959](#fixed-959--two-build-conversations-could-write-one-checkout-with-no-way-to-give-either-its-own-br-03) | Medium | Build / execution target | Fixed 2026-10-19 — BR-03 worktrees and one turn per checkout |
+| [FIXED-960](#fixed-960--a-parked-build-turn-resumed-wherever-the-repository-had-moved-to-br-07) | Medium | Build / recovery | Fixed 2026-10-19 — BR-07 target revalidated on resume |
+| [FIXED-961](#fixed-961--a-turn-read-as-verified-while-its-own-patch-review-held-a-high-severity-finding-br-d04) | Low | Build / review | Fixed 2026-10-19 — BR-D04 outcome reads the review |
+| [FIXED-962](#fixed-962--restart-and-provider-faults-were-proven-only-against-the-classifiers-inputs-br-d06) | Low | Build / testing | Fixed 2026-10-19 — BR-D06 second slice |
 
 ---
 
@@ -34286,3 +34291,138 @@ provider that died before the checks, a hidden failing test, a check in the
 wrong folder, a destination removed, a branch switched or a folder vanished
 under the turn, and a check waiting for approval — and asserts each lands on its
 truthful outcome and never `completed_verified` (**14/14**).
+
+## FIXED-958 — A commit Raiker made could not say so, and nothing could check a claim that it did (BR-D05, first slice)
+
+**Severity: Medium. Area: Build / provenance. Status: Fixed 2026-10-19 — the
+first slice of [BR-D05](BUILD_WORKSPACE_SPEC.md); signed evidence stays on its
+row.**
+
+**Observed.** A commit Raiker recorded on the owner's approval was
+indistinguishable in history from one the owner typed. A reviewer of the
+repository had only the model's account of what produced a change.
+
+**Fixed.**
+
+* `raiker/control/build_provenance.py` builds `Raiker-Session` / `Raiker-Turn`
+  trailers only from ids matching `sess_…` / `turn_…` (8–64 safe characters), so
+  a path, a newline-smuggled second trailer, a token or model text is never
+  written. `create_commit` appends them as the message's final paragraph;
+  staging is unchanged.
+* `GitWriteExecutor` names the proposing conversation — `origin_session_id` for
+  an approval resolved from the inbox — and the turn only when the record says it
+  belongs to that conversation.
+* `GET /api/code/repos/{repo_id}/provenance` reads the last twenty commits'
+  trailers back: `recorded` when this account holds that session and turn,
+  `unrecorded` when they claim Raiker and nothing here backs them, `none`
+  otherwise. Nothing reads a trailer to allow anything.
+* **Changes → Recent commits** labels them **Made in Raiker** and **Says Raiker —
+  no record here**.
+
+**Evidence.** `tests/test_build_provenance_and_worktrees.py` (trailer shapes and
+injection refusals, a real commit carrying both trailers and reading back
+`recorded`, a hand-typed trailer reading `unrecorded`, the executor never pairing
+a session with another conversation's turn, and the route);
+`RecentCommits.test.ts` (2). Live: see [FIXED-959](#fixed-959--two-build-conversations-could-write-one-checkout-with-no-way-to-give-either-its-own-br-03).
+
+## FIXED-959 — Two Build conversations could write one checkout, with no way to give either its own (BR-03)
+
+**Severity: Medium. Area: Build / execution target. Status: Fixed 2026-10-19 —
+BR-03 in [BR-D02](BUILD_WORKSPACE_SPEC.md); Windows and cancel evidence stay on
+its row.**
+
+**Observed.** BR-03 requires concurrent write-capable work to use separate
+worktrees and owned branches. Build had one checkout per repository, and two
+conversations could run Build turns into it at the same time, each changing the
+other's files and diff.
+
+**Fixed.**
+
+* `raiker/control/build_worktrees.py`: `create_worktree` adds
+  `<repo>.worktrees/<name>` on a new `raiker/<name>` branch from HEAD, with
+  repository hooks off; it refuses an invalid name, an existing branch
+  (`branch_exists`), a branch checked out elsewhere (`branch_in_use`), an
+  existing folder, a repository with no commits, a folder that is not a
+  repository root, and a repository that is the workspace itself (its sibling
+  would be outside the workspace). `remove_worktree` removes only a clean linked
+  worktree, refuses uncommitted work (`worktree_has_uncommitted_changes`) and
+  the main checkout (`not_a_task_worktree`), and keeps the branch.
+* `POST /api/code/repos/{repo_id}/worktrees` connects the worktree as its own
+  repository (without moving the selection); `DELETE
+  /api/code/repos/{repo_id}/worktree` removes and forgets it. Both are audited
+  as repository connect/disconnect events.
+* The gateway refuses a Build turn while another conversation's Build turn is
+  running against the same folder, streamed as `build_target_busy`, and names a
+  worktree as the way to run both. A turn quiet for fifteen minutes is treated as
+  abandoned so a dead host cannot hold a folder.
+* The repository panel offers **New worktree** on a local repository and
+  **Remove worktree** on a task worktree, with each refusal in words.
+
+**Evidence.** `tests/test_build_provenance_and_worktrees.py` (create, separate
+target fingerprint, main checkout unmoved, existing branch, invalid name,
+uncommitted work refused and kept, removal keeps the branch and its commit,
+main checkout not removable, workspace-root repository refused, a second
+conversation refused, the same conversation and a finished turn not blocking,
+an abandoned turn not holding the folder); `RepoConnector.test.ts` (2 new).
+Live: `br-d02-d05-worktree-provenance-live.spec.ts` against a fresh
+`raiker-web` with Anthropic connected through Models: **New worktree** made
+`svc.worktrees/notes` on `raiker/notes`, the header read `raiker/notes · <head>`
+while `svc` stayed on `main`; a real `claude-haiku-4-5` Build turn wrote
+`NOTES.md` and committed it with `git_commit` after two **Accept**s — the commit
+carried `Raiker-Session` and `Raiker-Turn`, `svc`'s own HEAD did not move, and
+**Recent commits** read **Made in Raiker** for it and nothing for `init`;
+**Remove worktree** with an untracked file in it was refused and the file stayed,
+and once clean the worktree went and `raiker/notes` still held the commit.
+Captures under `docs/screenshots/2026-10-19-br-d02-d05-worktree-provenance/` (not committed) were reviewed. Reviewing them found the removal refusal printed under the connect form at the foot of the panel, far from the button that raised it; worktree refusals now render beside the repository list, re-checked live on a second worktree (`raiker/second`: refused while dirty, removed once clean, branch kept).
+
+## FIXED-960 — A parked Build turn resumed wherever the repository had moved to (BR-07)
+
+**Severity: Medium. Area: Build / recovery. Status: Fixed 2026-10-19 — the
+target half of BR-07; delegation and credential revalidation at resume stay on
+[BR-D02](BUILD_WORKSPACE_SPEC.md)'s row.**
+
+**Observed.** A Build turn parked on an approval resumed under whatever the
+repository was by then. If the owner switched branch or moved the folder while
+the card waited, the continuation carried on its plan in a place it had never
+inspected.
+
+**Fixed.** Before a parked turn is claimed, the gateway compares its recorded
+target with the current one. On drift it claims the parked turn, finalizes it as
+`target_changed`, closes the turn as failed with the moved fields named, and
+refuses with `build_target_changed` (409). Build says *This turn was not
+continued: the folder, repository, branch or environment it started on has
+changed since. Start a new turn here.* and does not retry.
+
+**Evidence.** `tests/test_build_provenance_and_worktrees.py` (no drift is a
+no-op; a branch switched under a parked turn raises `build_target_changed`,
+leaves the suspended row `target_changed` and the turn `failed`);
+`approvalResume.test.ts` classifies the code.
+
+## FIXED-961 — A turn read as verified while its own patch review held a high-severity finding (BR-D04)
+
+**Severity: Low. Area: Build / review. Status: Fixed 2026-10-19 — part of
+[BR-D04](BUILD_WORKSPACE_SPEC.md).**
+
+**Fixed.** The outcome reads the stored review of the patch in the turn's
+repository now — it never runs one — and a high-severity finding on it keeps a
+passing turn **Not verified** with the reason named; the outcome line says *The
+review of the current patch has 1 high-severity finding — see Changes.*
+
+**Evidence.** `tests/test_build_provenance_and_worktrees.py` (clean and
+medium-only reviews still verify, a high finding does not; the outcome route
+reads `review: null` before a review and the high count after one);
+`BuildOutcome.test.ts`.
+
+## FIXED-962 — Restart and provider faults were proven only against the classifier's inputs (BR-D06)
+
+**Severity: Low. Area: Build / testing. Status: Fixed 2026-10-19 — the second
+slice of [BR-D06](BUILD_WORKSPACE_SPEC.md).**
+
+**Fixed.** Two faults are now injected through the real stores and routes rather
+than into the classifier's inputs: a background check left `running` with no
+exit code — what a host that went away mid-check leaves in `command_runs` —
+reads `outcome_unknown` through the outcome route
+(`tests/test_build_provenance_and_worktrees.py`); and a provider that fails on
+the continuation after an accepted write, through the real prompt, resolve and
+resume routes with a scripted provider, leaves the written file on disk and the
+turn **Not verified** (`tests/test_build_fault_provider.py`).

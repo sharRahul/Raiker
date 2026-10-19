@@ -139,7 +139,7 @@
           <p>Fixed since the last review:</p>
           <ul>
             {#each resolved as item, index (`${item.rule}:${item.path}:${index}`)}
-              <li>{item.title}{#if item.path} — <code>{item.path}</code>{/if}</li>
+              <li>{item.title}{#if item.path}<code class="resolved-path">{item.path}</code>{/if}</li>
             {/each}
           </ul>
         </div>
@@ -285,5 +285,10 @@
   .resolved code {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
+  }
+  /* Spacing in CSS, not in markup: whitespace before an element at the start
+     of an {#if} block is dropped, which ran the title into the path. */
+  .resolved-path {
+    margin-left: 0.4rem;
   }
 </style>

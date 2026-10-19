@@ -33,6 +33,7 @@ import argparse
 import contextlib
 import json
 import os
+import secrets
 import shutil
 import signal
 import socket
@@ -46,7 +47,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-PASSWORD = "correct horse battery staple 1"
+#: The throwaway owner this scenario registers on its own fresh workspace,
+#: made per run so nothing here is a stored credential.
+OWNER_PASSPHRASE = secrets.token_urlsafe(24)
+#: What the owner types to confirm a Tier-2 capability on the Permissions page.
+HUMAN_CONFIRMATION = "confirm"
 #: The project's declared check: a script that passes, slowly — still running
 #: when the host is killed, and certain to pass had it been left to finish.
 SLOW_CHECK = "import time\n\ntime.sleep(90)\nprint('checks passed')\n"
@@ -201,7 +206,7 @@ class Host:
 
     def sign_in(self, *, register: bool) -> None:
         route = "/api/auth/register" if register else "/api/auth/login"
-        body = self.call("POST", route, {"username": "owner", "password": PASSWORD})
+        body = self.call("POST", route, {"username": "owner", "password": OWNER_PASSPHRASE})
         self.token = str(body["token"])
         self.csrf = str(body.get("csrf_token") or "")
 
@@ -252,7 +257,7 @@ def _turn_on(host: Host, capability: str, *, acknowledge: bool = False) -> None:
     body: dict[str, Any] = {"target_state": "enabled_runtime", "reason": "restart fault scenario"}
     if acknowledge:
         # A Tier-2 capability also asks for the owner's typed confirmation.
-        body["confirmation_token"] = "confirm"
+        body["confirmation_token"] = HUMAN_CONFIRMATION
     host.call("POST", f"/api/capability-gates/{capability}/set", body)
 
 

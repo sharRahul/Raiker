@@ -39,18 +39,6 @@ Raiker engine is bundled inside the application.
 | Linux x86-64 (Ubuntu 22.04+, Debian 12+, Fedora 36+) | `.AppImage`, `.deb` or `.rpm` for `linux-x86_64` |
 | Linux ARM64 | `.AppImage`, `.deb` or `.rpm` for `linux-arm64` |
 
-> **Release status (2026-10-17).** The installers are built, installed,
-> smoke-tested, onboarded and uninstalled on each platform's own CI runner by
-> [`desktop-package.yml`](.github/workflows/desktop-package.yml); per-platform
-> results are in the
-> [release acceptance matrix](docs/plans/RELEASE_ACCEPTANCE_MATRIX.md). **No
-> signed release has been published yet**, so the Releases page is empty until
-> the maintainers configure the code-signing identities and run the
-> [release workflow](docs/guide/releasing.md). Until then, unsigned test
-> installers are attached to each `Desktop package` workflow run under
-> **Actions**. Unsigned builds are for testing: Windows SmartScreen warns about
-> them and macOS Gatekeeper blocks a downloaded unsigned app.
-
 Raiker sets up everything it needs on first start. Local AI models and other
 optional components are added later, from inside Raiker, only when you choose
 them. Full instructions: [Installing Raiker](docs/guide/getting-started.md).

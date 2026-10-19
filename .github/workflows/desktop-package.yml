@@ -83,7 +83,7 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.11"
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   VERSION: ${{ inputs.version || '0.0.0' }}
   SIGNED: ${{ inputs.signed && 'true' || 'false' }}
 
@@ -95,10 +95,10 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Node
         # actions/setup-node v5.0.0 (Node 24 runtime)
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (Node 24)
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -110,7 +110,7 @@ jobs:
           npm run build
       - name: Upload
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: desktop-web-assets
           path: web/dist
@@ -138,14 +138,14 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python (build tooling only)
         # actions/setup-python v6.2.0 (Node 24 runtime)
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Set up Node (build tooling only)
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 (Node 24)
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -171,7 +171,7 @@ jobs:
         run: npm ci
       - name: Download web assets
         # actions/download-artifact v4
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           name: desktop-web-assets
           path: web/dist
@@ -360,7 +360,7 @@ jobs:
 
       - name: Upload this target's installers and evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: desktop-${{ matrix.target }}
           path: |
@@ -380,13 +380,13 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python (test harness only)
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Download the x86-64 installers
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           name: desktop-windows-x86_64
           path: x64
@@ -414,7 +414,7 @@ jobs:
           "PASS x86-64 package installed, smoke-tested and uninstalled on Windows on Arm" | Tee-Object -FilePath evidence\uninstall-windows-arm64.txt
       - name: Upload evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: desktop-windows-arm64
           path: evidence/*
@@ -428,7 +428,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Collect the evidence
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: evidence

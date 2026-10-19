@@ -3,6 +3,9 @@
   "private": true,
   "license": "Apache-2.0",
   "version": "0.0.0",
+  "engines": {
+    "node": ">=24"
+  },
   "description": "Raiker's local-first personal AI agent. Root scripts delegate to the governed single-owner web app in web/ and its desktop window in desktop/.",
   "scripts": {
     "dev": "npm --prefix web run dev",

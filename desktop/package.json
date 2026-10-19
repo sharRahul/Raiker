@@ -3,6 +3,9 @@
   "private": true,
   "license": "Apache-2.0",
   "version": "0.0.0",
+  "engines": {
+    "node": ">=24"
+  },
   "description": "Raiker's desktop window: an Electron shell around the local Raiker host.",
   "main": "dist/main.js",
   "scripts": {

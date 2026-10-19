@@ -38,7 +38,7 @@ CI**, which is deliberate: the phrases are the claims.
 
 ### `web.yml` — only when `web/**` changes
 
-Node 22: `npm ci`, lint, `check`, unit tests, build, then the **mocked**
+Node 24: `npm ci`, lint, `check`, unit tests, build, then the **mocked**
 end-to-end suite against that build. Every API call is answered from a fixture,
 so it needs no credential and no network. The `live` project — which drives a
 real host holding real provider keys — is deliberately not run in CI, because a

@@ -81,7 +81,7 @@ reinstalling or updating never touches it.
 Contributors run Raiker from a source checkout. This needs:
 
 - Python 3.11 or newer
-- Node 20 or newer (to build the dashboard and the desktop window)
+- Node 24 or newer (to build the dashboard and the desktop window)
 - Git
 
 **Check the Python version before anything else**, and check it *inside* the

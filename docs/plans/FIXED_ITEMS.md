@@ -20,6 +20,14 @@ Evidence: `screenshots/working/` (verified behaviour),
 
 ## Release packaging maintenance
 
+### FIXED-RELEASE-02 — GitHub Actions and JavaScript builds use Node.js 24
+
+**Fixed 2026-10-19.** GitHub Actions checkout, setup, upload and download
+actions now use their Node.js 24-compatible releases. The web and desktop
+workflows build with Node.js 24, and the three JavaScript packages declare
+Node.js 24 or newer in their engine requirements. No release workflow was
+dispatched for this maintenance change.
+
 ### FIXED-RELEASE-01 — unsupported Intel macOS desktop target removed
 
 **Fixed 2026-10-19.** The desktop release matrix, target registry, installer

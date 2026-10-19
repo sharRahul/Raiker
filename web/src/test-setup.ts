@@ -7,7 +7,7 @@ import { resetWorkDrafts } from "./lib/workDraft.svelte";
 // Node 25 ships a built-in `localStorage` global. It shadows the one jsdom
 // installs and is inert unless the process was started with a valid
 // `--localstorage-file`, so `window.localStorage.clear is not a function` took
-// out every theme and login test on a current Node while CI, pinned to Node 22,
+// out every theme and login test on a current Node while CI, pinned to Node 24,
 // stayed green. Rather than pin harder — which only defers the same break to the
 // next Node — the storage jsdom promises is restored when what is present is not
 // a working `Storage`.

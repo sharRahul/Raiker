@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python and install the package
         uses: ./.github/actions/setup-python
         with:
@@ -143,7 +143,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python
         uses: ./.github/actions/setup-python
       - name: Measure handwritten source
@@ -151,7 +151,7 @@ jobs:
           python scripts/measure_loc.py --json loc-report.json
       - name: Keep the report
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: loc-report
           path: loc-report.json
@@ -170,7 +170,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python
         uses: ./.github/actions/setup-python
       - name: Install pip-audit
@@ -223,7 +223,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python
         uses: ./.github/actions/setup-python
       - name: Install the pinned scanner
@@ -241,7 +241,7 @@ jobs:
       - name: Keep the report
         if: always()
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: image-scan
           path: image-scan.json
@@ -259,7 +259,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python and install the package
         uses: ./.github/actions/setup-python
         with:
@@ -291,7 +291,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Show toolchain
         working-directory: native
         run: |

@@ -48,7 +48,7 @@ permissions:
 
 env:
   PYTHON_VERSION: "3.11"
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
 
 jobs:
   # ── 1. Is this release even coherent, and what does it consist of? ──────
@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python
         # actions/setup-python v6.2.0 (Node 24 runtime)
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
@@ -126,7 +126,7 @@ jobs:
         run: python -m pip install -e .
       - name: Collect every target's installers
         # actions/download-artifact v4
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: collected
@@ -209,7 +209,7 @@ jobs:
           echo "pin with: raiker-app update --channel-url <url of desktop-${{ inputs.channel }}.json> --channel-key $(cat dist/release-public-key.txt)"
       - name: Upload the signed channel
         # actions/upload-artifact v4
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
         with:
           name: release-channel
           path: dist
@@ -227,7 +227,7 @@ jobs:
     steps:
       - name: Collect the signed channel
         # actions/download-artifact v4
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           name: release-channel
           path: dist
@@ -279,7 +279,7 @@ jobs:
       contents: write
     steps:
       - name: Collect unsigned desktop artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: collected

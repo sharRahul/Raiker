@@ -75,7 +75,7 @@ Evidence: `screenshots/not-working/` (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
+| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — rechecked 2026-10-19: Docker Desktop and Ollama are reachable on this host, but the mandatory live bypass/revocation/credential proof and production signing anchor remain |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains |
@@ -95,6 +95,15 @@ on this host, and Podman is not installed. Raiker therefore continues to refuse
 container-network execution rather than claim unverified direct-DNS/direct-TCP
 bypass, active-stream revocation, or copy-on-write credential-delivery proof.
 The container proof and a production signing anchor remain open.
+
+**2026-10-19 recheck.** Docker Desktop 4.88.1 answered `docker version` and
+the local Ollama service answered `ollama list`; Podman is still not installed.
+That removes the stopped-daemon blocker from this host, but it does not close
+the defect: the repository still has no live proof that an approved container
+allows only the declared egress, refuses a bypass, revokes an active stream,
+or delivers credentials through the copy-on-write/delta-quarantine path. The
+production signing anchor is also still absent. The product therefore remains
+correct to keep `filtered_network` and credential delivery unadvertised.
 
 **2026-08-21 update.** Foreground SSH and Daytona now enter the same
 `CommandService` lifecycle through a canonical length-prefixed envelope, exact
@@ -281,6 +290,13 @@ The seven provider scenarios are still converted only one at a time and re-run,
 as this entry requires. The same round also found that `signInAsOwner` rejected
 the current exact **Welcome** heading; [FIXED-946](FIXED_ITEMS.md#fixed-946--the-live-sign-in-helper-rejected-the-current-welcome-heading)
 repairs that shared precondition without changing the inline-sign-in count.
+
+**2026-10-19 live recheck.** In a fresh isolated workspace, the supplied
+Anthropic key was entered through Models (never written to a spec or log) and
+`anthropic-key-live.spec.ts` passed its real catalogue round. This is provider
+access evidence only; it does not convert the remaining inline sign-ins or
+close the ten-spec remainder, which still requires each scenario to be
+converted and re-run with its own real provider.
 
 **2026-09-29 — four more, and two product defects behind them.**
 `composer-parity-and-turn-honesty-live`, `fts5-mem03-bug194-live`,
@@ -496,6 +512,12 @@ against a consented repository with a connected model and a delegation, read
 back as a branch, a commit and a pull request receipt, with a merge never
 attempted unprompted.
 
+**2026-10-19 live recheck.** `bug-339-issue-to-pr-routine-live.spec.ts`
+passed 1/1 against the isolated running service: the plan named the branch,
+push and pull-request steps as owner approvals, named merge as never allowed,
+and kept scheduling disabled without a selected consented repository. RR-40
+therefore remains open; no external repository was changed in this run.
+
 ## BUG-346 — An accepted Build write failed as an invalid tool call on an Ollama cloud model
 
 **Severity: Medium. Area: Build / approvals / Ollama. Status: Open — found
@@ -512,6 +534,16 @@ answered with a JSON plan and called no tool, and one met the provider's 402 on
 `deepseek-v4-pro:cloud`. After the turn the composer also said *No readiness
 check exists for this exact model* and disabled **Run**, for a model kept
 through the Ollama picker without **Check**.
+
+**2026-10-19 live recheck.** With Docker Desktop and Ollama reachable, a
+fresh isolated workspace selected `gpt-oss:120b-cloud` from the Ollama picker
+and ran the same Build request through the UI. The first turn answered
+**The requested tool call was invalid** without a write. Retrying produced the
+real approval card and its one-line diff; after **Accept**, the tool row became
+**failed** with the same invalid-tool-call answer and the requested file was
+absent from the project. This reproduces BUG-346 on the current revision and
+keeps BR-D01's real-file half blocked. The run used no provider API key; the
+model was the existing Ollama Cloud connection.
 
 **What is known.** The BR-D01 outcome read the turn correctly as `no_change`
 (nothing was written, so nothing was claimed). The resumed call's row stays

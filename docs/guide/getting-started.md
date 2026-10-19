@@ -151,7 +151,7 @@ For Fedora, install the equivalent prerequisites:
 sudo dnf install python3 python3-pip git
 ```
 
-Confirm that `python3 --version` is 3.11 or newer and `node --version` is 20 or
+Confirm that `python3 --version` is 3.11 or newer and `node --version` is 24 or
 newer. Stable distributions may ship an older Node.js; use NodeSource, `nvm`,
 or another trusted versioned source rather than continuing with an unsupported
 runtime. Then install and build Raiker:
@@ -187,14 +187,14 @@ reinstall the service after moving them.
 With Homebrew:
 
 ```bash
-brew install python@3.11 node@20 git
+brew install python@3.11 node@24 git
 git clone https://github.com/sharRahul/Raiker.git
 cd Raiker
 $(brew --prefix python@3.11)/bin/python3.11 -m venv .venv
 . .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
-export PATH="$(brew --prefix node@20)/bin:$PATH"
+export PATH="$(brew --prefix node@24)/bin:$PATH"
 npm --prefix web ci
 npm --prefix web run build
 raiker-app --print-paths

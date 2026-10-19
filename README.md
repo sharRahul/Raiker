@@ -182,7 +182,7 @@ backups on other drives are never removed. Data locations:
 
 ## For developers
 
-Contributors run Raiker from a source checkout with Python 3.11+, Node.js 20+
+Contributors run Raiker from a source checkout with Python 3.11+, Node.js 24+
 and Git:
 
 ```bash

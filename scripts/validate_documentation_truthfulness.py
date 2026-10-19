@@ -9,7 +9,7 @@ REQUIRED_CONTENT: dict[str, list[str]] = {
         # The README must lead with the personal-agent product identity while
         # honestly distinguishing today's assistant/Build foundation from
         # goal-level autonomy that is still staged and unverified.
-        "local-first personal autonomous AI agent",
+        "personal autonomous AI agent",
         "coding/build agent",
         "goal-level capabilities are planned",
         "docs/guide/README.md",

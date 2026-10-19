@@ -20,6 +20,15 @@ Evidence: `screenshots/working/` (verified behaviour),
 
 ## Release packaging maintenance
 
+### FIXED-RELEASE-03 — the README identity check followed the owner's wording
+
+**Fixed 2026-10-19.** The owner removed "local-first" from the README's opening
+description (`bc54a63`), and `scripts/validate_documentation_truthfulness.py`
+still required the old phrase, which turned CI's Python job red on the next
+push (1 failed, 7142 passed). The validator now requires "personal autonomous AI
+agent", the identity the README states; `tests/test_documentation_validators.py`
+passes.
+
 ### FIXED-RELEASE-02 — GitHub Actions and JavaScript builds use Node.js 24
 
 **Fixed 2026-10-19.** GitHub Actions checkout, setup, upload and download

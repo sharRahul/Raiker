@@ -1083,6 +1083,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-994](#fixed-994--png-and-pdf-exports-drew-a-box-for-an-em-dash-and-for-accented-letters) | Medium | Design / export | Fixed 2026-10-19 — found live: missing glyphs in raster exports |
 | [FIXED-995](#fixed-995--text-that-overflowed-its-box-was-clipped-on-the-canvas-but-drawn-in-full-in-exports) | Low | Design / web | Fixed 2026-10-19 — found live: canvas clipped overflowing text |
 | [FIXED-996](#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused) | Low | Design / web | Fixed 2026-10-19 — found by test: conflict notice cleared |
+| [FIXED-997](#fixed-997--the-design-wire-types-broke-the-api-contract-on-python-311) | Medium | Design / API | Fixed 2026-10-19 — found by CI on Python 3.11 |
 
 ---
 
@@ -35129,3 +35130,19 @@ that said why.
 since you loaded it…*.
 
 **Evidence.** `DesignDocuments.test.ts` — *says a conflict in words and reloads instead of writing over later work*.
+
+## FIXED-997 — The Design wire types broke the API contract on Python 3.11
+
+**Severity: Medium. Area: Design / API. Status: Fixed 2026-10-19 — found by CI.**
+
+**Observed.** CI's Python 3.11 job failed one test of 7214,
+`test_the_generated_contract_files_are_current`: pydantic refuses a
+`typing.TypedDict` before Python 3.12 (`typed-dict-version`). The round had been
+verified on Python 3.13, where the standard-library class is accepted.
+
+**Fixed.** `raiker/api/wire/design.py` imports `TypedDict` from
+`typing_extensions`, as every other wire module does.
+
+**Evidence.** The test failed before and passed after under a local Python 3.11
+environment; mypy, ruff and SAST clean there too.
+

@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, and BUG-346, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287 and BUG-339, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 

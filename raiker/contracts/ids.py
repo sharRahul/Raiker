@@ -129,6 +129,13 @@ _PREFIXES = {
     "deleg_",
     # BR-12 — what GitHub confirmed about a pull request Raiker opened.
     "prr_",
+    # DW-01 to DW-11 — a Design document, design system, agent proposal,
+    # export and Build handoff.
+    "ddoc_",
+    "dsys_",
+    "dprop_",
+    "dexp_",
+    "dhand_",
 }
 
 

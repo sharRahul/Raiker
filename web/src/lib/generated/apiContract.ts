@@ -1699,6 +1699,12 @@ export type CreateCodeWorktreeRequest = {
   name: string;
 };
 
+export type CreateDesignDocumentRequest = {
+  title?: string;
+  preset?: string;
+  project_id?: string | null;
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -1813,6 +1819,310 @@ export type DelegationRequest = {
   expires_in_hours?: number;
   max_actions?: number | null;
   note?: string | null;
+};
+
+/** DW-05 — which live documents place an image, so removing it is never silent. */
+export type DesignAssetUsage = {
+  asset_id: string;
+  documents: DesignAssetUse[];
+};
+
+export type DesignAssetUse = {
+  document_id: string;
+  title: string;
+  layers: number;
+};
+
+export type DesignBaseVersionRequest = {
+  base_version: number;
+};
+
+/** DW-08 — a change written as a new version. */
+export type DesignChangeView = {
+  ok: boolean;
+  version: number;
+  rebased: boolean;
+  summary: string[];
+  document: DesignDocumentView;
+};
+
+export type DesignDocumentList = {
+  documents: DesignDocumentSummary[];
+  deleted: DesignDocumentSummary[];
+  presets: DesignFramePreset[];
+};
+
+/** One document in a list: what it is and where, never its layers. */
+export type DesignDocumentSummary = {
+  document_id: string;
+  title: string;
+  project_id: string | null;
+  system_id: string | null;
+  system_version: number | null;
+  current_version: number;
+  content_hash: string;
+  frame_count: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+};
+
+/** One document with its frames and layer tree, at ``current_version``. */
+export type DesignDocumentView = {
+  document_id: string;
+  title: string;
+  project_id: string | null;
+  system_id: string | null;
+  system_version: number | null;
+  current_version: number;
+  content_hash: string;
+  frame_count: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  document: Record<string, unknown>;
+  can_undo: boolean;
+  can_redo: boolean;
+};
+
+export type DesignExportList = {
+  exports: DesignExportView[];
+};
+
+export type DesignExportRequest = {
+  frame_id: string;
+  format: string;
+  scale?: number;
+};
+
+/** DW-11 — one export, pinned to the version and validation it came from. */
+export type DesignExportView = {
+  export_id: string;
+  document_id: string;
+  version: number;
+  frame_id: string;
+  format: string;
+  settings: Record<string, unknown>;
+  validation_outcome: string;
+  media_type: string;
+  sha256: string;
+  byte_size: number;
+  created_at: string;
+};
+
+export type DesignFramePreset = {
+  preset: string;
+  label: string;
+  width: number;
+  height: number;
+};
+
+export type DesignHandoffList = {
+  handoffs: DesignHandoffRecord[];
+};
+
+/** DW-11 — what Build was given: a bounded context document, never authority. */
+export type DesignHandoffRecord = {
+  handoff_id: string;
+  document_id: string;
+  version: number;
+  frame_ids: string[];
+  target: string;
+  attachment_id: string;
+  sha256: string;
+  created_at: string;
+};
+
+export type DesignHandoffRequest = {
+  frame_ids: string[];
+  target?: string;
+};
+
+/** A handoff just made, with the attachment Build's composer carries. */
+export type DesignHandoffView = {
+  handoff_id: string;
+  document_id: string;
+  version: number;
+  frame_ids: string[];
+  target: string;
+  attachment_id: string;
+  sha256: string;
+  created_at: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+};
+
+/** DW-08 — typed operations, made against ``base_version``. */
+export type DesignOperationsRequest = {
+  base_version: number;
+  operations: Record<string, unknown>[];
+};
+
+export type DesignProposalConflict = {
+  index: number;
+  node_ids: string[];
+  changed_in_version: number;
+};
+
+/** DW-08 — what accepting or rejecting a proposal did, and what it refused to overwrite. */
+export type DesignProposalDecision = {
+  ok: boolean;
+  proposal: DesignProposalView;
+  applied: number[];
+  conflicts: DesignProposalConflict[];
+  version: number | null;
+};
+
+/** Accept all or the listed operations, or reject; ``skip_conflicts`` applies the rest. */
+export type DesignProposalDecisionRequest = {
+  decision: string;
+  indexes?: number[] | null;
+  skip_conflicts?: boolean;
+};
+
+export type DesignProposalList = {
+  proposals: DesignProposalView[];
+};
+
+export type DesignProposalOperation = {
+  index: number;
+  operation: Record<string, unknown>;
+  status: "valid" | "refused";
+  reason_code: string | null;
+  summary: string;
+  touched: string[];
+};
+
+export type DesignProposalRequest = {
+  frame_id: string;
+  brief: string;
+  model_profile?: string | null;
+  model?: string | null;
+};
+
+/** DW-07 — an agent's plan and typed operations, waiting on the owner. */
+export type DesignProposalView = {
+  proposal_id: string;
+  document_id: string;
+  base_version: number;
+  frame_id: string;
+  brief: string;
+  provider: string;
+  model: string;
+  plan: Record<string, unknown>;
+  operations: DesignProposalOperation[];
+  status: string;
+  result: Record<string, unknown> | null;
+  created_at: string;
+  decided_at: string | null;
+};
+
+export type DesignSystemChange = {
+  frame_id: string;
+  node_id: string | null;
+  name: string;
+  field: string;
+  before: string | null;
+  after: string;
+};
+
+/** DW-06 — which system a document uses; ``system_id`` null clears it. */
+export type DesignSystemChoiceRequest = {
+  system_id?: string | null;
+  version?: number | null;
+  base_version?: number | null;
+};
+
+export type DesignSystemList = {
+  systems: DesignSystemView[];
+};
+
+export type DesignSystemMissing = {
+  frame_id: string;
+  node_id: string | null;
+  variable: string;
+};
+
+/** DW-06 — what choosing a system would change in this document, before anything is written. */
+export type DesignSystemPreview = {
+  system: DesignSystemView | null;
+  changes: DesignSystemChange[];
+  missing: DesignSystemMissing[];
+  operation_count: number;
+};
+
+export type DesignSystemRequest = {
+  name: string;
+  source_note?: string;
+  variables: Record<string, unknown>;
+};
+
+/** DW-06 — one version of a design system. */
+export type DesignSystemView = {
+  system_id: string;
+  version: number;
+  name: string;
+  source_note: string;
+  variables: Record<string, unknown>;
+  created_at: string;
+};
+
+export type DesignValidationCheck = {
+  check: string;
+  label: string;
+  status: "pass" | "fail" | "unsupported" | "unknown";
+  findings: DesignValidationFinding[];
+};
+
+export type DesignValidationFinding = {
+  frame_id: string | null;
+  node_id: string | null;
+  layer: string;
+  message: string;
+};
+
+/** DW-10 — each check's honest state, at one document version. */
+export type DesignValidationView = {
+  outcome: "passed" | "failed" | "partly_checked";
+  validator_version: string;
+  document_hash: string;
+  version: number;
+  checks: DesignValidationCheck[];
+};
+
+export type DesignVersionList = {
+  current_version: number;
+  versions: DesignVersionSummary[];
+};
+
+export type DesignVersionSummary = {
+  version: number;
+  actor: string;
+  kind: string;
+  summary: string;
+  scope: string[];
+  operation_count: number;
+  content_hash: string;
+  undo_parent: number | null;
+  redo_target: number | null;
+  proposal_id: string | null;
+  created_at: string;
+};
+
+export type DesignVersionView = {
+  version: number;
+  actor: string;
+  kind: string;
+  summary: string;
+  scope: string[];
+  operation_count: number;
+  content_hash: string;
+  undo_parent: number | null;
+  redo_target: number | null;
+  proposal_id: string | null;
+  created_at: string;
+  document: Record<string, unknown>;
 };
 
 /** One sign-in of this account, without its token. */
@@ -2638,6 +2948,7 @@ export type ImageGallery = {
   sized_providers: string[];
   generations: ImageGeneration[];
   deleted: ImageGeneration[];
+  operations: Record<string, string[]>;
 };
 
 /** One generation as the page sees it — metadata only, never the bytes. */
@@ -5757,6 +6068,12 @@ export type UpdateDeferred = {
   message: string;
 };
 
+/** Rename or file a document. ``project_id`` "" unfiles it; absent leaves it. */
+export type UpdateDesignDocumentRequest = {
+  title?: string | null;
+  project_id?: string | null;
+};
+
 /** Provenance, channel and recovery points; ``not_checked`` is not an assurance. */
 export type UpdateStatusView = {
   state: "source_checkout" | "no_channel" | "unsigned_build" | "not_checked" | "up_to_date" | "available" | "unreachable";
@@ -6119,6 +6436,58 @@ export const contract = {
     request<CredentialDeltaList>(withQuery("/api/credential-deltas", query)),
   discardCredentialDelta: (runId: string, body: Record<string, unknown>) =>
     call<CredentialDeltaDiscarded>("POST", `/api/credential-deltas/${encodeURIComponent(runId)}/discard`, { body }),
+  readDesignAssetUsage: (assetId: string) =>
+    request<DesignAssetUsage>(`/api/design/assets/${encodeURIComponent(assetId)}/usage`),
+  listDesignDocuments: () =>
+    request<DesignDocumentList>("/api/design/documents"),
+  createDesignDocument: (body: CreateDesignDocumentRequest) =>
+    call<DesignDocumentView>("POST", "/api/design/documents", { body }),
+  deleteDesignDocument: (documentId: string) =>
+    call<DesignDocumentSummary>("DELETE", `/api/design/documents/${encodeURIComponent(documentId)}`),
+  readDesignDocument: (documentId: string) =>
+    request<DesignDocumentView>(`/api/design/documents/${encodeURIComponent(documentId)}`),
+  updateDesignDocument: (documentId: string, body: UpdateDesignDocumentRequest) =>
+    call<DesignDocumentView>("PATCH", `/api/design/documents/${encodeURIComponent(documentId)}`, { body }),
+  listDesignExports: (documentId: string) =>
+    request<DesignExportList>(`/api/design/documents/${encodeURIComponent(documentId)}/exports`),
+  exportDesignFrame: (documentId: string, body: DesignExportRequest) =>
+    call<DesignExportView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/exports`, { body }),
+  handDesignToBuild: (documentId: string, body: DesignHandoffRequest) =>
+    call<DesignHandoffView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/handoff`, { body }),
+  listDesignHandoffs: (documentId: string) =>
+    request<DesignHandoffList>(`/api/design/documents/${encodeURIComponent(documentId)}/handoffs`),
+  applyDesignOperations: (documentId: string, body: DesignOperationsRequest) =>
+    call<DesignChangeView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/operations`, { body }),
+  listDesignProposals: (documentId: string) =>
+    request<DesignProposalList>(`/api/design/documents/${encodeURIComponent(documentId)}/proposals`),
+  proposeDesignChange: (documentId: string, body: DesignProposalRequest) =>
+    call<DesignProposalView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/proposals`, { body }),
+  redoDesignChange: (documentId: string, body: DesignBaseVersionRequest) =>
+    call<DesignChangeView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/redo`, { body }),
+  restoreDesignDocument: (documentId: string) =>
+    call<DesignDocumentView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/restore`),
+  chooseDesignSystem: (documentId: string, body: DesignSystemChoiceRequest) =>
+    call<DesignChangeView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/system`, { body }),
+  previewDesignSystem: (documentId: string, body: DesignSystemChoiceRequest) =>
+    call<DesignSystemPreview>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/system/preview`, { body }),
+  undoDesignChange: (documentId: string, body: DesignBaseVersionRequest) =>
+    call<DesignChangeView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/undo`, { body }),
+  validateDesignDocument: (documentId: string) =>
+    request<DesignValidationView>(`/api/design/documents/${encodeURIComponent(documentId)}/validation`),
+  listDesignVersions: (documentId: string) =>
+    request<DesignVersionList>(`/api/design/documents/${encodeURIComponent(documentId)}/versions`),
+  readDesignVersion: (documentId: string, version: string) =>
+    request<DesignVersionView>(`/api/design/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(version)}`),
+  restoreDesignVersion: (documentId: string, version: string, body: DesignBaseVersionRequest) =>
+    call<DesignChangeView>("POST", `/api/design/documents/${encodeURIComponent(documentId)}/versions/${encodeURIComponent(version)}/restore`, { body }),
+  decideDesignProposal: (proposalId: string, body: DesignProposalDecisionRequest) =>
+    call<DesignProposalDecision>("POST", `/api/design/proposals/${encodeURIComponent(proposalId)}/decision`, { body }),
+  listDesignSystems: () =>
+    request<DesignSystemList>("/api/design/systems"),
+  createDesignSystem: (body: DesignSystemRequest) =>
+    call<DesignSystemView>("POST", "/api/design/systems", { body }),
+  updateDesignSystem: (systemId: string, body: DesignSystemRequest) =>
+    call<DesignSystemView>("PUT", `/api/design/systems/${encodeURIComponent(systemId)}`, { body }),
   getDiagnostics: () =>
     request<DiagnosticsView>("/api/diagnostics"),
   getDiagnosticsExport: () =>

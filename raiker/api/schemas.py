@@ -1008,3 +1008,70 @@ def serialize_dto(dto: Any) -> Any:
     # A declared body (a TypedDict) may carry views; each is projected the way a
     # view's own nested fields are, so the wire never depends on who built it.
     return json_ready(dict(dto))
+
+
+# ── Raiker Design: structured documents (DW-01 to DW-11) ─────────────────────
+
+
+class CreateDesignDocumentRequest(StrictRequest):
+    title: str = Field(default="Untitled design", max_length=120)
+    preset: str = Field(default="social_square", max_length=40)
+    project_id: str | None = Field(default=None, max_length=80)
+
+
+class UpdateDesignDocumentRequest(StrictRequest):
+    """Rename or file a document. ``project_id`` "" unfiles it; absent leaves it."""
+
+    title: str | None = Field(default=None, max_length=120)
+    project_id: str | None = Field(default=None, max_length=80)
+
+
+class DesignOperationsRequest(StrictRequest):
+    """DW-08 — typed operations, made against ``base_version``."""
+
+    base_version: int = Field(ge=1)
+    operations: list[dict[str, Any]] = Field(max_length=200)
+
+
+class DesignBaseVersionRequest(StrictRequest):
+    base_version: int = Field(ge=1)
+
+
+class DesignSystemRequest(StrictRequest):
+    name: str = Field(min_length=1, max_length=80)
+    source_note: str = Field(default="", max_length=500)
+    variables: dict[str, Any]
+
+
+class DesignSystemChoiceRequest(StrictRequest):
+    """DW-06 — which system a document uses; ``system_id`` null clears it."""
+
+    system_id: str | None = Field(default=None, max_length=80)
+    version: int | None = Field(default=None, ge=1)
+    base_version: int | None = Field(default=None, ge=1)
+
+
+class DesignExportRequest(StrictRequest):
+    frame_id: str = Field(min_length=1, max_length=48)
+    format: str = Field(max_length=8)
+    scale: float = Field(default=1.0, ge=0.25, le=4.0)
+
+
+class DesignProposalRequest(StrictModelRequest):
+    frame_id: str = Field(min_length=1, max_length=48)
+    brief: str = Field(min_length=1, max_length=2000)
+    model_profile: str | None = Field(default=None, max_length=200)
+    model: str | None = Field(default=None, max_length=200)
+
+
+class DesignProposalDecisionRequest(StrictRequest):
+    """Accept all or the listed operations, or reject; ``skip_conflicts`` applies the rest."""
+
+    decision: str = Field(max_length=10)
+    indexes: list[int] | None = Field(default=None, max_length=40)
+    skip_conflicts: bool = False
+
+
+class DesignHandoffRequest(StrictRequest):
+    frame_ids: list[str] = Field(min_length=1, max_length=40)
+    target: str = Field(default="", max_length=300)

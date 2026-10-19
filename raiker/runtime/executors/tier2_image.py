@@ -65,6 +65,18 @@ SUPPORTED_SIZES = ("1024x1024", "1536x1024", "1024x1536")
 #: reads the fact from the runtime rather than keeping its own copy of it.
 SIZED_PROVIDERS = ("openai",)
 
+#: DW-04 — what each provider's governed path above really does, so Design
+#: draws a control only where the runtime can honour it. Both providers take a
+#: source picture (an edit) and a count (variations); only OpenAI takes a size.
+#: Mask or region edits, outpainting and upscaling have no governed path on any
+#: provider in this build, so they are absent rather than offered and refused.
+#: Crop and fit are not provider operations at all: they are non-destructive
+#: properties of an image layer in a design document.
+IMAGE_OPERATIONS: dict[str, tuple[str, ...]] = {
+    "openai": ("generate", "edit", "variations", "size"),
+    "gemini": ("generate", "edit", "variations"),
+}
+
 def declared_image_models(profile: dict[str, Any]) -> tuple[str, ...]:
     """Every image model this profile offers, default first.
 

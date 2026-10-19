@@ -425,6 +425,10 @@ class ImageGallery(TypedDict):
     #: UX-DESIGN-01 — Recently deleted, newest deletion first. Never mixed into
     #: ``generations``, so nothing put away is drawn as a version or sibling.
     deleted: list[ImageGeneration]
+    #: DW-04 — what each provider's governed path really does
+    #: (``generate``, ``edit``, ``variations``, ``size``). An operation no
+    #: provider lists — masks, outpainting, upscaling — has no control at all.
+    operations: dict[str, list[str]]
 
 
 class ImageLifecycleChanged(TypedDict):

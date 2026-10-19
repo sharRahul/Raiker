@@ -2,11 +2,19 @@
 
 For the Design product target, structured-canvas requirements and delivery
 boundary, see [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md).
-This guide describes the current shipped image workspace only.
+This guide describes what ships today.
 
-**Design** generates images from a prompt using a hosted image model you have
-connected, keeps what it made in this workspace, and lets you work on one
-picture at a time.
+**Design** has two halves, switched at the top of the page:
+
+- **Images** generates pictures from a prompt using a hosted image model you
+  have connected, keeps what it made in this workspace, and lets you work on one
+  picture at a time.
+- **Documents** is a design you keep editing: frames of text, shapes and
+  placed pictures, with versions, a design system, an agent that proposes
+  changes, checks, exports and a handoff to Build. See
+  [Documents](#documents) below.
+
+Everything up to [Documents](#documents) is about **Images**.
 
 Until you select something it is a small page: a prompt, a model, a size, a
 count, and everything you have asked for. Open a picture and it becomes a canvas
@@ -59,9 +67,14 @@ and the prompt and its references together stay within the prompt limit. The
 picture's inspector then lists what it was **Sent with**, with the passage and
 the pages.
 
-What is *not* there is still not there: no crop, no mask, no outpaint. Those need
-provider capabilities behind the governed endpoint that this build does not have,
-and a control that named them anyway would be a promise the runtime cannot keep.
+What is *not* there is still not there: no mask, no outpaint, no upscale. Those
+need provider capabilities behind the governed endpoint that this build does not
+have, and a control that named them anyway would be a promise the runtime cannot
+keep. Raiker reads what each provider's path really does — generate, edit,
+several at once, a size — and draws only those controls: the count is greyed
+out for a provider that cannot return several. Cropping and fitting a picture
+are not provider operations at all; they are done, without changing the
+picture, where it is placed in a design under **Documents**.
 
 Design remembers the model you chose for it, separately from Chat's and Build's.
 Putting Chat on a small local model does not move your image prompts onto it.
@@ -111,7 +124,9 @@ on a canvas, and it is read in the history with its reason.
 
 ## Deleting and restoring
 
-**Delete** is not permanent. The picture leaves the canvas and the history and
+**Delete** is not permanent. If the picture is placed in a design under
+**Documents**, Raiker names those designs and asks first; they keep the layer
+and show it as missing until you restore the picture. The picture leaves the canvas and the history and
 waits under **Recently deleted**, at the foot of the history, with its bytes and
 its versions intact; **Restore** puts it back exactly where it was in its
 lineage. A picture in Recently deleted cannot be the subject of an edit.
@@ -195,3 +210,127 @@ so nothing in a prompt can redirect a generation — or your credential — at a
 host you did not name.
 
 Full contract: [`docs/threat-models/image-generation.md`](../threat-models/image-generation.md).
+
+## Documents
+
+**Documents** is where a design stays editable. A design is a document of
+**frames** (pages or screens), each holding **layers** — text, rectangles,
+ellipses, placed pictures, groups and stacks. Text stays text and a placed
+picture stays linked to the picture under **Images**, so nothing is ever
+flattened into a screenshot.
+
+Start with **New design**: name it and choose what it starts as — a square or
+story social post, an A4 page, a 16:9 slide, a mobile or desktop screen, or a
+custom size. Designs are listed newest first; **Delete** puts one in
+**Recently deleted**, where **Restore** brings it back.
+
+### Editing
+
+The page has three regions: frames and layers on the left, the canvas in the
+middle, and the panels on the right.
+
+- **Add a layer** with *Text*, *Rectangle*, *Ellipse*, *Stack* or *Image* (a
+  picture you made under Images). A **stack** lines up what is inside it in a
+  row or column, with a gap and padding, and keeps it lined up as you change it.
+- **Select** a layer by clicking it on the canvas or in **Layers**. Layers lists
+  the front-most first; the eye hides a layer and the lock protects it. A
+  locked layer can be shown, hidden, renamed or unlocked, and nothing else.
+- **Inspect** edits the selected layer: position, size, rotation, opacity, text,
+  font, size, weight, alignment, colour, fill, corner radius, stack spacing, and
+  for a picture its alternative text, fit and **crop**. Crop and fit never change
+  the picture itself.
+- **On the canvas**, the arrow keys move the selected layer 1px (Shift: 10px),
+  Delete removes it, Escape clears the selection, and Ctrl+Z / Ctrl+Shift+Z undo
+  and redo.
+- **Make variant** copies the frame at another size — a mobile version of a
+  social post, say — scaled once and marked *variant of* its source. It does not
+  follow the source afterwards; change each as you need.
+
+Dragging layers with the pointer, resize handles, multi-select and align/
+distribute are not there yet; position and size are set from the keyboard and
+the inspector.
+
+### Versions
+
+Every change is a numbered **version** — **v12** beside the name — recording who
+made it (you, or the agent), what it touched and when. **Undo** and **Redo**
+step through them, and **History** lists them all with **Go back to this**.
+Going back adds a new version on top; nothing is ever removed from the history.
+
+If the design changed since you loaded it (in another tab, say), a change that
+touches the same layers is refused with *This design changed since you loaded
+it*, and the page reloads; one that touches other layers is simply applied on
+top.
+
+### Design systems
+
+**System** holds your brand as named variables: colours (`primary=#1144aa`),
+fonts (`body=sans-serif`), spacing, usage rules, the variables a finished design
+must use, and a note on where they came from. Saving a system again makes a new
+version; designs using the earlier one are not changed.
+
+A layer can use a variable — **Fill variable**, **Colour variable** — and keeps
+the colour it is drawn in. **Choose** a system and press **Preview the change**:
+Raiker lists every layer whose colour or font would change, from what to what,
+and every variable the system does not define. Nothing changes until **Apply to
+this design**, which changes only this design, as one version you can undo.
+
+### The design agent
+
+**Agent** asks a chat model you have connected to change the frame you are
+looking at. Write what you want, choose the model, and press **Propose
+changes**. What goes to the model's provider is that frame's layers and your
+brief — text that looks like a credential is removed first — and the model gets
+no tools.
+
+What comes back is a **proposal**: a short plan (what goes where, what it
+assumed, which pictures you would need, what to check) and a list of changes,
+each with a box. Nothing is applied yet. Changes the agent may not make are
+listed as **refused** with the reason: touching another frame, adding or
+removing frames, placing pictures, removing a locked layer or a group of more
+than three layers. **Accept selected** applies the ticked changes as one version
+marked as the agent's, and new layers show an *agent* badge; **Reject** applies
+nothing.
+
+If you changed a layer after the agent read the design, a change to that layer
+is never applied over yours: Raiker names the layers and offers **Apply the
+rest, keep my changes**.
+
+### Check
+
+**Check** runs nine checks and says, for each, **Passed**, **Failed**, **Not
+supported by the export** or **Cannot be known from the design**:
+
+| Check | What it looks at |
+|---|---|
+| Pictures | Every placed picture is one you have, not in Recently deleted |
+| Alternative text | Every visible picture describes itself |
+| Text fits | Text fits its box, measured with the font exports are drawn in |
+| Contrast | Text meets WCAG AA against a solid colour behind it; over a picture it cannot be known |
+| Fonts | The font, and every character in the text, can be drawn in PNG and PDF |
+| Inside the frame | No visible layer lies wholly outside its frame |
+| Variables | Every variable a layer uses exists in the chosen system |
+| Required variables | Every variable the system requires is used |
+| Brand colours | Colours come from the chosen system |
+
+Each finding names its layer (and frame, when there are several) and opens it.
+Check never judges how good the design looks.
+
+### Export
+
+**Export** writes the frame as **PNG**, **PDF** (one picture-like page), **SVG**
+(text stays text, so it remains editable in a vector tool) or **JSON** (the
+frame's structure). Each export is listed with its version, the result of Check
+at that moment, and the file's SHA-256, and downloads from there. PNG and PDF are
+drawn in one sans font — the export records which — and a font you named is
+drawn in it; SVG names your font and a viewer without it substitutes its own.
+Exporting never changes the design.
+
+### Hand to Build
+
+**Hand to Build** gives Build this frame at this version — its layers, text,
+colours, picture ids and your design system — as a document attached to Build's
+composer the next time you open Build, with what you said it should become.
+It is context, not permission: Build's modes and approvals decide every change
+it proposes from it.
+

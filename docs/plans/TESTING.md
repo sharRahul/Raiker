@@ -50,6 +50,22 @@ model-driven mandatory scenarios five times on fresh state; retain every run.
 | T-15 | Security and resilience | Exercise hostile prompt/page/connector data, expired credential, provider outage, corrupt/locked disposable store and duplicate triggers. | No authority expansion, secret leak, duplicate consequential effect or false completion; recovery keeps durable work/evidence. |
 | T-16 | Comparative claim | Run the same declared personal-goal fixture against any named comparison product and Raiker. | Same scope, permissions, model/host disclosure, validator, interventions and receipts; blocked comparison access is recorded as blocked, not a win. |
 
+**2026-10-19 — first T-11 / T-12 run.** On a fresh `raiker-web`
+(`scripts/reset_live_workspace.py`), Linux, hosted Anthropic
+`claude-haiku-4-5-20251001` entered through Models,
+[`dw-design-documents-live.spec.ts`](../../web/e2e/dw-design-documents-live.spec.ts)
+passed 6/6: a design edited by typed operations, undone and redone as versions;
+a mobile variant; a previewed design system; an agent proposal that changed
+nothing until two of its operations were accepted; Check, PNG and SVG exports
+with version and hash; and a Build handoff carried by Build's composer with no
+repository written. It found and fixed three defects
+([FIXED-993](FIXED_ITEMS.md#fixed-993--a-build-handoffs-file-name-reached-the-page-as-redacted_secret),
+[FIXED-994](FIXED_ITEMS.md#fixed-994--png-and-pdf-exports-drew-a-box-for-an-em-dash-and-for-accented-letters),
+[FIXED-995](FIXED_ITEMS.md#fixed-995--text-that-overflowed-its-box-was-clipped-on-the-canvas-but-drawn-in-full-in-exports)).
+This is one run, not the five a model-driven scenario requires, and the stale-
+proposal conflict was proven by API tests rather than live; T-11 and T-12 remain
+open until both are met. Remaining gaps: [BUG-348](TO_BE_FIXED.md#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial).
+
 ## Test levels and release decision
 
 1. **Component and contract tests** prove deterministic invariants but do not

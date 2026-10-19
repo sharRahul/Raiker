@@ -354,6 +354,14 @@ EVENT_TYPES = {
     # receipt recorded: repository, number, branch, head commit and whether
     # GitHub confirmed it. Never a token and never the pull request body.
     "pull_request_receipt_recorded",
+    # DW-07 / DW-08 / DW-11 — Raiker Design. A model proposed typed operations
+    # for one frame; the owner accepted or rejected them; a frame was exported;
+    # a document version was handed to Build as context. Ids, counts, model,
+    # format and hashes only — never a brief, a layer's text or exported bytes.
+    "design_proposal_created",
+    "design_proposal_decided",
+    "design_exported",
+    "design_handed_off",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).

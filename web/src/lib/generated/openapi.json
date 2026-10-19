@@ -8532,6 +8532,37 @@
         "title": "CreateCodeWorktreeRequest",
         "type": "object"
       },
+      "CreateDesignDocumentRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "preset": {
+            "default": "social_square",
+            "maxLength": 40,
+            "title": "Preset",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "title": {
+            "default": "Untitled design",
+            "maxLength": 120,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "CreateDesignDocumentRequest",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -9099,6 +9130,1548 @@
           "operations"
         ],
         "title": "DelegationRequest",
+        "type": "object"
+      },
+      "DesignAssetUsage": {
+        "description": "DW-05 — which live documents place an image, so removing it is never silent.",
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DesignAssetUse"
+            },
+            "title": "Documents",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "documents"
+        ],
+        "title": "DesignAssetUsage",
+        "type": "object"
+      },
+      "DesignAssetUse": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "layers": {
+            "title": "Layers",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "layers"
+        ],
+        "title": "DesignAssetUse",
+        "type": "object"
+      },
+      "DesignBaseVersionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base_version": {
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "base_version"
+        ],
+        "title": "DesignBaseVersionRequest",
+        "type": "object"
+      },
+      "DesignChangeView": {
+        "description": "DW-08 — a change written as a new version.\n\n``rebased`` is true when the change was made against an older version and\ntouched nothing changed since, so it was applied on top rather than refused.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/DesignDocumentView"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "rebased": {
+            "title": "Rebased",
+            "type": "boolean"
+          },
+          "summary": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Summary",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "version",
+          "rebased",
+          "summary",
+          "document"
+        ],
+        "title": "DesignChangeView",
+        "type": "object"
+      },
+      "DesignDocumentList": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "$ref": "#/components/schemas/DesignDocumentSummary"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DesignDocumentSummary"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/DesignFramePreset"
+            },
+            "title": "Presets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "documents",
+          "deleted",
+          "presets"
+        ],
+        "title": "DesignDocumentList",
+        "type": "object"
+      },
+      "DesignDocumentSummary": {
+        "description": "One document in a list: what it is and where, never its layers.",
+        "properties": {
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "frame_count": {
+            "title": "Frame Count",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Id"
+          },
+          "system_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Version"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "project_id",
+          "system_id",
+          "system_version",
+          "current_version",
+          "content_hash",
+          "frame_count",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "DesignDocumentSummary",
+        "type": "object"
+      },
+      "DesignDocumentView": {
+        "description": "One document with its frames and layer tree, at ``current_version``.",
+        "properties": {
+          "can_redo": {
+            "title": "Can Redo",
+            "type": "boolean"
+          },
+          "can_undo": {
+            "title": "Can Undo",
+            "type": "boolean"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "frame_count": {
+            "title": "Frame Count",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "system_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Id"
+          },
+          "system_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Version"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "title",
+          "project_id",
+          "system_id",
+          "system_version",
+          "current_version",
+          "content_hash",
+          "frame_count",
+          "created_at",
+          "updated_at",
+          "deleted_at",
+          "document",
+          "can_undo",
+          "can_redo"
+        ],
+        "title": "DesignDocumentView",
+        "type": "object"
+      },
+      "DesignExportList": {
+        "properties": {
+          "exports": {
+            "items": {
+              "$ref": "#/components/schemas/DesignExportView"
+            },
+            "title": "Exports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exports"
+        ],
+        "title": "DesignExportList",
+        "type": "object"
+      },
+      "DesignExportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "maxLength": 8,
+            "title": "Format",
+            "type": "string"
+          },
+          "frame_id": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "scale": {
+            "default": 1.0,
+            "maximum": 4.0,
+            "minimum": 0.25,
+            "title": "Scale",
+            "type": "number"
+          }
+        },
+        "required": [
+          "frame_id",
+          "format"
+        ],
+        "title": "DesignExportRequest",
+        "type": "object"
+      },
+      "DesignExportView": {
+        "description": "DW-11 — one export, pinned to the version and validation it came from.",
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "frame_id": {
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "validation_outcome": {
+            "title": "Validation Outcome",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "export_id",
+          "document_id",
+          "version",
+          "frame_id",
+          "format",
+          "settings",
+          "validation_outcome",
+          "media_type",
+          "sha256",
+          "byte_size",
+          "created_at"
+        ],
+        "title": "DesignExportView",
+        "type": "object"
+      },
+      "DesignFramePreset": {
+        "properties": {
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "preset",
+          "label",
+          "width",
+          "height"
+        ],
+        "title": "DesignFramePreset",
+        "type": "object"
+      },
+      "DesignHandoffList": {
+        "properties": {
+          "handoffs": {
+            "items": {
+              "$ref": "#/components/schemas/DesignHandoffRecord"
+            },
+            "title": "Handoffs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "handoffs"
+        ],
+        "title": "DesignHandoffList",
+        "type": "object"
+      },
+      "DesignHandoffRecord": {
+        "description": "DW-11 — what Build was given: a bounded context document, never authority.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "frame_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Frame Ids",
+            "type": "array"
+          },
+          "handoff_id": {
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "document_id",
+          "version",
+          "frame_ids",
+          "target",
+          "attachment_id",
+          "sha256",
+          "created_at"
+        ],
+        "title": "DesignHandoffRecord",
+        "type": "object"
+      },
+      "DesignHandoffRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "frame_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 40,
+            "minItems": 1,
+            "title": "Frame Ids",
+            "type": "array"
+          },
+          "target": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame_ids"
+        ],
+        "title": "DesignHandoffRequest",
+        "type": "object"
+      },
+      "DesignHandoffView": {
+        "description": "A handoff just made, with the attachment Build's composer carries.",
+        "properties": {
+          "attachment_id": {
+            "title": "Attachment Id",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "frame_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Frame Ids",
+            "type": "array"
+          },
+          "handoff_id": {
+            "title": "Handoff Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "handoff_id",
+          "document_id",
+          "version",
+          "frame_ids",
+          "target",
+          "attachment_id",
+          "sha256",
+          "created_at",
+          "filename",
+          "media_type",
+          "byte_size"
+        ],
+        "title": "DesignHandoffView",
+        "type": "object"
+      },
+      "DesignOperationsRequest": {
+        "additionalProperties": false,
+        "description": "DW-08 — typed operations, made against ``base_version``.",
+        "properties": {
+          "base_version": {
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "operations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 200,
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "base_version",
+          "operations"
+        ],
+        "title": "DesignOperationsRequest",
+        "type": "object"
+      },
+      "DesignProposalConflict": {
+        "properties": {
+          "changed_in_version": {
+            "title": "Changed In Version",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Node Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "node_ids",
+          "changed_in_version"
+        ],
+        "title": "DesignProposalConflict",
+        "type": "object"
+      },
+      "DesignProposalDecision": {
+        "description": "DW-08 — what accepting or rejecting a proposal did, and what it refused to overwrite.",
+        "properties": {
+          "applied": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Applied",
+            "type": "array"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/DesignProposalConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/DesignProposalView"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "ok",
+          "proposal",
+          "applied",
+          "conflicts",
+          "version"
+        ],
+        "title": "DesignProposalDecision",
+        "type": "object"
+      },
+      "DesignProposalDecisionRequest": {
+        "additionalProperties": false,
+        "description": "Accept all or the listed operations, or reject; ``skip_conflicts`` applies the rest.",
+        "properties": {
+          "decision": {
+            "maxLength": 10,
+            "title": "Decision",
+            "type": "string"
+          },
+          "indexes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 40,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexes"
+          },
+          "skip_conflicts": {
+            "default": false,
+            "title": "Skip Conflicts",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "DesignProposalDecisionRequest",
+        "type": "object"
+      },
+      "DesignProposalList": {
+        "properties": {
+          "proposals": {
+            "items": {
+              "$ref": "#/components/schemas/DesignProposalView"
+            },
+            "title": "Proposals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "proposals"
+        ],
+        "title": "DesignProposalList",
+        "type": "object"
+      },
+      "DesignProposalOperation": {
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "operation": {
+            "additionalProperties": true,
+            "title": "Operation",
+            "type": "object"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "status": {
+            "enum": [
+              "valid",
+              "refused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "touched": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Touched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "operation",
+          "status",
+          "reason_code",
+          "summary",
+          "touched"
+        ],
+        "title": "DesignProposalOperation",
+        "type": "object"
+      },
+      "DesignProposalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Brief",
+            "type": "string"
+          },
+          "frame_id": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          }
+        },
+        "required": [
+          "frame_id",
+          "brief"
+        ],
+        "title": "DesignProposalRequest",
+        "type": "object"
+      },
+      "DesignProposalView": {
+        "description": "DW-07 — an agent's plan and typed operations, waiting on the owner.",
+        "properties": {
+          "base_version": {
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "brief": {
+            "title": "Brief",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "frame_id": {
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/DesignProposalOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "title": "Plan",
+            "type": "object"
+          },
+          "proposal_id": {
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "document_id",
+          "base_version",
+          "frame_id",
+          "brief",
+          "provider",
+          "model",
+          "plan",
+          "operations",
+          "status",
+          "result",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "DesignProposalView",
+        "type": "object"
+      },
+      "DesignSystemChange": {
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "frame_id": {
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          }
+        },
+        "required": [
+          "frame_id",
+          "node_id",
+          "name",
+          "field",
+          "before",
+          "after"
+        ],
+        "title": "DesignSystemChange",
+        "type": "object"
+      },
+      "DesignSystemChoiceRequest": {
+        "additionalProperties": false,
+        "description": "DW-06 — which system a document uses; ``system_id`` null clears it.",
+        "properties": {
+          "base_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "system_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "DesignSystemChoiceRequest",
+        "type": "object"
+      },
+      "DesignSystemList": {
+        "properties": {
+          "systems": {
+            "items": {
+              "$ref": "#/components/schemas/DesignSystemView"
+            },
+            "title": "Systems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "systems"
+        ],
+        "title": "DesignSystemList",
+        "type": "object"
+      },
+      "DesignSystemMissing": {
+        "properties": {
+          "frame_id": {
+            "title": "Frame Id",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "variable": {
+            "title": "Variable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "frame_id",
+          "node_id",
+          "variable"
+        ],
+        "title": "DesignSystemMissing",
+        "type": "object"
+      },
+      "DesignSystemPreview": {
+        "description": "DW-06 — what choosing a system would change in this document, before anything is written.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/DesignSystemChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/DesignSystemMissing"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "operation_count": {
+            "title": "Operation Count",
+            "type": "integer"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DesignSystemView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "system",
+          "changes",
+          "missing",
+          "operation_count"
+        ],
+        "title": "DesignSystemPreview",
+        "type": "object"
+      },
+      "DesignSystemRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "source_note": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Source Note",
+            "type": "string"
+          },
+          "variables": {
+            "additionalProperties": true,
+            "title": "Variables",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "variables"
+        ],
+        "title": "DesignSystemRequest",
+        "type": "object"
+      },
+      "DesignSystemView": {
+        "description": "DW-06 — one version of a design system.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_note": {
+            "title": "Source Note",
+            "type": "string"
+          },
+          "system_id": {
+            "title": "System Id",
+            "type": "string"
+          },
+          "variables": {
+            "additionalProperties": true,
+            "title": "Variables",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "system_id",
+          "version",
+          "name",
+          "source_note",
+          "variables",
+          "created_at"
+        ],
+        "title": "DesignSystemView",
+        "type": "object"
+      },
+      "DesignValidationCheck": {
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/DesignValidationFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "unsupported",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "label",
+          "status",
+          "findings"
+        ],
+        "title": "DesignValidationCheck",
+        "type": "object"
+      },
+      "DesignValidationFinding": {
+        "properties": {
+          "frame_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Id"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          }
+        },
+        "required": [
+          "frame_id",
+          "node_id",
+          "layer",
+          "message"
+        ],
+        "title": "DesignValidationFinding",
+        "type": "object"
+      },
+      "DesignValidationView": {
+        "description": "DW-10 — each check's honest state, at one document version.",
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DesignValidationCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "document_hash": {
+            "title": "Document Hash",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "passed",
+              "failed",
+              "partly_checked"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "validator_version": {
+            "title": "Validator Version",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "outcome",
+          "validator_version",
+          "document_hash",
+          "version",
+          "checks"
+        ],
+        "title": "DesignValidationView",
+        "type": "object"
+      },
+      "DesignVersionList": {
+        "properties": {
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/DesignVersionSummary"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "current_version",
+          "versions"
+        ],
+        "title": "DesignVersionList",
+        "type": "object"
+      },
+      "DesignVersionSummary": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_count": {
+            "title": "Operation Count",
+            "type": "integer"
+          },
+          "proposal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposal Id"
+          },
+          "redo_target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redo Target"
+          },
+          "scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scope",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "undo_parent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Parent"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "actor",
+          "kind",
+          "summary",
+          "scope",
+          "operation_count",
+          "content_hash",
+          "undo_parent",
+          "redo_target",
+          "proposal_id",
+          "created_at"
+        ],
+        "title": "DesignVersionSummary",
+        "type": "object"
+      },
+      "DesignVersionView": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_count": {
+            "title": "Operation Count",
+            "type": "integer"
+          },
+          "proposal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposal Id"
+          },
+          "redo_target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redo Target"
+          },
+          "scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scope",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "undo_parent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Parent"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "actor",
+          "kind",
+          "summary",
+          "scope",
+          "operation_count",
+          "content_hash",
+          "undo_parent",
+          "redo_target",
+          "proposal_id",
+          "created_at",
+          "document"
+        ],
+        "title": "DesignVersionView",
         "type": "object"
       },
       "DeviceSessionView": {
@@ -13560,6 +15133,16 @@
             "title": "Generations",
             "type": "array"
           },
+          "operations": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Operations",
+            "type": "object"
+          },
           "sized_providers": {
             "items": {
               "type": "string"
@@ -13579,7 +15162,8 @@
           "sizes",
           "sized_providers",
           "generations",
-          "deleted"
+          "deleted",
+          "operations"
         ],
         "title": "ImageGallery",
         "type": "object"
@@ -29810,6 +31394,38 @@
         "title": "UpdateDeferred",
         "type": "object"
       },
+      "UpdateDesignDocumentRequest": {
+        "additionalProperties": false,
+        "description": "Rename or file a document. ``project_id`` \"\" unfiles it; absent leaves it.",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateDesignDocumentRequest",
+        "type": "object"
+      },
       "UpdateStatusView": {
         "description": "Provenance, channel and recovery points; ``not_checked`` is not an assurance.",
         "properties": {
@@ -35167,6 +36783,1156 @@
           }
         },
         "summary": "Discard Credential Delta"
+      }
+    },
+    "/api/design/assets/{asset_id}/usage": {
+      "get": {
+        "description": "DW-05 — the documents that place this image, asked before it is put away.",
+        "operationId": "read_design_asset_usage_api_design_assets__asset_id__usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignAssetUsage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Asset Usage"
+      }
+    },
+    "/api/design/documents": {
+      "get": {
+        "operationId": "list_design_documents_api_design_documents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Design Documents"
+      },
+      "post": {
+        "description": "DW-01 — a new document with one empty frame. Filing it is explicit and optional.",
+        "operationId": "create_design_document_api_design_documents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDesignDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Design Document"
+      }
+    },
+    "/api/design/documents/{document_id}": {
+      "delete": {
+        "description": "Put a document in Recently deleted. Its versions, exports and handoffs stay.",
+        "operationId": "delete_design_document_api_design_documents__document_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Design Document"
+      },
+      "get": {
+        "operationId": "read_design_document_api_design_documents__document_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Document"
+      },
+      "patch": {
+        "description": "Rename, file or unfile. Filing moves this document only — no asset or conversation moves with it.",
+        "operationId": "update_design_document_api_design_documents__document_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDesignDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Design Document"
+      }
+    },
+    "/api/design/documents/{document_id}/exports": {
+      "get": {
+        "operationId": "list_design_exports_api_design_documents__document_id__exports_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignExportList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Design Exports"
+      },
+      "post": {
+        "description": "DW-11 — write one frame out, recording version, settings, validation and the file's hash.\n\nThe stored document is never flattened; an export is a separate file. A\nfailing validation does not stop the owner exporting — it is recorded with\nthe export, so the file says what was known about it.",
+        "operationId": "export_design_frame_api_design_documents__document_id__exports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignExportView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Design Frame"
+      }
+    },
+    "/api/design/documents/{document_id}/handoff": {
+      "post": {
+        "description": "DW-11 — selected frames of this exact version, as a bounded Markdown document for Build.\n\nIt is stored as one of the owner's attachments, so Build's composer carries\nit through the governed attachment path, labelled untrusted. It grants\nBuild nothing: writes there still go through Build's own modes and approvals.",
+        "operationId": "hand_design_to_build_api_design_documents__document_id__handoff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignHandoffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignHandoffView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hand Design To Build"
+      }
+    },
+    "/api/design/documents/{document_id}/handoffs": {
+      "get": {
+        "operationId": "list_design_handoffs_api_design_documents__document_id__handoffs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignHandoffList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Design Handoffs"
+      }
+    },
+    "/api/design/documents/{document_id}/operations": {
+      "post": {
+        "description": "DW-02 / DW-08 — the owner's direct edits, as typed operations against ``base_version``.",
+        "operationId": "apply_design_operations_api_design_documents__document_id__operations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignOperationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Design Operations"
+      }
+    },
+    "/api/design/documents/{document_id}/proposals": {
+      "get": {
+        "operationId": "list_design_proposals_api_design_documents__document_id__proposals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Design Proposals"
+      },
+      "post": {
+        "description": "DW-07 — ask the owner's chosen model for a plan and typed operations on one frame.\n\nThe answer is stored as a proposal and applied only when the owner accepts it.",
+        "operationId": "propose_design_change_api_design_documents__document_id__proposals_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Design Change"
+      }
+    },
+    "/api/design/documents/{document_id}/redo": {
+      "post": {
+        "operationId": "redo_design_change_api_design_documents__document_id__redo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignBaseVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redo Design Change"
+      }
+    },
+    "/api/design/documents/{document_id}/restore": {
+      "post": {
+        "operationId": "restore_design_document_api_design_documents__document_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDocumentView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Design Document"
+      }
+    },
+    "/api/design/documents/{document_id}/system": {
+      "post": {
+        "description": "DW-06 — apply exactly the previewed plan to this one document, as one version.",
+        "operationId": "choose_design_system_api_design_documents__document_id__system_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignSystemChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Choose Design System"
+      }
+    },
+    "/api/design/documents/{document_id}/system/preview": {
+      "post": {
+        "description": "DW-06 — every layer the choice would change, from what to what. Writes nothing.",
+        "operationId": "preview_design_system_api_design_documents__document_id__system_preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignSystemChoiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSystemPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Design System"
+      }
+    },
+    "/api/design/documents/{document_id}/undo": {
+      "post": {
+        "description": "DW-08 — structured undo: the state before the last change, written as a new version.\n\nNothing in the history is removed, so an undo can itself be redone.",
+        "operationId": "undo_design_change_api_design_documents__document_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignBaseVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Design Change"
+      }
+    },
+    "/api/design/documents/{document_id}/validation": {
+      "get": {
+        "description": "DW-10 — the checks at the current version. Reads only.",
+        "operationId": "validate_design_document_api_design_documents__document_id__validation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignValidationView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Design Document"
+      }
+    },
+    "/api/design/documents/{document_id}/versions": {
+      "get": {
+        "operationId": "list_design_versions_api_design_documents__document_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignVersionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Design Versions"
+      }
+    },
+    "/api/design/documents/{document_id}/versions/{version}": {
+      "get": {
+        "description": "One earlier version with its layers, to compare beside the current one.",
+        "operationId": "read_design_version_api_design_documents__document_id__versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignVersionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Version"
+      }
+    },
+    "/api/design/documents/{document_id}/versions/{version}/restore": {
+      "post": {
+        "description": "Go back to version N as a new version on top; nothing made since is removed.",
+        "operationId": "restore_design_version_api_design_documents__document_id__versions__version__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignBaseVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignChangeView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Design Version"
+      }
+    },
+    "/api/design/exports/{export_id}/bytes": {
+      "get": {
+        "operationId": "download_design_export_api_design_exports__export_id__bytes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "export_id",
+            "required": true,
+            "schema": {
+              "title": "Export Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Design Export"
+      }
+    },
+    "/api/design/proposals/{proposal_id}/decision": {
+      "post": {
+        "description": "DW-08 — accept all or some of a proposal, or reject it; never over later owner work.\n\nAn accepted operation that touches a layer changed since the proposal was\nmade is a conflict. With conflicts and no ``skip_conflicts`` nothing is\napplied and the conflicts are returned; with it, the rest are applied on\ntop of the current version and the conflicting ones are recorded as refused.",
+        "operationId": "decide_design_proposal_api_design_proposals__proposal_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignProposalDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalDecision"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Design Proposal"
+      }
+    },
+    "/api/design/systems": {
+      "get": {
+        "operationId": "list_design_systems_api_design_systems_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSystemList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Design Systems"
+      },
+      "post": {
+        "description": "DW-06 — a new system, version 1.",
+        "operationId": "create_design_system_api_design_systems_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignSystemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSystemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Design System"
+      }
+    },
+    "/api/design/systems/{system_id}": {
+      "put": {
+        "description": "DW-06 — the next version. No document using an earlier version changes.",
+        "operationId": "update_design_system_api_design_systems__system_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "system_id",
+            "required": true,
+            "schema": {
+              "title": "System Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignSystemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSystemView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Design System"
       }
     },
     "/api/diagnostics": {

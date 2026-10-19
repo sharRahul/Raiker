@@ -24,6 +24,8 @@
   import ComposerContext from "../components/ComposerContext.svelte";
   import Icon from "../components/Icon.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
+  import DesignDocuments from "../components/DesignDocuments.svelte";
+  import TabStrip from "../components/TabStrip.svelte";
   // BUG-281 — the research turn already records every page it read; these are
   // what make those records openable here rather than only in the conversation.
   import Markdown from "../components/Markdown.svelte";
@@ -40,6 +42,7 @@
   import { routeStateFromHash } from "../routeState";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError } from "../api";
+  import { contract } from "../generated/apiContract";
   import { providerName } from "../format";
   import { runtimeBlock } from "../capabilityModel";
   import { composerMenu } from "../composerCapabilities";
@@ -65,6 +68,15 @@
     /** The owner's projects, so the composer can name the one work runs in. */
     projects = null,
   }: { projects?: ProjectsList | null } = $props();
+
+  /*
+   * DW-02 — two layers, one surface. **Images** is the Asset layer this view
+   * has always been; **Documents** is the structured canvas beside it. The
+   * link `#/design?view=documents` opens on the second.
+   */
+  let mode = $state<"images" | "documents">(
+    window.location.hash.includes("view=documents") ? "documents" : "images",
+  );
 
   let view = $state<ImageGenerationsView | null>(null);
   let loadError = $state<string | null>(null);
@@ -239,6 +251,17 @@
    * no claim, and an absent claim is not read as "no provider takes a size" —
    * that would disable a working control on every older host.
    */
+  /**
+   * DW-04 — what the chosen provider's governed path does, from the runtime.
+   * A host that predates the field makes no claim, so nothing is withdrawn.
+   */
+  const providerOps = $derived.by(() => {
+    const declared = view?.operations;
+    if (declared === undefined || choice === null) return null;
+    return declared[choice.provider] ?? [];
+  });
+  const variationsOffered = $derived(providerOps === null || providerOps.includes("variations"));
+
   const sizeIsSent = $derived.by(() => {
     const declared = view?.sized_providers;
     if (declared === undefined || choice === null) return true;
@@ -591,6 +614,24 @@
    */
   async function deleteAsset(generationId: string) {
     lifecycleNotice = null;
+    /*
+     * DW-05 — a picture placed in a design is asked about before it is put
+     * away. The design keeps its layer either way; it shows the picture as
+     * missing (and Check says so) until the picture is restored.
+     */
+    try {
+      const usage = await contract.readDesignAssetUsage(generationId);
+      if (
+        usage.documents.length > 0 &&
+        !window.confirm(
+          `This picture is placed in ${usage.documents.map((doc) => `“${doc.title}”`).join(", ")}. ` +
+            "Those designs keep the layer and show it as missing until you restore the picture. Put it in Recently deleted anyway?",
+        )
+      )
+        return;
+    } catch {
+      // The usage read is a courtesy; a failure must not block the owner's delete.
+    }
     try {
       await api.deleteImage(generationId);
       if (selectedId === generationId) selectedId = null;
@@ -677,6 +718,22 @@
   data-density={surface.density}
   style={`--surface-gap:${densityGap(surface.density)}`}
 >
+  <div class="mode-switch">
+    <TabStrip
+      tabs={[
+        { id: "images", label: "Images" },
+        { id: "documents", label: "Documents" },
+      ]}
+      selected={mode}
+      onselect={(id: string) => (mode = id as "images" | "documents")}
+      label="Design layer"
+    />
+  </div>
+  {#if mode === "documents"}
+    <div class="thread">
+      <DesignDocuments {projects} />
+    </div>
+  {:else}
   <div class="thread" bind:this={threadEl}>
     {#if lifecycleNotice !== null}
       <p class="notice" role="alert">{lifecycleNotice}</p>
@@ -855,10 +912,12 @@
           class="bar-select"
           bind:value={variations}
           aria-label="How many"
-          disabled={busy || selectedId !== null}
+          disabled={busy || selectedId !== null || !variationsOffered}
           title={selectedId !== null
             ? "An edit produces one new version of the selected image."
-            : "How many images to generate"}
+            : !variationsOffered
+              ? `${choice?.provider ?? "This provider"} has no governed path for several images at once.`
+              : "How many images to generate"}
         >
           {#each COUNTS as option (option)}
             <option value={option}>{option === 1 ? "1 image" : `${option} images`}</option>
@@ -984,9 +1043,11 @@
       Enter {selectedId ? "edits" : "generates"} · Shift+Enter adds a line
     {/snippet}
   </Composer>
+  {/if}
 </div>
 
 <style>
+  .mode-switch { margin: 0 0 var(--space-3); }
   /* NEW-PROJ-02 — the canvas saying which project it is scoped to. */
   .scope-chip {
     display: flex;

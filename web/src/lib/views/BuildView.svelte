@@ -126,6 +126,7 @@
     type ArtifactTab,
   } from "../buildArtifacts";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { takeDesignHandoff } from "../designHandoff.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
@@ -243,6 +244,12 @@
   // is exactly what you want to hand a coding agent, and until now this
   // composer had no way to hand it one.
   const attachStore = createAttachmentStore();
+  // DW-11 — a handoff made in Design arrives here once, as an attached
+  // document: context for the next turn, never a grant.
+  onMount(() => {
+    const handoff = takeDesignHandoff();
+    if (handoff !== null && !attachStore.full) attachStore.set([...attachStore.items, handoff]);
+  });
   // A file dropped on the composer is attached to the next turn, exactly as if
   // it had been picked from the attach panel (BUG-252).
   const composerDrop = createFileDrop({

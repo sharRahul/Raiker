@@ -34,7 +34,7 @@ from raiker.api.wire.models import (
     ImagesGenerated,
 )
 from raiker.contracts.ids import new_id
-from raiker.runtime.executors.tier2_image import SIZED_PROVIDERS, SUPPORTED_SIZES
+from raiker.runtime.executors.tier2_image import IMAGE_OPERATIONS, SIZED_PROVIDERS, SUPPORTED_SIZES
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -113,6 +113,7 @@ async def list_images(request: Request) -> dict[str, Any]:
         # page can stop offering a choice to one that ignores it and stop
         # printing a requested size as though it were the returned picture's.
         "sized_providers": list(SIZED_PROVIDERS),
+        "operations": {provider: list(ops) for provider, ops in IMAGE_OPERATIONS.items()},
         "generations": [_public(row) for row in rows],
         "deleted": [
             _public(row)

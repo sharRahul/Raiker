@@ -4659,6 +4659,111 @@ CREATE TABLE IF NOT EXISTS build_task_targets (
 );
 """
 
+# DW-01 to DW-11 — Raiker Design's structured documents. A document is an
+# owner-scoped layer tree; every change is a numbered version holding its
+# snapshot, the actor, the ids it touched and the operations that made it, so
+# history is never rewritten and a stale change can be detected by scope. Design
+# systems are versioned the same way. Proposals, exports and handoffs are
+# records of what an agent suggested, what was written out and what Build was
+# given — each pinned to the document version it came from.
+DESIGN_DOCUMENTS_MIGRATION_ID = "RAIKER-2119-design-documents"
+
+DESIGN_DOCUMENTS_SQL = """
+CREATE TABLE IF NOT EXISTS design_documents (
+  document_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  project_id TEXT,
+  system_id TEXT,
+  system_version INTEGER,
+  current_version INTEGER NOT NULL,
+  doc_json TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_design_documents_owner
+  ON design_documents(owner_principal_id, updated_at DESC);
+CREATE TABLE IF NOT EXISTS design_document_versions (
+  document_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  scope_json TEXT NOT NULL,
+  ops_json TEXT NOT NULL,
+  doc_json TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  undo_parent INTEGER,
+  redo_target INTEGER,
+  proposal_id TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (document_id, version)
+);
+CREATE TABLE IF NOT EXISTS design_systems (
+  system_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  source_note TEXT NOT NULL,
+  variables_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (system_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_design_systems_owner
+  ON design_systems(owner_principal_id, system_id, version DESC);
+CREATE TABLE IF NOT EXISTS design_proposals (
+  proposal_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  base_version INTEGER NOT NULL,
+  frame_id TEXT NOT NULL,
+  brief TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  plan_json TEXT NOT NULL,
+  operations_json TEXT NOT NULL,
+  status TEXT NOT NULL,
+  result_json TEXT,
+  created_at TEXT NOT NULL,
+  decided_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_design_proposals_document
+  ON design_proposals(owner_principal_id, document_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS design_exports (
+  export_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  frame_id TEXT NOT NULL,
+  format TEXT NOT NULL,
+  settings_json TEXT NOT NULL,
+  validation_json TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  byte_size INTEGER NOT NULL,
+  data BLOB NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_design_exports_document
+  ON design_exports(owner_principal_id, document_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS design_handoffs (
+  handoff_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  frame_ids_json TEXT NOT NULL,
+  target TEXT NOT NULL,
+  attachment_id TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_design_handoffs_document
+  ON design_handoffs(owner_principal_id, document_id, created_at DESC);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4923,6 +5028,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(PATCH_MODEL_REVIEWS_MIGRATION_ID, PATCH_MODEL_REVIEWS_SQL),
     Migration(PULL_REQUEST_RECEIPTS_MIGRATION_ID, PULL_REQUEST_RECEIPTS_SQL),
     Migration(BUILD_TASK_TARGETS_MIGRATION_ID, BUILD_TASK_TARGETS_SQL),
+    Migration(DESIGN_DOCUMENTS_MIGRATION_ID, DESIGN_DOCUMENTS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

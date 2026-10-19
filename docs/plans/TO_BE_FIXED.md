@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339 and BUG-347, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347 and BUG-348, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -87,6 +87,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
+| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open — found 2026-10-19 closing DW-D02 to DW-D06 ([FIXED-979](FIXED_ITEMS.md#fixed-979--a-design-was-one-picture-never-a-document-of-layers-dw-01-dw-02) to [FIXED-996](FIXED_ITEMS.md#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused)) |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -560,6 +561,37 @@ an owner-visible decision about remote access; neither has been made, so this
 stays open rather than being guessed. The required UI outcome: Diagnostics
 names a proxied loopback host as public, and the host's own refusal says what
 to change.
+
+## BUG-348 — The Design canvas is edited by keyboard and inspector only, and five DW requirements are still partial
+
+**Severity: Medium. Area: Design / composition. Status: Open — found
+2026-10-19 while closing DW-D02 to DW-D06 ([FIXED-979](FIXED_ITEMS.md#fixed-979--a-design-was-one-picture-never-a-document-of-layers-dw-01-dw-02)
+to [FIXED-996](FIXED_ITEMS.md#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused)).**
+
+**Observed.** The structured canvas, versions, systems, agent proposals,
+checks, exports and the Build handoff ship and pass live. What the round did
+not reach, each a gap against [the Design workspace](DESIGN_WORKSPACE_SPEC.md):
+
+| Requirement | What exists | What is missing |
+|---|---|---|
+| DW-02 direct manipulation | Click to select; arrows nudge; the inspector sets position, size, rotation and order | Pointer drag, resize and rotate handles, multi-select, align and distribute, snapping and guides |
+| DW-04 owner assets | Pictures generated under Images are placed by link | Importing the owner's own picture or logo into Design without a provider |
+| DW-06 system sources | Colours, fonts, spacing, rules and required variables typed by the owner | Importing from a brand guide, screenshot or codebase; reusable components |
+| DW-08 annotations | Every change is a version with actor and scope | Comments and annotations on layers |
+| DW-11 / DW-12 formats and receipts | PNG, raster PDF, SVG, JSON; versions, proposals and exports recorded | Vector PDF and presentation formats; a durable *outcome unknown* record for a proposal whose model call the host did not survive |
+
+The canvas also draws text in the browser's font while PNG and PDF use the
+host's raster font (recorded with each export), so a line can break in a
+slightly different place on screen than in the file; Check measures with the
+export font.
+
+**Proposed fix.** One slice per row, each with its own live evidence: pointer
+handles first (they are the largest everyday gap), then owner image import
+through the existing attachment validator, then system import.
+
+**Required user-interface outcome.** A layer can be dragged, resized and
+rotated on the canvas with the same versions and locks as the keyboard; the
+other rows are reachable from the Documents workspace and absent until they are.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

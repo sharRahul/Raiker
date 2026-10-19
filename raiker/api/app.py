@@ -36,6 +36,7 @@ from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_context import router as context_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
+from raiker.api.routes_design import router as design_router
 from raiker.api.routes_egress import router as egress_router
 from raiker.api.routes_github import router as github_router
 from raiker.api.routes_guide import router as guide_router
@@ -633,6 +634,7 @@ def create_app(
     app.include_router(dashboard_router)
     app.include_router(context_router)
     app.include_router(images_router)
+    app.include_router(design_router)
     app.include_router(knowledge_files_router)
     app.include_router(project_roots_router)
     app.include_router(code_files_router)

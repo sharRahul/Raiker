@@ -1065,6 +1065,24 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-976](#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02) | High | Build / tasks | Fixed 2026-10-19 — BR-02 / BR-D03 task bound to its repository |
 | [FIXED-977](#fixed-977--a-repair-was-never-reviewed-again-and-a-persisting-finding-looked-new-each-time-br-11) | Low | Build / review | Fixed 2026-10-19 — BR-11 rereview and persistence |
 | [FIXED-978](#fixed-978--a-model-review-with-no-explicit-choice-went-to-a-placeholder-model-and-failed-with-a-bare-502) | Medium | Build / review | Fixed 2026-10-19 — found driving FIXED-969 live |
+| [FIXED-979](#fixed-979--a-design-was-one-picture-never-a-document-of-layers-dw-01-dw-02) | Medium | Design / composition | Fixed 2026-10-19 — DW-01/DW-02 structured document and typed operations |
+| [FIXED-980](#fixed-980--a-change-made-against-an-old-copy-of-a-design-would-have-overwritten-newer-work-dw-08) | High | Design / versions | Fixed 2026-10-19 — DW-08 stale changes rebased or refused |
+| [FIXED-981](#fixed-981--undo-meant-regenerating-a-picture-not-stepping-back-through-the-design-dw-08) | Medium | Design / versions | Fixed 2026-10-19 — DW-08 structured undo, redo and go back |
+| [FIXED-982](#fixed-982--there-were-no-frames-layouts-or-responsive-variants-to-design-into-dw-03) | Medium | Design / composition | Fixed 2026-10-19 — DW-03 frames, stacks and responsive variants |
+| [FIXED-983](#fixed-983--nothing-could-be-edited-directly-on-a-design-dw-02) | Medium | Design / web | Fixed 2026-10-19 — DW-02 Documents canvas, layers and inspector |
+| [FIXED-984](#fixed-984--a-picture-used-in-a-design-could-be-deleted-without-a-word-dw-05) | Medium | Design / assets | Fixed 2026-10-19 — DW-05 linked pictures and the usage guard |
+| [FIXED-985](#fixed-985--image-controls-could-not-say-which-provider-supported-them-and-there-was-no-crop-dw-03-dw-04) | Low | Design / assets | Fixed 2026-10-19 — DW-03/DW-04 crop, fit and the provider operations matrix |
+| [FIXED-986](#fixed-986--a-design-had-no-brand-to-follow-dw-06) | Medium | Design / systems | Fixed 2026-10-19 — DW-06 versioned design systems |
+| [FIXED-987](#fixed-987--changing-a-designs-brand-would-have-rewritten-it-unseen-dw-06) | Medium | Design / systems | Fixed 2026-10-19 — DW-06 previewed system choice |
+| [FIXED-988](#fixed-988--there-was-no-design-agent-only-an-image-prompt-dw-07) | High | Design / agent | Fixed 2026-10-19 — DW-07 bounded agent proposals |
+| [FIXED-989](#fixed-989--accepting-an-agents-work-could-not-be-partial-and-could-overwrite-the-owners-dw-08-dw-d05) | High | Design / agent | Fixed 2026-10-19 — DW-08/DW-D05 selective acceptance and conflicts |
+| [FIXED-990](#fixed-990--nothing-checked-a-design-before-it-left-raiker-dw-10) | Medium | Design / validation | Fixed 2026-10-19 — DW-10 nine checks with honest states |
+| [FIXED-991](#fixed-991--a-design-could-not-be-exported-and-an-export-would-not-have-said-what-it-was-dw-11) | Medium | Design / export | Fixed 2026-10-19 — DW-11 exports pinned to version and hash |
+| [FIXED-992](#fixed-992--a-finished-design-could-not-reach-build-except-as-a-screenshot-dw-11) | Medium | Design / Build | Fixed 2026-10-19 — DW-11 Build handoff as context |
+| [FIXED-993](#fixed-993--a-build-handoffs-file-name-reached-the-page-as-redacted_secret) | Low | Design / Build | Fixed 2026-10-19 — found live: redacted handoff name |
+| [FIXED-994](#fixed-994--png-and-pdf-exports-drew-a-box-for-an-em-dash-and-for-accented-letters) | Medium | Design / export | Fixed 2026-10-19 — found live: missing glyphs in raster exports |
+| [FIXED-995](#fixed-995--text-that-overflowed-its-box-was-clipped-on-the-canvas-but-drawn-in-full-in-exports) | Low | Design / web | Fixed 2026-10-19 — found live: canvas clipped overflowing text |
+| [FIXED-996](#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused) | Low | Design / web | Fixed 2026-10-19 — found by test: conflict notice cleared |
 
 ---
 
@@ -34839,3 +34857,275 @@ calling any provider.
 
 **Evidence.** `tests/test_build_model_review.py::test_a_placeholder_default_is_refused_as_no_model_chosen`.
 
+
+## Design workspace — structured documents (2026-10-19)
+
+## FIXED-979 — A design was one picture, never a document of layers (DW-01, DW-02)
+
+**Severity: Medium. Area: Design / composition. Status: Fixed 2026-10-19.**
+
+**Observed.** Design held generated pictures and a one-image viewer. There was
+no document a layout could live in: no frames, no layer that stayed text, no
+stable id an edit or an agent could name.
+
+**Fixed.** A **design document** (`raiker/design/document.py`) is frames holding
+an ordered, nested layer tree — text, rectangle, ellipse, image, group and stack
+— where every node has a stable id, geometry, rotation, opacity, visibility,
+lock and the actor that created it. Every change is a **typed operation**
+(`add_node`, `update_node`, `remove_node`, `move_node`, `group_nodes`, `ungroup`,
+`add_frame`, `update_frame`, `remove_frame`, `duplicate_frame`) applied all or
+nothing and checked field by field: ids unique across the document, colours
+`#rrggbb`, sizes, counts and depth bounded, and a locked layer only shown,
+hidden, renamed or unlocked. Documents are owner-scoped rows
+(`design_documents`, migration `RAIKER-2119-design-documents`), filed in a
+project only when the owner chooses one, and put in Recently deleted rather than
+removed. Routes: `/api/design/documents` (list, create, read, rename/file,
+delete, restore).
+
+**Evidence.** `tests/test_design_documents.py` (all-or-nothing operations naming the refused one, locked layers, owner scoping, filing refused for another owner's project).
+
+## FIXED-980 — A change made against an old copy of a design would have overwritten newer work (DW-08)
+
+**Severity: High. Area: Design / versions. Status: Fixed 2026-10-19.**
+
+**Fixed.** Every write names the version it was made against
+(`base_version`) and is stored as the next numbered version with its actor,
+kind, summary, scope (the ids it touched), operations and a snapshot
+(`design_document_versions`). A change against an older version is applied on
+top when it touches nothing changed since (`rebased: true`), and refused as
+`design_version_conflict:<ids>` when it meets later work. The page reloads the
+design on a conflict and says why the change did not land.
+
+**Evidence.** `test_a_stale_change_is_rebased_when_disjoint_and_refused_when_it_meets_later_work`; `DesignDocuments.test.ts` (conflict said in words, base version sent).
+
+## FIXED-981 — Undo meant regenerating a picture, not stepping back through the design (DW-08)
+
+**Severity: Medium. Area: Design / versions. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Undo**, **Redo** and **Go back to this** act on the structured
+state and are themselves new versions: an undo writes the state before the last
+change and remembers what it undid, so a redo restores it, through any number of
+steps; going back to version N adds a version on top. Nothing in the history is
+removed, and each acts only on the version the owner is looking at.
+
+**Evidence.** `test_undo_and_redo_are_new_versions_on_the_structured_state`; live: `dw-design-documents-live.spec.ts` (v5 → undo v6 → redo v7, History names both).
+
+## FIXED-982 — There were no frames, layouts or responsive variants to design into (DW-03)
+
+**Severity: Medium. Area: Design / composition. Status: Fixed 2026-10-19.**
+
+**Fixed.** A frame starts from a named target — square or story social post,
+A4 document page, 16:9 presentation, mobile or desktop screen, or custom — with
+a background and an 8px grid that can be shown. A **stack** places its children
+along a row or column with gap, padding and alignment, recomputed by the server
+after every change, so a stored document is always the one drawn; a **group**
+is the box around its children and moves them with it. **Make variant** copies a
+frame at another target size, scaled once, and records `variant_of` so the link
+is shown without implying the two stay identical.
+
+**Evidence.** `test_a_stack_places_its_children_and_a_group_moves_with_them`, `test_a_variant_is_scaled_once_and_linked_to_its_source`; live: mobile variant named *variant of Frame 1*.
+
+## FIXED-983 — Nothing could be edited directly on a design (DW-02)
+
+**Severity: Medium. Area: Design / web. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Design → Documents** (`DesignDocuments.svelte`) has three regions:
+frames and layers on the left, the canvas in the middle, and Inspect / Agent /
+System / Check / Export / History on the right. The canvas is the document
+drawn as SVG. A layer is selected on the canvas or in Layers (front-most first,
+nested, with show/hide and lock and an *agent* badge on what the agent made);
+the inspector edits position, size, rotation, opacity, text, font, colour, fill,
+radius, stack spacing and image fit; arrange offers forward, backward, group,
+ungroup, duplicate and remove. The canvas is one keyboard stop: arrows nudge 1px
+(Shift 10px), Delete removes, Escape clears the selection, Ctrl+Z / Ctrl+Shift+Z
+undo and redo. Below 80rem the right rail moves under the canvas; on a phone the
+canvas comes first. `#/design?view=documents` opens on it.
+
+**Evidence.** `DesignDocuments.test.ts`, `designDocument.test.ts`; live screenshots `02-canvas-layers-inspector.png`, `11-phone-width.png` (no horizontal overflow at 390px).
+
+## FIXED-984 — A picture used in a design could be deleted without a word (DW-05)
+
+**Severity: Medium. Area: Design / assets. Status: Fixed 2026-10-19.**
+
+**Fixed.** An image layer is a **link** to a picture in Images
+(`asset_id`), never a copy. `GET /api/design/assets/{asset_id}/usage` names the
+live designs that place it, and **Delete** in Images asks first when there are
+any. A design whose picture is in Recently deleted keeps its layer, draws it as
+a placeholder, and Check names it.
+
+**Evidence.** `test_an_asset_used_by_a_design_says_so`; the *assets* check in `test_validation_is_honest_about_what_it_can_and_cannot_tell`.
+
+## FIXED-985 — Image controls could not say which provider supported them, and there was no crop (DW-03, DW-04)
+
+**Severity: Low. Area: Design / assets. Status: Fixed 2026-10-19.**
+
+**Fixed.** `GET /api/images` now carries `operations` — what each provider's
+governed path really does (`openai`: generate, edit, variations, size;
+`gemini`: generate, edit, variations), from `IMAGE_OPERATIONS` beside the code
+that sends the request. The count control is disabled for a provider without
+variations, and masks, outpainting and upscaling stay absent because no provider
+path exists. Crop (a box of fractions) and fit (cover, contain, stretch) are
+**non-destructive** properties of an image layer, drawn by the canvas and every
+export; the picture itself never changes.
+
+**Evidence.** `test_an_export_is_pinned_to_its_version_and_hash_and_never_flattens_the_document` (a cropped placed picture in the PNG); `DesignView.test.ts`.
+
+## FIXED-986 — A design had no brand to follow (DW-06)
+
+**Severity: Medium. Area: Design / systems. Status: Fixed 2026-10-19.**
+
+**Fixed.** A **design system** (`design_systems`) holds named colours, font
+families and spacing, usage rules, the variables a finished design must use and
+a note on where it came from. Saving one again writes the next version; no
+document using an earlier version changes. Layers refer to it through
+`fill_var`, `color_var`, `font_var` and a frame's `background_var`, and keep the
+literal value they are drawn with.
+
+They are called **variables**, not tokens, for a measured reason: the response
+redactor discards any field whose name contains `token`, so `fill_token` and a
+system's `tokens` reached the page as `***REDACTED***` in the first test run.
+
+**Evidence.** `test_a_system_is_versioned_and_applied_only_through_a_preview` (v2 leaves a v1 design alone; invalid values named).
+
+## FIXED-987 — Changing a design's brand would have rewritten it unseen (DW-06)
+
+**Severity: Medium. Area: Design / systems. Status: Fixed 2026-10-19.**
+
+**Fixed.** Choosing a system is two explicit steps. **Preview the change**
+(`POST …/system/preview`) lists every layer whose drawn value would change, from
+what to what, and every variable the system does not define, and writes nothing.
+**Apply to this design** writes exactly that plan to this one document as one
+version that undo reverses; a locked layer is reported and left alone.
+
+**Evidence.** `test_a_system_is_versioned_and_applied_only_through_a_preview`; live `05-system-preview.png`.
+
+## FIXED-988 — There was no design agent, only an image prompt (DW-07)
+
+**Severity: High. Area: Design / agent. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Agent → Propose changes** sends one named frame (credential-
+redacted, delimited as untrusted data) and the owner's brief to the chat model
+they choose, through their own router, gates and egress allowlist, with no
+tools. The answer must be a plan (summary, hierarchy, assumptions, assets,
+validation) and typed operations. Each operation is dry-run in order against the
+version the proposal was made from and kept as **valid** or **refused** with its
+reason: outside the target frame, an operation an agent may not use (frames),
+placing an image, removing more than three layers, a locked layer, an unknown
+id. Unreadable answers are said (`design_proposal_unreadable`), never shown as
+an empty proposal. Nothing is applied; `design_proposal_created` is audited
+without the brief or any text.
+
+**Evidence.** `test_an_agent_proposal_is_bounded_vetted_and_never_applied_by_itself`, `test_an_agent_may_not_remove_a_large_subtree`, `test_an_unreadable_answer_is_said`; live with Anthropic `claude-haiku-4-5-20251001`: two valid operations proposed, version unchanged until accepted (`06-agent-proposal.png`).
+
+## FIXED-989 — Accepting an agent's work could not be partial and could overwrite the owner's (DW-08, DW-D05)
+
+**Severity: High. Area: Design / agent. Status: Fixed 2026-10-19.**
+
+**Fixed.** Each valid operation has a box; **Accept selected** applies only
+those, as one version marked `actor: agent` with the proposal id, and new layers
+carry `created_by: agent`. An operation that touches a layer changed after the
+proposal was made is a conflict: nothing is applied, the page names the layers,
+and **Apply the rest, keep my changes** applies only the others. A proposal is
+decided once; `design_proposal_decided` is audited with counts.
+
+**Evidence.** `test_a_stale_proposal_never_overwrites_later_owner_work`; live `07-agent-accepted.png` (*Agent proposal accepted — Accepted 2 of 2*).
+
+## FIXED-990 — Nothing checked a design before it left Raiker (DW-10)
+
+**Severity: Medium. Area: Design / validation. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Check** (`GET …/validation`, `design-validate/1`) runs nine
+checks — placed pictures resolve, alternative text, text overflow measured with
+the export renderer, WCAG AA contrast against a solid colour behind the text,
+fonts the export can draw, layers outside their frame, variables that resolve,
+required variables used, colours from the system — and states each as
+**Passed**, **Failed**, **Not supported by the export** or **Cannot be known
+from the design** (text over a photo, translucent text). Each finding names its
+frame and layer and opens it. The outcome is *passed* only when every check
+passed.
+
+**Evidence.** `test_validation_is_honest_about_what_it_can_and_cannot_tell`; live `08-checks.png`.
+
+## FIXED-991 — A design could not be exported, and an export would not have said what it was (DW-11)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Export** writes one frame as PNG or PDF (raster, at 0.5×–2×), SVG
+(text stays text, shapes stay shapes, placed pictures embedded with crop and
+fit) or JSON (the frame's structure). Each export records the version, frame,
+format, settings (including which font drew a raster), the validation outcome
+and the file's SHA-256 (`design_exports`), is downloaded through the owner's
+session, and is audited as `design_exported`. The stored document is never
+flattened.
+
+**Evidence.** `test_an_export_is_pinned_to_its_version_and_hash_and_never_flattens_the_document` (pixels of a cropped picture, `%PDF`, `<text>`); live PNG and SVG with hashes, download named `raiker-design-frame-1-vN.png`.
+
+## FIXED-992 — A finished design could not reach Build except as a screenshot (DW-11)
+
+**Severity: Medium. Area: Design / Build. Status: Fixed 2026-10-19.**
+
+**Fixed.** **Hand to Build** writes the selected frame at the current version
+— document and version, content hash, validation outcome, the stated target,
+the system's variables and every layer's type, geometry, text, colours and
+image ids — as a bounded Markdown document stored as the owner's attachment
+(`design_handoffs`, audited as `design_handed_off`). Build's composer carries it
+on the next visit like any attached document, labelled untrusted. It grants
+nothing: every code change still goes through Build's modes and approvals.
+
+**Evidence.** `test_a_build_handoff_is_bounded_context_that_writes_no_code` (credential redacted, no file written); `DesignDocuments.test.ts`; live `10-build-carries-handoff.png`.
+
+## FIXED-993 — A Build handoff's file name reached the page as [REDACTED_SECRET]
+
+**Severity: Low. Area: Design / Build. Status: Fixed 2026-10-19.**
+
+**Observed (live, 2026-10-19).** After **Hand to Build** the page read
+*Ready in Build's composer as `[REDACTED_SECRET].md`*.
+
+**Root cause.** The name was a hyphenated slug of the title and version — one
+unbroken run of URL-safe characters over forty long — which the response
+redactor's entropy fallback treats as a credential.
+
+**Fixed.** The handoff is named in words with spaces, *Design handoff Launch
+post v10.md*.
+
+**Evidence.** `test_a_build_handoff_is_bounded_context_that_writes_no_code` asserts the exact name; live re-run passed.
+
+## FIXED-994 — PNG and PDF exports drew a box for an em dash and for accented letters
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-10-19.**
+
+**Observed (live, 2026-10-19).** *Launch day — 21 October* exported as
+*Launch day ☐ 21 October*: the font bundled with Pillow has no glyph for the em
+dash, and none for é, ñ or € either.
+
+**Fixed.** Raster exports use the first broad sans font the host has (DejaVu
+Sans, Arial, Liberation Sans, Helvetica) and fall back to the bundled one; the
+export records which. A character that font cannot draw is named by Check
+(*no glyph for 中*) before export.
+
+**Evidence.** `test_a_character_the_export_font_cannot_draw_is_named_before_export`; live PNG re-inspected (`pillow:DejaVuSans.ttf`).
+
+## FIXED-995 — Text that overflowed its box was clipped on the canvas but drawn in full in exports
+
+**Severity: Low. Area: Design / web. Status: Fixed 2026-10-19.**
+
+**Observed (live, 2026-10-19).** A 48px headline in a 72px box showed one
+line on the canvas while Check said it needed 115px and the PNG drew two.
+
+**Fixed.** The canvas draws text past its box, as exports do, so what Check
+calls overflow is visible where it is fixed.
+
+**Evidence.** Live `07-agent-accepted.png` (both lines visible).
+
+## FIXED-996 — A conflicting edit's explanation vanished in the reload it caused
+
+**Severity: Low. Area: Design / web. Status: Fixed 2026-10-19.**
+
+**Observed.** Found by the component test: a change refused as
+`design_version_conflict` reloaded the design, and the reload cleared the notice
+that said why.
+
+**Fixed.** The reload after a conflict keeps the notice: *This design changed
+since you loaded it…*.
+
+**Evidence.** `DesignDocuments.test.ts` — *says a conflict in words and reloads instead of writing over later work*.

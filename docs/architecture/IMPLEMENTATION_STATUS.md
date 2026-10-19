@@ -178,6 +178,21 @@ five by default — re-confirmed opportunistically in the background while a wor
 surface is open, with the invalidation hooks still authoritative over the timer
 (FIXED-169).
 
+## Design workspace status — 2026-10-19
+
+The [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) target is staged as
+below. Every Design route is owner-scoped; none of them grants a capability.
+
+| Slice | Status | Evidence |
+|---|---|---|
+| Image generation, edit, variations and lineage (Asset layer) | `implemented_policy_gated` — `image_generation` gate, egress allowlist and credential | `raiker/runtime/executors/tier2_image.py`; real-provider remainder BUG-287 |
+| Structured documents, typed operations, versions, undo/redo (DW-01/02/03/08) | `implemented_verified` | `raiker/design/document.py`, `raiker/design/store.py`, `tests/test_design_documents.py` |
+| Design systems with previewed choice (DW-06) | `implemented_verified` | `raiker/design/systems.py` |
+| Agent proposals (DW-07) | `implemented_verified` — one model call through the owner's router; applied only on owner acceptance | `raiker/design/agent.py`, live with Anthropic Haiku 4.5 |
+| Validation (DW-10) | `implemented_read_only` | `raiker/design/validation.py` |
+| Export and Build handoff (DW-11) | `implemented_verified` — exports and handoffs are workspace files; nothing leaves the machine | `raiker/design/render.py`, `raiker/api/routes_design.py` |
+| Pointer handles, owner image import, system import, annotations, vector PDF | `contract_only` | BUG-348 |
+
 ## Personal-agent target status — 2026-10-07
 
 **Product scope:** an individual owner's personal autonomous AI agent, with

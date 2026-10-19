@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**419 operations: 406 verified, 0 eligible, 0 deferred, 13 special.**
+**446 operations: 432 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -131,6 +131,33 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest | ManifestRegistered | verified | declared by cast |
 | GET | `/api/credential-deltas` |  | CredentialDeltaList | verified | declared CredentialDeltaList |
 | POST | `/api/credential-deltas/{run_id}/discard` | dict | CredentialDeltaDiscarded | verified | declared CredentialDeltaDiscarded |
+| GET | `/api/design/assets/{asset_id}/usage` |  | DesignAssetUsage | verified | declared DesignAssetUsage |
+| GET | `/api/design/documents` |  | DesignDocumentList | verified | declared DesignDocumentList |
+| POST | `/api/design/documents` | CreateDesignDocumentRequest | DesignDocumentView | verified | _view |
+| DELETE | `/api/design/documents/{document_id}` |  | DesignDocumentSummary | verified | _summary |
+| GET | `/api/design/documents/{document_id}` |  | DesignDocumentView | verified | _view |
+| PATCH | `/api/design/documents/{document_id}` | UpdateDesignDocumentRequest | DesignDocumentView | verified | _view |
+| GET | `/api/design/documents/{document_id}/exports` |  | DesignExportList | verified | declared DesignExportList |
+| POST | `/api/design/documents/{document_id}/exports` | DesignExportRequest | DesignExportView | verified | declared by cast |
+| POST | `/api/design/documents/{document_id}/handoff` | DesignHandoffRequest | DesignHandoffView | verified | declared by cast |
+| GET | `/api/design/documents/{document_id}/handoffs` |  | DesignHandoffList | verified | declared DesignHandoffList |
+| POST | `/api/design/documents/{document_id}/operations` | DesignOperationsRequest | DesignChangeView | verified | declared DesignChangeView |
+| GET | `/api/design/documents/{document_id}/proposals` |  | DesignProposalList | verified | declared DesignProposalList |
+| POST | `/api/design/documents/{document_id}/proposals` | DesignProposalRequest | DesignProposalView | verified | declared by cast |
+| POST | `/api/design/documents/{document_id}/redo` | DesignBaseVersionRequest | DesignChangeView | verified | _snapshot_change |
+| POST | `/api/design/documents/{document_id}/restore` |  | DesignDocumentView | verified | _view |
+| POST | `/api/design/documents/{document_id}/system` | DesignSystemChoiceRequest | DesignChangeView | verified | declared DesignChangeView |
+| POST | `/api/design/documents/{document_id}/system/preview` | DesignSystemChoiceRequest | DesignSystemPreview | verified | declared DesignSystemPreview |
+| POST | `/api/design/documents/{document_id}/undo` | DesignBaseVersionRequest | DesignChangeView | verified | _snapshot_change |
+| GET | `/api/design/documents/{document_id}/validation` |  | DesignValidationView | verified | _validation |
+| GET | `/api/design/documents/{document_id}/versions` |  | DesignVersionList | verified | declared DesignVersionList |
+| GET | `/api/design/documents/{document_id}/versions/{version}` |  | DesignVersionView | verified | declared by cast |
+| POST | `/api/design/documents/{document_id}/versions/{version}/restore` | DesignBaseVersionRequest | DesignChangeView | verified | _snapshot_change |
+| GET | `/api/design/exports/{export_id}/bytes` |  |  | special | special |
+| POST | `/api/design/proposals/{proposal_id}/decision` | DesignProposalDecisionRequest | DesignProposalDecision | verified | declared DesignProposalDecision |
+| GET | `/api/design/systems` |  | DesignSystemList | verified | declared DesignSystemList |
+| POST | `/api/design/systems` | DesignSystemRequest | DesignSystemView | verified | _save_system |
+| PUT | `/api/design/systems/{system_id}` | DesignSystemRequest | DesignSystemView | verified | _save_system |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  | DiagnosticsExport | verified | WebReadModels.diagnostics_export |
 | GET | `/api/diagnostics/recovery` |  | RecoveryMatrixView | verified | declared RecoveryMatrixView |

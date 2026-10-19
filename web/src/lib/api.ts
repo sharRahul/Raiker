@@ -554,6 +554,9 @@ export const api = {
   purgeImage: (generationId: string) => contract.purgeImage(generationId),
   // DEC-07 step 4 — an earlier version back as a new version on top of `head`.
   revertImage: (headId: string, to: string) => contract.revertImage(headId, { to }),
+  // DW-11 — an export's bytes, fetched with the bearer token to be saved.
+  designExportBlob: (exportId: string): Promise<Blob> =>
+    requestBlob(`/api/design/exports/${encodeURIComponent(exportId)}/bytes`),
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => contract.getModelPricing(),
   refreshModelPricing: () => contract.refreshModelPricing(),

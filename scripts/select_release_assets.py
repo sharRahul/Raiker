@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Choose the one installer per platform a draft GitHub release carries.
 
 The release workflow builds, installs and tests every installer format on every

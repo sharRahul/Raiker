@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """BR-D06 — kill a live ``raiker-web`` mid-check, start it again, and read the outcome.
 
 The fault fixtures in ``tests/test_build_fault_boundaries.py`` inject faults

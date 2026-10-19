@@ -282,3 +282,5 @@ class StoredCommandRun:
     receipt_digest: str | None
     created_at: str
     updated_at: str
+    #: BR-D01 — the workspace-relative folder the run executed in.
+    cwd: str = "."

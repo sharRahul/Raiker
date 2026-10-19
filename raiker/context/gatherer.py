@@ -343,6 +343,16 @@ class ContextGatherer:
                 "run each one exactly as written with the command tool, then report its result:"
             )
             lines.extend(f"- {check}" for check in checks)
+            # The folder a check counts in (BR-D01 wrong-path): the selected
+            # repository's, never the workspace root by accident.
+            from raiker.tools.git import selected_repository_subpath
+
+            subpath = selected_repository_subpath(store, owner_principal_id)
+            if subpath:
+                lines.append(
+                    f"Run the checks with cwd set to {subpath}, the selected repository's "
+                    "folder; a check run anywhere else does not count."
+                )
         if memory_enabled:
             memories = list_memory(
                 workspace_root=root,

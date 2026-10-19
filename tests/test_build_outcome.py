@@ -140,5 +140,7 @@ def test_checks_are_saved_with_the_project_and_reach_the_turn(api: tuple[TestCli
     assert outcome.status_code == 200, outcome.text
     body = outcome.json()
     assert body["outcome"] == "completed_unverified" and body["writes"] == 1
-    assert body["checks"] == [{"command": "pytest -q", "result": "not_run", "exit_code": None, "run_id": None}]
+    assert body["checks"] == [
+        {"command": "pytest -q", "result": "not_run", "exit_code": None, "run_id": None, "cwd": None}
+    ]
     assert client.get("/api/sessions/sess_b/turns/turn_x/outcome", headers=headers).status_code == 404

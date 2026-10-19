@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from cryptography.fernet import InvalidToken
@@ -137,8 +137,8 @@ class CommandStore:
                 """INSERT INTO command_runs (
                     run_id, owner_principal_id, acting_principal_id, session_id, turn_id,
                     action_id, authority_kind, authority_id, state, profile_id, safe_display, template_digest,
-                    encrypted_execution_material, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    encrypted_execution_material, cwd, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     request.run_id,
                     request.owner_principal_id,
@@ -153,6 +153,7 @@ class CommandStore:
                     request.safe_display,
                     request.template_digest,
                     encrypted,
+                    PurePosixPath(request.cwd.replace("\\", "/")).as_posix(),
                     now,
                     now,
                 ),
@@ -472,7 +473,7 @@ class CommandStore:
                           turn_id, action_id, authority_kind, authority_id, state, profile_id, backend, safe_display,
                           template_digest, started_at, completed_at, lease_expires_at,
                           exit_code, termination_reason, stdout_bytes, stderr_bytes,
-                          truncated, redaction_count, receipt_digest, created_at, updated_at
+                          truncated, redaction_count, receipt_digest, created_at, updated_at, cwd
                    FROM command_runs WHERE owner_principal_id = ? AND run_id = ?""",
                 (owner_principal_id, run_id),
             ).fetchone()
@@ -851,4 +852,5 @@ class CommandStore:
             receipt_digest=row["receipt_digest"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            cwd=str(row["cwd"] or "."),
         )

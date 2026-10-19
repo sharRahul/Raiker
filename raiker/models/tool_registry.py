@@ -1195,8 +1195,19 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         read_shaped=True,
         required_args=("command",),
         required_list_args=(),
-        optional_args=("background",),
+        optional_args=("background", "cwd"),
         arg_schemas=(
+            (
+                "cwd",
+                {
+                    "type": "string",
+                    "description": (
+                        "Workspace-relative folder to run the command in, such as the "
+                        "repository's folder. Defaults to the workspace root; a folder "
+                        "outside the workspace is refused."
+                    ),
+                },
+            ),
             (
                 "background",
                 {

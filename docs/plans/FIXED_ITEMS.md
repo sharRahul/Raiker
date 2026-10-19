@@ -993,6 +993,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-951](#fixed-951--three-open-entries-were-decided-boundaries-or-superseded-work-not-defects-bug-226-bug-228-bug-234) | Low | Hooks / plugins / MCP | Retired 2026-10-18 — BUG-226, BUG-228, BUG-234 |
 | [FIXED-952](#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice) | Medium | Build / verification | Fixed 2026-10-18 — BR-D01 first slice |
 | [FIXED-953](#fixed-953--an-accepted-build-write-wrote-nothing-and-its-row-read-failed-bug-346) | Medium | Build / approvals | Fixed 2026-10-19 — BUG-346 |
+| [FIXED-954](#fixed-954--a-build-check-counted-wherever-it-ran-and-a-written-file-was-never-read-back-br-d01) | Medium | Build / verification | Fixed 2026-10-19 — BR-D01 wrong-path and read-back |
+| [FIXED-955](#fixed-955--a-build-turn-named-a-repository-not-the-target-it-ran-against-br-d02-first-slice) | Medium | Build / execution target | Fixed 2026-10-19 — BR-D02 first slice |
+| [FIXED-956](#fixed-956--a-patch-was-shown-never-reviewed-and-every-look-was-a-new-look-br-d04-first-slice) | Medium | Build / review | Fixed 2026-10-19 — BR-D04 first slice |
+| [FIXED-957](#fixed-957--nothing-proved-an-injected-fault-could-not-read-as-verified-br-d06-first-slice) | Low | Build / testing | Fixed 2026-10-19 — BR-D06 first slice |
 
 ---
 
@@ -34133,3 +34137,152 @@ model names relative to the workspace root (`notes.txt` landed beside the
 project folder, not inside it); the path authority for a managed project is the
 workspace, as before.
 
+## FIXED-954 — A Build check counted wherever it ran, and a written file was never read back (BR-D01)
+
+**Severity: Medium. Area: Build / verification. Status: Fixed 2026-10-19 — the
+two BR-D01 faults [FIXED-952](#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice) left open; BR-D01 is now implemented on its
+row in [`BUILD_WORKSPACE_SPEC.md`](BUILD_WORKSPACE_SPEC.md).**
+
+**Observed.** A declared check counted wherever it ran. `run_command` always ran
+at the workspace root, so for a repository in a sub-folder the check either
+could not be run in the right place at all or, run at the root, checked a
+different tree and still read **Verified**. Separately, nothing read a written
+file back: a write the runtime recorded as successful, whose file was deleted
+before the check, still read as verified.
+
+**Root cause.** The run's working directory was stored only inside the
+encrypted execution material, so the outcome could not read it; the command
+tool offered no working directory; and the classifier read `tool_actions` and
+`command_runs` but never the disk.
+
+**Fixed.**
+
+* `run_command` takes an optional `cwd`, resolved through the workspace read
+  authority (symlinks resolved, nothing outside the workspace, must be a
+  directory) — `command_cwd_outside_workspace` / `command_cwd_not_a_directory`
+  otherwise. The grant, allowlist and placement checks are unchanged.
+* `command_runs.cwd` (migration `RAIKER-2113-command-run-cwd`) stores the
+  workspace-relative folder in plain form; it is on `CommandRunView` too.
+* `classify_build_turn` takes the turn's repository folder: the same check run
+  elsewhere reads `wrong_directory` and never `passed`. The project context asks
+  for the checks to run with `cwd` set to the selected repository's folder.
+* `read_back_writes` reads each written file back — `matches`, `present`,
+  `changed_since`, `missing`, `unreadable` — through the same read authority. A
+  `missing` destination keeps an otherwise passing turn **Not verified**; a later
+  change does not undo verification.
+* Build's outcome line says *ran outside the repository folder (in the workspace
+  root)* and lists any file *no longer on disk* or *changed since this turn*.
+
+**Evidence.** `tests/test_build_target_and_review.py` (repository folder
+verifies, workspace root reads `wrong_directory`, folder spellings compare,
+no recorded target accepts any folder, read-back states, read-back never leaves
+the workspace, missing destination demotes, later change does not, `cwd`
+confinement including a symlink escape, the run stores its folder, and the API
+outcome with a real git repository) and `tests/test_build_outcome.py` pass;
+`BuildOutcome.test.ts` adds the wrong-folder and read-back cases.
+
+## FIXED-955 — A Build turn named a repository, not the target it ran against (BR-D02, first slice)
+
+**Severity: Medium. Area: Build / execution target. Status: Fixed 2026-10-19 —
+the first slice of [BR-D02](BUILD_WORKSPACE_SPEC.md); concurrent worktrees stay
+on its row.**
+
+**Observed.** BR-02 requires a named, validated target before a write-capable
+turn. Build showed a repository label. When the selected local folder had moved,
+`resolve_repository_root` fell back to the workspace root, so a Build turn ran
+its git and file tools against a tree the owner had not chosen, with only a
+header warning.
+
+**Fixed.**
+
+* `raiker/control/build_target.py` describes the target from the runtime's own
+  sources: folder, repository identity (GitHub coordinate, or the `origin`
+  remote with credentials stripped), branch, commit, selected command
+  environment and where code would be placed. A SHA-256 fingerprint covers
+  identity, folder, branch and environment — not the commit (a turn's own commit
+  is not drift) and not placement (a timed re-measurement must not invent
+  drift).
+* `GET /api/code/repos/{repo_id}/target`, read-only and owner-scoped.
+* The gateway records the target for every Build turn
+  (`build_turn_targets`, migration `RAIKER-2114-build-turn-targets`, first record
+  wins) and **refuses a Build turn whose selected folder is gone** before it
+  starts — streamed as `build_target_missing` — instead of running in the
+  workspace root.
+* The outcome compares the recorded target with the current one; drift (branch,
+  folder, repository, environment, or a vanished folder) keeps a passing turn
+  **Not verified**, and the line says what moved. Otherwise it says where the
+  turn ran: *Ran in app on main from 6e99715*.
+* The Build header shows the target chip — `main · 6e99715` and **Sandbox** /
+  **This computer** / **Your environment** — with the folder, identity,
+  environment and fingerprint as its tooltip and accessible name.
+
+**Evidence.** `tests/test_build_target_and_review.py` (credential stripping, a
+real repository described and fingerprinted, a commit is not drift and a branch
+switch is, moved folder / coordinate / none, a vanished folder is drift,
+record-once, the gateway refusal and binding, the route, and the outcome reading
+a branch switched under the turn); `BuildTargetChip.test.ts` (3). Live:
+`br-d02-d04-build-target-and-review-live.spec.ts` passed **4/4** against a fresh
+`raiker-web` on a workspace reset with `scripts/reset_live_workspace.py`, with
+Anthropic connected through Models using the round's identity-linked key and
+workspace ID: the chip read `main · 6e99715 · This computer`; a real
+`claude-haiku-4-5` Build turn wrote `app/NOTES.md` (read back from disk) and its
+outcome read **Not verified** — no checks declared — *Ran in app on main from
+6e99715*; and with the folder moved away the header said so and the turn
+answered *The repository folder app is no longer in the workspace, so this Build
+turn did not start* with no file written. Captures `01-build-target-chip.png`,
+`02-real-turn-outcome-target.png` and `05-missing-target-refused.png` (under
+`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/`, not committed) were reviewed.
+
+## FIXED-956 — A patch was shown, never reviewed, and every look was a new look (BR-D04, first slice)
+
+**Severity: Medium. Area: Build / review. Status: Fixed 2026-10-19 — the first
+slice of [BR-D04](BUILD_WORKSPACE_SPEC.md); independent validators and selected
+model review stay on its row.**
+
+**Observed.** Build's Changes pane showed the diff. Nothing repeatable said what
+had been checked in it, and nothing could tell a finding already raised on this
+patch from a new one.
+
+**Fixed.**
+
+* `raiker/review/patch_review.py` reviews one exact unified diff — the working
+  tree's, built by the helpers a commit is built from — with precise,
+  deterministic rules: possible credential (value never echoed), merge conflict
+  marker, debugger breakpoint in a source file of that language, CI/workflow
+  definition changed (left to the owner, BR-12), instruction-like text (BR-04),
+  and source changed without a test. Each finding has severity, category,
+  confidence, file and line, evidence and a next step.
+* Reviews are stored by the SHA-256 of the patch (`patch_reviews`, migration
+  `RAIKER-2115-patch-reviews`): the same patch returns the stored review with
+  `reused: true`, any edit is a different review.
+* `GET` / `POST /api/code/repos/{repo_id}/review`; the POST reviews and stores
+  and changes no file.
+* Changes shows **Review this patch** above the diff, then the findings in the
+  page's danger/warn tokens, and **Reviewed** with the fingerprint for a stored
+  review.
+
+**Evidence.** `tests/test_build_target_and_review.py` (each seeded problem at its
+line, no secret in the output, false-positive controls — a function named
+`ignore_previous`, documentation mentioning `breakpoint()` and `=======`, a
+variable named `debuggerEnabled` — stay quiet, same patch same findings, and the
+routes storing exactly one review); `PatchReview.test.ts` (3). Live: on the
+same round a seeded credential-shaped assignment and `breakpoint()` read
+*Possible credential added* `src/service.py:2`, *Debugging statement left in*
+`src/service.py:3` and *Source changed without a test change*, with no part of
+the value on the page; after a reload the same patch read **Reviewed ·
+e5d8a713** and offered no second review. Captures `03-patch-review-findings.png`
+and `04-patch-review-stored.png` were reviewed.
+
+## FIXED-957 — Nothing proved an injected fault could not read as verified (BR-D06, first slice)
+
+**Severity: Low. Area: Build / testing. Status: Fixed 2026-10-19 — the first
+slice of [BR-D06](BUILD_WORKSPACE_SPEC.md); restart and provider faults injected
+into a running host stay on its row.**
+
+**Fixed.** `tests/test_build_fault_boundaries.py` asserts a verified baseline,
+then injects thirteen faults one at a time — a failed write, a change after the
+checks, a check lost on restart, cancelled, timed out or still running, a
+provider that died before the checks, a hidden failing test, a check in the
+wrong folder, a destination removed, a branch switched or a folder vanished
+under the turn, and a check waiting for approval — and asserts each lands on its
+truthful outcome and never `completed_verified` (**14/14**).

@@ -105,3 +105,64 @@ class CodeRepoDiagnosticsView(TypedDict):
     reason_code: str
     reason: str
     diagnostics: list[Diagnostic]
+
+
+class CodeRepoTargetView(TypedDict):
+    """BR-D02 — the execution target a Build turn on this repository would use."""
+
+    repo_id: str | None
+    repo_kind: str
+    label: str
+    state: Literal["ready", "folder_missing", "remote_only", "no_repository"]
+    host: Literal["this_computer", "remote"]
+    folder: str
+    folder_exists: bool
+    git: bool
+    branch: str
+    head: str
+    #: The repository's identity: its GitHub coordinate, credential-free remote, or folder.
+    identity: str
+    environment: str
+    code_placement: str
+    code_placement_reason: str
+    fingerprint: str
+
+
+class PatchReviewFinding(TypedDict):
+    """BR-D04 — one deterministic finding on an exact patch."""
+
+    finding_id: str
+    rule: str
+    severity: Literal["high", "medium", "low", "info"]
+    category: str
+    title: str
+    evidence: str
+    next_step: str
+    confidence: Literal["high", "medium", "low"]
+    path: str | None
+    line: int | None
+
+
+class PatchReview(TypedDict):
+    fingerprint: str
+    files: int
+    added_lines: int
+    truncated: bool
+    findings: list[PatchReviewFinding]
+    counts: dict[str, int]
+    reviewed_at: str
+
+
+class CodeRepoReviewView(TypedDict):
+    """The review of the working tree's current patch, if one has been taken.
+
+    ``fingerprint`` is the current patch's; ``review`` is null until the owner
+    asks for one. ``reused`` says the stored review of this same patch was
+    returned instead of a second, duplicate set of findings.
+    """
+
+    fingerprint: str
+    has_changes: bool
+    review: PatchReview | None
+    reused: bool
+    reason_code: str | None

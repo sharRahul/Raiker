@@ -924,6 +924,13 @@ export const api = {
   // The `Changes` tab of Build's artifact pane reads this; it is the same change
   // set a commit would record, because it comes from the same two helpers.
   readCodeRepoChanges: (repoId: string) => contract.readCodeRepoChanges(repoId),
+  // BR-D02 — where a Build turn on this repository would run: folder, branch,
+  // environment and the fingerprint a turn is bound to. Read-only.
+  readCodeRepoTarget: (repoId: string) => contract.readCodeRepoTarget(repoId),
+  // BR-D04 — the stored review of the current patch (null until asked for),
+  // and the request that reviews it. One review per exact patch.
+  readCodeRepoReview: (repoId: string) => contract.readCodeRepoReview(repoId),
+  reviewCodeRepoPatch: (repoId: string) => contract.reviewCodeRepoPatch(repoId),
   // B10 — what a parser sees in the file the owner just opened.
   readCodeRepoDiagnostics: (repoId: string, path: string) =>
     contract.readCodeRepoDiagnostics(repoId, { path }),

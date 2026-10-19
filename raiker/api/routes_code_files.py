@@ -11,6 +11,11 @@ These are the two reads that fix it, and they are deliberately only reads:
   shape ``/api/projects/{id}/browse`` answers, so the explorer component does not
   care which kind of root it is over.
 * ``GET /api/code/repos/{repo_id}/file`` — one bounded text file.
+* ``GET /api/code/repos/{repo_id}/target`` — the execution target a Build turn
+  here would use, and its fingerprint (BR-D02).
+* ``GET`` / ``POST /api/code/repos/{repo_id}/review`` — the exact-patch review
+  of the current working-tree change, stored by the patch's fingerprint
+  (BR-D04). The POST computes and stores a review; it changes no file.
 * ``GET /api/code/repos/{repo_id}/changes`` — the working tree's own uncommitted
   changes (the Build artifact pane), read through the *same* helpers the commit proposal is
   built from, so what Build shows as "Changes" and what a commit would record
@@ -46,6 +51,9 @@ from raiker.api.wire.code import (
     CodeRepoChangesView,
     CodeRepoDiagnosticsView,
     CodeRepoFileView,
+    CodeRepoReviewView,
+    CodeRepoTargetView,
+    PatchReview,
 )
 from raiker.api.wire.projects import ProjectBrowseEntry
 from raiker.knowledge.extractors import resolve_extractable_media_type
@@ -441,3 +449,107 @@ async def read_code_repo_diagnostics(
         "diagnostics": result.get("diagnostics") or [],
     }
     return serialize_dto(answer_1)
+
+
+@router.get("/api/code/repos/{repo_id}/target")
+async def read_code_repo_target(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D02 — where a Build turn on this repository would actually run.
+
+    The folder, repository identity, branch, commit and command environment,
+    with the fingerprint the turn is bound to. Read-only; a GitHub coordinate
+    answers ``remote_only`` and a moved folder ``folder_missing`` rather than
+    pretending the workspace root is the target.
+    """
+    from raiker.control.build_target import describe_target  # noqa: PLC0415
+
+    principal_id = auth_data[0].principal_id
+    repo = _owned_repo(request, repo_id, principal_id)
+    target = describe_target(SQLiteStore(_ws(request)), _ws(request), principal_id, repo)
+    answer: CodeRepoTargetView = cast(CodeRepoTargetView, target)
+    return serialize_dto(answer)
+
+
+def _current_patch(request: Request, repo: dict[str, Any]) -> tuple[str, str | None]:
+    """The full working-tree diff for *repo*, or the reason there is none."""
+    from raiker.tools.git import working_tree_changes, working_tree_diff  # noqa: PLC0415
+
+    root = _repo_root(request, repo)
+    if root is None:
+        return "", (
+            "repo_not_checked_out" if str(repo.get("kind")) == "github" else "repo_folder_missing"
+        )
+    if not (root / ".git").exists():
+        return "", "not_a_git_repository"
+    entries = working_tree_changes(root)
+    return (working_tree_diff(root, entries) if entries else ""), None
+
+
+def _review_answer(
+    fingerprint: str, diff: str, review: dict[str, Any] | None, reused: bool, reason: str | None
+) -> CodeRepoReviewView:
+    answer: CodeRepoReviewView = {
+        "fingerprint": fingerprint,
+        "has_changes": bool(diff),
+        "review": cast(PatchReview, review) if review is not None else None,
+        "reused": reused,
+        "reason_code": reason,
+    }
+    return answer
+
+
+@router.get("/api/code/repos/{repo_id}/review")
+async def read_code_repo_review(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D04 — the stored review of the current patch, if one was taken."""
+    from raiker.review.patch_review import load_review, patch_fingerprint  # noqa: PLC0415
+
+    principal_id = auth_data[0].principal_id
+    repo = _owned_repo(request, repo_id, principal_id)
+    diff, reason = _current_patch(request, repo)
+    fingerprint = patch_fingerprint(diff) if diff else ""
+    review = (
+        load_review(
+            SQLiteStore(_ws(request)),
+            owner_principal_id=principal_id,
+            repo_id=repo_id,
+            fingerprint=fingerprint,
+        )
+        if diff
+        else None
+    )
+    answer = _review_answer(fingerprint, diff, review, review is not None, reason)
+    return serialize_dto(answer)
+
+
+@router.post("/api/code/repos/{repo_id}/review")
+async def review_code_repo_patch(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D04 — review the exact current patch, once per patch.
+
+    Reviewing a patch that already has a stored review returns that review with
+    ``reused: true``: the same finding is never raised twice for the same
+    change. Nothing in the working tree changes.
+    """
+    from raiker.review.patch_review import patch_fingerprint, review_once  # noqa: PLC0415
+
+    principal_id = auth_data[0].principal_id
+    repo = _owned_repo(request, repo_id, principal_id)
+    diff, reason = _current_patch(request, repo)
+    if not diff:
+        empty = _review_answer("", diff, None, False, reason or "no_changes")
+        return serialize_dto(empty)
+    review, reused = review_once(
+        SQLiteStore(_ws(request)), owner_principal_id=principal_id, repo_id=repo_id, diff=diff
+    )
+    answer = _review_answer(patch_fingerprint(diff), diff, review, reused, None)
+    return serialize_dto(answer)

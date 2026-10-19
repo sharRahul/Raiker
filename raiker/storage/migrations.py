@@ -4542,6 +4542,57 @@ PROJECT_CHECKS_SQL = """
 ALTER TABLE project_contexts ADD COLUMN checks_json TEXT NOT NULL DEFAULT '[]';
 """
 
+# BR-D01 — where a command ran, in plain form. The working directory was only
+# inside the encrypted execution material, so a Build outcome could not tell a
+# check that ran in the repository from the same command run somewhere else.
+# It is a workspace-relative locator (never absolute, never `..`), the same
+# value `CommandRequest` already validates, so storing it reveals nothing the
+# run list does not.
+COMMAND_RUN_CWD_MIGRATION_ID = "RAIKER-2113-command-run-cwd"
+
+COMMAND_RUN_CWD_SQL = """
+ALTER TABLE command_runs ADD COLUMN cwd TEXT NOT NULL DEFAULT '.';
+"""
+
+# BR-D02 — the execution target a Build turn started against: which folder,
+# repository, branch and commit, and its fingerprint. The outcome compares the
+# target now with this row, so a branch switched or a folder moved under a turn
+# is reported instead of verified across.
+BUILD_TURN_TARGETS_MIGRATION_ID = "RAIKER-2114-build-turn-targets"
+
+BUILD_TURN_TARGETS_SQL = """
+CREATE TABLE IF NOT EXISTS build_turn_targets (
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  repo_id TEXT,
+  target_json TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, turn_id)
+);
+CREATE INDEX IF NOT EXISTS idx_build_turn_targets_session
+  ON build_turn_targets(owner_principal_id, session_id, created_at);
+"""
+
+# BR-D04 — an exact-patch review, stored by the fingerprint of the patch it
+# read. Reviewing the same patch again returns the stored findings instead of a
+# second, duplicate set; a different patch is a different row.
+PATCH_REVIEWS_MIGRATION_ID = "RAIKER-2115-patch-reviews"
+
+PATCH_REVIEWS_SQL = """
+CREATE TABLE IF NOT EXISTS patch_reviews (
+  owner_principal_id TEXT NOT NULL,
+  repo_id TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  review_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, repo_id, fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_patch_reviews_repo
+  ON patch_reviews(owner_principal_id, repo_id, created_at DESC);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -4800,6 +4851,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(CHANNEL_REPLY_HOLDS_MIGRATION_ID, CHANNEL_REPLY_HOLDS_SQL),
     Migration(SETUP_PRIVACY_MODE_MIGRATION_ID, SETUP_PRIVACY_MODE_SQL),
     Migration(PROJECT_CHECKS_MIGRATION_ID, PROJECT_CHECKS_SQL),
+    Migration(COMMAND_RUN_CWD_MIGRATION_ID, COMMAND_RUN_CWD_SQL),
+    Migration(BUILD_TURN_TARGETS_MIGRATION_ID, BUILD_TURN_TARGETS_SQL),
+    Migration(PATCH_REVIEWS_MIGRATION_ID, PATCH_REVIEWS_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

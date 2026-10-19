@@ -2548,6 +2548,17 @@
             "title": "Command",
             "type": "string"
           },
+          "cwd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwd"
+          },
           "exit_code": {
             "anyOf": [
               {
@@ -2566,7 +2577,8 @@
               "not_run",
               "ran_before_change",
               "waiting",
-              "unknown"
+              "unknown",
+              "wrong_directory"
             ],
             "title": "Result",
             "type": "string"
@@ -2587,9 +2599,36 @@
           "command",
           "result",
           "exit_code",
-          "run_id"
+          "run_id",
+          "cwd"
         ],
         "title": "BuildCheckRow",
+        "type": "object"
+      },
+      "BuildReadBackRow": {
+        "description": "BR-D01 — one file the turn wrote, read back from disk after the turn.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "matches",
+              "present",
+              "changed_since",
+              "missing",
+              "unreadable"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "state"
+        ],
+        "title": "BuildReadBackRow",
         "type": "object"
       },
       "BuildSkillRequest": {
@@ -2661,9 +2700,33 @@
             ],
             "title": "Project Id"
           },
+          "readback": {
+            "items": {
+              "$ref": "#/components/schemas/BuildReadBackRow"
+            },
+            "title": "Readback",
+            "type": "array"
+          },
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuildTurnTargetSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_drift": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Drift",
+            "type": "array"
           },
           "turn_id": {
             "title": "Turn Id",
@@ -2680,9 +2743,51 @@
           "outcome",
           "writes",
           "checks",
-          "reason"
+          "reason",
+          "readback",
+          "target_drift",
+          "target"
         ],
         "title": "BuildTurnOutcome",
+        "type": "object"
+      },
+      "BuildTurnTargetSummary": {
+        "description": "BR-D02 — where a turn ran: the target it started on.",
+        "properties": {
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "head": {
+            "title": "Head",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "repo_kind": {
+            "title": "Repo Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_kind",
+          "label",
+          "folder",
+          "branch",
+          "head",
+          "fingerprint"
+        ],
+        "title": "BuildTurnTargetSummary",
         "type": "object"
       },
       "BulkDeleteSessionsRequest": {
@@ -5569,6 +5674,53 @@
         "title": "CodeRepoFileView",
         "type": "object"
       },
+      "CodeRepoReviewView": {
+        "description": "The review of the working tree's current patch, if one has been taken.\n\n``fingerprint`` is the current patch's; ``review`` is null until the owner\nasks for one. ``reused`` says the stored review of this same patch was\nreturned instead of a second, duplicate set of findings.",
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "has_changes": {
+            "title": "Has Changes",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "reused": {
+            "title": "Reused",
+            "type": "boolean"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatchReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "fingerprint",
+          "has_changes",
+          "review",
+          "reused",
+          "reason_code"
+        ],
+        "title": "CodeRepoReviewView",
+        "type": "object"
+      },
       "CodeRepoSelected": {
         "properties": {
           "code_map": {
@@ -5603,6 +5755,107 @@
           "code_map"
         ],
         "title": "CodeRepoSelected",
+        "type": "object"
+      },
+      "CodeRepoTargetView": {
+        "description": "BR-D02 — the execution target a Build turn on this repository would use.",
+        "properties": {
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "code_placement": {
+            "title": "Code Placement",
+            "type": "string"
+          },
+          "code_placement_reason": {
+            "title": "Code Placement Reason",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "folder": {
+            "title": "Folder",
+            "type": "string"
+          },
+          "folder_exists": {
+            "title": "Folder Exists",
+            "type": "boolean"
+          },
+          "git": {
+            "title": "Git",
+            "type": "boolean"
+          },
+          "head": {
+            "title": "Head",
+            "type": "string"
+          },
+          "host": {
+            "enum": [
+              "this_computer",
+              "remote"
+            ],
+            "title": "Host",
+            "type": "string"
+          },
+          "identity": {
+            "title": "Identity",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "repo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repo Id"
+          },
+          "repo_kind": {
+            "title": "Repo Kind",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "folder_missing",
+              "remote_only",
+              "no_repository"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "repo_id",
+          "repo_kind",
+          "label",
+          "state",
+          "host",
+          "folder",
+          "folder_exists",
+          "git",
+          "branch",
+          "head",
+          "identity",
+          "environment",
+          "code_placement",
+          "code_placement_reason",
+          "fingerprint"
+        ],
+        "title": "CodeRepoTargetView",
         "type": "object"
       },
       "CodeRepoView": {
@@ -6100,6 +6353,10 @@
             "title": "Created At",
             "type": "string"
           },
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
           "exit_code": {
             "anyOf": [
               {
@@ -6234,7 +6491,8 @@
           "redaction_count",
           "receipt_digest",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "cwd"
         ],
         "title": "CommandRunView",
         "type": "object"
@@ -20313,6 +20571,139 @@
         "title": "PasswordRecoveryCompleteRequest",
         "type": "object"
       },
+      "PatchReview": {
+        "properties": {
+          "added_lines": {
+            "title": "Added Lines",
+            "type": "integer"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/PatchReviewFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "title": "Reviewed At",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "files",
+          "added_lines",
+          "truncated",
+          "findings",
+          "counts",
+          "reviewed_at"
+        ],
+        "title": "PatchReview",
+        "type": "object"
+      },
+      "PatchReviewFinding": {
+        "description": "BR-D04 — one deterministic finding on an exact patch.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "next_step": {
+            "title": "Next Step",
+            "type": "string"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id",
+          "rule",
+          "severity",
+          "category",
+          "title",
+          "evidence",
+          "next_step",
+          "confidence",
+          "path",
+          "line"
+        ],
+        "title": "PatchReviewFinding",
+        "type": "object"
+      },
       "PathAttachment": {
         "description": "A workspace path a task reads.",
         "properties": {
@@ -32984,6 +33375,124 @@
           }
         },
         "summary": "Read Code Repo File"
+      }
+    },
+    "/api/code/repos/{repo_id}/review": {
+      "get": {
+        "description": "BR-D04 — the stored review of the current patch, if one was taken.",
+        "operationId": "read_code_repo_review_api_code_repos__repo_id__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoReviewView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Code Repo Review"
+      },
+      "post": {
+        "description": "BR-D04 — review the exact current patch, once per patch.\n\nReviewing a patch that already has a stored review returns that review with\n``reused: true``: the same finding is never raised twice for the same\nchange. Nothing in the working tree changes.",
+        "operationId": "review_code_repo_patch_api_code_repos__repo_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoReviewView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Code Repo Patch"
+      }
+    },
+    "/api/code/repos/{repo_id}/target": {
+      "get": {
+        "description": "BR-D02 — where a Build turn on this repository would actually run.\n\nThe folder, repository identity, branch, commit and command environment,\nwith the fingerprint the turn is bound to. Read-only; a GitHub coordinate\nanswers ``remote_only`` and a moved folder ``folder_missing`` rather than\npretending the workspace root is the target.",
+        "operationId": "read_code_repo_target_api_code_repos__repo_id__target_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoTargetView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Code Repo Target"
       }
     },
     "/api/command-runs": {

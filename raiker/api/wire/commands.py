@@ -38,6 +38,7 @@ class CommandRunView(TypedDict):
     receipt_digest: str | None
     created_at: str
     updated_at: str
+    cwd: str
 
 
 class CommandChunkView(TypedDict):

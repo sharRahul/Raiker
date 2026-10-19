@@ -515,9 +515,16 @@ export type BreachCheckRequest = {
 /** BR-D01 — one declared check, and what the turn's command record says of it. */
 export type BuildCheckRow = {
   command: string;
-  result: "passed" | "failed" | "not_run" | "ran_before_change" | "waiting" | "unknown";
+  result: "passed" | "failed" | "not_run" | "ran_before_change" | "waiting" | "unknown" | "wrong_directory";
   exit_code: number | null;
   run_id: string | null;
+  cwd: string | null;
+};
+
+/** BR-D01 — one file the turn wrote, read back from disk after the turn. */
+export type BuildReadBackRow = {
+  path: string;
+  state: "matches" | "present" | "changed_since" | "missing" | "unreadable";
 };
 
 /** A skill Raiker authored: the name, the trigger description, the body. */
@@ -536,6 +543,19 @@ export type BuildTurnOutcome = {
   writes: number;
   checks: BuildCheckRow[];
   reason: string;
+  readback: BuildReadBackRow[];
+  target_drift: string[];
+  target: BuildTurnTargetSummary | null;
+};
+
+/** BR-D02 — where a turn ran: the target it started on. */
+export type BuildTurnTargetSummary = {
+  repo_kind: string;
+  label: string;
+  folder: string;
+  branch: string;
+  head: string;
+  fingerprint: string;
 };
 
 export type BulkDeleteSessionsRequest = {
@@ -1117,10 +1137,38 @@ export type CodeRepoFileView = {
   reason_code: string;
 };
 
+/** The review of the working tree's current patch, if one has been taken. */
+export type CodeRepoReviewView = {
+  fingerprint: string;
+  has_changes: boolean;
+  review: PatchReview | null;
+  reused: boolean;
+  reason_code: string | null;
+};
+
 export type CodeRepoSelected = {
   ok: boolean;
   selected_repo_id: string | null;
   code_map: CodeMapSummary | null;
+};
+
+/** BR-D02 — the execution target a Build turn on this repository would use. */
+export type CodeRepoTargetView = {
+  repo_id: string | null;
+  repo_kind: string;
+  label: string;
+  state: "ready" | "folder_missing" | "remote_only" | "no_repository";
+  host: "this_computer" | "remote";
+  folder: string;
+  folder_exists: boolean;
+  git: boolean;
+  branch: string;
+  head: string;
+  identity: string;
+  environment: string;
+  code_placement: string;
+  code_placement_reason: string;
+  fingerprint: string;
 };
 
 /** One repository a coding chat can be pointed at. */
@@ -1241,6 +1289,7 @@ export type CommandRunView = {
   receipt_digest: string | null;
   created_at: string;
   updated_at: string;
+  cwd: string;
 };
 
 export type CommandStopRequested = {
@@ -3883,6 +3932,30 @@ export type PasswordRecoveryCompleteRequest = {
   new_password: string;
 };
 
+export type PatchReview = {
+  fingerprint: string;
+  files: number;
+  added_lines: number;
+  truncated: boolean;
+  findings: PatchReviewFinding[];
+  counts: Record<string, number>;
+  reviewed_at: string;
+};
+
+/** BR-D04 — one deterministic finding on an exact patch. */
+export type PatchReviewFinding = {
+  finding_id: string;
+  rule: string;
+  severity: "high" | "medium" | "low" | "info";
+  category: string;
+  title: string;
+  evidence: string;
+  next_step: string;
+  confidence: "high" | "medium" | "low";
+  path: string | null;
+  line: number | null;
+};
+
 /** A workspace path a task reads. */
 export type PathAttachment = {
   type: "path";
@@ -5849,6 +5922,12 @@ export const contract = {
     request<CodeRepoDiagnosticsView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/diagnostics`, query)),
   readCodeRepoFile: (repoId: string, query: { path?: string } = {}) =>
     request<CodeRepoFileView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/file`, query)),
+  readCodeRepoReview: (repoId: string) =>
+    request<CodeRepoReviewView>(`/api/code/repos/${encodeURIComponent(repoId)}/review`),
+  reviewCodeRepoPatch: (repoId: string) =>
+    call<CodeRepoReviewView>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/review`),
+  readCodeRepoTarget: (repoId: string) =>
+    request<CodeRepoTargetView>(`/api/code/repos/${encodeURIComponent(repoId)}/target`),
   listCommands: (query: { session_id?: string } = {}) =>
     request<CommandRunList>(withQuery("/api/command-runs", query)),
   getCommand: (runId: string) =>

@@ -306,6 +306,39 @@ record, not from what the model said it did. A check that ran before the last
 change, a command that only looks like it, or no checks at all leaves the
 change **Not verified**; the line lists each check and what happened to it.
 
+Three more things can only lower the answer, never raise it:
+
+- **Where a check ran.** A check counts only in the selected repository's
+  folder. The agent runs it there by passing that folder as the command's
+  working directory; the same command run at the workspace root, which checks a
+  different tree, reads *ran outside the repository folder (in the workspace
+  root)*.
+- **What is on disk.** Every file the turn wrote is read back afterwards. A file
+  that is no longer there is listed as *no longer on disk* and keeps the turn
+  **Not verified**. A file someone changed later is listed as *changed since this
+  turn*; it does not undo checks that passed on what the turn wrote.
+- **Whether the target moved.** A Build turn records the folder, repository,
+  branch and command environment it started on. If any of them has changed since
+  — you switched branch, say — the line says *The branch this turn started on has
+  changed since* and the turn is not verified across it. Otherwise it says where
+  the turn ran: *Ran in app on main from abc1234*. A commit the turn made itself
+  is not the target moving.
+
+## Where a turn runs
+
+The Build header shows the target beside the repository name: the branch and
+commit, and where code such as a test run would execute — **Sandbox**, **This
+computer**, **Your environment** or **Remote environment**. Hover or focus it for
+the folder, the repository's identity (its remote, with any credentials taken
+out), the command environment and the target's fingerprint. A GitHub repository
+reads **GitHub · no checkout**.
+
+If the repository's folder has moved or been deleted, the header says so and a
+Build turn **does not start**: the message names the folder and asks you to
+reconnect the repository or choose another. The file and git tools would
+otherwise fall back to the workspace root, which is not the repository you
+pointed Build at.
+
 ## Reading the repository
 
 **Files** on the Build header opens the connected repository beside the
@@ -355,6 +388,26 @@ reviewed. When a turn raises a new approval they step aside, keeping the view
 and place you had, so the decision is not hidden under something you were
 reading. Reopening one while the approval is still waiting is your choice, and
 it stays open.
+
+### Reviewing the patch
+
+**Changes** offers **Review this patch** above the diff. It reviews the exact
+uncommitted patch — the same change set a commit would record — and lists each
+finding with its severity, the file and line, what was found and what to do:
+
+- a possible credential added (the value is never shown);
+- an unresolved merge conflict marker;
+- a debugger breakpoint left in source code;
+- a change to a CI or workflow definition, which Build leaves to you;
+- added text that tells a model to ignore its instructions or reveal its prompt —
+  issue and repository text is data, never an instruction to Raiker;
+- source changed with no test change.
+
+The review is kept for that exact patch, identified by its fingerprint. Opening
+Changes again on the same patch shows **Reviewed** with the same findings rather
+than a fresh set; any edit makes it a different patch, and the button comes back.
+The review reads only: it changes no file, and acting on a finding is an
+ordinary change you approve.
 
 ## Finding your way around code
 

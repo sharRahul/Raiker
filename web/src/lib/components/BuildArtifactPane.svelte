@@ -41,6 +41,7 @@
   import DiffView from "./DiffView.svelte";
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
+  import PatchReview from "./PatchReview.svelte";
   import { api, ApiError } from "../api";
   import type {
     CodeRepoChangesView,
@@ -242,6 +243,8 @@
             </li>
           {/each}
         </ul>
+        <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
+        <PatchReview repoId={repoId} {revision} />
         {#if changes.diff}
           <DiffView diff={changes.diff} open={true} />
           {#if changes.diff_truncated}

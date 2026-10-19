@@ -536,6 +536,24 @@ The focused regression set, documentation contracts, Ruff, mypy, and web checks 
 
 These are not closed by this documentation/live-test pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
 
+## 2026-10-19 verification follow-up — readiness line after a live Anthropic Build turn
+
+Found while running `br-d02-d04-build-target-and-review-live.spec.ts` against a
+fresh `raiker-web` (closed work: [FIXED-954](FIXED_ITEMS.md#fixed-954--a-build-check-counted-wherever-it-ran-and-a-written-file-was-never-read-back-br-d01)
+to [FIXED-957](FIXED_ITEMS.md#fixed-957--nothing-proved-an-injected-fault-could-not-read-as-verified-br-d06-first-slice)).
+Anthropic was connected through Models with an identity-linked key and its
+workspace ID, `claude-haiku-4-5-20251001` was kept through the picker without
+**Check**, and a Build turn completed. Afterwards the composer showed two lines
+that disagree: the readiness strip read *Checking this model — you can still
+send*, while the line under the composer read *No readiness check exists for
+this exact model. Open Models*. The turn itself was admitted and ran, so this is
+presentation, not a refusal. Not triaged in this run: whether the gateway's
+first-use check stores its observation under a different key than the composer
+reads (the FIXED-953 round saw neither line with Ollama), or whether the footer
+line is read before the post-turn refresh. The capture is
+`02-real-turn-outcome-target.png` in
+`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/` (not committed).
+
 ## Decision statements added 2026-10-05
 
 **Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.

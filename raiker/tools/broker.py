@@ -560,6 +560,9 @@ class ToolBroker:
                 "status": "denied",
                 "error": {"type": "command_not_authorised", "fallback_tool": "shell"},
             }
+        cwd, cwd_refusal = self._command_cwd(args.get("cwd"))
+        if cwd_refusal is not None:
+            return {"status": "denied", "error": {"type": cwd_refusal}}
         try:
             # GCR-06 — the workspace this command will actually run in, stated
             # here rather than read from a module global. This call site never
@@ -593,6 +596,7 @@ class ToolBroker:
                 authority_id=grant_identity,
                 command=str(args.get("command", "")),
                 argv=command,
+                cwd=cwd,
                 max_output_bytes=100_000,
             )
             host_refusal = self._host_network_code_refusal(
@@ -626,6 +630,34 @@ class ToolBroker:
             reason = exc.reason_code if isinstance(exc, CommandServiceError) else str(exc)
             return {"status": "failed", "error": {"type": reason}}
         return {"status": "success", **result}
+
+    def _command_cwd(self, requested: Any) -> tuple[str, str | None]:
+        """BR-D01 — the folder a granted command runs in, confined to the workspace.
+
+        A Build check such as ``python -m pytest`` means something only in the
+        repository it checks. Without a working directory every command ran at
+        the workspace root, so a repository in a sub-folder could not be checked
+        at all. The folder goes through the same read authority every file read
+        uses — symlinks resolved, nothing outside the workspace — and must be an
+        existing directory; the run stores the workspace-relative result.
+        """
+        from raiker.tools.filesystem import resolve_workspace_path
+
+        text = str(requested or "").strip()
+        if not text or text == ".":
+            return ".", None
+        root = Path(self.command_service.workspace_root).resolve()
+        try:
+            resolved = resolve_workspace_path(root, text)
+        except Exception:  # noqa: BLE001 — every refusal reads the same to the model
+            return ".", "command_cwd_outside_workspace"
+        if not resolved.is_dir():
+            return ".", "command_cwd_not_a_directory"
+        try:
+            relative = resolved.relative_to(root).as_posix()
+        except ValueError:
+            return ".", "command_cwd_outside_workspace"
+        return relative or ".", None
 
     def _host_network_code_refusal(
         self, command: list[str], context: ToolExecutionContext, *, background: bool

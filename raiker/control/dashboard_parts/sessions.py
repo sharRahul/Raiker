@@ -107,7 +107,8 @@ class SessionService:
         Reads only: the turn's tool actions, its command runs and the project's
         declared checks. ``None`` when the session or turn is not this owner's.
         """
-        from raiker.control.build_outcome import classify_build_turn
+        from raiker.control.build_outcome import classify_build_turn, read_back_writes
+        from raiker.control.build_target import describe_target, load_turn_target, target_drift
         from raiker.execution.commands.store import CommandStore
 
         row = self.store.load_session(session_id)
@@ -129,12 +130,39 @@ class SessionService:
             for run in CommandStore(self.store).list_runs(owner_principal_id, session_id=session_id, limit=500)
             if run.turn_id == turn_id
         ]
+        actions = self.store.list_turn_tool_actions(session_id, turn_id)
+        workspace_root = self.store.paths.workspace_root
+        # BR-D02 — the target this turn started on, when one was recorded. A
+        # turn from before targets were recorded is judged without one rather
+        # than against whatever is selected today.
+        started = load_turn_target(self.store, owner_principal_id=owner_principal_id, turn_id=turn_id)
+        expected_cwd: str | None = None
+        drift: list[str] = []
+        current: dict[str, Any] | None = None
+        if started is not None:
+            if started.get("repo_kind") == "local":
+                expected_cwd = str(started.get("folder") or ".")
+            repo = (
+                self.store.load_code_repo(owner_principal_id, str(started["repo_id"]))
+                if started.get("repo_id")
+                else None
+            )
+            current = describe_target(self.store, workspace_root, owner_principal_id, repo)
+            drift = target_drift(started, current)
         outcome = classify_build_turn(
-            tool_actions=self.store.list_turn_tool_actions(session_id, turn_id),
+            tool_actions=actions,
             command_runs=runs,
             checks=checks,
+            expected_cwd=expected_cwd,
+            readback=read_back_writes(actions, workspace_root),
+            target_drift=drift,
         )
-        return {"turn_id": turn_id, "project_id": project_id, **outcome}
+        return {
+            "turn_id": turn_id,
+            "project_id": project_id,
+            **outcome,
+            "target": _target_summary(started),
+        }
 
     def build_session_transcript(
         self: DashboardService,
@@ -953,3 +981,17 @@ class SessionService:
             can_restore_state=bool(row.get("can_restore_state", 0)),
             can_restore_files=bool(row.get("can_restore_files", 0)),
         )
+
+
+def _target_summary(target: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The part of a recorded target an outcome shows: where the turn ran."""
+    if target is None:
+        return None
+    return {
+        "repo_kind": str(target.get("repo_kind") or "none"),
+        "label": str(target.get("label") or ""),
+        "folder": str(target.get("folder") or "."),
+        "branch": str(target.get("branch") or ""),
+        "head": str(target.get("head") or ""),
+        "fingerprint": str(target.get("fingerprint") or ""),
+    }

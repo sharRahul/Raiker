@@ -29,7 +29,32 @@
     ran_before_change: "ran before the last change",
     waiting: "waiting for your approval",
     unknown: "did not finish",
+    wrong_directory: "ran outside the repository folder",
   };
+  const READBACK: Record<BuildTurnOutcome["readback"][number]["state"], string> = {
+    matches: "on disk as written",
+    present: "on disk",
+    changed_since: "changed since this turn",
+    missing: "no longer on disk",
+    unreadable: "could not be read back",
+  };
+  const DRIFT: Record<string, string> = {
+    branch: "branch",
+    folder: "folder",
+    identity: "repository",
+    repo_kind: "repository",
+    environment: "command environment",
+    folder_exists: "folder (it is gone)",
+  };
+
+  const drift = $derived(
+    [...new Set((outcome?.target_drift ?? []).map((name) => DRIFT[name] ?? name))],
+  );
+  // Files that read back as anything but what was written are worth a line;
+  // a file on disk exactly as written is the expected case and stays quiet.
+  const notable = $derived(
+    (outcome?.readback ?? []).filter((row) => row.state !== "matches" && row.state !== "present"),
+  );
 
   $effect(() => {
     const session = sessionId;
@@ -56,12 +81,28 @@
       <ul>
         {#each outcome.checks as check (check.command)}
           <li>
-            <code>{check.command}</code> — {RESULT[check.result]}{check.exit_code !== null && check.result === "failed" ? ` (exit ${check.exit_code})` : ""}
+            <code>{check.command}</code> — {RESULT[check.result]}{check.exit_code !== null && check.result === "failed" ? ` (exit ${check.exit_code})` : ""}{check.result === "wrong_directory" && check.cwd ? ` (in ${check.cwd === "." ? "the workspace root" : check.cwd})` : ""}
           </li>
         {/each}
       </ul>
     {:else}
       <p class="hint">Add checks to this project's context so a change can be verified.</p>
+    {/if}
+    {#if notable.length}
+      <ul class="readback" aria-label="Files read back">
+        {#each notable as row (row.path)}
+          <li data-state={row.state}><code>{row.path}</code> — {READBACK[row.state]}</li>
+        {/each}
+      </ul>
+    {/if}
+    {#if drift.length}
+      <p class="drift" data-testid="build-target-drift">
+        The {drift.join(", ")} this turn started on has changed since{outcome.target?.branch ? ` (it began on ${outcome.target.branch})` : ""}.
+      </p>
+    {:else if outcome.target}
+      <p class="where">
+        Ran in <code>{outcome.target.folder}</code>{outcome.target.branch ? ` on ${outcome.target.branch}` : ""}{outcome.target.head ? ` from ${outcome.target.head}` : ""}.
+      </p>
     {/if}
   </div>
 {/if}
@@ -91,4 +132,7 @@
   ul { margin: var(--space-1) 0 0; padding-left: 1.1rem; }
   code { font-family: var(--font-mono); font-size: var(--text-xs); }
   .hint { margin-top: var(--space-1); color: var(--text-3); }
+  .readback li[data-state="missing"] { color: var(--danger); }
+  .drift { margin-top: var(--space-1); color: var(--warn); }
+  .where { margin-top: var(--space-1); color: var(--text-3); }
 </style>

@@ -269,6 +269,35 @@ claim without matched evidence. Current Build capabilities are foundations, not
 proof that this whole workflow is shipped; implementation work remains in the
 referenced ledgers, including a governed scheduled issue-to-PR runner.
 
+### The execution target (BR-D02)
+
+A Build turn runs against a **target**, not a label: the selected repository's
+folder, its identity (GitHub coordinate, or `origin` remote with credentials
+stripped), branch and commit, and the command environment. The target is read
+from the runtime's own sources (`raiker/control/build_target.py`) and reduced to
+a fingerprint over identity, folder, branch and environment. The commit is
+recorded but not fingerprinted, because a turn's own commit is not the target
+moving; where code is placed is shown but not fingerprinted, because that is
+re-measured on a timer.
+
+The gateway records the target for every Build turn and refuses a Build turn
+whose selected folder is gone, rather than letting the tools fall back to the
+workspace root. The turn's outcome compares the recorded target with the current
+one: a branch switched, a folder moved or an environment changed under the turn
+is reported and keeps it short of `completed_verified`. The Build header states
+the target (`main · 6e99715 · Sandbox`), and `GET /api/code/repos/{repo_id}/target`
+returns it.
+
+### Reviewing the patch (BR-D04)
+
+**Changes → Review this patch** reviews the exact uncommitted diff — the change
+set a commit would record — with deterministic rules (possible credential,
+conflict marker, debugging left in, CI/workflow change, instruction-like text,
+source without tests). Each finding names its file and line, evidence and next
+step. The review is stored by the patch's SHA-256 fingerprint, so the same patch
+returns the same review and any edit is a new one. It reads only; acting on a
+finding is an ordinary governed change.
+
 ### Reading it (B13)
 
 **Files** on the Build header opens the connected repository beside the
@@ -354,10 +383,10 @@ does not describe a shipped capability.
 
 | ID / status | Objective | Reason | Accepted decision and closure evidence |
 |---|---|---|---|
-| BR-D01 / Partly implemented 2026-10-18 | Gate `completed_verified` on independent checks. | A plausible patch or final model statement is not a completed coding outcome. | Reuse the verification runtime; preserve `unverified`, partial, blocked and unknown outcomes. Close with hidden-test, wrong-path, timeout and read-back faults. **First slice shipped ([FIXED-952](FIXED_ITEMS.md#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice))**: owner-declared project checks, an outcome read from the turn's own tool actions and command runs, shown under each settled Build turn. Hidden-test, stale-check, lookalike-command and timeout faults are proven by `tests/test_build_outcome.py`; still open are wrong-path detection (a run's working directory is not stored in plain form), and destination read-back. A real model turn that changes a file now passes live: after [FIXED-953](FIXED_ITEMS.md#fixed-953--an-accepted-build-write-wrote-nothing-and-its-row-read-failed-bug-346) (BUG-346), a `gpt-oss:120b-cloud` Build turn's accepted write lands once and the outcome reads **Not verified** with the declared check *not run after the last change*. |
-| BR-D02 / Planned | Bind every write-capable turn to a named execution target. | A project label cannot substitute for the actual host, root, repository, branch/worktree and sandbox. | Require target fingerprint/revalidation and separate worktrees for concurrent writes. Close with Linux/Windows, stale target, cancel and same-file concurrency scenarios. |
+| BR-D01 / Implemented 2026-10-19 | Gate `completed_verified` on independent checks. | A plausible patch or final model statement is not a completed coding outcome. | Reuse the verification runtime; preserve `unverified`, partial, blocked and unknown outcomes. Close with hidden-test, wrong-path, timeout and read-back faults. **First slice ([FIXED-952](FIXED_ITEMS.md#fixed-952--a-build-change-read-as-done-whether-or-not-anything-checked-it-br-d01-first-slice))**: owner-declared project checks, an outcome read from the turn's own tool actions and command runs, shown under each settled Build turn; hidden-test, stale-check, lookalike-command and timeout faults in `tests/test_build_outcome.py`, and a live `gpt-oss:120b-cloud` turn after [FIXED-953](FIXED_ITEMS.md#fixed-953--an-accepted-build-write-wrote-nothing-and-its-row-read-failed-bug-346). **Closed ([FIXED-954](FIXED_ITEMS.md#fixed-954--a-build-check-counted-wherever-it-ran-and-a-written-file-was-never-read-back-br-d01))**: `run_command` takes a workspace-confined `cwd` stored in plain form on the run, a check run outside the turn's repository folder reads `wrong_directory`, and each written file is read back from disk — a missing destination keeps the turn **Not verified**. |
+| BR-D02 / Partly implemented 2026-10-19 | Bind every write-capable turn to a named execution target. | A project label cannot substitute for the actual host, root, repository, branch/worktree and sandbox. | Require target fingerprint/revalidation and separate worktrees for concurrent writes. Close with Linux/Windows, stale target, cancel and same-file concurrency scenarios. **First slice ([FIXED-955](FIXED_ITEMS.md#fixed-955--a-build-turn-named-a-repository-not-the-target-it-ran-against-br-d02-first-slice))**: the target (folder, credential-free repository identity, branch, commit, command environment, code placement) is described with a fingerprint at `GET /api/code/repos/{repo_id}/target` and on the Build header, recorded for every Build turn, and compared by the outcome, so drift is reported rather than verified across; a Build turn whose selected folder is gone is refused before it starts. Still open: separate worktrees and branch ownership for concurrent write-capable turns, revalidation at resume/approval time, and Windows/cancel/same-file concurrency evidence. |
 | BR-D03 / Planned | Deliver governed issue-to-PR completion. | A template or connection cannot itself fix an issue, validate it, push, and open a reviewable PR. | Use a stored repository delegation, dedicated branch/workspace, target-bound commands and provider receipts; never merge automatically. Close with the autonomous bug-fix and mid-run revocation scenarios in [Testing](../plans/TESTING.md). |
-| BR-D04 / Planned | Review an exact patch before PR-quality completion. | Human diff display alone cannot establish repeatable quality or detect duplicate findings. | Run static/secret/policy checks, independent validators and selected model review against a patch fingerprint; proposed repair is bounded and never auto-merges. Close with seeded correctness, regression, secret and prompt-injection cases plus false-positive controls. |
+| BR-D04 / Partly implemented 2026-10-19 | Review an exact patch before PR-quality completion. | Human diff display alone cannot establish repeatable quality or detect duplicate findings. | Run static/secret/policy checks, independent validators and selected model review against a patch fingerprint; proposed repair is bounded and never auto-merges. Close with seeded correctness, regression, secret and prompt-injection cases plus false-positive controls. **First slice ([FIXED-956](FIXED_ITEMS.md#fixed-956--a-patch-was-shown-never-reviewed-and-every-look-was-a-new-look-br-d04-first-slice))**: deterministic secret, conflict-marker, debug-statement, CI/workflow-change, instruction-text and missing-test findings with file, line, evidence and next step, stored by patch fingerprint so the same patch is never reviewed twice; seeded and false-positive cases pass, and **Changes → Review this patch** shows them. Still open: independent validators and selected model review against the same fingerprint, and bounded repair. |
 | BR-D05 / Planned | Provide code provenance and signed-review evidence where supported. | A recipient needs to identify what agent/workspace produced a change without trusting a model narrative. | Treat signatures/watermarks as optional evidence that never grants authority and never replaces ordinary Git/review controls. Close with provenance read-back and key/credential redaction tests. |
-| BR-D06 / Planned | Continuously exercise recovery and fault boundaries. | Coding autonomy that succeeds only in a happy path is not safe to leave running. | Add bounded chaos/fault fixtures to the common testing protocol; preserve run records and block false completion. Close with repeatable injected target, tool, provider and restart failures. |
+| BR-D06 / Partly implemented 2026-10-19 | Continuously exercise recovery and fault boundaries. | Coding autonomy that succeeds only in a happy path is not safe to leave running. | Add bounded chaos/fault fixtures to the common testing protocol; preserve run records and block false completion. Close with repeatable injected target, tool, provider and restart failures. **First slice ([FIXED-957](FIXED_ITEMS.md#fixed-957--nothing-proved-an-injected-fault-could-not-read-as-verified-br-d06-first-slice))**: thirteen injected tool, check, provider, folder, read-back and target faults never classify as `completed_verified` (`tests/test_build_fault_boundaries.py`). Still open: the same faults injected into a running host (a real restart mid-check, a provider failing mid-turn) rather than into the classifier's inputs. |
 | BR-D07 / Implemented foundation | Retain governed modes, approvals, patch application, commands, repository context, checkpoints and human diff review. | These are the narrow foundations on which the verified loop is built. | Keep the existing shared runtime controls; they may tighten but never bypass the active execution profile or standing policy. Evidence remains current implementation status and the testing protocol. |

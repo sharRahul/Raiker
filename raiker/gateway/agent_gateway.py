@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from pathlib import Path
+from typing import Any
 
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
@@ -382,6 +384,8 @@ class AgentGateway:
                 client=prompt_envelope.client,
             )
         )
+        if surface == "build":
+            self._record_build_target(prompt_envelope)
         if self.hook_dispatcher.is_active():
             additions: list[str] = []
             if existing_session is None:
@@ -396,6 +400,65 @@ class AgentGateway:
             session_id=prompt_envelope.session_id,
             turn_id=prompt_envelope.turn_id,
             role_ids=("assistant",),
+        )
+
+    def _current_build_target(self) -> dict[str, Any]:
+        from raiker.control.build_target import describe_target, selected_repo
+
+        return describe_target(
+            self.store,
+            self.workspace_root,
+            self.owner_principal_id,
+            selected_repo(self.store, self.owner_principal_id),
+        )
+
+    def _record_build_target(self, prompt_envelope: PromptEnvelope) -> None:
+        """BR-D02 — bind this Build turn to the target it starts on.
+
+        The outcome later compares the target now with this record, so a branch
+        switched or a folder moved under the turn is reported, not verified
+        across. Recording is best effort: a failure here leaves the turn judged
+        without a target, which can only make its claim weaker.
+        """
+        from raiker.control.build_target import record_turn_target
+
+        with contextlib.suppress(Exception):
+            record_turn_target(
+                self.store,
+                owner_principal_id=self.owner_principal_id,
+                session_id=prompt_envelope.session_id,
+                turn_id=prompt_envelope.turn_id,
+                target=self._current_build_target(),
+            )
+
+    def _build_target_refusal(self, prompt_envelope: PromptEnvelope) -> AgentResponse | None:
+        """BR-02 — a Build turn whose selected folder is gone fails closed.
+
+        The git and file tools fall back to the workspace root when the selected
+        repository's folder cannot be resolved. That is safe for reading, and
+        wrong for a coding turn: the owner pointed Build at one repository and
+        the turn would change another. So the turn is refused before it starts,
+        with the reason, and nothing runs.
+        """
+        surface = normalize_prompt_surface(prompt_envelope.prompt.metadata.get("surface", "chat"))
+        if surface != "build":
+            return None
+        try:
+            target = self._current_build_target()
+        except Exception:  # noqa: BLE001 — an unreadable target is not a missing one
+            return None
+        if target.get("state") != "folder_missing":
+            return None
+        return AgentResponse(
+            request_id=prompt_envelope.request_id,
+            session_id=prompt_envelope.session_id,
+            turn_id=prompt_envelope.turn_id,
+            status="failed",
+            message=(
+                f"The repository folder {target.get('folder')} is no longer in the workspace, "
+                "so this Build turn did not start. Reconnect the repository or choose another one."
+            ),
+            client=prompt_envelope.client,
         )
 
     def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
@@ -601,6 +664,8 @@ class AgentGateway:
             return error
         if refusal := await self._model_readiness_refusal(prompt_envelope):
             return refusal
+        if refusal := self._build_target_refusal(prompt_envelope):
+            return refusal
         identity = await self._aprepare_turn(prompt_envelope)
         response: AgentResponse | None = None
         try:
@@ -713,6 +778,14 @@ class AgentGateway:
                 kind=FINAL,
                 event_type="model_not_ready",
                 payload={"reason_code": "model_not_ready"},
+                response=refusal,
+            )
+            return
+        if refusal := self._build_target_refusal(prompt_envelope):
+            yield StreamEvent(
+                kind=FINAL,
+                event_type="build_target_missing",
+                payload={"reason_code": "build_target_missing"},
                 response=refusal,
             )
             return

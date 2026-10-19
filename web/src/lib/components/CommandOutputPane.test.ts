@@ -29,6 +29,7 @@ const run: CommandRunView = {
   receipt_digest: "abc123def456",
   created_at: "2026-08-14T10:00:00Z",
   updated_at: "2026-08-14T10:00:01Z",
+  cwd: ".",
 };
 
 it("shows the authoritative environment, redacted output, and immutable receipt", async () => {

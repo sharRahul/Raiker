@@ -16,9 +16,31 @@ class BuildCheckRow(TypedDict):
     """BR-D01 — one declared check, and what the turn's command record says of it."""
 
     command: str
-    result: Literal["passed", "failed", "not_run", "ran_before_change", "waiting", "unknown"]
+    result: Literal[
+        "passed", "failed", "not_run", "ran_before_change", "waiting", "unknown", "wrong_directory"
+    ]
     exit_code: int | None
     run_id: str | None
+    #: The workspace-relative folder the counted run executed in, if any.
+    cwd: str | None
+
+
+class BuildReadBackRow(TypedDict):
+    """BR-D01 — one file the turn wrote, read back from disk after the turn."""
+
+    path: str
+    state: Literal["matches", "present", "changed_since", "missing", "unreadable"]
+
+
+class BuildTurnTargetSummary(TypedDict):
+    """BR-D02 — where a turn ran: the target it started on."""
+
+    repo_kind: str
+    label: str
+    folder: str
+    branch: str
+    head: str
+    fingerprint: str
 
 
 class BuildTurnOutcome(TypedDict):
@@ -32,6 +54,10 @@ class BuildTurnOutcome(TypedDict):
     writes: int
     checks: list[BuildCheckRow]
     reason: str
+    readback: list[BuildReadBackRow]
+    #: Target fields that changed since the turn started; empty when none did.
+    target_drift: list[str]
+    target: BuildTurnTargetSummary | None
 
 
 class ParkedApproval(TypedDict):

@@ -47,6 +47,7 @@
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import BuildOutcome from "../components/BuildOutcome.svelte";
+  import BuildTargetChip from "../components/BuildTargetChip.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
@@ -1918,6 +1919,10 @@
         </button>
         {#if activeRepo?.kind === "local" && !activeRepo.local_exists}
           <span class="repo-warning" role="status">That folder is no longer in the workspace.</span>
+        {:else}
+          <!-- BR-D02 — the branch, commit and execution placement a turn here
+               is bound to, from the server's own target description. -->
+          <BuildTargetChip repoId={activeRepo?.repo_id ?? null} revision={workingTreeRevision} />
         {/if}
       </div>
 

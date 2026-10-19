@@ -43,6 +43,9 @@ test-results/
 # looking at; they are not worth carrying in the tree.
 docs/plans/screenshots/working/
 docs/plans/screenshots/not-working/
+# Live rounds since 2026-10-19 write their captures to a dated folder under
+# docs/screenshots/ ("not committed" in FIXED_ITEMS); the same rule applies.
+docs/screenshots/20[0-9][0-9]-*/
 # Working captures taken while driving the app during development. Four of
 # these reached a commit before this line existed, which is the same hundred
 # megabytes of binaries arriving one convenience at a time.

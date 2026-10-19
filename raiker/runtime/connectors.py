@@ -335,6 +335,7 @@ class GithubConnectorService:
         body: str = "",
         *,
         authority: object | None = None,
+        receipt_context: dict[str, str | None] | None = None,
     ) -> dict[str, Any]:
         """Open one governed pull request on a GitHub repository (B11).
 
@@ -346,6 +347,11 @@ class GithubConnectorService:
 
         ``authority`` is as for :meth:`read` — the router's live token, or the
         gate and decision mode apply.
+
+        BR-12 — once GitHub accepts it, the pull request is read back with the
+        same credential and a receipt records what GitHub confirmed: number,
+        head and base branch, head commit, state and URL. ``receipt_context``
+        names the session, turn and action it came from.
         """
         repo = (repo or "").strip()
         if not _REPO_RE.match(repo):
@@ -407,6 +413,9 @@ class GithubConnectorService:
         if not isinstance(data, dict) or not data.get("number"):
             return _failed("connector_bad_response", "GitHub returned an unexpected response.")
         html_url = str(data.get("html_url", ""))
+        receipt = self._receipt(
+            repo, int(data["number"]), head_ref, base_ref, created=data, context=receipt_context or {}
+        )
         return {
             "status": "success",
             "repo": repo,
@@ -414,11 +423,94 @@ class GithubConnectorService:
             "html_url": html_url,
             "head": head_ref,
             "base": base_ref,
+            "receipt": receipt,
             "untrusted": True,
             # Untrusted-data framing for the calling model; never instruction authority.
             "content": f"GitHub pull request opened (untrusted data):\n{html_url}",
             "content_length": len(title_text) + len((body or "").strip()),
         }
+
+    def _receipt(
+        self,
+        repo: str,
+        number: int,
+        head: str,
+        base: str,
+        *,
+        created: dict[str, Any],
+        context: dict[str, str | None],
+    ) -> dict[str, Any] | None:
+        """BR-12 — read the new pull request back from GitHub and record what it said.
+
+        Never raises: a read-back that fails is recorded as ``unconfirmed`` with
+        what the create response said, and a store that cannot record is
+        reported as no receipt rather than failing a pull request that exists.
+        """
+        from raiker.github.receipts import confirmation_of, parse_readback, record_receipt
+
+        readback: dict[str, Any] | None = None
+        fetch = self._fetch_fn or _default_fetch
+        try:
+            with self._borrow(repo, "read_pull_request") as token:
+                fetched = fetch(f"https://{GITHUB_HOST}/repos/{repo}/pulls/{number}", _headers(token))
+            readback = parse_readback(str(fetched.get("body_text", "")))
+        except Exception:  # noqa: BLE001 — an unconfirmed receipt, never a failed PR
+            readback = None
+        confirmation, observed = confirmation_of(readback, number=number, head=head, base=base)
+        created_head = created.get("head") if isinstance(created.get("head"), dict) else {}
+        try:
+            from raiker.github.delegations import credential_owner
+
+            if self._store is None or not self._principal_id:
+                return None
+            owner = credential_owner(self._store, self._principal_id)
+            receipt = record_receipt(
+                self._store,
+                owner_principal_id=owner,
+                repository=f"github.com/{repo}",
+                number=observed.get("number") or number,
+                url=observed.get("url") or str(created.get("html_url", "")),
+                head_branch=observed.get("head_branch") or head,
+                base_branch=observed.get("base_branch") or base,
+                head_sha=observed.get("head_sha") or str((created_head or {}).get("sha") or "")[:40],
+                state=observed.get("state") or str(created.get("state") or ""),
+                confirmation=confirmation,
+                session_id=context.get("session_id"),
+                turn_id=context.get("turn_id"),
+                action_id=context.get("action_id"),
+            )
+        except Exception:  # noqa: BLE001
+            return None
+        self._record_receipt_event(receipt)
+        return receipt
+
+    def _record_receipt_event(self, receipt: dict[str, Any]) -> None:
+        import contextlib as _contextlib
+
+        from raiker.events.types import make_event
+        from raiker.events.writer import EventLogWriter
+
+        if self._store is None:
+            return
+        session_id = str(receipt.get("session_id") or f"sess_inbox_{self._principal_id}")
+        with _contextlib.suppress(Exception):
+            self._store.create_session(session_id, str(self._workspace_root), title="Inbox")
+        with _contextlib.suppress(Exception):
+            EventLogWriter(self._store).append(
+                make_event(
+                    session_id=session_id,
+                    turn_id=receipt.get("turn_id"),
+                    event_type="pull_request_receipt_recorded",
+                    actor="github_connector",
+                    payload={
+                        key: receipt.get(key)
+                        for key in (
+                            "repository", "number", "head_branch", "base_branch", "head_sha",
+                            "state", "confirmation",
+                        )
+                    },
+                )
+            )
 
     def _write_withheld(self, noun: str) -> dict[str, Any] | None:
         """The gate/decision-mode refusal for a write, or None when it may proceed."""

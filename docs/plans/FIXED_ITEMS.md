@@ -20,6 +20,44 @@ Evidence: `screenshots/working/` (verified behaviour),
 
 ## Release packaging maintenance
 
+### FIXED-RELEASE-06 — seven workflows became three
+
+**Fixed 2026-10-19, at the owner's request.** `web.yml`, `desktop.yml`,
+`licensing.yml` and the new Build fault workflow are now jobs in `ci.yml` (**Web
+UI**, **Electron shell**, **Licensing and SBOM**, **Build faults**), so one CI
+run on each pull request and push to `main` shows every gate. The web job loses
+its path filter and runs on every change — a superset of the GCR-15 contract
+paths `tests/test_web_workflow.py` still checks. `desktop-package.yml` stays its
+own workflow because `release.yml` calls it per platform; `release.yml` stays
+manual. `docs/architecture/VERIFICATION_PLAN.md` describes the three.
+
+### FIXED-RELEASE-05 — the README explains running Raiker under WSL2 and on a VPS
+
+**Fixed 2026-10-19.** The README gains *Running Raiker under WSL2 or on a VPS*:
+WSL2 install, building inside the Linux file system, reaching the loopback host
+from Windows, model and credential notes; a VPS as an unprivileged user under
+systemd, bound to loopback and reached through an SSH tunnel, or bound to a
+private VPN address with `--allow-public` and a hardened `RAIKER_OWNER_TOKEN`.
+Writing it found that a reverse proxy pointed at `127.0.0.1` would make remote
+requests look local; the README warns against it and
+[BUG-347](TO_BE_FIXED.md#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local)
+records the defect.
+
+### FIXED-RELEASE-04 — a draft release carries one installer per platform, named for the platform
+
+**Fixed 2026-10-19.** The last beta draft attached every installer format with
+their manifests, checksums and smoke reports, and unsigned builds were named
+`-unsigned`. The owner asked for one artefact per platform and no "unsigned"
+in names. `raiker.app.desktop_release.release_asset_names` now chooses five
+files — Windows x86-64 and Arm `setup.exe` (Arm is the x86-64 program tested on
+a Windows on Arm runner, as ADR-0003 decided), macOS Apple-silicon `.dmg`,
+Linux x86-64 and ARM64 `.AppImage` — and `scripts/select_release_assets.py`
+copies them under platform names with a `SHA256SUMS.txt` whose contents go in
+the release notes. Both draft jobs attach only those five. Every format is
+still built, installed and tested on every run. Filenames no longer carry
+`-unsigned`; signing state stays in `installation.json` and the manifest.
+`tests/test_desktop_release.py` and `tests/test_release_workflow.py` pin it.
+
 ### FIXED-RELEASE-03 — the README identity check followed the owner's wording
 
 **Fixed 2026-10-19.** The owner removed "local-first" from the README's opening
@@ -1017,6 +1055,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-966](#fixed-966--a-finding-could-be-read-but-not-acted-on-without-retyping-it-br-d04-bounded-repair) | Low | Build / review | Fixed 2026-10-19 — BR-D04 bounded repair |
 | [FIXED-967](#fixed-967--provenance-review-and-scheduled-build-runs-were-invisible-where-the-owner-decides-br-d03-br-d05) | Low | Build / tasks / provenance | Fixed 2026-10-19 — BR-D03 foundation, BR-D05 disclosure |
 | [FIXED-968](#fixed-968--changes-kept-showing-the-tree-from-before-accept-applied-a-change) | Medium | Build / workbench | Fixed 2026-10-19 — found driving BR-D04 live |
+| [FIXED-969](#fixed-969--a-patch-was-reviewed-by-rules-never-by-the-model-the-owner-chose-br-d04) | Medium | Build / review | Fixed 2026-10-19 — BR-D04 selected model review |
+| [FIXED-970](#fixed-970--a-stored-review-could-be-changed-and-a-signed-commit-said-nothing-br-d05) | Medium | Build / provenance | Fixed 2026-10-19 — BR-D05 signed review evidence |
+| [FIXED-971](#fixed-971--a-parked-build-turn-resumed-after-its-delegation-or-credential-was-withdrawn-br-07) | Medium | Build / recovery | Fixed 2026-10-19 — BR-07 authority revalidated on resume |
+| [FIXED-972](#fixed-972--nothing-proved-a-stopped-build-turn-kept-its-target-and-let-go-of-the-folder-br-d02) | Low | Build / execution target | Fixed 2026-10-19 — BR-D02 cancel-mid-turn evidence |
+| [FIXED-973](#fixed-973--no-live-host-had-ever-been-killed-mid-check-br-d06) | Medium | Build / testing | Fixed 2026-10-19 — BR-D06 live restart fault, scheduled |
+| [FIXED-974](#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12) | Medium | Build / GitHub | Fixed 2026-10-19 — BR-12 pull request receipts |
+| [FIXED-975](#fixed-975--the-build-header-never-said-what-a-turn-could-do-without-asking-br-01) | Low | Build / delegation | Fixed 2026-10-19 — BR-01 delegation on the target |
+| [FIXED-976](#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02) | High | Build / tasks | Fixed 2026-10-19 — BR-02 / BR-D03 task bound to its repository |
+| [FIXED-977](#fixed-977--a-repair-was-never-reviewed-again-and-a-persisting-finding-looked-new-each-time-br-11) | Low | Build / review | Fixed 2026-10-19 — BR-11 rereview and persistence |
+| [FIXED-978](#fixed-978--a-model-review-with-no-explicit-choice-went-to-a-placeholder-model-and-failed-with-a-bare-502) | Medium | Build / review | Fixed 2026-10-19 — found driving FIXED-969 live |
 
 ---
 
@@ -34564,3 +34612,230 @@ review, the target chip and Recent commits re-read.
 
 **Evidence.** The live round in [FIXED-966](#fixed-966--a-finding-could-be-read-but-not-acted-on-without-retyping-it-br-d04-bounded-repair) failed at *the
 last review was of an earlier version* before the fix and passed after it.
+
+## FIXED-969 — A patch was reviewed by rules, never by the model the owner chose (BR-D04)
+
+**Severity: Medium. Area: Build / review. Status: Fixed 2026-10-19 — closes
+[BR-D04](BUILD_WORKSPACE_SPEC.md)'s "selected model review" remainder.**
+
+**Observed.** The exact-patch review ran deterministic rules and a parse
+validator. BR-10 also asks for selected model review against the same patch
+fingerprint, and nothing let the owner ask a model to read the patch Build was
+about to commit.
+
+**Fixed.** `raiker/review/model_review.py` and
+`POST /api/code/repos/{repo_id}/review/model`:
+
+* the exact working-tree diff is credential-redacted and delimited as untrusted
+  data, with no tools offered, and sent to the model chosen in the Build
+  composer through the owner's own router (their gates, egress allowlist and
+  connections);
+* the answer is read strictly: findings outside the changed files are dropped,
+  an unverified *high* is shown as medium at most, each is marked
+  `source: model`, and an answer that is not the JSON asked for is refused as
+  `model_review_unreadable` and stores nothing;
+* the reading is stored by patch fingerprint **and** provider/model
+  (`patch_model_reviews`), so the same model is never asked twice about one
+  patch, and is audited as `patch_model_review_completed` — model, fingerprint
+  and counts, never the patch or the answer;
+* a model finding never decides `completed_verified`.
+
+**Changes → Patch review → Model review** names the model (**Ask Claude Haiku
+5.5 to review**), shows the findings with *These are its reading, not checks*,
+and offers **Ask Raiker to fix** on each.
+
+**Evidence.** `tests/test_build_model_review.py` (redaction and framing, strict
+parsing, unreadable answers, once-per-patch-and-model with no second call,
+content-free audit, a model finding not deciding verification);
+`PatchReview.test.ts`; the API contract case. Live: see
+[FIXED-978](#fixed-978--a-model-review-with-no-explicit-choice-went-to-a-placeholder-model-and-failed-with-a-bare-502).
+
+## FIXED-970 — A stored review could be changed, and a signed commit said nothing (BR-D05)
+
+**Severity: Medium. Area: Build / provenance. Status: Fixed 2026-10-19 — closes
+[BR-D05](BUILD_WORKSPACE_SPEC.md).**
+
+**Observed.** A stored review was a database row: anything that could write it
+could drop a finding and the owner would read the edited list as the review.
+And Recent commits said nothing about a commit the owner had signed.
+
+**Fixed.** `raiker/review/review_attestation.py` signs every review when it is
+taken — the deterministic one and each model reading — with this
+installation's Ed25519 issuer key (the key that already signs per-turn machine
+identities), over a digest of the review bound to owner, repository, patch
+fingerprint and kind. Every read verifies it: `verified`, `invalid`,
+`unknown_key` or `unsigned`. The owner is sent the state, key id and time,
+never the signature bytes. Changes shows **Signed here**, or *This stored
+review no longer matches the signature Raiker made when it was taken … don't
+rely on these findings*. Recent commits reads Git's own `%G?` verdict on each
+commit and shows **Signed**, **Signed — key not trusted here**, **Bad
+signature** and the rest; an unsigned commit shows nothing. Raiker still never
+signs a commit itself.
+
+**Evidence.** `tests/test_build_model_review.py` (a taken review verifies; one
+with a finding dropped reads `invalid`; a model reading is signed; an unsigned
+one says so; an unsigned commit reads `none`); `PatchReview.test.ts` and
+`RecentCommits.test.ts`. Live: `02-review-signed-here.png`.
+
+## FIXED-971 — A parked Build turn resumed after its delegation or credential was withdrawn (BR-07)
+
+**Severity: Medium. Area: Build / recovery. Status: Fixed 2026-10-19 — the
+delegation and credential half of BR-07, after
+[FIXED-960](#fixed-960--a-parked-build-turn-resumed-wherever-the-repository-had-moved-to-br-07)'s target half.**
+
+**Observed.** A Build turn parked on an approval was checked for target drift
+before it resumed, and for nothing else. An owner who revoked the repository
+delegation the turn was working under — or removed the Git credential it would
+push with — while the card waited still had the turn continue its plan.
+
+**Fixed.** The turn's target record now carries `authority`: the active
+delegations on its repository's GitHub identity and the selected Git
+credential's id and state (identifiers only). Before a parked turn is claimed,
+the gateway compares them: a delegation now revoked, expired, exhausted or gone,
+or a credential removed, replaced or in another state, finalizes the parked
+turn as `authority_changed`, closes the turn as failed with what was lost, and
+refuses with `build_authority_changed`. Build says *This turn was not
+continued: a repository delegation it started under was revoked or ran out, or
+the Git credential it would use was removed or replaced. Check Settings →
+GitHub, then start a new turn.*
+
+**Evidence.** `tests/test_build_provenance_and_worktrees.py` (revoked delegation;
+replaced credential; a turn that started with neither never drifts; a target
+recorded before this has nothing to compare); `approvalResume.test.ts`.
+
+## FIXED-972 — Nothing proved a stopped Build turn kept its target and let go of the folder (BR-D02)
+
+**Severity: Low. Area: Build / execution target. Status: Fixed 2026-10-19 —
+the cancel scenario BR-D02 named as still open.**
+
+**Fixed.** `tests/test_build_cancel_mid_turn.py` drives a Build turn through
+the real routes with only the provider scripted, and presses Stop while the
+model is answering: the turn ends `stopped` with the model asked once, its
+fingerprinted target is still recorded, its outcome reads `no_change` with no
+drift, `running_turns_on_folder` no longer counts it, and a second
+conversation's Build turn in the same checkout is admitted. It runs on the
+Windows CI job with the other target tests. No product change was needed.
+
+## FIXED-973 — No live host had ever been killed mid-check (BR-D06)
+
+**Severity: Medium. Area: Build / testing. Status: Fixed 2026-10-19 — closes
+[BR-D06](BUILD_WORKSPACE_SPEC.md).**
+
+**Fixed.** `scripts/build_restart_fault.py` runs a real `raiker-web` process —
+routes, gateway, broker, command service, leases, store — with only the model
+scripted, so it needs no credential. A Build turn writes a file (accepted
+through the approval routes) and starts the project's declared check in the
+background under a session command grant; the host is killed with `SIGKILL`
+while the check runs; a new host is started on the same workspace.
+
+Two variants, both run by the `build-faults` job in `.github/workflows/ci.yml`
+on every pull request and push to `main`:
+
+* **reattach** — only the host dies. The turn reads `outcome_unknown` (*A check
+  you declared did not finish*) while the check runs; the new host takes the
+  surviving run back over and records its real exit, and only then can the turn
+  read verified.
+* **lost** — the host and the check die together. The run settles with a
+  failed receipt and the turn never reads verified.
+
+**Evidence.** Both variants passed on this host (2026-10-19). Writing the
+harness showed that a check outlives its host and is reattached — the honest
+behaviour, now stated in the scenario rather than assumed away.
+
+## FIXED-974 — A pull request Raiker opened was known only from the create response (BR-12)
+
+**Severity: Medium. Area: Build / GitHub. Status: Fixed 2026-10-19 — part of
+[BR-D03](BUILD_WORKSPACE_SPEC.md).**
+
+**Observed.** BR-12: *push output alone does not prove a PR exists*. A pull
+request Raiker opened was recorded from GitHub's create response and nothing
+else, and nowhere in Build listed it.
+
+**Fixed.** After GitHub accepts a pull request, `GithubConnectorService` reads
+it back with the same credential (`GET /repos/{repo}/pulls/{number}`) and
+`raiker/github/receipts.py` stores a receipt (`pull_request_receipts`):
+repository, number, URL, head and base branch, head commit, state and
+`confirmed` / `mismatch` / `unconfirmed`. A failed read-back never fails a pull
+request that exists; it is recorded as unconfirmed with what the create
+response said. The approval result says *opened and confirmed by GitHub* or
+*GitHub did not confirm it on read-back*. `pull_request_receipt_recorded` is
+audited without the body or token. **Changes → Pull requests**
+(`GET /api/code/repos/{repo_id}/pull-requests`) lists them.
+
+**Evidence.** `tests/test_git_write_path.py` (confirmed, mismatch, unconfirmed;
+no token in the receipt; no test reaches the network); `PullRequestReceipts.test.ts`.
+RR-40's live run against a consented repository remains open on BR-D03.
+
+## FIXED-975 — The Build header never said what a turn could do without asking (BR-01)
+
+**Severity: Low. Area: Build / delegation. Status: Fixed 2026-10-19.**
+
+**Fixed.** `GET /api/code/repos/{repo_id}/target` adds `authority`: the active
+delegations on the target's GitHub identity (operations, branch pattern, pull
+request allowance, expiry, actions left) and whether a Git credential is
+selected. The target chip adds **Delegated: push, pull request on raiker/\***
+or **Writes ask you**; its tooltip lists each delegation and says *Merging is
+never delegated: it stays with you, on GitHub*.
+
+**Evidence.** `BuildTargetChip.test.ts`. Live: `01-target-writes-ask-you.png`
+on a repository whose `origin` is a GitHub URL and that has no delegation.
+
+## FIXED-976 — A scheduled Build task ran in whatever repository Build was pointed at (BR-02)
+
+**Severity: High. Area: Build / tasks. Status: Fixed 2026-10-19 — the
+dedicated-workspace part of [BR-D03](BUILD_WORKSPACE_SPEC.md).**
+
+**Observed.** A Build task's cycles ran against the repository selected in
+Build *at the time the cycle fired*. An issue-to-PR task scheduled for one
+repository would carry its change into another if the owner had since pointed
+Build elsewhere — BR-02: *a missing, moved, stale or mismatched target fails
+closed*.
+
+**Fixed.** Creating a Build task records the repository Build is pointed at
+(`build_task_targets`); the scheduler passes the task id with each cycle; the
+gateway refuses a cycle whose current target is another repository, none, or
+the same reference on a different remote or folder — *This scheduled Build task
+was set up for widget (widget), and Build is now pointed at notes, so this run
+did not start and nothing was changed* — which the task's attempt history shows.
+Settings → GitHub → *Issue to pull request* says where the task will run before
+it is scheduled.
+
+**Evidence.** `tests/test_build_task_target.py` (recorded at creation; refused
+on another repository and on none; a turn that is not a task's is not held);
+`GitHubConnection.test.ts`. Runs on the Windows CI job.
+
+## FIXED-977 — A repair was never reviewed again, and a persisting finding looked new each time (BR-11)
+
+**Severity: Low. Area: Build / review. Status: Fixed 2026-10-19.**
+
+**Fixed.** After the owner presses **Ask Raiker to fix**, the next time the
+working tree settles with a new patch Changes reviews it once by itself and
+says *Reviewed again after the repair*; a later settle without a new request
+reviews nothing. Each finding carries `reviews_present` — how many reviews in a
+row raised it — and Changes shows **In 3 reviews in a row**. No bound was
+invented: the repair stays owner-sent, so the loop is the owner's to continue,
+and the count shows when it is not converging.
+
+**Evidence.** `tests/test_build_review_lifecycle.py` (count grows, resets after
+resolution); `PatchReview.test.ts` (one rereview after a repair, none without one).
+
+## FIXED-978 — A model review with no explicit choice went to a placeholder model and failed with a bare 502
+
+**Severity: Medium. Area: Build / review. Status: Fixed 2026-10-19 — found
+driving [FIXED-969](#fixed-969--a-patch-was-reviewed-by-rules-never-by-the-model-the-owner-chose-br-d04) live.**
+
+**Observed.** On a fresh `raiker-web` with Anthropic connected through Models
+and Build on its default model, **Ask the model to review** answered
+`502 Bad Gateway` and the pane showed a generic error.
+
+**Root cause.** With no per-work choice the composer sent no model, and the
+server fell back to the owner's stored selection — on this workspace still the
+catalogue placeholder `ollama/<model>` — which the router then failed to reach.
+
+**Fixed.** Build sends the model the composer will actually use (this work's
+choice, else the default it shows), and the server refuses a placeholder as
+`model_review_model_required` (*Choose a model in the composer first*) without
+calling any provider.
+
+**Evidence.** `tests/test_build_model_review.py::test_a_placeholder_default_is_refused_as_no_model_chosen`.
+

@@ -65,7 +65,9 @@ python scripts/build_desktop_app.py --version 0.1.0
 ```
 
 Output goes to `desktop-release/`. Linux `.rpm` needs `rpmbuild` (`apt install
-rpm`). A local build is always unsigned and named `-unsigned`. To smoke-test a
+rpm`). A local build is always unsigned; its `installation.json` records
+`signing.applied = false`, and its filename is the same as a signed build's
+(`Raiker-<version>-<target>[-setup].<ext>`). To smoke-test a
 build or an installation: `python -m raiker.app.desktop_smoke --host <path to
 resources/host/Raiker>`.
 
@@ -94,13 +96,29 @@ resources/host/Raiker>`.
    target whose identity is missing, builds and signs `desktop-<channel>.json`,
    the SBOM and the provenance, verifies all of it the way an installed Raiker
    will, and creates a **draft** release.
-4. Review the draft (download one installer per platform and open it), then
-   publish it. Copy `desktop-<channel>.json` and its `.sig`, plus every
-   installer, manifest and signature, to the channel host.
+4. Review the draft, then publish it. The draft carries exactly **one
+   installer per platform**, named for the platform, with their SHA-256 in the
+   notes:
 
-`signing: skip` exercises the whole pipeline without identities. It produces
-`-unsigned` artifacts that record `signing.applied = false`, and the workflow
-refuses to publish them.
+   | Platform | Release asset |
+   |---|---|
+   | Windows x86-64 | `Raiker-<version>-windows-x86_64-setup.exe` |
+   | Windows on Arm | `Raiker-<version>-windows-arm64-setup.exe` — the x86-64 setup program, installed, smoke-tested and uninstalled on a Windows on Arm runner; it runs under Windows' built-in emulation |
+   | macOS (Apple silicon) | `Raiker-<version>-macos-arm64.dmg` |
+   | Linux x86-64 | `Raiker-<version>-linux-x86_64.AppImage` |
+   | Linux ARM64 | `Raiker-<version>-linux-arm64.AppImage` |
+
+   The other formats (`.msi`, macOS `.zip`, `.deb`, `.rpm`) are still built,
+   installed and tested on every run and stay in the workflow artifacts
+   (`scripts/select_release_assets.py` chooses the five). Copy the run's
+   `release-channel` artifact — `desktop-<channel>.json` and its `.sig`, every
+   installer the updater replaces an installation with, and their manifests and
+   signatures — to the channel host.
+
+`signing: skip` exercises the whole pipeline without identities. Every build
+records `signing.applied = false`, no channel index is made, and with
+`channel: beta` and `publish: true` the workflow creates a beta draft carrying
+the same five files; it refuses to publish an unsigned stable release.
 
 ## Prerelease, stable, rollback and patches
 

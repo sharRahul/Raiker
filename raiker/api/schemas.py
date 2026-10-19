@@ -599,6 +599,13 @@ class BrainSourceUploadRequest(StrictRequest):
     store_copy: bool
 
 
+class ModelPatchReviewRequest(StrictModelRequest):
+    """BR-D04 — which connected model reads the patch; the owner's selection when unset."""
+
+    model_profile: str | None = Field(default=None, max_length=200)
+    model: str | None = Field(default=None, max_length=200)
+
+
 class CreateCodeWorktreeRequest(StrictRequest):
     """BR-03 — a task worktree on a new ``raiker/<name>`` branch of a connected repository."""
 

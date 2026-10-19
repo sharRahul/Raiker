@@ -183,6 +183,188 @@ def target_drift(started: dict[str, Any] | None, current: dict[str, Any] | None)
     return changed
 
 
+# ── The authority a turn started under (BR-07) ──────────────────────────────
+
+
+def _github_repository(target: dict[str, Any]) -> str:
+    """``github.com/owner/repo`` — the key delegations use — for a GitHub target, else empty."""
+    identity = str(target.get("identity") or "")
+    if identity.startswith("github:"):
+        return "github.com/" + identity[len("github:") :]
+    if identity.startswith("folder:") or not identity:
+        return ""
+    try:
+        from raiker.runtime.git_credential import repository_key
+
+        return str(repository_key(identity) or "")
+    except Exception:  # noqa: BLE001 — a remote that is not GitHub has no delegation
+        return ""
+
+
+def authority_snapshot(store: Any, owner_principal_id: str, target: dict[str, Any]) -> dict[str, Any]:
+    """BR-07 — the delegations and Git credential a Build turn starts under.
+
+    Recorded with the target, never fingerprinted: they are not *where* the turn
+    runs but *what it may do there*, and a resume compares them on their own.
+    Only identifiers and timestamps — never a token.
+    """
+    from raiker.github.delegations import DelegationService, credential_owner
+
+    account = credential_owner(store, owner_principal_id)
+    repository = _github_repository(target)
+    delegations: list[str] = []
+    if repository:
+        try:
+            for row in DelegationService(store, account).delegations():
+                if str(row.get("repository") or "").lower() == repository.lower() and row.get("state") == "active":
+                    delegations.append(str(row["delegation_id"]))
+        except Exception:  # noqa: BLE001 — unreadable delegations are none to depend on
+            delegations = []
+    credential: dict[str, str] | None = None
+    try:
+        selected = store.selected_git_credential(account)
+    except Exception:  # noqa: BLE001
+        selected = None
+    if selected:
+        credential = {
+            "credential_id": str(selected.get("credential_id") or ""),
+            "status": str(selected.get("status") or ""),
+        }
+    return {"repository": repository, "delegations": sorted(delegations), "credential": credential}
+
+
+def delegation_summary(store: Any, owner_principal_id: str, target: dict[str, Any]) -> dict[str, Any]:
+    """BR-01 — the repository delegations a Build turn here would act under, for the owner to read.
+
+    Only active delegations on this target's GitHub identity, each with the
+    operations it allows, its branch pattern, whether it may open a pull
+    request, when it ends and how many actions it has left. Merging is never
+    delegable, so it is never listed. Identifiers and patterns only.
+    """
+    from raiker.github.delegations import DelegationService, credential_owner
+
+    account = credential_owner(store, owner_principal_id)
+    repository = _github_repository(target)
+    rows: list[dict[str, Any]] = []
+    if repository:
+        try:
+            for row in DelegationService(store, account).delegations():
+                if str(row.get("repository") or "").lower() != repository.lower() or row.get("state") != "active":
+                    continue
+                limit = row.get("max_actions")
+                rows.append(
+                    {
+                        "delegation_id": str(row["delegation_id"]),
+                        "operations": [str(item) for item in row.get("operations") or []],
+                        "branch_pattern": row.get("branch_pattern"),
+                        "allow_pull_request": bool(row.get("allow_pull_request")),
+                        "expires_at": str(row.get("expires_at") or ""),
+                        "actions_left": None if limit is None else max(0, int(limit) - int(row.get("actions_used") or 0)),
+                    }
+                )
+        except Exception:  # noqa: BLE001 — unreadable delegations are shown as none
+            rows = []
+    try:
+        credential = bool(store.selected_git_credential(account))
+    except Exception:  # noqa: BLE001
+        credential = False
+    return {"repository": repository or None, "delegations": rows, "git_credential": credential}
+
+
+def authority_drift(store: Any, owner_principal_id: str, started: dict[str, Any] | None) -> list[str]:
+    """What the turn's recorded authority lost since it started, in words a reason code can carry.
+
+    ``delegation_<state>`` for a delegation the turn started under that is no
+    longer active (revoked, expired, exhausted, or gone), and
+    ``credential_changed`` when the Git credential in use was removed, replaced
+    by another, or changed state (expired, revoked, failed validation). A turn that started with no delegation and no credential has
+    nothing to lose and never drifts here.
+    """
+    from raiker.github.delegations import DelegationError, DelegationService, credential_owner
+
+    authority = (started or {}).get("authority")
+    if not isinstance(authority, dict):
+        return []
+    account = credential_owner(store, owner_principal_id)
+    reasons: list[str] = []
+    service = DelegationService(store, account)
+    for delegation_id in authority.get("delegations") or []:
+        try:
+            state = str(service.get(str(delegation_id)).get("state") or "missing")
+        except (DelegationError, KeyError):
+            state = "missing"
+        except Exception:  # noqa: BLE001 — unreadable is not proof it still holds
+            state = "unreadable"
+        if state != "active":
+            reasons.append(f"delegation_{state}")
+    recorded = authority.get("credential")
+    if isinstance(recorded, dict) and recorded.get("credential_id"):
+        try:
+            current = store.selected_git_credential(account)
+        except Exception:  # noqa: BLE001
+            current = None
+        if (
+            not current
+            or str(current.get("credential_id") or "") != str(recorded.get("credential_id"))
+            or str(current.get("status") or "") != str(recorded.get("status") or "")
+        ):
+            reasons.append("credential_changed")
+    return sorted(set(reasons))
+
+
+# ── A scheduled Build task's repository (BR-02 / BR-D03) ────────────────────
+
+
+def record_task_target(store: Any, *, owner_principal_id: str, task_id: str, target: dict[str, Any]) -> bool:
+    """Remember the repository a Build task was scheduled for. ``False`` when there is none."""
+    if not target.get("repo_id"):
+        return False
+    with store.connect() as connection:
+        connection.execute(
+            """INSERT OR IGNORE INTO build_task_targets
+               (task_id, owner_principal_id, repo_id, label, identity, folder, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                task_id,
+                owner_principal_id,
+                str(target["repo_id"]),
+                str(target.get("label") or ""),
+                str(target.get("identity") or ""),
+                str(target.get("folder") or "."),
+                utc_now(),
+            ),
+        )
+    return True
+
+
+def load_task_target(store: Any, *, owner_principal_id: str, task_id: str) -> dict[str, Any] | None:
+    with store.connect() as connection:
+        row = connection.execute(
+            "SELECT * FROM build_task_targets WHERE owner_principal_id = ? AND task_id = ?",
+            (owner_principal_id, task_id),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def task_target_mismatch(scheduled: dict[str, Any] | None, current: dict[str, Any]) -> list[str]:
+    """What differs between the repository a task was scheduled for and Build's target now.
+
+    ``repository`` when Build is pointed at another connected repository (or
+    none), ``identity`` or ``folder`` when the same reference now names a
+    different remote or folder. Empty when the task may run.
+    """
+    if not scheduled:
+        return []
+    if str(current.get("repo_id") or "") != str(scheduled.get("repo_id") or ""):
+        return ["repository"]
+    changed: list[str] = []
+    if str(current.get("identity") or "") != str(scheduled.get("identity") or ""):
+        changed.append("identity")
+    if str(current.get("folder") or ".") != str(scheduled.get("folder") or "."):
+        changed.append("folder")
+    return changed
+
+
 # ── The turn binding ─────────────────────────────────────────────────────────
 
 

@@ -16,6 +16,7 @@ from raiker.app.desktop_release import (
     artifact_names,
     build_desktop_channel,
     desktop_record,
+    release_asset_names,
     update_artifact_name,
     write_checksums,
     write_manifests,
@@ -60,7 +61,7 @@ def test_artifact_names_match_the_electron_builder_templates() -> None:
         )
 
     for signed in (True, False):
-        suffix = "" if signed else "-unsigned"
+        suffix = ""
         names = artifact_names("1.2.3", "windows-x86_64", signed=signed)
         assert names["-setup.exe"] == expand(config["nsis"]["artifactName"], "exe", "windows-x86_64", suffix)
         assert names[".msi"] == expand(config["msi"]["artifactName"], "msi", "windows-x86_64", suffix)
@@ -71,11 +72,39 @@ def test_artifact_names_match_the_electron_builder_templates() -> None:
             )
 
 
-def test_an_unsigned_build_is_named_as_one() -> None:
-    for name in artifact_names("1.2.3", "macos-arm64", signed=False).values():
-        assert "-unsigned" in name
-    for name in artifact_names("1.2.3", "macos-arm64", signed=True).values():
-        assert "unsigned" not in name
+def test_a_build_is_named_for_its_platform_whether_or_not_it_was_signed() -> None:
+    # The owner's decision (2026-10-19): signing state is recorded inside the
+    # build and its manifest, never in the filename.
+    for target in DESKTOP_TARGETS:
+        unsigned = artifact_names("1.2.3", target.target_id, signed=False)
+        assert unsigned == artifact_names("1.2.3", target.target_id, signed=True)
+        for name in unsigned.values():
+            assert "unsigned" not in name
+
+
+def test_a_release_carries_exactly_one_installer_per_platform() -> None:
+    assets = release_asset_names("1.2.3")
+    assert sorted(assets) == [
+        "Raiker-1.2.3-linux-arm64.AppImage",
+        "Raiker-1.2.3-linux-x86_64.AppImage",
+        "Raiker-1.2.3-macos-arm64.dmg",
+        "Raiker-1.2.3-windows-arm64-setup.exe",
+        "Raiker-1.2.3-windows-x86_64-setup.exe",
+    ]
+    assert {platform for _built, platform in assets.values()} == {
+        "windows-x86_64", "windows-arm64", "macos-arm64", "linux-x86_64", "linux-arm64",
+    }
+    # Windows on Arm is the x86-64 setup program, tested under emulation.
+    assert assets["Raiker-1.2.3-windows-arm64-setup.exe"][0] == "Raiker-1.2.3-windows-x86_64-setup.exe"
+    for built, _platform in assets.values():
+        assert "unsigned" not in built
+
+
+def test_the_release_workflow_publishes_only_the_release_assets() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "release_asset_names" in workflow
+    assert "dist/*" not in workflow
+    assert "-unsigned" not in workflow
 
 
 def test_the_installer_config_is_per_user_and_keeps_owner_data() -> None:
@@ -155,7 +184,7 @@ def test_the_builder_is_pinned_and_an_unsigned_build_cannot_pick_up_an_identity(
     )
     assert "CSC_LINK" not in env
     assert env["CSC_IDENTITY_AUTO_DISCOVERY"] == "false"
-    assert env["RAIKER_ARTIFACT_SUFFIX"] == "-unsigned"
+    assert env["RAIKER_ARTIFACT_SUFFIX"] == ""
     signed = builder_environment(target_id="macos-arm64", signed=True, environ={"CSC_LINK": "x"})
     assert signed["CSC_LINK"] == "x" and signed["RAIKER_ARTIFACT_SUFFIX"] == ""
 
@@ -221,3 +250,27 @@ def test_the_installers_carry_raikers_artwork() -> None:
     assert background.is_file()
     assert background.with_name(background.stem + "@2x.png").is_file()
     assert {item.get("path") for item in config["dmg"]["contents"]} >= {"/Applications"}
+
+
+def test_selecting_release_assets_copies_five_files_and_refuses_a_missing_one(tmp_path: Path) -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("select_release_assets", ROOT / "scripts/select_release_assets.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source = tmp_path / "dist"
+    source.mkdir()
+    for target in DESKTOP_TARGETS:
+        for name in artifact_names("1.2.3", target.target_id, signed=False).values():
+            (source / name).write_bytes(name.encode())
+    (source / "Raiker-1.2.3-linux-x86_64.deb.manifest.json").write_text("{}", encoding="utf-8")
+    chosen = module.select("1.2.3", source, tmp_path / "assets")
+    assert len(chosen) == 5
+    published = sorted(p.name for p in (tmp_path / "assets").iterdir())
+    assert published == sorted([*release_asset_names("1.2.3"), "SHA256SUMS.txt"])
+    arm = (tmp_path / "assets" / "Raiker-1.2.3-windows-arm64-setup.exe").read_bytes()
+    assert arm == b"Raiker-1.2.3-windows-x86_64-setup.exe"
+    (source / "Raiker-1.2.3-macos-arm64.dmg").unlink()
+    with pytest.raises(SystemExit, match="macos-arm64.dmg"):
+        module.select("1.2.3", source, tmp_path / "again")

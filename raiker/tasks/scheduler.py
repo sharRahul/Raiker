@@ -659,7 +659,9 @@ class TaskScheduler:
                     # for. Every cycle ran as Chat before this, so a task
                     # whose job is "read the repository, make the change, run
                     # the tests" was given the assistant's method for it.
-                    metadata={"surface": task.surface},
+                    # BR-02 — and which task it is, so a Build cycle can be
+                    # held to the repository the task was scheduled for.
+                    metadata={"surface": task.surface, "task_id": task.task_id},
                 ),
                 options=PromptOptions(
                     model_profile=task.model_profile or "",

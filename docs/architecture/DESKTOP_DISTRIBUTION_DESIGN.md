@@ -275,7 +275,7 @@ Every item is implemented; the evidence for each is in
 | DESK-10 | A clicked notification brings the window forward | `web/src/lib/desktopNotice.ts` | FIXED-911 |
 | DESK-11 | `raiker-app` opens the window by default; `--browser` and an explained fallback | `raiker/app/desktop_shell.py` | FIXED-904 |
 | DESK-12 | Packaging: the frozen host inside the shell | `desktop/electron-builder.yml` | FIXED-912, FIXED-913 |
-| DESK-13 | CI for the shell | `.github/workflows/desktop.yml` | FIXED-915 |
+| DESK-13 | CI for the shell | `.github/workflows/ci.yml` (job `desktop`) | FIXED-915 |
 | DESK-14 | Live round against a real host and provider | `desktop/e2e/desktop-live.spec.ts`, `desktop/e2e/packaged-live.spec.ts` | FIXED-916 |
 
 The release work that remained (BUG-343) is done by ADR-0003: the signed

@@ -163,7 +163,7 @@ are the load-bearing ones; a detector adds an advisory signal, not prevention.
 - `raiker/plugins/verify.py:35` — `verify_plugin_checksum()` recomputes
   SHA-256 over canonical manifest content and fails closed on mismatch or
   absence.
-- `scripts/licensing_check.py:168` + `.github/workflows/licensing.yml:31` — CI
+- `scripts/licensing_check.py:168` + `.github/workflows/ci.yml` (job `licensing`) — CI
   validates licences and emits an SPDX 2.3 SBOM for dependencies.
 - Plugins are disabled by default; manifest validation and permission diffs
   gate enablement.

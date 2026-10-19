@@ -115,4 +115,124 @@ describe("PatchReview", () => {
     expect(await screen.findByTestId("patch-review-stale")).toHaveTextContent("earlier version of this patch (2 findings)");
     expect(screen.getByRole("button", { name: "Review this patch" })).toBeInTheDocument();
   });
+
+  it("asks the composer's model to read the patch and labels its findings as the model's", async () => {
+    const reading = {
+      fingerprint: FINGERPRINT,
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      truncated: false,
+      reviewed_at: "2026-10-19T12:00:00Z",
+      counts: { high: 0, medium: 1, low: 0, info: 0 },
+      findings: [
+        {
+          finding_id: "m1",
+          rule: "model_review",
+          severity: "medium",
+          category: "model_review",
+          title: "Division by zero",
+          evidence: "`1 / 0` always raises.",
+          next_step: "Return 1.",
+          confidence: "medium",
+          path: "app/calc.py",
+          line: 4,
+          source: "model",
+        },
+      ],
+    };
+    const fetch = stubFetch({
+      [`GET ${ROUTE}`]: { fingerprint: FINGERPRINT, has_changes: true, review: null, reused: false, reason_code: null },
+      [`POST ${ROUTE}/model`]: { fingerprint: FINGERPRINT, has_changes: true, model_review: reading, reused: false, reason_code: null },
+    });
+    const requests: string[] = [];
+    render(PatchReview, {
+      repoId: "repo_1",
+      reviewModel: { profile: "anthropic-default", model: "claude-haiku-5-5" },
+      onrepair: (request: string) => requests.push(request),
+    });
+    await fireEvent.click(await screen.findByRole("button", { name: /^Ask .+ to review$/ }));
+    expect(await screen.findByText("Division by zero")).toBeInTheDocument();
+    expect(screen.getByText(/These are its reading, not checks/)).toBeInTheDocument();
+    // The model's `code` spans read as code, not as literal backticks.
+    expect(screen.getByText("1 / 0").tagName).toBe("CODE");
+    const post = fetch.mock.calls.find(([url]) => String(url).endsWith("/review/model"));
+    expect(JSON.parse(String((post?.[1] as RequestInit).body))).toEqual({
+      model_profile: "anthropic-default",
+      model: "claude-haiku-5-5",
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Ask Raiker to fix" }));
+    expect(requests[0]).toContain("app/calc.py at line 4: Division by zero");
+  });
+
+  it("says when the model's answer could not be read, and stores nothing", async () => {
+    stubFetch({
+      [`GET ${ROUTE}`]: { fingerprint: FINGERPRINT, has_changes: true, review: null, reused: false, reason_code: null },
+      [`POST ${ROUTE}/model`]: { __status: 502, detail: { reason_code: "model_review_unreadable" } },
+    });
+    render(PatchReview, { repoId: "repo_1" });
+    await fireEvent.click(await screen.findByRole("button", { name: "Ask the model to review" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("not with findings Raiker could read");
+  });
+
+  it("says a stored review is signed here, and warns when it no longer matches its signature", async () => {
+    stubFetch({
+      [`GET ${ROUTE}`]: {
+        fingerprint: FINGERPRINT, has_changes: true, review, reused: true, reason_code: null,
+        attestation: { state: "verified", key_id: "mkey_1", signed_at: "2026-10-19T12:00:00Z" },
+      },
+    });
+    const { unmount } = render(PatchReview, { repoId: "repo_1" });
+    const signed = await screen.findByText("Signed here");
+    expect(signed).toHaveAttribute("title", expect.stringContaining("mkey_1"));
+    expect(screen.queryByTestId("patch-review-tampered")).toBeNull();
+    unmount();
+
+    stubFetch({
+      [`GET ${ROUTE}`]: {
+        fingerprint: FINGERPRINT, has_changes: true, review, reused: true, reason_code: null,
+        attestation: { state: "invalid", key_id: "mkey_1", signed_at: "2026-10-19T12:00:00Z" },
+      },
+    });
+    render(PatchReview, { repoId: "repo_1" });
+    expect(await screen.findByTestId("patch-review-tampered")).toHaveTextContent("don't rely on these findings");
+  });
+
+  it("reviews the patch again once after a repair turn settles, and counts a finding that persists", async () => {
+    const persisting = {
+      ...review,
+      findings: [{ ...review.findings[0], since: "still_present", reviews_present: 3 }],
+      counts: { high: 1, medium: 0, low: 0, info: 0 },
+    };
+    const fetch = stubFetch({
+      [`GET ${ROUTE}`]: { fingerprint: FINGERPRINT, has_changes: true, review: persisting, reused: true, reason_code: null },
+      [`POST ${ROUTE}`]: { fingerprint: FINGERPRINT, has_changes: true, review, reused: false, reason_code: null },
+    });
+    const requests: string[] = [];
+    const { rerender } = render(PatchReview, {
+      repoId: "repo_1",
+      revision: 1,
+      onrepair: (request: string) => requests.push(request),
+    });
+    expect(await screen.findByText("In 3 reviews in a row")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Ask Raiker to fix" }));
+    expect(requests).toHaveLength(1);
+    const posts = () => fetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === "POST").length;
+    expect(posts()).toBe(0);
+
+    // The repair turn settles: the patch moved, so the next read has no review yet.
+    stubFetch({
+      [`GET ${ROUTE}`]: { fingerprint: "f2", has_changes: true, review: null, reused: false, reason_code: null },
+      [`POST ${ROUTE}`]: { fingerprint: "f2", has_changes: true, review, reused: false, reason_code: null },
+    });
+    await rerender({ repoId: "repo_1", revision: 2, onrepair: (request: string) => requests.push(request) });
+    expect(await screen.findByTestId("patch-review-rereviewed")).toBeInTheDocument();
+
+    // A later settle without a new repair request reviews nothing by itself.
+    const quiet = stubFetch({
+      [`GET ${ROUTE}`]: { fingerprint: "f3", has_changes: true, review: null, reused: false, reason_code: null },
+    });
+    await rerender({ repoId: "repo_1", revision: 3, onrepair: (request: string) => requests.push(request) });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(quiet.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(false);
+  });
 });

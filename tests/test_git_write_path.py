@@ -478,7 +478,7 @@ class TestGithubPullRequest:
     def _service(self, workspace: Path, store: SQLiteStore):  # type: ignore[no-untyped-def]
         from raiker.runtime.connectors import GithubConnectorService
 
-        return GithubConnectorService(workspace, store)
+        return GithubConnectorService(workspace, store, principal_id="principal_owner")
 
     @pytest.mark.parametrize(
         ("kwargs", "reason"),
@@ -540,6 +540,15 @@ class TestGithubPullRequest:
             return {"status": 201, "body_bytes": len(body), "body_text": body, "truncated": False}
 
         monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _post)
+        reads: list[str] = []
+
+        def _readback(url: str, headers: dict[str, str]) -> dict[str, object]:
+            reads.append(url)
+            pull = {"number": 7, "html_url": "https://github.com/octo/repo/pull/7", "state": "open",
+                    "head": {"ref": "feature/x", "sha": "a" * 40}, "base": {"ref": "main"}}
+            return {"status": 200, "body_text": json.dumps(pull)}
+
+        monkeypatch.setattr("raiker.runtime.connectors._default_fetch", _readback)
         with routed_dispatch("connector_github_runtime", "act_test") as authority:
             outcome = self._service(ws, SQLiteStore(ws)).create_pull_request(
                 "octo/repo", "Fix the thing", "feature/x", "main", "why", authority=authority
@@ -548,6 +557,14 @@ class TestGithubPullRequest:
         assert outcome["number"] == 7
         assert outcome["untrusted"] is True
         assert "untrusted data" in outcome["content"]
+        # BR-12 — the pull request was read back from GitHub and the receipt
+        # records what GitHub itself confirmed.
+        assert reads == ["https://api.github.com/repos/octo/repo/pulls/7"]
+        receipt = outcome["receipt"]
+        assert receipt["confirmation"] == "confirmed"
+        assert receipt["head_branch"] == "feature/x" and receipt["base_branch"] == "main"
+        assert receipt["head_sha"] == "a" * 40 and receipt["state"] == "open"
+        assert "ghp_" not in json.dumps(receipt)
 
     def test_the_executor_routes_the_pull_request_operation(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -563,6 +580,12 @@ class TestGithubPullRequest:
         monkeypatch.setattr(
             "raiker.runtime.connectors.post_json_url",
             lambda *a, **k: {"status": 201, "body_bytes": len(body), "body_text": body, "truncated": False},
+        )
+        # A read-back that answers someone else's branch is a mismatch, not a confirmation.
+        other = json.dumps({"number": 7, "html_url": "https://github.com/octo/repo/pull/7", "state": "open",
+                            "head": {"ref": "someone/else", "sha": "b" * 40}, "base": {"ref": "main"}})
+        monkeypatch.setattr(
+            "raiker.runtime.connectors._default_fetch", lambda url, headers: {"status": 200, "body_text": other}
         )
         result = execute_as_routed(GithubConnectorExecutor(ws, SQLiteStore(ws)), 
             _action(
@@ -582,3 +605,41 @@ class TestGithubPullRequest:
         assert result.artifacts["number"] == 7
         # The proposed text is the owner's material, not audit metadata.
         assert result.artifacts["content_redacted"] is True
+        assert result.artifacts["receipt"]["confirmation"] == "mismatch"
+        assert "did not confirm" in result.summary
+
+
+
+def test_a_failed_read_back_leaves_an_unconfirmed_receipt_never_a_failed_pull_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.github.receipts import list_receipts
+    from raiker.runtime.connectors import GithubConnectorService
+
+    ws = tmp_path / "gh"
+    ws.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_secrettoken")
+    monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "api.github.com")
+    created = json.dumps({"number": 9, "html_url": "https://github.com/octo/repo/pull/9", "state": "open",
+                          "head": {"ref": "raiker/fix", "sha": "c" * 40}})
+    monkeypatch.setattr(
+        "raiker.runtime.connectors.post_json_url",
+        lambda *a, **k: {"status": 201, "body_bytes": len(created), "body_text": created, "truncated": False},
+    )
+
+    def unreachable(url: str, headers: dict[str, str]) -> dict[str, object]:
+        raise OSError("network down")
+
+    monkeypatch.setattr("raiker.runtime.connectors._default_fetch", unreachable)
+    store = SQLiteStore(ws)
+    with routed_dispatch("connector_github_runtime", "act_test") as authority:
+        outcome = GithubConnectorService(ws, store, principal_id="principal_owner").create_pull_request(
+            "octo/repo", "Fix", "raiker/fix", "main", authority=authority
+        )
+    assert outcome["status"] == "success" and outcome["number"] == 9
+    assert outcome["receipt"]["confirmation"] == "unconfirmed"
+    # What the create response said is kept, labelled as unconfirmed.
+    assert outcome["receipt"]["head_sha"] == "c" * 40
+    assert outcome["receipt"]["receipt_id"]
+    assert [row["number"] for row in list_receipts(store, "principal_owner")] == [9]

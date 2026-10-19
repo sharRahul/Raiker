@@ -82,6 +82,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("DELETE", "/api/code/repos/{repo_id}"),
         ("GET", "/api/code/repos/{repo_id}/review"),
         ("POST", "/api/code/repos/{repo_id}/review"),
+        ("POST", "/api/code/repos/{repo_id}/review/model"),
+        ("GET", "/api/code/repos/{repo_id}/pull-requests"),
         ("GET", "/api/code/repos/{repo_id}/target"),
         ("GET", "/api/code/repos/{repo_id}/provenance"),
         ("POST", "/api/code/repos/{repo_id}/worktrees"),

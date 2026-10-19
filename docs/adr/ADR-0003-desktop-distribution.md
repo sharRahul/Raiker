@@ -180,7 +180,12 @@ acceptance criteria, and references.
   uninstalls exactly that on a `windows-11-arm` runner. MLX is pinned to
   Apple silicon only, because it publishes no Intel-Mac wheels.
 
-  Names: `Raiker-<version>-<target>[-setup][-unsigned].<ext>`. Windows
+  Names: `Raiker-<version>-<target>[-setup].<ext>`, signed or not (owner
+  decision 2026-10-19: signing state is recorded in `installation.json` and the
+  manifest, not the filename). A draft release carries one installer per
+  platform — Windows x86-64 and Arm (the emulated x86-64 setup program under
+  its own name), macOS Apple silicon `.dmg`, Linux x86-64 and ARM64
+  `.AppImage`. Windows
   installs per user (`%LOCALAPPDATA%\Programs\Raiker`), never elevates, adds
   Start-menu and desktop shortcuts, and refuses Windows before 10 1809 and
   32-bit Windows (`desktop/build-resources/installer.nsh`). macOS uses the

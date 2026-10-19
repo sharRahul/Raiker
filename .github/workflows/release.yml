@@ -12,9 +12,16 @@
 # **The honesty rule.** `signing: require` is the default and fails a target
 # whose identity secrets are absent, rather than producing an artifact that
 # looks like a release. `signing: skip` is the way to exercise the pipeline
-# without identities: it produces artifacts named `-unsigned`, records
-# `signing.applied = false` inside them so the installed product says so, and
-# refuses to publish. Nothing in between.
+# without identities: it records `signing.applied = false` inside every build
+# so the installed product says so, and may publish only as a beta draft.
+# Nothing in between. Filenames name the platform only; whether a build was
+# signed is in the build, its manifest and the release notes, not its name.
+#
+# **One download per platform.** A draft release carries exactly five files —
+# Windows x86-64 and Arm, macOS Apple silicon, Linux x86-64 and Arm — chosen by
+# `raiker.app.desktop_release.release_asset_names`. The other installer formats
+# are still built, installed and tested on every run and stay in the workflow
+# artifacts, with the manifests, checksums and the signed channel.
 name: Release
 
 on:
@@ -231,6 +238,18 @@ jobs:
         with:
           name: release-channel
           path: dist
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+        with:
+          path: source
+      - name: Choose one installer per platform
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python source/scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
       # `gh` ships on the runner, so the draft needs no third-party action.
       - name: Create the draft
         env:
@@ -242,11 +261,11 @@ jobs:
 
           | Your computer | Download |
           |---|---|
-          | Windows 10/11 (Intel or AMD) | `Raiker-<version>-windows-x86_64-setup.exe` (or the `.msi`) |
-          | Windows 11 on Arm | the x86-64 `setup.exe` (runs under emulation) |
+          | Windows 10/11 (Intel or AMD) | `Raiker-<version>-windows-x86_64-setup.exe` |
+          | Windows 11 on Arm | `Raiker-<version>-windows-arm64-setup.exe` (the x86-64 program, runs under Windows' built-in emulation) |
           | Mac with Apple silicon | `Raiker-<version>-macos-arm64.dmg` |
-          | Linux (x86-64) | `.AppImage`, `.deb` or `.rpm` for `linux-x86_64` |
-          | Linux (ARM64) | `.AppImage`, `.deb` or `.rpm` for `linux-arm64` |
+          | Linux (x86-64) | `Raiker-<version>-linux-x86_64.AppImage` |
+          | Linux (ARM64) | `Raiker-<version>-linux-arm64.AppImage` |
 
           Run the installer and follow the guided setup. No Python, Node.js or
           terminal is needed. Each installer was built, installed, smoke-tested and
@@ -254,45 +273,52 @@ jobs:
 
           ## Verifying
 
-          Every installer has an Ed25519-signed schema-1 manifest
-          (`<file>.manifest.json` + `.sig`); `desktop-<channel>.json` is the signed
-          update index an installed Raiker reads once you pin it:
-
-              raiker-app update --channel-url <desktop index url> --channel-key <key>
-
-          The key is `release-public-key.txt`. `raiker-<version>.spdx.json` is the
-          SPDX SBOM, `release-provenance.json` (+ `.sig`) binds every file's SHA-256
-          to the source commit, lock and SBOM, and `SHA256SUMS` lists every file.
+          These builds are signed with the platform identities. The signed
+          update index, per-installer manifests, SBOM, provenance and checksums
+          are in this run's `release-channel` workflow artifact, for hosting at
+          the update channel URL.
           NOTES
-          gh release create "v${{ inputs.version }}" dist/* \
+          {
+            echo
+            echo '## SHA-256'
+            echo
+            echo '```'
+            cat assets/SHA256SUMS.txt
+            echo '```'
+          } >> notes.md
+          gh release create "v${{ inputs.version }}" assets/Raiker-* \
             --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md
 
   # Beta distribution can be a deliberate, unsigned download while platform
   # identities are being provisioned. It never creates a channel index, so an
   # installed beta cannot silently accept unsigned updates.
   beta_publish:
-    name: Draft unsigned beta download
+    name: Draft beta download
     needs: [plan, desktop]
     if: always() && inputs.publish && inputs.channel == 'beta' && inputs.signing == 'skip' && needs.plan.result == 'success' && needs.desktop.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Collect unsigned desktop artifacts
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Collect the desktop artifacts
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: collected
-      - name: Flatten installer files
+      - name: Choose one installer per platform
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           mkdir -p dist
-          find collected -type f \( \
-            -name 'Raiker-*' -o -name 'SHA256SUMS-*.txt' -o \
-            -name '*.manifest.json' -o -name 'smoke-*.txt' -o -name 'uninstall-*.txt' \
-          \) -exec cp {} dist/ \;
-          test -n "$(find dist -maxdepth 1 -type f -name 'Raiker-*' -print -quit)"
-          ls -la dist
-      - name: Create the unsigned beta draft
+          find collected -type f -name 'Raiker-*' -exec cp {} dist/ \;
+          python scripts/select_release_assets.py --version "$VERSION" --from dist --to assets
+      - name: Create the beta draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
@@ -301,18 +327,36 @@ jobs:
           cat > notes.md <<'NOTES'
           ## Beta download and install
 
-          This is an **unsigned beta download**. It is a normal manual install:
-          on macOS, open the `.dmg` and drag `Raiker.app` to Applications. macOS
-          may require Control-click → Open because no Apple Developer ID
-          certificate or notarization was available for this beta.
+          One download per platform:
 
-          Unsigned beta artifacts are not added to Raiker's automatic update
-          channel. Download the artifact for your platform from this draft and
-          verify its SHA-256 file before installing.
+          | Your computer | Download |
+          |---|---|
+          | Windows 10/11 (Intel or AMD) | `Raiker-<version>-windows-x86_64-setup.exe` |
+          | Windows 11 on Arm | `Raiker-<version>-windows-arm64-setup.exe` (the x86-64 program, runs under Windows' built-in emulation) |
+          | Mac with Apple silicon | `Raiker-<version>-macos-arm64.dmg` |
+          | Linux (x86-64) | `Raiker-<version>-linux-x86_64.AppImage` |
+          | Linux (ARM64) | `Raiker-<version>-linux-arm64.AppImage` |
+
+          This beta was built without platform signing identities, and each
+          installed copy says so in Settings. On macOS, open the `.dmg` and drag
+          `Raiker.app` to Applications; macOS may require Control-click → Open
+          because no Apple Developer ID certificate or notarization was
+          available. Windows SmartScreen may ask you to confirm *Run anyway*.
+
+          Beta downloads are not added to Raiker's automatic update channel.
+          Check the SHA-256 below before installing.
 
           ## Maintainer notes
 
           NOTES
           printf '%s\n' "$RELEASE_NOTES" >> notes.md
-          gh release create "v${{ inputs.version }}" dist/* \
+          {
+            echo
+            echo '## SHA-256'
+            echo
+            echo '```'
+            cat assets/SHA256SUMS.txt
+            echo '```'
+          } >> notes.md
+          gh release create "v${{ inputs.version }}" assets/Raiker-* \
             --draft --title "Raiker ${{ inputs.version }} (beta)" --notes-file notes.md

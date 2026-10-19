@@ -33,11 +33,15 @@ Raiker engine is bundled inside the application.
 
 | Your computer | Download |
 |---|---|
-| Windows 10 (1809+) or 11, Intel/AMD | `Raiker-<version>-windows-x86_64-setup.exe` (or `.msi`) |
-| Windows 11 on Arm | The x86-64 `setup.exe` (runs under Windows 11's built-in emulation; there is no native Arm build yet) |
+| Windows 10 (1809+) or 11, Intel/AMD | `Raiker-<version>-windows-x86_64-setup.exe` |
+| Windows 11 on Arm | `Raiker-<version>-windows-arm64-setup.exe` (the x86-64 program, tested on Windows on Arm; it runs under Windows 11's built-in emulation — there is no native Arm build yet) |
 | Mac with Apple silicon (M1 or later), macOS 12+ | `Raiker-<version>-macos-arm64.dmg` |
-| Linux x86-64 (Ubuntu 22.04+, Debian 12+, Fedora 36+) | `.AppImage`, `.deb` or `.rpm` for `linux-x86_64` |
-| Linux ARM64 | `.AppImage`, `.deb` or `.rpm` for `linux-arm64` |
+| Linux x86-64 (Ubuntu 22.04+, Debian 12+, Fedora 36+) | `Raiker-<version>-linux-x86_64.AppImage` |
+| Linux ARM64 | `Raiker-<version>-linux-arm64.AppImage` |
+
+Each release carries exactly one download per platform. The `.msi`, `.deb` and
+`.rpm` packages are built and tested on every release run but are not attached
+to the release; see [Releasing](docs/guide/releasing.md).
 
 Raiker sets up everything it needs on first start. Local AI models and other
 optional components are added later, from inside Raiker, only when you choose
@@ -84,6 +88,149 @@ there is no permissions step; review them any time on the Permissions page.
 Setup can be left and resumed at any point, and does not appear again once
 complete. Running Raiker from a source checkout has no installer, so there the
 in-app setup also includes **This device** and **Check** stages.
+
+## Running Raiker under WSL2 or on a VPS
+
+The desktop installers above are the standard installation. Two other setups
+run the **same single-owner host** (`raiker-web`) from a source checkout: inside
+WSL2 on a Windows PC, or on a Linux virtual private server (VPS) you control.
+Neither makes Raiker a hosted multi-user service, and there is still no Raiker
+cloud account: the host, its encrypted data and its credentials stay on the
+machine you install it on.
+
+Both need Python 3.11+, Node.js 24+ and Git on that machine.
+
+### WSL2 (Windows 10 21H2+ or Windows 11)
+
+1. In an administrator PowerShell, install WSL2 with Ubuntu and restart when
+   asked:
+
+   ```powershell
+   wsl --install -d Ubuntu-24.04
+   ```
+
+2. Open **Ubuntu** from the Start menu, then install the build tools and
+   Node.js 24:
+
+   ```bash
+   sudo apt update && sudo apt install -y git python3 python3-venv python3-pip build-essential curl
+   curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+   sudo apt install -y nodejs
+   ```
+
+3. Clone and build Raiker **inside the Linux file system** (`~`, not
+   `/mnt/c/…`: the Windows drive is much slower from WSL and its permissions do
+   not protect Raiker's data):
+
+   ```bash
+   git clone https://github.com/sharRahul/Raiker.git ~/Raiker && cd ~/Raiker
+   python3 -m venv .venv && . .venv/bin/activate
+   python -m pip install -e .
+   npm --prefix web ci && npm --prefix web run build
+   ```
+
+4. Start the host on loopback and open it from Windows:
+
+   ```bash
+   raiker-web --workspace ~/raiker-workspace --no-browser
+   ```
+
+   WSL2 forwards `localhost` to Windows, so open <http://127.0.0.1:8765/> in a
+   Windows browser and complete setup there. Keep the host on loopback; do not
+   pass `--allow-public` just to reach it from the same PC.
+
+Notes for WSL2:
+
+- **Models.** A model server running on Windows (Ollama, LM Studio) is reached
+  from WSL at the Windows host's address, not `127.0.0.1`, unless WSL's
+  mirrored networking is on (`networkingMode=mirrored` in `%UserProfile%\.wslconfig`).
+  Hosted providers need nothing extra.
+- **Credentials.** WSL usually has no unlocked Secret Service, so
+  *This device* reports *Credential protection — private file*. Provider keys
+  are still encrypted at rest; see [Troubleshooting](docs/guide/troubleshooting.md).
+- **Starting it again.** WSL stops when its last terminal closes. Reopen
+  Ubuntu, `cd ~/Raiker && . .venv/bin/activate`, and run `raiker-web` again,
+  or keep it running with the systemd unit shown for a VPS below (enable
+  systemd in WSL with `[boot] systemd=true` in `/etc/wsl.conf`).
+
+### VPS (a Linux server you control)
+
+Use a VPS with at least 2 vCPU, 4 GB of memory and 20 GB of disk running
+Ubuntu 22.04/24.04 or Debian 12, and a hosted AI provider (a small VPS cannot
+run useful local models). Run Raiker as its own unprivileged user.
+
+1. Install the tools (as above for Ubuntu), then create the user and build:
+
+   ```bash
+   sudo adduser --disabled-password --gecos "" raiker
+   sudo -iu raiker
+   git clone https://github.com/sharRahul/Raiker.git ~/Raiker && cd ~/Raiker
+   python3 -m venv .venv && . .venv/bin/activate
+   python -m pip install -e .
+   npm --prefix web ci && npm --prefix web run build
+   exit
+   ```
+
+2. Run the host under systemd, **bound to loopback**:
+
+   ```ini
+   # /etc/systemd/system/raiker.service
+   [Unit]
+   Description=Raiker host
+   After=network-online.target
+
+   [Service]
+   User=raiker
+   WorkingDirectory=/home/raiker/Raiker
+   ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --host 127.0.0.1 --port 8765 --no-browser
+   Restart=on-failure
+   NoNewPrivileges=true
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   ```bash
+   sudo systemctl daemon-reload && sudo systemctl enable --now raiker
+   ```
+
+3. **Reach it through an SSH tunnel** (recommended). Nothing is exposed to the
+   internet; from your own computer:
+
+   ```bash
+   ssh -N -L 8765:127.0.0.1:8765 raiker-vps
+   ```
+
+   then open <http://127.0.0.1:8765/> and complete setup. The first person to
+   create the owner account owns the instance, so do this before anything else
+   can reach the port.
+
+4. **Or reach it over a private network** if you need a browser on another
+   device without a tunnel. Put the VPS on a VPN you control (WireGuard,
+   Tailscale), then bind Raiker to that private address — never to a public
+   one. Raiker refuses a non-loopback bind unless you pass `--allow-public`
+   *and* set a hardened `RAIKER_OWNER_TOKEN`, and it then turns on its
+   transport guardrails (security headers, HSTS, rate limit):
+
+   ```ini
+   # in raiker.service, replacing ExecStart
+   Environment=RAIKER_OWNER_TOKEN=<a long random value, e.g. from: openssl rand -hex 32>
+   ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --host 100.64.0.10 --port 8765 --allow-public --no-browser
+   ```
+
+   Terminate TLS in front of it if your VPN does not already encrypt the
+   traffic, with the proxy connecting to that private address. **Do not point a
+   reverse proxy at `127.0.0.1:8765`:** Raiker treats a loopback peer as this
+   machine, so every remote request would arrive as a local one, without the
+   public-bind guardrails. A remote instance is still a single-owner instance:
+   every action stays governed, approved and audited, and the owner password
+   protects it — choose a strong one and turn on **Settings → Security &
+   sign-in → Enroll in MFA**.
+
+Update a WSL2 or VPS installation with `git pull`, `python -m pip install -e .`
+and `npm --prefix web ci && npm --prefix web run build`, then restart
+`raiker-web` (`sudo systemctl restart raiker`). Back up the workspace directory
+first. More: [Managing the host](docs/guide/managing-the-host.md#explicit-web-server-control).
 
 ## AI providers
 

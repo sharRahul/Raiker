@@ -44,18 +44,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
 from raiker.api.dependencies import workspace_path as _ws
-from raiker.api.schemas import serialize_dto
+from raiker.api.schemas import ModelPatchReviewRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.code import (
     CodeRepoBrowseView,
     CodeRepoChangesView,
     CodeRepoDiagnosticsView,
     CodeRepoFileView,
+    CodeRepoModelReviewView,
     CodeRepoProvenanceView,
+    CodeRepoPullRequestsView,
     CodeRepoReviewView,
     CodeRepoTargetView,
+    ModelPatchReview,
     PatchReview,
     PatchReviewSummary,
+    PullRequestReceipt,
 )
 from raiker.api.wire.projects import ProjectBrowseEntry
 from raiker.knowledge.extractors import resolve_extractable_media_type
@@ -466,12 +470,14 @@ async def read_code_repo_target(
     answers ``remote_only`` and a moved folder ``folder_missing`` rather than
     pretending the workspace root is the target.
     """
-    from raiker.control.build_target import describe_target  # noqa: PLC0415
+    from raiker.control.build_target import delegation_summary, describe_target  # noqa: PLC0415
 
     principal_id = auth_data[0].principal_id
     repo = _owned_repo(request, repo_id, principal_id)
-    target = describe_target(SQLiteStore(_ws(request)), _ws(request), principal_id, repo)
+    store = SQLiteStore(_ws(request))
+    target = describe_target(store, _ws(request), principal_id, repo)
     answer: CodeRepoTargetView = cast(CodeRepoTargetView, target)
+    answer["authority"] = cast(Any, delegation_summary(store, principal_id, target))
     return serialize_dto(answer)
 
 
@@ -515,6 +521,32 @@ def _review_answer(
         "previous": summary,
     }
     return answer
+
+
+def _signed_view(
+    store: SQLiteStore, principal_id: str, repo_id: str, review: dict[str, Any] | None
+) -> tuple[dict[str, Any] | None, Any]:
+    """BR-D05 — *review* without its signature bytes, and its verified signature state."""
+    from raiker.review.review_attestation import public_attestation, verify_review  # noqa: PLC0415
+
+    if review is None:
+        return None, None
+    state = verify_review(store, owner_principal_id=principal_id, repo_id=repo_id, review=review)
+    shown = {key: value for key, value in review.items() if key != "attestation"}
+    return shown, public_attestation(review, state)
+
+
+def _attester(request: Request, store: SQLiteStore, principal_id: str, repo_id: str, kind: str) -> Any:
+    from raiker.review.review_attestation import attest_review  # noqa: PLC0415
+
+    def attest(review: dict[str, Any]) -> dict[str, Any]:
+        return attest_review(
+            _ws(request), store, owner_principal_id=principal_id, repo_id=repo_id,
+            kind=kind,  # type: ignore[arg-type]
+            review=review,
+        )
+
+    return attest
 
 
 def _record_review(request: Request, principal_id: str, repo_id: str, review: dict[str, Any], reused: bool) -> None:
@@ -571,7 +603,18 @@ async def read_code_repo_review(
         if diff and review is None
         else None
     )
-    answer = _review_answer(fingerprint, diff, review, review is not None, reason, previous)
+    shown, attestation = _signed_view(store, principal_id, repo_id, review)
+    answer = _review_answer(fingerprint, diff, shown, review is not None, reason, previous)
+    answer["attestation"] = attestation
+    if diff:
+        from raiker.review.model_review import load_model_review  # noqa: PLC0415
+
+        reading = load_model_review(
+            store, owner_principal_id=principal_id, repo_id=repo_id, fingerprint=fingerprint
+        )
+        shown_reading, model_attestation = _signed_view(store, principal_id, repo_id, reading)
+        answer["model_review"] = cast(ModelPatchReview, shown_reading) if shown_reading is not None else None
+        answer["model_attestation"] = model_attestation
     return serialize_dto(answer)
 
 
@@ -604,10 +647,201 @@ async def review_code_repo_patch(
         return parse_findings(_ws(request), store, principal_id, root, files)
 
     review, reused = review_once(
-        store, owner_principal_id=principal_id, repo_id=repo_id, diff=diff, validator=validator
+        store, owner_principal_id=principal_id, repo_id=repo_id, diff=diff, validator=validator,
+        attest=_attester(request, store, principal_id, repo_id, "patch"),
     )
     _record_review(request, principal_id, repo_id, review, reused)
-    answer = _review_answer(patch_fingerprint(diff), diff, review, reused, None)
+    shown, attestation = _signed_view(store, principal_id, repo_id, review)
+    answer = _review_answer(patch_fingerprint(diff), diff, shown, reused, None)
+    answer["attestation"] = attestation
+    return serialize_dto(answer)
+
+
+def _model_for_review(router: Any, default: tuple[str, str], body: ModelPatchReviewRequest) -> tuple[str, str]:
+    """The ``(provider, model)`` the owner chose for this review, or their selection.
+
+    A profile is named by its id, as a turn names it. An unknown or test-only
+    profile, or a placeholder model, is refused rather than replaced with
+    another model the owner did not choose.
+    """
+    from raiker.models.registry import RegistryError, profile_with_model  # noqa: PLC0415
+
+    if not body.model_profile:
+        # The owner's selection may still be a catalogue placeholder: that is
+        # no model to send a patch to, and is said rather than tried.
+        if not default[1] or "<" in default[1] or ">" in default[1]:
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "model_review_model_required")
+        return default
+    try:
+        profile = router.registry.resolve_profile_id(body.model_profile)
+    except RegistryError:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "model_review_profile_unknown") from None
+    if bool(profile.raw.get("test_only", False)):
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "model_review_profile_unknown")
+    model = (body.model or profile.model or "").strip()
+    if not model or "<" in model or ">" in model:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "model_review_model_required")
+    if model != profile.model and not router.registry.find(profile.provider, model):
+        router.registry.register(profile_with_model(profile, model))
+    return router.registry.turn_token(profile), model
+
+
+def _record_model_review(
+    request: Request, principal_id: str, repo_id: str, review: dict[str, Any], reused: bool
+) -> None:
+    """BR-D04 — audit a model reading: which model, which patch, counts. Never content."""
+    import contextlib  # noqa: PLC0415
+
+    from raiker.events.types import make_event  # noqa: PLC0415
+    from raiker.events.writer import EventLogWriter  # noqa: PLC0415
+
+    store = SQLiteStore(_ws(request))
+    session_id = f"sess_inbox_{principal_id}"
+    with contextlib.suppress(Exception):
+        store.create_session(session_id, str(_ws(request)), title="Inbox")
+        EventLogWriter(store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="patch_model_review_completed",
+                actor="code_review",
+                payload={
+                    "principal_id": principal_id,
+                    "repo_id": repo_id,
+                    "fingerprint": str(review.get("fingerprint") or ""),
+                    "provider": str(review.get("provider") or ""),
+                    "model": str(review.get("model") or ""),
+                    "counts": dict(review.get("counts") or {}),
+                    "reused": reused,
+                },
+            )
+        )
+
+
+@router.post("/api/code/repos/{repo_id}/review/model")
+async def model_review_code_repo_patch(
+    repo_id: str,
+    body: ModelPatchReviewRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-D04 — ask a connected model to read the exact current patch, once per patch and model.
+
+    The patch is credential-redacted and framed as untrusted data, no tools are
+    offered, and the reading is stored by the patch fingerprint and the model.
+    Its findings are marked as the model's and never decide whether a turn is
+    verified. The request reaches the provider only through the owner's own
+    router: their gates, egress allowlist and connections apply.
+    """
+    from raiker.events.writer import EventLogWriter  # noqa: PLC0415
+    from raiker.models.contracts import ModelMessage  # noqa: PLC0415
+    from raiker.models.exceptions import ModelProviderError, safe_error  # noqa: PLC0415
+    from raiker.models.owner_runtime import owner_model_runtime  # noqa: PLC0415
+    from raiker.models.registry import RegistryError  # noqa: PLC0415
+    from raiker.review.model_review import (  # noqa: PLC0415
+        MAX_OUTPUT_TOKENS,
+        build_model_review,
+        load_model_review,
+        review_messages,
+        save_model_review,
+    )
+    from raiker.review.patch_review import patch_fingerprint  # noqa: PLC0415
+
+    principal_id = auth_data[0].principal_id
+    repo = _owned_repo(request, repo_id, principal_id)
+    diff, reason = _current_patch(request, repo)
+    if not diff:
+        empty: CodeRepoModelReviewView = {
+            "fingerprint": "",
+            "has_changes": False,
+            "model_review": None,
+            "reused": False,
+            "reason_code": reason or "no_changes",
+        }
+        return serialize_dto(empty)
+    store = SQLiteStore(_ws(request))
+    fingerprint = patch_fingerprint(diff)
+    router, default = owner_model_runtime(store, principal_id, EventLogWriter(store))
+    provider, model = _model_for_review(router, default, body)
+    stored = load_model_review(
+        store, owner_principal_id=principal_id, repo_id=repo_id, fingerprint=fingerprint,
+        provider=provider, model=model,
+    )
+    if stored is not None:
+        _record_model_review(request, principal_id, repo_id, stored, True)
+        shown_stored, stored_attestation = _signed_view(store, principal_id, repo_id, stored)
+        reused: CodeRepoModelReviewView = {
+            "fingerprint": fingerprint,
+            "has_changes": True,
+            "model_review": cast(ModelPatchReview, shown_stored),
+            "reused": True,
+            "reason_code": None,
+            "model_attestation": stored_attestation,
+        }
+        return serialize_dto(reused)
+    raw_messages, _truncated = review_messages(diff)
+    messages = [ModelMessage(role=item["role"], content=item["content"]) for item in raw_messages]
+    try:
+        response = await router.achat(provider, model, messages, None, max_tokens=MAX_OUTPUT_TOKENS)
+    except RegistryError:
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "model_review_profile_unknown") from None
+    except ModelProviderError as exc:
+        raise refusal(
+            status.HTTP_502_BAD_GATEWAY, f"model_review_provider_error:{safe_error(str(exc))}"
+        ) from None
+    try:
+        review = build_model_review(diff, provider=provider, model=model, answer=response.text)
+    except ValueError:
+        raise refusal(status.HTTP_502_BAD_GATEWAY, "model_review_unreadable") from None
+    review = _attester(request, store, principal_id, repo_id, "model")(review)
+    if not save_model_review(store, owner_principal_id=principal_id, repo_id=repo_id, review=review):
+        again = load_model_review(
+            store, owner_principal_id=principal_id, repo_id=repo_id, fingerprint=fingerprint,
+            provider=provider, model=model,
+        )
+        review = again or review
+    _record_model_review(request, principal_id, repo_id, review, False)
+    shown_review, model_attestation = _signed_view(store, principal_id, repo_id, review)
+    answer: CodeRepoModelReviewView = {
+        "fingerprint": fingerprint,
+        "has_changes": True,
+        "model_review": cast(ModelPatchReview, shown_review),
+        "reused": False,
+        "reason_code": None,
+        "model_attestation": model_attestation,
+    }
+    return serialize_dto(answer)
+
+
+@router.get("/api/code/repos/{repo_id}/pull-requests")
+async def read_code_repo_pull_requests(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BR-12 — receipts for the pull requests Raiker opened on this repository.
+
+    Each receipt is what GitHub said when the pull request was read back after
+    it was created. Evidence only: nothing reads a receipt to allow anything.
+    """
+    from raiker.control.build_target import _github_repository, describe_target  # noqa: PLC0415
+    from raiker.github.delegations import credential_owner  # noqa: PLC0415
+    from raiker.github.receipts import list_receipts  # noqa: PLC0415
+
+    principal_id = auth_data[0].principal_id
+    repo = _owned_repo(request, repo_id, principal_id)
+    store = SQLiteStore(_ws(request))
+    repository = _github_repository(describe_target(store, _ws(request), principal_id, repo)) or None
+    receipts = (
+        list_receipts(store, credential_owner(store, principal_id), repository=repository)
+        if repository
+        else []
+    )
+    answer: CodeRepoPullRequestsView = {
+        "repository": repository,
+        "receipts": [cast(PullRequestReceipt, row) for row in receipts],
+        "reason_code": None if repository else "not_a_github_repository",
+    }
     return serialize_dto(answer)
 
 

@@ -35,4 +35,21 @@ describe("RecentCommits", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByTestId("recent-commits")).toBeNull();
   });
+
+  it("shows Git's verdict on a commit the owner signed, and nothing for an unsigned one", async () => {
+    stubFetch({
+      [ROUTE]: {
+        reason_code: null,
+        commits: [
+          { commit: "1111111", subject: "Signed by me", committed_at: "2026-10-19T12:00:00Z", provenance: "none", session_id: null, turn_id: null, signature: "good" },
+          { commit: "2222222", subject: "Tampered", committed_at: "2026-10-19T11:00:00Z", provenance: "none", session_id: null, turn_id: null, signature: "bad" },
+          { commit: "3333333", subject: "Plain", committed_at: "2026-10-19T10:00:00Z", provenance: "none", session_id: null, turn_id: null, signature: "none" },
+        ],
+      },
+    });
+    render(RecentCommits, { repoId: "repo_1" });
+    expect(await screen.findByText("Signed")).toBeInTheDocument();
+    expect(screen.getByText("Bad signature")).toHaveAttribute("data-signature", "bad");
+    expect(screen.getByText("Plain").closest("li")?.querySelector(".signature")).toBeNull();
+  });
 });

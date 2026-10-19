@@ -8,6 +8,10 @@
    * Raiker here recorded; **Says Raiker — no record here** means the trailer is
    * there and nothing backs it. Evidence only: nothing reads it to allow
    * anything, and a commit without trailers is simply a commit.
+   *
+   * A commit the owner signed shows Git's own verdict on that signature
+   * (**Signed**, **Signed — key not trusted here**, **Bad signature**…). Raiker
+   * never signs a commit itself, so an unsigned commit shows nothing.
    */
   import { api } from "../api";
   import type { CodeRepoProvenanceView } from "../generated/apiContract";
@@ -38,6 +42,16 @@
     unrecorded: "Says Raiker — no record here",
     none: "",
   };
+
+  const SIGNATURE: Record<string, string> = {
+    good: "Signed",
+    untrusted: "Signed — key not trusted here",
+    bad: "Bad signature",
+    expired: "Signed — key expired",
+    revoked: "Signed — key revoked",
+    unverifiable: "Signed — can't check here",
+    none: "",
+  };
 </script>
 
 {#if view && view.commits.length}
@@ -56,6 +70,9 @@
               {LABEL[commit.provenance]}
             </span>
           {/if}
+          {#if commit.signature && commit.signature !== "none"}
+            <span class="badge signature" data-signature={commit.signature}>{SIGNATURE[commit.signature]}</span>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -63,6 +80,11 @@
 {/if}
 
 <style>
+  .signature[data-signature="bad"],
+  .signature[data-signature="revoked"] {
+    color: var(--danger);
+    border-color: var(--danger-border);
+  }
   .recent-commits {
     margin: var(--space-2) 0;
     font-size: var(--text-sm);
@@ -107,7 +129,10 @@
     border: 1px solid var(--neutral-border);
     font-size: var(--text-xs);
   }
-  li[data-provenance="recorded"] .badge {
+  .badge + .badge {
+    margin-left: 0;
+  }
+  li[data-provenance="recorded"] .badge:not(.signature) {
     border-color: var(--ok-border);
     background: var(--ok-soft);
     color: var(--ok);

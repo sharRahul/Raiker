@@ -6,8 +6,11 @@ updated.
 
 ## What CI runs
 
-Three workflows run on a pull request and on a push to `main`; a fourth is
-`workflow_dispatch` only. The Python set-up every job repeated — the pinned
+Three workflows (consolidated 2026-10-19 from seven): **`ci.yml`** runs every
+job on each pull request and push to `main`; **`desktop-package.yml`** builds,
+installs and tests the desktop installers on each platform's runner when the
+desktop or packaging code changes, and is called by the release; and
+**`release.yml`** is `workflow_dispatch` only. The Python set-up every job repeated — the pinned
 interpreter and, where a job needs it, the package installed with its dev
 extras — is one local composite action, `.github/actions/setup-python`, pinned
 the same way as every third-party action it uses.
@@ -20,13 +23,10 @@ the same way as every third-party action it uses.
 | **Source measurement** | `scripts/measure_loc.py --json loc-report.json`, kept as the `loc-report` artifact for 90 days. Handwritten production and test lines per language, comment and docstring lines apart, the largest files, Python functions over 150 lines and the bundle size — the baseline a simplification reports against. It measures and never fails a change. |
 | **Dependency vulnerabilities** | `pip-audit` over the runtime dependencies and the locked release set, and `uv lock --check` with the release exports compared against the lock. |
 | **Native runner (`ubuntu-latest`, `windows-latest`)** | `cargo fmt --check`, `cargo clippy --all-targets -D warnings`, `cargo test --all`, then `scripts/build_native_runner.py`. The sandbox runner is the only non-Python part of Raiker and the part that builds the operating-system boundary; a boundary that compiles on one machine is not a boundary. |
-
-### `licensing.yml`
-
-Validates licences and generates an SPDX SBOM
-(`scripts/licensing_check.py --sbom`), then builds the distributions and
-validates them (`--dist-dir dist`). Web dependencies are installed from the
-lockfile with `npm ci`.
+| **Web UI (Node 24)** | `npm ci`, `npm audit`, lint, `check`, unit tests, build, then the **mocked** end-to-end suite against that build. Every API call is answered from a fixture, so it needs no credential and no network. It runs on every change, not only `web/**`, because the backend produces the contracts the client reads (GCR-15). The `live` project — which drives a real host holding real provider keys — is deliberately not run in CI, because a suite that cannot really pass must not report that it did. |
+| **Electron shell** | The desktop window's audit, lint, type-check, unit tests and Electron end-to-end suite against a fixture page (DESK-13). No host, no credential. |
+| **Licensing and SBOM** | Validates licences and generates an SPDX SBOM (`scripts/licensing_check.py --sbom`), then builds the distributions and validates them (`--dist-dir dist`). |
+| **Build faults (host killed mid-check)** | `scripts/build_restart_fault.py`: a real `raiker-web` with only the model scripted is SIGKILLed while a Build turn's declared check runs, then restarted; the outcome is never verified on a check that did not finish (BR-D06). |
 
 ### The documentation validators
 
@@ -36,22 +36,15 @@ other four validators below now run inside the ordinary pytest suite, from
 all. **A documentation change that removes one of the phrases they guard fails
 CI**, which is deliberate: the phrases are the claims.
 
-### `web.yml` — only when `web/**` changes
-
-Node 24: `npm ci`, lint, `check`, unit tests, build, then the **mocked**
-end-to-end suite against that build. Every API call is answered from a fixture,
-so it needs no credential and no network. The `live` project — which drives a
-real host holding real provider keys — is deliberately not run in CI, because a
-suite that cannot really pass must not report that it did.
-
 ### `release.yml` — `workflow_dispatch` only
 
 Builds a reproducible payload per platform on that platform's own runner, proves
 it rebuilds to the same bytes, runs an encrypted-database packaging test there,
 builds the installer, and signs the channel index the updater verifies. It
 **refuses to build without code-signing identities**; `signing: skip` produces
-artifacts named `-unsigned` that the product itself calls unsigned and that the
-publish job will not release.
+builds the product itself calls unsigned, which may be published only as a beta
+draft. A draft carries one installer per platform (see
+[Releasing](../guide/releasing.md)).
 
 ## Required local checks
 

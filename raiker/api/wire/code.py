@@ -107,6 +107,25 @@ class CodeRepoDiagnosticsView(TypedDict):
     diagnostics: list[Diagnostic]
 
 
+class TargetDelegation(TypedDict):
+    """BR-01 — one active repository delegation a Build turn here would act under."""
+
+    delegation_id: str
+    operations: list[str]
+    branch_pattern: str | None
+    allow_pull_request: bool
+    expires_at: str
+    actions_left: int | None
+
+
+class TargetAuthority(TypedDict):
+    """What a Build turn on this target may do unprompted, beyond asking you."""
+
+    repository: str | None
+    delegations: list[TargetDelegation]
+    git_credential: bool
+
+
 class CodeRepoTargetView(TypedDict):
     """BR-D02 — the execution target a Build turn on this repository would use."""
 
@@ -126,6 +145,8 @@ class CodeRepoTargetView(TypedDict):
     code_placement: str
     code_placement_reason: str
     fingerprint: str
+    #: BR-01 — the delegations and Git credential a turn here would act under.
+    authority: NotRequired[TargetAuthority]
 
 
 class PatchReviewFinding(TypedDict):
@@ -144,6 +165,22 @@ class PatchReviewFinding(TypedDict):
     #: Against the repository's previous review: ``new`` or ``still_present``;
     #: null for the first review (and for reviews stored before this existed).
     since: NotRequired[Literal["new", "still_present"] | None]
+    #: ``model`` for a selected model's reading (a claim nothing checked).
+    source: NotRequired[Literal["model"]]
+    #: BR-11 — how many reviews in a row have raised this finding, this one included.
+    reviews_present: NotRequired[int]
+
+
+class ModelPatchReview(TypedDict):
+    """BR-D04 — one connected model's reading of an exact patch, stored by patch and model."""
+
+    fingerprint: str
+    provider: str
+    model: str
+    findings: list[PatchReviewFinding]
+    counts: dict[str, int]
+    truncated: bool
+    reviewed_at: str
 
 
 class ResolvedFinding(TypedDict):
@@ -177,6 +214,20 @@ class PatchReviewSummary(TypedDict):
     counts: dict[str, int]
 
 
+class ReviewAttestationView(TypedDict):
+    """BR-D05 — whether a stored review is exactly what this installation signed.
+
+    ``verified``: signed here and unchanged; ``invalid``: the review or its
+    signature was changed after it was taken; ``unknown_key``: signed by a key
+    this installation does not hold; ``unsigned``: taken before reviews were
+    signed. Evidence only — no state grants or blocks anything.
+    """
+
+    state: Literal["verified", "invalid", "unknown_key", "unsigned"]
+    key_id: str | None
+    signed_at: str | None
+
+
 class CodeRepoReviewView(TypedDict):
     """The review of the working tree's current patch, if one has been taken.
 
@@ -193,6 +244,22 @@ class CodeRepoReviewView(TypedDict):
     #: When the current patch has no review yet: the latest review this
     #: repository has, of an earlier patch — so the owner can see it is stale.
     previous: PatchReviewSummary | None
+    #: The latest selected-model reading of this exact patch, if one was asked for.
+    model_review: NotRequired[ModelPatchReview | None]
+    #: BR-D05 — the signature state of ``review`` and of ``model_review``.
+    attestation: NotRequired[ReviewAttestationView | None]
+    model_attestation: NotRequired[ReviewAttestationView | None]
+
+
+class CodeRepoModelReviewView(TypedDict):
+    """BR-D04 — the answer to asking a model to read the current patch."""
+
+    fingerprint: str
+    has_changes: bool
+    model_review: ModelPatchReview | None
+    reused: bool
+    reason_code: str | None
+    model_attestation: NotRequired[ReviewAttestationView | None]
 
 
 class CommitProvenance(TypedDict):
@@ -204,10 +271,41 @@ class CommitProvenance(TypedDict):
     provenance: Literal["recorded", "unrecorded", "none"]
     session_id: str | None
     turn_id: str | None
+    #: BR-D05 — Git's verdict on the commit's own signature (``%G?``).
+    signature: Literal["good", "untrusted", "bad", "expired", "revoked", "unverifiable", "none"]
 
 
 class CodeRepoProvenanceView(TypedDict):
     commits: list[CommitProvenance]
+    reason_code: str | None
+
+
+class PullRequestReceipt(TypedDict):
+    """BR-12 — what GitHub confirmed about a pull request Raiker opened."""
+
+    receipt_id: str
+    repository: str
+    number: int
+    url: str
+    head_branch: str
+    base_branch: str
+    head_sha: str
+    state: str
+    #: ``confirmed``: read back from GitHub and it matches the request;
+    #: ``mismatch``: GitHub answered with a different head, base or number;
+    #: ``unconfirmed``: the read-back failed, so only the create response is known.
+    confirmation: Literal["confirmed", "mismatch", "unconfirmed"]
+    session_id: str | None
+    turn_id: str | None
+    created_at: str
+    confirmed_at: str | None
+
+
+class CodeRepoPullRequestsView(TypedDict):
+    """The pull requests Raiker opened on this repository's GitHub identity, newest first."""
+
+    repository: str | None
+    receipts: list[PullRequestReceipt]
     reason_code: str | None
 
 

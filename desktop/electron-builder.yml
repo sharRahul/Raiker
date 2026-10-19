@@ -11,8 +11,8 @@
 #
 # Signing identities never appear here. electron-builder reads them from the
 # environment only when the release workflow supplies them (CSC_LINK and
-# friends); an unsigned build is named `-unsigned` so it can never be mistaken
-# for a release.
+# friends); an unsigned build records `signing.applied = false` in
+# installation.json, so the installed product says so.
 appId: org.raiker.desktop
 productName: Raiker
 copyright: Copyright © Raiker contributors
@@ -29,9 +29,9 @@ extraResources:
   - from: ../raiker/assets/raiker-icon.png
     to: raiker-icon.png
 asar: true
-# The release names say what they are: product, version, target (OS and
-# architecture, RAIKER_TARGET) and, for a test build, `-unsigned`
-# (RAIKER_ARTIFACT_SUFFIX). Both are set by the build script, and
+# The release names say what they are: product, version and target (OS and
+# architecture, RAIKER_TARGET). RAIKER_ARTIFACT_SUFFIX is empty for signed and
+# unsigned builds alike. Both are set by the build script, and
 # `raiker/app/desktop_release.py` computes the same names.
 artifactName: "${productName}-${version}-${env.RAIKER_TARGET}${env.RAIKER_ARTIFACT_SUFFIX}.${ext}"
 publish: null

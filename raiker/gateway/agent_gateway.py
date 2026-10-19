@@ -426,15 +426,20 @@ class AgentGateway:
         across. Recording is best effort: a failure here leaves the turn judged
         without a target, which can only make its claim weaker.
         """
-        from raiker.control.build_target import record_turn_target
+        from raiker.control.build_target import authority_snapshot, record_turn_target
 
         with contextlib.suppress(Exception):
+            target = self._current_build_target()
+            # BR-07 — and the delegations and Git credential it may act under,
+            # so a resume can tell when the owner withdrew either.
+            with contextlib.suppress(Exception):
+                target = {**target, "authority": authority_snapshot(self.store, self.owner_principal_id, target)}
             record_turn_target(
                 self.store,
                 owner_principal_id=self.owner_principal_id,
                 session_id=prompt_envelope.session_id,
                 turn_id=prompt_envelope.turn_id,
-                target=self._current_build_target(),
+                target=target,
             )
 
     def _build_target_refusal(self, prompt_envelope: PromptEnvelope) -> AgentResponse | None:
@@ -454,7 +459,7 @@ class AgentGateway:
         except Exception:  # noqa: BLE001 — an unreadable target is not a missing one
             return None
         if target.get("state") != "folder_missing":
-            return None
+            return self._task_target_refusal(prompt_envelope, target)
         return AgentResponse(
             request_id=prompt_envelope.request_id,
             session_id=prompt_envelope.session_id,
@@ -463,6 +468,44 @@ class AgentGateway:
             message=(
                 f"The repository folder {target.get('folder')} is no longer in the workspace, "
                 "so this Build turn did not start. Reconnect the repository or choose another one."
+            ),
+            client=prompt_envelope.client,
+        )
+
+    def _task_target_refusal(
+        self, prompt_envelope: PromptEnvelope, target: dict[str, Any]
+    ) -> AgentResponse | None:
+        """BR-02 / BR-D03 — a scheduled Build task runs in its own repository or not at all.
+
+        The task recorded the repository Build was pointed at when it was
+        scheduled. A cycle that finds Build pointed somewhere else — another
+        repository, the same reference on a different remote or folder, or
+        none — is refused before it starts, rather than carrying an issue's
+        change into a checkout nobody scheduled it for.
+        """
+        from raiker.control.build_target import load_task_target, task_target_mismatch
+
+        task_id = str(prompt_envelope.prompt.metadata.get("task_id") or "")
+        if not task_id:
+            return None
+        try:
+            scheduled = load_task_target(self.store, owner_principal_id=self.owner_principal_id, task_id=task_id)
+        except Exception:  # noqa: BLE001 — an unreadable record is no record
+            return None
+        mismatch = task_target_mismatch(scheduled, target)
+        if not mismatch or scheduled is None:
+            return None
+        now = target.get("label") or "no repository"
+        return AgentResponse(
+            request_id=prompt_envelope.request_id,
+            session_id=prompt_envelope.session_id,
+            turn_id=prompt_envelope.turn_id,
+            status="failed",
+            message=(
+                f"This scheduled Build task was set up for {scheduled.get('label') or 'another repository'} "
+                f"({scheduled.get('folder')}), and Build is now pointed at {now}, so this run did not start "
+                "and nothing was changed. Select that repository in Build to let it run, or schedule the "
+                "task again for this one."
             ),
             client=prompt_envelope.client,
         )
@@ -538,8 +581,39 @@ class AgentGateway:
             return None
         return ",".join(drift) or None
 
+    def _resume_authority_refusal(self, envelope: PromptEnvelope) -> str | None:
+        """BR-07 — what the parked turn's recorded authority lost, if anything."""
+        from raiker.control.build_target import authority_drift, load_turn_target
+
+        try:
+            started = load_turn_target(
+                self.store, owner_principal_id=self.owner_principal_id, turn_id=envelope.turn_id
+            )
+            lost = authority_drift(self.store, self.owner_principal_id, started)
+        except Exception:  # noqa: BLE001 — unreadable is not drift
+            return None
+        return ",".join(lost) or None
+
     def _refuse_resume_on_drift(self, approval_id: str, envelope: PromptEnvelope) -> None:
-        """Close a parked turn whose target moved, instead of continuing it elsewhere."""
+        """Close a parked turn whose target moved, or whose authority was withdrawn.
+
+        A delegation the owner revoked, or a Git credential they removed or
+        replaced, while the turn waited is a stop at a safe boundary (BR-07):
+        the continuation would otherwise carry on a plan made under authority
+        that no longer exists.
+        """
+        lost = self._resume_authority_refusal(envelope)
+        if lost is not None:
+            if not self.store.claim_suspended_turn(approval_id):
+                raise TurnSuspensionError("suspended_turn_already_resumed")
+            self.store.finalize_suspended_turn(approval_id, status="authority_changed")
+            with contextlib.suppress(Exception):
+                self.sessions.close_turn(
+                    envelope.turn_id,
+                    "failed",
+                    f"Not continued: the authority this Build turn started under changed ({lost}).",
+                )
+            raise TurnSuspensionError("build_authority_changed")
         drift = self._resume_target_refusal(envelope)
         if drift is None:
             return

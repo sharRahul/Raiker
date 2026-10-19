@@ -234,7 +234,12 @@ export function alreadyResumedElsewhere(reasonCode: string | null | undefined): 
  * - `failed` — everything else, including an unreadable parked state. This is a
  *   real failure and must still say so, with its reason.
  */
-export type ResumeFailure = "continued-elsewhere" | "not-yet-resolved" | "target-changed" | "failed";
+export type ResumeFailure =
+  | "continued-elsewhere"
+  | "not-yet-resolved"
+  | "target-changed"
+  | "authority-changed"
+  | "failed";
 
 export function classifyResumeFailure(reasonCode: string | null | undefined): ResumeFailure {
   if (alreadyResumedElsewhere(reasonCode)) return "continued-elsewhere";
@@ -243,5 +248,9 @@ export function classifyResumeFailure(reasonCode: string | null | undefined): Re
   // started on moved while it waited. The server closed it rather than
   // continue its plan somewhere it never looked.
   if (reasonCode === "build_target_changed") return "target-changed";
+  // BR-07 — a repository delegation the turn started under was revoked or
+  // ran out, or the Git credential in use was removed or replaced, while it
+  // waited. The server stopped it at this safe boundary.
+  if (reasonCode === "build_authority_changed") return "authority-changed";
   return "failed";
 }

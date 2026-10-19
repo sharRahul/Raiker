@@ -5721,6 +5721,63 @@
         "title": "CodeRepoFileView",
         "type": "object"
       },
+      "CodeRepoModelReviewView": {
+        "description": "BR-D04 — the answer to asking a model to read the current patch.",
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "has_changes": {
+            "title": "Has Changes",
+            "type": "boolean"
+          },
+          "model_attestation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewAttestationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPatchReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "reused": {
+            "title": "Reused",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "has_changes",
+          "model_review",
+          "reused",
+          "reason_code"
+        ],
+        "title": "CodeRepoModelReviewView",
+        "type": "object"
+      },
       "CodeRepoProvenanceView": {
         "properties": {
           "commits": {
@@ -5749,9 +5806,60 @@
         "title": "CodeRepoProvenanceView",
         "type": "object"
       },
+      "CodeRepoPullRequestsView": {
+        "description": "The pull requests Raiker opened on this repository's GitHub identity, newest first.",
+        "properties": {
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/PullRequestReceipt"
+            },
+            "title": "Receipts",
+            "type": "array"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          }
+        },
+        "required": [
+          "repository",
+          "receipts",
+          "reason_code"
+        ],
+        "title": "CodeRepoPullRequestsView",
+        "type": "object"
+      },
       "CodeRepoReviewView": {
         "description": "The review of the working tree's current patch, if one has been taken.\n\n``fingerprint`` is the current patch's; ``review`` is null until the owner\nasks for one. ``reused`` says the stored review of this same patch was\nreturned instead of a second, duplicate set of findings.",
         "properties": {
+          "attestation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewAttestationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fingerprint": {
             "title": "Fingerprint",
             "type": "string"
@@ -5759,6 +5867,26 @@
           "has_changes": {
             "title": "Has Changes",
             "type": "boolean"
+          },
+          "model_attestation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewAttestationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPatchReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "previous": {
             "anyOf": [
@@ -5846,6 +5974,9 @@
       "CodeRepoTargetView": {
         "description": "BR-D02 — the execution target a Build turn on this repository would use.",
         "properties": {
+          "authority": {
+            "$ref": "#/components/schemas/TargetAuthority"
+          },
           "branch": {
             "title": "Branch",
             "type": "string"
@@ -6711,6 +6842,19 @@
             ],
             "title": "Session Id"
           },
+          "signature": {
+            "enum": [
+              "good",
+              "untrusted",
+              "bad",
+              "expired",
+              "revoked",
+              "unverifiable",
+              "none"
+            ],
+            "title": "Signature",
+            "type": "string"
+          },
           "subject": {
             "title": "Subject",
             "type": "string"
@@ -6733,7 +6877,8 @@
           "committed_at",
           "provenance",
           "session_id",
-          "turn_id"
+          "turn_id",
+          "signature"
         ],
         "title": "CommitProvenance",
         "type": "object"
@@ -18413,6 +18558,88 @@
         "title": "ModelOperations",
         "type": "object"
       },
+      "ModelPatchReview": {
+        "description": "BR-D04 — one connected model's reading of an exact patch, stored by patch and model.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/PatchReviewFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "title": "Reviewed At",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "provider",
+          "model",
+          "findings",
+          "counts",
+          "truncated",
+          "reviewed_at"
+        ],
+        "title": "ModelPatchReview",
+        "type": "object"
+      },
+      "ModelPatchReviewRequest": {
+        "additionalProperties": false,
+        "description": "BR-D04 — which connected model reads the patch; the owner's selection when unset.",
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          }
+        },
+        "title": "ModelPatchReviewRequest",
+        "type": "object"
+      },
       "ModelPriceRequest": {
         "additionalProperties": false,
         "description": "An administrator's price override for one model, per million tokens.\n\nBoth input and output null clears the override and returns the model to the\nprovider-published or documented list price. Rates are strings so a decimal\nprice survives the round trip without binary float drift.\n\nCache-write and cache-read are separate optional components (BUG-21): a\nprovider bills them independently of input, and an omitted one stays unset\nrather than being inferred. ``effective_from`` dates the row so a correction\ncan be recorded as of when it actually applied, and ``reason`` is kept with\nthe row so an override is never anonymous.",
@@ -20911,6 +21138,10 @@
             ],
             "title": "Path"
           },
+          "reviews_present": {
+            "title": "Reviews Present",
+            "type": "integer"
+          },
           "rule": {
             "title": "Rule",
             "type": "string"
@@ -20939,6 +21170,11 @@
               }
             ],
             "title": "Since"
+          },
+          "source": {
+            "const": "model",
+            "title": "Source",
+            "type": "string"
           },
           "title": {
             "title": "Title",
@@ -23004,6 +23240,106 @@
         "title": "ProviderWeeklyUsage",
         "type": "object"
       },
+      "PullRequestReceipt": {
+        "description": "BR-12 — what GitHub confirmed about a pull request Raiker opened.",
+        "properties": {
+          "base_branch": {
+            "title": "Base Branch",
+            "type": "string"
+          },
+          "confirmation": {
+            "enum": [
+              "confirmed",
+              "mismatch",
+              "unconfirmed"
+            ],
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "head_branch": {
+            "title": "Head Branch",
+            "type": "string"
+          },
+          "head_sha": {
+            "title": "Head Sha",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "repository": {
+            "title": "Repository",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "repository",
+          "number",
+          "url",
+          "head_branch",
+          "base_branch",
+          "head_sha",
+          "state",
+          "confirmation",
+          "session_id",
+          "turn_id",
+          "created_at",
+          "confirmed_at"
+        ],
+        "title": "PullRequestReceipt",
+        "type": "object"
+      },
       "QuietHoursState": {
         "description": "The owner's quiet-hours terms and where the clock is now, decided server-side.",
         "properties": {
@@ -24127,6 +24463,50 @@
           "to"
         ],
         "title": "RevertImageRequest",
+        "type": "object"
+      },
+      "ReviewAttestationView": {
+        "description": "BR-D05 — whether a stored review is exactly what this installation signed.\n\n``verified``: signed here and unchanged; ``invalid``: the review or its\nsignature was changed after it was taken; ``unknown_key``: signed by a key\nthis installation does not hold; ``unsigned``: taken before reviews were\nsigned. Evidence only — no state grants or blocks anything.",
+        "properties": {
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "state": {
+            "enum": [
+              "verified",
+              "invalid",
+              "unknown_key",
+              "unsigned"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "key_id",
+          "signed_at"
+        ],
+        "title": "ReviewAttestationView",
         "type": "object"
       },
       "RoutineDoctor": {
@@ -27190,6 +27570,96 @@
           "changes_written"
         ],
         "title": "SyncResult",
+        "type": "object"
+      },
+      "TargetAuthority": {
+        "description": "What a Build turn on this target may do unprompted, beyond asking you.",
+        "properties": {
+          "delegations": {
+            "items": {
+              "$ref": "#/components/schemas/TargetDelegation"
+            },
+            "title": "Delegations",
+            "type": "array"
+          },
+          "git_credential": {
+            "title": "Git Credential",
+            "type": "boolean"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          }
+        },
+        "required": [
+          "repository",
+          "delegations",
+          "git_credential"
+        ],
+        "title": "TargetAuthority",
+        "type": "object"
+      },
+      "TargetDelegation": {
+        "description": "BR-01 — one active repository delegation a Build turn here would act under.",
+        "properties": {
+          "actions_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actions Left"
+          },
+          "allow_pull_request": {
+            "title": "Allow Pull Request",
+            "type": "boolean"
+          },
+          "branch_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Pattern"
+          },
+          "delegation_id": {
+            "title": "Delegation Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Operations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "delegation_id",
+          "operations",
+          "branch_pattern",
+          "allow_pull_request",
+          "expires_at",
+          "actions_left"
+        ],
+        "title": "TargetDelegation",
         "type": "object"
       },
       "TaskAttemptView": {
@@ -33777,6 +34247,46 @@
         "summary": "Read Code Repo Provenance"
       }
     },
+    "/api/code/repos/{repo_id}/pull-requests": {
+      "get": {
+        "description": "BR-12 — receipts for the pull requests Raiker opened on this repository.\n\nEach receipt is what GitHub said when the pull request was read back after\nit was created. Evidence only: nothing reads a receipt to allow anything.",
+        "operationId": "read_code_repo_pull_requests_api_code_repos__repo_id__pull_requests_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoPullRequestsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Code Repo Pull Requests"
+      }
+    },
     "/api/code/repos/{repo_id}/review": {
       "get": {
         "description": "BR-D04 — the stored review of the current patch, if one was taken.",
@@ -33853,6 +34363,56 @@
           }
         },
         "summary": "Review Code Repo Patch"
+      }
+    },
+    "/api/code/repos/{repo_id}/review/model": {
+      "post": {
+        "description": "BR-D04 — ask a connected model to read the exact current patch, once per patch and model.\n\nThe patch is credential-redacted and framed as untrusted data, no tools are\noffered, and the reading is stored by the patch fingerprint and the model.\nIts findings are marked as the model's and never decide whether a turn is\nverified. The request reaches the provider only through the owner's own\nrouter: their gates, egress allowlist and connections apply.",
+        "operationId": "model_review_code_repo_patch_api_code_repos__repo_id__review_model_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelPatchReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeRepoModelReviewView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Model Review Code Repo Patch"
       }
     },
     "/api/code/repos/{repo_id}/target": {

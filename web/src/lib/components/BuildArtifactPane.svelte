@@ -42,6 +42,7 @@
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import PatchReview from "./PatchReview.svelte";
+  import PullRequestReceipts from "./PullRequestReceipts.svelte";
   import RecentCommits from "./RecentCommits.svelte";
   import { api, ApiError } from "../api";
   import type {
@@ -64,6 +65,7 @@
     revision = 0,
     terminalOpen = $bindable(false),
     onrepair,
+    reviewModel = null,
     onclose,
   }: {
     tab?: ArtifactTab;
@@ -78,6 +80,8 @@
     terminalOpen?: boolean;
     /** BR-D04 — put a scoped repair request in the composer; never sends it. */
     onrepair?: (request: string) => void;
+    /** BR-D04 — the composer's model, for a model review of the patch. */
+    reviewModel?: { profile: string; model: string } | null;
     onclose: () => void;
   } = $props();
 
@@ -248,7 +252,7 @@
           {/each}
         </ul>
         <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
-        <PatchReview repoId={repoId} {revision} {onrepair} />
+        <PatchReview repoId={repoId} {revision} {onrepair} {reviewModel} />
         {#if changes.diff}
           <DiffView diff={changes.diff} open={true} />
           {#if changes.diff_truncated}
@@ -261,6 +265,7 @@
       {#if repoId !== null && changes !== null && !changes.root_missing && changes.reason_code !== "not_a_git_repository"}
         <!-- BR-D05 — which recent commits Raiker made, read back from them. -->
         <RecentCommits {repoId} {revision} />
+        <PullRequestReceipts {repoId} {revision} />
       {/if}
     </div>
   {:else if tab === "preview"}

@@ -91,15 +91,26 @@ class GithubConnectorExecutor:
                 str(action.arguments.get("base", "")),
                 str(action.arguments.get("body", "")),
                 authority=current_routed_authority(action.action_id),
+                receipt_context={
+                    "session_id": action.origin_session_id or action.session_id or None,
+                    "turn_id": action.turn_id or None,
+                    "action_id": action.action_id,
+                },
             )
             if outcome.get("status") != "success":
                 error = outcome.get("error", {})
                 return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+            receipt = outcome.get("receipt") or {}
+            confirmed = receipt.get("confirmation") == "confirmed"
             return ExecutionResult(
                 ok=True,
                 capability=self.capability,
                 action_id=action.action_id,
-                summary="GitHub pull request opened; content withheld from artifacts (metadata only).",
+                summary=(
+                    f"GitHub pull request #{outcome.get('number')} opened"
+                    + (" and confirmed by GitHub" if confirmed else " — GitHub did not confirm it on read-back")
+                    + "; content withheld from artifacts (metadata only)."
+                ),
                 artifacts={
                     "repo": outcome.get("repo"),
                     "number": outcome.get("number"),
@@ -107,6 +118,11 @@ class GithubConnectorExecutor:
                     "base": outcome.get("base"),
                     "html_url": outcome.get("html_url"),
                     "content_redacted": True,
+                    # BR-12 — what GitHub itself confirmed on read-back.
+                    "receipt": {
+                        key: receipt.get(key)
+                        for key in ("confirmation", "head_sha", "state", "receipt_id")
+                    } if receipt else None,
                 },
             )
         if operation != "read":

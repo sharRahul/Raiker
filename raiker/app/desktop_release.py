@@ -14,7 +14,11 @@ as data:
   the installers electron-builder produces there, and the one the signed updater
   replaces an installation with;
 * :func:`artifact_names` — the published filenames, which say the product,
-  version, OS, architecture and, for a test build, ``-unsigned``;
+  version, OS and architecture. Whether a build was signed is recorded inside
+  it (``signing.applied`` in ``installation.json``) and in its manifest, not in
+  its filename, so a signed and an unsigned build of one target share a name;
+* :data:`RELEASE_ASSETS` / :func:`release_asset_names` — the one installer per
+  platform a draft GitHub release carries;
 * :func:`desktop_record` — the ``installation.json`` written beside the frozen
   host, so the running product reports what it is;
 * :func:`write_manifests` / :func:`build_desktop_channel` — the schema-1
@@ -133,9 +137,14 @@ def current_desktop_target() -> DesktopTarget | None:
     return None
 
 
-def suffix(*, signed: bool) -> str:
-    """``-unsigned`` for a test build; nothing for one platform signing ran on."""
-    return "" if signed else "-unsigned"
+def suffix(*, signed: bool) -> str:  # noqa: ARG001 — kept for the build environment's contract
+    """The filename suffix for a build: none, signed or not.
+
+    Signing state lives in the installed record and the signed manifest. The
+    owner's decision (2026-10-19) was that a release's files are named for the
+    platform alone, so the suffix is empty for both.
+    """
+    return ""
 
 
 def artifact_names(version: str, target_id: str, *, signed: bool) -> dict[str, str]:
@@ -154,6 +163,38 @@ def artifact_names(version: str, target_id: str, *, signed: bool) -> dict[str, s
         else:
             names[fmt] = f"Raiker-{version}-{target_id}{tail}{fmt}"
     return names
+
+
+#: The single installer each platform's download is, in the order a release
+#: lists them. Windows on Arm has no native host (see :data:`DESKTOP_TARGETS`):
+#: its download is the x86-64 setup program, installed, smoke-tested and
+#: uninstalled on a Windows on Arm runner and published under its own name.
+RELEASE_ASSETS: tuple[tuple[str, str, str], ...] = (
+    # (platform shown to the owner, target the file comes from, its format)
+    ("windows-x86_64", "windows-x86_64", "-setup.exe"),
+    ("windows-arm64", "windows-x86_64", "-setup.exe"),
+    ("macos-arm64", "macos-arm64", ".dmg"),
+    ("linux-x86_64", "linux-x86_64", ".AppImage"),
+    ("linux-arm64", "linux-arm64", ".AppImage"),
+)
+
+
+def release_asset_names(version: str) -> dict[str, tuple[str, str]]:
+    """``{published name: (built name, platform)}`` for every release asset.
+
+    One file per platform. The built name is what the platform's runner
+    produced; the published name says the platform the owner downloads it for.
+    """
+    _validate_version(version)
+    assets: dict[str, tuple[str, str]] = {}
+    for platform_id, source_target, fmt in RELEASE_ASSETS:
+        built = artifact_names(version, source_target, signed=True)[fmt]
+        if fmt == "-setup.exe":
+            published = f"Raiker-{version}-{platform_id}-setup.exe"
+        else:
+            published = f"Raiker-{version}-{platform_id}{fmt}"
+        assets[published] = (built, platform_id)
+    return assets
 
 
 def update_artifact_name(version: str, target_id: str, *, signed: bool) -> str:
@@ -269,11 +310,9 @@ def update_artifacts(directory: Path, version: str) -> list[ReleaseArtifact]:
     """The one updater artifact per target found in *directory*, with its manifest."""
     found: list[ReleaseArtifact] = []
     for target in DESKTOP_TARGETS:
-        for signed in (True, False):
-            name = update_artifact_name(version, target.target_id, signed=signed)
-            path = directory / name
-            if not path.is_file():
-                continue
+        name = update_artifact_name(version, target.target_id, signed=True)
+        path = directory / name
+        if path.is_file():
             manifest_path = directory / f"{name}.manifest.json"
             signature_path = directory / f"{name}.manifest.json.sig"
             if not manifest_path.is_file() or not signature_path.is_file():
@@ -285,7 +324,9 @@ def update_artifacts(directory: Path, version: str) -> list[ReleaseArtifact]:
                     version=version,
                     target_id=target.target_id,
                     channel="",
-                    signed=signed,
+                    # A manifest signature is required just above, so an
+                    # artifact listed here is one the signed channel can carry.
+                    signed=True,
                     manifest_path=manifest_path,
                     signature_path=signature_path,
                 )

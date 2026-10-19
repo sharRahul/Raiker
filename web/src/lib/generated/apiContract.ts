@@ -1147,8 +1147,25 @@ export type CodeRepoFileView = {
   reason_code: string;
 };
 
+/** BR-D04 — the answer to asking a model to read the current patch. */
+export type CodeRepoModelReviewView = {
+  fingerprint: string;
+  has_changes: boolean;
+  model_review: ModelPatchReview | null;
+  reused: boolean;
+  reason_code: string | null;
+  model_attestation?: ReviewAttestationView | null;
+};
+
 export type CodeRepoProvenanceView = {
   commits: CommitProvenance[];
+  reason_code: string | null;
+};
+
+/** The pull requests Raiker opened on this repository's GitHub identity, newest first. */
+export type CodeRepoPullRequestsView = {
+  repository: string | null;
+  receipts: PullRequestReceipt[];
   reason_code: string | null;
 };
 
@@ -1160,6 +1177,9 @@ export type CodeRepoReviewView = {
   reused: boolean;
   reason_code: string | null;
   previous: PatchReviewSummary | null;
+  model_review?: ModelPatchReview | null;
+  attestation?: ReviewAttestationView | null;
+  model_attestation?: ReviewAttestationView | null;
 };
 
 export type CodeRepoSelected = {
@@ -1185,6 +1205,7 @@ export type CodeRepoTargetView = {
   code_placement: string;
   code_placement_reason: string;
   fingerprint: string;
+  authority?: TargetAuthority;
 };
 
 /** One repository a coding chat can be pointed at. */
@@ -1342,6 +1363,7 @@ export type CommitProvenance = {
   provenance: "recorded" | "unrecorded" | "none";
   session_id: string | null;
   turn_id: string | null;
+  signature: "good" | "untrusted" | "bad" | "expired" | "revoked" | "unverifiable" | "none";
 };
 
 export type CompactConversationRequest = {
@@ -3583,6 +3605,23 @@ export type ModelOperations = {
   items: ModelOperationView[];
 };
 
+/** BR-D04 — one connected model's reading of an exact patch, stored by patch and model. */
+export type ModelPatchReview = {
+  fingerprint: string;
+  provider: string;
+  model: string;
+  findings: PatchReviewFinding[];
+  counts: Record<string, number>;
+  truncated: boolean;
+  reviewed_at: string;
+};
+
+/** BR-D04 — which connected model reads the patch; the owner's selection when unset. */
+export type ModelPatchReviewRequest = {
+  model_profile?: string | null;
+  model?: string | null;
+};
+
 /** An administrator's price override for one model, per million tokens. */
 export type ModelPriceRequest = {
   model: string;
@@ -4004,6 +4043,8 @@ export type PatchReviewFinding = {
   path: string | null;
   line: number | null;
   since?: "new" | "still_present" | null;
+  source?: "model";
+  reviews_present?: number;
 };
 
 /** The repository's latest review of an earlier patch than the current one. */
@@ -4413,6 +4454,23 @@ export type ProviderWeeklyUsage = {
   subscription?: SubscriptionLimitsView | null;
 };
 
+/** BR-12 — what GitHub confirmed about a pull request Raiker opened. */
+export type PullRequestReceipt = {
+  receipt_id: string;
+  repository: string;
+  number: number;
+  url: string;
+  head_branch: string;
+  base_branch: string;
+  head_sha: string;
+  state: string;
+  confirmation: "confirmed" | "mismatch" | "unconfirmed";
+  session_id: string | null;
+  turn_id: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+};
+
 /** The owner's quiet-hours terms and where the clock is now, decided server-side. */
 export type QuietHoursState = {
   enabled: boolean;
@@ -4659,6 +4717,13 @@ export type ResumeHandle = {
 
 export type RevertImageRequest = {
   to: string;
+};
+
+/** BR-D05 — whether a stored review is exactly what this installation signed. */
+export type ReviewAttestationView = {
+  state: "verified" | "invalid" | "unknown_key" | "unsigned";
+  key_id: string | null;
+  signed_at: string | null;
 };
 
 export type RoutineDoctor = {
@@ -5303,6 +5368,23 @@ export type SyncResult = {
   models_recorded: number;
   changes_written: number;
   reason_code: string | null;
+};
+
+/** What a Build turn on this target may do unprompted, beyond asking you. */
+export type TargetAuthority = {
+  repository: string | null;
+  delegations: TargetDelegation[];
+  git_credential: boolean;
+};
+
+/** BR-01 — one active repository delegation a Build turn here would act under. */
+export type TargetDelegation = {
+  delegation_id: string;
+  operations: string[];
+  branch_pattern: string | null;
+  allow_pull_request: boolean;
+  expires_at: string;
+  actions_left: number | null;
 };
 
 /** One run of a task, from where it started to how it settled. */
@@ -5993,10 +6075,14 @@ export const contract = {
     request<CodeRepoFileView>(withQuery(`/api/code/repos/${encodeURIComponent(repoId)}/file`, query)),
   readCodeRepoProvenance: (repoId: string) =>
     request<CodeRepoProvenanceView>(`/api/code/repos/${encodeURIComponent(repoId)}/provenance`),
+  readCodeRepoPullRequests: (repoId: string) =>
+    request<CodeRepoPullRequestsView>(`/api/code/repos/${encodeURIComponent(repoId)}/pull-requests`),
   readCodeRepoReview: (repoId: string) =>
     request<CodeRepoReviewView>(`/api/code/repos/${encodeURIComponent(repoId)}/review`),
   reviewCodeRepoPatch: (repoId: string) =>
     call<CodeRepoReviewView>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/review`),
+  modelReviewCodeRepoPatch: (repoId: string, body: ModelPatchReviewRequest) =>
+    call<CodeRepoModelReviewView>("POST", `/api/code/repos/${encodeURIComponent(repoId)}/review/model`, { body }),
   readCodeRepoTarget: (repoId: string) =>
     request<CodeRepoTargetView>(`/api/code/repos/${encodeURIComponent(repoId)}/target`),
   removeCodeWorktree: (repoId: string) =>

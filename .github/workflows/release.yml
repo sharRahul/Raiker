@@ -245,7 +245,6 @@ jobs:
           | Windows 10/11 (Intel or AMD) | `Raiker-<version>-windows-x86_64-setup.exe` (or the `.msi`) |
           | Windows 11 on Arm | the x86-64 `setup.exe` (runs under emulation) |
           | Mac with Apple silicon | `Raiker-<version>-macos-arm64.dmg` |
-          | Mac with Intel | `Raiker-<version>-macos-x86_64.dmg` |
           | Linux (x86-64) | `.AppImage`, `.deb` or `.rpm` for `linux-x86_64` |
           | Linux (ARM64) | `.AppImage`, `.deb` or `.rpm` for `linux-arm64` |
 

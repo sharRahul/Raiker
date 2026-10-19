@@ -13,7 +13,7 @@ else to install first, and no terminal.
    |---|---|---|
    | Windows 10 (1809+) or 11 | `Raiker-<version>-windows-x86_64-setup.exe` | Open it, choose where to install (your user folder by default), finish. No administrator password is asked for. An `.msi` is also published for managed installs. |
    | Windows 11 on Arm | the same x86-64 `setup.exe` | Windows runs it under its built-in emulation. |
-   | Mac with Apple silicon / Intel (macOS 12+) | `Raiker-<version>-macos-arm64.dmg` / `-macos-x86_64.dmg` | Open the `.dmg` and drag **Raiker** into **Applications**. |
+   | Mac with Apple silicon (macOS 12+) | `Raiker-<version>-macos-arm64.dmg` | Open the `.dmg` and drag **Raiker** into **Applications**. |
    | Ubuntu, Debian | `Raiker-<version>-linux-<arch>.deb` | Open it with Software, or `sudo apt install ./Raiker-….deb`. |
    | Fedora, openSUSE | `Raiker-<version>-linux-<arch>.rpm` | Open it with Software, or `sudo dnf install ./Raiker-….rpm`. |
    | Any other Linux desktop | `Raiker-<version>-linux-<arch>.AppImage` | Mark it executable (file properties) and open it. |

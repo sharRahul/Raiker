@@ -11,7 +11,6 @@ safe. The decisions behind it are in
 |---|---|---|
 | `windows-x86_64` | `windows-2022` | `Raiker-<v>-windows-x86_64-setup.exe`, `Raiker-<v>-windows-x86_64.msi` |
 | `macos-arm64` | `macos-14` | `Raiker-<v>-macos-arm64.dmg`, `.zip` |
-| `macos-x86_64` | `macos-15-intel` | `Raiker-<v>-macos-x86_64.dmg`, `.zip` |
 | `linux-x86_64` | `ubuntu-22.04` | `Raiker-<v>-linux-x86_64.AppImage`, `.deb`, `.rpm` |
 | `linux-arm64` | `ubuntu-22.04-arm` | `Raiker-<v>-linux-arm64.AppImage`, `.deb`, `.rpm` |
 

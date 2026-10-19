@@ -25,7 +25,6 @@ and the evidence files named below.
 | windows-x86_64 (`windows-2022`) | setup.exe, msi | PASS | PASS — NSIS `/S` per user, Start-menu shortcut present; MSI `/qn` per user | PASS (NSIS and MSI) | PASS | PASS — NSIS uninstall; MSI `/x` | NOT TESTED |
 | Windows on Arm (`windows-11-arm`, x86-64 package under emulation) | setup.exe (x86-64) | n/a — no native build | PASS — NSIS `/S` per user | PASS | NOT TESTED | PASS — NSIS uninstall | NOT TESTED |
 | macos-arm64 (`macos-14`) | dmg, zip | PASS | PASS — app copied from the mounted dmg to ~/Applications | PASS | PASS | PASS — app removed, ~/Library/Application Support/Raiker kept | NOT TESTED |
-| macos-x86_64 (`macos-15-intel`) | dmg, zip | PASS | PASS | PASS | PASS | PASS | NOT TESTED |
 | linux-x86_64 (`ubuntu-22.04`) | AppImage, deb, rpm | PASS | PASS — `apt-get install ./…deb` | PASS (deb and AppImage) | PASS | PASS — `apt-get remove raiker`, ~/.local/share/raiker kept | NOT TESTED |
 | linux-arm64 (`ubuntu-22.04-arm`) | AppImage, deb, rpm | PASS | PASS | PASS (deb and AppImage) | PASS | PASS | NOT TESTED |
 

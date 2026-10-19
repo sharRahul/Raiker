@@ -42,7 +42,7 @@ def test_the_workflow_matrix_is_the_target_list() -> None:
 def test_every_supported_platform_and_architecture_is_a_target() -> None:
     assert {(t.target.os_name, t.target.arch) for t in DESKTOP_TARGETS} == {
         ("windows", "x86_64"),
-        ("macos", "arm64"), ("macos", "x86_64"),
+        ("macos", "arm64"),
         ("linux", "x86_64"), ("linux", "arm64"),
     }
     for target in DESKTOP_TARGETS:
@@ -97,13 +97,13 @@ def test_the_installer_config_is_per_user_and_keeps_owner_data() -> None:
 
 
 def test_the_desktop_record_is_read_back_as_a_desktop_installation(tmp_path: Path) -> None:
-    record = desktop_record(version="1.2.3", target_id="macos-x86_64", channel="stable", signed=False)
+    record = desktop_record(version="1.2.3", target_id="macos-arm64", channel="stable", signed=False)
     (tmp_path / "installation.json").write_text(json.dumps(record), encoding="utf-8")
     install = detect_installation(tmp_path)
     assert install.packaged is True
     assert install.signed is False
     assert install.distribution == "desktop"
-    assert install.target == "macos-x86_64"
+    assert install.target == "macos-arm64"
     assert install.version == "1.2.3"
 
 

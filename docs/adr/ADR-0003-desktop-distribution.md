@@ -170,7 +170,6 @@ acceptance criteria, and references.
   | `windows-x86_64` | `windows-2022` | NSIS `-setup.exe`, `.msi` | `-setup.exe` |
   | Windows on Arm | `windows-11-arm` (test only) | the x86-64 NSIS installer, under emulation | — |
   | `macos-arm64` | `macos-14` | `.dmg`, `.zip` | `.zip` |
-  | `macos-x86_64` | `macos-15-intel` | `.dmg`, `.zip` | `.zip` |
   | `linux-x86_64` | `ubuntu-22.04` | `.AppImage`, `.deb`, `.rpm` | `.AppImage` |
   | `linux-arm64` | `ubuntu-22.04-arm` | `.AppImage`, `.deb`, `.rpm` | `.AppImage` |
 
@@ -397,9 +396,8 @@ acceptance criteria, and references.
 - `.deb`, `.rpm` and `.msi` installations are updated by installing the new
   package, not in place.
 - The app key is not yet in the OS key store (D6).
-- Intel Macs use `cryptography` 48.x, the last release line with an Intel-Mac
-  wheel; 49+ builds from source there and its OpenSSL collides with Python's
-  in the frozen host (found by CI). Revisit when upstream ships Intel wheels
-  again or Intel Macs leave the supported list.
+- Intel Macs are not a supported desktop target. The release matrix ships
+  macOS Apple-silicon artifacts only; the headless payload remains separately
+  documented below where applicable.
 - The update channel URL must serve files directly (no redirects), so GitHub
   Release download links cannot be pinned as a channel.

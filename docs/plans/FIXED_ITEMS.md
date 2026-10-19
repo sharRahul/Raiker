@@ -18,6 +18,16 @@ monitored, not prevention-by-restriction** — is stated at the top of
 Evidence: `screenshots/working/` (verified behaviour),
 `screenshots/not-working/` (the defects as found).
 
+## Release packaging maintenance
+
+### FIXED-RELEASE-01 — unsupported Intel macOS desktop target removed
+
+**Fixed 2026-10-19.** The desktop release matrix, target registry, installer
+guides, architecture decision, acceptance matrix and beta release notes now
+ship macOS Apple-silicon artifacts only. The headless payload target list was
+left unchanged. Focused release tests passed after the matrix and registry
+were made identical.
+
 **Those two capture sets are no longer stored in the repository.** They were
 removed on 2026-09-06 to stop carrying roughly a hundred megabytes of binaries
 in the tree. Entries below still name the capture each observation came from,

@@ -157,7 +157,6 @@ the desktop installers (DIST-04):
 | Windows 10/11 x86-64 | `windows-2022` | NSIS `-setup.exe`, `.msi` | Authenticode (electron-builder) |
 | Windows 11 on Arm | `windows-11-arm` (test only) | the x86-64 installer under emulation | — |
 | macOS Apple silicon | `macos-14` | `.dmg`, `.zip` | Developer ID + notarisation |
-| macOS Intel | `macos-15-intel` | `.dmg`, `.zip` | Developer ID + notarisation |
 | Linux x86-64 | `ubuntu-22.04` | AppImage, `.deb`, `.rpm` | GPG detached signatures |
 | Linux ARM64 | `ubuntu-22.04-arm` | AppImage, `.deb`, `.rpm` | GPG detached signatures |
 

@@ -106,8 +106,6 @@ DESKTOP_TARGETS: tuple[DesktopTarget, ...] = (
             ("-setup.exe", ".msi"), ("--win", "--x64"), "-setup.exe"),
     _target("macos-arm64", "macos", "arm64", "macos-14",
             (".dmg", ".zip"), ("--mac", "--arm64"), ".zip"),
-    _target("macos-x86_64", "macos", "x86_64", "macos-15-intel",
-            (".dmg", ".zip"), ("--mac", "--x64"), ".zip"),
     _target("linux-x86_64", "linux", "x86_64", "ubuntu-22.04",
             (".AppImage", ".deb", ".rpm"), ("--linux", "--x64"), ".AppImage"),
     _target("linux-arm64", "linux", "arm64", "ubuntu-22.04-arm",

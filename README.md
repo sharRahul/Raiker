@@ -36,7 +36,6 @@ Raiker engine is bundled inside the application.
 | Windows 10 (1809+) or 11, Intel/AMD | `Raiker-<version>-windows-x86_64-setup.exe` (or `.msi`) |
 | Windows 11 on Arm | The x86-64 `setup.exe` (runs under Windows 11's built-in emulation; there is no native Arm build yet) |
 | Mac with Apple silicon (M1 or later), macOS 12+ | `Raiker-<version>-macos-arm64.dmg` |
-| Mac with Intel, macOS 12+ | `Raiker-<version>-macos-x86_64.dmg` |
 | Linux x86-64 (Ubuntu 22.04+, Debian 12+, Fedora 36+) | `.AppImage`, `.deb` or `.rpm` for `linux-x86_64` |
 | Linux ARM64 | `.AppImage`, `.deb` or `.rpm` for `linux-arm64` |
 

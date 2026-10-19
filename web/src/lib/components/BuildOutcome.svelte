@@ -19,8 +19,10 @@
     completed_verified: "Verified",
     completed_unverified: "Not verified",
     failed: "Checks failed",
-    blocked: "Waiting on a check",
+    blocked: "Waiting on you",
     outcome_unknown: "Result unknown",
+    partially_completed: "Partly applied",
+    stopped: "Stopped",
   };
   const RESULT: Record<BuildTurnOutcome["checks"][number]["result"], string> = {
     passed: "passed",
@@ -72,6 +74,8 @@
 </script>
 
 {#if outcome && outcome.outcome !== "no_change"}
+  <!-- BR-09 — a turn waiting on a write it has not been allowed yet says so
+       too: "nothing changed" is true, and incomplete. -->
   <div class="build-outcome" data-outcome={outcome.outcome} data-testid="build-outcome">
     <p>
       <span class="label">{LABEL[outcome.outcome]}</span>
@@ -85,8 +89,13 @@
           </li>
         {/each}
       </ul>
-    {:else}
+    {:else if outcome.writes > 0}
       <p class="hint">Add checks to this project's context so a change can be verified.</p>
+    {/if}
+    {#if (outcome.unapplied_writes ?? 0) > 0 && outcome.writes > 0}
+      <p class="partial">
+        {outcome.unapplied_writes} proposed change{outcome.unapplied_writes === 1 ? "" : "s"} did not apply.
+      </p>
     {/if}
     {#if notable.length}
       <ul class="readback" aria-label="Files read back">
@@ -129,9 +138,13 @@
   .build-outcome[data-outcome="failed"] { border-color: var(--danger-border); background: var(--danger-soft); }
   .build-outcome[data-outcome="failed"] .label { color: var(--danger); }
   .build-outcome[data-outcome="completed_unverified"],
+  .build-outcome[data-outcome="partially_completed"],
+  .build-outcome[data-outcome="stopped"],
   .build-outcome[data-outcome="blocked"],
   .build-outcome[data-outcome="outcome_unknown"] { border-color: var(--warn-border); background: var(--warn-soft); }
   .build-outcome[data-outcome="completed_unverified"] .label,
+  .build-outcome[data-outcome="partially_completed"] .label,
+  .build-outcome[data-outcome="stopped"] .label,
   .build-outcome[data-outcome="blocked"] .label,
   .build-outcome[data-outcome="outcome_unknown"] .label { color: var(--warn); }
   ul { margin: var(--space-1) 0 0; padding-left: 1.1rem; }
@@ -140,5 +153,6 @@
   .readback li[data-state="missing"] { color: var(--danger); }
   .drift { margin-top: var(--space-1); color: var(--warn); }
   .review-note { margin-top: var(--space-1); color: var(--danger); }
+  .partial { margin-top: var(--space-1); color: var(--warn); }
   .where { margin-top: var(--space-1); color: var(--text-3); }
 </style>

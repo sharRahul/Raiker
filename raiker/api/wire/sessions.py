@@ -57,9 +57,20 @@ class BuildTurnOutcome(TypedDict):
     turn_id: str
     project_id: str | None
     outcome: Literal[
-        "no_change", "completed_verified", "completed_unverified", "failed", "blocked", "outcome_unknown"
+        "no_change",
+        "completed_verified",
+        "completed_unverified",
+        "partially_completed",
+        "failed",
+        "blocked",
+        "stopped",
+        "outcome_unknown",
     ]
     writes: int
+    #: Proposed writes in this turn that failed or were refused.
+    unapplied_writes: int
+    #: Proposed writes still waiting for the owner's approval.
+    pending_writes: int
     checks: list[BuildCheckRow]
     reason: str
     readback: list[BuildReadBackRow]

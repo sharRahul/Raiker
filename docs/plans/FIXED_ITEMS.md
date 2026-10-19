@@ -1002,6 +1002,12 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-960](#fixed-960--a-parked-build-turn-resumed-wherever-the-repository-had-moved-to-br-07) | Medium | Build / recovery | Fixed 2026-10-19 — BR-07 target revalidated on resume |
 | [FIXED-961](#fixed-961--a-turn-read-as-verified-while-its-own-patch-review-held-a-high-severity-finding-br-d04) | Low | Build / review | Fixed 2026-10-19 — BR-D04 outcome reads the review |
 | [FIXED-962](#fixed-962--restart-and-provider-faults-were-proven-only-against-the-classifiers-inputs-br-d06) | Low | Build / testing | Fixed 2026-10-19 — BR-D06 second slice |
+| [FIXED-963](#fixed-963--a-stopped-partly-applied-or-waiting-build-turn-read-as-one-of-the-other-outcomes-br-09) | Medium | Build / verification | Fixed 2026-10-19 — BR-09 stopped, partial and waiting states |
+| [FIXED-964](#fixed-964--the-patch-review-checked-patterns-never-whether-the-code-still-parsed-br-d04) | Medium | Build / review | Fixed 2026-10-19 — BR-D04 parse validator |
+| [FIXED-965](#fixed-965--every-review-was-a-fresh-list-with-no-word-on-what-was-new-fixed-or-stale-br-d04) | Low | Build / review | Fixed 2026-10-19 — BR-D04 review history and staleness |
+| [FIXED-966](#fixed-966--a-finding-could-be-read-but-not-acted-on-without-retyping-it-br-d04-bounded-repair) | Low | Build / review | Fixed 2026-10-19 — BR-D04 bounded repair |
+| [FIXED-967](#fixed-967--provenance-review-and-scheduled-build-runs-were-invisible-where-the-owner-decides-br-d03-br-d05) | Low | Build / tasks / provenance | Fixed 2026-10-19 — BR-D03 foundation, BR-D05 disclosure |
+| [FIXED-968](#fixed-968--changes-kept-showing-the-tree-from-before-accept-applied-a-change) | Medium | Build / workbench | Fixed 2026-10-19 — found driving BR-D04 live |
 
 ---
 
@@ -34426,3 +34432,126 @@ reads `outcome_unknown` through the outcome route
 the continuation after an accepted write, through the real prompt, resolve and
 resume routes with a scripted provider, leaves the written file on disk and the
 turn **Not verified** (`tests/test_build_fault_provider.py`).
+
+## FIXED-963 — A stopped, partly applied or waiting Build turn read as one of the other outcomes (BR-09)
+
+**Severity: Medium. Area: Build / verification. Status: Fixed 2026-10-19 —
+completes BR-09's named outcomes on [BR-D01](BUILD_WORKSPACE_SPEC.md).**
+
+**Observed.** BR-09 names `partially_completed` and `stopped` beside the
+outcomes Build already reported, and neither existed. A turn the owner stopped
+after a write read **Not verified** or even **Verified**; one where two of three
+writes were refused read as a whole change; and a turn whose only write was still
+waiting for approval read `no_change` and showed nothing.
+
+**Fixed.** `classify_build_turn` takes the turn's own recorded status and the
+statuses of every proposed write: a stopped turn that changed files reads
+`stopped` (a failed check still reads `failed`); writes that partly applied read
+`partially_completed` with `unapplied_writes`; a write still waiting reads
+`blocked` with `pending_writes` — *A change this turn proposed is waiting for
+your approval; nothing has changed yet*. Build labels them **Stopped**, **Partly
+applied** and **Waiting on you**, and says how many proposed changes did not
+apply.
+
+**Evidence.** `tests/test_build_review_lifecycle.py` (stopped, stopped-but-failed,
+stopped-with-no-change, partial, waiting) and `BuildOutcome.test.ts`.
+
+## FIXED-964 — The patch review checked patterns, never whether the code still parsed (BR-D04)
+
+**Severity: Medium. Area: Build / review. Status: Fixed 2026-10-19 — the
+independent-validator half of [BR-D04](BUILD_WORKSPACE_SPEC.md); selected model
+review stays on its row.**
+
+**Observed.** The exact-patch review matched patterns in added lines. A change
+that left a file unparseable passed it with *no findings*, and BR-D04 asks for
+independent validators against the same patch.
+
+**Fixed.** `parse_findings` parses each changed source or test file through the
+governed `LanguageIntelligenceService` — the same service and gate the agent's
+`diagnostics` tool and Build's file viewer use, so the three never disagree — and
+each syntax error is a high-severity *File does not parse* finding at its line.
+With **Language intelligence** off, the review carries an info finding *Changed
+files were not parsed* instead of implying the files are fine. The validator
+runs once per patch, inside the stored review.
+
+**Evidence.** `tests/test_build_review_lifecycle.py` (a syntax error found at its
+file with the gate on; *not run* with it off). Live: see
+[FIXED-966](#fixed-966--a-finding-could-be-read-but-not-acted-on-without-retyping-it-br-d04-bounded-repair).
+
+## FIXED-965 — Every review was a fresh list, with no word on what was new, fixed or stale (BR-D04)
+
+**Severity: Low. Area: Build / review. Status: Fixed 2026-10-19 — part of
+[BR-D04](BUILD_WORKSPACE_SPEC.md).**
+
+**Fixed.** Each new review is compared with the repository's previous one: a
+finding is `new` or `still_present`, matched by rule and file so a line that only
+moved is not a new problem, and the previous review's findings that are gone are
+listed as `resolved`. A read of a patch with no review yet returns the latest
+earlier review as `previous`, so Changes says *The last review was of an earlier
+version of this patch*. Changes marks **New** findings and lists **Fixed since
+the last review**. Every review — taken or reused — appends a
+`patch_review_completed` event with the fingerprint, counts, new and resolved
+numbers only (catalogued in `EVENT_CATALOG.md`).
+
+**Evidence.** `tests/test_build_review_lifecycle.py` (moved credential still
+present, removed breakpoint resolved, conflict marker new; the stale read; two
+audit events, neither carrying patch text); `PatchReview.test.ts`.
+
+## FIXED-966 — A finding could be read but not acted on without retyping it (BR-D04 bounded repair)
+
+**Severity: Low. Area: Build / review. Status: Fixed 2026-10-19 — bounded repair
+on [BR-D04](BUILD_WORKSPACE_SPEC.md).**
+
+**Fixed.** **Ask Raiker to fix** on a finding writes one scoped request into the
+Build composer — the file and line, the finding and its next step, *Change only
+what this finding needs, then run the project's checks. Do not commit, push or
+merge.* — and focuses it. It calls nothing, so the repair is one more ordinary
+turn the owner reads and sends, under the same modes and approvals, and the
+review cannot loop on itself.
+
+**Evidence.** `PatchReview.test.ts` (the request text, and no request made by the
+click). Live: `br-d04-review-repair-live.spec.ts` against a fresh `raiker-web` with Anthropic connected through Models: a file broken so it no longer parses read *File does not parse* `calc.py:4` (*'(' was never closed.*); **Ask Raiker to fix** put *Fix this patch review finding in calc.py at line 4: File does not parse…* in the composer and sent nothing; sent, a real `claude-haiku-4-5` turn repaired the file after the owner's **Accept**; Changes then said the last review was of an earlier version, and reviewing again listed *File does not parse* under **Fixed since the last review**. Running it found [FIXED-968](#fixed-968--changes-kept-showing-the-tree-from-before-accept-applied-a-change) and a missing space in the resolved list, both fixed. Captures under `docs/screenshots/2026-10-19-br-d04-review-repair/` (not committed) were reviewed.
+
+## FIXED-967 — Provenance, review and scheduled Build runs were invisible where the owner decides (BR-D03, BR-D05)
+
+**Severity: Low. Area: Build / tasks / provenance. Status: Fixed 2026-10-19 —
+the outcome foundation of [BR-D03](BUILD_WORKSPACE_SPEC.md) and the disclosure
+half of BR-D05.**
+
+**Fixed.**
+
+* A task's attempts now carry the session and turn they ran (`TaskAttemptView`),
+  and a Build task's attempt history shows that turn's outcome — the same
+  component and record a Build turn shows — so a scheduled issue-to-PR run reads
+  **Verified**, **Not verified**, **Partly applied** or **Stopped** on its own
+  history.
+* The commit approval says, before the owner decides, that the commit message
+  will end with `Raiker-Session` and `Raiker-Turn` lines.
+* The Windows CI job now runs the Build target, worktree, provenance and outcome
+  tests, so target binding has Windows evidence on every push; the directory
+  symlink case, which needs a privilege the runner lacks, is Linux-only.
+
+**Evidence.** `tests/test_build_review_lifecycle.py` (the approval body names the
+trailers; an attempt names its turn); `TaskHistory.test.ts` (a Build attempt
+shows the outcome, a Chat attempt asks for none). Live: on the same round, asked to commit, the Git commit card in Approvals read *The commit message will end with Raiker-Session and Raiker-Turn lines naming the conversation it came from.* above the diff, before **Approve and execute once** (`04-commit-approval-names-provenance.png`).
+
+## FIXED-968 — Changes kept showing the tree from before Accept applied a change
+
+**Severity: Medium. Area: Build / workbench. Status: Fixed 2026-10-19 — found
+driving [BR-D04](BUILD_WORKSPACE_SPEC.md) live.**
+
+**Observed.** A Build turn proposed a write; the owner pressed **Accept**; the
+continuation applied it. Changes still showed the diff from before — and so did
+its patch review, which kept the broken file's findings although the file on
+disk was fixed. Reloading the page showed the truth.
+
+**Root cause.** The workbench re-read the working tree only when a *fresh* turn's
+stream ended. An accepted change is applied by the continuation the approval
+resumes, which ends in `resumeTurn`, and that path never bumped the re-read.
+
+**Fixed.** `resumeTurn` now signals that the working tree may have changed when
+the continuation settles, exactly as a fresh turn does, so Changes, its patch
+review, the target chip and Recent commits re-read.
+
+**Evidence.** The live round in [FIXED-966](#fixed-966--a-finding-could-be-read-but-not-acted-on-without-retyping-it-br-d04-bounded-repair) failed at *the
+last review was of an earlier version* before the fix and passed after it.

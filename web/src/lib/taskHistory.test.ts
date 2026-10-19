@@ -21,6 +21,8 @@ function attempt(over: Partial<TaskAttemptView> = {}): TaskAttemptView {
     summary: "Done.",
     approval_id: null,
     events: [],
+    session_id: null,
+    turn_id: null,
     ...over,
   };
 }

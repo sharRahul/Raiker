@@ -2682,12 +2682,18 @@
               "no_change",
               "completed_verified",
               "completed_unverified",
+              "partially_completed",
               "failed",
               "blocked",
+              "stopped",
               "outcome_unknown"
             ],
             "title": "Outcome",
             "type": "string"
+          },
+          "pending_writes": {
+            "title": "Pending Writes",
+            "type": "integer"
           },
           "project_id": {
             "anyOf": [
@@ -2742,6 +2748,10 @@
             "title": "Turn Id",
             "type": "string"
           },
+          "unapplied_writes": {
+            "title": "Unapplied Writes",
+            "type": "integer"
+          },
           "writes": {
             "title": "Writes",
             "type": "integer"
@@ -2752,6 +2762,8 @@
           "project_id",
           "outcome",
           "writes",
+          "unapplied_writes",
+          "pending_writes",
           "checks",
           "reason",
           "readback",
@@ -5748,6 +5760,16 @@
             "title": "Has Changes",
             "type": "boolean"
           },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PatchReviewSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "reason_code": {
             "anyOf": [
               {
@@ -5779,7 +5801,8 @@
           "has_changes",
           "review",
           "reused",
-          "reason_code"
+          "reason_code",
+          "previous"
         ],
         "title": "CodeRepoReviewView",
         "type": "object"
@@ -20799,6 +20822,24 @@
             "title": "Fingerprint",
             "type": "string"
           },
+          "previous_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Fingerprint"
+          },
+          "resolved": {
+            "items": {
+              "$ref": "#/components/schemas/ResolvedFinding"
+            },
+            "title": "Resolved",
+            "type": "array"
+          },
           "reviewed_at": {
             "title": "Reviewed At",
             "type": "string"
@@ -20884,6 +20925,21 @@
             "title": "Severity",
             "type": "string"
           },
+          "since": {
+            "anyOf": [
+              {
+                "enum": [
+                  "new",
+                  "still_present"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -20902,6 +20958,38 @@
           "line"
         ],
         "title": "PatchReviewFinding",
+        "type": "object"
+      },
+      "PatchReviewSummary": {
+        "description": "The repository's latest review of an earlier patch than the current one.",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "findings": {
+            "title": "Findings",
+            "type": "integer"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "title": "Reviewed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "reviewed_at",
+          "findings",
+          "counts"
+        ],
+        "title": "PatchReviewSummary",
         "type": "object"
       },
       "PathAttachment": {
@@ -23676,6 +23764,54 @@
           "reason"
         ],
         "title": "ResolveApprovalRequest",
+        "type": "object"
+      },
+      "ResolvedFinding": {
+        "description": "A finding the previous review raised that this patch no longer has.",
+        "properties": {
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule",
+          "title",
+          "severity",
+          "path",
+          "line"
+        ],
+        "title": "ResolvedFinding",
         "type": "object"
       },
       "RestorePlan": {
@@ -27100,6 +27236,18 @@
             "title": "Outcome",
             "type": "string"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
           "started_at": {
             "title": "Started At",
             "type": "string"
@@ -27107,6 +27255,18 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Turn Id"
           }
         },
         "required": [

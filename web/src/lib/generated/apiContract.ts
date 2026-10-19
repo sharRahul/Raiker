@@ -539,8 +539,10 @@ export type BuildSkillRequest = {
 export type BuildTurnOutcome = {
   turn_id: string;
   project_id: string | null;
-  outcome: "no_change" | "completed_verified" | "completed_unverified" | "failed" | "blocked" | "outcome_unknown";
+  outcome: "no_change" | "completed_verified" | "completed_unverified" | "partially_completed" | "failed" | "blocked" | "stopped" | "outcome_unknown";
   writes: number;
+  unapplied_writes: number;
+  pending_writes: number;
   checks: BuildCheckRow[];
   reason: string;
   readback: BuildReadBackRow[];
@@ -1157,6 +1159,7 @@ export type CodeRepoReviewView = {
   review: PatchReview | null;
   reused: boolean;
   reason_code: string | null;
+  previous: PatchReviewSummary | null;
 };
 
 export type CodeRepoSelected = {
@@ -3984,6 +3987,8 @@ export type PatchReview = {
   findings: PatchReviewFinding[];
   counts: Record<string, number>;
   reviewed_at: string;
+  previous_fingerprint?: string | null;
+  resolved?: ResolvedFinding[];
 };
 
 /** BR-D04 — one deterministic finding on an exact patch. */
@@ -3998,6 +4003,15 @@ export type PatchReviewFinding = {
   confidence: "high" | "medium" | "low";
   path: string | null;
   line: number | null;
+  since?: "new" | "still_present" | null;
+};
+
+/** The repository's latest review of an earlier patch than the current one. */
+export type PatchReviewSummary = {
+  fingerprint: string;
+  reviewed_at: string;
+  findings: number;
+  counts: Record<string, number>;
 };
 
 /** A workspace path a task reads. */
@@ -4565,6 +4579,15 @@ export type ResolveApprovalRequest = {
   approve: boolean;
   reason: string;
   accepted_hunks?: string[] | null;
+};
+
+/** A finding the previous review raised that this patch no longer has. */
+export type ResolvedFinding = {
+  rule: string;
+  title: string;
+  severity: string;
+  path: string | null;
+  line: number | null;
 };
 
 /** What restoring to a checkpoint would rewrite, delete or skip — computed, not performed. */
@@ -5292,6 +5315,8 @@ export type TaskAttemptView = {
   summary: string;
   approval_id: string | null;
   events: TaskEventView[];
+  session_id: string | null;
+  turn_id: string | null;
 };
 
 export type TaskCreateRequest = {

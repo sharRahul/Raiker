@@ -22,6 +22,15 @@ Rules, each chosen for precision over recall (a noisy reviewer is ignored):
   instructions or reveal its prompt: content a later turn could read as an
   order. The issue and the repository are untrusted input (BR-04).
 * **Source changed without tests** — code changed and no test file did.
+* **Does not parse** — an independent validator: each changed file the
+  language-intelligence parser supports is parsed, and a syntax error is a
+  finding at its line. A file it cannot parse is never reported as clean, and
+  when the owner has the capability off the review says it was not run.
+
+Each review also states what changed since the repository's previous one: a
+finding is ``new`` or ``still_present`` (matched by rule and file, so a line
+that merely moved is not a new problem), and the previous review's findings
+that are gone are listed as ``resolved``.
 
 The review reads only. It grants nothing, runs nothing, and never changes the
 working tree; acting on a finding is an ordinary governed change.
@@ -310,14 +319,30 @@ def save_review(store: Any, *, owner_principal_id: str, repo_id: str, review: Ma
 
 
 def review_once(
-    store: Any, *, owner_principal_id: str, repo_id: str, diff: str
+    store: Any,
+    *,
+    owner_principal_id: str,
+    repo_id: str,
+    diff: str,
+    validator: Any = None,
 ) -> tuple[dict[str, Any], bool]:
-    """The review of this exact patch, and whether it was already stored."""
+    """The review of this exact patch, and whether it was already stored.
+
+    ``validator`` is called with the changed file list and returns extra
+    findings (the parse check); it runs only for a patch not reviewed before.
+    """
     fingerprint = patch_fingerprint(diff)
     stored = load_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, fingerprint=fingerprint)
     if stored is not None:
         return stored, True
     review = review_patch(diff)
+    if validator is not None:
+        files, _added = _files_and_added(diff[:MAX_REVIEW_CHARS])
+        review = with_extra_findings(review, list(validator(files)))
+    review = with_lifecycle(
+        review,
+        latest_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, exclude=fingerprint),
+    )
     if not save_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, review=review):
         # Another request stored the same patch first; theirs is the record.
         again = load_review(store, owner_principal_id=owner_principal_id, repo_id=repo_id, fingerprint=fingerprint)
@@ -325,3 +350,138 @@ def review_once(
             return again, True
     return review, False
 
+
+# ── Independent validator: does each changed file still parse? ──────────────
+
+
+def parse_findings(
+    workspace_root: Any, store: Any, principal_id: str, root: Any, files: list[str]
+) -> list[dict[str, Any]]:
+    """Parse-level problems in the changed files, through the governed service.
+
+    The same service and gate the agent's ``diagnostics`` tool and Build's file
+    viewer use, so the review and the editor never disagree about a file. A
+    refused gate yields one ``info`` finding saying the check did not run.
+    """
+    from raiker.graph.language_service import LanguageIntelligenceService
+
+    candidates = [path for path in files if classify_file(path) in {"code", "test"}]
+    if not candidates:
+        return []
+    try:
+        result = LanguageIntelligenceService(
+            workspace_root, store, principal_id=principal_id, repository_root=root
+        ).diagnostics(candidates)
+    except Exception:  # noqa: BLE001 — an unavailable validator is stated, not hidden
+        result = {"status": "failed"}
+    if result.get("status") != "success":
+        return [
+            _finding(
+                "parse_check_not_run",
+                severity="info",
+                category="correctness",
+                title="Changed files were not parsed",
+                evidence="The parse check did not run, so this review says nothing about syntax.",
+                next_step="Turn on Language intelligence in Permissions to have changed files parsed.",
+                confidence="high",
+            )
+        ]
+    findings: list[dict[str, Any]] = []
+    for item in result.get("diagnostics") or []:
+        get = item.get if isinstance(item, dict) else lambda key, _item=item: getattr(_item, key, None)
+        if str(get("severity") or "") != "error":
+            continue
+        findings.append(
+            _finding(
+                "does_not_parse",
+                severity="high",
+                category="correctness",
+                title="File does not parse",
+                evidence=str(get("message") or "The parser reported a syntax error.")[:200],
+                next_step="Fix the syntax error before running or committing this change.",
+                confidence="high",
+                path=str(get("path") or "") or None,
+                line=int(get("line") or 0) or None,
+            )
+        )
+    return findings[:MAX_FINDINGS_PER_RULE_AND_FILE * 4]
+
+
+def with_extra_findings(review: dict[str, Any], extra: list[dict[str, Any]]) -> dict[str, Any]:
+    """*review* with *extra* findings merged, sorted and recounted."""
+    if not extra:
+        return review
+    findings = [*review["findings"], *extra]
+    findings.sort(key=lambda item: (SEVERITY_ORDER[item["severity"]], item.get("path") or "", item.get("line") or 0))
+    counts = {severity: 0 for severity in SEVERITY_ORDER}
+    for item in findings:
+        counts[item["severity"]] += 1
+    return {**review, "findings": findings, "counts": counts}
+
+
+# ── What changed since the repository's previous review ─────────────────────
+
+
+def latest_review(store: Any, *, owner_principal_id: str, repo_id: str, exclude: str = "") -> dict[str, Any] | None:
+    with store.connect() as connection:
+        row = connection.execute(
+            """SELECT review_json FROM patch_reviews
+               WHERE owner_principal_id = ? AND repo_id = ? AND fingerprint != ?
+               ORDER BY created_at DESC, rowid DESC LIMIT 1""",
+            (owner_principal_id, repo_id, exclude),
+        ).fetchone()
+    if row is None:
+        return None
+    try:
+        value = json.loads(str(row["review_json"]))
+    except (TypeError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def with_lifecycle(review: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
+    """Mark each finding ``new`` or ``still_present`` against *previous*, and list what was resolved."""
+    if previous is None:
+        return {
+            **review,
+            "previous_fingerprint": None,
+            "resolved": [],
+            "findings": [{**item, "since": None} for item in review["findings"]],
+        }
+    remaining: dict[tuple[str, str], int] = {}
+    for item in previous.get("findings") or []:
+        key = (str(item.get("rule")), str(item.get("path") or ""))
+        remaining[key] = remaining.get(key, 0) + 1
+    marked: list[dict[str, Any]] = []
+    for item in review["findings"]:
+        key = (str(item.get("rule")), str(item.get("path") or ""))
+        if remaining.get(key, 0) > 0:
+            remaining[key] -= 1
+            marked.append({**item, "since": "still_present"})
+        else:
+            marked.append({**item, "since": "new"})
+    current: dict[tuple[str, str], int] = {}
+    for item in review["findings"]:
+        key = (str(item.get("rule")), str(item.get("path") or ""))
+        current[key] = current.get(key, 0) + 1
+    resolved: list[dict[str, Any]] = []
+    for item in previous.get("findings") or []:
+        key = (str(item.get("rule")), str(item.get("path") or ""))
+        if current.get(key, 0) > 0:
+            current[key] -= 1
+            continue
+        resolved.append(
+            {
+                "rule": item.get("rule"),
+                "title": item.get("title"),
+                "severity": item.get("severity"),
+                "path": item.get("path"),
+                "line": item.get("line"),
+            }
+        )
+    return {
+        **review,
+        "previous_fingerprint": previous.get("fingerprint"),
+        "resolved": resolved,
+        "findings": marked,
+    }

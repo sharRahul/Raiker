@@ -11,11 +11,20 @@
    * Findings are deterministic rules, each tied to a file and line with its
    * evidence and a next step. Nothing here changes a file; acting on a finding
    * is an ordinary governed change.
+   *
+   * **Ask Raiker to fix** (BR-D04 bounded repair) only writes a scoped request
+   * into the composer — this finding, this file, nothing else, no merge — for
+   * the owner to read and send. It never sends itself, so a repair is one more
+   * ordinary turn under the same modes and approvals, never a loop.
    */
   import { api, ApiError } from "../api";
   import type { CodeRepoReviewView } from "../generated/apiContract";
 
-  let { repoId, revision = 0 }: { repoId: string; revision?: number } = $props();
+  let {
+    repoId,
+    revision = 0,
+    onrepair,
+  }: { repoId: string; revision?: number; onrepair?: (request: string) => void } = $props();
 
   let view = $state<CodeRepoReviewView | null>(null);
   let busy = $state(false);
@@ -52,6 +61,20 @@
   }
 
   const SEVERITY: Record<string, string> = { high: "High", medium: "Medium", low: "Low", info: "Note" };
+
+  type Finding = NonNullable<CodeRepoReviewView["review"]>["findings"][number];
+
+  /** The one change a repair turn is asked to make — and the limits it keeps. */
+  function repairRequest(finding: Finding): string {
+    const where = finding.path ? ` in ${finding.path}${finding.line ? ` at line ${finding.line}` : ""}` : "";
+    return (
+      `Fix this patch review finding${where}: ${finding.title}. ${finding.next_step} ` +
+      "Change only what this finding needs, then run the project's checks. " +
+      "Do not commit, push or merge."
+    );
+  }
+
+  const resolved = $derived(view?.review?.resolved ?? []);
 
   const findings = $derived(view?.review?.findings ?? []);
   const counts = $derived(view?.review?.counts ?? {});
@@ -95,18 +118,43 @@
                   {#if finding.path}
                     <code>{finding.path}{finding.line ? `:${finding.line}` : ""}</code>
                   {/if}
+                  {#if finding.since === "new"}<span class="since">New</span>{/if}
                 </p>
                 <p class="evidence">{finding.evidence}</p>
                 <p class="next">{finding.next_step}</p>
+                {#if onrepair && finding.severity !== "info"}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm repair"
+                    onclick={() => onrepair?.(repairRequest(finding))}
+                  >Ask Raiker to fix</button>
+                {/if}
               </div>
             </li>
           {/each}
         </ul>
       {/if}
+      {#if resolved.length}
+        <div class="resolved" data-testid="patch-review-resolved">
+          <p>Fixed since the last review:</p>
+          <ul>
+            {#each resolved as item, index (`${item.rule}:${item.path}:${index}`)}
+              <li>{item.title}{#if item.path}{" — "}<code>{item.path}</code>{/if}</li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
     {:else}
+      {#if view.previous}
+        <p class="stale" role="status" data-testid="patch-review-stale">
+          The last review was of an earlier version of this patch ({view.previous.findings}
+          finding{view.previous.findings === 1 ? "" : "s"}). Review it again to see what changed.
+        </p>
+      {/if}
       <p class="hint">
         Checks this exact patch for credentials, conflict markers, debugging left in, workflow
-        changes, instruction-like text and missing tests. The review is kept for this patch.
+        changes, instruction-like text, missing tests and files that no longer parse. The review is
+        kept for this patch.
       </p>
     {/if}
   </section>
@@ -205,5 +253,37 @@
   }
   .next {
     color: var(--text-3);
+  }
+  .since {
+    margin-left: 0.35rem;
+    padding: 0 0.4rem;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-soft);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  .repair {
+    margin-top: 0.2rem;
+    padding-inline: 0;
+  }
+  .resolved,
+  .stale {
+    margin: var(--space-2) 0 0;
+    color: var(--text-2);
+  }
+  .resolved p {
+    margin: 0;
+    color: var(--ok);
+    font-weight: 600;
+  }
+  .resolved ul {
+    margin: 0.2rem 0 0;
+    padding-left: 1.1rem;
+  }
+  .resolved code {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
   }
 </style>

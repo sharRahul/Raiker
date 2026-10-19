@@ -647,7 +647,11 @@ class ApprovalService:
             truncated = "\n\n(diff truncated)" if snapshot["truncated"] else ""
             return (
                 f"{snapshot['file_count']} file(s) on {snapshot['branch']} "
-                f"in repository {repository}\n{header}\n\n{body}{truncated}",
+                f"in repository {repository}\n{header}\n\n"
+                # BR-D05 — said before the decision, not discovered in the log.
+                "The commit message will end with Raiker-Session and Raiker-Turn lines "
+                "naming the conversation it came from.\n\n"
+                f"{body}{truncated}",
                 str(snapshot["branch"]),
                 "git_change",
             )

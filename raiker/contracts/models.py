@@ -343,6 +343,10 @@ EVENT_TYPES = {
     # never a path's content and never a symbol's text.
     "code_map_indexed",
     "code_map_refreshed",
+    # BR-D04 — an exact-patch review was taken, or the stored review of the same
+    # patch was returned. Fingerprint, counts and whether it was reused only —
+    # never a line of the patch and never a matched value.
+    "patch_review_completed",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).

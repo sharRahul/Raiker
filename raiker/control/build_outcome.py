@@ -45,7 +45,14 @@ from typing import Any, Literal
 from raiker.models.tool_registry import FAMILY_FILE_WRITE, TOOL_DEFINITIONS
 
 BuildOutcome = Literal[
-    "no_change", "completed_verified", "completed_unverified", "failed", "blocked", "outcome_unknown"
+    "no_change",
+    "completed_verified",
+    "completed_unverified",
+    "partially_completed",
+    "failed",
+    "blocked",
+    "stopped",
+    "outcome_unknown",
 ]
 CheckResult = Literal[
     "passed", "failed", "not_run", "ran_before_change", "waiting", "unknown", "wrong_directory"
@@ -70,7 +77,13 @@ _REASONS: dict[str, str] = {
     "readback_missing": "Every check passed, but a file this turn wrote is no longer on disk.",
     "target_changed": "Every check passed, but the folder, repository, branch or environment this turn started on has changed since.",
     "review_high": "Every check passed, but the review of the current patch has a high-severity finding.",
+    "write_waiting": "A change this turn proposed is waiting for your approval; nothing has changed yet.",
+    "partially_completed": "Some changes this turn proposed were applied, and others failed or were refused.",
+    "stopped": "You stopped this turn after it changed files. What it applied stays; anything after that was not done.",
 }
+
+#: Write statuses that mean a proposed change did not happen.
+_UNAPPLIED_WRITE_STATES = frozenset({"failed", "denied", "error", "rejected"})
 
 
 def _tokens(command: str) -> tuple[str, ...]:
@@ -189,6 +202,7 @@ def classify_build_turn(
     readback: Sequence[Mapping[str, Any]] = (),
     target_drift: Sequence[str] = (),
     review: Mapping[str, Any] | None = None,
+    turn_status: str | None = None,
 ) -> dict[str, Any]:
     """The outcome a Build turn's own records support, with one row per declared check.
 
@@ -197,7 +211,8 @@ def classify_build_turn(
     :func:`read_back_writes`; ``target_drift`` is the list of target fields that
     moved since the turn began. ``review`` is the stored review of the patch
     in the working tree now (BR-D04), when one was taken; a high-severity
-    finding on it keeps the turn short of verified.
+    finding on it keeps the turn short of verified. ``turn_status`` is the
+    turn's own recorded status; ``stopped`` means the owner stopped it.
     """
     actions = list(tool_actions)
     writes = [
@@ -205,12 +220,18 @@ def classify_build_turn(
         if str(row.get("tool_name") or "") in WRITE_TOOLS and row.get("status") == "success"
     ]
     last_write = max((str(row.get("completed_at") or row.get("proposed_at") or "") for row in writes), default="")
+    write_rows = [row for row in actions if str(row.get("tool_name") or "") in WRITE_TOOLS]
+    unapplied = [row for row in write_rows if str(row.get("status") or "") in _UNAPPLIED_WRITE_STATES]
+    pending = [row for row in write_rows if row.get("status") == "approval_required"]
     if not writes:
+        parked = bool(pending)
         return {
-            "outcome": "no_change",
+            "outcome": "blocked" if parked else "no_change",
             "writes": 0,
+            "unapplied_writes": len(unapplied),
+            "pending_writes": len(pending),
             "checks": [],
-            "reason": _REASONS["no_change"],
+            "reason": _REASONS["write_waiting"] if parked else _REASONS["no_change"],
             "readback": [],
             "target_drift": [],
             "review": None,
@@ -293,9 +314,17 @@ def classify_build_turn(
             outcome, reason = "completed_unverified", _REASONS["target_changed"]
         elif review is not None and int((review.get("counts") or {}).get("high") or 0) > 0:
             outcome, reason = "completed_unverified", _REASONS["review_high"]
+    # BR-09 — a change only some of which happened is not a completed one, and
+    # a turn the owner stopped is reported as stopped, whatever ran before.
+    if unapplied and outcome in {"completed_verified", "completed_unverified"}:
+        outcome, reason = "partially_completed", _REASONS["partially_completed"]
+    if turn_status == "stopped" and outcome != "failed":
+        outcome, reason = "stopped", _REASONS["stopped"]
     return {
         "outcome": outcome,
         "writes": len(writes),
+        "unapplied_writes": len(unapplied),
+        "pending_writes": len(pending),
         "checks": rows,
         "reason": reason,
         "readback": [dict(item) for item in readback],

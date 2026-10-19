@@ -552,7 +552,12 @@ first-use check stores its observation under a different key than the composer
 reads (the FIXED-953 round saw neither line with Ollama), or whether the footer
 line is read before the post-turn refresh. The capture is
 `02-real-turn-outcome-target.png` in
-`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/` (not committed).
+`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/` (not committed). **Seen again later on 2026-10-19** in the BR-D04 repair round: with Run enabled
+and a request in the composer, the strip read *Checking this model — you can still
+send* while the footer read *The last model check has expired. Open Models*
+(`02-repair-request-in-composer.png`). The two lines read the same readiness
+record differently: the strip treats an aged-out observation as non-blocking
+(BUG-238), the footer still words it as a problem to fix.
 
 ## Decision statements added 2026-10-05
 

@@ -63,6 +63,7 @@
     /** Bumped by the caller when a turn ends, so Changes re-reads without a button. */
     revision = 0,
     terminalOpen = $bindable(false),
+    onrepair,
     onclose,
   }: {
     tab?: ArtifactTab;
@@ -75,6 +76,8 @@
     projects?: ProjectsList | null;
     revision?: number;
     terminalOpen?: boolean;
+    /** BR-D04 — put a scoped repair request in the composer; never sends it. */
+    onrepair?: (request: string) => void;
     onclose: () => void;
   } = $props();
 
@@ -245,7 +248,7 @@
           {/each}
         </ul>
         <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
-        <PatchReview repoId={repoId} {revision} />
+        <PatchReview repoId={repoId} {revision} {onrepair} />
         {#if changes.diff}
           <DiffView diff={changes.diff} open={true} />
           {#if changes.diff_truncated}

@@ -133,6 +133,11 @@ class TaskAttemptView(View):
     #: The decision this attempt waited on, when the runtime recorded which.
     approval_id: str | None
     events: list[TaskEventView] = field(default_factory=list)
+    #: BR-D03 — the conversation and turn this attempt ran, from its own
+    #: events (the last that named one), so a Build task's attempt can show
+    #: what that turn may claim about its change. ``None`` when none named one.
+    session_id: str | None = None
+    turn_id: str | None = None
 
 
 def event_detail(event_type: str, payload: dict[str, Any]) -> str:
@@ -207,6 +212,8 @@ class _Segment:
             summary=self.summary or (self.events[-1].detail if self.events else ""),
             approval_id=self.approval_id,
             events=list(self.events),
+            session_id=next((e.session_id for e in reversed(self.events) if e.turn_id and e.session_id), None),
+            turn_id=next((e.turn_id for e in reversed(self.events) if e.turn_id and e.session_id), None),
         )
 
 

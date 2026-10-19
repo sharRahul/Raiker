@@ -366,6 +366,11 @@ audit log, read at the scope of one task.
   summary line Wednesday's cycle overwrote.
 - **Filed** is its own record, above the first attempt, so a task that has not
   run yet opens on when you asked for it rather than on nothing.
+- **A Build task's attempt** also says what its turn may claim about the change
+  it made — **Verified**, **Not verified**, **Partly applied**, **Stopped** and
+  the rest — from the same record a Build turn shows, so a scheduled
+  issue-to-pull-request run is read the way a Build turn is (see
+  [Working in Build](working-in-build.md#whether-a-change-was-checked)).
 
 A task belonging to another account has no address here: its id answers *"That
 task is not on this account's board"*, which is the same visibility rule the

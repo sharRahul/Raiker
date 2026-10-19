@@ -55,6 +55,7 @@ from raiker.api.wire.code import (
     CodeRepoReviewView,
     CodeRepoTargetView,
     PatchReview,
+    PatchReviewSummary,
 )
 from raiker.api.wire.projects import ProjectBrowseEntry
 from raiker.knowledge.extractors import resolve_extractable_media_type
@@ -490,16 +491,60 @@ def _current_patch(request: Request, repo: dict[str, Any]) -> tuple[str, str | N
 
 
 def _review_answer(
-    fingerprint: str, diff: str, review: dict[str, Any] | None, reused: bool, reason: str | None
+    fingerprint: str,
+    diff: str,
+    review: dict[str, Any] | None,
+    reused: bool,
+    reason: str | None,
+    previous: dict[str, Any] | None = None,
 ) -> CodeRepoReviewView:
+    summary: PatchReviewSummary | None = None
+    if review is None and previous is not None:
+        summary = {
+            "fingerprint": str(previous.get("fingerprint") or ""),
+            "reviewed_at": str(previous.get("reviewed_at") or ""),
+            "findings": len(previous.get("findings") or []),
+            "counts": dict(previous.get("counts") or {}),
+        }
     answer: CodeRepoReviewView = {
         "fingerprint": fingerprint,
         "has_changes": bool(diff),
         "review": cast(PatchReview, review) if review is not None else None,
         "reused": reused,
         "reason_code": reason,
+        "previous": summary,
     }
     return answer
+
+
+def _record_review(request: Request, principal_id: str, repo_id: str, review: dict[str, Any], reused: bool) -> None:
+    """BR-D04 — audit that a review was taken or reused. Counts only, never content."""
+    import contextlib  # noqa: PLC0415
+
+    from raiker.events.types import make_event  # noqa: PLC0415
+    from raiker.events.writer import EventLogWriter  # noqa: PLC0415
+
+    store = SQLiteStore(_ws(request))
+    session_id = f"sess_inbox_{principal_id}"
+    with contextlib.suppress(Exception):
+        store.create_session(session_id, str(_ws(request)), title="Inbox")
+        EventLogWriter(store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="patch_review_completed",
+                actor="code_review",
+                payload={
+                    "principal_id": principal_id,
+                    "repo_id": repo_id,
+                    "fingerprint": str(review.get("fingerprint") or ""),
+                    "counts": dict(review.get("counts") or {}),
+                    "new": sum(1 for item in review.get("findings") or [] if item.get("since") == "new"),
+                    "resolved": len(review.get("resolved") or []),
+                    "reused": reused,
+                },
+            )
+        )
 
 
 @router.get("/api/code/repos/{repo_id}/review")
@@ -509,23 +554,24 @@ async def read_code_repo_review(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """BR-D04 — the stored review of the current patch, if one was taken."""
-    from raiker.review.patch_review import load_review, patch_fingerprint  # noqa: PLC0415
+    from raiker.review.patch_review import latest_review, load_review, patch_fingerprint  # noqa: PLC0415
 
     principal_id = auth_data[0].principal_id
     repo = _owned_repo(request, repo_id, principal_id)
     diff, reason = _current_patch(request, repo)
     fingerprint = patch_fingerprint(diff) if diff else ""
+    store = SQLiteStore(_ws(request))
     review = (
-        load_review(
-            SQLiteStore(_ws(request)),
-            owner_principal_id=principal_id,
-            repo_id=repo_id,
-            fingerprint=fingerprint,
-        )
+        load_review(store, owner_principal_id=principal_id, repo_id=repo_id, fingerprint=fingerprint)
         if diff
         else None
     )
-    answer = _review_answer(fingerprint, diff, review, review is not None, reason)
+    previous = (
+        latest_review(store, owner_principal_id=principal_id, repo_id=repo_id, exclude=fingerprint)
+        if diff and review is None
+        else None
+    )
+    answer = _review_answer(fingerprint, diff, review, review is not None, reason, previous)
     return serialize_dto(answer)
 
 
@@ -549,9 +595,18 @@ async def review_code_repo_patch(
     if not diff:
         empty = _review_answer("", diff, None, False, reason or "no_changes")
         return serialize_dto(empty)
+    from raiker.review.patch_review import parse_findings  # noqa: PLC0415
+
+    store = SQLiteStore(_ws(request))
+    root = _repo_root(request, repo)
+
+    def validator(files: list[str]) -> list[dict[str, Any]]:
+        return parse_findings(_ws(request), store, principal_id, root, files)
+
     review, reused = review_once(
-        SQLiteStore(_ws(request)), owner_principal_id=principal_id, repo_id=repo_id, diff=diff
+        store, owner_principal_id=principal_id, repo_id=repo_id, diff=diff, validator=validator
     )
+    _record_review(request, principal_id, repo_id, review, reused)
     answer = _review_answer(patch_fingerprint(diff), diff, review, reused, None)
     return serialize_dto(answer)
 

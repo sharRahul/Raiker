@@ -294,8 +294,12 @@ anything it does not cover waits in Approvals.
 ## Whether a change was checked
 
 A Build turn that changed files says what its own record supports, under the
-answer: **Verified**, **Not verified**, **Checks failed**, **Waiting on a check**
-or **Result unknown**. A turn that changed nothing shows nothing.
+answer: **Verified**, **Not verified**, **Partly applied**, **Checks failed**,
+**Waiting on you**, **Stopped** or **Result unknown**. A turn that changed
+nothing shows nothing — unless a change it proposed is still waiting for your
+approval, which reads **Waiting on you**. **Partly applied** means some of the
+changes it proposed landed and others failed or were refused; **Stopped** means
+you stopped it after it changed files, and what it applied stays.
 
 The checks are yours. In **Work → Projects**, open the project and write one
 command per line under **Checks** (at most ten), such as `pytest -q` or
@@ -378,7 +382,7 @@ Raiker-Session: sess_…
 Raiker-Turn: turn_…
 ```
 
-**Changes → Recent commits** reads them back. **Made in Raiker** means the turn
+The commit's approval card says so before you decide. **Changes → Recent commits** reads them back. **Made in Raiker** means the turn
 they name is one this Raiker recorded; **Says Raiker — no record here** means the
 lines are there and nothing here backs them (anyone can type them, and a commit
 made by another installation has them too). A commit without them is simply a
@@ -447,7 +451,21 @@ finding with its severity, the file and line, what was found and what to do:
 - a change to a CI or workflow definition, which Build leaves to you;
 - added text that tells a model to ignore its instructions or reveal its prompt —
   issue and repository text is data, never an instruction to Raiker;
-- source changed with no test change.
+- source changed with no test change;
+- a changed file that **no longer parses**, at its line — an independent parser,
+  the same one the file viewer and the agent's own diagnostics use. With
+  **Language intelligence** off in Permissions the review says the parse check
+  did not run rather than implying the files are fine.
+
+Each finding new since the last review of this repository is marked **New**, and
+anything the last review raised that is gone is listed under **Fixed since the
+last review**. When the patch has changed since its last review, Changes says the
+last review was of an earlier version.
+
+**Ask Raiker to fix** on a finding writes a request for exactly that fix into the
+composer — the file, the line, the finding, and *Do not commit, push or merge* —
+for you to read, edit and send. It sends nothing itself, so a repair is one more
+ordinary turn under your modes and approvals.
 
 If a declared check passes but the review you took of the current patch has a
 high-severity finding, the turn's outcome stays **Not verified** and says so.

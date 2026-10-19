@@ -141,6 +141,19 @@ class PatchReviewFinding(TypedDict):
     confidence: Literal["high", "medium", "low"]
     path: str | None
     line: int | None
+    #: Against the repository's previous review: ``new`` or ``still_present``;
+    #: null for the first review (and for reviews stored before this existed).
+    since: NotRequired[Literal["new", "still_present"] | None]
+
+
+class ResolvedFinding(TypedDict):
+    """A finding the previous review raised that this patch no longer has."""
+
+    rule: str
+    title: str
+    severity: str
+    path: str | None
+    line: int | None
 
 
 class PatchReview(TypedDict):
@@ -151,6 +164,17 @@ class PatchReview(TypedDict):
     findings: list[PatchReviewFinding]
     counts: dict[str, int]
     reviewed_at: str
+    previous_fingerprint: NotRequired[str | None]
+    resolved: NotRequired[list[ResolvedFinding]]
+
+
+class PatchReviewSummary(TypedDict):
+    """The repository's latest review of an earlier patch than the current one."""
+
+    fingerprint: str
+    reviewed_at: str
+    findings: int
+    counts: dict[str, int]
 
 
 class CodeRepoReviewView(TypedDict):
@@ -166,6 +190,9 @@ class CodeRepoReviewView(TypedDict):
     review: PatchReview | None
     reused: bool
     reason_code: str | None
+    #: When the current patch has no review yet: the latest review this
+    #: repository has, of an earlier patch — so the owner can see it is stale.
+    previous: PatchReviewSummary | None
 
 
 class CommitProvenance(TypedDict):

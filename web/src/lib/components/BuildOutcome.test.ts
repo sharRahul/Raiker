@@ -17,6 +17,8 @@ function outcome(overrides: Record<string, unknown>): Record<string, unknown> {
     checks: [],
     reason: "",
     readback: [],
+    unapplied_writes: 0,
+    pending_writes: 0,
     target_drift: [],
     target: null,
     ...overrides,
@@ -113,5 +115,32 @@ describe("BuildOutcome", () => {
     expect(await screen.findByTestId("build-outcome-review")).toHaveTextContent(
       "The review of the current patch has 1 high-severity finding — see Changes.",
     );
+  });
+
+  it("says a stopped turn stopped, and a partial change that some of it did not apply", async () => {
+    stubFetch({
+      [ROUTE]: outcome({
+        outcome: "partially_completed",
+        reason: "Some changes this turn proposed were applied, and others failed or were refused.",
+        unapplied_writes: 2,
+      }),
+    });
+    render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByText("Partly applied")).toBeInTheDocument();
+    expect(screen.getByText("2 proposed changes did not apply.")).toBeInTheDocument();
+  });
+
+  it("names a turn waiting on a write as waiting on you, without asking for checks", async () => {
+    stubFetch({
+      [ROUTE]: outcome({
+        outcome: "blocked",
+        writes: 0,
+        pending_writes: 1,
+        reason: "A change this turn proposed is waiting for your approval; nothing has changed yet.",
+      }),
+    });
+    render(BuildOutcome, { sessionId: "sess_1", turnId: "turn_1" });
+    expect(await screen.findByText("Waiting on you")).toBeInTheDocument();
+    expect(screen.queryByText(/Add checks to this project's context/)).toBeNull();
   });
 });

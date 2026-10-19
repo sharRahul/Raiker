@@ -157,6 +157,7 @@ class SessionService:
             readback=read_back_writes(actions, workspace_root),
             target_drift=drift,
             review=_stored_patch_review(self.store, owner_principal_id, started),
+            turn_status=str(turn.get("status") or ""),
         )
         return {
             "turn_id": turn_id,

@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -230,14 +231,19 @@ def test_run_command_cwd_is_confined_to_the_workspace(tmp_path: Path) -> None:
 
     (tmp_path / "repo").mkdir()
     (tmp_path / "file.txt").write_text("x")
-    outside = tmp_path.parent / f"{tmp_path.name}-outside"
-    outside.mkdir()
-    (tmp_path / "link").symlink_to(outside, target_is_directory=True)
+    # A directory symlink needs a privilege Windows runners lack; the escape it
+    # tests is the same check `../` exercises below.
+    linked = sys.platform != "win32"
+    if linked:
+        outside = tmp_path.parent / f"{tmp_path.name}-outside"
+        outside.mkdir()
+        (tmp_path / "link").symlink_to(outside, target_is_directory=True)
     broker = ToolBroker(workspace_root=tmp_path, policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)))
     assert broker._command_cwd(None) == (".", None)
     assert broker._command_cwd("repo/") == ("repo", None)
     assert broker._command_cwd("../") == (".", "command_cwd_outside_workspace")
-    assert broker._command_cwd("link") == (".", "command_cwd_outside_workspace")
+    if linked:
+        assert broker._command_cwd("link") == (".", "command_cwd_outside_workspace")
     assert broker._command_cwd("file.txt") == (".", "command_cwd_not_a_directory")
 
 

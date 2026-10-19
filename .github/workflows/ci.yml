@@ -275,6 +275,15 @@ jobs:
             python -X faulthandler -m pytest -q -p no:cacheprovider               tests/test_instance_runtime_lifecycle.py tests/test_windows_internal_paths.py
             echo "::endgroup::"
           done
+      # BR-D02 — target binding, worktrees and provenance must hold on Windows
+      # as well as Linux. These drive real git repositories, worktrees and the
+      # command store, so a path or line-ending assumption fails here first.
+      - name: Build target, worktree and provenance tests
+        shell: bash
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+        run: |
+          python -m pytest -q -p no:cacheprovider tests/test_build_target_and_review.py tests/test_build_provenance_and_worktrees.py tests/test_build_fault_boundaries.py tests/test_build_outcome.py
 
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it

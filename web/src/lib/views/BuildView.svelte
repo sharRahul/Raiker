@@ -1620,6 +1620,11 @@
     } finally {
       turn.streaming = false;
       streaming = false;
+      // An accepted change is applied by the continuation, not by the turn
+      // that proposed it, so this is the moment the working tree moved. Without
+      // it Changes — and its patch review — kept showing the tree from before
+      // the owner pressed Accept.
+      noteWorkingTreeMayHaveChanged();
       void scrollToEnd();
     }
   }
@@ -2671,6 +2676,12 @@
         projectId={projectId || null}
         {projects}
         revision={workingTreeRevision}
+        onrepair={(request) => {
+          // BR-D04 bounded repair — the request lands in the composer for the
+          // owner to read, edit and send. Nothing is sent from here.
+          draft.text = request;
+          promptEl?.focus();
+        }}
         onclose={() => closeRail(true)}
       />
     </div>

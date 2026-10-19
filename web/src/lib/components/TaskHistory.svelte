@@ -18,6 +18,7 @@
    * occurred, because that is the only order a run makes sense in.
    */
   import Badge from "./Badge.svelte";
+  import BuildOutcome from "./BuildOutcome.svelte";
   import Icon from "./Icon.svelte";
   import PageState from "./PageState.svelte";
   import { relativeTime } from "../format";
@@ -138,6 +139,11 @@
               />
             </div>
             {#if attempt.summary}<p class="outcome">{attempt.summary}</p>{/if}
+            <!-- BR-D03 — a Build task's attempt is a coding turn, and says what
+                 its own records support about the change it made. -->
+            {#if detail.task.surface === "build" && attempt.session_id && attempt.turn_id && attempt.outcome !== "in_progress"}
+              <BuildOutcome sessionId={attempt.session_id} turnId={attempt.turn_id} />
+            {/if}
             <ul class="steps">
               {#each attempt.events as event (event.event_id)}
                 <li>

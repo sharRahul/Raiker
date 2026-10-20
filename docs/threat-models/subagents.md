@@ -45,7 +45,7 @@ network, and cannot widen the parent's authority.
 
 Default gate state is **DISABLED**. Enabling requires (per
 `raiker/runtime/authority/activation.py`): a HUMAN `runtime_gate_manager`,
-the `local_single_user_runtime` mode active, a registered real executor, a
+the agent runtime switched on, a registered real executor, a
 `threat_model_acks` row referencing this document, and a human confirmation
 token. AI principals can never flip the gate.
 

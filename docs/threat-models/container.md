@@ -34,7 +34,7 @@ set, and returns metadata only.
 ## Activation requirements
 
 Default gate state is **DISABLED**. Enabling requires a HUMAN
-`runtime_gate_manager`, the `local_single_user_runtime` mode (this is local
+`runtime_gate_manager`, the agent runtime switched on (this is local
 Docker, not networked execution), the registered executor, a
 `threat_model_acks` row referencing this document, and a human confirmation
 token. AI principals can never flip the gate.

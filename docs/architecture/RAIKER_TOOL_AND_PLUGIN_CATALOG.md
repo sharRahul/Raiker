@@ -10,11 +10,12 @@ and **the terminal client's visible command surface**. Both remain governed by
 the acting principal, policy, capability gate, decision mode, and executor
 availability.
 
-Approval resolution is `metadata_only` except for the twelve capabilities in
+Approval resolution is `metadata_only` except for the fourteen capabilities in
 `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`): a local file
 mutation (`write_file` / `edit_file`), a patch (`apply_patch`), a bounded local
-command (`shell`), a repository change (`git_branch` / `git_commit`), a push
-(`git_push`), a GitHub write (`github_write`), a durable memory write or forget
+command (`shell`), a repository change (`git_branch` / `git_commit`), a fetch or
+clone (`git_fetch` / `git_clone`), a push (`git_push`), a checkpoint restore
+(owner-proposed from the API or terminal; no model tool), a GitHub write (`github_write`), a durable memory write or forget
 (`memory_write` / `memory_forget`), the two local planning rows (`create_task` /
 `assign_session_project`), and an owner-selected SSH or Daytona command
 (`remote_execute` / `cloud_execute`).

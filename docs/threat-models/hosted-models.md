@@ -85,7 +85,7 @@ log, and the variable neither opens nor closes anything. See
 ## Activation requirements
 
 Default gate state is **DISABLED** for both capabilities. Enabling requires a
-HUMAN `runtime_gate_manager`, the `local_single_user_runtime` mode (the model
+HUMAN `runtime_gate_manager`, the agent runtime switched on (the model
 API is called *from* the owner's local machine, like the reference channel),
 the registered executor, a `threat_model_acks` row referencing this document,
 and a human confirmation token. AI principals can never flip the gates. Saving

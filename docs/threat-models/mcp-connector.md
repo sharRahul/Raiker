@@ -41,7 +41,7 @@ third-party SDK), so the runtime stays hermetic and local-only.
 Default gate state is enabled-runtime for the local single-user owner (a real
 executor exists), governed per action by the default-`ask` decision mode.
 Flipping the gate through the control plane requires a HUMAN
-`runtime_gate_manager`, `local_single_user_runtime` mode, the registered
+`runtime_gate_manager`, the agent runtime switched on, the registered
 executor, a `threat_model_acks` row referencing this document, and a human
 confirmation token. AI principals can never flip the gate.
 

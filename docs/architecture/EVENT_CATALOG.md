@@ -145,7 +145,7 @@ literal against the declared set.
 
 Event records are append-style local audit evidence, not tamper-proof logging.
 
-**Approval resolution does emit execution events.** For the twelve capabilities
+**Approval resolution does emit execution events.** For the fourteen capabilities
 in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) the relay records
 `approval_executed` on success and `approval_execution_denied` when governance
 refused at execution time; a turn resolving its own eligible call under the

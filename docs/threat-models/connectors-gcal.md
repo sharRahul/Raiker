@@ -53,7 +53,7 @@ Two surfaces, one governance:
 ## Activation requirements
 
 Enabling `connector_gcal_runtime` requires a HUMAN `runtime_gate_manager`, the
-`local_single_user_runtime` mode, the registered executor, a `threat_model_acks`
+agent runtime switched on, the registered executor, a `threat_model_acks`
 row referencing this document, and a human confirmation token. A *working* read
 additionally requires the owner credential (`RAIKER_GCAL_TOKEN`), the host on
 `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, and the decision mode raised to `allow`. The

@@ -707,7 +707,7 @@ standing:
   comparison found the count understated, because it credited any document that
   mentioned a capability's name in passing; eleven documents were written rather
   than eight, and **all forty-six capabilities with a real executor now have
-  one**. See
+  one** (fifty as of 2026-10-20, still all covered). See
   [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
 - *"`RUNTIME_EXECUTORS_SPEC.md` omits 17 capabilities"* was carried here after it
   had already been completed. Re-checked on 2026-08-23: all 66 names in

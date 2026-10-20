@@ -34,7 +34,7 @@ the routines whose `next_run` has passed.
 ## Activation requirements
 
 Default gate state is **DISABLED**. Enabling requires a HUMAN
-`runtime_gate_manager`, the `local_single_user_runtime` mode, the registered
+`runtime_gate_manager`, the agent runtime switched on, the registered
 executor, a `threat_model_acks` row referencing this document, and a human
 confirmation token. AI principals can never flip the gate.
 

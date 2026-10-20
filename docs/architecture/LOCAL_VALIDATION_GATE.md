@@ -54,4 +54,4 @@ npm --prefix web run test:e2e:live
 Strict non-allow blocking, role revoke governed, and capability gate per action
 must remain documented and validated.
 
-Approval resolution executes an approved local file mutation through the governed relay, along with the eleven other capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`), and is metadata-only otherwise; unsupported capabilities are disabled and fail-closed.
+Approval resolution executes an approved local file mutation through the governed relay, along with the twelve other capabilities in `EXECUTABLE_ON_APPROVAL` (fourteen in all) (`raiker/approvals/execution.py`), and is metadata-only otherwise; unsupported capabilities are disabled and fail-closed.

@@ -28,12 +28,14 @@ an acting principal. AI principals cannot hold human-only roles, including
 `RuntimeAuthority` persists and evaluates `runtime_mode_state` and
 `capability_gate_state`; owner recovery is explicit, local, and audited.
 
-Approval resolution executes a narrow allowlist — the twelve capabilities in
+Approval resolution executes a narrow allowlist — the fourteen capabilities in
 `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`): local file mutations
 (`file_write_execution`, `patch_apply_execution`), governed local commands
-(`shell_execution`), the git write and push path (`git_write_execution`,
-`git_push_execution`), a GitHub write (`connector_github_runtime`), durable
-memory (`memory_write_execution`, `memory_forget_execution`), the two local
+(`shell_execution`), the git write, fetch and push path (`git_write_execution`,
+`git_fetch_execution`, `git_push_execution`), a GitHub write
+(`connector_github_runtime`), durable memory (`memory_write_execution`,
+`memory_forget_execution`), a checkpoint restore
+(`checkpoint_restore_execution`), the two local
 planning rows (`task_management_runtime`, `project_assignment_runtime`), and
 owner-selected SSH and Daytona commands (`remote_execution_cap`,
 `cloud_execution_cap`). All of it runs only through the approval execution relay —

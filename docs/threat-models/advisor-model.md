@@ -51,7 +51,7 @@ Two surfaces, one governance:
 ## Activation requirements
 
 Enabling `advisor_model_runtime` requires a HUMAN `runtime_gate_manager`, the
-`local_single_user_runtime` mode, the registered executor, a
+agent runtime switched on, the registered executor, a
 `threat_model_acks` row referencing this document, and a human confirmation
 token. Because the advisor is typically hosted, a *working* consult
 additionally requires the hosted (or private-network) egress path from

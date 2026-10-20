@@ -1,7 +1,7 @@
 # Capability Decision Modes (Ask / Deny / Allow / Auto)
 
 > Enforcement: strict non-allow blocking, role revoke governed, capability gate
-> per action. Approval resolution **executes** the twelve capabilities in
+> per action. Approval resolution **executes** the fourteen capabilities in
 > `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) and stays
 > decision-only for every other capability — see
 > [Implementation status](IMPLEMENTATION_STATUS.md).

@@ -159,4 +159,50 @@ describe("the Documents workspace", () => {
     expect(await screen.findByText(/Ready in Build's composer/)).toBeInTheDocument();
     expect(pendingDesignHandoff()).toMatchObject({ kind: "document", attachmentId: "att_1", mediaType: "text/markdown" });
   });
+
+  it("selects several layers with Shift and aligns them as one change", async () => {
+    const BOX = { ...TITLE, id: "box", type: "rect", name: "Box", x: 300, y: 500, w: 100, h: 100, fill: "#cccccc" };
+    const fetch = stubFetch(
+      routes({
+        "GET /api/design/documents/ddoc_1": view([TITLE, BOX]),
+        "POST /api/design/documents/ddoc_1/operations": {
+          ok: true, version: 3, rebased: false, summary: ["changed Box"],
+          document: view([TITLE, { ...BOX, x: 40 }], 3),
+        },
+      }),
+    );
+    await openLaunch();
+    await fireEvent.click(screen.getByRole("button", { name: "text Headline" }));
+    await fireEvent.click(screen.getByRole("button", { name: "rect Box" }), { shiftKey: true });
+    const panel = await screen.findByRole("region", { name: "Selected layers" });
+    expect(panel).toHaveTextContent("2 layers selected");
+    expect(screen.getByRole("button", { name: "Distribute across" })).toBeDisabled();
+    await fireEvent.click(screen.getByRole("button", { name: "Align left" }));
+    await waitFor(() => expect(screen.getByText("v3")).toBeInTheDocument());
+    const sent = fetch.mock.calls.find(([url, init]) => String(url).endsWith("/operations") && init?.method === "POST");
+    expect(JSON.parse(String(sent![1]!.body)).operations).toEqual([
+      { op: "update_node", node_id: "box", set: { x: 40 } },
+    ]);
+  });
+
+  it("says when a proposal's outcome is unknown and offers to ask again", async () => {
+    stubFetch(
+      routes({
+        "GET /api/design/documents/ddoc_1/proposals": {
+          proposals: [{
+            proposal_id: "dprop_1", document_id: "ddoc_1", base_version: 2, frame_id: "frame-1", brief: "A caption",
+            provider: "anthropic-hosted", model: "claude-haiku-5-5", status: "outcome_unknown",
+            result: { host_run: "old" }, created_at: "2026-10-19T10:00:00Z", decided_at: null,
+            plan: {}, operations: [],
+          }],
+        },
+      }),
+    );
+    await openLaunch();
+    await fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
+    expect(await screen.findByText(/whether the provider answered is not known/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept selected" })).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Ask again with this brief" }));
+    expect(screen.getByLabelText("Brief for the agent")).toHaveValue("A caption");
+  });
 });

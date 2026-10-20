@@ -45,6 +45,9 @@ MAX_TEXT = 5_000
 MAX_COORD = 100_000.0
 MAX_SIZE = 20_000.0
 MAX_FRAME_SIZE = 8_000
+MAX_COMPONENTS = 50
+MAX_NOTES = 200
+MAX_NOTE_TEXT = 1_000
 
 NODE_TYPES = ("text", "rect", "ellipse", "image", "group", "stack")
 CONTAINER_TYPES = ("group", "stack")
@@ -75,7 +78,7 @@ _FIELDS: dict[str, tuple[str, ...]] = {
     "rect": _COMMON + _SHAPE + ("radius",),
     "ellipse": _COMMON + _SHAPE,
     "image": _COMMON + ("asset_id", "alt", "fit", "crop", "radius"),
-    "group": _COMMON,
+    "group": _COMMON + ("component_id",),
     "stack": _COMMON + _SHAPE + ("radius", "direction", "gap", "padding", "align"),
 }
 #: What may still change on a locked node.
@@ -274,6 +277,12 @@ def _clean_field(kind: str, field: str, value: Any) -> Any:
         return _choice(value, field, ("row", "column"))
     if field in ("gap", "padding"):
         return _number(value, field, 0, 2_000)
+    if field == "component_id":
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str) or not _ID.match(value):
+            raise DesignError("invalid_field", field)
+        return value
     raise DesignError("unknown_field", field)
 
 
@@ -295,7 +304,7 @@ _DEFAULTS: dict[str, dict[str, Any]] = {
     "rect": {"fill": "#d9d9d9", "fill_var": None, "stroke": None, "stroke_width": 0, "radius": 0},
     "ellipse": {"fill": "#d9d9d9", "fill_var": None, "stroke": None, "stroke_width": 0},
     "image": {"asset_id": None, "alt": "", "fit": "cover", "crop": None, "radius": 0},
-    "group": {},
+    "group": {"component_id": None},
     "stack": {"fill": None, "fill_var": None, "stroke": None, "stroke_width": 0, "radius": 0,
               "direction": "column", "gap": 16, "padding": 16, "align": "start"},
 }
@@ -382,8 +391,69 @@ def validate_document(raw: Any, *, created_by: str = "owner") -> dict[str, Any]:
     system = raw.get("system")
     if isinstance(system, Mapping) and isinstance(system.get("id"), str) and isinstance(system.get("version"), int):
         document["system"] = {"id": system["id"][:80], "version": int(system["version"])}
+    components = _clean_components(raw.get("components"), created_by)
+    if components:
+        document["components"] = components
+    notes = _clean_notes(raw.get("notes"))
+    if notes:
+        document["notes"] = notes
     _check_ids(document)
     return normalize(document)
+
+
+def _clean_component(raw: Any, created_by: str) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        raise DesignError("invalid_component")
+    nodes = raw.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise DesignError("invalid_component")
+    return {
+        "name": _text(raw.get("name") or "Component", "name", 120).strip() or "Component",
+        "nodes": [clean_node(node, created_by=created_by) for node in nodes],
+    }
+
+
+def _clean_components(raw: Any, created_by: str) -> dict[str, Any]:
+    """DW-06 — reusable components: a name and a layer tree drawn from (0, 0)."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or len(raw) > MAX_COMPONENTS:
+        raise DesignError("invalid_field", "components")
+    out: dict[str, Any] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not _ID.match(key):
+            raise DesignError("invalid_component_id", str(key)[:48])
+        out[key] = _clean_component(value, created_by)
+    return out
+
+
+def _clean_note(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        raise DesignError("invalid_note")
+    note_id, target = raw.get("id"), raw.get("target")
+    if not isinstance(note_id, str) or not _ID.match(note_id):
+        raise DesignError("invalid_note_id", str(note_id)[:48])
+    if not isinstance(target, str) or not _ID.match(target):
+        raise DesignError("invalid_field", "target")
+    text = _text(raw.get("text"), "text", MAX_NOTE_TEXT).strip()
+    if not text:
+        raise DesignError("empty_note", note_id)
+    return {
+        "id": note_id,
+        "target": target,
+        "text": text,
+        "author": raw.get("author") if raw.get("author") in ("owner", "agent") else "owner",
+        "resolved": bool(raw.get("resolved", False)),
+    }
+
+
+def _clean_notes(raw: Any) -> list[dict[str, Any]]:
+    """DW-08 — notes on a layer or a frame. Not drawn and not exported as pixels."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_NOTES:
+        raise DesignError("invalid_field", "notes")
+    return [_clean_note(item) for item in raw]
 
 
 def _check_ids(document: Mapping[str, Any]) -> None:
@@ -403,6 +473,11 @@ def _check_ids(document: Mapping[str, Any]) -> None:
         seen.add(str(node["id"]))
     if count > MAX_NODES:
         raise DesignError("too_many_nodes")
+    note_ids: set[str] = set()
+    for note in document.get("notes") or []:
+        if note["id"] in note_ids:
+            raise DesignError("duplicate_id", str(note["id"]))
+        note_ids.add(str(note["id"]))
 
 
 # ── Layout ────────────────────────────────────────────────────────────────
@@ -464,6 +539,8 @@ def normalize(document: dict[str, Any]) -> dict[str, Any]:
 OPERATION_KINDS = (
     "add_node", "update_node", "remove_node", "move_node", "group_nodes", "ungroup",
     "add_frame", "update_frame", "remove_frame", "duplicate_frame",
+    "define_component", "place_component", "update_instance", "remove_component",
+    "add_note", "update_note", "remove_note",
 )
 
 
@@ -646,7 +723,143 @@ def _apply_one(document: dict[str, Any], op: Mapping[str, Any], actor: str, touc
         return f"removed frame {frame['name']}"
     if kind == "duplicate_frame":
         return _duplicate_frame(document, op, actor, touched)
+    if kind in ("define_component", "place_component", "update_instance", "remove_component"):
+        return _component_op(document, op, actor, touched)
+    if kind in ("add_note", "update_note", "remove_note"):
+        return _note_op(document, op, actor, touched)
     raise DesignError("unknown_operation", str(kind)[:40])
+
+
+# ── Components (DW-06) ────────────────────────────────────────────────────
+
+
+def _component_copy(document: dict[str, Any], component_id: str, instance_id: str, x: float, y: float,
+                    actor: str) -> list[dict[str, Any]]:
+    """The component's layers with fresh ids under *instance_id*, placed at (*x*, *y*)."""
+    component = (document.get("components") or {}).get(component_id)
+    if component is None:
+        raise DesignError("unknown_component", component_id)
+    taken = _ids(document)
+    copies = copy.deepcopy(component["nodes"])
+    for node, _ in iter_nodes(copies):
+        node["id"] = _fresh_id(f"{instance_id}-{node['id']}"[:40], taken)
+        node["created_by"] = actor
+    for node in copies:
+        _translate(node, x, y)
+    return copies
+
+
+def _component_op(document: dict[str, Any], op: Mapping[str, Any], actor: str, touched: set[str]) -> str:
+    """A component is a named layer tree kept in the document; an instance is a group linked to it.
+
+    Placing copies the tree with fresh ids, so an instance is ordinary layers the
+    owner can still edit. *Update from component* replaces an instance's layers
+    with the component's again — an explicit act, never automatic.
+    """
+    kind = op.get("op")
+    components = document.setdefault("components", {})
+    if kind == "define_component":
+        component_id = str(op.get("component_id") or "")
+        if not _ID.match(component_id) or component_id in components:
+            raise DesignError("invalid_component_id", component_id[:48])
+        if len(components) >= MAX_COMPONENTS:
+            raise DesignError("too_many_components")
+        node_id = str(op.get("node_id") or "")
+        _frame, holder, index, _parent = locate(document, node_id)
+        source = copy.deepcopy(holder[index])
+        if source["type"] == "group" and source.get("component_id"):
+            # Made from an instance: the component is what the instance holds.
+            nodes = source["children"]
+        else:
+            nodes = [source]
+        left = min(float(node["x"]) for node in nodes)
+        top = min(float(node["y"]) for node in nodes)
+        for node in nodes:
+            _translate(node, -left, -top)
+        components[component_id] = _clean_component(
+            {"name": op.get("name") or source["name"], "nodes": nodes}, actor
+        )
+        touched.add(component_id)
+        return f"made component {components[component_id]['name']}"
+    if kind == "place_component":
+        component_id = str(op.get("component_id") or "")
+        if component_id not in components:
+            raise DesignError("unknown_component", component_id)
+        frame = find_frame(document, str(op.get("frame_id") or ""))
+        instance_id = str(op.get("node_id") or "")
+        if not _ID.match(instance_id) or instance_id in _ids(document):
+            raise DesignError("invalid_node_id", instance_id[:48])
+        x = _number(op.get("x", 0), "x", -MAX_COORD, MAX_COORD)
+        y = _number(op.get("y", 0), "y", -MAX_COORD, MAX_COORD)
+        group = clean_node({"id": instance_id, "type": "group", "name": components[component_id]["name"],
+                            "component_id": component_id}, created_by=actor)
+        group["children"] = _component_copy(document, component_id, instance_id, x, y, actor)
+        frame["nodes"].append(group)
+        touched.update(subtree_ids(group))
+        touched.add(component_id)
+        return f"placed {group['name']}"
+    if kind == "update_instance":
+        node_id = str(op.get("node_id") or "")
+        _frame, holder, index, _parent = locate(document, node_id)
+        instance = holder[index]
+        component_id = str(instance.get("component_id") or "") if instance["type"] == "group" else ""
+        if not component_id:
+            raise DesignError("not_an_instance", node_id)
+        if instance.get("locked") or any(child.get("locked") for child, _ in iter_nodes(instance["children"])):
+            raise DesignError("node_locked", node_id)
+        touched.update(subtree_ids(instance))
+        x, y = float(instance["x"]), float(instance["y"])
+        instance["children"] = []
+        instance["children"] = _component_copy(document, str(component_id), node_id, x, y, actor)
+        touched.update(subtree_ids(instance))
+        return f"updated {instance['name']} from its component"
+    if kind == "remove_component":
+        component_id = str(op.get("component_id") or "")
+        if component_id not in components:
+            raise DesignError("unknown_component", component_id)
+        # Instances keep their layers; their link reads as broken until they are
+        # detached or the component comes back, and Check says so.
+        name = components.pop(component_id)["name"]
+        touched.add(component_id)
+        return f"removed component {name}"
+    raise DesignError("unknown_operation", str(kind)[:40])
+
+
+# ── Notes (DW-08) ─────────────────────────────────────────────────────────
+
+
+def _note_op(document: dict[str, Any], op: Mapping[str, Any], actor: str, touched: set[str]) -> str:
+    """Notes are versioned like any change, so a note's history is the document's."""
+    kind = op.get("op")
+    notes = document.setdefault("notes", [])
+    if kind == "add_note":
+        raw = op.get("note")
+        if not isinstance(raw, Mapping):
+            raise DesignError("invalid_note")
+        note = _clean_note({**raw, "author": actor, "resolved": False})
+        if note["target"] not in _ids(document):
+            raise DesignError("unknown_note_target", note["target"])
+        if any(item["id"] == note["id"] for item in notes):
+            raise DesignError("duplicate_id", note["id"])
+        if len(notes) >= MAX_NOTES:
+            raise DesignError("too_many_notes")
+        notes.append(note)
+        touched.add(note["id"])
+        return f"added a note on {note['target']}"
+    note_id = str(op.get("note_id") or "")
+    found = next((item for item in notes if item["id"] == note_id), None)
+    if found is None:
+        raise DesignError("unknown_note", note_id)
+    touched.add(note_id)
+    if kind == "update_note":
+        changes = op.get("set")
+        if not isinstance(changes, Mapping) or not changes or set(changes) - {"text", "resolved"}:
+            raise DesignError("invalid_field", "set")
+        updated = _clean_note({**found, **changes})
+        found.update(text=updated["text"], resolved=updated["resolved"])
+        return "resolved a note" if changes.get("resolved") else "changed a note"
+    notes.remove(found)
+    return "removed a note"
 
 
 def _duplicate_frame(document: dict[str, Any], op: Mapping[str, Any], actor: str, touched: set[str]) -> str:
@@ -712,6 +925,10 @@ def apply_operations(
         except DesignError as exc:
             raise DesignError(exc.reason, f"{exc.detail}@{position}" if exc.detail else str(position)) from None
     _check_ids(working)
+    if not working.get("components"):
+        working.pop("components", None)
+    if not working.get("notes"):
+        working.pop("notes", None)
     return normalize(working), touched, summary
 
 

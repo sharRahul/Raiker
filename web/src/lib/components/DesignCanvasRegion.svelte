@@ -109,7 +109,7 @@
 
   /** Whether this generation's size is a request Raiker actually made. */
   function sizeWasSent(generation: ImageGeneration): boolean {
-    if (sizedProviders === undefined) return true;
+    if (sizedProviders === undefined || generation.kind === "import") return true;
     return sizedProviders.includes(generation.provider);
   }
   const selected = $derived(
@@ -234,7 +234,7 @@
               {readable(item.reason_code)}
             </p>
           {/if}
-          <p class="sub">{item.model} · {item.size} · {relativeTime(item.created_at)}</p>
+          <p class="sub">{item.kind === "import" ? "Imported" : item.model} · {item.size} · {relativeTime(item.created_at)}</p>
         </div>
       </li>
     {/each}
@@ -407,7 +407,12 @@
               {/if}
             </dd>
           </div>
-          <div><dt>Model</dt><dd>{selected.generation.model}</dd></div>
+          {#if selected.generation.kind === "import"}
+            <!-- DW-04 — the owner's own file: no provider and no model made it. -->
+            <div><dt>Source</dt><dd>Your file, {selected.generation.prompt}. No provider has seen it.</dd></div>
+          {:else}
+            <div><dt>Model</dt><dd>{selected.generation.model}</dd></div>
+          {/if}
           <!-- REM-DESIGN-01 — the recorded size is what was *asked for*, and
                for a provider Raiker sends no size to it was never asked. It
                printed here beside the picture as though it described it. -->

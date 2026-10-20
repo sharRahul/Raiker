@@ -9480,7 +9480,7 @@
         "additionalProperties": false,
         "properties": {
           "format": {
-            "maxLength": 8,
+            "maxLength": 12,
             "title": "Format",
             "type": "string"
           },
@@ -9758,6 +9758,66 @@
         "title": "DesignHandoffView",
         "type": "object"
       },
+      "DesignImportAssetRequest": {
+        "additionalProperties": false,
+        "description": "DW-04 — one of the owner's own pictures, base64, checked like any image upload.",
+        "properties": {
+          "data_base64": {
+            "maxLength": 7000000,
+            "minLength": 1,
+            "title": "Data Base64",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "media_type": {
+            "maxLength": 40,
+            "title": "Media Type",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "filename",
+          "media_type",
+          "data_base64"
+        ],
+        "title": "DesignImportAssetRequest",
+        "type": "object"
+      },
+      "DesignImportedAsset": {
+        "description": "DW-04 — the owner's own picture, stored as an asset without any provider.",
+        "properties": {
+          "generation": {
+            "$ref": "#/components/schemas/ImageGeneration"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "generation"
+        ],
+        "title": "DesignImportedAsset",
+        "type": "object"
+      },
       "DesignOperationsRequest": {
         "additionalProperties": false,
         "description": "DW-08 — typed operations, made against ``base_version``.",
@@ -9782,6 +9842,46 @@
           "operations"
         ],
         "title": "DesignOperationsRequest",
+        "type": "object"
+      },
+      "DesignPalette": {
+        "description": "DW-06 — a picture's dominant colours, read on this machine.",
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "colors": {
+            "items": {
+              "$ref": "#/components/schemas/DesignPaletteColor"
+            },
+            "title": "Colors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "asset_id",
+          "colors"
+        ],
+        "title": "DesignPalette",
+        "type": "object"
+      },
+      "DesignPaletteColor": {
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "share": {
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "color",
+          "share"
+        ],
+        "title": "DesignPaletteColor",
         "type": "object"
       },
       "DesignProposalConflict": {
@@ -10350,6 +10450,91 @@
           "created_at"
         ],
         "title": "DesignSystemView",
+        "type": "object"
+      },
+      "DesignTokenImport": {
+        "description": "DW-06 — what a tokens file holds, as variables for a new system. Writes nothing.",
+        "properties": {
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/DesignTokenSkip"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "variables": {
+            "additionalProperties": true,
+            "title": "Variables",
+            "type": "object"
+          }
+        },
+        "required": [
+          "format",
+          "filename",
+          "sha256",
+          "found",
+          "variables",
+          "skipped"
+        ],
+        "title": "DesignTokenImport",
+        "type": "object"
+      },
+      "DesignTokenImportRequest": {
+        "additionalProperties": false,
+        "description": "DW-06 — a tokens file's text (CSS custom properties or JSON).",
+        "properties": {
+          "filename": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "text"
+        ],
+        "title": "DesignTokenImportRequest",
+        "type": "object"
+      },
+      "DesignTokenSkip": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "DesignTokenSkip",
         "type": "object"
       },
       "DesignValidationCheck": {
@@ -15210,7 +15395,8 @@
               "create",
               "edit",
               "variation",
-              "revert"
+              "revert",
+              "import"
             ],
             "title": "Kind",
             "type": "string"
@@ -36785,6 +36971,85 @@
         "summary": "Discard Credential Delta"
       }
     },
+    "/api/design/assets/import": {
+      "post": {
+        "description": "DW-04 — the owner's own picture or logo, stored as an asset. No provider is involved.\n\nThe bytes pass the same validator as any image upload (allowlisted type,\nsize cap, content sniff). The row is an ``import``: provider ``owner``, no\nmodel and no prompt beyond the file's name. Sending it to a provider later\n— to edit it — is a separate, governed request the owner makes under Images.",
+        "operationId": "import_design_asset_api_design_assets_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignImportAssetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignImportedAsset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Design Asset"
+      }
+    },
+    "/api/design/assets/{asset_id}/palette": {
+      "get": {
+        "description": "DW-06 — the dominant colours of one of the owner's pictures, read here, sent nowhere.",
+        "operationId": "read_design_asset_palette_api_design_assets__asset_id__palette_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "title": "Asset Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignPalette"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Asset Palette"
+      }
+    },
     "/api/design/assets/{asset_id}/usage": {
       "get": {
         "description": "DW-05 — the documents that place this image, asked before it is put away.",
@@ -37883,6 +38148,45 @@
           }
         },
         "summary": "Create Design System"
+      }
+    },
+    "/api/design/systems/tokens": {
+      "post": {
+        "description": "DW-06 — the colours, fonts and spacing in a tokens file, and what was skipped. Writes nothing.",
+        "operationId": "read_design_tokens_api_design_systems_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignTokenImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignTokenImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design Tokens"
       }
     },
     "/api/design/systems/{system_id}": {

@@ -53,6 +53,7 @@ human authorizer, runtime authority, or other literal actor.
 | `design_proposal_created` | The Design agent proposed typed operations for one frame of a design document (DW-07) — the document and proposal ids, the version it was made against, the frame, the provider and model, and how many operations were valid and refused. Never the brief and never a layer's text |
 | `design_proposal_decided` | The owner accepted all or some of a Design proposal, or rejected it (DW-08) — the proposal id, the decision, how many operations were applied, how many met later changes and were refused, and the resulting version |
 | `design_exported` | A frame of a design document was exported (DW-11) — the document, version and frame, the format, the file's SHA-256 and size, and the validation outcome recorded with it. Never the exported bytes |
+| `design_asset_imported` | The owner imported their own picture into Design (DW-04) — the new asset id, media type, size and SHA-256. No provider was involved; never the bytes or the file name |
 | `design_handed_off` | A design version was handed to Build as a context document (DW-11) — the document, handoff id, version, frame count and the document's SHA-256. It grants Build nothing |
 | `code_map_refreshed` | The code map was re-parsed for exactly the paths an approved write touched — how many files were re-read and how many rows went away |
 | `attachment_downloaded` | A file this conversation holds was downloaded; metadata only — attachment id, filename, media type, byte size |

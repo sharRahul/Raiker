@@ -61,7 +61,7 @@ describe("the layer panel reads front-most first, with depth", () => {
 
 describe("new layers and ids", () => {
   it("never repeats an id", () => {
-    const taken = allIds({ schema: 1, frames: [FRAME] });
+    const taken = allIds({ schema: 1, frames: [FRAME], components: {}, notes: [] });
     expect(taken.has("inner")).toBe(true);
     expect(freshId("text", new Set(["text-1"]))).toBe("text-2");
     const { op, id } = addLayerOperation(FRAME, "text", taken);

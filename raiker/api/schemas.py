@@ -1053,7 +1053,7 @@ class DesignSystemChoiceRequest(StrictRequest):
 
 class DesignExportRequest(StrictRequest):
     frame_id: str = Field(min_length=1, max_length=48)
-    format: str = Field(max_length=8)
+    format: str = Field(max_length=12)
     scale: float = Field(default=1.0, ge=0.25, le=4.0)
 
 
@@ -1070,6 +1070,22 @@ class DesignProposalDecisionRequest(StrictRequest):
     decision: str = Field(max_length=10)
     indexes: list[int] | None = Field(default=None, max_length=40)
     skip_conflicts: bool = False
+
+
+class DesignImportAssetRequest(StrictRequest):
+    """DW-04 — one of the owner's own pictures, base64, checked like any image upload."""
+
+    filename: str = Field(min_length=1, max_length=200)
+    media_type: str = Field(max_length=40)
+    data_base64: str = Field(min_length=1, max_length=7_000_000)
+    project_id: str | None = Field(default=None, max_length=80)
+
+
+class DesignTokenImportRequest(StrictRequest):
+    """DW-06 — a tokens file's text (CSS custom properties or JSON)."""
+
+    filename: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=200_000)
 
 
 class DesignHandoffRequest(StrictRequest):

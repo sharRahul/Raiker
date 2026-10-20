@@ -23,7 +23,7 @@ from raiker.design.document import CONTAINER_TYPES, content_hash, iter_nodes
 from raiker.design.render import GENERIC_FONTS, missing_glyphs, raster_font_name, text_height
 from raiker.design.systems import VARIABLE_FIELDS
 
-VALIDATOR_VERSION = "design-validate/1"
+VALIDATOR_VERSION = "design-validate/2"
 
 #: ``asset_id -> "ok" | "deleted" | "missing"`` for this owner.
 AssetState = Callable[[str], str]
@@ -38,6 +38,7 @@ CHECKS = (
     ("variables", "Variables resolve in the selected design system"),
     ("required_variables", "The design system's required variables are used"),
     ("brand_colors", "Colours come from the selected design system"),
+    ("components", "Component instances link to a component in this design"),
 )
 
 
@@ -90,6 +91,7 @@ def validate(
     states: dict[str, str] = {key: "pass" for key, _ in CHECKS}
     used_variables: set[str] = set()
     palette = {str(value).lower() for value in ((variables or {}).get("colors") or {}).values()}
+    components = document.get("components") or {}
 
     def note(check: str, frame: Mapping[str, Any], node: Mapping[str, Any] | None, message: str,
              state: str = "fail") -> None:
@@ -114,6 +116,9 @@ def validate(
                     note("variables", frame, node, f"Uses the variable “{name}” but the design has no system selected.")
                 elif name not in (variables.get(group) or {}):
                     note("variables", frame, node, f"The selected system does not define “{name}”.")
+            if node["type"] == "group" and node.get("component_id") and node["component_id"] not in components:
+                note("components", frame, node,
+                     f"Links to the component “{node['component_id']}”, which this design no longer has.")
             if not node.get("visible", True):
                 continue
             right, bottom = float(node["x"]) + float(node["w"]), float(node["y"]) + float(node["h"])

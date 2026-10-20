@@ -725,7 +725,12 @@
         { id: "documents", label: "Documents" },
       ]}
       selected={mode}
-      onselect={(id: string) => (mode = id as "images" | "documents")}
+      onselect={(id: string) => {
+        mode = id as "images" | "documents";
+        // A picture imported under Documents is in the gallery now; read it
+        // again rather than show the list from before the switch.
+        if (mode === "images") void load();
+      }}
       label="Design layer"
     />
   </div>

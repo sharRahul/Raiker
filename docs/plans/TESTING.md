@@ -66,6 +66,31 @@ This is one run, not the five a model-driven scenario requires, and the stale-
 proposal conflict was proven by API tests rather than live; T-11 and T-12 remain
 open until both are met. Remaining gaps: [BUG-348](TO_BE_FIXED.md#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial).
 
+**2026-10-20 — second T-11 run (BUG-348 round).** On a fresh `raiker-web`
+(`scripts/reset_live_workspace.py`), Linux, hosted Anthropic
+`claude-haiku-4-5-20251001` entered through Models with its workspace ID,
+[`dw-design-round-two-live.spec.ts`](../../web/e2e/dw-design-round-two-live.spec.ts)
+passed 7/7:
+
+| Case | What the owner does | What has to be true |
+|---|---|---|
+| L-01 | Drags a rectangle, drags it back near the frame's centre, resizes it from a corner, rotates it with Shift, locks it and drags again | One version per gesture; the centre snap stores `x = 420` and draws a guide; rotation is a multiple of 15°; the locked layer writes nothing |
+| L-02 | Shift-clicks three layers in Layers, aligns left, distributes down, groups | *3 layers selected*; each action one version; a group appears |
+| L-03 | Imports a PNG under **Image → Import your own picture…**, then opens Images | The picture is placed; Images lists it as *Imported · 64x32* and says no provider has seen it |
+| L-04 | Makes the group a component, places it, widens a layer inside the copy, updates it from the component, adds and resolves a note | The panel says *differs* then *matches*; the note shows a pin and reads resolved |
+| L-05 | Imports a CSS tokens file, reads colours from the imported logo, saves the system, exports a vector PDF | Four values read and one skipped by name; `brand-1=#ff6600`; the download is `…vN.pdf` starting `%PDF-1.4` with its hash listed |
+| L-06 | Asks the agent, kills the host (`kill -9`) during the call, restarts it, asks again and accepts | The first proposal reads *Outcome unknown* and can only be asked again; the second completes and is accepted |
+| L-07 | Opens the design at 390px | No horizontal overflow |
+
+It found and fixed four defects ([FIXED-1003](FIXED_ITEMS.md#fixed-1003--images-did-not-show-a-picture-imported-under-documents-until-the-page-was-reloaded),
+[FIXED-1005](FIXED_ITEMS.md#fixed-1005--a-skipped-tokens-name-reached-the-page-as-redacted),
+[FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected),
+and the fractional drag coordinates in [FIXED-1001](FIXED_ITEMS.md#fixed-1001--a-drag-snapped-to-nothing-and-showed-no-guides-dw-02-bug-348)).
+The restart case needs `RAIKER_LIVE_RESTART_COMMAND`, a command that kills and
+restarts the host on the same workspace; without it the case asks once. This is
+still not the five model-driven runs T-11 requires. Remaining gaps:
+[BUG-348](TO_BE_FIXED.md#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial).
+
 ## Test levels and release decision
 
 1. **Component and contract tests** prove deterministic invariants but do not

@@ -178,7 +178,7 @@ five by default — re-confirmed opportunistically in the background while a wor
 surface is open, with the invalidation hooks still authoritative over the timer
 (FIXED-169).
 
-## Design workspace status — 2026-10-19
+## Design workspace status — 2026-10-20
 
 The [Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md) target is staged as
 below. Every Design route is owner-scoped; none of them grants a capability.
@@ -191,7 +191,11 @@ below. Every Design route is owner-scoped; none of them grants a capability.
 | Agent proposals (DW-07) | `implemented_verified` — one model call through the owner's router; applied only on owner acceptance | `raiker/design/agent.py`, live with Anthropic Haiku 4.5 |
 | Validation (DW-10) | `implemented_read_only` | `raiker/design/validation.py` |
 | Export and Build handoff (DW-11) | `implemented_verified` — exports and handoffs are workspace files; nothing leaves the machine | `raiker/design/render.py`, `raiker/api/routes_design.py` |
-| Pointer handles, owner image import, system import, annotations, vector PDF | `contract_only` | BUG-348 |
+| Pointer drag/resize/rotate, multi-select, align, distribute, snapping (DW-02) | `implemented_verified` — each gesture one versioned operation list | `web/src/lib/designDocument.ts`, live `dw-design-round-two-live.spec.ts` |
+| Owner picture import (DW-04), tokens and palette system import (DW-06) | `implemented_verified` — read and stored on this machine; no provider involved | `raiker/design/imports.py`, `POST /api/design/assets/import` |
+| Document components (DW-06), notes (DW-08), vector PDF (DW-11) | `implemented_verified` | `raiker/design/document.py`, `raiker/design/pdf.py` |
+| Proposal receipts with *outcome unknown* (DW-12) | `implemented_verified` — written before the model call | `raiker/design/store.py`, live host restart |
+| Selecting inside groups on the canvas, brand-guide import, system-level components, presentation export | `contract_only` | BUG-348 |
 
 ## Personal-agent target status — 2026-10-07
 

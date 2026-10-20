@@ -39,7 +39,7 @@ If this is your first time using Raiker, read these pages in order:
 | Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
 | Add connectors, MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
-| Generate images with a connected image model | [Design](design.md) |
+| Generate images, import your own, and compose editable designs to export or hand to Build | [Design](design.md) |
 | Use Raiker's desktop window, its menu and shortcuts | [The desktop window](managing-the-host.md#the-desktop-window) |
 | Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
 | Build installers, or publish a signed release (maintainers) | [Releasing](releasing.md) |

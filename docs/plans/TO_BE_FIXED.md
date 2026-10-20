@@ -87,7 +87,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
-| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open — found 2026-10-19 closing DW-D02 to DW-D06 ([FIXED-979](FIXED_ITEMS.md#fixed-979--a-design-was-one-picture-never-a-document-of-layers-dw-01-dw-02) to [FIXED-996](FIXED_ITEMS.md#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused)) |
+| [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -479,6 +479,13 @@ generation, edit, lineage and four variations completed and were inspected in
 the running UI. The same pass fixed [FIXED-945](FIXED_ITEMS.md#fixed-945--design-offered-image-models-from-unconnected-providers),
 found because the picker also offered an unconnected Gemini profile.
 
+**2026-10-20 — the source-image path exists.** [FIXED-1002](FIXED_ITEMS.md#fixed-1002--the-owners-own-picture-or-logo-could-not-be-brought-into-design-dw-04-bug-348)
+lets the owner import their own picture as an `import` asset under Images, and
+an edit of it goes through the same governed executor as any edit. That is the
+path a source-image refusal can be exercised on. This round's host had an
+Anthropic key only, which has no image model, so neither remaining contract was
+observed.
+
 **Interface outcome that has to be true before this closes.** The two remaining
 contracts above are observed through a real provider and shown in the inspector.
 
@@ -564,34 +571,39 @@ to change.
 
 ## BUG-348 — The Design canvas is edited by keyboard and inspector only, and five DW requirements are still partial
 
-**Severity: Medium. Area: Design / composition. Status: Open — found
+**Severity: Medium. Area: Design / composition. Status: Open remainder — found
 2026-10-19 while closing DW-D02 to DW-D06 ([FIXED-979](FIXED_ITEMS.md#fixed-979--a-design-was-one-picture-never-a-document-of-layers-dw-01-dw-02)
-to [FIXED-996](FIXED_ITEMS.md#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused)).**
+to [FIXED-996](FIXED_ITEMS.md#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused));
+reduced 2026-10-20 by [FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348)
+to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected).**
 
 **Observed.** The structured canvas, versions, systems, agent proposals,
-checks, exports and the Build handoff ship and pass live. What the round did
-not reach, each a gap against [the Design workspace](DESIGN_WORKSPACE_SPEC.md):
+checks, exports and the Build handoff ship and pass live. The 2026-10-20 round
+added pointer drag, resize and rotate handles, multi-select, align, distribute,
+snapping with guides, owner picture import, tokens-file and picture-palette
+system import, document components, notes, a vector PDF and durable proposal
+receipts, and passed 7/7 live. What is still a gap against
+[the Design workspace](DESIGN_WORKSPACE_SPEC.md):
 
 | Requirement | What exists | What is missing |
 |---|---|---|
-| DW-02 direct manipulation | Click to select; arrows nudge; the inspector sets position, size, rotation and order | Pointer drag, resize and rotate handles, multi-select, align and distribute, snapping and guides |
-| DW-04 owner assets | Pictures generated under Images are placed by link | Importing the owner's own picture or logo into Design without a provider |
-| DW-06 system sources | Colours, fonts, spacing, rules and required variables typed by the owner | Importing from a brand guide, screenshot or codebase; reusable components |
-| DW-08 annotations | Every change is a version with actor and scope | Comments and annotations on layers |
-| DW-11 / DW-12 formats and receipts | PNG, raster PDF, SVG, JSON; versions, proposals and exports recorded | Vector PDF and presentation formats; a durable *outcome unknown* record for a proposal whose model call the host did not survive |
+| DW-02 direct manipulation | Drag, resize and rotate handles, multi-select, align, distribute, snapping and guides | Clicking a layer inside a group on the canvas selects the group; its children are selected from Layers |
+| DW-06 system sources and components | Tokens files (CSS, JSON), a picture's colours, typed values; components kept in their document | Importing from a brand-guide document (PDF); components shared through a design system across documents |
+| DW-11 formats | PNG, raster PDF, vector PDF, SVG, JSON | Presentation and document formats; vector PDF text beyond Windows-1252 (counted and written as `?`) |
 
-The canvas also draws text in the browser's font while PNG and PDF use the
+The canvas also draws text in the browser's font while PNG and both PDFs use the
 host's raster font (recorded with each export), so a line can break in a
 slightly different place on screen than in the file; Check measures with the
-export font.
+export font. T-11 and T-12 still need the five model-driven runs the Testing
+protocol requires.
 
-**Proposed fix.** One slice per row, each with its own live evidence: pointer
-handles first (they are the largest everyday gap), then owner image import
-through the existing attachment validator, then system import.
+**Proposed fix.** One slice per row, each with its own live evidence: canvas
+selection inside groups (double-click to enter a group), then a brand-guide
+reader through the existing document attachment extraction, then system-level
+components, then a presentation export.
 
-**Required user-interface outcome.** A layer can be dragged, resized and
-rotated on the canvas with the same versions and locks as the keyboard; the
-other rows are reachable from the Documents workspace and absent until they are.
+**Required user-interface outcome.** The remaining rows are reachable from the
+Documents workspace and absent until they are.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

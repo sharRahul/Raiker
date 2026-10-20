@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**446 operations: 432 verified, 0 eligible, 0 deferred, 14 special.**
+**449 operations: 435 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -131,6 +131,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/connector-store/{connector_id}/manifest` | ManifestRequest | ManifestRegistered | verified | declared by cast |
 | GET | `/api/credential-deltas` |  | CredentialDeltaList | verified | declared CredentialDeltaList |
 | POST | `/api/credential-deltas/{run_id}/discard` | dict | CredentialDeltaDiscarded | verified | declared CredentialDeltaDiscarded |
+| POST | `/api/design/assets/import` | DesignImportAssetRequest | DesignImportedAsset | verified | declared DesignImportedAsset |
+| GET | `/api/design/assets/{asset_id}/palette` |  | DesignPalette | verified | declared DesignPalette |
 | GET | `/api/design/assets/{asset_id}/usage` |  | DesignAssetUsage | verified | declared DesignAssetUsage |
 | GET | `/api/design/documents` |  | DesignDocumentList | verified | declared DesignDocumentList |
 | POST | `/api/design/documents` | CreateDesignDocumentRequest | DesignDocumentView | verified | _view |
@@ -157,6 +159,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/design/proposals/{proposal_id}/decision` | DesignProposalDecisionRequest | DesignProposalDecision | verified | declared DesignProposalDecision |
 | GET | `/api/design/systems` |  | DesignSystemList | verified | declared DesignSystemList |
 | POST | `/api/design/systems` | DesignSystemRequest | DesignSystemView | verified | _save_system |
+| POST | `/api/design/systems/tokens` | DesignTokenImportRequest | DesignTokenImport | verified | declared DesignTokenImport |
 | PUT | `/api/design/systems/{system_id}` | DesignSystemRequest | DesignSystemView | verified | _save_system |
 | GET | `/api/diagnostics` |  | DiagnosticsView | verified | DashboardService.get_diagnostics |
 | GET | `/api/diagnostics/export` |  | DiagnosticsExport | verified | WebReadModels.diagnostics_export |

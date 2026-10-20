@@ -229,26 +229,52 @@ custom size. Designs are listed newest first; **Delete** puts one in
 The page has three regions: frames and layers on the left, the canvas in the
 middle, and the panels on the right.
 
-- **Add a layer** with *Text*, *Rectangle*, *Ellipse*, *Stack* or *Image* (a
-  picture you made under Images). A **stack** lines up what is inside it in a
+- **Add a layer** with *Text*, *Rectangle*, *Ellipse*, *Stack* or *Image* — a
+  picture you made under Images, or **Import your own picture…** (PNG, JPEG,
+  WebP or GIF). An imported picture is checked like any upload, kept on this
+  machine and listed under Images as **Imported**; it goes to an image provider
+  only if you later ask to edit it there. A **stack** lines up what is inside it in a
   row or column, with a gap and padding, and keeps it lined up as you change it.
-- **Select** a layer by clicking it on the canvas or in **Layers**. Layers lists
-  the front-most first; the eye hides a layer and the lock protects it. A
-  locked layer can be shown, hidden, renamed or unlocked, and nothing else.
+- **Select** a layer by clicking it on the canvas or in **Layers**; Shift
+  (or Ctrl/Cmd) adds or removes one. Layers lists the front-most first; the eye
+  hides a layer and the lock protects it. A locked layer can be shown, hidden,
+  renamed or unlocked, and nothing else. Clicking inside a group on the canvas
+  selects the group; pick one of its layers in Layers.
+- **Drag** a layer to move it. It snaps to the frame's edges and centre and to
+  other layers' edges and centres, drawing a dashed guide for each (and to the
+  grid when it is shown); hold **Alt** to place it freely. The square **handles**
+  resize — Shift on a corner keeps the proportions — and the round handle above
+  rotates, in 15° steps with Shift. Each drag is one version.
+- With several layers selected, the panel offers **Align** (left, centre, right,
+  top, middle, bottom), **Distribute across / down** for three or more,
+  **Group** and **Remove**, and the arrow keys move them all. One selected layer
+  can be centred in the frame.
 - **Inspect** edits the selected layer: position, size, rotation, opacity, text,
   font, size, weight, alignment, colour, fill, corner radius, stack spacing, and
   for a picture its alternative text, fit and **crop**. Crop and fit never change
   the picture itself.
-- **On the canvas**, the arrow keys move the selected layer 1px (Shift: 10px),
-  Delete removes it, Escape clears the selection, and Ctrl+Z / Ctrl+Shift+Z undo
-  and redo.
+- **On the canvas**, the arrow keys move the selection 1px (Shift: 10px),
+  Delete removes it, Escape clears it, and Ctrl+Z / Ctrl+Shift+Z undo and redo.
 - **Make variant** copies the frame at another size — a mobile version of a
   social post, say — scaled once and marked *variant of* its source. It does not
   follow the source afterwards; change each as you need.
 
-Dragging layers with the pointer, resize handles, multi-select and align/
-distribute are not there yet; position and size are set from the keyboard and
-the inspector.
+### Components and notes
+
+**Make component** (under the selected layer's **Component**) keeps a copy of
+that layer — a card, a button, a logo lock-up — in this design. **Components →
+Place** puts it on the frame again: its layers are ordinary layers you can
+edit, linked to the component. Editing a placed copy never changes the
+component; the panel says whether the copy still matches, and **Update from
+component** replaces its layers with the component's, as one version. Removing
+a component keeps every placed copy's layers, and Check reports the broken
+link. Components belong to their design.
+
+**Notes** sit on the selected layer, or on the frame when nothing is selected:
+a reminder, a question for later. Each is a version like any change, can be
+resolved and reopened, and shows as a numbered pin on the canvas (**Show
+pins**) and a *note* badge in Layers. Notes are never drawn into an export;
+open ones go to Build with a handoff.
 
 ### Versions
 
@@ -268,6 +294,13 @@ top.
 fonts (`body=sans-serif`), spacing, usage rules, the variables a finished design
 must use, and a note on where they came from. Saving a system again makes a new
 version; designs using the earlier one are not changed.
+
+Instead of typing the values, **Import from a tokens file** reads CSS variables
+(`--brand-primary: #1144aa;`) or a JSON tokens file on this machine and fills
+the form with the colours, fonts and px/rem sizes it found, listing anything it
+skipped and why; **Or colours from a picture** reads the main colours of a logo
+or screenshot you have. The source note names the file and its hash. Nothing is
+saved until **Save system**.
 
 A layer can use a variable — **Fill variable**, **Colour variable** — and keeps
 the colour it is drawn in. **Choose** a system and press **Preview the change**:
@@ -296,9 +329,15 @@ If you changed a layer after the agent read the design, a change to that layer
 is never applied over yours: Raiker names the layers and offers **Apply the
 rest, keep my changes**.
 
+A proposal is recorded before the model is asked. If Raiker stopped while it
+waited, the proposal reads **Outcome unknown** — whether the provider answered
+is not known, nothing was applied, and it is never retried on its own; one whose
+call failed reads **Failed** with the reason. **Ask again with this brief** puts
+the brief back for a new request.
+
 ### Check
 
-**Check** runs nine checks and says, for each, **Passed**, **Failed**, **Not
+**Check** runs ten checks and says, for each, **Passed**, **Failed**, **Not
 supported by the export** or **Cannot be known from the design**:
 
 | Check | What it looks at |
@@ -312,17 +351,21 @@ supported by the export** or **Cannot be known from the design**:
 | Variables | Every variable a layer uses exists in the chosen system |
 | Required variables | Every variable the system requires is used |
 | Brand colours | Colours come from the chosen system |
+| Components | Every placed copy of a component links to one still in the design |
 
 Each finding names its layer (and frame, when there are several) and opens it.
 Check never judges how good the design looks.
 
 ### Export
 
-**Export** writes the frame as **PNG**, **PDF** (one picture-like page), **SVG**
-(text stays text, so it remains editable in a vector tool) or **JSON** (the
-frame's structure). Each export is listed with its version, the result of Check
+**Export** writes the frame as **PNG**, **PDF (vector, selectable text)** —
+shapes as paths, text as real text, an A4 frame as an A4 page — **PDF (one
+raster page)**, **SVG** (text stays text, so it remains editable in a vector
+tool) or **JSON** (the frame's structure). The vector PDF writes text in the
+Western European character set; any other character becomes `?`, and the export
+records how many. Each export is listed with its version, the result of Check
 at that moment, and the file's SHA-256, and downloads from there. PNG and PDF are
-drawn in one sans font — the export records which — and a font you named is
+drawn in one sans font — the export records which (the vector PDF embeds it) — and a font you named is
 drawn in it; SVG names your font and a viewer without it substitutes its own.
 Exporting never changes the design.
 

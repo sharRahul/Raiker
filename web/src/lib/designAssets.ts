@@ -185,4 +185,5 @@ export const KIND_LABEL: Record<string, string> = {
   edit: "Edited from",
   variation: "One of a set",
   revert: "Went back to",
+  import: "Imported",
 };

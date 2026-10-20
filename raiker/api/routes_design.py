@@ -17,13 +17,17 @@ Composition and Agent layers (DW-01 to DW-12), and they keep three rules:
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import contextlib
 import hashlib
+import io
 import json
 import re
 from typing import Any, cast
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from PIL import Image
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
@@ -33,11 +37,13 @@ from raiker.api.schemas import (
     DesignBaseVersionRequest,
     DesignExportRequest,
     DesignHandoffRequest,
+    DesignImportAssetRequest,
     DesignOperationsRequest,
     DesignProposalDecisionRequest,
     DesignProposalRequest,
     DesignSystemChoiceRequest,
     DesignSystemRequest,
+    DesignTokenImportRequest,
     UpdateDesignDocumentRequest,
     serialize_dto,
 )
@@ -52,6 +58,8 @@ from raiker.api.wire.design import (
     DesignHandoffList,
     DesignHandoffRecord,
     DesignHandoffView,
+    DesignImportedAsset,
+    DesignPalette,
     DesignProposalConflict,
     DesignProposalDecision,
     DesignProposalList,
@@ -59,6 +67,7 @@ from raiker.api.wire.design import (
     DesignSystemList,
     DesignSystemPreview,
     DesignSystemView,
+    DesignTokenImport,
     DesignValidationView,
     DesignVersionList,
     DesignVersionSummary,
@@ -74,6 +83,7 @@ from raiker.design.document import (
     content_hash,
     find_frame,
 )
+from raiker.design.pdf import render_pdf
 from raiker.design.render import encode_raster, raster_font_name, render_raster, render_svg
 from raiker.design.systems import clean_variables, plan_system_change
 from raiker.design.validation import validate
@@ -87,8 +97,11 @@ EXPORT_FORMATS = {
     "svg": "image/svg+xml",
     "png": "image/png",
     "pdf": "application/pdf",
+    "vector_pdf": "application/pdf",
     "json": "application/json",
 }
+#: The file extension a download is named with, where it is not the format's name.
+EXPORT_EXTENSIONS = {"vector_pdf": "pdf"}
 
 
 def _principal(request: Request) -> tuple[str, Any]:
@@ -541,6 +554,84 @@ async def read_design_asset_usage(asset_id: str, request: Request) -> dict[str, 
     return serialize_dto(answer)
 
 
+@router.post("/api/design/assets/import")
+async def import_design_asset(body: DesignImportAssetRequest, request: Request) -> dict[str, Any]:
+    """DW-04 — the owner's own picture or logo, stored as an asset. No provider is involved.
+
+    The bytes pass the same validator as any image upload (allowlisted type,
+    size cap, content sniff). The row is an ``import``: provider ``owner``, no
+    model and no prompt beyond the file's name. Sending it to a provider later
+    — to edit it — is a separate, governed request the owner makes under Images.
+    """
+    from raiker.api.routes_images import _public  # noqa: PLC0415
+    from raiker.contracts.ids import new_id  # noqa: PLC0415
+    from raiker.runtime.attachments import AttachmentValidationError, store_image  # noqa: PLC0415
+
+    owner, principal = _principal(request)
+    store = _store(request)
+    project_id = _check_project(store, principal, (body.project_id or "").strip())
+    try:
+        data = base64.b64decode(body.data_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise refusal(status.HTTP_400_BAD_REQUEST, "invalid_base64") from None
+    try:
+        stored = store_image(store, filename=body.filename, media_type=body.media_type, data=data,
+                             owner_principal_id=owner)
+    except AttachmentValidationError as exc:
+        raise refusal(status.HTTP_400_BAD_REQUEST, exc.reason) from None
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            size = f"{opened.width}x{opened.height}"
+    except (OSError, ValueError):
+        size = "unknown"
+    generation_id = new_id("img_")
+    store.record_image_generation(
+        generation_id=generation_id, owner_principal_id=owner, profile_id="owner-import", provider="owner",
+        model="", prompt=stored.filename, size=size, status="ok", attachment_id=stored.attachment_id,
+        media_type=stored.media_type, byte_size=stored.byte_size, kind="import", project_id=project_id,
+    )
+    _audit(store, request, owner, "design_asset_imported", {
+        "generation_id": generation_id, "media_type": stored.media_type, "byte_size": stored.byte_size,
+        "sha256": stored.sha256,
+    })
+    row = store.get_image_generation(generation_id, owner_principal_id=owner)
+    assert row is not None
+    answer: DesignImportedAsset = {"ok": True, "generation": _public(row)}
+    return serialize_dto(answer)
+
+
+@router.get("/api/design/assets/{asset_id}/palette")
+async def read_design_asset_palette(asset_id: str, request: Request) -> dict[str, Any]:
+    """DW-06 — the dominant colours of one of the owner's pictures, read here, sent nowhere."""
+    from raiker.design.imports import extract_palette  # noqa: PLC0415
+
+    owner, _ = _principal(request)
+    found = _asset_loader(_store(request), owner)(asset_id)
+    if found is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "unknown_design_asset")
+    try:
+        colors = await asyncio.to_thread(extract_palette, found[1])
+    except (OSError, ValueError):
+        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_asset_unreadable") from None
+    answer: DesignPalette = {"asset_id": asset_id, "colors": cast(Any, colors)}
+    return serialize_dto(answer)
+
+
+@router.post("/api/design/systems/tokens")
+async def read_design_tokens(body: DesignTokenImportRequest, request: Request) -> dict[str, Any]:
+    """DW-06 — the colours, fonts and spacing in a tokens file, and what was skipped. Writes nothing."""
+    from raiker.design.imports import parse_tokens  # noqa: PLC0415
+
+    _principal(request)
+    parsed = parse_tokens(body.filename, body.text)
+    answer: DesignTokenImport = {
+        "format": parsed["format"], "filename": body.filename.strip()[:200],
+        "sha256": hashlib.sha256(body.text.encode("utf-8")).hexdigest(), "found": parsed["found"],
+        "variables": parsed["variables"], "skipped": parsed["skipped"],
+    }
+    return serialize_dto(answer)
+
+
 # ── Validation and export ────────────────────────────────────────────────
 
 
@@ -558,16 +649,19 @@ async def validate_design_document(document_id: str, request: Request) -> dict[s
     return serialize_dto(answer)
 
 
-def _render(row: dict[str, Any], frame_id: str, fmt: str, scale: float, load: Any) -> bytes:
+def _render(row: dict[str, Any], frame_id: str, fmt: str, scale: float, load: Any) -> tuple[bytes, dict[str, Any]]:
+    """The file, and anything the export should record about how it was drawn."""
     document = row["document"]
     if fmt == "svg":
-        return render_svg(document, frame_id, load).encode("utf-8")
+        return render_svg(document, frame_id, load).encode("utf-8"), {}
+    if fmt == "vector_pdf":
+        return render_pdf(document, frame_id, load)
     if fmt == "json":
         frame = find_frame(document, frame_id)
         payload = {"schema": document.get("schema"), "document_id": row["document_id"],
                    "version": int(row["current_version"]), "system": document.get("system"), "frame": frame}
-        return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False).encode("utf-8")
-    return encode_raster(render_raster(document, frame_id, load, scale=scale), fmt)
+        return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False).encode("utf-8"), {}
+    return encode_raster(render_raster(document, frame_id, load, scale=scale), fmt), {}
 
 
 @router.post("/api/design/documents/{document_id}/exports")
@@ -590,14 +684,16 @@ async def export_design_frame(document_id: str, body: DesignExportRequest, reque
         raise _bad(exc) from None
     validation = _validation(store, owner, row)
     try:
-        data = await asyncio.to_thread(_render, row, body.frame_id, fmt, body.scale, _asset_loader(store, owner))
+        data, drawn = await asyncio.to_thread(_render, row, body.frame_id, fmt, body.scale, _asset_loader(store, owner))
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "export_too_large") from exc
     if len(data) > MAX_EXPORT_BYTES:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "export_too_large")
     settings = {"scale": body.scale if fmt in ("png", "pdf") else 1.0,
                 "renderer": f"pillow:{raster_font_name()}" if fmt in ("png", "pdf") else fmt,
-                "pdf_pages": "raster" if fmt == "pdf" else None}
+                "pdf_pages": "raster" if fmt == "pdf" else ("vector" if fmt == "vector_pdf" else None), **drawn}
+    if fmt == "vector_pdf":
+        settings["renderer"] = "raiker-pdf/1"
     saved = design_store.save_export(
         store, owner=owner, document_id=document_id, version=int(row["current_version"]), frame_id=body.frame_id,
         fmt=fmt, settings=settings, validation=dict(validation), media_type=EXPORT_FORMATS[fmt],
@@ -629,7 +725,7 @@ async def download_design_export(export_id: str, request: Request) -> Response:
     if found is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "unknown_design_export")
     meta, data = found
-    name = f"raiker-design-{meta['frame_id']}-v{meta['version']}.{meta['format']}"
+    name = f"raiker-design-{meta['frame_id']}-v{meta['version']}.{EXPORT_EXTENSIONS.get(meta['format'], meta['format'])}"
     return Response(
         content=data, media_type=meta["media_type"],
         headers={"Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="{name}"',
@@ -686,22 +782,38 @@ async def propose_design_change(document_id: str, body: DesignProposalRequest, r
     provider, model = _model_for_proposal(router_, default, body)
     raw = proposal_messages(row["document"], body.frame_id, body.brief, variables)
     messages = [ModelMessage(role=item["role"], content=item["content"]) for item in raw]
-    try:
-        response = await router_.achat(provider, model, messages, None, max_tokens=MAX_OUTPUT_TOKENS)
-    except RegistryError:
-        raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_proposal_profile_unknown") from None
-    except ModelProviderError as exc:
-        raise refusal(status.HTTP_502_BAD_GATEWAY, f"design_proposal_provider_error:{safe_error(str(exc))}") from None
-    try:
-        plan, operations = parse_plan(response.text)
-    except ValueError:
-        raise refusal(status.HTTP_502_BAD_GATEWAY, "design_proposal_unreadable") from None
-    vetted = vet_operations(row["document"], body.frame_id, operations)
-    saved = design_store.save_proposal(
+    # DW-12 — the receipt exists before the call does. If this host does not
+    # survive the call, the row reads as outcome unknown, never as success.
+    proposal_id = design_store.start_proposal(
         store, owner=owner, document_id=document_id, base_version=int(row["current_version"]),
         frame_id=body.frame_id, brief=" ".join(body.brief.split()), provider=provider, model=model,
-        plan=plan, operations=vetted,
     )
+    reason = "design_proposal_interrupted"
+    finished = False
+    try:
+        try:
+            response = await router_.achat(provider, model, messages, None, max_tokens=MAX_OUTPUT_TOKENS)
+        except RegistryError:
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "design_proposal_profile_unknown") from None
+        except ModelProviderError as exc:
+            raise refusal(
+                status.HTTP_502_BAD_GATEWAY, f"design_proposal_provider_error:{safe_error(str(exc))}"
+            ) from None
+        try:
+            plan, operations = parse_plan(response.text)
+        except ValueError:
+            raise refusal(status.HTTP_502_BAD_GATEWAY, "design_proposal_unreadable") from None
+        vetted = vet_operations(row["document"], body.frame_id, operations)
+        saved = design_store.finish_proposal(store, owner=owner, proposal_id=proposal_id, plan=plan,
+                                             operations=vetted)
+        finished = True
+    except HTTPException as exc:
+        detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
+        reason = str(detail.get("reason_code") or reason).split(":", 1)[0]
+        raise
+    finally:
+        if not finished:
+            design_store.fail_proposal(store, owner=owner, proposal_id=proposal_id, reason=reason)
     _audit(store, request, owner, "design_proposal_created", {
         "document_id": document_id, "proposal_id": saved["proposal_id"], "base_version": saved["base_version"],
         "frame_id": body.frame_id, "provider": saved["provider"], "model": model,
@@ -853,7 +965,24 @@ def _handoff_markdown(row: dict[str, Any], frame_ids: list[str], target: str, va
             variables_used = [f"{key}={node[key]}" for key in ("fill_var", "color_var", "font_var") if node.get(key)]
             if variables_used:
                 detail += f" [variables: {', '.join(variables_used)}]"
+            if node["type"] == "group" and node.get("component_id"):
+                detail += f" [instance of component `{node['component_id']}`]"
             lines.append(f"- {detail}")
+        lines.append("")
+        in_frame = {frame_id, *(str(node["id"]) for _f, node in all_nodes({"frames": [frame]}))}
+        notes = [note for note in document.get("notes") or [] if note["target"] in in_frame and not note["resolved"]]
+        if notes:
+            lines += ["### Open notes", ""]
+            for note in notes:
+                text, _found = redact_text(note["text"][:400])
+                lines.append(f"- on `{note['target']}`: {json.dumps(text, ensure_ascii=False)}")
+            lines.append("")
+    components = document.get("components") or {}
+    if components:
+        lines += ["## Components", ""]
+        for component_id, component in sorted(components.items()):
+            count = sum(1 for _f, _n in all_nodes({"frames": [{"nodes": component["nodes"]}]}))
+            lines.append(f"- `{component_id}` “{component['name']}”: {count} layers")
         lines.append("")
     return "\n".join(lines)[:_HANDOFF_LIMIT]
 

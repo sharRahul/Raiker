@@ -30,6 +30,7 @@
     DesignProposalView,
     DesignSystemPreview,
     DesignSystemView,
+    DesignTokenImport,
     DesignValidationView,
     DesignVersionList,
     ImageGallery,
@@ -38,7 +39,25 @@
   import type { ProjectsList } from "../apiTypes";
   import {
     addLayerOperation,
+    alignOperations,
     allIds,
+    distributeOperations,
+    freshId,
+    HANDLES,
+    handlePoint,
+    instanceOutOfDate,
+    moveOperations,
+    resizeBox,
+    rotationFromPointer,
+    siblingPosition,
+    snapMove,
+    toLocalDelta,
+    topLevelSelection,
+    type Alignment,
+    type Box,
+    type DesignNote,
+    type Guide,
+    type Handle,
     CHECK_STATUS,
     designReason,
     documentBody,
@@ -77,6 +96,31 @@
   const selected = $derived(frame ? findNode(frame.nodes, selectedId) : null);
   const rows = $derived(frame ? layerRows(frame.nodes) : []);
   const images = $derived((gallery?.generations ?? []).filter((item) => item.has_image));
+
+  /* ── Selection (DW-02) ──
+   * `selectedId` is the layer the inspector shows; `multi` holds every
+   * selected layer once there is more than one. Shift, Ctrl or Cmd adds or
+   * removes a layer, on the canvas and in Layers alike. */
+  let multi = $state<string[]>([]);
+  const selection = $derived(multi.length > 1 ? multi : selectedId ? [selectedId] : []);
+  const selectedNodes = $derived(
+    frame ? selection.map((id) => findNode(frame!.nodes, id)).filter((node): node is DesignNode => node !== null) : [],
+  );
+  $effect(() => {
+    if (multi.length > 0 && (selectedId === null || !multi.includes(selectedId))) multi = [];
+  });
+
+  function pick(id: string, additive: boolean) {
+    if (!additive) {
+      selectedId = id;
+      multi = [];
+      return;
+    }
+    const current = multi.length > 0 ? multi : selectedId ? [selectedId] : [];
+    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+    multi = next.length > 1 ? next : [];
+    selectedId = next[next.length - 1] ?? null;
+  }
 
   /* ── New document ── */
   let newTitle = $state("");
@@ -184,8 +228,10 @@
   }
 
   function removeSelected() {
-    if (!selected || selected.locked) return;
-    void apply([{ op: "remove_node", node_id: selected.id }], null);
+    if (!frame) return;
+    const doomed = topLevelSelection(frame.nodes, selection).filter((node) => !node.locked);
+    if (doomed.length === 0) return;
+    void apply(doomed.map((node) => ({ op: "remove_node", node_id: node.id })), null);
   }
 
   function reorder(direction: "forward" | "backward" | "front" | "back") {
@@ -195,9 +241,262 @@
   }
 
   function groupSelected() {
+    if (!selected || !frame) return;
+    const ids = selection.length > 1 ? selection : [selected.id];
+    const id = freshId("group", allIds(body));
+    void apply([{ op: "group_nodes", node_ids: ids, group_id: id, name: "Group" }], id);
+  }
+
+  /** Grouping needs every selected layer to share one parent. */
+  const sameParent = $derived(
+    frame !== null &&
+      new Set(selection.map((id) => siblingPosition(frame!.nodes, id)?.parentId ?? "?")).size === 1,
+  );
+
+  function align(how: Alignment) {
+    if (!frame) return;
+    const nodes = topLevelSelection(frame.nodes, selection);
+    void apply(alignOperations(nodes, how, { x: 0, y: 0, w: frame.width, h: frame.height }));
+  }
+
+  function distribute(axis: "horizontal" | "vertical") {
+    if (!frame) return;
+    void apply(distributeOperations(topLevelSelection(frame.nodes, selection), axis));
+  }
+
+  /* ── Pointer editing (DW-02) ──
+   * A drag is previewed locally and sent as one operation list when the
+   * pointer is released, so a whole gesture is one version with the same lock
+   * rules as the keyboard. Snapping draws the guides it matched; Alt turns it off. */
+  type Point = { x: number; y: number };
+  type Gesture =
+    | { kind: "move"; start: Point; nodes: DesignNode[]; ids: Set<string>; dx: number; dy: number; moved: boolean }
+    | { kind: "resize"; start: Point; node: DesignNode; handle: Handle; box: Box }
+    | { kind: "rotate"; node: DesignNode; rotation: number };
+  let gesture = $state<Gesture | null>(null);
+  let guides = $state<Guide[]>([]);
+  let unit = $state(1);
+  let swallowClick = false;
+
+  function svgPoint(event: PointerEvent): Point | null {
+    const matrix = canvasEl?.getScreenCTM();
+    if (!matrix) return null;
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    return { x: point.x, y: point.y };
+  }
+
+  function measure() {
+    const matrix = canvasEl?.getScreenCTM();
+    if (matrix && matrix.a > 0) unit = 1 / matrix.a;
+  }
+
+  function subtree(nodes: readonly DesignNode[]): Set<string> {
+    const ids = new Set<string>();
+    const walk = (items: readonly DesignNode[]) => {
+      for (const item of items) {
+        ids.add(item.id);
+        if (item.children) walk(item.children);
+      }
+    };
+    walk(nodes);
+    return ids;
+  }
+
+  function capture(event: PointerEvent) {
+    try {
+      canvasEl?.setPointerCapture(event.pointerId);
+    } catch {
+      // A synthetic pointer cannot be captured; the gesture still works.
+    }
+  }
+
+  function startMove(event: PointerEvent, node: DesignNode) {
+    if (event.button !== 0 || busy) return;
+    event.stopPropagation();
+    canvasEl?.focus();
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      pick(node.id, true);
+      swallowClick = true;
+      return;
+    }
+    if (!selection.includes(node.id)) pick(node.id, false);
+    const point = svgPoint(event);
+    if (!point || !frame) return;
+    const nodes = topLevelSelection(frame.nodes, selection.includes(node.id) ? selection : [node.id]).filter(
+      (item) => !item.locked,
+    );
+    swallowClick = true;
+    if (nodes.length === 0) return;
+    measure();
+    gesture = { kind: "move", start: point, nodes, ids: subtree(nodes), dx: 0, dy: 0, moved: false };
+    capture(event);
+  }
+
+  function startResize(event: PointerEvent, node: DesignNode, handle: Handle) {
+    event.stopPropagation();
+    const point = svgPoint(event);
+    if (!point || node.locked || busy) return;
+    measure();
+    swallowClick = true;
+    gesture = { kind: "resize", start: point, node, handle, box: { x: node.x, y: node.y, w: node.w, h: node.h } };
+    capture(event);
+  }
+
+  function startRotate(event: PointerEvent, node: DesignNode) {
+    event.stopPropagation();
+    if (node.locked || busy) return;
+    swallowClick = true;
+    gesture = { kind: "rotate", node, rotation: node.rotation };
+    capture(event);
+  }
+
+  function onPointerMove(event: PointerEvent) {
+    if (gesture === null || frame === null) return;
+    const point = svgPoint(event);
+    if (!point) return;
+    if (gesture.kind === "move") {
+      // Whole pixels: a pointer at a scaled canvas lands between them.
+      const dx = Math.round(point.x - gesture.start.x);
+      const dy = Math.round(point.y - gesture.start.y);
+      if (!gesture.moved && Math.hypot(dx, dy) < 3 * unit) return;
+      const nodes = gesture.nodes;
+      const left = Math.min(...nodes.map((n) => n.x));
+      const top = Math.min(...nodes.map((n) => n.y));
+      const box = { x: left, y: top, w: Math.max(...nodes.map((n) => n.x + n.w)) - left, h: Math.max(...nodes.map((n) => n.y + n.h)) - top };
+      const ids = gesture.ids;
+      const others = rows
+        .map((row) => row.node)
+        .filter((n) => n.visible && !ids.has(n.id) && !(n.children && n.children.some((c) => ids.has(c.id))));
+      const snapped = event.altKey
+        ? { dx, dy, guides: [] }
+        : snapMove(box, dx, dy, { x: 0, y: 0, w: frame.width, h: frame.height }, others, 6 * unit, frame.grid.visible ? frame.grid.size : 0);
+      gesture = { ...gesture, dx: snapped.dx, dy: snapped.dy, moved: true };
+      guides = snapped.guides;
+    } else if (gesture.kind === "resize") {
+      const [lx, ly] = toLocalDelta(point.x - gesture.start.x, point.y - gesture.start.y, gesture.node.rotation);
+      gesture = { ...gesture, box: resizeBox(gesture.node, gesture.handle, Math.round(lx), Math.round(ly), event.shiftKey) };
+    } else {
+      const node = gesture.node;
+      gesture = { ...gesture, rotation: rotationFromPointer(node.x + node.w / 2, node.y + node.h / 2, point.x, point.y, event.shiftKey) };
+    }
+  }
+
+  function onPointerUp(event: PointerEvent) {
+    const done = gesture;
+    gesture = null;
+    guides = [];
+    try {
+      canvasEl?.releasePointerCapture(event.pointerId);
+    } catch {
+      // Not captured.
+    }
+    if (done === null) return;
+    if (done.kind === "move" && done.moved) {
+      void apply(moveOperations(done.nodes, done.dx, done.dy));
+    } else if (done.kind === "resize") {
+      const set: Record<string, number> = {};
+      for (const key of ["x", "y", "w", "h"] as const) if (Math.abs(done.box[key] - done.node[key]) > 0.01) set[key] = done.box[key];
+      if (Object.keys(set).length > 0) void apply([{ op: "update_node", node_id: done.node.id, set }]);
+    } else if (done.kind === "rotate" && Math.abs(done.rotation - done.node.rotation) > 0.01) {
+      void apply([{ op: "update_node", node_id: done.node.id, set: { rotation: done.rotation } }]);
+    }
+  }
+
+  /** A layer as drawn right now: its stored geometry, or the gesture's preview of it. */
+  function look(node: DesignNode): { box: Box; rotation: number; shift: [number, number] } {
+    const box = { x: node.x, y: node.y, w: node.w, h: node.h };
+    if (gesture?.kind === "move" && gesture.moved && gesture.nodes.some((item) => item.id === node.id)) {
+      return { box, rotation: node.rotation, shift: [gesture.dx, gesture.dy] };
+    }
+    if (gesture?.kind === "resize" && gesture.node.id === node.id) return { box: gesture.box, rotation: node.rotation, shift: [0, 0] };
+    if (gesture?.kind === "rotate" && gesture.node.id === node.id) return { box, rotation: gesture.rotation, shift: [0, 0] };
+    return { box, rotation: node.rotation, shift: [0, 0] };
+  }
+
+  function transformOf(view: { box: Box; rotation: number; shift: [number, number] }): string | undefined {
+    const parts: string[] = [];
+    if (view.shift[0] || view.shift[1]) parts.push(`translate(${view.shift[0]} ${view.shift[1]})`);
+    if (view.rotation) parts.push(`rotate(${view.rotation} ${view.box.x + view.box.w / 2} ${view.box.y + view.box.h / 2})`);
+    return parts.length > 0 ? parts.join(" ") : undefined;
+  }
+
+  const handleNode = $derived(selectedNodes.length === 1 && !selectedNodes[0].locked ? selectedNodes[0] : null);
+
+  /* ── Components (DW-06) ── */
+  let componentName = $state("");
+  const componentList = $derived(Object.entries(body.components));
+
+  function makeComponent() {
     if (!selected) return;
-    const id = `group-${selected.id}`.slice(0, 48);
-    void apply([{ op: "group_nodes", node_ids: [selected.id], group_id: allIds(body).has(id) ? `${id}-2` : id, name: "Group" }]);
+    const name = componentName.trim() || selected.name;
+    const id = freshId(`component-${name}`, allIds(body));
+    componentName = "";
+    void apply([{ op: "define_component", component_id: id, node_id: selected.id, name }]);
+  }
+
+  function placeComponent(componentId: string) {
+    if (!frame) return;
+    const component = body.components[componentId];
+    if (!component) return;
+    const width = Math.max(...component.nodes.map((n) => n.x + n.w), 1);
+    const height = Math.max(...component.nodes.map((n) => n.y + n.h), 1);
+    const id = freshId(componentId.replace(/^component-/, ""), allIds(body));
+    void apply(
+      [{ op: "place_component", component_id: componentId, frame_id: frame.id, node_id: id,
+         x: Math.round((frame.width - width) / 2), y: Math.round((frame.height - height) / 2) }],
+      id,
+    );
+  }
+
+  /* ── Notes (DW-08) ── */
+  let noteDraft = $state("");
+  let showNotes = $state(true);
+  const openNotes = $derived(body.notes.filter((note) => !note.resolved));
+
+  function notesOn(target: string): DesignNote[] {
+    return body.notes.filter((note) => note.target === target);
+  }
+
+  function addNote(target: string) {
+    const text = noteDraft.trim();
+    if (!text) return;
+    noteDraft = "";
+    void apply([{ op: "add_note", note: { id: freshId("note", allIds(body)), target, text } }]);
+  }
+
+  /* ── The owner's own pictures (DW-04) ── */
+  let importing = $state(false);
+
+  function fileBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function importPicture(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || !frame) return;
+    importing = true;
+    notice = null;
+    try {
+      const made = await contract.importDesignAsset({
+        filename: file.name,
+        media_type: file.type,
+        data_base64: await fileBase64(file),
+        project_id: open?.project_id ?? null,
+      });
+      gallery = await api.images();
+      placeImage(made.generation.generation_id);
+    } catch (error) {
+      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+    } finally {
+      importing = false;
+    }
   }
 
   function ungroupSelected() {
@@ -288,18 +587,21 @@
     }
     if (event.key === "Escape") {
       selectedId = null;
+      multi = [];
       return;
     }
-    if (!selected) return;
+    if (!selected || !frame) return;
     if (event.key === "Delete" || event.key === "Backspace") {
       event.preventDefault();
       removeSelected();
       return;
     }
-    const op = nudge(selected, event.key, event.shiftKey);
-    if (op) {
+    const step = nudge(selected, event.key, event.shiftKey);
+    if (step) {
       event.preventDefault();
-      void apply([op]);
+      const set = step.set as { x: number; y: number };
+      const ops = selection.length > 1 ? moveOperations(topLevelSelection(frame.nodes, selection), set.x - selected.x, set.y - selected.y) : [step];
+      void apply(ops);
     }
   }
 
@@ -320,7 +622,12 @@
         exports = (await contract.listDesignExports(id)).exports;
         handoffs = (await contract.listDesignHandoffs(id)).handoffs;
       }
-      if (rail === "agent") proposals = (await contract.listDesignProposals(id)).proposals;
+      if (rail === "agent") {
+        proposals = (await contract.listDesignProposals(id)).proposals;
+        // Read again on every visit: a host that has just restarted, or a model
+        // connected on Models meanwhile, changes what can be asked.
+        models = await api.models();
+      }
       if (rail === "system") systems = (await contract.listDesignSystems()).systems;
     } catch {
       // Supplementary: the canvas stays usable when a side panel cannot load.
@@ -355,6 +662,10 @@
       .map((profile) => ({ key: `${profile.profile_id}::${profile.model}`, profile, model: profile.model })),
   );
   const agentPick = $derived(agentModels.find((item) => item.key === agentChoice) ?? agentModels[0] ?? null);
+  $effect(() => {
+    // The picker shows the model a proposal will use, never a blank choice.
+    if (agentPick !== null && agentChoice !== agentPick.key) agentChoice = agentPick.key;
+  });
   const pending = $derived(proposals.find((item) => item.status === "pending") ?? null);
 
   async function propose() {
@@ -408,8 +719,57 @@
   let systemName = $state("");
   let systemColors = $state("primary=#1144aa\nink=#111111\nsurface=#ffffff");
   let systemFonts = $state("body=sans-serif\nheading=sans-serif");
+  let systemSpacing = $state("");
   let systemRequired = $state("");
   let systemSource = $state("");
+  let tokenReport = $state<DesignTokenImport | null>(null);
+  let paletteAsset = $state("");
+
+  /** DW-06 — a tokens file read on this machine fills the form; saving is still the owner's. */
+  async function importTokens(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    notice = null;
+    try {
+      const read = await contract.readDesignTokens({ filename: file.name, text: await file.text() });
+      const variables = read.variables as Record<string, Record<string, string | number>>;
+      const lines = (group: string) => Object.entries(variables[group] ?? {}).map(([key, value]) => `${key}=${value}`).join("\n");
+      systemColors = lines("colors");
+      systemFonts = lines("fonts");
+      systemSpacing = lines("spacing");
+      systemSource = `${read.filename} (sha256 ${read.sha256.slice(0, 12)}…)`;
+      if (!systemName.trim()) systemName = read.filename.replace(/\.[^.]+$/, "");
+      tokenReport = read;
+    } catch (error) {
+      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+    }
+  }
+
+  /** DW-06 — the dominant colours of a picture the owner already has, read here. */
+  async function readPalette() {
+    const asset = images.find((item) => item.generation_id === paletteAsset);
+    if (!asset) return;
+    notice = null;
+    try {
+      const read = await contract.readDesignAssetPalette(asset.generation_id);
+      systemColors = read.colors.map((item, index) => `brand-${index + 1}=${item.color}`).join("\n");
+      systemSource = `Colours read from “${asset.prompt}” (${asset.generation_id})`;
+      tokenReport = null;
+    } catch (error) {
+      notice = designReason(error instanceof ApiError ? error.reasonCode : null);
+    }
+  }
+
+  function spacingPairs(text: string): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(pairs(text))) {
+      const number = Number(value.replace(/px$/, ""));
+      if (Number.isFinite(number)) out[key] = number;
+    }
+    return out;
+  }
 
   function pairs(text: string): Record<string, string> {
     const out: Record<string, string> = {};
@@ -430,12 +790,14 @@
         variables: {
           colors: pairs(systemColors),
           fonts: pairs(systemFonts),
+          spacing: spacingPairs(systemSpacing),
           required: systemRequired.split(",").map((item) => item.trim()).filter(Boolean),
         },
       });
       systems = (await contract.listDesignSystems()).systems;
       systemChoice = saved.system_id;
       systemName = "";
+      tokenReport = null;
     } catch (error) {
       notice = designReason(error instanceof ApiError ? error.reasonCode : null);
     } finally {
@@ -495,12 +857,14 @@
     }
   }
 
+  const FORMAT_LABEL: Record<string, string> = { png: "PNG", pdf: "PDF (raster)", vector_pdf: "PDF (vector)", svg: "SVG", json: "JSON" };
+
   async function download(item: DesignExportView) {
     const blob = await api.designExportBlob(item.export_id);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `raiker-design-${item.frame_id}-v${item.version}.${item.format}`;
+    link.download = `raiker-design-${item.frame_id}-v${item.version}.${item.format === "vector_pdf" ? "pdf" : item.format}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -620,6 +984,17 @@
     return Array.isArray(items) ? items.map(String) : [];
   }
 
+  /** DW-12 — a proposal's state in words. */
+  const PROPOSAL_STATE: Record<string, string> = {
+    pending: "Proposed",
+    requesting: "Asking the model",
+    accepted: "Accepted",
+    partially_accepted: "Partly accepted",
+    rejected: "Rejected",
+    failed: "Failed",
+    outcome_unknown: "Outcome unknown",
+  };
+
   function nodeLabel(node: DesignNode): string {
     return `${node.name} (${node.type}${node.locked ? ", locked" : ""}${node.visible ? "" : ", hidden"}${node.created_by === "agent" ? ", added by the agent" : ""})`;
   }
@@ -627,20 +1002,18 @@
 
 {#snippet layer(node: DesignNode)}
   {#if node.visible}
-    {@const isSelected = node.id === selectedId}
-    <g
-      data-layer={node.id}
-      opacity={node.opacity}
-      transform={node.rotation ? `rotate(${node.rotation} ${node.x + node.w / 2} ${node.y + node.h / 2})` : undefined}
-    >
+    {@const view = look(node)}
+    {@const b = view.box}
+    {@const isSelected = selection.includes(node.id)}
+    <g data-layer={node.id} opacity={node.opacity} transform={transformOf(view)}>
       {#if node.type === "rect" || (node.type === "stack" && (node.fill || node.stroke))}
-        <rect x={node.x} y={node.y} width={node.w} height={node.h} rx={node.radius ?? 0} fill={node.fill ?? "none"} stroke={node.stroke ?? undefined} stroke-width={node.stroke_width ?? 0} />
+        <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={node.radius ?? 0} fill={node.fill ?? "none"} stroke={node.stroke ?? undefined} stroke-width={node.stroke_width ?? 0} />
       {:else if node.type === "ellipse"}
-        <ellipse cx={node.x + node.w / 2} cy={node.y + node.h / 2} rx={node.w / 2} ry={node.h / 2} fill={node.fill ?? "none"} stroke={node.stroke ?? undefined} stroke-width={node.stroke_width ?? 0} />
+        <ellipse cx={b.x + b.w / 2} cy={b.y + b.h / 2} rx={b.w / 2} ry={b.h / 2} fill={node.fill ?? "none"} stroke={node.stroke ?? undefined} stroke-width={node.stroke_width ?? 0} />
       {:else if node.type === "text"}
         <!-- Drawn past its box when it overflows, as the export draws it, so
              what Check calls overflow is visible here rather than clipped. -->
-        <foreignObject x={node.x} y={node.y} width={Math.max(node.w, 1)} height={Math.max(node.h, (frame?.height ?? node.h) - node.y, 1)}>
+        <foreignObject x={b.x} y={b.y} width={Math.max(b.w, 1)} height={Math.max(b.h, (frame?.height ?? b.h) - b.y, 1)}>
           <div
             class="canvas-text"
             style={`font-family:${node.font_family};font-size:${node.font_size}px;font-weight:${node.font_weight};color:${node.color ?? "currentColor"};text-align:${node.align};line-height:${node.line_height}`}
@@ -649,11 +1022,11 @@
       {:else if node.type === "image"}
         {#if node.asset_id}
           {@const crop = node.crop ?? { x: 0, y: 0, w: 1, h: 1 }}
-          <svg x={node.x} y={node.y} width={node.w} height={node.h} viewBox={`${crop.x * 1000} ${crop.y * 1000} ${crop.w * 1000} ${crop.h * 1000}`} preserveAspectRatio={node.fit === "cover" ? "xMidYMid slice" : node.fit === "contain" ? "xMidYMid meet" : "none"}>
+          <svg x={b.x} y={b.y} width={b.w} height={b.h} viewBox={`${crop.x * 1000} ${crop.y * 1000} ${crop.w * 1000} ${crop.h * 1000}`} preserveAspectRatio={node.fit === "cover" ? "xMidYMid slice" : node.fit === "contain" ? "xMidYMid meet" : "none"}>
             <image href={api.imageBytesUrl(node.asset_id)} width="1000" height="1000" preserveAspectRatio="none" />
           </svg>
         {:else}
-          <rect class="missing" x={node.x} y={node.y} width={node.w} height={node.h} />
+          <rect class="missing" x={b.x} y={b.y} width={b.w} height={b.h} />
         {/if}
       {/if}
       {#if node.children}
@@ -662,22 +1035,54 @@
       <rect
         class="hit"
         class:selected={isSelected}
-        x={node.x}
-        y={node.y}
-        width={Math.max(node.w, 4)}
-        height={Math.max(node.h, 4)}
+        class:locked={node.locked}
+        x={b.x}
+        y={b.y}
+        width={Math.max(b.w, 4)}
+        height={Math.max(b.h, 4)}
         role="button"
         tabindex="-1"
         aria-label={nodeLabel(node)}
+        aria-pressed={isSelected}
+        onpointerdown={(event) => startMove(event, node)}
         onclick={(event) => {
+          // A press already selected in pointerdown; a click without one (a
+          // screen reader, a test) selects here.
           event.stopPropagation();
-          selectedId = node.id;
+          if (swallowClick) {
+            swallowClick = false;
+            return;
+          }
+          pick(node.id, event.shiftKey || event.metaKey || event.ctrlKey);
           canvasEl?.focus();
         }}
         onkeydown={() => {}}
       />
     </g>
   {/if}
+{/snippet}
+
+{#snippet notes(target: string, label: string)}
+  {@const here = notesOn(target)}
+  <section class="panel" aria-label="Notes">
+    <h3>Notes on {label} <span class="muted">{here.filter((note) => !note.resolved).length} open</span></h3>
+    {#each here as note (note.id)}
+      <div class="note" class:resolved={note.resolved}>
+        <p>{note.text}</p>
+        <span class="muted">{note.author === "agent" ? "the agent" : "you"}{note.resolved ? " · resolved" : ""}</span>
+        <div class="row-actions">
+          <button type="button" class="link" disabled={busy} onclick={() => void apply([{ op: "update_note", note_id: note.id, set: { resolved: !note.resolved } }])}>{note.resolved ? "Reopen" : "Resolve"}</button>
+          <button type="button" class="link danger" disabled={busy} onclick={() => void apply([{ op: "remove_note", note_id: note.id }])}>Delete</button>
+        </div>
+      </div>
+    {/each}
+    <textarea rows="2" bind:value={noteDraft} placeholder="Leave a note — what to change, a question for later" aria-label={`New note on ${label}`} maxlength="1000"></textarea>
+    <div class="row-actions">
+      <button type="button" class="btn btn-sm" disabled={busy || !noteDraft.trim()} onclick={() => addNote(target)}>Add note</button>
+      <label class="check"><input type="checkbox" bind:checked={showNotes} /> Show pins</label>
+    </div>
+    <p class="muted">Notes are versions like any change. They are not drawn into exports; open ones go with a Build handoff.</p>
+  </section>
 {/snippet}
 
 <div class="documents" data-testid="design-documents">
@@ -802,9 +1207,14 @@
           <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => addLayer("rect")}>Rectangle</button>
           <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => addLayer("ellipse")}>Ellipse</button>
           <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => addLayer("stack")}>Stack</button>
-          <button type="button" class="btn btn-ghost btn-sm" disabled={busy || images.length === 0} title={images.length === 0 ? "Generate a picture under Images first" : "Place a picture you made"} onclick={() => (placing = !placing)}>Image</button>
+          <button type="button" class="btn btn-ghost btn-sm" disabled={busy} title="Place a picture you made or import your own" aria-expanded={placing} onclick={() => (placing = !placing)}>Image</button>
         </div>
         {#if placing}
+          <label class="import-picture">
+            <span class="btn btn-ghost btn-sm">{importing ? "Importing…" : "Import your own picture…"}</span>
+            <input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={importing} onchange={(event) => void importPicture(event)} />
+          </label>
+          <p class="muted">An imported picture stays on this machine; it goes to an image provider only if you later ask to edit it under Images.</p>
           <ul class="place" aria-label="Choose a picture to place">
             {#each images.slice(0, 24) as item (item.generation_id)}
               <li>
@@ -815,6 +1225,21 @@
             {/each}
           </ul>
         {/if}
+        <h3>Components <span class="muted">{componentList.length}</span></h3>
+        {#if componentList.length === 0}
+          <p class="muted">Select a layer and choose <strong>Make component</strong> to reuse it.</p>
+        {:else}
+          <ul class="components">
+            {#each componentList as [componentId, component] (componentId)}
+              <li>
+                <span class="name">{component.name}</span>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => placeComponent(componentId)} aria-label={`Place ${component.name}`}>Place</button>
+                <button type="button" class="link danger" disabled={busy} onclick={() => void apply([{ op: "remove_component", component_id: componentId }])} aria-label={`Remove component ${component.name}`}>Remove</button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
         {#if rows.length === 0}
           <p class="muted">This frame is empty. Add a layer, or ask the agent.</p>
         {:else}
@@ -824,13 +1249,14 @@
                 <button
                   type="button"
                   class="row layer-row"
-                  class:current={row.node.id === selectedId}
-                  aria-current={row.node.id === selectedId ? "true" : undefined}
-                  onclick={() => (selectedId = row.node.id)}
+                  class:current={selection.includes(row.node.id)}
+                  aria-current={selection.includes(row.node.id) ? "true" : undefined}
+                  onclick={(event) => pick(row.node.id, event.shiftKey || event.metaKey || event.ctrlKey)}
                 >
-                  <span class="kind">{row.node.type}</span>
+                  <span class="kind">{row.node.component_id ? "instance" : row.node.type}</span>
                   <span class="name">{row.node.name}</span>
                   {#if row.node.created_by === "agent"}<span class="badge">agent</span>{/if}
+                  {#if openNotes.some((note) => note.target === row.node.id)}<span class="badge">note</span>{/if}
                 </button>
                 <button type="button" class="icon-btn" aria-label={`${row.node.visible ? "Hide" : "Show"} ${row.node.name}`} aria-pressed={!row.node.visible} onclick={() => void apply([{ op: "update_node", node_id: row.node.id, set: { visible: !row.node.visible } }])}>
                   <Icon name={row.node.visible ? "eye" : "eye-off"} size="sm" />
@@ -847,7 +1273,7 @@
       <section class="stage" aria-label="Canvas">
         {#if frame}
           <p class="stage-head muted">
-            {frame.name} · {frame.width}×{frame.height} — click a layer, then use the arrow keys to move it (Shift for 10px), Delete to remove it, Ctrl+Z to undo.
+            {frame.name} · {frame.width}×{frame.height} — drag a layer to move it (it snaps to edges and centres; hold Alt to place freely), drag a handle to resize or rotate, Shift-click to select more. Arrow keys nudge (Shift for 10px), Delete removes, Ctrl+Z undoes.
           </p>
           <!-- The canvas is one keyboard stop: arrows move the selected layer,
                Delete removes it, Escape clears the selection, Ctrl+Z undoes.
@@ -862,7 +1288,17 @@
             aria-label={`Canvas: ${frame.name}${selected ? `, ${selected.name} selected` : ""}`}
             tabindex="0"
             onkeydown={onCanvasKey}
-            onclick={() => (selectedId = null)}
+            onpointermove={onPointerMove}
+            onpointerup={onPointerUp}
+            onpointercancel={onPointerUp}
+            onclick={() => {
+              if (swallowClick) {
+                swallowClick = false;
+                return;
+              }
+              selectedId = null;
+              multi = [];
+            }}
           >
             <rect width={frame.width} height={frame.height} fill={frame.background ?? "#ffffff"} />
             {#if frame.grid.visible && frame.grid.size > 0}
@@ -874,6 +1310,56 @@
               <rect width={frame.width} height={frame.height} fill={`url(#grid-${frame.id})`} />
             {/if}
             {#each frame.nodes as node (node.id)}{@render layer(node)}{/each}
+            {#if showNotes}
+              {#each openNotes as note, index (note.id)}
+                {@const target = findNode(frame.nodes, note.target)}
+                {#if target && target.visible}
+                  <g class="note-pin" aria-hidden="true">
+                    <circle cx={target.x + target.w} cy={target.y} r={11 * unit} />
+                    <text x={target.x + target.w} y={target.y} font-size={12 * unit} text-anchor="middle" dominant-baseline="central">{index + 1}</text>
+                  </g>
+                {/if}
+              {/each}
+            {/if}
+            {#each guides as guide, i (i)}
+              {#if guide.axis === "x"}
+                <line class="guide" x1={guide.at} y1="0" x2={guide.at} y2={frame.height} />
+              {:else}
+                <line class="guide" x1="0" y1={guide.at} x2={frame.width} y2={guide.at} />
+              {/if}
+            {/each}
+            {#if handleNode && !(gesture?.kind === "move" && gesture.moved)}
+              {@const view = look(handleNode)}
+              {@const hb = view.box}
+              <!-- Handles: the same operations as the inspector, one version per drag. -->
+              <g class="handles" data-handles={handleNode.id} transform={view.rotation ? `rotate(${view.rotation} ${hb.x + hb.w / 2} ${hb.y + hb.h / 2})` : undefined}>
+                {#if handleNode.type !== "group"}
+                  {#each HANDLES as handle (handle)}
+                    {@const at = handlePoint(hb, handle)}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <rect
+                      class={`handle handle-${handle}`}
+                      data-handle={handle}
+                      x={at.x - 6 * unit}
+                      y={at.y - 6 * unit}
+                      width={12 * unit}
+                      height={12 * unit}
+                      onpointerdown={(event) => startResize(event, handleNode!, handle)}
+                    />
+                  {/each}
+                {/if}
+                <line class="rotate-stem" x1={hb.x + hb.w / 2} y1={hb.y} x2={hb.x + hb.w / 2} y2={hb.y - 30 * unit} />
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                <circle
+                  class="handle rotate"
+                  data-handle="rotate"
+                  cx={hb.x + hb.w / 2}
+                  cy={hb.y - 30 * unit}
+                  r={7 * unit}
+                  onpointerdown={(event) => startRotate(event, handleNode!)}
+                />
+              </g>
+            {/if}
           </svg>
         {/if}
       </section>
@@ -882,7 +1368,28 @@
         <TabStrip tabs={RAIL_TABS} selected={rail} onselect={(id: string) => (rail = id as RailTab)} label="Design panels" />
 
         {#if rail === "inspect"}
-          {#if selected}
+          {#if selectedNodes.length > 1}
+            <section class="panel" aria-label="Selected layers">
+              <h3>{selectedNodes.length} layers selected</h3>
+              <div class="row-actions" role="group" aria-label="Align">
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("left")}>Align left</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("center")}>Centre</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("right")}>Align right</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("top")}>Align top</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("middle")}>Middle</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => align("bottom")}>Align bottom</button>
+              </div>
+              <div class="row-actions" role="group" aria-label="Distribute">
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy || selectedNodes.length < 3} onclick={() => distribute("horizontal")}>Distribute across</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy || selectedNodes.length < 3} onclick={() => distribute("vertical")}>Distribute down</button>
+              </div>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy || !sameParent} title={sameParent ? "" : "Only layers with the same parent can be grouped"} onclick={groupSelected}>Group</button>
+                <button type="button" class="link danger" disabled={busy} onclick={removeSelected}>Remove</button>
+              </div>
+              <p class="muted">Locked layers stay where they are. Shift-click a layer to add or remove it; Escape clears the selection.</p>
+            </section>
+          {:else if selected}
             <section class="panel" aria-label="Layer properties">
               <h3>{selected.type} · <code>{selected.id}</code></h3>
               {#if selected.locked}<p class="muted">Locked — unlock it in Layers to change it.</p>{/if}
@@ -974,7 +1481,30 @@
                 <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => void apply([{ op: "add_node", frame_id: frame!.id, node: { ...selected!, id: `${selected!.id}-copy`.slice(0, 44), x: selected!.x + 16, y: selected!.y + 16, locked: false } }])}>Duplicate</button>
                 <button type="button" class="link danger" disabled={busy || selected.locked} onclick={removeSelected}>Remove</button>
               </div>
+              <div class="row-actions" role="group" aria-label="Align to the frame">
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy || selected.locked} onclick={() => align("center")}>Centre in frame</button>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={busy || selected.locked} onclick={() => align("middle")}>Middle of frame</button>
+              </div>
             </section>
+            <section class="panel" aria-label="Component">
+              <h3>Component</h3>
+              {#if selected.type === "group" && selected.component_id}
+                {@const component = body.components[selected.component_id]}
+                {#if component}
+                  <p>Placed from <strong>{component.name}</strong>.
+                    {#if instanceOutOfDate(selected, component)}It differs from the component now.{:else}It matches the component.{/if}</p>
+                  <button type="button" class="btn btn-sm" disabled={busy || selected.locked} onclick={() => void apply([{ op: "update_instance", node_id: selected!.id }])}>Update from component</button>
+                  <p class="muted">Updating replaces this layer's contents with the component's, as one version you can undo.</p>
+                {:else}
+                  <p class="notice-inline">Its component “{selected.component_id}” is no longer in this design. The layers stay; Check reports the broken link.</p>
+                {/if}
+              {:else}
+                <label>Name <input type="text" bind:value={componentName} placeholder={selected.name} maxlength="120" /></label>
+                <button type="button" class="btn btn-sm" disabled={busy} onclick={makeComponent}>Make component</button>
+                <p class="muted">Keeps a copy of this layer to place again. Placed copies change only when you update them.</p>
+              {/if}
+            </section>
+            {@render notes(selected.id, selected.name)}
           {:else if frame}
             <section class="panel" aria-label="Frame properties">
               <h3>Frame</h3>
@@ -988,6 +1518,7 @@
               <button type="button" class="link danger" disabled={busy || body.frames.length < 2} onclick={removeFrame}>Remove this frame</button>
               <p class="muted">Select a layer on the canvas or in Layers to edit it.</p>
             </section>
+            {@render notes(frame.id, frame.name)}
           {/if}
         {:else if rail === "agent"}
           <section class="panel" aria-label="Design agent">
@@ -1028,8 +1559,16 @@
           {/if}
           {#each proposals as proposal (proposal.proposal_id)}
             <section class="panel proposal" aria-label="Proposal">
-              <h3>{proposal.status === "pending" ? "Proposed" : proposal.status.replace("_", " ")} · {modelName(proposal.model)} · {relativeTime(proposal.created_at)}</h3>
+              <h3>{PROPOSAL_STATE[proposal.status] ?? proposal.status} · {modelName(proposal.model)} · {relativeTime(proposal.created_at)}</h3>
               <p><strong>{planSummary(proposal)}</strong></p>
+              {#if proposal.status === "outcome_unknown"}
+                <p class="notice-inline">Raiker stopped while it waited for the model, so whether the provider answered is not known. Nothing was applied and nothing will be retried on its own.</p>
+              {:else if proposal.status === "failed"}
+                <p class="notice-inline">{designReason(String((proposal.result as Record<string, unknown> | null)?.reason_code ?? ""))}</p>
+              {/if}
+              {#if proposal.status === "outcome_unknown" || proposal.status === "failed"}
+                <button type="button" class="btn btn-ghost btn-sm" onclick={() => (brief = proposal.brief)}>Ask again with this brief</button>
+              {/if}
               {#each ["hierarchy", "assumptions", "assets", "validation"] as part (part)}
                 {@const items = planItems(proposal, part)}
                 {#if items.length > 0}
@@ -1096,9 +1635,34 @@
           </section>
           <section class="panel" aria-label="New design system">
             <h3>New design system</h3>
+            <label>Import from a tokens file (CSS variables or JSON)
+              <input type="file" accept=".css,.json,.txt,text/css,application/json,text/plain" onchange={(event) => void importTokens(event)} />
+            </label>
+            {#if tokenReport}
+              <div class="preview" role="status">
+                <p>Read {tokenReport.found} {tokenReport.found === 1 ? "value" : "values"} from {tokenReport.filename} — check them below, then save.</p>
+                {#if tokenReport.skipped.length > 0}
+                  <p class="muted">Skipped {tokenReport.skipped.length}:</p>
+                  <ul class="skipped">{#each tokenReport.skipped as item, i (i)}<li>{item.name}: {item.reason}</li>{/each}</ul>
+                {/if}
+              </div>
+            {/if}
+            {#if images.length > 0}
+              <div class="variant">
+                <label>Or colours from a picture
+                  <select bind:value={paletteAsset} aria-label="Picture to read colours from">
+                    <option value="">Choose a picture…</option>
+                    {#each images.slice(0, 40) as item (item.generation_id)}<option value={item.generation_id}>{item.prompt.slice(0, 60)}</option>{/each}
+                  </select>
+                </label>
+                <button type="button" class="btn btn-ghost btn-sm" disabled={!paletteAsset} onclick={() => void readPalette()}>Read colours</button>
+              </div>
+            {/if}
+            <p class="muted">Both are read on this machine. Nothing is saved until you choose Save system.</p>
             <label>Name <input type="text" bind:value={systemName} placeholder="Acme brand" /></label>
             <label>Colours (name=#rrggbb per line) <textarea rows="3" bind:value={systemColors}></textarea></label>
             <label>Fonts (name=family per line) <textarea rows="2" bind:value={systemFonts}></textarea></label>
+            <label>Spacing (name=px per line) <textarea rows="2" bind:value={systemSpacing} placeholder="md=16"></textarea></label>
             <label>Required (comma-separated names) <input type="text" bind:value={systemRequired} placeholder="primary" /></label>
             <label>Where it came from <input type="text" bind:value={systemSource} placeholder="Brand guide 2026, p. 4" /></label>
             <button type="button" class="btn btn-sm" disabled={busy} onclick={() => void saveSystem()}>Save system</button>
@@ -1140,7 +1704,7 @@
             <div class="grid4">
               <label>Format
                 <select bind:value={exportFormat}>
-                  <option value="png">PNG</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option>
+                  <option value="png">PNG</option><option value="vector_pdf">PDF (vector, selectable text)</option><option value="pdf">PDF (one raster page)</option><option value="svg">SVG (editable)</option><option value="json">JSON (structured)</option>
                 </select>
               </label>
               {#if exportFormat === "png" || exportFormat === "pdf"}
@@ -1159,7 +1723,7 @@
               <ul class="exports">
                 {#each exports as item (item.export_id)}
                   <li>
-                    <button type="button" class="link" onclick={() => void download(item)}>{item.format.toUpperCase()} · v{item.version}</button>
+                    <button type="button" class="link" onclick={() => void download(item)}>{FORMAT_LABEL[item.format] ?? item.format.toUpperCase()} · v{item.version}</button>
                     <span class="muted">{item.frame_id} · checks {item.validation_outcome.replace("_", " ")} · sha256 {item.sha256.slice(0, 12)}… · {relativeTime(item.created_at)}</span>
                   </li>
                 {/each}
@@ -1249,6 +1813,29 @@
   .canvas :global(.hit.selected) { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 3; vector-effect: non-scaling-stroke; }
   .canvas :global(.missing) { fill: var(--sunken); stroke: var(--text-3); stroke-dasharray: 4 4; }
   .canvas :global(.grid-line) { fill: none; stroke: var(--border); stroke-width: 0.5; }
+  .canvas :global(.hit.locked) { cursor: not-allowed; }
+  .canvas :global(.hit:not(.locked)) { cursor: move; }
+  .canvas :global(.guide) { stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .canvas :global(.handle) { fill: var(--surface); stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .canvas :global(.handle-n), .canvas :global(.handle-s) { cursor: ns-resize; }
+  .canvas :global(.handle-e), .canvas :global(.handle-w) { cursor: ew-resize; }
+  .canvas :global(.handle-nw), .canvas :global(.handle-se) { cursor: nwse-resize; }
+  .canvas :global(.handle-ne), .canvas :global(.handle-sw) { cursor: nesw-resize; }
+  .canvas :global(.handle.rotate) { cursor: grab; }
+  .canvas :global(.rotate-stem) { stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .canvas :global(.note-pin circle) { fill: var(--warning); stroke: var(--surface); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  .canvas :global(.note-pin text) { fill: var(--text-1); font-weight: 700; pointer-events: none; }
+  .canvas :global(.note-pin) { pointer-events: none; }
+  .canvas { touch-action: none; }
+  .components { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+  .components li { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); }
+  .components .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .import-picture { display: inline-flex; cursor: pointer; }
+  .note { border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--space-1) var(--space-2); background: var(--sunken); display: grid; gap: 2px; }
+  .note p { margin: 0; font-size: var(--text-sm); white-space: pre-wrap; }
+  .note.resolved p { color: var(--text-3); text-decoration: line-through; }
+  .notice-inline { margin: 0; color: var(--warning); font-size: var(--text-sm); }
+  .skipped { margin: 0; padding-left: 1rem; font-size: var(--text-xs); }
   .canvas :global(.canvas-text) { width: 100%; height: 100%; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
   .panel { display: grid; gap: var(--space-2); }
   .panel label { display: grid; gap: 0.2rem; font-size: var(--text-xs); color: var(--text-2); }

@@ -407,7 +407,7 @@ class ImageGeneration(TypedDict):
     byte_size: int | None
     created_at: str
     source_generation_id: str | None
-    kind: Literal["create", "edit", "variation", "revert"]
+    kind: Literal["create", "edit", "variation", "revert", "import"]
     project_id: str | None
     #: DEC-07 step 4 — for a ``revert``, the version whose picture it carries.
     restored_generation_id: str | None

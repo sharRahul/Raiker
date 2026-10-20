@@ -87,6 +87,25 @@ def _listed(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
 
 _EXPORT = {"frame_id": "frame-1", "format": "svg"}
 
+
+def _png_base64() -> str:
+    import base64
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (17, 68, 170)).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+_IMPORT = {"filename": "logo.png", "media_type": "image/png", "data_base64": _png_base64()}
+
+
+def _imported(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    made = client.post("/api/design/assets/import", json=_IMPORT, headers=h).json()
+    return f"/api/design/assets/{made['generation']['generation_id']}/palette"
+
 CASES: Cases = {
     ("GET", "/api/design/documents"): _listed,
     ("POST", "/api/design/documents"): plain("/api/design/documents", {"title": "New", "preset": "mobile"}),
@@ -130,6 +149,11 @@ CASES: Cases = {
         lambda doc, c, h: (f"/api/design/documents/{doc}/system", {"system_id": _system(c, h), "base_version": 2})
     ),
     ("GET", "/api/design/assets/{asset_id}/usage"): plain("/api/design/assets/img_contract/usage"),
+    ("POST", "/api/design/assets/import"): plain("/api/design/assets/import", _IMPORT),
+    ("GET", "/api/design/assets/{asset_id}/palette"): _imported,
+    ("POST", "/api/design/systems/tokens"): plain(
+        "/api/design/systems/tokens", {"filename": "tokens.css", "text": ":root { --brand: #1144aa; --gap: 8px; }"}
+    ),
     ("GET", "/api/design/documents/{document_id}/validation"): _listing("validation"),
     ("POST", "/api/design/documents/{document_id}/exports"): _on_doc(
         lambda doc, c, h: (f"/api/design/documents/{doc}/exports", _EXPORT)

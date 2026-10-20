@@ -1953,10 +1953,35 @@ export type DesignHandoffView = {
   byte_size: number;
 };
 
+/** DW-04 — one of the owner's own pictures, base64, checked like any image upload. */
+export type DesignImportAssetRequest = {
+  filename: string;
+  media_type: string;
+  data_base64: string;
+  project_id?: string | null;
+};
+
+/** DW-04 — the owner's own picture, stored as an asset without any provider. */
+export type DesignImportedAsset = {
+  ok: boolean;
+  generation: ImageGeneration;
+};
+
 /** DW-08 — typed operations, made against ``base_version``. */
 export type DesignOperationsRequest = {
   base_version: number;
   operations: Record<string, unknown>[];
+};
+
+/** DW-06 — a picture's dominant colours, read on this machine. */
+export type DesignPalette = {
+  asset_id: string;
+  colors: DesignPaletteColor[];
+};
+
+export type DesignPaletteColor = {
+  color: string;
+  share: number;
 };
 
 export type DesignProposalConflict = {
@@ -2066,6 +2091,27 @@ export type DesignSystemView = {
   source_note: string;
   variables: Record<string, unknown>;
   created_at: string;
+};
+
+/** DW-06 — what a tokens file holds, as variables for a new system. Writes nothing. */
+export type DesignTokenImport = {
+  format: string;
+  filename: string;
+  sha256: string;
+  found: number;
+  variables: Record<string, unknown>;
+  skipped: DesignTokenSkip[];
+};
+
+/** DW-06 — a tokens file's text (CSS custom properties or JSON). */
+export type DesignTokenImportRequest = {
+  filename: string;
+  text: string;
+};
+
+export type DesignTokenSkip = {
+  name: string;
+  reason: string;
 };
 
 export type DesignValidationCheck = {
@@ -2966,7 +3012,7 @@ export type ImageGeneration = {
   byte_size: number | null;
   created_at: string;
   source_generation_id: string | null;
-  kind: "create" | "edit" | "variation" | "revert";
+  kind: "create" | "edit" | "variation" | "revert" | "import";
   project_id: string | null;
   restored_generation_id: string | null;
   deleted_at: string | null;
@@ -6436,6 +6482,10 @@ export const contract = {
     request<CredentialDeltaList>(withQuery("/api/credential-deltas", query)),
   discardCredentialDelta: (runId: string, body: Record<string, unknown>) =>
     call<CredentialDeltaDiscarded>("POST", `/api/credential-deltas/${encodeURIComponent(runId)}/discard`, { body }),
+  importDesignAsset: (body: DesignImportAssetRequest) =>
+    call<DesignImportedAsset>("POST", "/api/design/assets/import", { body }),
+  readDesignAssetPalette: (assetId: string) =>
+    request<DesignPalette>(`/api/design/assets/${encodeURIComponent(assetId)}/palette`),
   readDesignAssetUsage: (assetId: string) =>
     request<DesignAssetUsage>(`/api/design/assets/${encodeURIComponent(assetId)}/usage`),
   listDesignDocuments: () =>
@@ -6486,6 +6536,8 @@ export const contract = {
     request<DesignSystemList>("/api/design/systems"),
   createDesignSystem: (body: DesignSystemRequest) =>
     call<DesignSystemView>("POST", "/api/design/systems", { body }),
+  readDesignTokens: (body: DesignTokenImportRequest) =>
+    call<DesignTokenImport>("POST", "/api/design/systems/tokens", { body }),
   updateDesignSystem: (systemId: string, body: DesignSystemRequest) =>
     call<DesignSystemView>("PUT", `/api/design/systems/${encodeURIComponent(systemId)}`, { body }),
   getDiagnostics: () =>

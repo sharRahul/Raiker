@@ -1084,6 +1084,20 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-995](#fixed-995--text-that-overflowed-its-box-was-clipped-on-the-canvas-but-drawn-in-full-in-exports) | Low | Design / web | Fixed 2026-10-19 — found live: canvas clipped overflowing text |
 | [FIXED-996](#fixed-996--a-conflicting-edits-explanation-vanished-in-the-reload-it-caused) | Low | Design / web | Fixed 2026-10-19 — found by test: conflict notice cleared |
 | [FIXED-997](#fixed-997--the-design-wire-types-broke-the-api-contract-on-python-311) | Medium | Design / API | Fixed 2026-10-19 — found by CI on Python 3.11 |
+| [FIXED-998](#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) | Medium | Design / canvas | Fixed 2026-10-20 — DW-02 pointer drag, one version per gesture |
+| [FIXED-999](#fixed-999--there-were-no-resize-or-rotate-handles-dw-02-bug-348) | Medium | Design / canvas | Fixed 2026-10-20 — DW-02 resize and rotate handles |
+| [FIXED-1000](#fixed-1000--only-one-layer-could-be-selected-so-nothing-could-be-aligned-or-distributed-dw-02-bug-348) | Medium | Design / canvas | Fixed 2026-10-20 — DW-02 multi-select, align and distribute |
+| [FIXED-1001](#fixed-1001--a-drag-snapped-to-nothing-and-showed-no-guides-dw-02-bug-348) | Low | Design / canvas | Fixed 2026-10-20 — DW-02 snapping, guides, whole-pixel drags |
+| [FIXED-1002](#fixed-1002--the-owners-own-picture-or-logo-could-not-be-brought-into-design-dw-04-bug-348) | Medium | Design / assets | Fixed 2026-10-20 — DW-04 owner picture import, no provider |
+| [FIXED-1003](#fixed-1003--images-did-not-show-a-picture-imported-under-documents-until-the-page-was-reloaded) | Low | Design / web | Fixed 2026-10-20 — found live: Images stale after an import |
+| [FIXED-1004](#fixed-1004--a-design-system-could-only-be-typed-in-by-hand-dw-06-bug-348) | Medium | Design / systems | Fixed 2026-10-20 — DW-06 tokens-file and picture-palette import |
+| [FIXED-1005](#fixed-1005--a-skipped-tokens-name-reached-the-page-as-redacted) | Low | Design / API | Fixed 2026-10-20 — found live: redacted token names |
+| [FIXED-1006](#fixed-1006--nothing-in-a-design-could-be-reused-dw-06-dw-10-bug-348) | Medium | Design / composition | Fixed 2026-10-20 — DW-06 document components and their check |
+| [FIXED-1007](#fixed-1007--a-layer-could-not-carry-a-note-dw-08-bug-348) | Low | Design / composition | Fixed 2026-10-20 — DW-08 notes on layers and frames |
+| [FIXED-1008](#fixed-1008--a-pdf-export-was-a-picture-of-the-frame-dw-11-bug-348) | Medium | Design / export | Fixed 2026-10-20 — DW-11 vector PDF export |
+| [FIXED-1009](#fixed-1009--a-proposal-whose-host-stopped-mid-call-left-no-record-dw-12-bug-348) | Medium | Design / agent | Fixed 2026-10-20 — DW-12 proposal receipts and outcome unknown |
+| [FIXED-1010](#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected) | Low | Design / web | Fixed 2026-10-20 — found live: stale and blank agent model picker |
+| [FIXED-1011](#fixed-1011--a-design-audit-event-of-an-unregistered-type-would-have-been-dropped-without-a-word) | Low | Design / audit | Fixed 2026-10-20 — found by test: unregistered audit event |
 
 ---
 
@@ -35146,3 +35160,247 @@ verified on Python 3.13, where the standard-library class is accepted.
 **Evidence.** The test failed before and passed after under a local Python 3.11
 environment; mypy, ruff and SAST clean there too.
 
+
+## FIXED-998 — A layer could only be moved with the arrow keys (DW-02, BUG-348)
+
+**Severity: Medium. Area: Design / canvas. Status: Fixed 2026-10-20.**
+
+**Observed.** [BUG-348](TO_BE_FIXED.md#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial)
+recorded that the canvas was edited by keyboard and inspector only: a layer
+could be clicked and nudged a pixel at a time, never dragged.
+
+**Fixed.** A layer is dragged on the canvas. The drag is previewed locally and
+sent when the pointer is released as one operation list against the version on
+screen, so a whole gesture is one version — rebased or refused like any other —
+with whole-pixel coordinates. A locked layer does not move; a group moves its
+children with it. The click that ends a drag no longer clears the selection,
+and a click without a pointer press (a screen reader, a test) still selects.
+
+**Evidence.** `designManipulation.test.ts` (*moves every unlocked top-level
+layer in one operation list*); live `dw-design-round-two-live.spec.ts` test 1 —
+one version per drag, a locked rectangle dragged 100px writes nothing.
+
+## FIXED-999 — There were no resize or rotate handles (DW-02, BUG-348)
+
+**Severity: Medium. Area: Design / canvas. Status: Fixed 2026-10-20.**
+
+**Fixed.** The selected, unlocked layer shows eight resize handles and a rotate
+handle, drawn at a constant screen size and turned with the layer. Resizing
+keeps the opposite edge, never inverts a box or shrinks it below 1px, works
+along a rotated layer's own sides, and keeps proportions with Shift on a corner.
+Rotating follows the pointer about the layer's centre; Shift snaps to 15°. A
+group shows only the rotate handle, because its box is derived from its
+children. Each drag is one `update_node` version.
+
+**Evidence.** `designManipulation.test.ts` (*keeps the opposite edge…*, *resizes
+a rotated layer along its own sides*, *turns a pointer into a rotation*); live
+`02-resized-and-rotated.png` (wider, rotated 75° with Shift; deltas are whole
+pixels since [FIXED-1001](#fixed-1001--a-drag-snapped-to-nothing-and-showed-no-guides-dw-02-bug-348)).
+
+## FIXED-1000 — Only one layer could be selected, so nothing could be aligned or distributed (DW-02, BUG-348)
+
+**Severity: Medium. Area: Design / canvas. Status: Fixed 2026-10-20.**
+
+**Fixed.** Shift, Ctrl or Cmd adds or removes a layer from the selection, on
+the canvas and in Layers. With more than one selected, the inspector shows
+**N layers selected** with **Align left / Centre / Align right / Align top /
+Middle / Align bottom**, **Distribute across / down** (three or more), **Group**
+(when they share a parent) and **Remove**. Arrow keys move the whole
+selection. With one layer selected, **Centre in frame** and **Middle of frame**
+align it to the frame. Each is one version; locked layers stay where they are.
+
+**Evidence.** `designManipulation.test.ts` (*align and distribute*);
+`DesignDocuments.test.ts` (*selects several layers with Shift and aligns them as
+one change*); live test 2, `03-three-selected-aligned.png`.
+
+## FIXED-1001 — A drag snapped to nothing and showed no guides (DW-02, BUG-348)
+
+**Severity: Low. Area: Design / canvas. Status: Fixed 2026-10-20.**
+
+**Fixed.** While dragging, the moving box's edges and centre snap to the
+frame's edges and centre and to other layers' edges and centres within six
+screen pixels, and fall back to the grid when it is shown; each matched line is
+drawn as a dashed guide. Alt places freely. Drag and resize deltas are whole
+pixels — the first live drag stored `x = 176.58` because the canvas is scaled.
+
+**Evidence.** `designManipulation.test.ts` (*snapping*); live test 1 drags a
+rectangle near the centre and stores `x = 420`, (1080 − 240) / 2;
+`01-drag-snaps-to-centre.png`.
+
+## FIXED-1002 — The owner's own picture or logo could not be brought into Design (DW-04, BUG-348)
+
+**Severity: Medium. Area: Design / assets. Status: Fixed 2026-10-20.**
+
+**Fixed.** **Image → Import your own picture…** uploads a PNG, JPEG, WebP or GIF
+through `POST /api/design/assets/import`, which applies the image upload
+validator (allowlisted type, size cap, content sniff) and records an `import`
+asset: provider `owner`, no model, the file name and its pixel size, filed with
+the design's project. It is placed on the frame at once and appears under
+Images as **Imported**, *Your file … No provider has seen it.* Sending it to a
+provider later — an edit under Images — is a separate, governed request. This
+is also the source-image path BUG-287 asked for. Audited as
+`design_asset_imported` (ids, size and hash only).
+
+**Evidence.** `test_the_owners_picture_is_an_import_asset_with_no_provider`
+(a PNG declared as JPEG is refused); live test 3, `04-imported-picture-placed.png`,
+`05-images-names-it-imported.png`.
+
+## FIXED-1003 — Images did not show a picture imported under Documents until the page was reloaded
+
+**Severity: Low. Area: Design / web. Status: Fixed 2026-10-20 — found live.**
+
+**Observed (live, 2026-10-20).** After importing a picture under Documents,
+switching to **Images** read *Nothing generated yet*. The history line of an
+imported picture then read *· 64x32*, an empty model name.
+
+**Root cause.** Design read the gallery once when it mounted; switching tabs
+reused that read. The history line printed `model`, which an import does not
+have.
+
+**Fixed.** Switching to Images reads the gallery again, and an imported
+picture's line reads *Imported · 64x32*.
+
+**Evidence.** Live test 3 re-run passed.
+
+## FIXED-1004 — A design system could only be typed in by hand (DW-06, BUG-348)
+
+**Severity: Medium. Area: Design / systems. Status: Fixed 2026-10-20.**
+
+**Fixed.** **Import from a tokens file** reads CSS custom properties or a JSON
+tokens file — flat, nested, or W3C design-tokens `$value`/`$type` — on this
+machine (`POST /api/design/systems/tokens`, which writes nothing). Colours
+(`#rgb` to `#rrggbbaa`), font families and px/rem sizes fill the New design
+system form; every token it could not place is listed with its reason (*refers
+to another variable*, *not a colour, font or size*), and the source note names
+the file and its SHA-256. **Or colours from a picture** reads the dominant
+colours of any picture the owner has — a logo, a screenshot — with Pillow,
+ignoring transparent pixels (`GET /api/design/assets/{id}/palette`). The form
+gains **Spacing**. Nothing is saved until **Save system**.
+
+**Evidence.** `test_tokens_from_css_and_json_are_placed_or_skipped_with_a_reason`,
+`test_reading_tokens_writes_no_system`, `test_a_palette_ignores_transparent_pixels`;
+live test 5, `08-tokens-imported.png` (four values read, one skipped, brand-1
+`#ff6600` from the imported logo).
+
+## FIXED-1005 — A skipped token's name reached the page as REDACTED
+
+**Severity: Low. Area: Design / API. Status: Fixed 2026-10-20 — found live.**
+
+**Observed (live, 2026-10-20).** The token report read *Skipped 1:
+\*\*\*REDACTED\*\*\*: not a colour, font or size* for `--shadow-sm`.
+
+**Root cause.** The skipped entry's field was called `token`, and the response
+redactor blanks any field by that name — the same family as
+[FIXED-993](#fixed-993--a-build-handoffs-file-name-reached-the-page-as-redacted_secret).
+
+**Fixed.** The field is `name` (`DesignTokenSkip`).
+
+**Evidence.** Live test 5 asserts *shadow-sm: not a colour, font or size*.
+
+## FIXED-1006 — Nothing in a design could be reused (DW-06, DW-10, BUG-348)
+
+**Severity: Medium. Area: Design / composition. Status: Fixed 2026-10-20.**
+
+**Fixed.** **Make component** keeps a copy of the selected layer — a group, a
+shape, an instance — in the document as a named component drawn from (0, 0)
+(`define_component`). **Components → Place** puts an instance on the frame: a
+group linked by `component_id` whose layers are ordinary, editable copies with
+fresh ids (`place_component`). Editing an instance never changes its
+component; the inspector says whether it still matches, and **Update from
+component** replaces its layers as one version (`update_instance`). Removing a
+component keeps every instance's layers; Check's new **Component instances
+link to a component in this design** fails for the broken link
+(`design-validate/2`). The Build handoff names components and instances. A
+component lives in its document; sharing one through a design system remains
+in BUG-348.
+
+**Evidence.** `test_a_component_is_placed_as_linked_ordinary_layers_and_updated_only_on_request`,
+`test_a_broken_component_link_is_a_failed_check_and_instances_keep_their_layers`;
+`designManipulation.test.ts` (*says when an instance no longer matches*); live
+test 4, `06-component-instance.png`.
+
+## FIXED-1007 — A layer could not carry a note (DW-08, BUG-348)
+
+**Severity: Low. Area: Design / composition. Status: Fixed 2026-10-20.**
+
+**Fixed.** The inspector's **Notes** section adds, resolves, reopens and
+deletes notes on the selected layer or on the frame (`add_note`,
+`update_note`, `remove_note`). A note names its author and is a version like
+any change, so undo brings back what a note said. Open notes are numbered pins
+on the canvas (**Show pins**) and a *note* badge in Layers. They are never
+drawn into an export; open notes on a handed-off frame go to Build under
+*Open notes*, credential-redacted.
+
+**Evidence.** `test_notes_are_versioned_changes_on_real_targets` (unknown target
+refused, version scope is the note, undo restores, handoff carries it); live
+test 4, `07-note-pinned.png`.
+
+## FIXED-1008 — A PDF export was a picture of the frame (DW-11, BUG-348)
+
+**Severity: Medium. Area: Design / export. Status: Fixed 2026-10-20.**
+
+**Fixed.** **PDF (vector, selectable text)** (`vector_pdf`) draws the frame with
+PDF's own operators (`raiker/design/pdf.py`): rectangles with their radius and
+ellipses as paths, opacity as a graphics state, rotation as a transform, text
+as real text in the same font the raster export uses — embedded, wrapped where
+the PNG wraps it — and placed pictures embedded after crop and fit. The page is
+the frame at 0.75 pt per pixel, so an A4 frame is an A4 page. Text is
+Windows-1252; a character outside it is written as `?` and counted in the
+export's settings (`characters_replaced`). The download is named `.pdf`.
+
+**Evidence.** `test_a_vector_pdf_keeps_text_as_text_and_counts_what_it_could_not_encode`
+(pypdf reads *Café —* back, 596 × 842 pt); live test 5 downloads
+`raiker-design-frame-1-vN.pdf` starting `%PDF-1.4`, `09-vector-pdf-export.png`.
+
+## FIXED-1009 — A proposal whose host stopped mid-call left no record (DW-12, BUG-348)
+
+**Severity: Medium. Area: Design / agent. Status: Fixed 2026-10-20.**
+
+**Observed.** A proposal row was written only after the model answered, so a
+host that stopped during the call left nothing to say a request had been sent.
+
+**Fixed.** The row is written as `requesting` before the model is asked,
+stamped with the host run. It becomes `pending` with the vetted operations,
+`failed` with the refusal code when the call ends without a usable answer, and
+reads as `outcome_unknown` once a later host run finds it still requesting —
+whether the provider answered is not known, nothing was applied, and it can
+never be accepted or retried on its own. The Agent panel says so and offers
+**Ask again with this brief**.
+
+**Evidence.** `test_a_failed_call_is_recorded_and_an_interrupted_one_reads_as_outcome_unknown`;
+`DesignDocuments.test.ts` (*says when a proposal's outcome is unknown*); live
+test 6 kills the host (`kill -9`) while Anthropic Haiku 4.5 is being asked,
+restarts it, reads *Outcome unknown* (`10-proposal-outcome-unknown.png`), then
+asks again and accepts (`11-proposal-after-restart.png`).
+
+## FIXED-1010 — After a restart the design agent said no chat model was connected
+
+**Severity: Low. Area: Design / web. Status: Fixed 2026-10-20 — found live.**
+
+**Observed (live, 2026-10-20).** Re-opening a design right after the host
+restarted, the Agent panel read *No chat model is connected* although Anthropic
+was; once models were read, the picker showed a blank choice.
+
+**Root cause.** The model list was read once when Documents mounted, and the
+picker was bound to an empty choice the first model only stood in for.
+
+**Fixed.** Opening the Agent panel reads the models again, and the picker
+always shows the model a proposal will use.
+
+**Evidence.** Live test 6 re-run; `DesignDocuments.test.ts`.
+
+## FIXED-1011 — A Design audit event of an unregistered type would have been dropped without a word
+
+**Severity: Low. Area: Design / audit. Status: Fixed 2026-10-20 — found writing the import test.**
+
+**Observed.** The first version of the picture import wrote its audit record as
+`design_asset_imported`, a type the event contract did not list. Design writes
+audit events inside `contextlib.suppress(Exception)` so that a failing audit
+never fails the owner's change, which meant the refused event left no trace.
+
+**Fixed.** `design_asset_imported` is registered in `raiker/contracts/models.py`
+and described in the [event catalog](../architecture/EVENT_CATALOG.md); the
+import test asserts the indexed event exists.
+
+**Evidence.** `test_the_owners_picture_is_an_import_asset_with_no_provider`
+fails without the registration and passes with it.

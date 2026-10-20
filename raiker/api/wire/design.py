@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from typing_extensions import TypedDict
 
+from raiker.api.wire.models import ImageGeneration
+
 
 class DesignFramePreset(TypedDict):
     preset: str
@@ -234,6 +236,42 @@ class DesignHandoffView(DesignHandoffRecord):
 
 class DesignHandoffList(TypedDict):
     handoffs: list[DesignHandoffRecord]
+
+
+class DesignImportedAsset(TypedDict):
+    """DW-04 — the owner's own picture, stored as an asset without any provider."""
+
+    ok: bool
+    generation: ImageGeneration
+
+
+class DesignPaletteColor(TypedDict):
+    color: str
+    share: float
+
+
+class DesignPalette(TypedDict):
+    """DW-06 — a picture's dominant colours, read on this machine."""
+
+    asset_id: str
+    colors: list[DesignPaletteColor]
+
+
+class DesignTokenSkip(TypedDict):
+    #: Not ``token``: the response redactor blanks a field by that name.
+    name: str
+    reason: str
+
+
+class DesignTokenImport(TypedDict):
+    """DW-06 — what a tokens file holds, as variables for a new system. Writes nothing."""
+
+    format: str
+    filename: str
+    sha256: str
+    found: int
+    variables: dict[str, Any]
+    skipped: list[DesignTokenSkip]
 
 
 class DesignAssetUse(TypedDict):

@@ -10,6 +10,7 @@ overwrite.
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -42,6 +43,10 @@ def diff_scope(before: Mapping[str, Any], after: Mapping[str, Any]) -> set[str]:
             out[str(frame["id"])] = _dumps({k: v for k, v in frame.items() if k != "nodes"})
         for _frame, node in all_nodes(document):
             out[str(node["id"])] = _dumps({k: v for k, v in node.items() if k != "children"})
+        for component_id, component in (document.get("components") or {}).items():
+            out[str(component_id)] = _dumps(component)
+        for note in document.get("notes") or []:
+            out[str(note["id"])] = _dumps(note)
         return out
 
     a, b = index(before), index(after)
@@ -304,6 +309,18 @@ def list_systems(store: Any, *, owner: str) -> list[dict[str, Any]]:
 
 # ── Proposals ────────────────────────────────────────────────────────────
 
+#: DW-12 — this host process. A proposal still ``requesting`` under another one
+#: was interrupted with its model call in flight: whether the provider answered
+#: is not known, so it reads as ``outcome_unknown`` and is never retried blind.
+HOST_RUN = uuid.uuid4().hex
+
+
+def _proposal_status(row: Mapping[str, Any]) -> str:
+    status = str(row["status"])
+    if status == "requesting" and _loads(row["result_json"], {}).get("host_run") != HOST_RUN:
+        return "outcome_unknown"
+    return status
+
 
 def _proposal_view(row: Mapping[str, Any]) -> dict[str, Any]:
     return {
@@ -316,28 +333,50 @@ def _proposal_view(row: Mapping[str, Any]) -> dict[str, Any]:
         "model": str(row["model"]),
         "plan": _loads(row["plan_json"], {}),
         "operations": _loads(row["operations_json"], []),
-        "status": str(row["status"]),
+        "status": _proposal_status(row),
         "result": _loads(row["result_json"], None),
         "created_at": str(row["created_at"]),
         "decided_at": row["decided_at"],
     }
 
 
-def save_proposal(store: Any, *, owner: str, document_id: str, base_version: int, frame_id: str, brief: str,
-                  provider: str, model: str, plan: Mapping[str, Any], operations: list[Any]) -> dict[str, Any]:
+def start_proposal(store: Any, *, owner: str, document_id: str, base_version: int, frame_id: str, brief: str,
+                   provider: str, model: str) -> str:
+    """DW-12 — the durable receipt, written before the model is asked."""
     proposal_id = new_id("dprop_")
     with store.connect() as connection:
         connection.execute(
             """INSERT INTO design_proposals
                (proposal_id, owner_principal_id, document_id, base_version, frame_id, brief, provider, model,
-                plan_json, operations_json, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
+                plan_json, operations_json, status, result_json, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', '[]', 'requesting', ?, ?)""",
             (proposal_id, owner, document_id, base_version, frame_id, brief, provider, model,
-             _dumps(plan), _dumps(operations), utc_now()),
+             _dumps({"host_run": HOST_RUN}), utc_now()),
+        )
+    return proposal_id
+
+
+def finish_proposal(store: Any, *, owner: str, proposal_id: str, plan: Mapping[str, Any],
+                    operations: list[Any]) -> dict[str, Any]:
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE design_proposals SET plan_json = ?, operations_json = ?, status = 'pending', result_json = NULL "
+            "WHERE proposal_id = ? AND owner_principal_id = ? AND status = 'requesting'",
+            (_dumps(plan), _dumps(operations), proposal_id, owner),
         )
     found = get_proposal(store, owner=owner, proposal_id=proposal_id)
     assert found is not None
     return found
+
+
+def fail_proposal(store: Any, *, owner: str, proposal_id: str, reason: str) -> None:
+    """The model call ended without a usable answer; nothing was changed."""
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE design_proposals SET status = 'failed', result_json = ?, decided_at = ? "
+            "WHERE proposal_id = ? AND owner_principal_id = ? AND status = 'requesting'",
+            (_dumps({"reason_code": reason}), utc_now(), proposal_id, owner),
+        )
 
 
 def get_proposal(store: Any, *, owner: str, proposal_id: str) -> dict[str, Any] | None:

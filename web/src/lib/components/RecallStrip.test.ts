@@ -15,7 +15,54 @@ const MEMORIES = [
   },
 ];
 
+const DISCLOSURE = {
+  turn_id: "turn_1",
+  recall_mode: "search_when_relevant" as const,
+  effective_mode: "search_when_relevant" as const,
+  incognito: false,
+  retrieval_backend: "memory-brief-v1 + sqlite-fts5 + raiker-local-hash-v1",
+  brief_version: "memory-brief-v1",
+  brief_count: 1,
+  brief_omitted: 2,
+  recall_count: 0,
+};
+
 describe("RecallStrip", () => {
+  // MEM-MODE-02 — the turn says which recall mode and backend it ran under.
+  it("names the mode beside the count and the backend when opened", async () => {
+    render(RecallStrip, {
+      props: { memories: MEMORIES, disclosure: DISCLOSURE, onforget: vi.fn(), oncorrect: vi.fn() },
+    });
+    const toggle = screen.getByRole("button", { name: "Remembered 1 · Brief + search" });
+    await fireEvent.click(toggle);
+    expect(
+      screen.getByText(
+        "Recall mode: Search when relevant · searched sqlite-fts5 + raiker-local-hash-v1 · 2 approved memories left out of the brief by its budget",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says memory was off, or that Incognito held it back, when nothing was recalled", () => {
+    const { rerender } = render(RecallStrip, {
+      props: {
+        memories: [],
+        disclosure: { ...DISCLOSURE, effective_mode: "off" as const, incognito: true, retrieval_backend: "none" },
+        onforget: vi.fn(),
+        oncorrect: vi.fn(),
+      },
+    });
+    expect(screen.getByText("Memory not used: Incognito is on")).toBeInTheDocument();
+    rerender({
+      memories: [],
+      disclosure: { ...DISCLOSURE, brief_omitted: 0 },
+      onforget: vi.fn(),
+      oncorrect: vi.fn(),
+    });
+    expect(
+      screen.getByText("Memory: Brief + search · nothing recalled · searched sqlite-fts5 + raiker-local-hash-v1"),
+    ).toBeInTheDocument();
+  });
+
   it("renders nothing when the turn recalled nothing", () => {
     const { container } = render(RecallStrip, {
       props: { memories: [], onforget: vi.fn(), oncorrect: vi.fn() },

@@ -194,6 +194,7 @@ import type {
   SessionDetail,
   SessionRecall,
   SessionView,
+  TurnMemoryDisclosure,
   SetupCheck,
   SetupState,
   SetupSystemReadiness,
@@ -682,6 +683,8 @@ export type { SourceAnchorView };
 export type { TurnSourceView };
 
 export type { RecalledMemory };
+
+export type { TurnMemoryDisclosure };
 
 export type SessionRecallView = SessionRecall;
 

@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352 and BUG-353, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353 and BUG-354, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -92,6 +92,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
 | [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
 | [BUG-353](#bug-353--the-pinned-https-opener-used-for-web-reads-and-mcp-does-not-work-through-a-proxy) | Medium | Web access / MCP / transport | Open — found 2026-10-20 implementing BUG-349; not yet reproduced live |
+| [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -713,6 +714,32 @@ proxy-only host.
 **Required user-interface outcome.** A web read or MCP call on a proxied host
 either works or says that the proxy route is not supported — never a bare
 fetch failure.
+
+## BUG-354 — The workspace key cannot be rotated in place
+
+**Severity: Low. Area: Storage / memory key. Status: Open — found 2026-10-20
+writing the MEM-KEY-05 runbook ([FIXED-1036](FIXED_ITEMS.md#fixed-1036--the-memory-key-had-no-runbook-and-nothing-checked-the-key-stays-out-of-memory-mem-key-05)).**
+
+**Observed.** `.raiker/app.key` is generated once per workspace and derives the
+SQLCipher database key (`raiker/auth/app_key.py`, `SQLiteStore._open_keyed`).
+Nothing rekeys the database: there is no `PRAGMA rekey` path, no route and no
+setting. An owner who believes the key was copied off the machine can only
+export memories and import them into a new workspace, which leaves
+conversations, review history and backups behind.
+
+**Root cause.** Rotation was never in scope; backups record a key fingerprint
+and restore requires the same key, so a rekey also has to say what happens to
+backups made with the old key.
+
+**Proposed fix.** An owner-started, step-up-verified **Rotate workspace key**:
+take a verified backup, `PRAGMA rekey` the live database to a new key written
+atomically beside the old one, re-verify, then retire the old key file; mark
+older backups as needing the retired key, which the owner can keep or discard.
+Fail closed and leave the old key in place on any error.
+
+**Required user-interface outcome.** **Settings → Security & sign-in** offers
+the rotation, says which existing backups will still need the old key, and
+reports the new key fingerprint after a verified rekey.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

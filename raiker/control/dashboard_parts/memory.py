@@ -1025,7 +1025,28 @@ class MemoryService:
                 "scope": entry.scope,
                 "pinned": memory_id in pinned,
             })
-        return ControlResult(ok=True, data={"session_id": session_id, "memories": memories})
+        # MEM-MODE-02 — and which mode and backend each turn ran under, so the
+        # transcript can say it even for a turn that recalled nothing.
+        disclosures = [
+            {
+                "turn_id": str(row["turn_id"]),
+                "recall_mode": str(row["recall_mode"]),
+                "effective_mode": str(row["effective_mode"]),
+                "incognito": bool(row["incognito"]),
+                "retrieval_backend": str(row["retrieval_backend"]),
+                "brief_version": str(row["brief_version"]),
+                "brief_count": int(row["brief_count"]),
+                "brief_omitted": int(row["brief_omitted"]),
+                "recall_count": int(row["recall_count"]),
+            }
+            for row in self.store.load_turn_memory_disclosures(
+                session_id, acting_principal_id or "", turn_id
+            )
+        ]
+        return ControlResult(
+            ok=True,
+            data={"session_id": session_id, "memories": memories, "disclosures": disclosures},
+        )
 
     def memory_integrity(self: DashboardService, acting_principal_id: str | None) -> ControlResult:
         """MEM-09 — the integrity report, on request, where the owner can read it.
@@ -1318,6 +1339,10 @@ class MemoryService:
             providers.append(item)
         return MemorySettingsView(
             incognito=self.store.is_memory_incognito(acting_principal_id),
+            recall_mode=cast(
+                Literal["off", "brief", "search_when_relevant"],
+                self.store.get_memory_recall_mode(acting_principal_id),
+            ),
             embedding_backend=self.store.get_memory_embedding_backend(owner),
             # A semantic *space* and semantic *recall* are two claims, and only
             # the first one is true today: the question is not embedded into the
@@ -1407,6 +1432,24 @@ class MemoryService:
                 return ControlResult(ok=False, reason_code="embedding_backend_unknown")
         self.store.set_memory_embedding_backend(backend, owner)
         return ControlResult(ok=True, data={"embedding_backend": backend})
+
+    def set_memory_recall_mode(
+        self: DashboardService, mode: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """MEM-MODE-02 — choose Off, Brief only or Search when relevant (human-only).
+
+        An unknown mode is refused rather than coerced. Incognito is separate
+        and still wins: this records the owner's choice, it does not lift it.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if mode not in self.store.MEMORY_RECALL_MODES:
+            return ControlResult(ok=False, reason_code="memory_recall_mode_unknown")
+        self.store.set_memory_recall_mode(mode, principal.principal_id)
+        return ControlResult(ok=True, data={"recall_mode": mode})
 
     def set_memory_incognito(
         self: DashboardService, incognito: bool, acting_principal_id: str | None

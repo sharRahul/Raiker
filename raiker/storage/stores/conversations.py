@@ -719,7 +719,10 @@ class ConversationStore:
         terms = self._match_terms(query)
         conditions = ["turns.turn_id IS NOT NULL"]
         params: list[Any] = []
-        ordering = "turns.created_at DESC"
+        # MEM-HISTORY-03 — the id breaks every tie, so two exchanges recorded in
+        # the same instant come back in the same order on every search and the
+        # result window is deterministic.
+        ordering = "turns.created_at DESC, turns.turn_id ASC"
         if terms:
             source = (
                 "conversation_fts JOIN turns ON turns.turn_id = conversation_fts.turn_id "
@@ -735,7 +738,10 @@ class ConversationStore:
                 # Only the `text` column is indexed; the other three are
                 # UNINDEXED and can never contribute, but `bm25` still requires
                 # one weight per declared column.
-                ordering = "bm25(conversation_fts, 0.0, 0.0, 0.0, 1.0) ASC, turns.created_at DESC"
+                ordering = (
+                    "bm25(conversation_fts, 0.0, 0.0, 0.0, 1.0) ASC, turns.created_at DESC, "
+                    "turns.turn_id ASC"
+                )
         else:
             # Terms shorter than the index tokenizer's floor (an identifier such
             # as `q3`) still have to be findable, so a substring scan stands in.

@@ -258,4 +258,13 @@ def retrieve_hybrid_memory(
                     source=str(memory_row["source"] or ""),
                 )
             )
-    return sorted(results, key=lambda item: (-item.score, item.memory_id))[:limit]
+    # MEM-EVAL-06 — a tie in score is decided by the record, not by the id's
+    # spelling: the higher-confidence memory first, then the newer one, and
+    # only then the id. Two contradictory records that match a question equally
+    # (an inferred "Monday" and the owner's "Thursday") otherwise came back in
+    # an order an id happened to give them. Stable sorts, least significant key
+    # first.
+    results.sort(key=lambda item: item.memory_id)
+    results.sort(key=lambda item: item.created_at, reverse=True)
+    results.sort(key=lambda item: (-item.score, -item.confidence))
+    return results[:limit]

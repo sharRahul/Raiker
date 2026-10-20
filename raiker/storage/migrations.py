@@ -4659,6 +4659,41 @@ CREATE TABLE IF NOT EXISTS build_task_targets (
 );
 """
 
+# MEM-MODE-02 — the owner's ambient-recall mode, and what each turn used.
+#
+# ``recall_mode`` is ``off`` (no ambient recall), ``brief`` (the bounded Memory
+# Brief only) or ``search_when_relevant`` (the brief plus governed retrieval).
+# The default keeps the behaviour every install already had, plus the brief.
+# Incognito still wins over all three; it is a separate column on purpose.
+#
+# ``turn_memory_disclosures`` records, per turn, which mode was in force, what
+# actually ran (Incognito can turn ``search_when_relevant`` into ``off``) and
+# which retrieval backend answered, so the transcript can say exactly that.
+# Ids and labels only — never a memory's text.
+MEMORY_RECALL_MODE_MIGRATION_ID = "RAIKER-2120-memory-recall-mode"
+
+MEMORY_RECALL_MODE_SQL = """
+ALTER TABLE memory_settings ADD COLUMN recall_mode TEXT NOT NULL DEFAULT 'search_when_relevant';
+CREATE TABLE IF NOT EXISTS turn_memory_disclosures (
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  recall_mode TEXT NOT NULL,
+  effective_mode TEXT NOT NULL,
+  incognito INTEGER NOT NULL DEFAULT 0,
+  retrieval_backend TEXT NOT NULL,
+  brief_version TEXT NOT NULL DEFAULT '',
+  brief_count INTEGER NOT NULL DEFAULT 0,
+  brief_omitted INTEGER NOT NULL DEFAULT 0,
+  recall_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, turn_id)
+);
+CREATE INDEX IF NOT EXISTS idx_turn_memory_disclosures_principal
+  ON turn_memory_disclosures(principal_id, session_id, created_at);
+"""
+
+
 # DW-01 to DW-11 — Raiker Design's structured documents. A document is an
 # owner-scoped layer tree; every change is a numbered version holding its
 # snapshot, the actor, the ids it touched and the operations that made it, so
@@ -5029,6 +5064,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(PULL_REQUEST_RECEIPTS_MIGRATION_ID, PULL_REQUEST_RECEIPTS_SQL),
     Migration(BUILD_TASK_TARGETS_MIGRATION_ID, BUILD_TASK_TARGETS_SQL),
     Migration(DESIGN_DOCUMENTS_MIGRATION_ID, DESIGN_DOCUMENTS_SQL),
+    Migration(MEMORY_RECALL_MODE_MIGRATION_ID, MEMORY_RECALL_MODE_SQL),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

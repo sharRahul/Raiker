@@ -15,6 +15,7 @@ import type {
   SpeechRuntimeChange,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
+import type { MemoryRecallMode } from "./memoryRecallMode";
 import { restoreSession } from "./api/auth";
 import { request, requestBlob } from "./api/core";
 // OPT-02 — every ordinary JSON operation's wrapper is generated
@@ -892,6 +893,10 @@ export const api = {
   forgetMemory: (id: string) => contract.forgetMemory(id),
   memorySettings: () => contract.getMemorySettings(),
   setMemoryIncognito: (incognito: boolean) => contract.setMemoryIncognito({ incognito }),
+  // MEM-MODE-02 — Off, Brief only or Search when relevant. Incognito still
+  // wins on the server; this records the owner's choice and nothing more.
+  setMemoryRecallMode: (mode: MemoryRecallMode) =>
+    contract.setMemoryRecallMode({ recall_mode: mode }),
   // MEM-03 — "auto" resolves to the best space that actually holds vectors;
   // any other value must name one, or the server refuses rather than silently
   // searching a different corpus.

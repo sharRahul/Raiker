@@ -95,6 +95,14 @@ principal, every request resolves an acting-principal, and a human
 `runtime_gate_manager` governs capability changes and stopping or starting the
 single agent runtime.
 
+Ambient recall follows the [SQLCipher memory decision](MEMORY_AND_CONTEXT_STRATEGY.md#sqlcipher-memory-decision)
+(implemented 2026-10-20): a bounded **Memory Brief** of approved records joins
+each turn, the owner chooses **Off**, **Brief only** or **Search when relevant**
+(Incognito wins), and every answer records which mode and backend it ran under.
+History search is bounded, redacted and never promoted; an external
+`MemoryAdapter` contract exists with **no provider enabled**; in-place key
+rotation is not offered ([BUG-354](../plans/TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)).
+
 Strict non-allow blocking, role revoke governed, and capability gate per action
 are enforced. The historical readiness records in `raiker/workspace/views.py`
 still report these compatibility flags as `False`; they describe those

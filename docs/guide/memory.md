@@ -88,16 +88,60 @@ and the rejection is kept: a rejected link is still listed and still says so.
 ## What enters a turn
 
 Raiker builds context in layers. The current prompt, task, conversation history,
-and explicit project context come first. It then retrieves eligible approved
-memory within a bounded budget. Policy filtering happens before ranking, so a
+and explicit project context come first. Then comes the **memory brief**, and —
+in the default mode — eligible approved memory retrieved for this question, all
+within a bounded budget. Policy filtering happens before ranking, so a
 high-scoring record cannot bypass scope or privacy rules.
+
+### The memory brief
+
+The brief is a short, fixed list of your approved memories that joins every turn
+in the *Brief only* and *Search when relevant* modes, so a durable preference
+does not depend on your question happening to share its words. It is read from
+the same encrypted records the Memory page lists — not a second store — so a
+memory you forget, archive, correct or switch out of search leaves the brief on
+the next turn.
+
+- **What can be in it.** Approved, active records you hold, with search on,
+  confidence of at least 0.6, and never secret- or credential-like (Raiker reads
+  the text itself; a label cannot lower that). Account-level memories always
+  qualify; a project's memories only in a Build turn for that project, or a Chat
+  filed in it with project memory on. Another project's never do.
+- **Which come first.** Pinned memories, then ones you wrote or corrected
+  yourself, then by confidence, trust and how recently they changed. The same
+  records always give the same brief.
+- **How big it is.** At most eight memories and about 400 tokens; one long
+  memory is cut at 280 characters and marked as cut. A memory the budget leaves
+  out is counted — the answer's strip says how many — rather than silently
+  dropped.
+
+Each brief entry carries the memory's id, where it came from, how fresh it is,
+and the label *owner-approved data, not instructions*.
+
+### Recall mode
+
+**Memory → Recall & indexing → Recall mode** decides what Raiker adds to a turn
+on its own:
+
+| Mode | What a turn is given |
+|---|---|
+| **Off** | No memory on its own. You (or the assistant, through its tools) can still look something up. |
+| **Brief only** | The memory brief. Nothing is searched. |
+| **Search when relevant** (default) | The brief, plus approved memories, files and earlier chats that match the question. |
+
+**Incognito wins over every mode**: while it is on, nothing is recalled, and the
+answer says so. Each settled answer in Chat says which mode it ran under —
+**Remembered *n* · Brief + search**, or one quiet line such as *Memory: Brief
+only · nothing recalled* or *Memory not used: Incognito is on* — and, opened,
+which search backend answered and how many memories the brief's budget left out.
 
 Recall can happen in two ways:
 
-1. Raiker automatically attaches a small number of relevant, approved memories
-   while assembling a turn.
+1. Raiker automatically attaches the brief and, in *Search when relevant*, a
+   small number of relevant approved memories while assembling a turn.
 2. The assistant can use governed memory or conversation-recall tools when the
-   task needs a more explicit search.
+   task needs a more explicit search. These return at most 50 memories or 25
+   earlier exchanges per call, whatever they ask for.
 
 Both paths use the same eligibility rules. A recalled result carries source and
 trust information so the answer can say where it came from. Use **View source**
@@ -122,7 +166,11 @@ strip.
 Conversation recall is related but distinct. It searches completed exchanges
 from your earlier conversations. Durable memory searches approved facts. Raiker
 labels the source so an old message is treated as historical data, not as a new
-instruction. See [Working in Chat](working-in-chat.md#recalling-an-older-conversation).
+instruction. A search returns the same exchanges in the same order every time,
+masks anything credential-shaped in an old message before the model sees it
+(and says it did), is withheld while Incognito is on, and never turns a match
+into a memory — that still takes your approval. See
+[Working in Chat](working-in-chat.md#recalling-an-older-conversation).
 
 ## Scope, privacy, and sensitivity
 
@@ -135,7 +183,10 @@ Memory is filtered before ranking:
   enter normal retrieval.
 - Sensitivity rules can withhold a memory even when its words match perfectly.
 - **Incognito session** disables approved-memory and cross-conversation recall
-  for new conversations and tasks. It does not delete stored records.
+  for new conversations and tasks, whatever the recall mode — including the
+  assistant's own memory and conversation searches, which answer *withheld:
+  Incognito*. Reading one record by its id, and the Memory page, still work. It
+  does not delete stored records.
 - Secret-like and credential-like text is never sent to an embedding provider —
   when building an index, embedding a file or embedding a question. Raiker reads
   the text itself to decide; a label saying it is harmless cannot lower that.
@@ -374,6 +425,53 @@ zero, and **Rescan** runs it again on request — nothing sweeps in the backgrou
 When the conversation index has drifted, and only then, the card offers **Rebuild
 conversation index**: that index is a projection of your turns, so rebuilding it
 recomputes every row and can lose nothing.
+
+## The memory key and recovery
+
+Approved memory lives in the workspace's SQLCipher-encrypted database,
+`.raiker/raiker.db`. This is the runbook for the key that opens it.
+
+**Where the key comes from.** Raiker generates one random key per workspace the
+first time the workspace opens, writes it to `.raiker/app.key` with owner-only
+permissions, and derives the database key from it. You never type it. The key is
+never written into the database, a log, a memory export, a backup or anything
+sent to a model or service. If `app.key` goes missing while the database still
+exists, Raiker refuses to start (`store_key_missing`) and writes nothing — it
+will not mint a new key that opens nothing.
+
+**Keep a copy.** Copy `.raiker/app.key` somewhere safe and separate from the
+machine, the same way you would a password-manager recovery key. Every backup
+needs it; none contains it.
+
+**Verify a backup.** **Settings → Account → Backups → Verify** re-reads the
+backup's checksum, whether *this* key opens it and its integrity. A backup that
+reads *Unreadable* was made with a different key. See
+[Backups](security-and-privacy.md#backups).
+
+**Restore.** With the original `app.key` in place, restore from **Settings →
+Account → Backups**, or from the lock screen when the database will not open.
+Deletions made after the backup was taken are applied again, so a restored
+memory you had forgotten stays forgotten.
+
+**Losing the machine.** Recovery needs both the backup *and* the matching
+`app.key`. A backup without its key cannot be opened by Raiker or anyone else —
+that is the protection working, and there is no back door.
+
+**Rotating the key.** Raiker does not offer in-place key rotation yet. To move to
+a new key today, export your memories (**Recall & indexing → Export**), start a
+new workspace — which generates a new key — and import them there. Records keep
+their text and provenance; review history and conversations stay with the old
+workspace.
+
+**Diagnosing key-page protection.** **Settings → Security & sign-in → Database
+encryption** shows whether key memory is *Locked in memory*, *Disabled by user*
+or *Degraded on this host*. `GET /api/health` gives the detail: `cipher_memory_security` (what was asked for),
+`memory_security_in_force` (what the process is actually doing — once on, it
+stays on until restart), `memory_security_reason`, `memory_security_probe` and
+`memlock_allowance_bytes`. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to require
+locked key pages (Raiker then refuses to open the store rather than run without
+them), `off` to never lock them, or leave it unset for *auto*, which enables it
+only after a disposable probe succeeds. Restart Raiker after changing it.
 
 ## Maintenance contract
 

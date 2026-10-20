@@ -1117,6 +1117,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1028](#fixed-1028--nothing-stopped-a-key-being-attached-to-another-origin-tls-name-checking-was-untested) | Low | Models / transport | Fixed 2026-10-20 |
 | [FIXED-1029](#fixed-1029--the-models-page-did-not-say-whether-a-request-went-through-a-proxy) | Low | Models / UI | Fixed 2026-10-20 — verified live |
 | [FIXED-1030](#fixed-1030--a-refused-dial-and-other-classified-denials-read-as-enable-its-gate) | Medium | Models / UI / turns | Fixed 2026-10-20 — verified live |
+| [FIXED-1031](#fixed-1031--a-durable-preference-reached-a-turn-only-when-the-prompt-shared-its-words-mem-brief-01) | Medium | Memory / context | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1032](#fixed-1032--ambient-recall-could-not-be-turned-down-and-no-answer-said-which-recall-it-ran-under-mem-mode-02) | Medium | Memory / UI | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1033](#fixed-1033--history-search-returned-a-pasted-credential-an-order-that-could-change-and-ran-under-incognito-mem-history-03) | Medium | Memory / conversation recall | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1034](#fixed-1034--memory_search-returned-as-many-memories-as-the-model-asked-for-incognito-or-not) | Medium | Memory / tools | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1035](#fixed-1035--there-was-no-contract-an-external-memory-provider-would-have-to-meet-mem-adapter-04) | Low | Memory / security | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1036](#fixed-1036--the-memory-key-had-no-runbook-and-nothing-checked-the-key-stays-out-of-memory-mem-key-05) | Low | Memory / storage / docs | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1037](#fixed-1037--two-contradictory-memories-that-matched-equally-came-back-in-id-order-mem-eval-06) | Medium | Memory / retrieval / evaluation | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
+| [FIXED-1038](#fixed-1038--the-answers-recall-backend-read-redacted_secret) | Low | Memory / API / UI | Fixed 2026-10-20 — found live: backend label redacted |
 
 ---
 
@@ -35782,3 +35790,83 @@ detail, that it is *a policy refusal, not a network fault*, and
 `ModelsView.test.ts` (*explains a refused dial in the picker as an address, not
 a gate*), `test_a_dial_refusal_keeps_its_own_code_and_sentence`; live MT-03,
 MT-04 assert neither *enable its gate* nor *could not be reached* appears.
+
+## FIXED-1031 — A durable preference reached a turn only when the prompt shared its words (MEM-BRIEF-01)
+
+**Severity: Medium. Area: Memory / context. Status: Fixed 2026-10-20.**
+
+**Observed.** Ambient recall was search only: an approved preference ("British spelling", "the standup is on Thursday") reached a turn only when the prompt happened to share its words, so the same owner fact was present on one turn and absent on the next.
+
+**Fixed.** `raiker/memory/brief.py` builds the versioned `memory-brief-v1` projection of approved encrypted records — never a second store. Eligibility runs before ranking (approved, active, owner-held, search enabled, in scope, confidence ≥ 0.6, neither labelled nor *reading* secret- or credential-like); priority is pinned → written or corrected by the owner → confidence → trust → freshness → id; the budget is 8 items and 400 tokens, with one record cut at 280 characters. Every item names its `memory_id`, provenance, trust label, freshness and truncation reason, and a record the budget leaves out is reported with `max_items` or `token_budget`. The gatherer adds it as a `memory_brief` source ranked above searched recall, labelled untrusted data, and records its ids in the turn recall ledger so **Remembered** can correct or forget them.
+
+**Evidence.** `tests/test_memory_brief_and_recall_mode.py` (eligibility, provenance, deterministic order, budget reasons, labelled data that grants nothing); live RT-MEM-BRIEF.
+
+## FIXED-1032 — Ambient recall could not be turned down, and no answer said which recall it ran under (MEM-MODE-02)
+
+**Severity: Medium. Area: Memory / UI. Status: Fixed 2026-10-20.**
+
+**Observed.** The only control over ambient recall was Incognito (all or nothing), and nothing in the transcript said whether a turn had searched memory, used a brief, or had memory switched off.
+
+**Fixed.** `memory_settings.recall_mode` (`off`, `brief`, `search_when_relevant`; default `search_when_relevant`, the behaviour every install already had) with `PUT /api/memory/recall-mode` (human-only, unknown modes refused with 409) and **Memory → Recall & indexing → Recall mode**. The gatherer resolves the mode once; Incognito wins over all three. Each turn records `turn_memory_disclosures` — mode, what ran, Incognito, the retrieval backend and counts of what the budget let in — returned with `GET /api/sessions/{id}/recall`. The strip under an answer reads **Remembered *n* · Brief + search**, or one quiet line (*Memory: Brief only · nothing recalled*, *Memory not used: Incognito is on*), and opened says the backend and how many memories the brief left out.
+
+**Evidence.** `tests/test_memory_brief_and_recall_mode.py` (each mode, Incognito override, budget-true counts, route and owner-scoped disclosure), `memoryRecallMode.test.ts`, `RecallStrip.test.ts`, `MemoryView.test.ts`; live RT-MEM-BRIEF.
+
+## FIXED-1033 — History search returned a pasted credential, an order that could change, and ran under Incognito (MEM-HISTORY-03)
+
+**Severity: Medium. Area: Memory / conversation recall. Status: Fixed 2026-10-20.**
+
+**Observed.** `conversation_search` returned an old exchange's text unredacted, so a token pasted months ago came back into a turn; exchanges recorded in the same instant could come back in a different order; and the tool answered while Incognito was on, although the guide says Incognito disables cross-conversation recall.
+
+**Fixed.** `search_conversation_turns` breaks every tie by `turn_id`. Each result's window and match pass through the context redactor and carry `redacted`. Under Incognito the tool answers `withheld: incognito` instead of an empty list that would read as "never discussed". Results stay at most 25 of 1,200 characters, labelled `untrusted_conversation_data`, and nothing is written to memory.
+
+**Evidence.** `tests/test_memory_history_boundary.py` (tie order, masking, bounds, Incognito, owner isolation, no promotion).
+
+## FIXED-1034 — `memory_search` returned as many memories as the model asked for, Incognito or not
+
+**Severity: Medium. Area: Memory / tools. Status: Fixed 2026-10-20.**
+
+**Found while doing MEM-HISTORY-03.** The broker passed `int(max_results)` straight through, so one call could ask for the whole archive, and the tool ignored Incognito.
+
+**Fixed.** The requested count is clamped to `MAX_SEARCH_RESULTS` (50), a non-number falls back to 20, and under Incognito the tool answers `withheld: incognito`. `memory_get` and the Memory page, which read one named record, are unchanged.
+
+**Evidence.** `test_memory_search_clamps_the_requested_count`, `test_memory_search_is_withheld_under_incognito`.
+
+## FIXED-1035 — There was no contract an external memory provider would have to meet (MEM-ADAPTER-04)
+
+**Severity: Low. Area: Memory / security. Status: Fixed 2026-10-20.**
+
+**Observed.** The decision allows a future external memory adapter only under opt-in egress, redaction, provenance mapping, scope propagation, local degradation, deletion reconciliation, pinned versions and audit — none of which existed as code or a threat model.
+
+**Fixed.** `raiker/memory/adapter.py`: `MemoryAdapter` protocol, a disabled-by-default `MemoryAdapterPolicy`, `prepare_adapter_payload` (only approved, active, owner-held, allowed-scope, allowed-class records; secret- and credential-like never; redacted; six fields only), `query_with_local_fallback` (pinned version, returned ids limited to those sent, `degraded` local answer on any fault) and `reconcile_deletions` (only an explicit receipt confirms; the rest stay `pending`). Audits hold ids and counts, never text. [Memory adapter threat model](../threat-models/memory-adapter.md). **No provider is integrated or enabled.**
+
+**Evidence.** `tests/test_memory_adapter_contract.py`.
+
+## FIXED-1036 — The memory key had no runbook, and nothing checked the key stays out of memory (MEM-KEY-05)
+
+**Severity: Low. Area: Memory / storage / docs. Status: Fixed 2026-10-20.**
+
+**Observed.** Where the SQLCipher key comes from, how to verify and restore an encrypted backup, what machine loss means, and how to read the key-page posture were spread over code comments and a backups section.
+
+**Fixed.** [The memory key and recovery](../guide/memory.md#the-memory-key-and-recovery) in the memory guide: key source and `store_key_missing`, keeping a copy of `app.key`, verify, restore, machine loss, the export/import route in place of rotation ([BUG-354](TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)), and the `cipher_memory_security` posture fields.
+
+**Evidence.** `tests/test_memory_key_never_leaves.py` — the key and its derived form appear in no database bytes, memory export, log line or adapter payload.
+
+## FIXED-1037 — Two contradictory memories that matched equally came back in id order (MEM-EVAL-06)
+
+**Severity: Medium. Area: Memory / retrieval / evaluation. Status: Fixed 2026-10-20.**
+
+**Observed.** The recall evaluation needed a corpus that runs through the real context assembly. Its first run found that an inferred "standup is Monday" (confidence 0.7) ranked ahead of the owner's "standup is Thursday" (1.0) because hybrid recall broke a score tie by memory id.
+
+**Fixed.** `raiker/memory/recall_evaluation.py` (`memory-recall-eval-v2`): nine synthetic cases — preference recall, stale-fact correction, contradictory memories, forgotten-memory non-resurrection, prompt-injection content, owner isolation, project isolation, Incognito and budget truncation — through `ContextGatherer`, scoring precision, provenance completeness and unsafe-recall rate. `retrieve_hybrid_memory` now breaks a tie by confidence, then recency, then id.
+
+**Evidence.** `tests/test_memory_recall_evaluation_v2.py` — precision 1.0, provenance completeness 1.0, unsafe-recall rate 0.0.
+
+## FIXED-1038 — The answer's recall backend read [REDACTED_SECRET]
+
+**Severity: Low. Area: Memory / API / UI. Status: Fixed 2026-10-20 — found live in RT-MEM-03.**
+
+**Observed.** Opened, the strip under an answer read *Recall mode: Search when relevant · searched [REDACTED_SECRET]*. The disclosure joined its labels as `memory-brief-v1+sqlite-fts5+raiker-local-hash-v1`, one unbroken 49-character token, and the response redactor masks a token that long as a possible secret — the same class as [FIXED-993](#fixed-993--a-build-handoffs-file-name-reached-the-page-as-redacted_secret) and [FIXED-1005](#fixed-1005--a-skipped-tokens-name-reached-the-page-as-redacted).
+
+**Fixed.** The gatherer joins the labels with ` + `, so no part reaches the redactor's length; the page trims each part. The redactor is unchanged.
+
+**Evidence.** `test_each_mode_assembles_exactly_what_it_says` asserts every part is under 40 characters; `memoryRecallMode.test.ts`; live RT-MEM-03 reads *searched sqlite-fts5 + raiker-local-hash-v1*.

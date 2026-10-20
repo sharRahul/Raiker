@@ -19502,6 +19502,16 @@
             "title": "Incognito",
             "type": "boolean"
           },
+          "recall_mode": {
+            "default": "search_when_relevant",
+            "enum": [
+              "off",
+              "brief",
+              "search_when_relevant"
+            ],
+            "title": "Recall Mode",
+            "type": "string"
+          },
           "retrieval": {
             "anyOf": [
               {
@@ -25305,6 +25315,30 @@
         "title": "ReadinessStep",
         "type": "object"
       },
+      "RecallModeSet": {
+        "description": "MEM-MODE-02 — the owner's ambient-recall mode, as stored.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "recall_mode": {
+            "enum": [
+              "off",
+              "brief",
+              "search_when_relevant"
+            ],
+            "title": "Recall Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "recall_mode"
+        ],
+        "title": "RecallModeSet",
+        "type": "object"
+      },
       "RecalledMemory": {
         "description": "An approved memory a turn of this conversation was given, as Raiker knows it now.",
         "properties": {
@@ -27180,6 +27214,13 @@
       },
       "SessionRecall": {
         "properties": {
+          "disclosures": {
+            "items": {
+              "$ref": "#/components/schemas/TurnMemoryDisclosure"
+            },
+            "title": "Disclosures",
+            "type": "array"
+          },
           "memories": {
             "items": {
               "$ref": "#/components/schemas/RecalledMemory"
@@ -27199,7 +27240,8 @@
         "required": [
           "ok",
           "session_id",
-          "memories"
+          "memories",
+          "disclosures"
         ],
         "title": "SessionRecall",
         "type": "object"
@@ -30888,6 +30930,70 @@
           "events"
         ],
         "title": "TurnDetailView",
+        "type": "object"
+      },
+      "TurnMemoryDisclosure": {
+        "description": "MEM-MODE-02 — which recall mode a turn ran under and what answered.\n\n``recall_mode`` is the owner's setting; ``effective_mode`` is what ran,\nwhich Incognito turns to ``off``. Labels and counts only.",
+        "properties": {
+          "brief_count": {
+            "title": "Brief Count",
+            "type": "integer"
+          },
+          "brief_omitted": {
+            "title": "Brief Omitted",
+            "type": "integer"
+          },
+          "brief_version": {
+            "title": "Brief Version",
+            "type": "string"
+          },
+          "effective_mode": {
+            "enum": [
+              "off",
+              "brief",
+              "search_when_relevant"
+            ],
+            "title": "Effective Mode",
+            "type": "string"
+          },
+          "incognito": {
+            "title": "Incognito",
+            "type": "boolean"
+          },
+          "recall_count": {
+            "title": "Recall Count",
+            "type": "integer"
+          },
+          "recall_mode": {
+            "enum": [
+              "off",
+              "brief",
+              "search_when_relevant"
+            ],
+            "title": "Recall Mode",
+            "type": "string"
+          },
+          "retrieval_backend": {
+            "title": "Retrieval Backend",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "recall_mode",
+          "effective_mode",
+          "incognito",
+          "retrieval_backend",
+          "brief_version",
+          "brief_count",
+          "brief_omitted",
+          "recall_count"
+        ],
+        "title": "TurnMemoryDisclosure",
         "type": "object"
       },
       "TurnSourceExcerpt": {
@@ -42276,6 +42382,47 @@
           }
         },
         "summary": "Decide Memory Proposal"
+      }
+    },
+    "/api/memory/recall-mode": {
+      "put": {
+        "description": "Choose the ambient-recall mode (MEM-MODE-02, human-only).\n\n``off`` recalls nothing ambiently, ``brief`` attaches only the bounded\nMemory Brief, ``search_when_relevant`` adds governed retrieval. Incognito\nstill wins over all three. An unknown mode is refused, never coerced.",
+        "operationId": "set_memory_recall_mode_api_memory_recall_mode_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecallModeSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Memory Recall Mode"
       }
     },
     "/api/memory/reconcile": {

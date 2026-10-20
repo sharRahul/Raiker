@@ -260,7 +260,7 @@ class ToolBroker:
                 str(args.get("query", "")),
                 scope=args.get("scope"),
                 entity_id=str(args["entity_id"]) if args.get("entity_id") else None,
-                max_results=int(args.get("max_results", 20)),
+                max_results=args.get("max_results", 20),
                 owner_principal_id=self.owner_scope,
             ),
             "memory_list": lambda args: memory_list(
@@ -372,6 +372,7 @@ class ToolBroker:
                     if self.store
                     else None
                 ),
+                owner_principal_id=self.owner_scope,
             ),
             # B10 — the three language-intelligence reads. Governed inside the
             # service by the `language_intelligence` gate, exactly as the code

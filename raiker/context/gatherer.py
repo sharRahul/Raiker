@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +15,7 @@ from raiker.context.models import (
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import normalize_prompt_surface
+from raiker.memory.brief import MEMORY_BRIEF_VERSION, build_memory_brief
 from raiker.memory.candidates import governed_memory_status
 from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.semantic import semantic_memory_status
@@ -196,6 +197,18 @@ class ContextGatherer:
             store, owner_principal_id, session_id=session_id, turn_id=turn_id
         )
 
+        # MEM-MODE-02 — the owner's ambient-recall mode, with Incognito over
+        # it. Resolved once so the brief, searched recall, project memory and
+        # the disclosure all answer to the same decision.
+        disclosure = self._memory_disclosure(store, owner_principal_id)
+        # A caller that is not an account has no owner whose setting applies,
+        # and no owner-scoped recall either; its explicit project context keeps
+        # the behaviour it always had.
+        effective_mode = (
+            str(disclosure.get("effective_mode") or "off") if disclosure else "search_when_relevant"
+        )
+        brief_project_id = scope.project_id or self._brief_project_id(project)
+
         builders: dict[str, Callable[[], ContextItem | None]] = {
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
             "workspace_summary": lambda: self._workspace_summary(
@@ -204,10 +217,23 @@ class ContextGatherer:
             "capability_status": lambda: self._capability_status(root, store, owner_principal_id),
             "connector_status": lambda: self._connector_status(root, store, owner_principal_id),
             "project_context": lambda: self._project_context(
-                root, store, session_id, owner_principal_id
+                root,
+                store,
+                session_id,
+                owner_principal_id,
+                include_memory=effective_mode == "search_when_relevant",
             ),
-            "memory_recall": lambda: self._memory_recall(
-                store, prompt_text, session_id, owner_principal_id, scope, query_embedder
+            "memory_brief": lambda: (
+                self._memory_brief(store, owner_principal_id, brief_project_id, disclosure)
+                if effective_mode in {"brief", "search_when_relevant"}
+                else None
+            ),
+            "memory_recall": lambda: (
+                self._memory_recall(
+                    store, prompt_text, session_id, owner_principal_id, scope, query_embedder
+                )
+                if effective_mode == "search_when_relevant"
+                else None
             ),
             "code_map": lambda: self._code_map(root, store, prompt_text, owner_principal_id),
             "approvals": lambda: self._approvals(root, store, scoped_session_id),
@@ -238,12 +264,96 @@ class ContextGatherer:
             if item is not None:
                 candidates.append(item)
 
-        return self._apply_budget(
+        bundle = self._apply_budget(
             candidates,
             session_id=session_id,
             turn_id=turn_id,
             max_items=max_items,
             max_chars=max_chars,
+        )
+        if not disclosure:
+            return bundle
+        return replace(bundle, memory_disclosure=disclosure)
+
+    # --- memory recall mode (MEM-MODE-02) -------------------------------------------
+
+    @staticmethod
+    def _memory_disclosure(store: SQLiteStore, owner_principal_id: str | None) -> dict[str, object]:
+        """The mode in force, what will run, and the backend that answers.
+
+        Empty for a caller that is not an account: there is no owner whose
+        memory could be recalled, so there is nothing to disclose.
+        """
+        if not owner_principal_id:
+            return {}
+        mode = store.get_memory_recall_mode(owner_principal_id)
+        incognito = store.is_memory_incognito(owner_principal_id)
+        effective = "off" if incognito else mode
+        if effective == "search_when_relevant":
+            from raiker.vector.backends import resolve_embedding_backend
+
+            vector = resolve_embedding_backend(store, owner_principal_id=owner_principal_id)
+            # Joined with spaces on purpose: run together, the three labels make
+            # one 40-character token, and the response redactor masks a token
+            # that long as a secret — the owner read "[REDACTED_SECRET]".
+            backend = " + ".join(
+                (
+                    MEMORY_BRIEF_VERSION,
+                    f"sqlite-{store.resolved_text_search_engine()}",
+                    vector.model_label,
+                )
+            )
+            semantic = bool(vector.semantic)
+        elif effective == "brief":
+            backend, semantic = MEMORY_BRIEF_VERSION, False
+        else:
+            backend, semantic = "none", False
+        return {
+            "recall_mode": mode,
+            "effective_mode": effective,
+            "incognito": incognito,
+            "retrieval_backend": backend,
+            "semantic": semantic,
+            "brief_version": MEMORY_BRIEF_VERSION if effective != "off" else "",
+            "brief_omitted": 0,
+        }
+
+    @staticmethod
+    def _brief_project_id(project: dict[str, object] | None) -> str | None:
+        """A Chat conversation filed in a project with memory on brings that
+        project's memories into the brief; any other project stays out."""
+        if project is None or not bool(project.get("memory_enabled")):
+            return None
+        return str(project.get("project_id") or "") or None
+
+    def _memory_brief(
+        self,
+        store: SQLiteStore,
+        owner_principal_id: str | None,
+        project_id: str | None,
+        disclosure: dict[str, object],
+    ) -> ContextItem | None:
+        """MEM-BRIEF-01 — the bounded Memory Brief as one context item."""
+        if not owner_principal_id:
+            return None
+        brief = build_memory_brief(
+            store, owner_principal_id=owner_principal_id, project_id=project_id
+        )
+        disclosure["brief_omitted"] = len(brief.omitted)
+        if not brief.items:
+            return None
+        return self._make_item(
+            source_type="memory_brief",
+            trust_level="untrusted_external",
+            sensitivity="normal",
+            provenance={
+                "origin": "memory_brief",
+                "brief_version": brief.version,
+                "project_id": project_id or "",
+            },
+            title="Memory brief: approved memories, always present",
+            content=brief.render(),
+            metadata=brief.metadata(),
         )
 
     # --- budget -------------------------------------------------------------------
@@ -316,7 +426,13 @@ class ContextGatherer:
         return attachments
 
     def _project_context(
-        self, root: Path, store: SQLiteStore, session_id: str, owner_principal_id: str | None
+        self,
+        root: Path,
+        store: SQLiteStore,
+        session_id: str,
+        owner_principal_id: str | None,
+        *,
+        include_memory: bool = True,
     ) -> ContextItem | None:
         project = self._project_for_session(store, session_id, owner_principal_id)
         if project is None:
@@ -329,6 +445,11 @@ class ContextGatherer:
         # project opted in. The memory is not deleted — only excluded from
         # the model's view until the owner turns incognito off.
         if memory_enabled and store.is_memory_incognito(owner_principal_id):
+            memory_enabled = False
+        # MEM-MODE-02 — under Off or Brief only, the project's memories are not
+        # listed here: Off recalls nothing ambiently, and Brief only reaches
+        # them through the bounded brief, which already admits this project.
+        if not include_memory:
             memory_enabled = False
         lines = [f"Project: {project['name']}"]
         if instructions:

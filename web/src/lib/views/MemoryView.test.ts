@@ -319,6 +319,27 @@ describe("MemoryView", () => {
     });
   });
 
+  it("chooses a recall mode and says Incognito overrides it", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: true, recall_mode: "search_when_relevant" },
+      "PUT /api/memory/recall-mode": { ok: true, recall_mode: "brief" },
+    });
+    render(MemoryView, { props: { tab: "recall" } });
+
+    const group = await screen.findByRole("radiogroup", { name: /recall mode/i });
+    expect(within(group).getByRole("radio", { name: /search when relevant/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText(/no mode recalls anything until you turn it off/i)).toBeInTheDocument();
+    await fireEvent.click(within(group).getByRole("radio", { name: /brief only/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/recall-mode",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ recall_mode: "brief" }) }),
+      );
+    });
+  });
+
   it("pins and forgets a memory through the governed API", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = stubFetch({

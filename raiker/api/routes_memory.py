@@ -49,6 +49,7 @@ from raiker.api.wire.memory import (
     ObservationsDeleted,
     ObservationsView,
     ProposalDecided,
+    RecallModeSet,
     RelationshipDecided,
     RelationshipRejected,
     RelationshipScan,
@@ -453,6 +454,31 @@ async def set_memory_incognito(
     if not result.ok:
         raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
     answer = cast(IncognitoSet, {"ok": True, **result.data})
+    return serialize_dto(answer)
+
+
+@router.put("/api/memory/recall-mode")
+async def set_memory_recall_mode(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Choose the ambient-recall mode (MEM-MODE-02, human-only).
+
+    ``off`` recalls nothing ambiently, ``brief`` attaches only the bounded
+    Memory Brief, ``search_when_relevant`` adds governed retrieval. Incognito
+    still wins over all three. An unknown mode is refused, never coerced.
+    """
+    mode = str(body.get("recall_mode", "")).strip()
+    result = _service(request).set_memory_recall_mode(mode, auth_data[0].principal_id)
+    if not result.ok:
+        raise refusal(
+            status.HTTP_409_CONFLICT
+            if result.reason_code == "memory_recall_mode_unknown"
+            else status.HTTP_403_FORBIDDEN,
+            result.reason_code,
+        )
+    answer = cast(RecallModeSet, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

@@ -15,6 +15,27 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-20 (Memory Brief and recall mode, hosted Anthropic Haiku 4.5)
+
+The SQLCipher memory decision's MEM-BRIEF-01 and MEM-MODE-02
+([FIXED-1031](../plans/FIXED_ITEMS.md#fixed-1031--a-durable-preference-reached-a-turn-only-when-the-prompt-shared-its-words-mem-brief-01),
+[FIXED-1032](../plans/FIXED_ITEMS.md#fixed-1032--ambient-recall-could-not-be-turned-down-and-no-answer-said-which-recall-it-ran-under-mem-mode-02)).
+A fresh workspace served by `raiker-web` on `127.0.0.1:8765`. The
+identity-linked Anthropic key and workspace ID were typed into the Models dialog
+by the spec from the run's environment; neither appears in a spec, command,
+document, screenshot or the server log. Spec: `web/e2e/mem-brief-recall-mode-live.spec.ts`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-MEM-01 | Anthropic connects through **Models → Connect** (key and workspace ID), Haiku 4.5 kept, **Test** reads *can reach* | ✅ |
+| RT-MEM-02 | A memory imported through **Recall & indexing → Review import**; the **Recall mode** card opens on *Search when relevant* | ✅ |
+| RT-MEM-03 | *Search when relevant*: *What is my favourite tea?* → `Oolong.`; the strip reads **Remembered 1 · Brief + search** and, opened, *Recall mode: Search when relevant · searched sqlite-fts5 + raiker-local-hash-v1* | ✅ after a fix found in this round ([FIXED-1038](../plans/FIXED_ITEMS.md#fixed-1038--the-answers-recall-backend-read-redacted_secret)): the backend first read *searched [REDACTED_SECRET]* |
+| RT-MEM-04 | *Brief only*: *Which drink do I like best?* — no word shared with the memory — still answers *oolong* from the brief; the strip reads **Remembered 1 · Brief only** and *no search* | ✅ |
+| RT-MEM-05 | *Off*: the same question gets no memory; the answer carries the quiet line *Memory off for this answer* and no **Remembered** strip | ✅ |
+| RT-MEM-06 | Incognito on over *Search when relevant*: the card says no mode recalls anything; the answer reads *Memory not used: Incognito is on*; the card at 390 px in dark has no horizontal overflow; Incognito turned off afterwards | ✅ |
+| Suites | `mem-brief-recall-mode-live` 6/6 (3.2 min); `tests/test_memory_brief_and_recall_mode.py`, `test_memory_history_boundary.py`, `test_memory_adapter_contract.py`, `test_memory_key_never_leaves.py`, `test_memory_recall_evaluation_v2.py` | ✅ |
+| Visual review | `docs/screenshots/2026-10-20-memory-brief-recall-mode/` (01–06), inspected at original resolution; dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-20 (model transport guard, hosted Anthropic Haiku 4.5)
 
 BUG-349 ([FIXED-1021](../plans/FIXED_ITEMS.md#fixed-1021--a-hosted-model-name-was-dialled-wherever-its-dns-answer-pointed-was-bug-349)

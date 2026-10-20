@@ -131,6 +131,8 @@ class EmbeddingProviderView(TypedDict):
 @dataclass(frozen=True)
 class MemorySettingsView(View):
     incognito: bool
+    #: MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins.
+    recall_mode: Literal["off", "brief", "search_when_relevant"] = "search_when_relevant"
     #: MEM-03 — which embedding space recall searches, and what is selectable.
     #: `retrieval` is what is in force *now*, including the reason a weaker
     #: backend is in force; `spaces` is what this workspace actually holds

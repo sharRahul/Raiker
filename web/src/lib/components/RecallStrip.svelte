@@ -12,16 +12,24 @@
    * The actions are the governed ones the Memory page already uses; nothing
    * here is a second path to the memory store. Collapsed by default: recall is
    * background, and a strip that shouts would make every turn about memory.
+   *
+   * MEM-MODE-02 — the strip also says which recall mode and backend the turn
+   * ran under, read from the turn's own disclosure. A turn that recalled
+   * nothing still says so in one quiet line, because "no memory was used"
+   * and "memory is off" are different facts an owner may need to tell apart.
    */
   import Icon from "./Icon.svelte";
-  import type { RecalledMemory } from "../apiTypes";
+  import type { RecalledMemory, TurnMemoryDisclosure } from "../apiTypes";
+  import { disclosureDetail, disclosureShort, quietDisclosure } from "../memoryRecallMode";
 
   let {
     memories,
+    disclosure = null,
     onforget,
     oncorrect,
   }: {
     memories: RecalledMemory[];
+    disclosure?: TurnMemoryDisclosure | null;
     onforget: (memory: RecalledMemory) => void | Promise<void>;
     oncorrect: (memory: RecalledMemory, text: string) => void | Promise<void>;
   } = $props();
@@ -41,9 +49,12 @@
     <button type="button" class="recall-toggle" aria-expanded={open} onclick={() => (open = !open)}>
       <Icon name={open ? "chevron-down" : "chevron-right"} size="sm" />
       <Icon name="spark" size="sm" />
-      <span>Remembered {memories.length}</span>
+      <span>{disclosure ? `Remembered ${memories.length} · ${disclosureShort(disclosure)}` : `Remembered ${memories.length}`}</span>
     </button>
     {#if open}
+      {#if disclosure}
+        <p class="recall-mode">{disclosureDetail(disclosure)}</p>
+      {/if}
       <ul class="recall-list">
         {#each memories as memory (memory.memory_id)}
           <li>
@@ -80,6 +91,11 @@
       </ul>
     {/if}
   </section>
+{:else if disclosure}
+  <p class="recall-mode recall-quiet">
+    <Icon name="spark" size="sm" />
+    <span>{quietDisclosure(disclosure)}</span>
+  </p>
 {/if}
 
 <style>
@@ -104,6 +120,20 @@
     padding: 0;
   }
   .recall-toggle:hover { color: var(--text-2); }
+  .recall-mode {
+    margin: 0;
+    font-size: var(--text-2xs);
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+  .recall-quiet {
+    margin-top: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+  }
   .recall-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .recall-list {
     list-style: none;

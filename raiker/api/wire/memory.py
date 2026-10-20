@@ -242,6 +242,13 @@ class IncognitoSet(TypedDict):
     incognito: bool
 
 
+class RecallModeSet(TypedDict):
+    """MEM-MODE-02 — the owner's ambient-recall mode, as stored."""
+
+    ok: bool
+    recall_mode: Literal["off", "brief", "search_when_relevant"]
+
+
 class EmbeddingBackendSet(TypedDict):
     ok: bool
     embedding_backend: str

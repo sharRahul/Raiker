@@ -380,6 +380,7 @@ def list_session_recall(
         "ok": True,
         "session_id": result.data["session_id"],
         "memories": result.data["memories"],
+        "disclosures": result.data["disclosures"],
     }
     return serialize_dto(answer)
 

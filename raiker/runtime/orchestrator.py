@@ -918,6 +918,25 @@ class RuntimeOrchestrator:
                 memory_ids=memory_ids,
             )
 
+    def _record_turn_memory_disclosure(
+        self, envelope: PromptEnvelope, disclosure: dict[str, object]
+    ) -> None:
+        """MEM-MODE-02 — store which recall mode and backend this turn used.
+
+        Best-effort for the same reason as the recall ledger: a workspace that
+        cannot record the disclosure must still be able to answer.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None or not disclosure:
+            return
+        with contextlib.suppress(Exception):
+            store.record_turn_memory_disclosure(
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                principal_id=envelope.user.id,
+                disclosure=disclosure,
+            )
+
     async def _conversation_history(
         self, envelope: PromptEnvelope, fixed_messages: list[ModelMessage]
     ) -> list[ModelMessage]:
@@ -2414,6 +2433,7 @@ class RuntimeOrchestrator:
         # the transcript can say which ones were used and let the owner correct
         # or forget one there. Ids only; the sentences are read live.
         self._record_turn_recall(envelope, bundle.recalled_memory_ids())
+        self._record_turn_memory_disclosure(envelope, bundle.disclosure())
         await self._instructions_loaded_hook(envelope, context_payload)
 
         retrieval_context: str | None = None

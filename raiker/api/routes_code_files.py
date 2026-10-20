@@ -586,7 +586,11 @@ async def read_code_repo_review(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """BR-D04 — the stored review of the current patch, if one was taken."""
-    from raiker.review.patch_review import latest_review, load_review, patch_fingerprint  # noqa: PLC0415
+    from raiker.review.patch_review import (  # noqa: PLC0415
+        latest_review,
+        load_review,
+        patch_fingerprint,
+    )
 
     principal_id = auth_data[0].principal_id
     repo = _owned_repo(request, repo_id, principal_id)

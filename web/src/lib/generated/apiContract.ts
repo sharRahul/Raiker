@@ -3811,6 +3811,7 @@ export type MemoryScopeChanged = {
 
 export type MemorySettingsView = {
   incognito: boolean;
+  recall_mode: "off" | "brief" | "search_when_relevant";
   embedding_backend: string;
   retrieval: EmbeddingSpaceView | null;
   spaces: EmbeddingSpaceView[];
@@ -4862,6 +4863,12 @@ export type ReadinessStep = {
   state: "done" | "blocked" | "waiting" | "unchecked";
 };
 
+/** MEM-MODE-02 — the owner's ambient-recall mode, as stored. */
+export type RecallModeSet = {
+  ok: boolean;
+  recall_mode: "off" | "brief" | "search_when_relevant";
+};
+
 /** An approved memory a turn of this conversation was given, as Raiker knows it now. */
 export type RecalledMemory = {
   memory_id: string;
@@ -5282,6 +5289,7 @@ export type SessionRecall = {
   ok: boolean;
   session_id: string;
   memories: RecalledMemory[];
+  disclosures: TurnMemoryDisclosure[];
 };
 
 export type SessionRenamed = {
@@ -5993,6 +6001,19 @@ export type TurnControl = {
 export type TurnDetailView = {
   turn: TurnView;
   events: EventView[];
+};
+
+/** MEM-MODE-02 — which recall mode a turn ran under and what answered. */
+export type TurnMemoryDisclosure = {
+  turn_id: string;
+  recall_mode: "off" | "brief" | "search_when_relevant";
+  effective_mode: "off" | "brief" | "search_when_relevant";
+  incognito: boolean;
+  retrieval_backend: string;
+  brief_version: string;
+  brief_count: number;
+  brief_omitted: number;
+  recall_count: number;
 };
 
 /** One cited source, opened at the passage the turn used (C4). */
@@ -6763,6 +6784,8 @@ export const contract = {
     request<MemoryProposal[]>("/api/memory/proposals"),
   decideMemoryProposal: (candidateId: string, body: Record<string, unknown>) =>
     call<ProposalDecided>("POST", `/api/memory/proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
+  setMemoryRecallMode: (body: Record<string, unknown>) =>
+    call<RecallModeSet>("PUT", "/api/memory/recall-mode", { body }),
   reconcileMemoryIndexes: () =>
     call<MemoryReconciled>("POST", "/api/memory/reconcile"),
   getMemoryRelationshipProposals: () =>

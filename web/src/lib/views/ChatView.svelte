@@ -1804,6 +1804,7 @@
           {#if !turn.streaming}
             <RecallStrip
               memories={recall.forTurn(turn.response?.turn_id)}
+              disclosure={recall.disclosureFor(turn.response?.turn_id)}
               onforget={recall.forget}
               oncorrect={recall.correct}
             />

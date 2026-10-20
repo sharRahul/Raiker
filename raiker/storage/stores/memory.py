@@ -267,6 +267,125 @@ class MemoryStore:
             (scope_id, backend, utc_now()),
         )
 
+    #: MEM-MODE-02 — the three ambient-recall modes, in the order the Memory
+    #: page offers them. ``search_when_relevant`` is the default because it is
+    #: what every install did before the setting existed.
+    MEMORY_RECALL_MODES = ("off", "brief", "search_when_relevant")
+    DEFAULT_MEMORY_RECALL_MODE = "search_when_relevant"
+
+    def get_memory_recall_mode(self: SQLiteStore, owner_principal_id: str | None = None) -> str:
+        """The owner's ambient-recall mode. Read like ``is_memory_incognito``.
+
+        A stored value this build does not know reads as ``off``: an unknown
+        mode is a reason to recall less, never more.
+        """
+        scope_id = (
+            f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+            if owner_principal_id
+            else self.MEMORY_SETTINGS_SCOPE
+        )
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT recall_mode FROM memory_settings WHERE scope_id = ?", (scope_id,)
+            ).fetchone()
+            if row is None and owner_principal_id is None:
+                original = self._original_owner_from_connection(connection)
+                if original is not None:
+                    row = connection.execute(
+                        "SELECT recall_mode FROM memory_settings WHERE scope_id = ?",
+                        (f"{self.MEMORY_SETTINGS_SCOPE}:{original}",),
+                    ).fetchone()
+        if row is None or not row["recall_mode"]:
+            return self.DEFAULT_MEMORY_RECALL_MODE
+        mode = str(row["recall_mode"])
+        return mode if mode in self.MEMORY_RECALL_MODES else "off"
+
+    def set_memory_recall_mode(
+        self: SQLiteStore, mode: str, owner_principal_id: str | None = None
+    ) -> None:
+        if mode not in self.MEMORY_RECALL_MODES:
+            raise ValueError("memory_recall_mode_unknown")
+        if owner_principal_id is None:
+            owner_principal_id = self.original_account_principal_id()
+        scope_id = (
+            f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+            if owner_principal_id
+            else self.MEMORY_SETTINGS_SCOPE
+        )
+        self._execute(
+            """
+            INSERT INTO memory_settings (scope_id, incognito, recall_mode, updated_at)
+            VALUES (?, 0, ?, ?)
+            ON CONFLICT(scope_id) DO UPDATE SET
+              recall_mode = excluded.recall_mode,
+              updated_at = excluded.updated_at
+            """,
+            (scope_id, mode, utc_now()),
+        )
+
+    def record_turn_memory_disclosure(
+        self: SQLiteStore,
+        *,
+        session_id: str,
+        turn_id: str,
+        principal_id: str,
+        disclosure: dict[str, Any],
+    ) -> None:
+        """MEM-MODE-02 — what memory a turn used: mode, effect and backend.
+
+        Labels and counts only; never a memory's text. One row per turn, so a
+        retried turn records what its final assembly used.
+        """
+        self._execute(
+            """
+            INSERT INTO turn_memory_disclosures
+              (session_id, turn_id, principal_id, recall_mode, effective_mode, incognito,
+               retrieval_backend, brief_version, brief_count, brief_omitted, recall_count,
+               created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, turn_id) DO UPDATE SET
+              recall_mode = excluded.recall_mode,
+              effective_mode = excluded.effective_mode,
+              incognito = excluded.incognito,
+              retrieval_backend = excluded.retrieval_backend,
+              brief_version = excluded.brief_version,
+              brief_count = excluded.brief_count,
+              brief_omitted = excluded.brief_omitted,
+              recall_count = excluded.recall_count
+            """,
+            (
+                session_id,
+                turn_id,
+                principal_id,
+                str(disclosure.get("recall_mode") or "off"),
+                str(disclosure.get("effective_mode") or "off"),
+                1 if disclosure.get("incognito") else 0,
+                str(disclosure.get("retrieval_backend") or "none"),
+                str(disclosure.get("brief_version") or ""),
+                int(disclosure.get("brief_count") or 0),
+                int(disclosure.get("brief_omitted") or 0),
+                int(disclosure.get("recall_count") or 0),
+                utc_now(),
+            ),
+        )
+
+    def load_turn_memory_disclosures(
+        self: SQLiteStore, session_id: str, principal_id: str, turn_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Owner-scoped per-turn disclosures for one conversation."""
+        query = "SELECT * FROM turn_memory_disclosures WHERE session_id = ? AND principal_id = ?"
+        params: list[Any] = [session_id, principal_id]
+        if turn_id:
+            query += " AND turn_id = ?"
+            params.append(turn_id)
+        query += " ORDER BY created_at ASC"
+        disclosures = []
+        for row in self._rows(query, tuple(params)):
+            item = dict(row)
+            item["incognito"] = bool(item.get("incognito"))
+            disclosures.append(item)
+        return disclosures
+
     def list_memories_missing_embedding(
         self: SQLiteStore,
         embedding_model: str | None,

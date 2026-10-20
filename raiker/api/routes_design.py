@@ -763,7 +763,12 @@ async def propose_design_change(document_id: str, body: DesignProposalRequest, r
 
     The answer is stored as a proposal and applied only when the owner accepts it.
     """
-    from raiker.design.agent import MAX_OUTPUT_TOKENS, parse_plan, proposal_messages, vet_operations  # noqa: PLC0415
+    from raiker.design.agent import (  # noqa: PLC0415
+        MAX_OUTPUT_TOKENS,
+        parse_plan,
+        proposal_messages,
+        vet_operations,
+    )
     from raiker.events.writer import EventLogWriter  # noqa: PLC0415
     from raiker.models.contracts import ModelMessage  # noqa: PLC0415
     from raiker.models.exceptions import ModelProviderError, safe_error  # noqa: PLC0415

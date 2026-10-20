@@ -409,3 +409,68 @@ must invalidate derived profile and goal-context indexes. Current Chat recall
 is account-wide; project filing is not a retrieval restriction or authority.
 Memory cannot enable a capability or authorise an effect. See
 [personal context](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#personal-context-without-permission-by-memory).
+
+## SQLCipher memory decision
+
+**Accepted 2026-10-20; all six delivery items implemented 2026-10-20**
+([FIXED-1031](../plans/FIXED_ITEMS.md#fixed-1031--a-durable-preference-reached-a-turn-only-when-the-prompt-shared-its-words-mem-brief-01)
+to [FIXED-1037](../plans/FIXED_ITEMS.md#fixed-1037--two-contradictory-memories-that-matched-equally-came-back-in-id-order-mem-eval-06)).
+Raiker keeps **SQLCipher-encrypted SQLite as the local, authoritative memory
+store**. Human-readable exports, vector indexes, graph indexes and any future
+external memory service are derived views or adapters, never a second
+authority. Memory is context, never authority: a recalled record cannot enable
+a capability, approve an action, change policy or instruct the runtime.
+
+```text
+event / owner input / imported source
+  -> observation metadata or memory proposal
+  -> owner review
+  -> approved encrypted durable record
+  -> policy-filtered brief / lexical / semantic / graph recall
+  -> provenance-labelled context
+```
+
+Model-inferred memories and relationships remain proposals until approved;
+secret-like and credential-like content is denied before a durable-memory
+approval is created.
+
+**Encryption is not key-page locking.** Database encryption protects contents at
+rest. `PRAGMA cipher_memory_security` asks SQLCipher to lock and wipe pages that
+hold key material; it costs roughly seven times per operation and can exhaust
+the host's locked-memory allowance. It is therefore owner-configurable through
+`RAIKER_SQLCIPHER_MEMORY_SECURITY` (`auto` enables it only after a disposable
+probe succeeds; `on` fails closed). The pragma latches on for the life of a
+process, so health reports the state in force, not only the request.
+
+### Comparative findings and the Raiker response
+
+A reference personal agent keeps two very small Markdown memories injected as a
+session-start snapshot, persists conversation history in SQLite FTS5 and offers
+optional external memory providers. Its lessons are adopted without weakening
+Raiker's model:
+
+| Finding | Raiker decision |
+|---|---|
+| A compact always-present layer keeps durable preferences available. | A bounded **Memory Brief**: a deterministic projection of approved encrypted records, not a free-form file or a second store. |
+| Session search answers "we discussed this before". | History stays distinct from durable memory: owner-scoped, bounded, redacted, untrusted, never promoted without approval. |
+| Background learning can preserve a mistaken preference. | Proposal and owner approval stay the default; background analysis may prepare a candidate, never an approved memory. |
+| Not every memory belongs on every turn. | Three per-owner modes — **Off**, **Brief only**, **Search when relevant** — with Incognito over all three. |
+| External providers add data-egress, provenance and deletion problems. | No provider is an authority. A `MemoryAdapter` is disabled by default with explicit egress, stable ids, deletion receipts and audit; none is enabled. |
+| Profiles must not share mutable memory by accident. | Every reader and writer requires owner identity and explicit scope. |
+| Fixed capacity forces curation. | Budgets apply to the brief and retrieval context, not to the encrypted archive. |
+
+### Delivery
+
+| Item | Delivered | Evidence |
+|---|---|---|
+| MEM-BRIEF-01 — bounded brief | `raiker/memory/brief.py` (`memory-brief-v1`): approved, active, owner-held, in-scope, non-sensitive records with confidence ≥ 0.6; pinned → owner-written → confidence → trust → freshness → id; at most 8 items and 400 tokens; each item names `memory_id`, provenance, trust label, freshness and truncation reason. A `memory_brief` context source ranked above searched recall and recorded in the turn recall ledger. | `tests/test_memory_brief_and_recall_mode.py` |
+| MEM-MODE-02 — recall mode | `memory_settings.recall_mode` (`off`, `brief`, `search_when_relevant`; default `search_when_relevant`), `PUT /api/memory/recall-mode`, **Memory → Recall & indexing → Recall mode**. Incognito wins. Each turn records `turn_memory_disclosures` (mode, effect, backend, counts) and the transcript says which mode and backend answered. | `tests/test_memory_brief_and_recall_mode.py`, `RecallStrip.test.ts`, `MemoryView.test.ts`, live test RT-MEM-BRIEF |
+| MEM-HISTORY-03 — history boundary | Deterministic tie order, at most 25 exchanges of 1,200 characters, redaction with a `redacted` flag, `withheld: incognito`, no promotion; `memory_search` clamped to 50 and withheld under Incognito. Legacy unattributed conversations (`user_id IS NULL`) stay visible to the account, as in every conversation listing. | `tests/test_memory_history_boundary.py` |
+| MEM-ADAPTER-04 — adapter contract | `raiker/memory/adapter.py` and the [memory adapter threat model](../threat-models/memory-adapter.md). No provider. | `tests/test_memory_adapter_contract.py` |
+| MEM-KEY-05 — key runbook | [The memory key and recovery](../guide/memory.md#the-memory-key-and-recovery). In-place key rotation is not offered; the runbook says so and gives the export/import route ([BUG-354](../plans/TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)). | `tests/test_memory_key_never_leaves.py` |
+| MEM-EVAL-06 — recall evaluation | `raiker/memory/recall_evaluation.py` (`memory-recall-eval-v2`): nine synthetic cases through the real context assembly, scoring precision, provenance completeness and unsafe-recall rate. It found tied contradictory memories returned in id order, now decided by confidence then recency. | `tests/test_memory_recall_evaluation_v2.py` |
+
+**Non-goals.** No automatic "remember everything" capture, unbounded prompt
+injection, cloud sync, shared multi-user memory service or external provider.
+Encrypted storage is not a substitute for governance, provenance, retention or
+owner control.

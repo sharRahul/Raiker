@@ -8,26 +8,37 @@
  * the strip absent: recall that cannot be shown must never be implied.
  */
 import { api } from "../../api";
-import type { RecalledMemory } from "../../apiTypes";
+import type { RecalledMemory, TurnMemoryDisclosure } from "../../apiTypes";
 
 export class RecallLedger {
   memories = $state<RecalledMemory[]>([]);
+  // MEM-MODE-02 — which recall mode and backend each turn ran under.
+  disclosures = $state<TurnMemoryDisclosure[]>([]);
   notice = $state<string | null>(null);
 
   constructor(private readonly session: () => string | null) {}
 
   refresh = async (id: string) => {
     try {
-      this.memories = (await api.sessionRecall(id)).memories;
+      const recall = await api.sessionRecall(id);
+      this.memories = recall.memories;
+      this.disclosures = recall.disclosures ?? [];
     } catch {
       this.memories = [];
+      this.disclosures = [];
     }
   };
 
   /** A new conversation starts with nothing recalled and nothing to report. */
   reset = () => {
     this.memories = [];
+    this.disclosures = [];
     this.notice = null;
+  };
+
+  disclosureFor = (turnId: string | undefined): TurnMemoryDisclosure | null => {
+    if (turnId === undefined || turnId === "") return null;
+    return this.disclosures.find((disclosure) => disclosure.turn_id === turnId) ?? null;
   };
 
   forTurn = (turnId: string | undefined): RecalledMemory[] => {

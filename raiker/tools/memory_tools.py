@@ -10,6 +10,9 @@ from raiker.memory.store import get_memory, list_memory
 from raiker.storage.sqlite import SQLiteStore
 from raiker.vector.backends import resolve_embedding_backend
 
+#: The most approved memories one ``memory_search`` call returns, whatever it asks.
+MAX_SEARCH_RESULTS = 50
+
 
 def memory_write(
     workspace_root: str | Path,
@@ -50,7 +53,7 @@ def memory_search(
     *,
     scope: str | None = None,
     entity_id: str | None = None,
-    max_results: int = 20,
+    max_results: Any = 20,
     owner_principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Search approved memory the way the runtime does — all three legs.
@@ -66,14 +69,24 @@ def memory_search(
     """
     if not query.strip():
         return {"status": "failed", "error": {"type": "empty_query", "message": "Search query cannot be empty."}}
+    # MEM-HISTORY-03 — a result budget the model cannot widen: the requested
+    # count is clamped, never trusted, so one call cannot pull the archive.
+    try:
+        limit = max(1, min(int(max_results), MAX_SEARCH_RESULTS))
+    except (TypeError, ValueError):
+        limit = 20
     store = SQLiteStore(workspace_root)
+    if owner_principal_id and store.is_memory_incognito(owner_principal_id):
+        # Incognito disables approved-memory recall, the assistant's own search
+        # included. Said, not returned empty: "nothing matched" is a different fact.
+        return {"status": "withheld", "reason": "incognito", "count": 0, "results": []}
     query_embedder = GovernedQueryEmbedder(store, owner_principal_id)
     results = retrieve_hybrid_memory(
         store=store,
         query=query,
         scope=scope,
         entity_id=entity_id,
-        limit=max_results,
+        limit=limit,
         owner_principal_id=owner_principal_id,
         query_embedder=query_embedder,
     )

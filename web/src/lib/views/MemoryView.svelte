@@ -6,6 +6,7 @@
   import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryImportBatch, MemoryImportPreview, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
+  import { RECALL_MODE_OPTIONS, type MemoryRecallMode } from "../memoryRecallMode";
   import GuideLink from "../components/GuideLink.svelte";
   import MemoryRecordDrawer from "../components/MemoryRecordDrawer.svelte";
   import FileLibrary from "../components/FileLibrary.svelte";
@@ -153,6 +154,15 @@
     busy = true; actionError = null;
     try { await api.setMemoryIncognito(!settings.incognito); await load(); }
     catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}).` : "Could not update memory use."; }
+    finally { busy = false; }
+  }
+  // MEM-MODE-02 — the owner's ambient-recall mode. Incognito still wins on the
+  // server, so the card says so instead of pretending the mode is in force.
+  async function chooseRecallMode(mode: MemoryRecallMode) {
+    if (!settings || busy || settings.recall_mode === mode) return;
+    busy = true; actionError = null;
+    try { await api.setMemoryRecallMode(mode); await load(); }
+    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall mode (${e.status}).` : "Could not change the recall mode."; }
     finally { busy = false; }
   }
   async function togglePin(m: MemoryControlView) {
@@ -761,6 +771,32 @@
     <button class="switch" class:on={settings.incognito} role="switch" aria-checked={settings.incognito} aria-label="Incognito session" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>{settings.incognito ? "On" : "Off"}</b></button>
   </section>
 
+  <section class="control-card recall-mode-card">
+    <div>
+      <h3>Recall mode</h3>
+      <p>What Raiker adds to a turn on its own. Each answer says which mode it ran under.</p>
+      {#if settings.incognito}
+        <p class="control-note">Incognito is on, so no mode recalls anything until you turn it off.</p>
+      {/if}
+      <div class="recall-modes" role="radiogroup" aria-label="Recall mode">
+        {#each RECALL_MODE_OPTIONS as option (option.value)}
+          <button
+            type="button"
+            class="recall-mode-opt"
+            class:selected={settings.recall_mode === option.value}
+            role="radio"
+            aria-checked={settings.recall_mode === option.value}
+            disabled={busy}
+            onclick={() => void chooseRecallMode(option.value)}
+          >
+            <strong>{option.label}</strong>
+            <small>{option.detail}</small>
+          </button>
+        {/each}
+      </div>
+    </div>
+  </section>
+
   <section class="control-card">
     <div>
       <h3>Recall backend</h3>
@@ -900,6 +936,14 @@
   .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
   .control-card + .control-card { margin-top:var(--space-3); }
+  .recall-mode-card > div { width:100%; }
+  .recall-modes { display:grid; gap:var(--space-2); grid-template-columns:repeat(auto-fit, minmax(12rem, 1fr)); margin-top:var(--space-3); }
+  .recall-mode-opt { display:grid; gap:.2rem; text-align:left; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); font:inherit; cursor:pointer; transition:border-color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease); }
+  .recall-mode-opt:hover:not(:disabled) { border-color:var(--border-strong); }
+  .recall-mode-opt.selected { border-color:var(--accent); background:var(--accent-soft); }
+  .recall-mode-opt:disabled { cursor:default; opacity:.7; }
+  .recall-mode-opt:focus-visible { outline:3px solid var(--focus-ring); outline-offset:2px; }
+  .recall-mode-opt small { color:var(--text-2); font-weight:400; font-size:var(--text-xs); }
   /* MEM-03 — the sentence that says which embedding is in force. It is a
      statement of fact rather than an alert, so it uses the same tone treatment
      as the posture strip above rather than a second, louder one. */

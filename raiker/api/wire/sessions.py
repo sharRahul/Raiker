@@ -336,10 +336,29 @@ class RecalledMemory(TypedDict):
     pinned: bool
 
 
+class TurnMemoryDisclosure(TypedDict):
+    """MEM-MODE-02 — which recall mode a turn ran under and what answered.
+
+    ``recall_mode`` is the owner's setting; ``effective_mode`` is what ran,
+    which Incognito turns to ``off``. Labels and counts only.
+    """
+
+    turn_id: str
+    recall_mode: Literal["off", "brief", "search_when_relevant"]
+    effective_mode: Literal["off", "brief", "search_when_relevant"]
+    incognito: bool
+    retrieval_backend: str
+    brief_version: str
+    brief_count: int
+    brief_omitted: int
+    recall_count: int
+
+
 class SessionRecall(TypedDict):
     ok: bool
     session_id: str
     memories: list[RecalledMemory]
+    disclosures: list[TurnMemoryDisclosure]
 
 
 class AgentPlanStep(TypedDict):

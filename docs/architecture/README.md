@@ -78,7 +78,7 @@ The cross-cutting map of every authority entry path is maintained in
 | Knowledge graph and repository code map | [Graph memory and codemap](GRAPH_MEMORY_AND_CODEMAP_SPEC.md) |
 | Persistence and retrieval | [Storage, database, and search](STORAGE_DATABASE_AND_SEARCH_SPEC.md) |
 | Archive-first hybrid memory design | [Hybrid memory plan](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md) |
-| Encrypted memory store decision, Memory Brief and recall modes | [SQLCipher memory decision](RAIKER_SQLCIPHER_MEMORY.md) |
+| Encrypted memory store decision, Memory Brief and recall modes | [SQLCipher memory decision](MEMORY_AND_CONTEXT_STRATEGY.md#sqlcipher-memory-decision) |
 
 The 2026-08-11 memory reliability audit closed in full and its plan was removed
 on 2026-09-28; its records are in [`FIXED_ITEMS.md`](../plans/FIXED_ITEMS.md),

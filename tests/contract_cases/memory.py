@@ -297,6 +297,9 @@ CASES: Cases = {
     ("POST", "/api/memory/gists/{gist_id}/discard"): _gist,
     ("POST", "/api/memory/eidetic/cleanup"): _cleanup,
     ("PUT", "/api/memory/incognito"): plain("/api/memory/incognito", {"incognito": True}),
+    ("PUT", "/api/memory/recall-mode"): plain(
+        "/api/memory/recall-mode", {"recall_mode": "brief"}
+    ),
     ("PUT", "/api/memory/embedding-backend"): plain(
         "/api/memory/embedding-backend", {"embedding_backend": "auto"}
     ),

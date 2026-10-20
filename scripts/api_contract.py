@@ -468,6 +468,7 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("PUT", "/api/mcp/servers/{server_id}"),
         ("PUT", "/api/memory/embedding-backend"),
         ("PUT", "/api/memory/incognito"),
+        ("PUT", "/api/memory/recall-mode"),
         ("PUT", "/api/memory/{memory_id}"),
         ("PUT", "/api/memory/{memory_id}/archive"),
         ("PUT", "/api/memory/{memory_id}/expiry"),

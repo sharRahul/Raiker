@@ -19,6 +19,8 @@ SOURCE_TYPES = (
     "capability_status",
     "connector_status",
     "project_context",
+    # MEM-BRIEF-01 — the bounded, always-present projection of approved memory.
+    "memory_brief",
     "memory_recall",
     # B9 — the repository code map: which files declare what, ranked against this
     # turn's prompt. Derived from workspace files, so it is untrusted data.
@@ -33,6 +35,9 @@ PRIORITY_ORDER = (
     # user this turn, so they outrank ambient metadata when the budget is tight.
     "attachment",
     "project_context",
+    # MEM-BRIEF-01 — small and owner-approved, so it outranks searched recall:
+    # a durable preference should survive a tight budget before a match does.
+    "memory_brief",
     "memory_recall",
     "workspace_summary",
     # B9 — orientation in the repository outranks the runtime's own bookkeeping:
@@ -89,6 +94,9 @@ class ContextBundle(View):
     redaction_applied: bool
     sources: list[str]
     summary: str
+    #: MEM-MODE-02 — which recall mode was in force, what ran and which backend
+    #: answered. Labels and counts only; empty for a turn with no owner.
+    memory_disclosure: dict[str, object] = field(default_factory=dict)
 
     @property
     def included_items(self) -> list[ContextItem]:
@@ -111,7 +119,9 @@ class ContextBundle(View):
         """
         ids: list[str] = []
         for item in self.included_items:
-            if item.source.source_type != "memory_recall":
+            # MEM-BRIEF-01 — brief items are recalled memories too: the
+            # transcript must name them, and Forget must work on them there.
+            if item.source.source_type not in {"memory_brief", "memory_recall"}:
                 continue
             # `metadata` is `dict[str, object]`, so the list has to be recovered
             # rather than assumed: a bundle carrying something else under this
@@ -140,6 +150,27 @@ class ContextBundle(View):
             "redaction_applied": self.redaction_applied,
             "source_types": self.source_types(),
             "sources": list(self.sources),
+            "memory_disclosure": self.disclosure(),
+        }
+
+    def disclosure(self) -> dict[str, object]:
+        """The disclosure, with counts taken from what the budget let in.
+
+        A brief or recall item the budget dropped was not *used*, so it is not
+        counted as used, even though it was built.
+        """
+        if not self.memory_disclosure:
+            return {}
+        counts = {"memory_brief": 0, "memory_recall": 0}
+        for item in self.included_items:
+            kind = item.source.source_type
+            if kind in counts:
+                ids = item.metadata.get("memory_ids")
+                counts[kind] = len(ids) if isinstance(ids, list) else 0
+        return {
+            **self.memory_disclosure,
+            "brief_count": counts["memory_brief"],
+            "recall_count": counts["memory_recall"],
         }
 
 

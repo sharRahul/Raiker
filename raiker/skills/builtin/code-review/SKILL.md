@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review a diff, a branch, a pull request, or a working tree for defects that will actually bite — correctness bugs, missed reuse, needless complexity, and gaps in test coverage — and report only findings worth someone's time. Use whenever someone says "review this", "review my PR", "look over this change", "what did I miss", "is this ready to merge", "sanity-check this diff", or asks for a second pass before shipping. Use it too when a review is expected to leave comments on a pull request, when a change touches code with a house style to honour (CLAUDE.md, CONTRIBUTING.md, a style guide), or when someone asks why a review keeps producing noise. Do not use it for security auditing — the security-review skill is aimed at that and applies different thresholds.
+description: Review a diff, a branch, a pull request, or a working tree for defects that will actually bite — correctness bugs, missed reuse, needless complexity, and gaps in test coverage — and report only findings worth someone's time. Use whenever someone says "review this", "review my PR", "look over this change", "what did I miss", "is this ready to merge", "sanity-check this diff", or asks for a second pass before shipping. Use it too when a review is expected to leave comments on a pull request, when a change touches code with a house style to honour (AGENTS.md, CONTRIBUTING.md, a style guide), or when someone asks why a review keeps producing noise. Do not use it for security auditing — the security-review skill is aimed at that and applies different thresholds.
 metadata:
   version: 1.0.0
 ---
@@ -34,8 +34,8 @@ In order, because each step changes how you read the next:
 1. **What is the change trying to do?** From the PR body, the commit messages,
    the issue it names. A diff read without its intent produces findings that
    argue with the goal rather than with the code.
-2. **What rules does this repository already have?** Read every `CLAUDE.md`,
-   `AGENTS.md`, `CONTRIBUTING.md` and style guide that applies to the changed
+2. **What rules does this repository already have?** Read every
+   `AGENTS.md` (and any assistant-specific rule file), `CONTRIBUTING.md` and style guide that applies to the changed
    paths, root-most first, most specific last. A house rule you did not read is
    a finding you will invent.
 3. **What did the surrounding code already do?** Read the file around each
@@ -145,10 +145,10 @@ The same review discipline is portable; only the mechanism around it differs.
 
 | Control | Elsewhere | In Raiker |
 |---|---|---|
-| Invoking a review | Claude Code `/code-review`; Codex review command; Cowork task | Skills → activate, then ask for a review in Chat or Build |
-| House rules | `CLAUDE.md` / `AGENTS.md` discovered by directory | Same files, read from the workspace boundary |
-| Parallel reviewer agents | Claude Code subagents; Hermes delegation | Subagent contracts, each with its own tool grant |
-| Posting to a PR | Claude Code `--comment`; Codex PR integration; OpenClaw channel relay | Git write capability, approval-gated |
+| Invoking a review | Other hosts: a `/code-review` command or a review task | Skills → activate, then ask for a review in Chat or Build |
+| House rules | `AGENTS.md` and assistant-specific rule files discovered by directory | Same files, read from the workspace boundary |
+| Parallel reviewer agents | Other hosts' subagents or delegation | Subagent contracts, each with its own tool grant |
+| Posting to a PR | Other hosts' comment flags, PR integrations or channel relays | Git write capability, approval-gated |
 | Confidence filtering | Plugin-side threshold | The threshold in this document, applied before anything is reported |
 
 Read `references/finding-quality.md` for the calibration examples — three

@@ -2,7 +2,7 @@
 
 **Scope.** &lt;branch, PR number, or revision range&gt; · &lt;n&gt; files ·
 &lt;n&gt; hunks
-**House rules read.** &lt;CLAUDE.md paths, style guides — or "none found"&gt;
+**House rules read.** &lt;AGENTS.md and rule-file paths, style guides — or "none found"&gt;
 **Result.** &lt;n&gt; findings at or above the reporting threshold.
 
 ---

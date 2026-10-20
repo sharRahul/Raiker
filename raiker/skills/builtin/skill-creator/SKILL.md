@@ -178,8 +178,8 @@ or an approval, so installing one is a low-risk, reversible act.
 ### Across agent surfaces
 
 A `SKILL.md` written to this shape is portable: the same document installs as a
-Claude Code / Cowork skill, is readable as a Codex or ChatGPT instruction file,
-and works as a Hermes or OpenClaw agent capability document. What differs is
+skill in other agent hosts, is readable as another coding agent's instruction
+file, and works as an agent capability document elsewhere. What differs is
 what surrounds it, and the differences are worth knowing before you write
 platform-specific instructions into a skill body.
 

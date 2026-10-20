@@ -100,11 +100,11 @@ differ in composer, protocol and default posture, never in authority.
 
 | Platform | What it is | Raiker surface it is measured against | Primary sources |
 |---|---|---|---|
-| **reference personal agent (personal AI agent)** | User-defined goals, background continuation after the app closes, proactive suggestions, isolated persistent Secure VM/browser, cross-app execution, consented actions and audit as Meta documents; **not** reference personal agent Wonder/reference personal agent Code | Personal-agent PAA-01–08/10; live parity remains untested | Meta product, launch, Secure VM/security, reference personal agent Wonder model announcement |
-| **external hosted assistant / external workspace assistant** | Anthropic's knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | external workspace assistant overview, Get started, Schedule recurring tasks, Projects in external workspace assistant, Computer use in external workspace assistant, Monitoring (OpenTelemetry), OpenTelemetry monitoring (support article), Dispatch — background tasks, Install plugins, external workspace assistant changelog, Skills overview, Connectors overview |
-| **external coding assistant** | Anthropic's coding agent: tools, permissions, sandboxing, hooks, skills, subagents, plugins, MCP | Raiker Build and the shared runtime | Extend external coding assistant, How it works, Tools reference, Permissions, Permission modes, Sandboxing, Sandbox environments, Hooks, Plugins, Plugins reference, Plugin marketplaces, Skills, Subagents, Workflows, Cross-session messaging, MCP, PROJECT_RULES.md, Checkpointing, Artifacts, Managed settings, Settings reference, Security, Monitoring, Sandboxing engineering post, Containment engineering post |
-| **ChatGPT Chat / Work** | OpenAI's assistant and workspace product: apps/connectors, projects, memory, agent mode, scheduled automations | Raiker Chat and the shared runtime | [Connectors in ChatGPT](https://help.openai.com/en/articles/11487775-connectors-in-chatgpt), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory FAQ](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq), [Voice mode FAQ](https://help.openai.com/en/articles/8400625-voice-mode-faq), [connected-workspace assistant admin FAQ](https://learn.chatgpt.com/docs/enterprise/work-admin-faq) |
-| **OpenAI local subscription client** | OpenAI's coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | [local subscription client sandboxing](https://learn.chatgpt.com/docs/sandboxing), [local subscription client manual](https://developers.openai.com/), [Running local subscription client safely](https://openai.com/), [Windows sandbox](https://openai.com/), [local subscription client upgrades](https://openai.com/), [local subscription client skills](https://learn.chatgpt.com/docs/build-skills) |
+| **reference personal agent (personal AI agent)** | User-defined goals, background continuation after the app closes, proactive suggestions, isolated persistent Secure VM/browser, cross-app execution, consented actions and audit as the vendor documents; **not** the vendor's model family or coding surface | Personal-agent PAA-01–08/10; live parity remains untested | Vendor product page, launch announcement, Secure VM/security note, model announcement |
+| **external hosted assistant / external workspace assistant** | A hosted knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | external workspace assistant overview, Get started, Schedule recurring tasks, Projects in external workspace assistant, Computer use in external workspace assistant, Monitoring (OpenTelemetry), OpenTelemetry monitoring (support article), Dispatch — background tasks, Install plugins, external workspace assistant changelog, Skills overview, Connectors overview |
+| **external coding assistant** | A hosted coding agent: tools, permissions, sandboxing, hooks, skills, subagents, plugins, MCP | Raiker Build and the shared runtime | Extend external coding assistant, How it works, Tools reference, Permissions, Permission modes, Sandboxing, Sandbox environments, Hooks, Plugins, Plugins reference, Plugin marketplaces, Skills, Subagents, Workflows, Cross-session messaging, MCP, PROJECT_RULES.md, Checkpointing, Artifacts, Managed settings, Settings reference, Security, Monitoring, Sandboxing engineering post, Containment engineering post |
+| **Reference chat assistant** | A hosted assistant and workspace product: apps/connectors, projects, memory, agent mode, scheduled automations | Raiker Chat and the shared runtime | Connectors in reference chat assistant, Projects, Memory FAQ, Voice mode FAQ, connected-workspace assistant admin FAQ |
+| **Hosted coding agent** | A hosted coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | local subscription client sandboxing, local subscription client manual, Running local subscription client safely, Windows sandbox, local subscription client upgrades, local subscription client skills |
 | **reference gateway** | Open-source local-first personal-agent gateway: channels, exec tool, optional container sandboxing, plugins | Platform-wide, and Raiker's channel and execution surfaces | External product documentation retained in the research log |
 | **reference extensible harness** | MIT-licensed agent harness (developer preview, v0.1, 2026-08-13) where models, tools, skills, sessions, sandboxes, storage, loops, scheduling and UI are all plugins, over an append-only trajectory | Platform-wide, and Raiker's extensibility and observability surfaces | External product documentation retained in the research log |
 | **Cross-vendor standards** | Not a platform: the formats every one of the above now implements, which is where interoperability claims have to be measured | Platform-wide | [Model Context Protocol](https://modelcontextprotocol.io/), [MCP versioning and revisions](https://modelcontextprotocol.io/specification/versioning), [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp), [`modelcontextprotocol/ext-apps`](https://github.com/modelcontextprotocol/ext-apps), [Agent Skills](https://agentskills.io), [Agent Skills specification](https://agentskills.io/specification), [`agentskills/agentskills`](https://github.com/agentskills/agentskills) |
@@ -124,19 +124,19 @@ carried-forward claims have now been re-read against the sources themselves.
 
 | Domain group | Status this pass | What it means for the claims drawn from it |
 |---|---|---|
-| `anthropic.com`, `github.com`, `www.anthropic.com` | Reachable, re-read | Confirmed for a second consecutive pass |
-| `anthropic.com` | **Reachable — newly verified** | external workspace assistant claims were carried forward unverified last pass; re-read here |
-| `learn.chatgpt.com`, `developers.openai.com` | **Reachable — newly verified** | local subscription client sandbox and connected-workspace assistant admin claims re-read here |
-| `deepseek.com`, `docs.reference platform.ai`, `reference platform.ai`, `reference-personal-agent.nousresearch.com` | **Reachable — newly verified** | Harness, reference platform and reference platform claims re-read here |
+| The external workspace and coding assistants' documentation hosts, `github.com` | Reachable, re-read | Confirmed for a second consecutive pass |
+| The external workspace assistant's product pages | **Reachable — newly verified** | external workspace assistant claims were carried forward unverified last pass; re-read here |
+| The hosted coding agent's documentation hosts | **Reachable — newly verified** | local subscription client sandbox and connected-workspace assistant admin claims re-read here |
+| The reference platforms' and reference personal agent's documentation hosts | **Reachable — newly verified** | Harness, reference platform and reference personal agent claims re-read here |
 | `modelcontextprotocol.io` | **Reachable — read in full this pass** | The versioning page and SEP-1865 were read, not just resolved; both back new rows |
 | `agentskills.io` | **Reachable — newly cited** | The overview, the specification and the client list were read this pass |
 | `genai.owasp.org`, `huggingface.co`, `openrouter.ai`, `lmstudio.ai`, `docs.ollama.com`, `pypi.org` | Reachable | Entry points confirmed to resolve |
-| `openai.com`, `help.openai.com`, `platform.openai.com` | **Bot-blocked (HTTP 403), not dead** | These refuse automated requests. The URLs are canonical and were not invented; claims resting on them alone are still not strengthened |
+| One vendor's product, help and platform hosts | **Bot-blocked (HTTP 403), not dead** | These refuse automated requests. The URLs are canonical and were not invented; claims resting on them alone are still not strengthened |
 
 **Every external URL in the documentation was requested this pass**, not just
 those in the table above. All 114 distinct `http(s)` links across `README.md`
 and `docs/**` were fetched: **106 answered `200`**, **8 answered `403`** — every
-one of them on an `openai.com` host, exactly the bot-blocking already recorded —
+one of them on that vendor's hosts, exactly the bot-blocking already recorded —
 and one is `https://example.test`, a deliberate placeholder inside a test
 assertion in an archived plan rather than a citation. **No dead link, no
 redirect left uncorrected, and no fabricated URL.**
@@ -152,8 +152,7 @@ weather.
 carried into the rows below:
 
 - **The local subscription client sandboxing URL had moved.**
-  `developers.openai.com/codex/concepts/sandboxing` answers `308 Permanent
-  Redirect` to [`learn.chatgpt.com/docs/sandboxing`](https://learn.chatgpt.com/docs/sandboxing),
+  The old sandboxing page answers `308 Permanent Redirect` to its new location,
   which is now cited directly. The claims it backs — `read-only` /
   `workspace-write` / `danger-full-access`, `untrusted` / `on-request` / `never`,
   network denied by default, Seatbelt on macOS, bubblewrap plus optional Landlock
@@ -168,8 +167,8 @@ carried into the rows below:
   *source* (`config`, `hook`, `user_permanent`, `user_temporary`, `user_abort`,
   `user_reject`). That is the closest external analogue to Raiker's audit record,
   and it sharpens the OpenTelemetry backlog item rather than changing it.
-- **reference platform supports more messaging surfaces than recorded.** The [messaging
-  gateway docs](https://reference-personal-agent.nousresearch.com/docs/user-guide/messaging/)
+- **reference platform supports more messaging surfaces than recorded.** The messaging
+  gateway docs
   name **27+** platforms; this document said "20+", which was conservative rather
   than wrong. The messaging source is now cited alongside the tools source.
 - **reference platform's seven terminal backends and 40+ tools are confirmed** from the
@@ -193,7 +192,7 @@ carried into the rows below and into the backlog:
   [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)
   declares UI resources under a `ui://` scheme, links them to tools through
   metadata, and renders them in a **mandatory sandboxed iframe** with auditable
-  JSON-RPC back to the host; the Anthropic assistant
+  JSON-RPC back to the host; a reference chat assistant
   ships it
   behind a per-app permission prompt. **This corrects a claim in this document.**
   It previously said no compared platform ships plugin UI panels — true of the
@@ -206,16 +205,15 @@ carried into the rows below and into the backlog:
   anywhere, and it is the underlying reason for two gaps already in the matrix.
 - **external workspace assistant has a delegating agent that routes child tasks by surface.**
   Dispatch takes one high-level
-  brief, splits it into child tasks, and routes each to **Code** (coding work) or
+  brief, splits it into child tasks, and routes each to **external coding assistant** (coding work) or
   **external workspace assistant** (knowledge work), tracking six states including *Awaiting answer*.
   Two details matter for Raiker: it is the concrete form of the delegated-ownership
   gap (BUG-220), and an unanswered permission prompt is **auto-denied after ten
   minutes** while the task continues — a design Raiker should not copy.
-- **Two local subscription client URLs move.** `developers.openai.com/codex/skills` answers `308` to
-  [`learn.chatgpt.com/docs/build-skills`](https://learn.chatgpt.com/docs/build-skills)
-  (local subscription client skills additionally accept an optional `agents/openai.yaml` for UI
-  metadata, `allow_implicit_invocation` and `dependencies.tools`).
-  `developers.openai.com/codex/codex-manual.md` still resolves `200` and is
+- **Two local subscription client URLs move.** The skills page answers `308` to
+  its new location (local subscription client skills additionally accept an
+  optional vendor-specific YAML file for UI metadata, `allow_implicit_invocation`
+  and `dependencies.tools`). The agent's manual still resolves `200` and is
   unchanged.
 
 **What earlier passes corrected, retained here.** Two URL corrections and three
@@ -226,7 +224,7 @@ claim corrections still stand, and are not re-litigated below:
   `the verified repository`.
   Fetching it is also what established the seventh terminal backend (Vercel
   Sandbox) an earlier pass had missed.
-- One OpenAI help URL was truncated (`…/11487775-connectors-in`) and carries its
+- One vendor help URL was truncated (`…/11487775-connectors-in`) and carries its
   full slug.
 - Three claims about reference platforms were wrong and were corrected in place,
   each marked where it appears: hook lifecycle events were recorded as "at parity"
@@ -256,9 +254,9 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 |---|---|---|---|---|---|---|
 | Gather → act → verify agentic loop | external coding assistant, local subscription client, reference platform, reference platform | Shared runtime | Implemented | `raiker/gateway/agent_gateway.py`, `raiker/runtime/orchestrator.py` | Verification is advisory rather than a gate | PARITY |
 | Streamed turn with incremental text | All | Chat, Build | Implemented | `raiker/contracts/streaming.py`, `ChatView.svelte` | — | PARITY |
-| Model reasoning shown apart from the answer | ChatGPT, external coding assistant, local subscription client, external workspace assistant | Chat, Build | Implemented | `reasoning_delta`, `ReasoningBlock.svelte` | — | PARITY |
+| Model reasoning shown apart from the answer | reference chat assistant, external coding assistant, local subscription client, external workspace assistant | Chat, Build | Implemented | `reasoning_delta`, `ReasoningBlock.svelte` | — | PARITY |
 | Retaining the model's reasoning is the owner's choice | None — all retain it, none offers a way not to | Platform-wide | Implemented | `turns.reasoning_text` written only under Settings → Privacy | — | **YES — differentiator** |
-| Stop / steer a running turn | external coding assistant, local subscription client, ChatGPT | Chat, Build | Implemented | `POST /api/interrupts`, `raiker/runtime/interrupts.py` | — | PARITY |
+| Stop / steer a running turn | external coding assistant, local subscription client, reference chat assistant | Chat, Build | Implemented | `POST /api/interrupts`, `raiker/runtime/interrupts.py` | — | PARITY |
 | Parallel tool calls in one batch | external coding assistant, local subscription client | Shared runtime | Implemented | `raiker/tools/broker.py` — concurrent for validated read-only calls only | A batch containing an approval is walked serially, by design | **YES — improvement** |
 | Turn parks on an approval and resumes | external workspace assistant, external coding assistant | Shared runtime | Implemented | `turn_suspended_for_approval` / `turn_resumed_after_approval` | — | **YES — improvement** |
 | Per-turn bound on tool calls | external coding assistant, local subscription client | Shared runtime | Implemented | `PromptOptions.max_tool_calls` | — | PARITY |
@@ -346,7 +344,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Plugin-contributed executables on `PATH` | external coding assistant `bin/` | Extensions → Plugins | Different by design | — | Putting plugin-authored binaries on a command's `PATH` is plugin code execution under another name | **AVOID — see [4.4](#44-plugin-code-on-the-command-path)** |
 | Plugin-contributed themes / output styles | external coding assistant `themes/`, `output-styles/` | — | Proposed | — | Raiker's design tokens are product-owned (`docs/architecture/VISUAL_DESIGN_SPEC.md`) | NO — little advantage |
 | Plugin-contributed UI panels | No external coding assistant *plugin component* is a panel — but see the row below; the frame has changed | Extensions → Plugins | Proposed | — | Named in Raiker's own `PLUGIN_SYSTEM_SPEC.md`; retired 2026-10-18 as superseded by MCP Apps (row below); plugins do not draw pages | NO — little advantage |
-| Server-contributed interactive UI, sandboxed and permission-gated | the Anthropic assistant, via [MCP Apps / SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp); OpenAI, via the Apps SDK it migrates from | Extensions → MCP | Proposed | — | **Corrected this pass.** A `ui://` resource is pre-declared, linked to a tool by metadata, rendered in a mandatory sandboxed iframe, and talks to the host over MCP's own JSON-RPC — so the host can prefetch, cache and security-review it before anything runs, and every message is auditable. That contract fits Raiker's model far better than a plugin-drawn page: the server is already governed, the surface is already sandboxed, and the traffic is already the shape the audit log records. Raiker's MCP client cannot reach it while pinned to `2024-11-05` | **YES — improvement** |
+| Server-contributed interactive UI, sandboxed and permission-gated | a reference chat assistant, via [MCP Apps / SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp); OpenAI, via the Apps SDK it migrates from | Extensions → MCP | Proposed | — | **Corrected this pass.** A `ui://` resource is pre-declared, linked to a tool by metadata, rendered in a mandatory sandboxed iframe, and talks to the host over MCP's own JSON-RPC — so the host can prefetch, cache and security-review it before anything runs, and every message is auditable. That contract fits Raiker's model far better than a plugin-drawn page: the server is already governed, the surface is already sandboxed, and the traffic is already the shape the audit log records. Raiker's MCP client cannot reach it while pinned to `2024-11-05` | **YES — improvement** |
 | A plugin marketplace or directory | external coding assistant (external plugin directories), external workspace assistant Customize | Extensions → Plugins | Different by design | Install from a path or URL with a reviewed permission diff | — | **Different — see [3.4](#34-a-reviewed-permission-diff-instead-of-a-marketplace)** |
 | Manifest authorship verification | external coding assistant and local subscription client verify MCP transport, not manifest authorship | Extensions → Plugins | Implemented | HMAC / Ed25519 with `verified` / `present only` / `unsigned` stated either way | Default install verifies checksums only, and says so | **YES — differentiator** |
 | Revocation removes what a plugin contributed | Not established by cited source | Extensions → Plugins | Implemented | Contributions are deleted, not flagged | — | **YES — improvement** |
@@ -369,23 +367,23 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Durable memory across sessions | ChatGPT, external workspace assistant, reference platform | Memory | Implemented | `raiker/memory/store.py`; `memory_write` / `memory_forget` behind their own gate, **off** by default | — | PARITY |
+| Durable memory across sessions | reference chat assistant, external workspace assistant, reference platform | Memory | Implemented | `raiker/memory/store.py`; `memory_write` / `memory_forget` behind their own gate, **off** by default | — | PARITY |
 | A memory write is a reviewed proposal, not a side effect | None — reference products write memories automatically | Memory | Implemented | Exact text shown; credential-like text refused before the decision | — | **YES — differentiator** |
-| Semantic retrieval by meaning | ChatGPT, external workspace assistant, reference platform (Honcho, Mem0, and other providers) | Memory | Implemented | Named provider or local `llama.cpp` spaces; one governed query embedding is shared by ambient and explicit recall; managed-file chunks carry revision-bound projections | — | **YES — improvement.** Provider/local choice, deny-safe lexical fallback, secret exclusion, exact retrieval legs and revision provenance are one control contract |
+| Semantic retrieval by meaning | reference chat assistant, external workspace assistant, reference platform (external memory providers) | Memory | Implemented | Named provider or local `llama.cpp` spaces; one governed query embedding is shared by ambient and explicit recall; managed-file chunks carry revision-bound projections | — | **YES — improvement.** Provider/local choice, deny-safe lexical fallback, secret exclusion, exact retrieval legs and revision provenance are one control contract |
 | Lexical retrieval ranked by relevance | All | Memory, Search Chat | Implemented | FTS5 + `bm25()`, with an honest FTS4/recency fallback reported on `/api/health` | — | PARITY |
-| Approximate-nearest-neighbour vector index | ChatGPT, external workspace assistant, reference platform memory providers | Memory | Implemented | Revision-checked process-local LSH candidate index, with exact cosine ranking below 512 vectors and exact re-ranking after approximate lookup | — | PARITY |
-| Which memories shaped **this** answer, correctable there | ChatGPT and external workspace assistant surface memory on their own page; none names the sentences one answer used | Chat | Implemented | `turn_recalls` + `GET /api/sessions/{id}/recall`; `RecallStrip.svelte` reads them live, so a corrected memory never shows a stale copy | — | **YES — differentiator** |
+| Approximate-nearest-neighbour vector index | reference chat assistant, external workspace assistant, reference platform memory providers | Memory | Implemented | Revision-checked process-local LSH candidate index, with exact cosine ranking below 512 vectors and exact re-ranking after approximate lookup | — | PARITY |
+| Which memories shaped **this** answer, correctable there | reference chat assistant and external workspace assistant surface memory on their own page; none names the sentences one answer used | Chat | Implemented | `turn_recalls` + `GET /api/sessions/{id}/recall`; `RecallStrip.svelte` reads them live, so a corrected memory never shows a stale copy | — | **YES — differentiator** |
 | A rebuildable index can be checked and repaired by the owner | None expose index health at all | Observability → Diagnostics | Implemented | `inspect_memory_integrity` over the text, projection, graph and conversation indexes; the one repair is offered beside the drift it repairs | — | **YES — differentiator** |
 | Retrieval says how each hit was found | None | Memory | Implemented | Per-hit `lexical` / `vector` / `graph` legs; the reply names the embedding space | — | **YES — differentiator** |
 | A knowledge graph the model can traverse | external workspace assistant, reference platform | Memory, Knowledge Map | Implemented | `knowledge_graph` tool: `entities`, `neighbors`, gated on `graph_indexing_runtime` | — | PARITY |
 | Every graph edge names its evidence | None | Memory | Implemented | Each edge carries the approved memory that evidences it; archiving the evidence removes the edge | — | **YES — differentiator** |
 | Capturing what a tool returned | All keep the tool output verbatim | Memory → Observations | Different by design | `eidetic_observations` stores summary, checksum, byte count, retention class — never the material | — | **Different — see [3.6](#36-an-observation-that-is-metadata-by-construction)** |
-| Automatic context compaction | external coding assistant, ChatGPT, local subscription client | Chat, Build | Implemented | Compaction at 90% of a known capacity; transcript unchanged | — | PARITY |
+| Automatic context compaction | external coding assistant, reference chat assistant, local subscription client | Chat, Build | Implemented | Compaction at 90% of a known capacity; transcript unchanged | — | PARITY |
 | Owner-guided summarisation of a chosen range | external coding assistant (`Summarize from here` / `up to here`) | Chat | Implemented | `POST /api/sessions/{id}/compact`, **Summarise up to here** on any owner message | — | **YES — improvement.** The owner's route and the threshold share one summarise-and-record step, so `PreCompact` decides on both and neither can be the half that skipped it |
 | Always-on project instructions | external coding assistant `PROJECT_RULES.md` and `project-rules/`, local subscription client `AGENTS.md` | Projects | Different by design | Project instructions are governed owner records in the encrypted store, not a repository file | A repository-supplied instruction file would be untrusted content granting standing context | **Different — see [3.7](#37-project-instructions-are-owner-records-not-repository-files)** |
 | Path-scoped rules that load with matching files | external coding assistant `project-rules/` `paths` frontmatter | Projects | Proposed | — | Project instructions are whole-project | NO — little advantage |
-| A retention sweep that runs by itself | ChatGPT | Memory | Partial | `expires_at` is computed and stored, enforced at read time | No sweep; cleanup is owner-confirmed (MEM-07) | PARITY |
-| Memory import / export | the Anthropic assistant (memory import/export) | Memory | Implemented (undocumented) | `GET /api/memory/export`, `POST /api/memory/import` (`raiker/api/routes_memory.py`), surfaced in the Memory view | Found during this reconciliation: the capability shipped and no document said so | PARITY |
+| A retention sweep that runs by itself | reference chat assistant | Memory | Partial | `expires_at` is computed and stored, enforced at read time | No sweep; cleanup is owner-confirmed (MEM-07) | PARITY |
+| Memory import / export | a reference chat assistant (memory import/export) | Memory | Implemented (undocumented) | `GET /api/memory/export`, `POST /api/memory/import` (`raiker/api/routes_memory.py`), surfaced in the Memory view | Found during this reconciliation: the capability shipped and no document said so | PARITY |
 
 ### 2.8 Coding agent — Raiker Build
 
@@ -399,7 +397,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Checkpoint before an edit | external coding assistant | Shared runtime | Implemented | `raiker/checkpoints/capture.py` — pre-image before every approved mutation | — | PARITY |
 | Rewind the workspace to a checkpoint | external coding assistant `/rewind` | Observability → Checkpoints | Partial | `CheckpointRestoreExecutor` exists, is registered and is tested; the CLI and web surfaces show a **restore preflight only** | No route, command or tool proposes a restore, so an owner cannot actually rewind | **PARITY** |
 | Rewind the conversation as well as the code | external coding assistant (`Restore conversation` / `Restore code` / both) | Chat, Build | Partial | Branching seeds a new conversation from a checkpoint | No in-place conversation rewind | PARITY |
-| Branch a conversation from a chosen point | ChatGPT, the Anthropic assistant, external coding assistant `/branch` | Chat | Implemented | `POST /api/checkpoints/{id}/branch`, branch-origin lineage band | — | **YES — improvement** |
+| Branch a conversation from a chosen point | reference chat assistants, external coding assistant `/branch` | Chat | Implemented | `POST /api/checkpoints/{id}/branch`, branch-origin lineage band | — | **YES — improvement** |
 | Repository symbol index / code intelligence | external coding assistant LSP plugins, local subscription client | Build | Partial | `raiker/graph/codemap_service.py`: real parser for Python, bounded patterns for 15 more languages | Textual `find references`; no resolved call graph, no LSP | PARITY |
 | Git read commands | All | Build | Implemented | `git_status`, `git_diff`, `git_log` | — | PARITY |
 | Governed git write and push | external coding assistant, local subscription client | Build | Implemented | `git_branch`, `git_commit`, `git_push` with its own gate, egress allowlist and lent credential | HTTPS GitHub remotes only; never force, never delete | **YES — improvement** |
@@ -413,31 +411,31 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
 | Streamed conversation with Markdown rendering | All | Chat | Implemented | `ChatView.svelte`, sanitised Markdown | — | PARITY |
-| Image and document attachments | ChatGPT, the Anthropic assistant, external workspace assistant | Chat, Build | Implemented | `raiker/runtime/attachments.py`, governed attachment store | — | PARITY |
-| Search across conversation history | ChatGPT, the Anthropic assistant, external workspace assistant | Search Chat | Implemented | FTS5 index over titles and message bodies, showing the matched exchange | — | PARITY |
-| The model can search past conversations itself | ChatGPT, external workspace assistant | Chat, Build | Implemented | `conversation_search`, date-narrowed, returning conversation/timestamp/turn id | — | PARITY |
+| Image and document attachments | reference chat assistants, external workspace assistant | Chat, Build | Implemented | `raiker/runtime/attachments.py`, governed attachment store | — | PARITY |
+| Search across conversation history | reference chat assistants, external workspace assistant | Search Chat | Implemented | FTS5 index over titles and message bodies, showing the matched exchange | — | PARITY |
+| The model can search past conversations itself | reference chat assistant, external workspace assistant | Chat, Build | Implemented | `conversation_search`, date-narrowed, returning conversation/timestamp/turn id | — | PARITY |
 | The model's search and the runtime's recall agree | None — most have one path | Shared runtime | Implemented | Both call `retrieve_hybrid_memory`; asserted by test (MEM-11) | — | **YES — differentiator** |
-| An incognito path that writes nothing | ChatGPT temporary chat | Chat | Implemented | Incognito switches the recall path off | — | PARITY |
-| Export a conversation | ChatGPT, the Anthropic assistant | Chat | Implemented | HTML, Markdown or PDF; reasoning excluded by construction | — | **YES — improvement** |
-| Projects as named scopes | ChatGPT Projects, the Anthropic assistant Projects, external workspace assistant Projects | Projects | Implemented | Project instructions, shared attachments, per-project sessions | — | PARITY |
+| An incognito path that writes nothing | reference chat assistant temporary chat | Chat | Implemented | Incognito switches the recall path off | — | PARITY |
+| Export a conversation | reference chat assistants | Chat | Implemented | HTML, Markdown or PDF; reasoning excluded by construction | — | **YES — improvement** |
+| Projects as named scopes | reference chat assistants' projects, external workspace assistant Projects | Projects | Implemented | Project instructions, shared attachments, per-project sessions | — | PARITY |
 | Citations resolved against what was read | Partially — reference products cite sources | Chat, Knowledge Map | Implemented | Reference graph records the contributed text; a deleted source is reported missing, not dropped | — | **YES — differentiator** |
-| Voice input | ChatGPT, the Anthropic assistant | Chat, Build | Implemented | Dictation into the editable draft; Done never sends; no audio stored | — | **YES — improvement** |
+| Voice input | reference chat assistants | Chat, Build | Implemented | Dictation into the editable draft; Done never sends; no audio stored | — | **YES — improvement** |
 | Dictation that never leaves the device | None — every compared platform transcribes off the machine | Models → Local | Implemented | A loopback transcription runtime the owner points Raiker at, refused if the address is not on this machine; the disclosure under the microphone states which runtime is in use | — | **YES — differentiator** |
-| Full-duplex live voice with interruption | ChatGPT, the Anthropic assistant | Chat | Proposed | — | Turn-based only, by decision | PARITY |
-| Read a reply aloud | ChatGPT, the Anthropic assistant | Chat | Implemented | Manual playback; code bodies and raw URLs excluded | — | PARITY |
-| Computer use / desktop control | external workspace assistant, ChatGPT agent mode | — | N/A | — | Screen and input control is a capability class with no governed executor and no threat model here | **NO — conflicts** |
-| Governed **browser** control, distinct from computer use | external workspace assistant via the Anthropic assistant in Chrome; reference platform via CDP and cloud backends | — | Proposed | — | A headless browser driven through a named tool set is a far narrower surface than screen and input control: destinations answer to the same address guard `web_fetch` uses, page text arrives through the same sanitiser, and every navigation is a governed action. Raiker has neither, and conflates the two today | **YES — improvement** |
+| Full-duplex live voice with interruption | reference chat assistants | Chat | Proposed | — | Turn-based only, by decision | PARITY |
+| Read a reply aloud | reference chat assistants | Chat | Implemented | Manual playback; code bodies and raw URLs excluded | — | PARITY |
+| Computer use / desktop control | external workspace assistant, reference chat assistant agent mode | — | N/A | — | Screen and input control is a capability class with no governed executor and no threat model here | **NO — conflicts** |
+| Governed **browser** control, distinct from computer use | external workspace assistant via a reference chat assistant's browser extension; reference platform via CDP and cloud backends | — | Proposed | — | A headless browser driven through a named tool set is a far narrower surface than screen and input control: destinations answer to the same address guard `web_fetch` uses, page text arrives through the same sanitiser, and every navigation is a governed action. Raiker has neither, and conflates the two today | **YES — improvement** |
 
 ### 2.10 Tasks, schedules and background work
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Delegate work that outlives the turn | external workspace assistant Tasks, ChatGPT agent mode | Tasks | Implemented | `raiker/tasks/manager.py` | — | PARITY |
-| A recurring schedule | external workspace assistant Routines, ChatGPT automations, reference platform cron | Tasks | Partial | Four named cadences (`continuous`, `hourly`, `daily`, `weekly`) | No time-of-day, no cron expression, no timezone binding, no one-shot | PARITY |
-| A schedule that fires while the host is closed | external workspace assistant (hosted), ChatGPT | Tasks | Partial | The 15-second tick lives in the FastAPI lifespan | A closed laptop is a missed cadence, recorded honestly | **N/A for a local-first product** |
+| Delegate work that outlives the turn | external workspace assistant Tasks, reference chat assistant agent mode | Tasks | Implemented | `raiker/tasks/manager.py` | — | PARITY |
+| A recurring schedule | external workspace assistant Routines, reference chat assistant automations, reference platform cron | Tasks | Partial | Four named cadences (`continuous`, `hourly`, `daily`, `weekly`) | No time-of-day, no cron expression, no timezone binding, no one-shot | PARITY |
+| A schedule that fires while the host is closed | external workspace assistant (hosted), reference chat assistant | Tasks | Partial | The 15-second tick lives in the FastAPI lifespan | A closed laptop is a missed cadence, recorded honestly | **N/A for a local-first product** |
 | A parked run reads as blocked, not failed | Not established by cited source | Tasks | Implemented | `task_blocked` with the reason and a link to the decision | — | **YES — improvement** |
 | One cycle is one governed turn | Not established by cited source | Shared runtime | Implemented | Every cycle passes policy, gates and approvals like a typed prompt | — | **YES — differentiator** |
-| Notifying the owner when background work finishes | external workspace assistant, ChatGPT | Observability → Notifications | Partial | Notification records exist | No outbound push; a finished cycle updates the view and the log | PARITY |
+| Notifying the owner when background work finishes | external workspace assistant, reference chat assistant | Observability → Notifications | Partial | Notification records exist | No outbound push; a finished cycle updates the view and the log | PARITY |
 | Nested / delegated task ownership | external workspace assistant Dispatch | Tasks | Implemented | [FIXED-286](../plans/FIXED_ITEMS.md) — a parent parks as `waiting_for_children` and settles on the last one | — | PARITY; nothing is inherited downward, so a child carries its own approvals — a **YES — improvement** over a parent decision standing in for its children's |
 | A delegating agent that routes a child task to the right **surface** | external workspace assistant Dispatch — coding work to Code, knowledge work to external workspace assistant | Tasks, Chat, Build | Implemented | [FIXED-381](../plans/FIXED_ITEMS.md#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) — a task carries a surface, the scheduler puts it in the cycle's prompt, and a delegating turn's `create_task` sets it per child | A Build task needs a project and is refused without one rather than run as Chat | **YES — improvement.** The routing is parity; deriving the parent from the thread the turn runs in rather than trusting a `parent_task_id` from the model, and **refusing Dispatch's ten-minute auto-deny** — a decision nobody made is not a decision — is not |
 | An unanswered permission prompt auto-denies and the task continues | external workspace assistant Dispatch — ten minutes, then denied | Approvals | Different by design | Raiker **parks** the turn (`turn_suspended_for_approval`) and resumes it when the owner decides; `dont_ask` declines immediately and records `denied_no_one_to_ask` | Raiker never silently continues past a decision it did not get. A timeout that proceeds without the action produces a turn whose result depends on how fast someone read a notification | **AVOID** |
@@ -454,7 +452,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Exact-model reachability proven before a turn | None — reference products fail at call time | Platform-wide | Implemented | `POST /api/model-readiness/check`, per owner/profile/model/endpoint, with a TTL | — | **YES — differentiator** |
 | An ordered fallback chain with no silent hosted fallback | external coding assistant `--fallback-model`, reference platform | Models | Implemented | Owner-ordered sequence judged as one chain | — | **YES — improvement** |
 | Per-surface default model | None | Models | Implemented | Chat, Build, Tasks and Schedule each remember their own | — | **YES — differentiator** |
-| Token and cost accounting | external coding assistant `/cost`, ChatGPT usage | Models | Implemented | Per-provider tokens, turns, requests, compactions, known cost, each figure's source named | Shipped list prices are unverified defaults stamped with `as_of` | PARITY |
+| Token and cost accounting | external coding assistant `/cost`, reference chat assistant usage | Models | Implemented | Per-provider tokens, turns, requests, compactions, known cost, each figure's source named | Shipped list prices are unverified defaults stamped with `as_of` | PARITY |
 | Reasoning-effort control | local subscription client `model_reasoning_effort`, external coding assistant thinking levels | Chat, Build | Implemented | Validated against the exact profile's declared values | — | PARITY |
 | A secondary fast/auxiliary model | external coding assistant small-fast model | Models | Implemented | Advisor model with its own readiness key and Check advisor control | — | PARITY |
 
@@ -464,8 +462,8 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 |---|---|---|---|---|---|---|
 | Encrypted local store | Not established by cited source | Platform-wide | Implemented | SQLCipher workspace database | Key-page memory locking ships **off**, with the measured reason stated on `/api/health` | **YES — differentiator** |
 | OpenTelemetry export of agent activity | external workspace assistant exports six event types | Observability → Overview | Implemented | [FIXED-379](../plans/FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) — `telemetry_export`, its own Tier-2 capability, delivering every governed event type to an owner-named OTLP/HTTP collector | No background sender: a delivery happens when the owner asks. Raised as [BUG-276](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button) rather than left implied | **YES — improvement.** external workspace assistant's six include `tool_decision`, carrying a decision and its source; Raiker exports every governed event type, with metadata defined as a fixed set of index columns rather than asserted, content behind one explicit opt-in and still redacted, the credential an environment-variable *name*, and a cursor that moves on delivery rather than on attempt |
-| Prompt-injection handling for untrusted content | external coding assistant, local subscription client, ChatGPT frame external content as data | Shared runtime | Implemented | Same framing, plus a deterministic advisory scanner that names the exact page or document and never blocks | — | **YES — differentiator** |
-| A fetched page reaches the model as text, not markup | external coding assistant, ChatGPT | Shared runtime | Implemented | `raiker/runtime/web_access.py`: invisible elements removed and counted, role markers defanged | — | **YES — improvement** |
+| Prompt-injection handling for untrusted content | external coding assistant, local subscription client, reference chat assistant frame external content as data | Shared runtime | Implemented | Same framing, plus a deterministic advisory scanner that names the exact page or document and never blocks | — | **YES — differentiator** |
+| A fetched page reaches the model as text, not markup | external coding assistant, reference chat assistant | Shared runtime | Implemented | `raiker/runtime/web_access.py`: invisible elements removed and counted, role markers defanged | — | **YES — improvement** |
 | Web egress control | external coding assistant `network.allowedDomains` (allowlist) | Settings → Web access | Different by design | Owner **blocklist** plus an address guard that cannot be switched off | — | **Different — see [3.8](#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist)** |
 | Redaction before storage or display | Coding agents suppress known secrets in logs | Platform-wide | Implemented | Incremental UTF-8 redaction at every split, exact loaned secrets, PEM blocks, stream boundaries | — | **YES — improvement** |
 | Owner-visible containment of a misbehaving component | Config-level disable in external coding assistant and local subscription client | Settings → Security | Implemented | Per-subject `active`/`paused`/`killed`, revocable in one press | — | **YES — differentiator** |
@@ -478,13 +476,13 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 |---|---|---|---|---|---|---|
 | A terminal client | external coding assistant, local subscription client, reference platform, reference platform | CLI | Implemented | `raiker`, 100+ governed inspection commands | No rich TUI; no resume/fork flags | PARITY |
 | A local web control surface | reference platform Control UI, external workspace assistant | Web dashboard | Implemented | `web`, loopback-bound | — | PARITY |
-| A desktop application | external workspace assistant, ChatGPT, external coding assistant Desktop | Desktop | Implemented | `raiker-app`, self-contained payload, tray, five-stage wizard | No signed public release yet | PARITY |
+| A desktop application | external workspace assistant, reference chat assistant, external coding assistant Desktop | Desktop | Implemented | `raiker-app`, self-contained payload, tray, five-stage wizard | No signed public release yet | PARITY |
 | Slash commands in the composer | external coding assistant, local subscription client, reference platform | Chat, Build | Implemented | `composerCommands.ts`; a test walks the whole set so no entry is inert | — | **YES — improvement** |
 | Owner-authored slash commands | external coding assistant, local subscription client, reference platform | Chat, Build, Extensions → Skills | Implemented | Active owner-scoped skills carry an optional unique trigger; server-side expansion explicitly loads the skill | The handle grants no capability and changes no decision or approval mode | **YES — improvement** |
 | `@`-mention file completion | external coding assistant, local subscription client | Build | Implemented | Completes against the owner-built code map, paths only, under the same gate | — | **YES — differentiator** |
 | `!` bash prefix / `#` memory prefix | external coding assistant | Chat, Build composers | Different by design | — | Both would be a second route into governed execution and governed memory | **AVOID — see [4.5](#45-a-second-route-into-a-governed-action)** |
 | Keyboard shortcut reference in the product | external coding assistant `/help`, local subscription client, reference platform | Chat, Build | Implemented | `/shortcuts`, built from the handlers that exist | — | PARITY |
-| Responsive layout across viewport sizes | ChatGPT, external workspace assistant | Web dashboard | Implemented | Bottom bar below 640 px, drawer to 1023 px, full sidebar at 1024 px+ | — | PARITY |
+| Responsive layout across viewport sizes | reference chat assistant, external workspace assistant | Web dashboard | Implemented | Bottom bar below 640 px, drawer to 1023 px, full sidebar at 1024 px+ | — | PARITY |
 | An in-product user guide | Not established by cited source | Utilities → Guide | Implemented | `raiker/guide/`, served read-only from the install | — | **YES — differentiator** |
 | An interrupt reachable from anywhere | external coding assistant (`Esc`), local subscription client, external workspace assistant — each surfaces a stop **while a turn runs** | Top bar, every page | Implemented | `StopSwitch.svelte` → the governed `POST /api/interrupts`, cancelling at the next safe boundary rather than force-killing. It reads the same `GET /api/tasks` the workbench reads and counts it with the same `isActiveTask`, so the two surfaces cannot disagree about what "active" means | — | **YES — improvement** ([FIXED-413](../plans/FIXED_ITEMS.md#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach)). Two differences, and each is a consequence of Raiker having a governed *queue* rather than one turn. It never leaves the bar — the Security Philosophy's instant stop is not conditional on Raiker believing something is running, and none of the compared products offers a stop when they think nothing is. And it **states how much it would reach before you commit**: `STOP 3`, and a confirm reading "This stops 3 tasks." None of them can, because none of them has tasks, schedules and parked approvals to count |
 | IDE extension | external coding assistant, local subscription client | — | Proposed | — | Phase 8 deferred | NO — little advantage |
@@ -842,7 +840,7 @@ had to be true first:
 | 21 | Autonomous skill creation with a review gate | Implement `SELF_IMPROVEMENT_MODEL.md` behind a zero-trust review (ADD-06) | A self-authored instruction that reaches turns without review is self-granted agency | **YES — improvement** |
 | 22 | Remote supervisor install lifecycle | Complete SSH/Daytona supervisor install, upgrade and live proof | Remote backends are adapters today and readiness-blocked in practice | PARITY |
 | ~~23~~ ★ | ~~**A delegating task that owns its children and routes by surface**~~ | **Done 2026-09-04 — [FIXED-381](../plans/FIXED_ITEMS.md#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work).** A task carries a `surface`, validated against the same set a composer's is; the scheduler puts it in the cycle's prompt, which selects the standing instructions and nothing else. A Build task needs a project and is refused without one rather than quietly downgraded, and a delegating turn's parent is derived from the thread it runs in rather than named by the model | Raiker already has both surfaces under one governed turn contract, so this is scheduling rather than a new execution path — and **without** Dispatch's ten-minute auto-deny, which Raiker refuses: a decision nobody made is not a decision. BUG-220's ownership is untouched, and a child still carries its own approvals | **YES — improvement** |
-| 24 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively (the Anthropic assistant in Chrome, reference platform via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
+| 24 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively (a reference chat assistant's browser extension, reference platform via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
 
 ### Low priority, low effort
 
@@ -923,7 +921,7 @@ The log also holds the concept-to-specification maps — external coding assista
 coverage and its per-page documentation mapping, external workspace assistant delegated tasks and
 schedule, reference platform-style personal agent, reference platform-style agent framework, eidetic
 memory, multi-agent, graph context, skills, memory, local inference,
-LangChain/LangGraph-style runtime, OWASP GenAI, self-improvement, mem0-style
+graph-orchestration-style runtime, OWASP GenAI, self-improvement, external-memory-style
 memory and memsearch-style semantic search — and every control-set review
 (turn transparency, composer, turn continuation, model readiness, desktop
 onboarding, governed shell and sandbox, resilience and containment, observation
@@ -966,30 +964,30 @@ PAA/PA-S and CR own implementation and outcome evidence.
 | Reference idea | Raiker present boundary | Target work / evidence |
 |---|---|---|
 | reference personal agent goal continuity and complete connector transactions | Current task/routine/connector paths do not establish general goal completion | PAA-01/02/05/08; PA-S02/03 |
-| the Anthropic assistant reusable project context, skills and recurring artifacts | Current projects/memory/skills/routines retain their own scopes; local scheduler requires running host | PAA-03/04/07/09; PA-S01/06 |
+| a reference chat assistant reusable project context, skills and recurring artifacts | Current projects/memory/skills/routines retain their own scopes; local scheduler requires running host | PAA-03/04/07/09; PA-S01/06 |
 | reference platform opt-in heartbeat and gateway automation | Current scheduler/channel support; no new standing-intent service claimed | PAA-04/10; PA-S04/08 |
 | reference platform user profile/session recall and agent-managed procedural skills | Current governed memory and instruction-only skills; no silent self-activation | PAA-03/09; PA-S06 |
 
-the Anthropic assistant's help pages checked on 2026-10-07 describe gradual Chat/external workspace assistant unification
+A reference chat assistant's help pages checked on 2026-10-07 describe gradual chat/workspace-assistant unification
 and remote scheduling with older local-task exceptions. Pin the actual surface,
 plan, date and execution host in comparisons. Do not infer remote Raiker support
 from that source. No parity claim or competitor run is added here.
 
 ## 9. reference personal agent competitive track — 2026-10-12
 
-**Targeted source update only; not a new full code reconciliation.** reference personal agent is a **personal AI agent product** launched September 8, 2026. Do not conflate it with Meta's **reference personal agent Wonder/Wonder Full model family** announced October 12, 2026 or the **reference personal agent Code** coding surface. The reference personal agent launch, product site, security engineering note and model announcement are primary sources for stated vendor capabilities, **not independently verified performance**.
+**Targeted source update only; not a new full code reconciliation.** reference personal agent is a **personal AI agent product** launched September 8, 2026. Do not conflate it with the vendor's **model family** announced October 12, 2026 or the vendor's separate **coding surface**. The reference personal agent launch, product site, security engineering note and model announcement are primary sources for stated vendor capabilities, **not independently verified performance**.
 
 | reference personal agent reference behavior | Raiker documented/code-backed baseline | Gap or different-by-design choice | Required independent proof |
 |---|---|---|---|
 | Persistent personal goals and execution after closing the app | Tasks and schedules exist; durable personal-goal coordinator PAA-01/02 planned | Full multi-day goal orchestration not demonstrated; local-host offline behavior differs from hosted reference personal agent | PA-S02 / CR-01/05/09/11 with restart and app-closed control |
 | Personal context, proactive suggestions and remembered preferences | Hybrid governed memory implemented; editable personal profile PAA-03 and standing intents PAA-04 planned | Provenance, freshness, correction and useful proactive intent need end-to-end proof | PA-S01/04, CR-04/05, revoked-source and changed-preference fixtures |
-| Secure persistent VM with browser, Sentinel gate and scoped credentials (Meta's documented design) | Local/native/container command boundaries and broker exist; PAA-06 browser workflow/ADD-23 not delivered | Preserve selectable local/private/hosted inference and owner authority; isolated browser/credential containment must be demonstrated, not asserted | PA-S05, CR-03/07/11, injection, cross-owner, exfiltration, crash/resume |
+| Secure persistent VM with browser, egress gate and scoped credentials (the vendor's documented design) | Local/native/container command boundaries and broker exist; PAA-06 browser workflow/ADD-23 not delivered | Preserve selectable local/private/hosted inference and owner authority; isolated browser/credential containment must be demonstrated, not asserted | PA-S05, CR-03/07/11, injection, cross-owner, exfiltration, crash/resume |
 | Cross-app effects, exact permissions, destination receipts | Generic connector service and GitHub auth exist; PAA-05/08 durable effect reconciliation planned | Authentication is not authorization; ambiguous external effects and approved payload revalidation need proof | PA-S03, CR-03/07/09/11, provider receipt, duplicate prevention, revoked credential |
 | Messaging plus proactive background delivery | Inbound Telegram answered back over Telegram since 2026-10-13 (a sensitive reply held for the owner); a real bot's delivered message not yet evidenced — [BUG-315](../plans/FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315) closed for the product path; off-device PAA-10 planned | Real reply/quiet-hours/offline behavior unresolved | PA-S08, CR-03/05/07/10 |
-| reference personal agent Wonder model Active Memory / Active Focus (announced today) | Raiker allows owner-selected hosted/local models and maintains governed memory | Compare model capability and agent behavior **separately**; no automatic Meta API integration assumed | Pin real supported model/version in CR-02 and measure PA-S02 recovery |
+| The vendor's model-level memory and focus features (announced today) | Raiker allows owner-selected hosted/local models and maintains governed memory | Compare model capability and agent behavior **separately**; no automatic vendor API integration assumed | Pin real supported model/version in CR-02 and measure PA-S02 recovery |
 
 
 
-**Security outcome benchmark:** Meta's published design mediates network egress, connectors and credentials through Sentinel/authd/privileged workers. Verify actual confinement under Raiker's chosen runtimes, not just policy class names. Test malicious page content, forged connector messages, protected token access, SSRF, revoked grants, user takeover, duplicate submissions and Stop. The security post is first-party architectural evidence, not an independent penetration test.
+**Security outcome benchmark:** The vendor's published design mediates network egress, connectors and credentials through a gate service, an auth daemon and privileged workers. Verify actual confinement under Raiker's chosen runtimes, not just policy class names. Test malicious page content, forged connector messages, protected token access, SSRF, revoked grants, user takeover, duplicate submissions and Stop. The security post is first-party architectural evidence, not an independent penetration test.
 
 **Explicit decision reference:** [RCD-10](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) remains a **recommendation pending owner acceptance**. PAA/ADD/BUG own implementation, CR/PA-S own measurement. Do not claim Raiker equals or exceeds reference personal agent without matched live trials.

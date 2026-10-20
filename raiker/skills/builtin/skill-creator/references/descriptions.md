@@ -82,11 +82,11 @@ The failure: "database work" is a theme. Nothing a user types looks like it.
 > Use when creating Model Context Protocol servers.
 
 The failure: correct but only fires when the user already knows the term. Most
-requests arrive as "let Claude use our API".
+requests arrive as "let the agent use our API".
 
 > Build, extend, or debug an MCP server that exposes an API as agent tools. Use
 > this whenever someone mentions MCP, FastMCP, mcp.json, or stdio transport —
-> and equally when they say "wrap this API so Claude can use it", "give the
+> and equally when they say "wrap this API so the agent can use it", "give the
 > agent access to our service", or "add a tool to the server". Use it too when
 > an MCP server connects but its tools never get called, or responses blow the
 > context window; those are tool-design problems even when nobody says "MCP".

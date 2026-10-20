@@ -167,7 +167,7 @@ when reviewing Raiker itself: `docs/architecture/THREAT_MODEL.md`,
 
 | Control | Elsewhere | In Raiker |
 |---|---|---|
-| Running a security pass | Claude Code `/security-review`; the security-review GitHub action; Codex review | Skills → activate, then ask for a security review |
+| Running a security pass | Other hosts' `/security-review` command; the security-review GitHub action | Skills → activate, then ask for a security review |
 | Scope of the audit | The PR diff, or a named path | The diff plus the workspace boundary the owner granted |
 | Where findings land | PR review comments | The review output, plus the audit log; posting is a gated write |
 | False-positive control | Exclusion list and a confidence floor | The same list and floor, in this document |

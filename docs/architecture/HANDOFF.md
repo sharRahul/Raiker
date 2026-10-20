@@ -522,7 +522,7 @@ comment.
   `knowledge_graph action=references|passages` exposes that to a model, scoped to
   the owner in SQL and reaching only material that already entered one of their
   turns — it re-runs no tool and re-reads no file. Targets are marked `resolved`,
-  `unresolved`, `external` or `attachment`, following Obsidian's rule that an
+  `unresolved`, `external` or `attachment`, following a note-taking app's rule that an
   unresolved link is reported rather than dropped; the Knowledge Map draws that
   state as a hollow, dashed node. Co-citation edges carry the number of
   conversations behind them and deliberately do **not** feed retrieval scoring —

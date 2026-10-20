@@ -47,7 +47,7 @@ my-plugin/
 ```
 
 Reference files inside the plugin by a root-relative path the runtime expands
-(`${CLAUDE_PLUGIN_ROOT}` in Claude Code; the manifest's own relative
+(a host-provided plugin-root variable elsewhere; the manifest's own relative
 `entrypoints` paths in Raiker). Never write an absolute path from your machine
 into a manifest — it is the single most common reason a plugin installs and then
 does nothing on someone else's computer.
@@ -177,10 +177,10 @@ Raiker's own references: `docs/architecture/PLUGIN_SYSTEM_SPEC.md`,
 
 | Control | Elsewhere | In Raiker |
 |---|---|---|
-| Manifest | Claude Code `plugin.json`; Codex extension manifest | `raiker-plugin.json`, with a required permission block |
+| Manifest | Other hosts' `plugin.json` or extension manifests | `raiker-plugin.json`, with a required permission block |
 | Component discovery | Convention directories | Same layout, declared in `entrypoints` |
 | Permission model | Tool allowlists at the session level | Per-permission `reason` + `expected_effect`, diffed on update |
-| Hooks | Claude Code hook events; OpenClaw gateway events | `docs/architecture/HOOKS_SPEC.md` event catalogue |
+| Hooks | Other hosts' hook or gateway events | `docs/architecture/HOOKS_SPEC.md` event catalogue |
 | Distribution | Marketplace / git URL | Marketplace entry or git source, with checksum and optional signature |
 | Enablement | Enabled on install | Install and enable are separate decisions; nothing runs until the gate for its class is open |
 | Updates | Version bump | Version bump **plus** a permission diff whenever authority widens |

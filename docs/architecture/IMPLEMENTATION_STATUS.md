@@ -20,12 +20,20 @@
 | `test_only` | Reserved for offline test support |
 | `disabled_deferred` | No usable executor; fails closed |
 
-Approval resolution executes approved local file mutations, and eleven other
-capabilities besides. The complete set is `EXECUTABLE_ON_APPROVAL`
-(`raiker/approvals/execution.py`): local file
+**Counts (reconciled with the code 2026-10-20).** `ALL_CAPABILITIES`
+(`raiker/phase_gates.py`) declares 70 capabilities; 50 have a real executor
+(`REAL_EXECUTOR_CAPABILITIES`, `raiker/runtime/executors/__init__.py`); 14 are
+relayed on approval. The 20 without an executor are the seven sensitive
+domains, two governance mutations, three interface contracts, the four durable
+graph and semantic-store gates, and four historical gate names.
+
+Approval resolution executes approved local file mutations, and twelve other
+capabilities besides — fourteen in all. The complete set is
+`EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`): local file
 mutations (`file_write_execution`, `patch_apply_execution`), bounded local
 `shell` commands (`shell_execution`), the git write path
-(`git_write_execution`), the push (`git_push_execution`), a GitHub write
+(`git_write_execution`), a fetch or clone (`git_fetch_execution`), the push
+(`git_push_execution`), a checkpoint restore (`checkpoint_restore_execution`), a GitHub write
 (`connector_github_runtime`), durable memory writes and forgets
 (`memory_write_execution`, `memory_forget_execution`), the two local planning
 rows (`task_management_runtime`, `project_assignment_runtime`), and
@@ -34,8 +42,9 @@ owner-selected SSH and Daytona commands (`remote_execution_cap`,
 against its own gate, the relay's `approval_execution_relay` gate, policy and
 posture; disabling either gate returns those approvals to metadata-only.
 
-`process` and `network` are **not** relayed: an approved `process` or `network`
-action records the decision and executes nothing. Shell execution and
+`process` is **not** relayed: an approved `process` action
+records the decision and executes nothing (the `network_execution` capability
+was deleted; see below). Shell execution and
 standing-grant `run_command` converge on the same durable `CommandService`; the
 runtime stores the authority identity and selected environment, redacts output
 before persistence, and requires an immutable receipt for every terminal state.
@@ -80,13 +89,17 @@ governed per action. Sensitive finance/investment/medical/pregnancy/CCTV/
 home-security/hardware domains remain `disabled_deferred` and fail closed.
 
 Phase 4 memory MVP is implemented. The launchable interfaces are the local
-terminal client and loopback web dashboard. Owner bootstrap creates the owner
+terminal client, the loopback web dashboard and the desktop application that
+packages them ([release acceptance](../plans/RELEASE_ACCEPTANCE_MATRIX.md)). Owner bootstrap creates the owner
 principal, every request resolves an acting-principal, and a human
 `runtime_gate_manager` governs capability changes and stopping or starting the
 single agent runtime.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action
-are enforced. Disabled runtime flags remain false where no executor exists:
+are enforced. The historical readiness records in `raiker/workspace/views.py`
+still report these compatibility flags as `False`; they describe those
+metadata-only readiness records, not whether a capability runs — that is the
+gate, decision mode and registered executor above:
 `plugin_execution_enabled`, `graph_indexing_enabled`,
 `semantic_memory_writes_enabled`, `vector_writes_enabled`,
 `embedding_creation_enabled`, `approval_execution_enabled`,
@@ -159,6 +172,16 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. This document distinguishes metadata-only, dry-run-only, contract-only, readiness-only, implemented-read-only, and test-only surfaces from executable capabilities.
 
 
+## Model destination authorization and transport — 2026-10-20
+
+| Slice | Status | Evidence |
+|---|---|---|
+| Connection-bound destinations: a saved connection authorizes its own origin; `RAIKER_MODEL_EGRESS_ALLOWLIST` retired | `implemented_verified` | [ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md), `raiker/models/endpoint_policy.py`, `tests/test_model_connection_authorization.py` |
+| Dial-time address classification, pinning and metadata refusal for provider calls and image calls | `implemented_verified` | `raiker/models/transport_guard.py`, `raiker/models/transport.py`, `tests/test_model_transport_guard.py` (NET-01 … NET-12), live `model-transport-guard-live.spec.ts` 6/6 |
+| Explicit proxy route, shown per card and in the Models posture | `implemented_verified` | `transport_guard.proxy_for` / `proxy_route`; FIXED-1026, FIXED-1029 |
+| A proxied hosted request is resolved by the proxy, not pinned | residual | [hosted-models threat model](../threat-models/hosted-models.md) |
+| Connector GET helper follows redirects; CLI `/model` cannot reach a connected hosted provider; web/MCP pinned opener behind a proxy | open | BUG-350, BUG-351, BUG-353 |
+
 ## Universal model readiness and acquisition
 
 Universal model readiness is `implemented_verified`: a fresh selection grants
@@ -185,7 +208,7 @@ below. Every Design route is owner-scoped; none of them grants a capability.
 
 | Slice | Status | Evidence |
 |---|---|---|
-| Image generation, edit, variations and lineage (Asset layer) | `implemented_policy_gated` — `image_generation` gate, egress allowlist and credential | `raiker/runtime/executors/tier2_image.py`; real-provider remainder BUG-287 |
+| Image generation, edit, variations and lineage (Asset layer) | `implemented_policy_gated` — `image_generation` gate and the owner's saved provider connection; the provider's fixed host, address checked and pinned | `raiker/runtime/executors/tier2_image.py`; real-provider remainder BUG-287 |
 | Structured documents, typed operations, versions, undo/redo (DW-01/02/03/08) | `implemented_verified` | `raiker/design/document.py`, `raiker/design/store.py`, `tests/test_design_documents.py` |
 | Design systems with previewed choice (DW-06) | `implemented_verified` | `raiker/design/systems.py` |
 | Agent proposals (DW-07) | `implemented_verified` — one model call through the owner's router; applied only on owner acceptance | `raiker/design/agent.py`, live with Anthropic Haiku 4.5 |

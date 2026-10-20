@@ -11,20 +11,25 @@ else to install first, and no terminal.
 
    | Your computer | Download | Then |
    |---|---|---|
-   | Windows 10 (1809+) or 11 | `Raiker-<version>-windows-x86_64-setup.exe` | Open it, choose where to install (your user folder by default), finish. No administrator password is asked for. An `.msi` is also published for managed installs. |
-   | Windows 11 on Arm | the same x86-64 `setup.exe` | Windows runs it under its built-in emulation. |
+   | Windows 10 (1809+) or 11, Intel/AMD | `Raiker-<version>-windows-x86_64-setup.exe` | Open it, choose where to install (your user folder by default), finish. No administrator password is asked for. |
+   | Windows 11 on Arm | `Raiker-<version>-windows-arm64-setup.exe` | The x86-64 program under another name; Windows runs it under its built-in emulation. There is no native Arm build yet. |
    | Mac with Apple silicon (macOS 12+) | `Raiker-<version>-macos-arm64.dmg` | Open the `.dmg` and drag **Raiker** into **Applications**. |
-   | Ubuntu, Debian | `Raiker-<version>-linux-<arch>.deb` | Open it with Software, or `sudo apt install ./Raiker-….deb`. |
-   | Fedora, openSUSE | `Raiker-<version>-linux-<arch>.rpm` | Open it with Software, or `sudo dnf install ./Raiker-….rpm`. |
-   | Any other Linux desktop | `Raiker-<version>-linux-<arch>.AppImage` | Mark it executable (file properties) and open it. |
+   | Linux x86-64 (Ubuntu 22.04+, Debian 12+, Fedora 36+) | `Raiker-<version>-linux-x86_64.AppImage` | Mark it executable (file properties) and open it. |
+   | Linux ARM64 | `Raiker-<version>-linux-arm64.AppImage` | The same, on an ARM64 machine. |
+
+   Each release carries exactly one download per platform, with
+   `SHA256SUMS.txt` beside them. The `.msi`, `.deb` and `.rpm` packages are
+   built and tested on every release run but are not attached to the release;
+   to make one for a managed install, see
+   [Releasing](releasing.md#building-installers-locally).
 
 2. Open **Raiker** from your applications menu, Start menu or Launchpad. The
    first time, **Raiker Setup** finishes the installation (below).
 3. Create your local account and follow the guided setup ([First run](#first-run)).
 
-**No signed release has been published yet** (2026-10-17). Until one is, the
-installers built by CI for each change are attached to the **Desktop package**
-workflow runs under the repository's **Actions** tab. They are unsigned test
+**No release has been published yet** (2026-10-20). Until one is, the
+installers built by CI for each packaging change are attached to the **Desktop
+package** workflow runs under the repository's **Actions** tab. They are unsigned test
 builds: Windows SmartScreen shows *Windows protected your PC* (choose **More
 info → Run anyway** only if you trust the build), and macOS refuses to open an
 unsigned app that was downloaded from the internet.
@@ -33,7 +38,8 @@ unsigned app that was downloaded from the internet.
 
 - Installs the application files only: on Windows into
   `%LOCALAPPDATA%\Programs\Raiker` for your account, on macOS into
-  Applications, on Linux into `/opt/Raiker`.
+  Applications. On Linux the AppImage runs from wherever you keep it; a `.deb`
+  or `.rpm` you built yourself installs into `/opt/Raiker`.
 - Adds Start-menu and desktop shortcuts (Windows) or an applications-menu entry
   (Linux).
 - **Checks this computer before installing anything.** The Windows installer's
@@ -41,8 +47,9 @@ unsigned app that was downloaded from the internet.
   free space for the program and for your data, each with ✔, ! (works, with a
   limit worth knowing) or ✖ (not met, with its fix); with a ✖ it will not
   continue, and a silent install (`/S`) exits with code 2 instead. The `.deb`
-  and `.rpm` packages check memory before unpacking. macOS refuses versions
-  before 12 itself.
+  and `.rpm` packages check memory before unpacking; the AppImage and the Mac
+  app are checked by **Raiker Setup** on first open (below). macOS refuses
+  versions before 12 itself.
 - Downloads nothing, creates no account, connects no model and makes no backup.
   Those happen in setup, when you choose them.
 
@@ -466,8 +473,8 @@ Six destinations are tabbed:
 | Memory | Overview, Memories, Suggestions, Sources, Recall & indexing, Map |
 | Models | Overview, My models, Add model, Runtime & routing, Usage |
 | Extensions | Overview, Connectors, Channels, MCP servers, Skills, Hooks, Plugins |
-| Observability | Overview, Sessions, Activity, Checkpoints, Live work, Notifications |
-| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, Git credential, Runtime configuration, Memory engine, Updates |
+| Observability | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
+| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, GitHub, Runtime configuration, Memory engine, Updates |
 
 Old links to the pages these absorbed still resolve and open the right tab —
 `#/tasks` opens Work on Tasks, `#/brain` opens Memory on Map, `#/messaging`

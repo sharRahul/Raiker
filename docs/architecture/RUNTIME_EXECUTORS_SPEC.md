@@ -31,12 +31,13 @@ executor/activation model added on top of `RuntimeAuthority`.
    only transition to an enabled state when its `ActivationRequirement` is satisfied:
    acting principal is HUMAN, the required runtime mode is active, a **real executor is
    registered**, any required threat-model ack exists, and (for sensitive tiers) a
-   human confirmation token is supplied. The runtime-enablement modes are
-   `local_single_user_runtime` and `multi_user_local_runtime` (see
-   `_RUNTIME_ENABLEMENT_MODES`); the default **Development preview**
-   (`development_preview`) is *not* one, so while it is active the dashboard does not
-   even offer the `enabled_runtime` transition. Activate a runtime mode under
-   **Settings → Runtime mode** first.
+   human confirmation token is supplied. There is one runtime, `raiker_runtime`, and
+   its only runtime-level state is `active` or `disabled`; the historical mode names
+   (`development_preview`, `local_single_user_runtime`, `multi_user_local_runtime`,
+   …) are still accepted and resolve to it (`LEGACY_RUNTIME_MODE_NAMES`,
+   `raiker/runtime/authority/models.py`). A gate cannot be enabled while the owner has
+   switched the agent runtime off in Settings' danger zone
+   (`activation_blocked:runtime_mode_not_active`, the historical spelling).
 3. **Executor registry** (`raiker/runtime/executors/registry.py`) — maps a capability
    to an `Executor`. `RuntimeAuthority.route_action()` executes the registered executor
    **only** on an `allow` decision; otherwise it returns the gate/policy reason and runs
@@ -69,14 +70,14 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 
 ### Real executors — governed-flippable (`REAL_EXECUTOR_CAPABILITIES`)
 
-This table covers all 46 members of `REAL_EXECUTOR_CAPABILITIES`
+This table covers all 50 members of `REAL_EXECUTOR_CAPABILITIES`
 (`raiker/runtime/executors/__init__.py`). A capability that is in that set and
 not in this table is a documentation defect, not a hidden feature.
 
 
 | Capability | Tier | What it does |
 |---|---|---|
-| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for the twelve capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) — file mutations and patches, bounded local `shell`, the git write and push path, a GitHub write, durable memory writes and forgets, the two local planning rows, and owner-selected SSH and Daytona commands; disabling this gate returns those approvals to metadata-only. |
+| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for the fourteen capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) — file mutations and patches, bounded local `shell`, the git write, fetch and push path, a GitHub write, durable memory writes and forgets, a checkpoint restore, the two local planning rows, and owner-selected SSH and Daytona commands; disabling this gate returns those approvals to metadata-only. |
 | `file_write_execution` | 1 | Writes a file in the workspace. Path-safe **and** refuses the `.raiker/` and `.git/` trees; the pre-image is checkpointed first. |
 | `patch_apply_execution` | 1 | Writes new file content for an approved change, under the same path rules. |
 | `git_write_execution` | 1 | Creates a branch or records a commit in the workspace repository (B11). Re-derives its own proposal before mutating, so a repository that moved since the approval fails closed with a named reason. Stages exactly the paths the owner reviewed — never `--all` — so `.raiker/` and `.git/` can never be swept into a commit, and disables the repository's own hooks for the invocation. |
@@ -90,16 +91,17 @@ not in this table is a documentation defect, not a hidden feature.
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
-| `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (owner egress allowlist + hosted/private gate state + API-key-from-env); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
+| `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (the owner's saved connection for that provider, bound to its origin + hosted/private gate state + the dial-time address guard); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). The gate is what the `spawn_subagent` tool answers to: it decides whether the owner allows delegation at all, while what a subagent may touch once delegated is decided one step at a time by the broker. |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
 | `external_channel_runtime` | 5 | Bounded outbound webhook delivery over the owner connector egress allowlist, signed with `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) when a secret is configured and reported as unsigned on the Channels tab when not. Inbound delivery is recorded, rate-limited to 60 messages per sender per minute, and quarantined: a channel message is untrusted content with a named sender who is not the owner, and never raises a turn's authority. Events stay metadata-only. |
 | `channel_approval_relay` | 5 | Metadata-only **pending** approval relay for a paired channel (never resolves). |
 | `container_execution_cap` | 5 | Local Docker run: owner image allowlist, no network, no host mounts, dropped caps, read-only, resource bounds. |
 | `scheduled_routines` | 5 | Local on-demand routine runner (no daemon); runs bounded read-only subagent payloads when due. |
-| `hosted_model_runtime` | 5 | The owner's saved hosted connection, origin-bound: gate-derived provider policy on the chat path (saved connection required, explicit revocation wins) + a metadata-only connectivity check of a connection named by `profile_id` (no endpoint or path arguments). |
-| `private_network_model_runtime` | 5 | The owner's saved home-lab connection (private network, HTTP permitted), origin-bound; same gate-derived policy and the same profile-named connectivity check. |
-| `advisor_model_runtime` | 5 | One governed advisor consult for local-model turns: default-ask decision mode withholds; the consult re-checks provider policy (hosted/private gate + owner egress allowlist + env-only key) per call. Metadata-only artifacts/events — question/answer text never emitted (lengths only). |
+| `hosted_model_runtime` | 5 | The owner's saved hosted connection, origin-bound: gate-derived provider policy on the chat path (saved connection required, explicit revocation wins) + a metadata-only connectivity check of a connection named by `profile_id` (no endpoint or path arguments). Every new connection is checked at dial time: each resolved answer must be public, the passing address is pinned, and a proxied request goes through the owner's proxy (`raiker/models/transport_guard.py`). |
+| `private_network_model_runtime` | 5 | The owner's saved home-lab connection (private network, HTTP permitted), origin-bound; same gate-derived policy and the same profile-named connectivity check. Resolved answers must be on the owner's network (link-local only with the connection's opt-in, metadata services never), and the request never uses a proxy. |
+| `image_generation` | 2 | Design's image generate, edit and variations through the owner's saved OpenAI or Gemini connection, sent only to that provider's fixed image host with redirects refused and the address checked and pinned at dial time. Results and lineage are stored owner-scoped; the prompt is not moderated by Raiker. See [`threat-models/image-generation.md`](../threat-models/image-generation.md). |
+| `advisor_model_runtime` | 5 | One governed advisor consult for local-model turns: default-ask decision mode withholds; the consult re-checks provider policy (hosted/private gate + the owner's saved connection for the advisor profile, origin-bound) per call. Metadata-only artifacts/events — question/answer text never emitted (lengths only). |
 | `connector_github_runtime` | 5 | One governed GitHub issue/PR read (`github_read` tool). Default-ask decision mode withholds; owner credential is env-only (`RAIKER_GITHUB_TOKEN`), host must be on the owner connector egress allowlist (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty = fail closed); request URL is built server-side from validated components (no model-supplied URL). Fetched content returned as untrusted data; metadata-only artifacts/events — the body text never emitted (repo/number/title/state/length only). Reference slice for Task 4 governed connectors. |
 | `connector_gmail_runtime` | 5 | One governed Gmail message/thread read (`gmail_read` tool). Same governed pattern as `connector_github_runtime`: default-ask decision mode withholds; owner credential is env-only (`RAIKER_GMAIL_TOKEN`), host must be on the owner connector egress allowlist (`gmail.googleapis.com`, empty = fail closed); request URL is built server-side (`format=metadata`) from validated components (resource ∈ message/thread, URL-safe id). Fetched snippet+headers returned as untrusted data; metadata-only artifacts/events — the body never emitted (resource/message_id/subject/length only). Second read connector for Task 4. |
 | `connector_gcal_runtime` | 5 | One governed Google Calendar event/calendar read (`gcal_read` tool). Same governed pattern: default-ask withholds; owner credential env-only (`RAIKER_GCAL_TOKEN`), host `www.googleapis.com` on the connector egress allowlist; request URL built server-side from validated, path-encoded components (resource ∈ event/calendar, calendar_id, event_id). Fetched summary returned as untrusted data; metadata-only artifacts/events (resource/calendar_id/event_id/title/length only). |
@@ -112,6 +114,7 @@ not in this table is a documentation defect, not a hidden feature.
 | `checkpoint_restore_execution` | 1 | Rewinds only the files recorded in a checkpoint's capture manifest, recomputing the plan at execution time rather than trusting a caller-supplied file list, refusing any path outside the workspace, and capturing its own pre-image first so a restore is itself reversible. Reached by `POST /api/checkpoints/{id}/restore` and `/checkpoints restore <id> --confirm`, both raising an ordinary approval; a cross-principal restore is classified critical and takes the human-only lifecycle instead. **No model tool proposes a restore**, so an agent can never rewind the workspace on its own say-so. |
 | `task_management_runtime` | 1 | Creates the owner-scoped task row an approved `create_task` describes. Local, reversible, relayed on approval. |
 | `project_assignment_runtime` | 1 | Moves the active conversation into a project. Local, reversible, relayed on approval. |
+| `git_fetch_execution` | 2 | One governed fetch or clone (ADD-27). Network egress like a push, so its own gate and the same host rules, and relayed on approval; a public repository needs no credential, and the owner's credential is lent only under a grant that covers fetching this repository. See [`threat-models/git-fetch.md`](../threat-models/git-fetch.md). |
 | `git_push_execution` | 2 | Publishes a branch to an HTTPS GitHub remote. Its own gate, separate from `git_write_execution`, because a push is egress carrying repository content off the machine; requires the remote's host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a credential lent for one command under an owner grant. Never forces, never deletes a branch. |
 | `code_map_indexing` | 3 | Builds and refreshes the repository symbol index Build points at — a real parser for Python, bounded patterns for fifteen other languages, each file recording which extractor produced it. Deliberately **not** `graph_codemap_indexing`: this is a derived cache, that is the governed durable graph store. A scan that hits a bound reports `partial` and names the bound. |
 | `language_intelligence` | 3 | Outlines a file, resolves an exact name to its declaration, and reports parse-level problems (GAP-BUILD B10). A sibling of `code_map_indexing` rather than part of it: the map **writes** a derived index of the machine, this writes nothing at all and every answer is a parse of a file `read_file` would already open. Diagnostics are parse-level, and a language with no parser here is reported as **not checked**, never as clean. |
@@ -217,8 +220,9 @@ switches an owner could hold on or off changed nothing at all
 ([FIXED-280](../plans/FIXED_ITEMS.md)).
 
 [`raiker/runtime/authority/entry_paths.py`](../../raiker/runtime/authority/entry_paths.py)
-records the answer for all forty-six, and it is the source the DTO and the web
-UI read:
+records the answer for every capability it classifies — fifty-nine entries,
+covering all fifty real executors — and it is the source the DTO and the web UI
+read:
 
 | Value | Meaning | Example |
 |---|---|---|

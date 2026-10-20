@@ -8,7 +8,9 @@ itself falls short of, whether or not anyone else does it.
 
 Raiker's documentation does not run ahead of its code. Every item below was
 measured on the shipped build as of **2026-08-23**, after a full reconciliation
-of every document against the source.
+of every document against the source, and items touched since carry their own
+date; capability counts and the model-destination items were re-checked against
+the code on **2026-10-20**.
 
 Two kinds of item live here and are kept apart:
 
@@ -205,7 +207,26 @@ alternative would be worse.
   metadata service — including through a name that resolves to one, an
   IPv4-mapped IPv6 address, or a redirect. The connection is pinned to an address
   that already passed, so the destination cannot change between the check and the
-  request. Emptying the blocklist opens none of that.
+  request. Emptying the blocklist opens none of that. **Behind a proxy** the
+  pinned opener is not yet proxy-aware, so a web read on a host whose only route
+  out is `HTTPS_PROXY` may fail rather than go through it (BUG-353, found
+  2026-10-20 by reading, not yet reproduced live).
+- **A model connection authorizes a name, and Raiker checks where the name
+  leads (2026-10-20).** An off-machine model is reached only through the
+  connection you saved for it, at that connection's own scheme, host and port;
+  `RAIKER_MODEL_EGRESS_ALLOWLIST` is retired and ignored
+  ([ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md)). Every
+  new connection resolves the name once and refuses the dial unless every answer
+  fits the connection's class — public for a hosted provider, your own network
+  for a home-lab server, this machine for a local one, link-local only when you
+  tick **Allow a link-local address**, and a cloud metadata service never — then
+  dials the address that passed (`model_dial_refused:<reason>`, a policy answer
+  rather than a network fault). What this does **not** cover: a hosted request
+  that goes through your proxy is resolved by the proxy, so it is not checked or
+  pinned here; a public address you connected is your own trust decision; and a
+  home-lab or local endpoint never uses a proxy, so a home lab reachable only
+  through one is not supported. Each card says **Direct connection** or
+  **Through your proxy**.
 - **A fetched page reaches the model as text, not as markup or instruction.**
   Scripts, styles and comments are dropped; elements a visitor could never see —
   `hidden`, `display:none`, zero-size, off-screen, `aria-hidden` — are removed and
@@ -419,6 +440,20 @@ on the shipped build, not estimated.
   per-sender rate limits and signed delivery. What is still short there is above
   the transport — the spec's routing modes, and resolving an approval over a
   channel.
+- **Terminal `/model` commands reach local models only (2026-10-20).** The
+  terminal's `/model` list, launch and use build a router with no owner, so they
+  read no saved connection and refuse a hosted provider with
+  `model_connection_required`. A Chat turn from the terminal goes through the
+  owner's gateway and is unaffected (BUG-351).
+- **Read connectors and the skill importer follow a redirect with your token
+  (2026-10-20).** The connector GET helper checks its host allowlist on the URL
+  it was given and then lets urllib follow a redirect — headers included — to a
+  host the allowlist does not name. The model and image helpers refuse redirects;
+  this one does not yet (BUG-350).
+- **A reverse proxy on the same machine makes every remote request look
+  local.** Raiker treats a loopback peer as this machine, so pointing a reverse
+  proxy at `127.0.0.1:8765` erases the distinction; the README warns against it
+  and the fix is open (BUG-347).
 - ~~**Eight gated capabilities have no threat model.**~~ **Closed 2026-08-23.**
   Opening a higher-risk gate requires a threat-model acknowledgement recorded
   against your principal, and eight capabilities had nothing written to
@@ -428,7 +463,8 @@ on the shipped build, not estimated.
   `process_execution` and `semantic_memory_runtime` — and left
   `file_write_execution` / `patch_apply_execution` with only a section of
   `THREAT_MODEL.md` whose central claim had gone stale. Eleven documents now
-  close it, and **all forty-six capabilities with a real executor have one**,
+  close it, and **every capability with a real executor has one** — forty-six
+  then, fifty on 2026-10-20 —
   each reachable from
   [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one)
   rather than only by filename. A test asserts the coverage so it cannot drift

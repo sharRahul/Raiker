@@ -122,8 +122,9 @@ nothing to model until one is proposed. See
 Re-derived **2026-08-23** by comparing `REAL_EXECUTOR_CAPABILITIES`
 (`raiker/runtime/executors/__init__.py`) against the index above, and again
 **2026-09-04** when `telemetry_export` made it forty-six, and **2026-09-05**
-when `image_generation` made it forty-seven.
-**All forty-six are covered**, and every one is reachable from a table on this
+when `image_generation` made it forty-seven, and **2026-10-20**, when the set
+stood at fifty.
+**All fifty are covered**, and every one is reachable from a table on this
 page rather than only by knowing a filename. The count is not maintained by
 care: `test_every_real_executor_capability_has_a_threat_model` fails the suite
 for a capability added without one, which is how the forty-sixth got its

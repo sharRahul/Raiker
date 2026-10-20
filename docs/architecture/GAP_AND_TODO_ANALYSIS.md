@@ -7,9 +7,11 @@
 
 ## Completed items
 
-The local terminal client, loopback dashboard, owner bootstrap, policy and
-approval boundaries, audit records, model profile selection, and governed local
-runtime slices are implemented.
+The local terminal client, loopback dashboard, desktop application, owner
+bootstrap, policy and approval boundaries, audit records, model profile
+selection and connection-bound model destinations with a dial-time address
+guard, the Chat, Build and Design work surfaces, and governed local runtime
+slices are implemented.
 
 ## No longer active gaps
 
@@ -22,7 +24,10 @@ checklists are not active product documentation. Current status is maintained in
 - Sensitive finance, investment, medical, pregnancy, CCTV, home-security, and
   hardware operations. **No executor exists**, so there is no enable path at all;
   they fail closed and are listed under Observability → Diagnostics.
-- Hosted multi-user deployment and native/mobile/IDE clients.
+- Hosted multi-user deployment and mobile/IDE clients. (The desktop
+  application ships; signed releases and an update through a published signed
+  channel are not yet tested — see the
+  [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md).)
 - Tamper-evident audit storage and a dedicated secret-management service.
 
 These areas remain disabled and fail closed. Strict non-allow blocking, role
@@ -65,14 +70,29 @@ kept here as the record of what they were:
 The **eight capabilities with no threat model** were a third item here and are
 **closed** (2026-08-23). Re-deriving the comparison found the count understated —
 it credited a passing mention — so eleven documents were written rather than
-eight, and all forty-six capabilities with a real executor have one. See
+eight. Every capability with a real executor has one — fifty as of 2026-10-20,
+including `image_generation` and `git_fetch_execution`, added since. See
 [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
 
 `RUNTIME_EXECUTORS_SPEC.md` completeness was a fourth item here and is **closed**:
-re-checked on 2026-08-23, all 66 capabilities in `raiker/phase_gates.py` appear in
-it. It is kept named rather than silently dropped, because the pattern it
+re-checked on 2026-10-20, all 70 capabilities in `raiker/phase_gates.py` appear in
+it (the 2026-10-20 check found `image_generation` and `git_fetch_execution`
+missing from its executor table and added them). It is kept named rather than silently dropped, because the pattern it
 represents — a canonical status document that omits capabilities — is the one
 worth watching for.
+
+### Open defects that bound current claims
+
+The canonical list is [to be fixed](../plans/TO_BE_FIXED.md). As of 2026-10-20
+the ones that limit what this build can claim are: the governed shell's live
+container and remote proof (BUG-194), a same-machine reverse proxy making
+remote requests look local (BUG-347), the Design canvas remainder (BUG-348),
+the connector GET helper following redirects with the owner's token (BUG-350),
+CLI `/model` commands unable to reach a connected hosted provider (BUG-351),
+and the web/MCP pinned opener not working behind a proxy (BUG-353). Image
+provider evidence (BUG-287), the issue-to-PR routine's live run (BUG-339), the
+live-spec sign-in remainder (BUG-248) and a custom endpoint's missing route
+line (BUG-352) are open as well.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action remain the baseline.
 

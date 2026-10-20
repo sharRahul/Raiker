@@ -1,44 +1,59 @@
-# Threat Model — Remote / Cloud Execution (Phase 4, slice 6: deliberately fail-closed)
+# Threat Model — Remote / Cloud Execution (SSH and Daytona)
 
 > Status marker: runtime_enablement_candidate — strict non-allow blocking,
-> role revoke governed, capability gate per action. Runtime execution remains
-> disabled/deferred. Approval resolution is metadata-only.
+> role revoke governed, capability gate per action. Remote and cloud command
+> execution have real foreground executors behind an owner-configured,
+> owner-selected profile, and are relayed by an approval.
 
-Per the **sandboxed-first** Phase 4 decision, the off-machine command-execution
-capabilities stay **fail-closed (no executor)**:
+**Corrected 2026-10-20.** This document described both capabilities as
+deliberately fail-closed with no executor. That stopped being true on
+2026-08-22: both are members of `REAL_EXECUTOR_CAPABILITIES` and of
+`EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`).
 
-- `remote_execution_cap` (SSH/VPS remote command execution)
-- `cloud_execution_cap` (cloud-provider execution)
+| Capability | Executor | What it runs |
+|---|---|---|
+| `remote_execution_cap` | `RemoteExecutionExecutor` (`raiker/runtime/executors/tier5_network.py`) | One OpenSSH command on the owner's configured host |
+| `cloud_execution_cap` | `CloudExecutionExecutor` (same file) | One `daytona exec` in the owner's existing Daytona sandbox |
 
-> Update (Phase 4 slice 7): `hosted_model_runtime` and
-> `private_network_model_runtime` completed the per-integration opt-in below
-> and were promoted to real governed executors — see
-> [`hosted-models.md`](hosted-models.md). Remote/cloud **command execution**
-> remains fail-closed as documented here.
+The historical Phase-3/4 gate name `remote_execution` remains declared only so
+an old configuration is refused by name; it has no executor. Hosted and
+private-network *model* calls are a separate pair of capabilities — see
+[`hosted-models.md`](hosted-models.md).
 
-These are **not** in `REAL_EXECUTOR_CAPABILITIES`; their executors return
-`not_implemented:<capability>` (`raiker/runtime/executors/tier5_network.py`),
-the executor registry refuses to register them, and activation is blocked with
-`activation_blocked:no_executor`. This is intentional, not an omission: each
-crosses the machine boundary and carries credential-handling, egress, and
-blast-radius risk that demands its own integration + threat model + tests.
+## Boundaries enforced (fail-closed)
 
-## What a future per-integration opt-in MUST satisfy
+| Control | Mechanism |
+|---|---|
+| Owner profile, owner-selected | The profile comes from the action's `profile_id` or the owner's selected execution environment, loaded by `(profile_id, owner_principal_id)`. A missing, disabled or wrong-type profile is `execution_profile_unavailable`; an unreadable one `invalid_execution_profile`. A profile record alone runs nothing — the gate, decision mode and approval still apply. |
+| No fallback | A refused remote or cloud command never falls back to running on this machine. |
+| Destination from the profile, not the action | The SSH host and user, and the Daytona sandbox id, come from the saved profile and are shape-checked; the action supplies only the command. |
+| Pinned host key | SSH runs with `BatchMode=yes` and `StrictHostKeyChecking=yes`; saving an SSH profile checks the supplied host public key against its SHA-256 fingerprint (`ssh_host_key_fingerprint_mismatch`). |
+| Credentials by reference | The SSH identity file and the Daytona API key are named by environment variable in the profile and read at execution time; they are never action arguments, never stored in events and, for Daytona, passed only in the child's environment. A missing reference is `ssh_profile_not_ready` / `daytona_profile_not_ready`. |
+| Bounded execution | Timeout clamped to 1–300 s, output capped at 200 kB, and the runner's program allowlist is exactly `ssh` or `daytona`. |
+| Cost ceiling (Daytona) | Each run reserves its estimated cost against the profile's `max_cost` in an append-only ledger before launch (`cloud_execution_budget_exceeded`); provider actuals reconcile reservations when an adapter reports them, and an unavailable billing adapter is explicit (`daytona_spend_api_unavailable`) and keeps the estimate. |
+| Metadata-only results | Artifacts carry the profile id, exit code, byte counts and truncation — never command output, credentials or destinations. |
+| Approval relay | Both are relayed once by an approval and re-governed at execution time against their own gate and `approval_execution_relay`. AI principals cannot enable either gate. |
 
-Promoting any of these to a real executor (the documented process in
-`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`) requires, per capability:
+The governed command service's remote backend
+(`raiker/execution/commands/backends/remote.py`) adds an exact length-prefixed
+envelope (`remote_envelope.py`) and a fixed supervisor path
+(`remote_supervisor.py`) for the same SSH and Daytona targets.
 
-1. A real integration that injects credentials from an owner secret store
-   (never from model/action args), over TLS, to an **owner-allowlisted**
-   destination only.
-2. An egress/destination allowlist that is empty by default (fail closed), plus
-   per-call resource/time/budget bounds.
-3. Metadata-only events (no command output, secrets, or destinations leaked).
-4. A dedicated threat model documenting escape/lateral-movement risks and
-   mitigations, plus a recorded `threat_model_acks` entry.
-5. Acceptance tests for executes-when-governed **and** fails-closed-when-disabled.
-6. Removal from the validator's `must_not_have_default_executor` set and from
-   the guard test's `_SENSITIVE` tuple, in lockstep with the above.
+## Residual risks & open work
 
-Until all of that lands for a given capability, it remains fail-closed and
-disabled/fail-closed by design, and AI principals can never run or enable it.
+- **Supervisor lifecycle and live proof.** Installing and upgrading the remote
+  supervisor, and live proof against a real remote host, remain open —
+  [BUG-194](../plans/TO_BE_FIXED.md). Selecting a profile with no installed
+  supervisor fails closed.
+- The remote host itself is the owner's trust decision: a command that reaches
+  it can do whatever that account can do there.
+- A leaked environment variable leaks the credential it names.
+- Other remote or cloud provider types have no executor and fail closed.
+
+## Activation requirements
+
+Default gate state follows the per-principal rule in
+[`RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md):
+enabling requires a HUMAN `runtime_gate_manager`, the registered executor, a
+`threat_model_acks` row referencing this document and a human confirmation
+token (tier 5, `raiker/runtime/authority/activation.py`).

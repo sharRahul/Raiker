@@ -5,9 +5,12 @@
 > local_single_user_production_hardening: implemented
 > production_ready_local_single_user_runtime: ready
 
-Raiker is a local-first runtime with two clients: the terminal client and the
-loopback web dashboard. Both call the same gateway; neither receives direct
-tool authority.
+Raiker is a local-first runtime with three clients: the terminal client, the
+loopback web dashboard, and the desktop application, which packages the same
+host and dashboard in a native window (`desktop/`,
+[ADR-0003](../adr/ADR-0003-desktop-distribution.md)). All of them call the same
+gateway; none receives direct tool authority. Paired messaging channels reach
+the gateway as untrusted inbound content, never as an authority.
 
 ## Governed action flow
 
@@ -59,25 +62,25 @@ remain brokered under a signed turn identity.
 | Terminal and web dashboard | Implemented local clients; no direct authority |
 | Local model profiles | Supported through governed provider contracts |
 | Integrated executors | Governed per capability and decision mode |
-| Approval resolution | Executes the twelve capabilities in `EXECUTABLE_ON_APPROVAL` through the governed relay, re-governed at execution time; file mutations are checkpointed first. Every other capability — including `process` and `network` — remains metadata-only |
-| Checkpoints | Capture is automatic before every approved mutation. **Rewind is not reachable by an owner**: the restore executor exists and no surface proposes a restore |
+| Approval resolution | Executes the fourteen capabilities in `EXECUTABLE_ON_APPROVAL` through the governed relay, re-governed at execution time; file mutations are checkpointed first. Every other capability — including `process` — remains metadata-only |
+| Checkpoints | Capture is automatic before every approved mutation. Rewind is owner-reachable: `POST /api/checkpoints/{id}/restore`, `/checkpoints restore <id> --confirm` and the Chat/Build rewind control raise an approval for `checkpoint_restore_execution`; no model tool proposes one |
+| Model destinations | A saved connection authorizes its own origin ([ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md)); every new connection's resolved addresses are checked against the connection's class and the passing address is pinned (`raiker/models/transport_guard.py`) |
 | Remote/cloud | Real foreground SSH and Daytona executors behind an owner-configured, owner-selected profile with a pinned host key and a cost ceiling; fail-closed without one |
 | Sensitive domains | No executor; disabled and fail-closed |
 
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
-The runtime state and capability gate state are durable. No `/sessions` command is
-currently implemented. sessions: deferred; no `/sessions` command is currently implemented.
-Session records are exposed through the documented
-commands and local API.
+The runtime state and capability gate state are durable. sessions: deferred; no
+`/sessions` command is currently implemented. Session records are exposed through
+the local API and **Observability → Sessions**.
 
 See [implementation status](IMPLEMENTATION_STATUS.md) for the current capability
 ledger and [security architecture](SECURITY_ARCHITECTURE.md) for trust boundaries.
 
 Approval resolution executes approved local file mutations and allowlisted,
 workspace-contained shell commands through the governed relay, along with the
-patch, git write and push, GitHub write, durable memory, local planning and
-owner-selected SSH/Daytona capabilities the relay's `EXECUTABLE_ON_APPROVAL` set
-names (`raiker/approvals/execution.py`). The terminal
+patch, git write, fetch and push, GitHub write, durable memory, checkpoint
+restore, local planning and owner-selected SSH/Daytona capabilities the relay's
+`EXECUTABLE_ON_APPROVAL` set names (`raiker/approvals/execution.py`). The terminal
 requires `RAIKER_API_TOKEN`, previews the immutable effect, and requires the id
 again before execution. Resolution is metadata-only for every other capability.
 Strict
@@ -96,6 +99,20 @@ owner-triggered minimal execution preflight. The Models acquisition plane owns
 approved GGUF roots, durable jobs, managed loopback llama.cpp, immutable Hugging
 Face snapshots, and the isolated conversion worker; none bypasses turn
 governance.
+
+Reaching an off-machine model is decided in two steps. The factory refuses an
+off-machine endpoint without the owner's saved connection for that profile, or
+at any origin other than the one the connection was saved for
+(`authorize_model_destination`). Then the pooled transport
+(`ModelTransport`) opens each new connection through `GuardedNetworkBackend`:
+the name is resolved once, every answer must fit the connection's class —
+public for hosted, the owner's network for home lab, loopback for local,
+link-local only by the connection's opt-in, cloud metadata never — and the
+address that passed is dialled while TLS and `Host` keep the name. The proxy
+route is explicit (`proxy_for`): only hosted origins use the owner's proxy, and
+a request the proxy carries is resolved by the proxy rather than pinned here. A
+refusal is `model_dial_refused:<reason>`, a policy answer distinct from a
+connection failure.
 
 ## Context budget and provider usage planes
 
@@ -116,6 +133,18 @@ separate from provider-native data. OpenRouter can report key-level figures with
 the inference key; OpenAI and Anthropic organization adapters require separate
 admin credentials; Ollama has no account quota adapter. Provider payloads are
 immediately normalized to bounded numbers and cached for five minutes.
+
+## Work surfaces
+
+Chat, Build and Design are the three ways to give Raiker work, and each is a
+client of the same gateway. Build binds a turn to its target repository, gives a
+scheduled or delegated task its own worktree with commit provenance, and reviews
+the exact patch it proposes before approval
+([working in Build](../guide/working-in-build.md)). Design keeps owner-scoped
+structured documents edited by typed, versioned operations; an agent proposal is
+one model call through the owner's router and is applied only on the owner's
+acceptance, and images go through the `image_generation` gate
+([Design workspace](../plans/DESIGN_WORKSPACE_SPEC.md)).
 
 ## Personal autonomous-agent direction
 

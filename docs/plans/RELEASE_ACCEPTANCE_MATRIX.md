@@ -12,13 +12,26 @@ row below is for an **unsigned** build.
 
 ## Matrix
 
-Status as of 2026-10-17. CI evidence: `.github/workflows/desktop-package.yml`,
-[run 39051611755](https://github.com/sharRahul/Raiker/actions/runs/39051611755)
-on commit `808409c` of PR #235 (every job green, with the installation-time
-system check and the Raiker Setup window; earlier runs 39044354934 on
-`6758e64` and 39041854653 on `914b60a` passed before them), each target on its own GitHub-hosted runner,
-unsigned, version stamp `0.0.0`. Each target's artifact holds its installers
-and the evidence files named below.
+Status as of 2026-10-20. CI evidence: `.github/workflows/desktop-package.yml`,
+[run 39327713463](https://github.com/sharRahul/Raiker/actions/runs/39327713463)
+(attempt 2) on commit `9c65e86` on `main` (PR #236) — all seven jobs green: the
+four build targets, the emulated Windows-on-Arm install, web assets and the
+release acceptance summary. Earlier runs 39051611755 on `808409c` (PR #235),
+39044354934 on `6758e64` and 39041854653 on `914b60a` passed before it. Each
+target runs on its own GitHub-hosted runner, unsigned, version stamp `0.0.0`,
+and its artifact holds its installers and the evidence files named below. The
+workflow runs on pull requests and pushes to `main` that touch packaging paths,
+on demand, and from `release.yml`; a change outside those paths (such as the 2026-10-20 model
+transport work) does not re-run it.
+
+**What a release carries.** A draft GitHub release has exactly one installer
+per platform (`RELEASE_ASSETS`, `raiker/app/desktop_release.py`;
+`scripts/select_release_assets.py`): `windows-x86_64-setup.exe`, the same
+installer as `windows-arm64-setup.exe`, `macos-arm64.dmg`,
+`linux-x86_64.AppImage` and `linux-arm64.AppImage`, with `SHA256SUMS.txt`. The
+`.msi`, `.zip`, `.deb` and `.rpm` formats in the table are built and tested on
+every run but are not attached to a release. No release has been published
+yet.
 
 | Target (runner) | Installers | Build + frozen-host smoke | Install | Installed-host smoke | Window + onboarding | Uninstall keeps data | Signed-channel update |
 |---|---|---|---|---|---|---|---|

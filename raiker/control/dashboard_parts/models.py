@@ -48,7 +48,6 @@ from raiker.control.views.security import (
     StorageSpace,
 )
 from raiker.events.writer import EventLogWriter
-from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import (
     ModelProviderError,
     ProviderPolicyError,
@@ -87,6 +86,15 @@ def _declared(raw: Any, key: str) -> bool | None:
     value = (raw or {}).get(key)
     return value if isinstance(value, bool) else None
 
+
+
+
+def _environment_credential_env(raw: dict[str, Any]) -> str | None:
+    """The profile's key variable, by name, when the owner's environment sets it."""
+    name = raw.get("api_key_env")
+    if isinstance(name, str) and name and os.environ.get(name, "").strip():
+        return name
+    return None
 
 class ModelService:
 
@@ -273,6 +281,9 @@ class ModelService:
                 in {"remote_hosted", "private_network"},
                 selected=selected,
                 connection_configured=bool(saved_connection),
+                environment_credential_env=_environment_credential_env(profile.raw)
+                if not saved_connection
+                else None,
                 usage_admin_configured=bool(
                     saved_connection and saved_connection.get("admin_api_key")
                 ),
@@ -439,9 +450,6 @@ class ModelService:
             hosted_model_gate_enforced=enforced_policy.allow_hosted_provider,
             private_network_model_gate_enforced=(
                 enforced_policy.allow_private_network_provider
-            ),
-            model_egress_allowlist_configured=bool(
-                os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
             ),
             remote_profile_count=sum(1 for p in profiles if p.off_machine),
             ready_provider_count=sum(1 for p in profiles if p.ready),
@@ -1379,7 +1387,7 @@ class ModelService:
 
         Returns None for unknown/test-only profiles (the route 404s). This is the
         only web read that touches the network, and only because the user asked
-        for this provider's catalogue; provider policy (gates, egress allowlist,
+        for this provider's catalogue; provider policy (gates, saved connection,
         API key) is enforced by the provider factory exactly as for a chat call,
         so a policy-denied provider is never contacted. On any failure the list
         is empty with an honest status — model names are never fabricated.
@@ -1577,7 +1585,7 @@ class ModelService:
 
         Mirrors the CLI ``/model use``: the effective profile (concrete model +
         endpoint + provider policy) is validated by the provider factory without
-        connecting, so a hosted provider whose gate/egress/key is missing fails
+        connecting, so a hosted provider whose gate, connection or key is missing fails
         closed here instead of at turn time. Placeholder profiles require an
         explicit concrete model.
         """

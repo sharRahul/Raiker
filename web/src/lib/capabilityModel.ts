@@ -185,6 +185,15 @@ export function isOnByDefault(gate: CapabilityGate): boolean {
  */
 export function unsetResolutionNote(gate: CapabilityGate): string {
   if (!isUnset(gate)) return "";
+  // ADR-0004 — a saved model connection is the owner's consent to use that
+  // provider, so this gate is on without a stored row. Turning it off is the
+  // explicit revocation that outranks every connection.
+  if (gate.enabled_by_connection) {
+    return (
+      "Turning it off stops every provider it covers, whatever is connected, " +
+      "until you turn it back on. Your saved connections stay saved."
+    );
+  }
   if (gate.unset_resolution === "shipped_default") {
     return (
       "Nothing is stored for this capability, and it ships on — an empty table " +
@@ -829,15 +838,15 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   // Models.
   model_provider_runtime: {
     label: "Provider embeddings",
-    description: "Call a provider's embedding endpoint and store semantic vectors (egress-gated).",
+    description: "Call a provider's embedding endpoint and store semantic vectors (through your saved connection).",
   },
   hosted_model_runtime: {
     label: "Hosted models",
-    description: "Talk to hosted LLM APIs (Anthropic, OpenAI, Gemini, OpenRouter) behind the egress allowlist.",
+    description: "Talk to hosted LLM APIs (Anthropic, OpenAI, Gemini, OpenRouter) you have connected.",
   },
   private_network_model_runtime: {
     label: "Home-lab models",
-    description: "Talk to private-network inference servers such as vLLM.",
+    description: "Talk to private-network inference servers such as vLLM that you have connected.",
   },
   // Personal-domain local stores.
   email_runtime: {

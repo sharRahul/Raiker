@@ -616,6 +616,7 @@ export type CapabilityGateView = {
   governance_note: string;
   unset_resolution: string;
   enforced_enabled: boolean;
+  enabled_by_connection: boolean;
   side_effect: string;
   ungoverned_consequence: string;
   authority_requirement: string;
@@ -3893,6 +3894,7 @@ export type ModelConnectionRequest = {
   workspace_id?: string | null;
   label?: string | null;
   backup_api_keys?: string[] | null;
+  use_environment_credential?: boolean;
 };
 
 export type ModelConversionRequestBody = {
@@ -4041,6 +4043,7 @@ export type ModelProfileView = {
   off_machine: boolean;
   selected: boolean;
   connection_configured: boolean;
+  environment_credential_env: string | null;
   usage_admin_configured: boolean;
   workspace_configured: boolean;
   routing_data_collection: string;
@@ -4152,7 +4155,6 @@ export type ModelsView = {
   private_network_model_gate_state: string;
   hosted_model_gate_enforced: boolean;
   private_network_model_gate_enforced: boolean;
-  model_egress_allowlist_configured: boolean;
   remote_profile_count: number;
   ready_provider_count: number;
   usable_provider_count: number;

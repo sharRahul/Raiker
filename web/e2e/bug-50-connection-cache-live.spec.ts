@@ -37,7 +37,7 @@
  *
  * Prerequisites:
  *   npm --prefix web run build
- *   RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com \
+ *   (connect Anthropic on the Models page first)
  *     python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser \
  *     --rate-limit-per-minute 6000
  *   RAIKER_LIVE_HOST_PID=<pid of that host> [RAIKER_LIVE_ANTHROPIC_KEY=…] \

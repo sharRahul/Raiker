@@ -113,23 +113,38 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     message: "OpenRouter is only reachable over HTTPS.",
     fix: "Remove the custom endpoint, or replace it with an https:// URL.",
   },
+  // Connection-bound authorization: an off-machine model is reached only
+  // through a connection the owner saved for it, and only at that
+  // connection's own address. These are policy answers, not connection faults.
+  model_connection_required: {
+    message: "This provider is off this machine and has no saved connection, so Raiker will not reach it.",
+    fix: "Connect it on the Models page. Saving the connection is what authorizes its address.",
+  },
+  model_connection_origin_mismatch: {
+    message: "The address this request would use is not the one the saved connection was authorized for.",
+    fix: "Reconnect the provider with the address you want Raiker to use.",
+  },
+  model_connection_origin_unbound: {
+    message: "The saved connection does not name an address, and this profile has none of its own.",
+    fix: "Reconnect the provider and enter its endpoint.",
+  },
+  endpoint_userinfo_rejected: {
+    message: "An endpoint containing a username or password is never used.",
+    fix: "Remove the user name and password from the address and paste the key into the key field instead.",
+  },
+  endpoint_ambiguous_host: {
+    message: "That address can be read as more than one host, so Raiker will not use it.",
+    fix: "Write the host as a name or a plain dotted IPv4 address, for example 192.168.1.20.",
+  },
+  environment_credential_unavailable: {
+    message: "The environment variable for this provider's key is not set in Raiker's environment.",
+    fix: "Paste the key instead, or set the variable and restart raiker-web.",
+  },
+  environment_credential_with_pasted_key: {
+    message: "Choose one: a pasted key, or the key from the environment.",
+    fix: "Clear the key field, or untick “Use the key from the environment”.",
+  },
 };
-
-/** `model_egress_denied:<host>` / `model_egress_denied:no_allowlist`. */
-function egressGuidance(code: string): Omit<ProviderErrorGuidance, "code"> {
-  const detail = code.slice("model_egress_denied:".length);
-  const host = detail === "no_allowlist" || detail === "missing_host" ? null : detail;
-  return {
-    message:
-      host === null
-        ? "No model endpoint is on the owner egress allowlist, so every off-machine provider fails closed."
-        : `${host} is not on the owner egress allowlist, so Raiker refused to reach it.`,
-    // The allowlist is process configuration on purpose: it is the last boundary
-    // before bytes leave the machine, so it is deliberately not editable from a
-    // browser session. Say so plainly rather than implying an in-app control.
-    fix: `Restart raiker-web with RAIKER_MODEL_EGRESS_ALLOWLIST set to the hosts you allow, for example RAIKER_MODEL_EGRESS_ALLOWLIST=${host ?? "api.anthropic.com"}. It is process configuration by design and cannot be changed from this browser session.`,
-  };
-}
 
 /** `missing_endpoint_env:VAR`. */
 function endpointEnvGuidance(code: string): Omit<ProviderErrorGuidance, "code"> {
@@ -163,8 +178,6 @@ export function providerErrorGuidance(
   const family = reasonCode.split(":", 1)[0];
   if (GUIDANCE[family] !== undefined && GUIDANCE[reasonCode] === undefined)
     return { ...GUIDANCE[family], code: reasonCode };
-  if (reasonCode.startsWith("model_egress_denied:"))
-    return { ...egressGuidance(reasonCode), code: reasonCode };
   if (reasonCode.startsWith("missing_endpoint_env:"))
     return { ...endpointEnvGuidance(reasonCode), code: reasonCode };
   if (reasonCode.startsWith("provider_api_key_missing:"))

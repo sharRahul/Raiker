@@ -271,8 +271,8 @@ def main() -> int:
     # external_channel_runtime,
     # channel_approval_relay (slice 4), container_execution_cap (slice 3),
     # scheduled_routines (slice 2), and hosted_model_runtime /
-    # private_network_model_runtime (slice 7 — owner egress allowlist,
-    # env-only credentials), and plugin_install (slice 8 — local manifest
+    # private_network_model_runtime (slice 7 — the owner's saved, origin-bound
+    # model connection), and plugin_install (slice 8 — local manifest
     # validation + install-record creation only), and plugin_execution_cap
     # (slice 9 — brokered read-only installed-plugin tool invocation only).
     for cap in must_not_have_default_executor:

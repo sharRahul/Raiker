@@ -108,6 +108,7 @@ class TestCapabilityGateView:
             # runtime would run it.
             "unset_resolution": "off",
             "enforced_enabled": False,
+            "enabled_by_connection": False,
             # BUG-293 — what this would cost if it ran without the owner, and
             # what stands in the way. Empty on the DTO's own defaults, because
             # the record is looked up by the service: a capability with no real
@@ -254,6 +255,7 @@ class TestRuntimeReadinessView:
                     "governance_note": "",
                     "unset_resolution": "off",
                     "enforced_enabled": False,
+                    "enabled_by_connection": False,
                     # BUG-293 — empty on the DTO's own defaults, as above: the
                     # record is looked up by the service, and a capability with
                     # no real executor has no cost to state.

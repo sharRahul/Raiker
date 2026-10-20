@@ -21,6 +21,15 @@ connection is never reused *as* an authorization. That is also why a changed
 connection needs no invalidation: a new endpoint is a new key, and a new key on
 the same endpoint is a different request header on the same socket.
 
+**Proxies.** A client honours the process's own proxy settings
+(``HTTPS_PROXY``/``HTTP_PROXY``/``NO_PROXY``) — the owner's environment, which
+no action, tool or model can set — except for a loopback origin, which is never
+handed to a proxy: a local model's traffic stays on the machine, exactly as
+:mod:`raiker.models.local_service` already does for its liveness checks. A
+proxy changes the route, not the destination: the request is still for the
+connection's origin, and over HTTPS the proxy carries an end-to-end TLS tunnel
+it cannot read. Redirects are not followed (httpx's default, kept here).
+
 **Clients belong to the event loop that created them.** An ``httpx.AsyncClient``
 holds anyio connections bound to one loop, so the pool is keyed by the running
 loop as well as the endpoint. A loop that has gone is a set of clients that can
@@ -55,6 +64,12 @@ def _origin(endpoint: str) -> str:
     return f"{split.scheme or 'https'}://{split.netloc}"
 
 
+def _is_loopback(endpoint: str) -> bool:
+    from raiker.models.endpoint_policy import classify_endpoint
+
+    return classify_endpoint(_origin(endpoint)) == "local_machine"
+
+
 class ProviderClientPool:
     """One :class:`httpx.AsyncClient` per event loop, origin and timeout."""
 
@@ -71,8 +86,14 @@ class ProviderClientPool:
         if existing is not None and not existing.is_closed:
             return existing
         # No default headers: every provider carries its own per request, so a
-        # pooled connection never becomes an authorization.
-        created = httpx.AsyncClient(timeout=timeout, limits=_LIMITS)
+        # pooled connection never becomes an authorization. No redirects, and no
+        # proxy for a loopback origin.
+        created = httpx.AsyncClient(
+            timeout=timeout,
+            limits=_LIMITS,
+            follow_redirects=False,
+            trust_env=_is_loopback(endpoint) is False,
+        )
         self._clients[key] = created
         self._loops[id(loop)] = loop
         return created

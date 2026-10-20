@@ -206,6 +206,12 @@ class RuntimeControlService:
             # Permissions saying Off about a capability that would run.
             enforced_enabled=self._enforced_enabled(
                 capability, principal.principal_id if principal else None
+            )
+            or self._enabled_by_connection(
+                capability, principal.principal_id if principal else None
+            ),
+            enabled_by_connection=self._enabled_by_connection(
+                capability, principal.principal_id if principal else None
             ),
             # BUG-293 — what this would cost if it ran without the owner, and
             # what stands in the way. Read rather than derived: the table is
@@ -245,6 +251,32 @@ class RuntimeControlService:
             "commands run with its network, and each one answers to "
             "Code with this machine's network."
         )
+
+    def _enabled_by_connection(self, capability: str, principal_id: str | None) -> bool:
+        """True when a saved model connection is what keeps this model gate on.
+
+        Asked of ``provider_runtime_policy_from_gates``, the read every model
+        call performs, so the row and the enforcing path cannot disagree. Only
+        for the two model gates, and only while the gate itself is not on and
+        not explicitly revoked — then the connection is the whole reason.
+        """
+        from raiker.models.policy_state import (
+            HOSTED_MODEL_GATE,
+            PRIVATE_NETWORK_MODEL_GATE,
+            provider_runtime_policy_from_gates,
+        )
+
+        if capability not in {HOSTED_MODEL_GATE, PRIVATE_NETWORK_MODEL_GATE} or not principal_id:
+            return False
+        try:
+            if self._enforced_enabled(capability, principal_id):
+                return False
+            policy = provider_runtime_policy_from_gates(self._store, principal_id)
+        except Exception:  # noqa: BLE001 — an unreadable row is a missing column, not a stop
+            return False
+        if capability == HOSTED_MODEL_GATE:
+            return policy.allow_hosted_provider
+        return policy.allow_private_network_provider
 
     def _enforced_enabled(self, capability: str, principal_id: str | None) -> bool:
         """What the enforcing path answers for this capability, right now.

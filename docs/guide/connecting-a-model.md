@@ -282,7 +282,7 @@ That is the whole flow. Behind it:
 | What used to be required | What happens now |
 |---|---|
 | Turn on the **Hosted models** capability gate first | A saved connection is the authorization. The gate remains, and turning it **off** still revokes access. |
-| Add the host to `RAIKER_MODEL_EGRESS_ALLOWLIST` and restart | The endpoint on the profile you configured is authorised — that host and no other. The environment variable still works for pre-authorising hosts before you configure them. |
+| Add the host to `RAIKER_MODEL_EGRESS_ALLOWLIST` and restart | Nothing. Saving the connection authorises that connection's own address — its scheme, host and port — and no other. The variable is retired: if it is still set, Raiker says so once in its log and otherwise ignores it. You can remove it. |
 | Generate a vault key in Settings first | The key is generated on first use at `0600`. Settings still owns viewing, rotating, and clearing it. |
 
 Then press **Choose model…** — Raiker asks the provider for its current live
@@ -369,15 +369,39 @@ lowest price, highest throughput or lowest latency. Nothing is denied until you
 tick it: with it ticked, some free models may have no provider left to serve
 them. Re-pasting the key keeps both choices.
 
+### Already have the key in your environment?
+
+If Raiker runs with the provider's own variable set (`OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, …), the connect dialog offers **Use the key from
+`<VARIABLE>`**. Tick it and press **Connect**: the connection is saved, the key
+stays where it is, and the page never sees it. Until you do that, a key in the
+environment is not a connection — it authorises nothing off this machine on its
+own, so an agent cannot reach a provider merely because a key happens to be set.
+
+This is also the upgrade path from an installation that used
+`RAIKER_MODEL_EGRESS_ALLOWLIST` with environment keys: connect each provider
+once, then remove the variable.
+
 ### What is still refused
 
 Consent by configuration is scoped, not a blanket opening:
 
-- A provider you have **not** configured still fails closed.
-- Configuring Anthropic authorises `api.anthropic.com`. It does not authorise
-  any other host.
+- A provider you have **not** configured still fails closed
+  (`model_connection_required`), whatever is in your environment.
+- Configuring Anthropic authorises `https://api.anthropic.com` on port 443. It
+  does not authorise any other host, port or scheme — and an environment
+  override cannot move a saved connection somewhere else
+  (`model_connection_origin_mismatch`).
+- A connection for one provider never authorises another, and a fallback model
+  needs its own connection.
+- Nothing an agent does can create or change a connection. Only you, signed in,
+  on the Models page (or the ChatGPT sign-in) can.
 - A capability gate you **explicitly** turn off wins over a saved connection.
-  Revocation is absolute, or the control would be theatre.
+  Revocation is absolute, or the control would be theatre. **Permissions →
+  Hosted models** (and **Home-lab models**) reads **On by connection** while a
+  connection is what keeps it on, and offers **Turn off**; afterwards a
+  connected provider's card reads **Policy blocked**, and your connections stay
+  saved for when you turn it back on.
 - Deferred dangerous domains — finance, medical, pregnancy, CCTV, home
   security, and hardware — have no governed executor and stay unavailable
   regardless. SSH and Daytona execution are separate, explicit owner-profile
@@ -618,7 +642,7 @@ model, each an ordered list of up to three you have set up:
   vision model the image is not sent, as before.
 
 Choosing a side model grants nothing: every call still goes through the same
-gates, keys and egress rules as a turn.
+gates, connections and keys as a turn.
 
 ## Advisor model
 
@@ -633,8 +657,8 @@ time by all of:
 - the `advisor_model_runtime` capability;
 - its decision mode, which is **ask** by default and withholds the consult until
   you allow it;
-- the advisor provider's own policy — its hosted gate, the egress allowlist and
-  its API key.
+- the advisor provider's own policy — its hosted gate, your saved connection for
+  it, and its API key.
 
 Miss any one and the consult is refused with its own named reason, exactly as
 any other governed action is.
@@ -649,10 +673,10 @@ keeping either side of it.
 ## Off-machine provider posture
 
 **Models → Add model** opens with four read-only facts about everything that
-would leave this machine: the hosted model gate, the private-network gate, whether an
-egress allowlist is configured, and how many off-machine profiles exist. It is
-status, not a control — allowlist values and API keys are never displayed
-anywhere in the product, including here.
+would leave this machine: the hosted model gate, the private-network gate, how
+many off-machine providers you have connected, and how many off-machine profiles
+exist. It is status, not a control — endpoints and API keys are never displayed
+here.
 
 The two gates report **what they answer**, not what is stored against them.
 Connecting a provider is itself consent to use it, so a gate nobody has touched
@@ -661,9 +685,9 @@ reads **Off until connected**, which is both the verdict and the thing that
 changes it. A gate you deliberately turned off in **Permissions** reads **Off**
 whatever is connected — an explicit decision outranks a connection, always.
 
-A hosted provider fails closed unless **all** of the following are present: the
-runtime gate, the threat-model acknowledgement, the confirmation token, the
-egress allowlist, and the provider key. There is no silent fallback to a hosted
+A hosted provider fails closed unless **all** of the following are present: a
+gate you have not turned off, your saved connection for it, and the provider
+key. There is no silent fallback to a hosted
 model: if the model you chose cannot run, the turn fails with the reason rather
 than quietly reaching for one that costs money and leaves the machine.
 

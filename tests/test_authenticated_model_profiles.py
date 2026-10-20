@@ -57,7 +57,7 @@ def test_local_lm_studio_sends_optional_api_token(monkeypatch: pytest.MonkeyPatc
 
 
 
-def test_ollama_cloud_requires_hosted_gate_allowlist_and_key(
+def test_ollama_cloud_requires_hosted_gate_connection_and_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = ModelProfileRegistry.load()
@@ -66,19 +66,24 @@ def test_ollama_cloud_requires_hosted_gate_allowlist_and_key(
         "gemma4:31b",
     )
 
-    with pytest.raises(ProviderPolicyError, match="provider_requires_explicit_policy_approval"):
+    with pytest.raises(ProviderPolicyError, match="model_connection_required"):
         ModelProviderFactory().create(profile)
 
     policy = ProviderRuntimePolicy(
         allow_policy_gated_provider=True,
         allow_hosted_provider=True,
     )
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "ollama.com")
-    with pytest.raises(ProviderConfigurationError, match="provider_api_key_missing:OLLAMA_API_KEY"):
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-secret")
+    with pytest.raises(ProviderPolicyError, match="model_connection_required"):
         ModelProviderFactory(policy=policy).create(profile)
 
+    saved = {"credential_source": "environment"}
+    monkeypatch.delenv("OLLAMA_API_KEY")
+    with pytest.raises(ProviderConfigurationError, match="provider_api_key_missing:OLLAMA_API_KEY"):
+        ModelProviderFactory(policy=policy, connection=saved).create(profile)
+
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-secret")
-    provider = ModelProviderFactory(policy=policy).create(profile)
+    provider = ModelProviderFactory(policy=policy, connection=saved).create(profile)
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     assert provider.endpoint == "https://ollama.com/v1"
     assert provider._http.headers["Authorization"] == "Bearer ollama-secret"
@@ -95,10 +100,11 @@ def test_huggingface_uses_router_and_hf_token(monkeypatch: pytest.MonkeyPatch) -
         allow_policy_gated_provider=True,
         allow_hosted_provider=True,
     )
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "router.huggingface.co")
     monkeypatch.setenv("HF_TOKEN", "hf-secret")
 
-    provider = ModelProviderFactory(policy=policy).create(profile)
+    provider = ModelProviderFactory(
+        policy=policy, connection={"credential_source": "environment"}
+    ).create(profile)
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     assert provider.endpoint == "https://router.huggingface.co/v1"
     assert provider.model == "openai/gpt-oss-120b:cheapest"
@@ -117,9 +123,10 @@ def test_chatgpt_subscription_uses_codex_without_an_api_key(
         allow_policy_gated_provider=True,
         allow_hosted_provider=True,
     )
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "chatgpt.com")
-
-    provider = ModelProviderFactory(policy=policy).create(profile)
+    # The marker the sign-in route saves is the connection.
+    provider = ModelProviderFactory(
+        policy=policy, connection={"connection_kind": "codex_subscription"}
+    ).create(profile)
 
     assert isinstance(provider, AsyncCodexAppServerProvider)
     run(provider.aclose())

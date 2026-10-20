@@ -270,22 +270,23 @@ def test_hosted_profiles_registered() -> None:
 
 
 def test_anthropic_factory_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.anthropic.com")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     profile = profile_with_model(
         ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted"), "claude-sonnet-4"
     )
     with pytest.raises(ProviderConfigurationError, match="provider_api_key_missing:ANTHROPIC_API_KEY"):
-        ModelProviderFactory(policy=_HOSTED_POLICY).create(profile)
+        ModelProviderFactory(
+            policy=_HOSTED_POLICY, connection={"credential_source": "environment"}
+        ).create(profile)
 
 
-def test_anthropic_factory_builds_native_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.anthropic.com")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-never-real")
+def test_anthropic_factory_builds_native_provider() -> None:
     profile = profile_with_model(
         ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted"), "claude-sonnet-4"
     )
-    provider = ModelProviderFactory(policy=_HOSTED_POLICY).create(profile)
+    provider = ModelProviderFactory(
+        policy=_HOSTED_POLICY, connection={"api_key": "test-key-never-real"}
+    ).create(profile)
     assert isinstance(provider, AsyncAnthropicMessagesProvider)
     assert provider.model == "claude-sonnet-4"
     asyncio.run(provider.aclose())
@@ -299,12 +300,13 @@ def test_openai_and_gemini_profiles_fail_closed_without_policy() -> None:
             ModelProviderFactory().create(registry.resolve_profile_id(profile_id), require_model=False)
 
 
-def test_openai_profile_builds_with_key_and_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
+def test_openai_profile_builds_with_a_saved_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key-never-real")
     registry = ModelProfileRegistry.load()
     profile = registry.resolve_profile_id("openai-hosted")
     configured = type(profile)(**{**profile.__dict__, "model": "gpt-4o"})
-    provider = ModelProviderFactory(policy=_HOSTED_POLICY).create(configured)
+    provider = ModelProviderFactory(
+        policy=_HOSTED_POLICY, connection={"credential_source": "environment"}
+    ).create(configured)
     assert provider.provider == "openai"
     asyncio.run(provider.aclose())

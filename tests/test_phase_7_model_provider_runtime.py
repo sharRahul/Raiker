@@ -36,7 +36,6 @@ from tests.factories import governed_action
 _CAP = "model_provider_runtime"
 _TOOL = "model_provider"
 _DOC = "docs/threat-models/model-provider.md"
-_ALLOWLIST_ENV = "RAIKER_MODEL_EGRESS_ALLOWLIST"
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -101,7 +100,6 @@ def test_model_provider_is_real_executor(tmp_path: Path) -> None:
 
 
 def test_gate_disabled_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     bootstrap_owner("owner", "Owner", workspace_root=ws)
     # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
@@ -122,19 +120,22 @@ def test_enable_requires_threat_model_ack(tmp_path: Path) -> None:
     assert "no_threat_model_ack" in (result.reason_code or "")
 
 
-# ── Egress allowlist gates the provider call ─────────────────────────────────
+# ── A saved connection gates the provider call ───────────────────────────────
 
 
-def test_empty_egress_allowlist_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(_ALLOWLIST_ENV, raising=False)
+def test_hosted_embedding_without_a_saved_connection_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """EGR-17: an environment key alone does not authorize an off-machine embedding."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key-never-real")
     ws = _ws(tmp_path)
     _enable(ws)
-    # No injected embedder: proves the egress guard trips before any provider call.
+    # No injected embedder: the real router and factory decide, before any request.
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action(principal.principal_id, text="hello", provider="openai", model="m"), principal
     )
-    assert result.error == "model_egress_denied:no_allowlist"
+    assert result.error == "model_provider_denied:model_connection_required"
     assert SQLiteStore(ws).list_vector_records() == []
 
 
@@ -142,7 +143,6 @@ def test_empty_egress_allowlist_fails_closed(tmp_path: Path, monkeypatch: pytest
 
 
 def test_missing_text_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     authority, principal = _authority(ws)
@@ -151,7 +151,6 @@ def test_missing_text_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 
 
 def test_unknown_operation_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     authority, principal = _authority(ws)
@@ -166,7 +165,6 @@ def test_unknown_operation_fails_closed(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 def test_provider_error_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
 
@@ -187,7 +185,6 @@ def test_provider_error_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyP
 def test_embed_persists_provider_vector_without_leaking_text(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     vector = [0.11, 0.22, 0.33, 0.44]
@@ -227,7 +224,6 @@ def test_embed_persists_provider_vector_without_leaking_text(
 def test_project_memory_records_provider_projection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -249,7 +245,6 @@ def test_project_memory_records_provider_projection(
 def test_project_memory_rejects_sensitive_memory_before_provider_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)

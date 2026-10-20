@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pytest
 
+from raiker.runtime.executors import sandbox
 from raiker.runtime.executors.sandbox import SandboxError, post_json, post_multipart
 
 FIELDS = {"model": "gpt-image-1", "prompt": "a cat"}
@@ -30,7 +31,7 @@ def _refuse(*args: object, **kwargs: object) -> dict:
 
 @pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://host/x", "not-a-url", "https://"])
 def test_only_http_and_https_are_addressable(url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("urllib.request.urlopen", _refuse)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", _refuse)
 
     with pytest.raises(SandboxError) as caught:
         post_multipart(url, FIELDS, FILES, egress_allowlist=frozenset({"*"}))
@@ -40,7 +41,7 @@ def test_only_http_and_https_are_addressable(url: str, monkeypatch: pytest.Monke
 
 def test_an_absent_allowlist_denies_everything(monkeypatch: pytest.MonkeyPatch) -> None:
     """Fail closed: an empty allowlist is not "no restriction"."""
-    monkeypatch.setattr("urllib.request.urlopen", _refuse)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", _refuse)
 
     allowlists: list[frozenset[str] | None] = [None, frozenset()]
     for allowlist in allowlists:
@@ -57,7 +58,7 @@ def test_an_absent_allowlist_denies_everything(monkeypatch: pytest.MonkeyPatch) 
 def test_a_host_outside_the_allowlist_is_refused_by_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("urllib.request.urlopen", _refuse)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", _refuse)
 
     with pytest.raises(SandboxError) as caught:
         post_multipart(
@@ -75,7 +76,7 @@ def test_it_refuses_exactly_where_post_json_refuses(monkeypatch: pytest.MonkeyPa
 
     If these two ever disagree, one of them has a way out the other does not.
     """
-    monkeypatch.setattr("urllib.request.urlopen", _refuse)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", _refuse)
     cases = [
         ("file:///etc/passwd", frozenset({"*"})),
         ("https://api.openai.com/x", None),
@@ -112,7 +113,7 @@ def _captured_send(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
         captured["body"] = request.data  # type: ignore[attr-defined]
         return _Response()
 
-    monkeypatch.setattr("urllib.request.urlopen", capture)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", capture)
     return captured
 
 
@@ -149,7 +150,7 @@ def test_a_part_carrying_the_boundary_is_refused_rather_than_sent(
     the boundary is pinned here rather than guessed. A guard that cannot be
     reached from outside is still a guard, and an untested one is a comment.
     """
-    monkeypatch.setattr("urllib.request.urlopen", _refuse)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", _refuse)
     monkeypatch.setattr("secrets.token_hex", lambda n=16: "deadbeef")
     boundary = "----raikerdeadbeef"
 
@@ -192,7 +193,7 @@ def test_the_boundary_is_unpredictable_between_calls(
         seen.append(str(request.get_header("Content-type")))  # type: ignore[attr-defined]
         return _Response()
 
-    monkeypatch.setattr("urllib.request.urlopen", capture)
+    monkeypatch.setattr(sandbox, "_open_without_redirects", capture)
     for _ in range(3):
         post_multipart(
             "https://api.openai.com/v1/images/edits",
@@ -215,7 +216,7 @@ def test_a_non_json_reply_is_a_named_refusal(monkeypatch: pytest.MonkeyPatch) ->
         def read(self, size: int) -> bytes:
             return b"<html>not json</html>"
 
-    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: _Response())
+    monkeypatch.setattr(sandbox, "_open_without_redirects", lambda *a, **k: _Response())
 
     with pytest.raises(SandboxError) as caught:
         post_multipart(

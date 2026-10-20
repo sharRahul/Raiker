@@ -20,7 +20,7 @@ from raiker.models.contracts import (
     ToolCallProposal,
     ToolSpec,
 )
-from raiker.models.endpoint_policy import classify_endpoint, enforce_model_egress
+from raiker.models.endpoint_policy import canonical_origin, classify_endpoint
 from raiker.models.exceptions import (
     ProviderConnectionError,
     ProviderUnsupportedCapabilityError,
@@ -96,9 +96,10 @@ def request(*, cache_ttl: str | None = None) -> ModelRequest:
     )
 
 
-def test_egress_allowlist_matches_hostname_not_port(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "models.example.com")
-    enforce_model_egress("https://models.example.com:8443/v1", kind="remote_hosted")
+def test_a_non_default_port_is_its_own_origin() -> None:
+    """The origin a connection authorizes includes the port, so :8443 is not :443."""
+    assert canonical_origin("https://models.example.com:8443/v1") == "https://models.example.com:8443"
+    assert canonical_origin("https://models.example.com/v1") == "https://models.example.com:443"
 
 
 def test_private_dns_names_are_classified_as_private_network() -> None:

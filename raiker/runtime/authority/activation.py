@@ -157,7 +157,7 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     # model has not thereby asked to spend credit generating images.
     r["image_generation"] = _req(
         "image_generation", "2", threat_ack=True, human_confirm=True,
-        notes="Hosted image model; model egress allowlist + owner credential; "
+        notes="Hosted image model; owner's saved connection (image origin) + hosted gate; "
               "endpoint built from the configured profile, never from the request.")
 
     # Tier 3
@@ -197,11 +197,11 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Isolation, secrets, egress, budget required.")
     # Hosted / private-network model APIs are called *from* the owner's machine
-    # (like the reference channel): owner egress allowlist + env-only
-    # credentials. See docs/threat-models/hosted-models.md.
+    # through the owner's saved connection for the profile, which authorizes
+    # that connection's origin only. See docs/threat-models/hosted-models.md.
     for cap in ("hosted_model_runtime", "private_network_model_runtime"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
-                      notes="Owner egress allowlist, env-only credentials, metadata-only events.")
+                      notes="Owner's saved connection (origin-bound), metadata-only events.")
     # Advisor model for local-model turns: the consult re-checks the hosted/
     # private egress path per call. See docs/threat-models/advisor-model.md.
     r["advisor_model_runtime"] = _req(

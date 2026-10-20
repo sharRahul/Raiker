@@ -1098,6 +1098,15 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1009](#fixed-1009--a-proposal-whose-host-stopped-mid-call-left-no-record-dw-12-bug-348) | Medium | Design / agent | Fixed 2026-10-20 — DW-12 proposal receipts and outcome unknown |
 | [FIXED-1010](#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected) | Low | Design / web | Fixed 2026-10-20 — found live: stale and blank agent model picker |
 | [FIXED-1011](#fixed-1011--a-design-audit-event-of-an-unregistered-type-would-have-been-dropped-without-a-word) | Low | Design / audit | Fixed 2026-10-20 — found by test: unregistered audit event |
+| [FIXED-1012](#fixed-1012--off-machine-models-needed-an-environment-allowlist-as-well-as-the-owners-connection) | High | Models / authorization | Fixed 2026-10-20 |
+| [FIXED-1013](#fixed-1013--the-connectivity-checks-took-their-destination-and-path-from-the-action) | High | Models / executors / security | Fixed 2026-10-20 |
+| [FIXED-1014](#fixed-1014--model-image-requests-followed-redirects-with-the-api-key) | Medium | Models / transport / security | Fixed 2026-10-20 |
+| [FIXED-1015](#fixed-1015--image-generation-could-send-a-key-saved-for-another-endpoint-to-the-providers-image-host) | Medium | Design / image runtime | Fixed 2026-10-20 |
+| [FIXED-1016](#fixed-1016--revoking-a-model-gate-did-not-stop-the-next-call-of-a-running-turn) | Medium | Models / lifecycle | Fixed 2026-10-20 |
+| [FIXED-1017](#fixed-1017--the-advisor-ignored-the-owners-saved-connection) | Low | Models / advisor | Fixed 2026-10-20 |
+| [FIXED-1018](#fixed-1018--a-custom-endpoint-could-not-be-on-the-owners-network-or-the-internet) | Medium | Models / custom endpoints | Fixed 2026-10-20 |
+| [FIXED-1019](#fixed-1019--a-loopback-model-request-could-be-handed-to-an-environment-proxy) | Low | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1020](#fixed-1020--permissions-said-hosted-models-was-off-above-a-provider-that-had-just-answered) | Medium | Permissions / models | Fixed 2026-10-20 — found live |
 
 ---
 
@@ -1139,7 +1148,7 @@ for audit correlation. Unknown codes fall through to the previous raw message so
 nothing is ever silently swallowed. Covered by
 `apps/web/src/lib/providerErrors.test.ts`.
 
-**Deliberately not changed.** The egress allowlist stays process configuration
+**Superseded 2026-10-20 by [FIXED-1012](#fixed-1012--off-machine-models-needed-an-environment-allowlist-as-well-as-the-owners-connection):** the allowlist below is retired. **Deliberately not changed (at the time).** The egress allowlist stays process configuration
 (`RAIKER_MODEL_EGRESS_ALLOWLIST`). It is the last boundary before bytes leave
 the machine; making it editable from a browser session would let a compromised
 session widen its own egress. The dialog now says so explicitly and prints the
@@ -35404,3 +35413,194 @@ import test asserts the indexed event exists.
 
 **Evidence.** `test_the_owners_picture_is_an_import_asset_with_no_provider`
 fails without the registration and passes with it.
+
+## FIXED-1012 — Off-machine models needed an environment allowlist as well as the owner's connection
+
+**Severity: High. Area: Models / authorization. Status: Fixed 2026-10-20 — owner request; [ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md).**
+
+**Observed.** A provider the owner had connected on the Models page still needed
+its host in `RAIKER_MODEL_EGRESS_ALLOWLIST` for provider-backed embeddings,
+memory indexing, image generation and the hosted/private connectivity checks,
+which refused with `model_egress_denied:no_allowlist` /
+`egress_denied:no_allowlist`. Conversely, an environment key plus that variable
+reached a provider the owner had never connected in the product.
+
+**Root cause.** Two destination checks: the factory's connection-scoped host,
+and a process-wide hostname glob list read independently in four places. The
+list matched hostnames, not origins, so a port or scheme change still matched.
+
+**Fixed.** `endpoint_policy.authorize_model_destination` and `canonical_origin`
+replace `model_egress_allowlist` / `enforce_model_egress`. Every off-machine
+model construction requires the owner's saved connection for that profile and
+the canonical origin (scheme, host, effective port) it is bound to — the
+connection's endpoint, or the profile's shipped endpoint for a key-only
+connection. An `endpoint_env` override cannot move it. Explicit revocation of
+the hosted/private gate still wins. The variable is ignored and named once in
+the log (never its value). The `model_egress_allowlist_configured` read-model
+field is gone; the Models posture shows connected off-machine providers. The
+connect dialog offers **Use the key from `<VARIABLE>`** to turn an environment
+key into a connection without the key reaching the page. Integrity-sweep
+baselines that recorded a model allowlist are read without it.
+
+**Evidence.** `tests/test_model_connection_authorization.py` (51, EGR-01 to
+EGR-28), `tests/test_phase_4_hosted_model_runtime.py`,
+`tests/test_phase_7_model_provider_runtime.py`, `tests/test_image_generation.py`,
+`ModelsView.test.ts` (environment key), `ModelChip.test.ts`,
+`providerErrors.test.ts`. Live: `web/e2e/model-connection-authorization-live.spec.ts`
+2/2 on a fresh workspace with `RAIKER_MODEL_EGRESS_ALLOWLIST` set to an
+unrelated host — one log notice, neither the variable's value nor the key in
+the log or `/api/models`
+(`docs/screenshots/2026-10-20-model-connection-authorization/`). Against a real
+provider, `model-connection-anthropic-live.spec.ts` 4/4: an identity-linked
+Anthropic key and workspace ID entered in **Connect** reached *can reach* and
+answered a Haiku 4.5 turn with no allowlist anywhere
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-10-20-model-connection-authorization-hosted-anthropic-haiku-45)).
+
+## FIXED-1013 — The connectivity checks took their destination and path from the action
+
+**Severity: High. Area: Models / executors / security. Status: Fixed 2026-10-20.**
+
+**Observed.** `hosted_model_runtime` / `private_network_model_runtime`
+`connectivity_check` read `endpoint` and `models_path` from action arguments and
+issued a GET to their concatenation. The environment allowlist was the only
+thing between a model-proposed URL and the request.
+
+**Fixed.** The action names a `profile_id`. `endpoint`, `models_path`, `url`,
+`base_url` and `path` are refused by name (`argument_not_accepted:<name>`). The
+executor resolves the acting principal's own connection and gates through the
+factory, checks the endpoint class, and lists models through the provider
+adapter's route (no redirects, capped body, 15 s). Artifacts: profile id,
+provider, endpoint kind, model count.
+
+**Evidence.** `tests/test_phase_4_hosted_model_runtime.py` (destination
+arguments ×5, cross-principal, unconnected, private HTTP, governed end to end).
+
+## FIXED-1014 — Model image requests followed redirects with the API key
+
+**Severity: Medium. Area: Models / transport / security. Status: Fixed 2026-10-20.**
+
+**Observed.** `sandbox.post_json` and `post_multipart` checked the host and then
+used `urllib.request.urlopen`, which follows a redirect and re-sends the
+request headers, `Authorization` included, to the new host.
+
+**Fixed.** Both send through `_open_without_redirects` (the `_NoRedirect`
+handler now shared with MCP) and report `redirect_refused:<status>`. httpx
+provider clients already followed no redirects; the pool now says so
+explicitly and a test asserts it.
+
+**Evidence.** `test_egr12_egr13_urllib_model_helper_refuses_a_redirect`,
+`test_egr12_egr13_provider_http_client_does_not_follow_a_redirect` — loopback
+servers, the redirect target receives nothing. The same defect in the connector
+GET helper is open as [BUG-350](TO_BE_FIXED.md#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token).
+
+## FIXED-1015 — Image generation could send a key saved for another endpoint to the provider's image host
+
+**Severity: Medium. Area: Design / image runtime. Status: Fixed 2026-10-20.**
+
+**Observed.** The image executor took the key from the saved connection or the
+environment and posted it to the fixed OpenAI/Gemini image host, whatever
+endpoint that connection was saved for, and an environment key with no
+connection was enough. A revoked hosted gate did not stop it.
+
+**Fixed.** A saved connection for the profile is required
+(`model_connection_required`), the hosted gate must not be revoked
+(`hosted_provider_requires_explicit_policy`), and the connection must be bound
+to the provider's image origin (`image_connection_origin_mismatch`). Requests
+are held to that one host and refuse redirects.
+
+**Evidence.** `tests/test_image_generation.py`, `tests/test_image_lineage.py`,
+contract case `/api/images`.
+
+## FIXED-1016 — Revoking a model gate did not stop the next call of a running turn
+
+**Severity: Medium. Area: Models / lifecycle. Status: Fixed 2026-10-20.**
+
+**Observed.** `AgentGateway`, `owner_model_runtime` and the embedding executor
+computed the provider policy once when their router was built, so a turn that
+made several model calls kept using hosted models after the owner turned the
+gate off.
+
+**Fixed.** `ModelRouter(runtime_policy_resolver=…)` re-reads the gates for every
+provider build; connections were already read per call. Pooled clients carry no
+credential, so nothing cached can restore a revoked authorization. A request
+already sent completes; nothing new starts.
+
+**Evidence.** `test_a_gate_revoked_mid_turn_stops_the_next_call`,
+`test_egr21_a_connection_deleted_mid_session_denies_the_next_request`,
+`test_egr16_egr22_authorized_embedding_uses_the_current_saved_key`.
+
+## FIXED-1017 — The advisor ignored the owner's saved connection
+
+**Severity: Low. Area: Models / advisor. Status: Fixed 2026-10-20.**
+
+**Observed.** The advisor's router had no connection resolver, so a hosted
+advisor worked only with an environment key and the environment allowlist —
+never with the key the owner saved on the Models page.
+
+**Fixed.** The consult resolves the acting owner's connection for the advisor
+profile, like every other model call.
+
+**Evidence.** `test_egr28_the_advisor_uses_the_owners_connection_or_nothing`.
+
+## FIXED-1018 — A custom endpoint could not be on the owner's network or the internet
+
+**Severity: Medium. Area: Models / custom endpoints. Status: Fixed 2026-10-20 — found reviewing FIXED-935.**
+
+**Observed.** FIXED-935 says a custom endpoint's address decides its gate, but
+`validate_endpoint_policy` refused any non-loopback address on the
+`generic-openai-compatible` profiles (`private_network_requires_network_and_egress_policy`,
+`hosted_endpoint_requires_egress_policy`) because they do not declare
+`requires_egress_policy`.
+
+**Fixed.** `local_only` is the profile-level restriction on where an endpoint
+may point; authorization is the connection and the gates. `requires_egress_policy`
+stays declarative metadata (and OpenRouter's declaration check). Hosted HTTP
+still needs `allow_remote_http`.
+
+**Evidence.** `test_egr02_saved_private_network_connection_is_allowed`,
+`test_a_custom_endpoint_may_be_an_owner_named_hosted_service`,
+`test_a_local_only_profile_is_never_pointed_off_the_machine`,
+`test_egr14_hosted_http_endpoint_is_refused_without_transport_permission`.
+
+## FIXED-1019 — A loopback model request could be handed to an environment proxy
+
+**Severity: Low. Area: Models / transport. Status: Fixed 2026-10-20.**
+
+**Observed.** Pooled provider clients used httpx's default `trust_env=True` for
+every origin, so with `HTTP_PROXY` set and no `NO_PROXY`, a local Ollama or
+llama.cpp request would go to the proxy. `local_service` already refused this
+for liveness checks.
+
+**Fixed.** Loopback origins get `trust_env=False`; hosted origins keep the
+owner's proxy settings. Documented in the threat model and the hardening plan.
+
+**Evidence.** `test_egr24_pooled_clients_follow_owner_proxies_except_for_loopback`.
+
+## FIXED-1020 — Permissions said Hosted models was off above a provider that had just answered
+
+**Severity: Medium. Area: Permissions / models. Status: Fixed 2026-10-20 — found live (LC-03).**
+
+**Observed (live, 2026-10-20).** With Anthropic connected and a Haiku 4.5 turn
+just answered, **Permissions → Hosted models** read *Off · Ask me* and *No —
+Raiker cannot use this on this account*, and offered only **Turn on**. The
+Models posture beside it read *On (by connection)*. The owner had no direct way
+to make the explicit revocation that outranks every connection: the only
+control on the row was the opposite one.
+
+**Root cause.** A saved connection is the owner's consent to the hosted and
+private-network gates (`provider_runtime_policy_from_gates`), but the gate view
+asked only the capability admission read, which does not know about
+connections. FIXED-322 had given the Models page the enforcing answer; the
+Permissions row still showed the stored one.
+
+**Fixed.** `CapabilityGateView` gains `enabled_by_connection`, asked of the same
+policy read every model call makes, and `enforced_enabled` includes it for the
+two model gates. The row shows **On by connection**, answers *Yes — on because
+you connected a provider in Models*, explains that turning it off stops every
+provider it covers while the connections stay saved, and offers **Turn off**.
+After it, the posture reads *Off* and a connected card reads **Policy blocked**.
+
+**Evidence.** `test_permissions_report_hosted_models_on_by_connection_and_revocable`,
+`permissionLanguage.test.ts` (on by connection, revocable), live LC-03 in
+`model-connection-anthropic-live.spec.ts`
+(`docs/screenshots/2026-10-20-model-connection-anthropic/04a`, `04`, `05`).

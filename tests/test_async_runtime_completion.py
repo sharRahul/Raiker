@@ -71,13 +71,14 @@ def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
         ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret")
     configured = type(profile)(**{**profile.__dict__, "model": "openrouter-model"})
-    # Phase 4 slice 7: off-machine model endpoints also require the owner
-    # egress allowlist — empty allowlist fails closed even with hosted policy.
-    monkeypatch.delenv("RAIKER_MODEL_EGRESS_ALLOWLIST", raising=False)
-    with pytest.raises(ProviderPolicyError, match="model_egress_denied:no_allowlist"):
+    # Off-machine model endpoints are reached only through a saved connection:
+    # an environment key with the hosted policy open is still not enough.
+    with pytest.raises(ProviderPolicyError, match="model_connection_required"):
         ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(configured)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "openrouter.ai")
-    provider = ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(configured)
+    provider = ModelProviderFactory(
+        policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True),
+        connection={"credential_source": "environment"},
+    ).create(configured)
     assert provider.provider == "openrouter"
 
 

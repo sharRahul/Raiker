@@ -11,7 +11,7 @@ Composition and Agent layers (DW-01 to DW-12), and they keep three rules:
 * **Nothing here grants anything.** An agent proposal is stored, not applied;
   an export writes a file to this workspace; a Build handoff is a context
   document Build's composer carries. The one network call — a proposal — goes
-  through the owner's own model router, gates and egress allowlist.
+  through the owner's own model router, gates and saved connections.
 """
 
 from __future__ import annotations

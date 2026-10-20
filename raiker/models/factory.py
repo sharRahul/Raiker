@@ -12,7 +12,9 @@ from raiker.models.connections import openrouter_routing, validated_workspace_id
 from raiker.models.contracts import ModelCapabilities
 from raiker.models.endpoint_policy import (
     EndpointPolicy,
-    enforce_model_egress,
+    authorize_model_destination,
+    canonical_origin,
+    note_legacy_model_egress_allowlist,
     validate_endpoint_policy,
 )
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
@@ -185,6 +187,11 @@ class ModelProviderFactory:
         if state == "enabled_for_tests_only":
             raise ProviderPolicyError("test_only_profile_not_runnable")
         if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
+            # With nothing saved, the answer that helps is "connect it": a gate
+            # turned on would still find no connection. With a connection saved,
+            # the owner has turned the gate off, and that is what to say.
+            if not self.connection:
+                raise ProviderPolicyError("model_connection_required")
             raise ProviderPolicyError("provider_requires_explicit_policy_approval")
         model_name = str(profile.model or "")
         if require_model and (not model_name or "<" in model_name or ">" in model_name):
@@ -208,28 +215,24 @@ class ModelProviderFactory:
             raise ProviderPolicyError("private_network_provider_requires_explicit_policy")
         if endpoint_kind == "remote_hosted" and not self.allow_hosted_provider:
             raise ProviderPolicyError("hosted_provider_requires_explicit_policy")
-        # Egress for a provider the owner has configured.
+        # The destination, bound to the owner's connection.
         #
         # Raiker is owner-authoritative and monitored, not prevention-by-
-        # restriction (docs/architecture/HANDOFF.md, "Security posture"). Saving a credential
-        # for a provider is a deliberate, authenticated act; making the owner
-        # then discover a *separate* environment allowlist before the host they
-        # just chose can be reached is exactly the wall that posture rejects.
-        #
-        # So a configured connection authorises this profile's own resolved
-        # endpoint — and only that endpoint, never a blanket opening. The
-        # environment allowlist stays available for pre-authorising hosts ahead
-        # of configuration, and an unconfigured profile still falls back to it
-        # and fails closed without one. Every request remains policy-checked,
-        # audited, and stoppable.
-        configured_allowlist: frozenset[str] | None = None
-        if self.connection:
-            saved_host = urlparse(str(self.connection.get("endpoint", ""))).hostname
-            effective_host = urlparse(endpoint).hostname
-            hosts = {host.lower() for host in (saved_host, effective_host) if host}
-            configured_allowlist = frozenset(hosts) if hosts else None
-        enforce_model_egress(
-            endpoint, kind=endpoint_kind, configured_allowlist=configured_allowlist
+        # restriction (docs/architecture/HANDOFF.md, "Security posture"). Saving
+        # a connection for a provider is a deliberate, authenticated act, and it
+        # authorizes that connection's own origin — scheme, host and port — and
+        # no other. There is no second, process-wide host list to discover: the
+        # retired RAIKER_MODEL_EGRESS_ALLOWLIST is ignored (and named once in the
+        # log if it is still set). An off-machine endpoint with no connection is
+        # refused, and so is one an environment override has moved away from the
+        # origin the connection was saved for.
+        note_legacy_model_egress_allowlist()
+        canonical_origin(endpoint)
+        authorize_model_destination(
+            endpoint,
+            kind=endpoint_kind,
+            connection=self.connection,
+            default_endpoint=str(raw.get("endpoint") or raw.get("base_url") or ""),
         )
         if provider == "openrouter" and raw.get("default_state") == "enabled":
             raise ProviderPolicyError("openrouter_must_not_be_enabled_by_default")

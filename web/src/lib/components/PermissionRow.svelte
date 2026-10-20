@@ -110,7 +110,11 @@
         <!-- Being on because nothing is stored is a different fact from being
              switched on (BUG-239), and the row says which it is rather than
              leaving the summary to contradict a chip beside it. -->
-        {#if isOnByDefault(gate)}
+        {#if gate.enabled_by_connection}
+          <!-- ADR-0004 — on because a model provider is connected, which is a
+               third reason, and the one whose remedy is in Models. -->
+          <span class="cap-reality cap-default-on">On by connection</span>
+        {:else if isOnByDefault(gate)}
           <span class="cap-reality cap-default-on">On by default</span>
         {/if}
         <!-- BUG-293 — reach, not state. "Leaves this machine" is true of

@@ -151,8 +151,9 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "Text the owner stored locally would be turned into vectors by whatever "
         "backend is configured, and a provider-backed backend sends that text "
         "off the machine to do it.",
-        "An owner-enabled gate; the provider-backed path additionally re-checks "
-        "the model egress allowlist and the hosted/private gate per call.",
+        "An owner-enabled gate; the provider-backed path additionally requires "
+        "the owner's saved connection for the profile and re-checks the "
+        "hosted/private gate per call.",
     ),
     # ── Reversible local state ─────────────────────────────────────────────
     _row(
@@ -329,9 +330,10 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "The prompt — and, for an edit, the source image — would be sent to a "
         "hosted provider and the owner's credit spent, on a turn's initiative "
         "rather than theirs.",
-        "An owner-enabled gate, a human principal, the model egress allowlist, "
-        "the owner's saved provider credential, and an approval. An endpoint is "
-        "built from the configured profile, never from the request.",
+        "An owner-enabled gate, a human principal, the owner's saved provider "
+        "connection bound to the provider's image origin, the hosted gate, and "
+        "an approval. An endpoint is built from the configured profile, never "
+        "from the request.",
     ),
     _row(
         "telemetry_export",
@@ -349,17 +351,19 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "Conversation content would be sent to a hosted provider, which is the "
         "single largest disclosure Raiker can make and the one an owner most "
         "expects to have chosen.",
-        "An owner-enabled gate, the model egress allowlist (process "
-        "configuration, deliberately not editable from a browser session), and "
-        "an owner credential supplied from the environment.",
+        "An owner-enabled gate (explicit revocation always wins) and a "
+        "connection the owner saved for that provider, which authorizes that "
+        "connection's own origin and no other. No action, tool or model can "
+        "create or change a connection.",
     ),
     _row(
         "private_network_model_runtime",
         SIDE_EFFECT_EXTERNAL,
         "Conversation content would be sent to a host on the owner's own "
         "network, which is not the internet and is still not this machine.",
-        "An owner-enabled gate and the model egress allowlist. The private "
-        "destination is named by the owner, not derived from the request.",
+        "An owner-enabled gate and a connection the owner saved for the "
+        "server. The private destination is named by the owner in that "
+        "connection, not derived from the request.",
     ),
     _row(
         "advisor_model_runtime",
@@ -376,8 +380,8 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         SIDE_EFFECT_EXTERNAL,
         "Text would be sent to an LLM provider to be embedded, which is the same "
         "disclosure as a chat turn wearing the clothes of an index build.",
-        "An owner-enabled gate layered over the egress allowlist, the "
-        "hosted/private gate and environment-only credentials.",
+        "An owner-enabled gate layered over the owner's saved connection for "
+        "the embedding profile and the hosted/private gate.",
     ),
     _row(
         "connector_github_runtime",

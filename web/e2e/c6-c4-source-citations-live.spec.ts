@@ -13,7 +13,7 @@
  *
  * Prerequisites:
  *   1. `raiker-web --workspace <fresh ws> --port 8765 --no-browser` with
- *      `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`
+ *      the provider connected on the Models page
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)
  *   3. `RAIKER_LIVE_WORKSPACE` pointing at that same workspace directory, so the
  *      spec can put a file where the agent's read tools will find it

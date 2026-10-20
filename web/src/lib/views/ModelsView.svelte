@@ -317,6 +317,9 @@
   /** Hermes credential pools: backup keys tried when the primary is throttled or spent. */
   let signInBackupKeys = $state<string[]>(["", "", ""]);
   let signInRemoveBackups = $state(false);
+  // Connect with the key already in this provider's environment variable. The
+  // server reports only the variable's name; the value never reaches the page.
+  let signInUseEnvironment = $state(false);
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
@@ -357,6 +360,7 @@
     signInLabel = models?.profiles.find((p) => p.profile_id === profileId)?.connection_label ?? "";
     signInBackupKeys = ["", "", ""];
     signInRemoveBackups = false;
+    signInUseEnvironment = false;
     // BUG-274 — a readiness answer that says "add the workspace ID to this
     // connection" has to land on the box, not three clicks away from it.
     signInAdvanced = options.advanced === true;
@@ -387,6 +391,7 @@
         adminApiKey: signInAdminApiKey,
         workspaceId: signInWorkspaceId,
         label: signInLabel,
+        useEnvironmentCredential: signInUseEnvironment,
         backupApiKeys: signInRemoveBackups
           ? []
           : signInBackupKeys.some((key) => key.trim())
@@ -892,7 +897,7 @@
   function posture(profile: ModelProfile): string {
     const parts = [
       profile.requires_network ? "Needs network" : "",
-      profile.requires_egress_policy ? "Egress-gated" : "",
+      profile.requires_egress_policy ? "Needs your connection" : "",
       profile.runtime_gate ? capabilityLabel(profile.runtime_gate) : "",
       profile.prompt_cache_ttl ? `Cache ${profile.prompt_cache_ttl}` : "",
     ].filter((part) => part !== "");
@@ -1215,8 +1220,12 @@
             </dd>
           </div>
           <div>
-            <dt>Egress allowlist</dt>
-            <dd><code>{models.model_egress_allowlist_configured ? "configured" : "not configured"}</code></dd>
+            <dt>Connected off-machine providers</dt>
+            <dd>
+              <code
+                >{models.profiles.filter((p) => p.off_machine && p.connection_configured).length}</code
+              >
+            </dd>
           </div>
           <div>
             <dt>Off-machine profiles</dt>
@@ -1925,7 +1934,17 @@
         </label>
       {/if}
 
-      {#if showApiKey}
+      {#if showApiKey && signInProfile.environment_credential_env}
+        <label class="field env-credential">
+          <input type="checkbox" bind:checked={signInUseEnvironment} />
+          <span>
+            Use the key from <code>{signInProfile.environment_credential_env}</code>
+            <small>(already set where Raiker runs — it stays there)</small>
+          </span>
+        </label>
+      {/if}
+
+      {#if showApiKey && !signInUseEnvironment}
         <label class="field">
           <span class="field-label">{b.credentialLabel}</span>
           <input
@@ -2036,6 +2055,7 @@
               signInLabel.trim() === "" &&
               !signInBackupKeys.some((key) => key.trim()) &&
               !signInRemoveBackups &&
+              !signInUseEnvironment &&
               !signInAdvanced)}
         >
           {signInSaving ? "Connecting…" : "Connect"}
@@ -2670,5 +2690,8 @@
   .add-endpoint { margin-top: .6rem; }
   .backup-keys { border: 0; padding: 0; margin: 0; display: grid; gap: .4rem; }
   .backup-remove { display: flex; align-items: center; gap: .4rem; font-size: var(--text-sm); }
+  .env-credential { flex-direction: row; align-items: flex-start; gap: .5rem; font-size: var(--text-sm); color: var(--text-2); }
+  .env-credential input { margin-top: .2rem; }
+  .env-credential small { display: block; color: var(--text-3); font-size: var(--text-2xs); }
   .pool-line { margin: .4rem 0 0; color: var(--text-3); font-size: var(--text-xs); }
 </style>

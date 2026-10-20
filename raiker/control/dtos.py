@@ -63,6 +63,12 @@ class CapabilityGateView(View):
     # would run, which is the defect FIXED-279 closed for the model's context
     # bundle and left standing on the screen the owner decides from.
     enforced_enabled: bool = False
+    # ADR-0004 — true when the only reason the hosted or private-network model
+    # gate is on is that the owner saved a connection, which is their consent.
+    # Permissions then says so and offers **Turn off**, the explicit revocation
+    # that outranks every connection; without it the row read "Off" above a
+    # provider that had just answered, and offered no way to revoke.
+    enabled_by_connection: bool = False
     # BUG-293 — the two columns DEC-16 step 8 asked for that had no home. Read
     # from `CAPABILITY_AUTHORITY`, so the page answering *what would this cost
     # if it ran without me* and the test proving it will not are the same row.

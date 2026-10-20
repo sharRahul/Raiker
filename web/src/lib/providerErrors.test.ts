@@ -11,18 +11,18 @@ describe("providerErrorGuidance", () => {
     expect(guidance?.code).toBe("provider_requires_explicit_policy_approval");
   });
 
-  it("names the refused host and the exact env var for an egress denial", () => {
-    const guidance = providerErrorGuidance("model_egress_denied:api.anthropic.com");
-    expect(guidance?.message).toMatch(/api\.anthropic\.com/);
-    expect(guidance?.fix).toMatch(/RAIKER_MODEL_EGRESS_ALLOWLIST=api\.anthropic\.com/);
-    // The allowlist is process configuration; the dialog must not imply a control it lacks.
-    expect(guidance?.href).toBeUndefined();
+  it("explains an unconnected off-machine provider as a missing connection", () => {
+    const guidance = providerErrorGuidance("model_connection_required");
+    expect(guidance?.message).toMatch(/no saved connection/);
+    expect(guidance?.fix).toMatch(/Connect it on the Models page/);
+    // The retired environment allowlist is never offered as the remedy.
+    expect(guidance?.fix).not.toMatch(/RAIKER_MODEL_EGRESS_ALLOWLIST/);
   });
 
-  it("explains an empty egress allowlist without inventing a host", () => {
-    const guidance = providerErrorGuidance("model_egress_denied:no_allowlist");
-    expect(guidance?.message).toMatch(/allowlist/);
-    expect(guidance?.message).not.toMatch(/no_allowlist/);
+  it("explains an origin the saved connection does not cover", () => {
+    const guidance = providerErrorGuidance("model_connection_origin_mismatch");
+    expect(guidance?.message).toMatch(/not the one the saved connection was authorized for/);
+    expect(guidance?.fix).toMatch(/Reconnect/);
   });
 
   it("routes a missing vault key to Settings", () => {

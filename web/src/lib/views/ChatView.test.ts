@@ -38,7 +38,6 @@ const MODELS_ROUTE = {
     advisor_model_gate_state: "enabled_runtime",
     hosted_model_gate_state: "enabled_runtime",
     private_network_model_gate_state: "enabled_runtime",
-    model_egress_allowlist_configured: false,
     remote_profile_count: 0,
     fallback_sequence: [],
     no_silent_hosted_fallback: true,

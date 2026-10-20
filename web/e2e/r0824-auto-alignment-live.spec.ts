@@ -12,7 +12,7 @@
  * turns off — which leaves them worse protected than the defect did.
  *
  * Requires:
- *   1. `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` on the running host
+ *   1. the provider connected on the Models page on the running host
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  *   3. `RAIKER_LIVE_WORKSPACE` pointing at the host's workspace, so the spec can
  *      plant the file the second half is about and read the result back

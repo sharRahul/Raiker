@@ -7,7 +7,6 @@ from typing import Any
 
 from raiker.api.sessions import ApiSessionStore
 from raiker.events.integrity import verify_session_events
-from raiker.models.endpoint_policy import model_egress_allowlist
 from raiker.runtime.executors.sandbox import (
     channel_egress_allowlist,
     connector_egress_allowlist,
@@ -15,6 +14,21 @@ from raiker.runtime.executors.sandbox import (
 from raiker.storage.sqlite import SQLiteStore
 
 _BASELINE_KEY = "integrity_sweep_baseline"
+
+
+def _without_retired_fields(baseline: dict[str, Any]) -> dict[str, Any]:
+    """A stored baseline as today's posture would have recorded it.
+
+    Baselines written before the model egress allowlist was retired carry a
+    ``model`` list under ``egress_allowlists``. Comparing it against a posture
+    that no longer has one would report drift nobody caused, once, on every
+    upgraded workspace.
+    """
+    allowlists = baseline.get("egress_allowlists")
+    if isinstance(allowlists, dict) and "model" in allowlists:
+        trimmed = {key: value for key, value in allowlists.items() if key != "model"}
+        return {**baseline, "egress_allowlists": trimmed}
+    return baseline
 
 
 class IntegritySweep:
@@ -28,8 +42,10 @@ class IntegritySweep:
                 for row in self._store.list_principal_capability_gate_states(principal_id)
             },
             "decision_modes": self._store.list_principal_capability_decision_modes(principal_id),
+            # Model destinations are not here: they are authorized per owner by
+            # saved connections, not by a process-wide list, so there is no
+            # model allowlist to drift.
             "egress_allowlists": {
-                "model": sorted(model_egress_allowlist()),
                 "connector": sorted(connector_egress_allowlist()),
                 "channel": sorted(channel_egress_allowlist()),
             },
@@ -43,7 +59,7 @@ class IntegritySweep:
             settings = {}
         baseline = settings.get(_BASELINE_KEY)
         if isinstance(baseline, dict):
-            return baseline
+            return _without_retired_fields(baseline)
         settings[_BASELINE_KEY] = posture
         from raiker.contracts.ids import utc_now
 

@@ -71,7 +71,6 @@ MODELS_VIEW = {
     # different facts: a saved connection opens a gate whose row is still unset.
     "hosted_model_gate_enforced",
     "private_network_model_gate_enforced",
-    "model_egress_allowlist_configured",
     "remote_profile_count",
     "no_silent_hosted_fallback",
 }

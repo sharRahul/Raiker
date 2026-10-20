@@ -17,7 +17,6 @@
  *   1. `raiker-web --workspace <ws> --port 8765 --no-browser` where `<ws>` is a
  *      git repository with an HTTPS GitHub remote it may push to, holding a
  *      second git repository at `projects/service`, and
- *        RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com
  *        RAIKER_CONNECTOR_EGRESS_ALLOWLIST=github.com
  *        RAIKER_GITHUB_TOKEN=<a token that may push to that remote>
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)

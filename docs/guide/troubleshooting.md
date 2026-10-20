@@ -17,8 +17,13 @@ itself. They remain below because they can still appear for a provider you have
 | `provider_requires_explicit_policy_approval` | You have configured no provider, or you explicitly turned this one off | Connect the provider in **Models**. If you previously turned **Hosted models** off in Permissions, turn it back on — an explicit revocation outranks a saved connection. |
 | `hosted_provider_requires_explicit_policy` | Same, for hosted providers | As above |
 | `private_network_provider_requires_explicit_policy` | Same, for a home-lab endpoint | As above, via **Home-lab models** |
-| `model_egress_denied:<host>` | That host is not the endpoint of any provider you configured | Connect the provider whose endpoint it is, or pre-authorise it with `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` |
-| `model_egress_denied:no_allowlist` | An off-machine endpoint with no configured connection and no environment allowlist | Connect the provider, or set `RAIKER_MODEL_EGRESS_ALLOWLIST` |
+| `model_connection_required` | The provider is off this machine and you have not connected it. A key in the environment is not a connection | Connect it in **Models** — paste the key, or tick **Use the key from `<VARIABLE>`** |
+| `model_connection_origin_mismatch` | The request would go to an address other than the one the saved connection was made for — usually an `endpoint_env` override that changed after you connected | Reconnect the provider with the address you want |
+| `model_connection_origin_unbound` | The saved connection names no address and the profile has none of its own | Reconnect and enter the endpoint |
+| `endpoint_userinfo_rejected` / `endpoint_ambiguous_host` | The endpoint embeds a user name or password, or writes its host in a form that could mean more than one address (`127.1`, `0x7f.0.0.1`) | Use a plain host name or dotted IPv4 address, and put the key in the key field |
+| `image_connection_origin_mismatch` | Design: this provider's connection is saved for a custom endpoint, so its key is not sent to the provider's image service | Connect the provider without a custom endpoint to generate images |
+| `redirect_refused:<status>` | The provider answered with a redirect; Raiker does not follow one with your key | Check the endpoint is the provider's real API address |
+| `environment_credential_unavailable` | You asked to use the key from the environment, and Raiker's environment does not have it | Paste the key, or set the variable and restart Raiker |
 | `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security & sign-in → Generate key |
 | `connector_vault_key_unset` | Only on a **read**: credentials exist but the key is gone, so they cannot be decrypted | Restore the key, or clear and re-enter the affected credentials. Writes provision a key automatically; reads deliberately do not, because minting a new key would hide a real problem. |
 | `hosted_api_key_missing` | Hosted provider needs a key | Paste it into the sign-in dialog |
@@ -41,11 +46,12 @@ itself. They remain below because they can still appear for a provider you have
 | `model_unavailable: provider_error_unclassified` | A legacy or mid-turn provider failure that could not be classified | Return to **Models** and run the readiness check. BUG-69 prevents this from being a fresh user's first action. |
 | `model_unavailable: provider_stream_failed:<Type>` | The provider connection ended in an exception nothing else classified; the exception class is in the code. Raiker already re-attempted the same model once | Retry. If it repeats, the class names the layer — a `RemoteProtocolError` or `ConnectError` is the network between you and the provider; the server log carries the same line. |
 
-**How egress is decided.** Configuring a provider authorises that profile's own
-endpoint — that host, and nothing else. There is no blanket opening, and no
-in-app control that widens egress to an arbitrary host: to reach a host that
-belongs to no configured provider you still set `RAIKER_MODEL_EGRESS_ALLOWLIST`
-in the process environment.
+**How a model destination is decided.** Connecting a provider authorises that
+connection's own address — scheme, host and port — and nothing else. There is
+no blanket opening and no environment list to maintain: a host that belongs to
+no connection you saved is not reachable for model calls. The old
+`RAIKER_MODEL_EGRESS_ALLOWLIST` is ignored; Raiker notes once in its log if it is
+still set.
 
 ## Capabilities and runtime
 
@@ -98,7 +104,7 @@ in the process environment.
 
 | Variable | Purpose |
 |---|---|
-| `RAIKER_MODEL_EGRESS_ALLOWLIST` | Hosts model providers may be reached on. Empty = every off-machine provider fails closed. |
+| `RAIKER_MODEL_EGRESS_ALLOWLIST` | **Retired** and ignored. Model providers are authorised by the connections you save in **Models**. Remove it. |
 | `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` | Hosts service connectors may be reached on |
 | `RAIKER_CONNECTOR_VAULT_KEY` | Overrides the workspace vault key file |
 | `RAIKER_OWNER_TOKEN` | Required with `--allow-public` |

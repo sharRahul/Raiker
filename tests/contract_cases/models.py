@@ -235,13 +235,20 @@ def _image(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
         "image_generation", "enabled_runtime", None, "test", confirmation_token="confirm"
     )
     assert enabled.ok, enabled.reason_code
+    # The owner's saved connection is what authorizes the provider's host.
+    from raiker.auth.vault_key_file import ensure_vault_key
+    from raiker.models.connections import put_model_connection
+
+    ensure_vault_key(ws)
+    put_model_connection(
+        SQLiteStore(ws), OWNER, "openai-hosted", {"credential_source": "environment"}
+    )
     return "/api/images", {"profile_id": "openai-hosted", "prompt": "a cat", "size": "1024x1024"}
 
 
 def _fake_image_provider(monkeypatch: Any) -> None:
     from raiker.runtime.executors import tier2_image
 
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-contract")
     monkeypatch.setattr(
         tier2_image, "post_json",

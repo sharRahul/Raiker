@@ -63,8 +63,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "approval_execution_relay",
     "admin_mutation",
     # BUG-298 — no `policy_mutation`: policy is process configuration the
-    # runtime *reads*, on the same footing as the model egress allowlist, and
-    # deliberately not editable from a browser session. The boundary is stated
+    # runtime *reads*, deliberately not editable from a browser session. The boundary is stated
     # in the Guide and in `docs/architecture/SECURITY_AND_POLICY.md`.
     "role_mutation",
     "model_provider_runtime",
@@ -219,10 +218,9 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                             # it leaves the machine.
                             "telemetry_export",
                             # The Design surface. An image model is a hosted
-                            # model, so it answers to the model egress
-                            # allowlist and the owner's saved credential like
-                            # every other provider call, and it is Tier 2 for
-                            # the same reason they are.
+                            # model, so it answers to the owner's saved
+                            # connection like every other provider call, and
+                            # it is Tier 2 for the same reason they are.
                             "image_generation")
     for name in _TIER2_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
@@ -272,7 +270,8 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     # gate does NOT by itself let an AI act unattended: AI-proposed actions are
     # still governed by the per-capability decision mode (default `ask`), the
     # critical-risk human-confirmation floor, PolicyEngine hard-denies, and
-    # executor-level env allowlists (model egress / plugin / container image),
+    # executor-level allowlists and bindings (connector egress, saved model
+    # connections, plugin / container image),
     # which are independent of the gate and remain fail-closed.
     for name in _real_executor_capabilities():
         existing = gates.get(name)

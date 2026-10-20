@@ -174,7 +174,7 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # ADD-27 GH-23 — fetch and clone, egress on the push's terms.
     "git_fetch_execution",
     # The Design surface. Egress on the same terms as any other model call: the
-    # model egress allowlist, the owner's saved provider credential, and an
+    # owner's saved provider connection (and its origin), the hosted gate, and an
     # endpoint built from the configured profile rather than from the request.
     "image_generation",
     # Tier 3 — local code-intelligence runtime
@@ -190,8 +190,8 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 3 — local deterministic embedding (hashing trick; no model download /
     # no network).
     "vector_embedding_runtime",
-    # Tier 3 — provider-backed semantic embedding through an LLM provider; layered
-    # egress + hosted/private gate + API-key gating (owner env creds only).
+    # Tier 3 — provider-backed semantic embedding through an LLM provider; the
+    # owner's saved connection + hosted/private gate + API-key gating.
     "model_provider_runtime",
     # Phase 4 — bounded, governed, in-process orchestration (no network / no spawn-out)
     "subagents",
@@ -214,14 +214,14 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # OAuth discovery, and unreviewed-tool execution stay fail-closed.
     "mcp_builder_runtime",
     "mcp_connector_runtime",
-    # Phase 4 slice 7 — hosted / private-network model runtime (owner egress
-    # allowlist, metadata-only connectivity probe; chat path re-checks the
-    # same allowlist in the provider factory)
+    # Phase 4 slice 7 — hosted / private-network model runtime (metadata-only
+    # connectivity check of an owner's saved connection, named by profile id;
+    # the destination is never an action argument)
     "hosted_model_runtime",
     "private_network_model_runtime",
     # Web-app task 2 — advisor model for local-model turns (default-ask consult
     # of the owner-picked advisor profile; provider policy — hosted/private gate,
-    # owner egress allowlist, env-only key — re-checked per call).
+    # the owner's saved connection, its key — re-checked per call).
     "advisor_model_runtime",
     # Web-app task 4 — GitHub read-only connector (reference slice). A model may
     # read a GitHub issue/PR through the brokered `github_read` tool; default-ask
@@ -320,8 +320,10 @@ def build_default_executor_registry(
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     registry.register("mcp_builder_runtime", McpBuilderExecutor(ws, store))
     registry.register("mcp_connector_runtime", McpConnectorExecutor(ws, store))
-    registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
-    registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
+    registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws, store))
+    registry.register(
+        "private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws, store)
+    )
     registry.register("advisor_model_runtime", AdvisorModelRuntimeExecutor(ws, store))
     registry.register("connector_github_runtime", GithubConnectorExecutor(ws, store))
     registry.register("connector_gmail_runtime", GmailConnectorExecutor(ws, store))

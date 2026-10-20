@@ -30,7 +30,7 @@ Raiker's, the provider's own documentation is the source.
 
 | Adapter | Serves | Vendor reference |
 |---|---|---|
-| `anthropic_messages.py` | Anthropic | [Messages API](https://docs.claude.com/en/api/messages), [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking), [models](https://docs.claude.com/en/docs/about-claude/models/overview) |
+| `anthropic_messages.py` | Anthropic | Messages API, extended thinking, models |
 | `openai_compatible.py` | OpenAI, Gemini, OpenRouter, Hugging Face Inference Providers, Ollama, Ollama Cloud, LM Studio, vLLM, and any owner-supplied OpenAI-compatible endpoint | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat), [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai), [OpenRouter](https://openrouter.ai/docs), [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md), [LM Studio server](https://lmstudio.ai/docs/app/api/endpoints/openai), [vLLM OpenAI server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) |
 | `llama_cpp_server.py` | A managed local `llama-server` | [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) |
 

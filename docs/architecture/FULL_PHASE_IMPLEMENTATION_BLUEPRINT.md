@@ -170,7 +170,7 @@ All actions available through one enabled primary interface must have an equival
 - Gist summaries.
 - Memory correction/deletion.
 - Memory usage attribution in context bundles.
-- Hermes-style skill candidate proposals after verified successful tasks.
+- reference platform-style skill candidate proposals after verified successful tasks.
 
 ### Model Runtime
 
@@ -366,7 +366,7 @@ Connector profiles already exist in `raiker/config/channel-connectors.json`. Pha
 
 All channel connectors must implement pairing, sender trust, rate limits, attachment policy, approval relay disabled by default, session binding, side-question routing, task controls where permitted, and event logging.
 
-### OpenClaw-Style Gateway Coverage
+### reference platform-Style Gateway Coverage
 
 Raiker must include:
 

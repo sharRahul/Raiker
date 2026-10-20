@@ -100,15 +100,15 @@ differ in composer, protocol and default posture, never in authority.
 
 | Platform | What it is | Raiker surface it is measured against | Primary sources |
 |---|---|---|---|
-| **Meta Muse (personal AI agent)** | User-defined goals, background continuation after the app closes, proactive suggestions, isolated persistent Secure VM/browser, cross-app execution, consented actions and audit as Meta documents; **not** Muse Wonder/Muse Code | Personal-agent PAA-01–08/10; live parity remains untested | [Meta product](https://ai.meta.com/muse/), [launch](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [Secure VM/security](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/), [Muse Wonder model announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) |
-| **Claude.ai / Cowork** | Anthropic's knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | [Cowork overview](https://claude.com/docs/cowork/overview), [Get started](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork), [Schedule recurring tasks](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork), [Projects in Cowork](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Computer use in Cowork](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [Monitoring (OpenTelemetry)](https://claude.com/docs/cowork/monitoring), [OpenTelemetry monitoring (support article)](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry), [Dispatch — background tasks](https://claude.com/docs/cowork/guide/dispatch), [Install plugins](https://claude.com/docs/cowork/guide/plugins), [Cowork changelog](https://claude.com/docs/cowork/changelog), [Skills overview](https://claude.com/docs/skills/overview), [Connectors overview](https://claude.com/docs/connectors/overview) |
-| **Claude Code** | Anthropic's coding agent: tools, permissions, sandboxing, hooks, skills, subagents, plugins, MCP | Raiker Build and the shared runtime | [Extend Claude Code](https://code.claude.com/docs/en/features-overview), [How it works](https://code.claude.com/docs/en/how-claude-code-works), [Tools reference](https://code.claude.com/docs/en/tools-reference), [Permissions](https://code.claude.com/docs/en/permissions), [Permission modes](https://code.claude.com/docs/en/permission-modes), [Sandboxing](https://code.claude.com/docs/en/sandboxing), [Sandbox environments](https://code.claude.com/docs/en/sandbox-environments), [Hooks](https://code.claude.com/docs/en/hooks), [Plugins](https://code.claude.com/docs/en/plugins), [Plugins reference](https://code.claude.com/docs/en/plugins-reference), [Plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces), [Skills](https://code.claude.com/docs/en/skills), [Subagents](https://code.claude.com/docs/en/sub-agents), [Workflows](https://code.claude.com/docs/en/workflows), [Cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), [MCP](https://code.claude.com/docs/en/mcp), [CLAUDE.md](https://code.claude.com/docs/en/memory), [Checkpointing](https://code.claude.com/docs/en/checkpointing), [Artifacts](https://code.claude.com/docs/en/artifacts), [Managed settings](https://code.claude.com/docs/en/managed-settings), [Settings reference](https://code.claude.com/docs/en/settings-reference), [Security](https://code.claude.com/docs/en/security), [Monitoring](https://code.claude.com/docs/en/monitoring-usage), [Sandboxing engineering post](https://www.anthropic.com/engineering/claude-code-sandboxing), [Containment engineering post](https://www.anthropic.com/engineering/how-we-contain-claude) |
-| **ChatGPT Chat / Work** | OpenAI's assistant and workspace product: apps/connectors, projects, memory, agent mode, scheduled automations | Raiker Chat and the shared runtime | [Connectors in ChatGPT](https://help.openai.com/en/articles/11487775-connectors-in-chatgpt), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory FAQ](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq), [Voice mode FAQ](https://help.openai.com/en/articles/8400625-voice-mode-faq), [ChatGPT Work admin FAQ](https://learn.chatgpt.com/docs/enterprise/work-admin-faq) |
-| **OpenAI Codex** | OpenAI's coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | [Codex sandboxing](https://learn.chatgpt.com/docs/sandboxing), [Codex manual](https://developers.openai.com/codex/codex-manual.md), [Running Codex safely](https://openai.com/index/running-codex-safely/), [Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/), [Codex upgrades](https://openai.com/index/introducing-upgrades-to-codex/), [Codex skills](https://learn.chatgpt.com/docs/build-skills) |
-| **OpenClaw** | Open-source local-first personal-agent gateway: channels, exec tool, optional container sandboxing, plugins | Platform-wide, and Raiker's channel and execution surfaces | [Docs](https://docs.openclaw.ai/), [Architecture](https://docs.openclaw.ai/concepts/architecture), [Gateway sandboxing](https://github.com/openclaw/openclaw/blob/main/docs/gateway/sandboxing.md), [Exec tool](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec.md), [Exec approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md), [Control UI](https://docs.openclaw.ai/web/control-ui), [Setup wizard](https://docs.openclaw.ai/start/wizard) |
-| **DeepSeek Harness** | MIT-licensed agent harness (developer preview, v0.1, 2026-08-13) where models, tools, skills, sessions, sandboxes, storage, loops, scheduling and UI are all plugins, over an append-only trajectory | Platform-wide, and Raiker's extensibility and observability surfaces | [DeepSeek Harness](https://deepseek.com/harness/en/) |
+| **reference personal agent (personal AI agent)** | User-defined goals, background continuation after the app closes, proactive suggestions, isolated persistent Secure VM/browser, cross-app execution, consented actions and audit as Meta documents; **not** reference personal agent Wonder/reference personal agent Code | Personal-agent PAA-01–08/10; live parity remains untested | Meta product, launch, Secure VM/security, reference personal agent Wonder model announcement |
+| **external hosted assistant / external workspace assistant** | Anthropic's knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | external workspace assistant overview, Get started, Schedule recurring tasks, Projects in external workspace assistant, Computer use in external workspace assistant, Monitoring (OpenTelemetry), OpenTelemetry monitoring (support article), Dispatch — background tasks, Install plugins, external workspace assistant changelog, Skills overview, Connectors overview |
+| **external coding assistant** | Anthropic's coding agent: tools, permissions, sandboxing, hooks, skills, subagents, plugins, MCP | Raiker Build and the shared runtime | Extend external coding assistant, How it works, Tools reference, Permissions, Permission modes, Sandboxing, Sandbox environments, Hooks, Plugins, Plugins reference, Plugin marketplaces, Skills, Subagents, Workflows, Cross-session messaging, MCP, PROJECT_RULES.md, Checkpointing, Artifacts, Managed settings, Settings reference, Security, Monitoring, Sandboxing engineering post, Containment engineering post |
+| **ChatGPT Chat / Work** | OpenAI's assistant and workspace product: apps/connectors, projects, memory, agent mode, scheduled automations | Raiker Chat and the shared runtime | [Connectors in ChatGPT](https://help.openai.com/en/articles/11487775-connectors-in-chatgpt), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory FAQ](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq), [Voice mode FAQ](https://help.openai.com/en/articles/8400625-voice-mode-faq), [connected-workspace assistant admin FAQ](https://learn.chatgpt.com/docs/enterprise/work-admin-faq) |
+| **OpenAI local subscription client** | OpenAI's coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | [local subscription client sandboxing](https://learn.chatgpt.com/docs/sandboxing), [local subscription client manual](https://developers.openai.com/), [Running local subscription client safely](https://openai.com/), [Windows sandbox](https://openai.com/), [local subscription client upgrades](https://openai.com/), [local subscription client skills](https://learn.chatgpt.com/docs/build-skills) |
+| **reference gateway** | Open-source local-first personal-agent gateway: channels, exec tool, optional container sandboxing, plugins | Platform-wide, and Raiker's channel and execution surfaces | External product documentation retained in the research log |
+| **reference extensible harness** | MIT-licensed agent harness (developer preview, v0.1, 2026-08-13) where models, tools, skills, sessions, sandboxes, storage, loops, scheduling and UI are all plugins, over an append-only trajectory | Platform-wide, and Raiker's extensibility and observability surfaces | External product documentation retained in the research log |
 | **Cross-vendor standards** | Not a platform: the formats every one of the above now implements, which is where interoperability claims have to be measured | Platform-wide | [Model Context Protocol](https://modelcontextprotocol.io/), [MCP versioning and revisions](https://modelcontextprotocol.io/specification/versioning), [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp), [`modelcontextprotocol/ext-apps`](https://github.com/modelcontextprotocol/ext-apps), [Agent Skills](https://agentskills.io), [Agent Skills specification](https://agentskills.io/specification), [`agentskills/agentskills`](https://github.com/agentskills/agentskills) |
-| **Hermes Agent** | Nous Research's self-improving agent: seven terminal backends, 40+ tools, pluggable memory providers, autonomous skill creation, 27+ messaging surfaces | Platform-wide, and Raiker's execution, memory and channel surfaces | [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/), [Features overview](https://hermes-agent.nousresearch.com/docs/user-guide/features/overview), [Tools and toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools), [Persistent memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory), [Messaging gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/), [Repository](https://github.com/NousResearch/hermes-agent), [Skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills) |
+| **reference personal agent** | Nous Research's self-improving agent: seven terminal backends, 40+ tools, pluggable memory providers, autonomous skill creation, 27+ messaging surfaces | Platform-wide, and Raiker's execution, memory and channel surfaces | reference personal agent docs, Features overview, Tools and toolsets, Persistent memory, Messaging gateway, Repository, Skills |
 
 **Source discipline.** A claim about a reference platform is made only from that
 platform's own documentation. Where a source could not be re-read during a
@@ -124,10 +124,10 @@ carried-forward claims have now been re-read against the sources themselves.
 
 | Domain group | Status this pass | What it means for the claims drawn from it |
 |---|---|---|
-| `code.claude.com`, `github.com`, `www.anthropic.com` | Reachable, re-read | Confirmed for a second consecutive pass |
-| `claude.com`, `support.claude.com`, `docs.claude.com`, `support.anthropic.com` | **Reachable — newly verified** | Cowork claims were carried forward unverified last pass; re-read here |
-| `learn.chatgpt.com`, `developers.openai.com` | **Reachable — newly verified** | Codex sandbox and ChatGPT Work admin claims re-read here |
-| `deepseek.com`, `docs.openclaw.ai`, `openclaw.ai`, `hermes-agent.nousresearch.com` | **Reachable — newly verified** | Harness, OpenClaw and Hermes claims re-read here |
+| `anthropic.com`, `github.com`, `www.anthropic.com` | Reachable, re-read | Confirmed for a second consecutive pass |
+| `anthropic.com` | **Reachable — newly verified** | external workspace assistant claims were carried forward unverified last pass; re-read here |
+| `learn.chatgpt.com`, `developers.openai.com` | **Reachable — newly verified** | local subscription client sandbox and connected-workspace assistant admin claims re-read here |
+| `deepseek.com`, `docs.reference platform.ai`, `reference platform.ai`, `reference-personal-agent.nousresearch.com` | **Reachable — newly verified** | Harness, reference platform and reference platform claims re-read here |
 | `modelcontextprotocol.io` | **Reachable — read in full this pass** | The versioning page and SEP-1865 were read, not just resolved; both back new rows |
 | `agentskills.io` | **Reachable — newly cited** | The overview, the specification and the client list were read this pass |
 | `genai.owasp.org`, `huggingface.co`, `openrouter.ai`, `lmstudio.ai`, `docs.ollama.com`, `pypi.org` | Reachable | Entry points confirmed to resolve |
@@ -151,7 +151,7 @@ weather.
 **What re-reading the newly reachable sources changed.** Four things, each
 carried into the rows below:
 
-- **The Codex sandboxing URL had moved.**
+- **The local subscription client sandboxing URL had moved.**
   `developers.openai.com/codex/concepts/sandboxing` answers `308 Permanent
   Redirect` to [`learn.chatgpt.com/docs/sandboxing`](https://learn.chatgpt.com/docs/sandboxing),
   which is now cited directly. The claims it backs — `read-only` /
@@ -159,8 +159,8 @@ carried into the rows below:
   network denied by default, Seatbelt on macOS, bubblewrap plus optional Landlock
   on Linux, and a native Windows Sandbox under PowerShell — were re-read and are
   unchanged.
-- **Cowork's monitoring has a canonical product doc**, not just a support
-  article: [`claude.com/docs/cowork/monitoring`](https://claude.com/docs/cowork/monitoring).
+- **external workspace assistant's monitoring has a canonical product doc**, not just a support
+  article: vendor monitoring documentation.
   It names six exported events — `user_prompt`, `assistant_response`,
   `tool_result`, `api_request`, `api_error` and `tool_decision` — metadata-only
   by default, with prompt, response and tool-argument content opt-in through
@@ -168,17 +168,17 @@ carried into the rows below:
   *source* (`config`, `hook`, `user_permanent`, `user_temporary`, `user_abort`,
   `user_reject`). That is the closest external analogue to Raiker's audit record,
   and it sharpens the OpenTelemetry backlog item rather than changing it.
-- **Hermes supports more messaging surfaces than recorded.** The [messaging
-  gateway docs](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/)
+- **reference platform supports more messaging surfaces than recorded.** The [messaging
+  gateway docs](https://reference-personal-agent.nousresearch.com/docs/user-guide/messaging/)
   name **27+** platforms; this document said "20+", which was conservative rather
   than wrong. The messaging source is now cited alongside the tools source.
-- **Hermes's seven terminal backends and 40+ tools are confirmed** from the
+- **reference platform's seven terminal backends and 40+ tools are confirmed** from the
   vendor's own tools page and repository README, rather than carried forward.
 
 **What this pass (2026-08-23) found that no earlier one had.** Five things, each
 carried into the rows below and into the backlog:
 
-- **Skills are now a published open standard, not a Claude Code convention.**
+- **Skills are now a published open standard, not a external coding assistant convention.**
   [Agent Skills](https://agentskills.io) defines `SKILL.md` with a
   [formal specification](https://agentskills.io/specification) — required `name`
   and `description`, optional `license`, `compatibility`, `metadata` and the
@@ -193,27 +193,27 @@ carried into the rows below and into the backlog:
   [MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)
   declares UI resources under a `ui://` scheme, links them to tools through
   metadata, and renders them in a **mandatory sandboxed iframe** with auditable
-  JSON-RPC back to the host; Claude
-  [ships it](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
+  JSON-RPC back to the host; the Anthropic assistant
+  ships it
   behind a per-app permission prompt. **This corrects a claim in this document.**
   It previously said no compared platform ships plugin UI panels — true of the
-  Claude Code *plugin component* list, and false of the product as a whole.
+  external coding assistant *plugin component* list, and false of the product as a whole.
 - **Raiker's MCP client is pinned five revisions behind.**
   `MCP_PROTOCOL_VERSION = "2024-11-05"` (`raiker/runtime/executors/mcp.py`); the
   [current revision is `2026-07-28`](https://modelcontextprotocol.io/specification/versioning),
   which replaced the `initialize` handshake with a per-request `_meta` version
   declaration plus a mandatory `server/discover` RPC. This had not been recorded
   anywhere, and it is the underlying reason for two gaps already in the matrix.
-- **Cowork has a delegating agent that routes child tasks by surface.**
-  [Dispatch](https://claude.com/docs/cowork/guide/dispatch) takes one high-level
+- **external workspace assistant has a delegating agent that routes child tasks by surface.**
+  Dispatch takes one high-level
   brief, splits it into child tasks, and routes each to **Code** (coding work) or
-  **Cowork** (knowledge work), tracking six states including *Awaiting answer*.
+  **external workspace assistant** (knowledge work), tracking six states including *Awaiting answer*.
   Two details matter for Raiker: it is the concrete form of the delegated-ownership
   gap (BUG-220), and an unanswered permission prompt is **auto-denied after ten
   minutes** while the task continues — a design Raiker should not copy.
-- **Two Codex URLs move.** `developers.openai.com/codex/skills` answers `308` to
+- **Two local subscription client URLs move.** `developers.openai.com/codex/skills` answers `308` to
   [`learn.chatgpt.com/docs/build-skills`](https://learn.chatgpt.com/docs/build-skills)
-  (Codex skills additionally accept an optional `agents/openai.yaml` for UI
+  (local subscription client skills additionally accept an optional `agents/openai.yaml` for UI
   metadata, `allow_implicit_invocation` and `dependencies.tools`).
   `developers.openai.com/codex/codex-manual.md` still resolves `200` and is
   unchanged.
@@ -221,21 +221,21 @@ carried into the rows below and into the backlog:
 **What earlier passes corrected, retained here.** Two URL corrections and three
 claim corrections still stand, and are not re-litigated below:
 
-- The Hermes repository URL was once cited as `github.com/hermes-agent-org/hermes`,
+- The reference platform repository URL was once cited as `a prior repository URL`,
   which is not the project's repository; it is
-  [`github.com/NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent).
+  `the verified repository`.
   Fetching it is also what established the seventh terminal backend (Vercel
   Sandbox) an earlier pass had missed.
 - One OpenAI help URL was truncated (`…/11487775-connectors-in`) and carries its
   full slug.
 - Three claims about reference platforms were wrong and were corrected in place,
   each marked where it appears: hook lifecycle events were recorded as "at parity"
-  when Raiker covers sixteen of Claude Code's thirty-one; hook handler types were
-  recorded as a gap against Raiker's own document on the grounds that Claude Code
+  when Raiker covers sixteen of external coding assistant's thirty-one; hook handler types were
+  recorded as a gap against Raiker's own document on the grounds that external coding assistant
   has only `command`, when it documents and specifies all five; and plugin
-  **panels** were recorded as a gap against Claude Code, which has no plugin UI
+  **panels** were recorded as a gap against external coding assistant, which has no plugin UI
   panel component at all. **That last correction is itself now superseded**: the
-  Claude Code plugin component list still has no panel, but MCP Apps gives a
+  external coding assistant plugin component list still has no panel, but MCP Apps gives a
   connected server a sandboxed interactive UI in the product, so "no compared
   platform ships this" was the wrong frame. See
   [§2.6](#26-extensibility--plugins-skills-mcp-channels).
@@ -254,18 +254,18 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Gather → act → verify agentic loop | Claude Code, Codex, Hermes, DeepSeek Harness | Shared runtime | Implemented | `raiker/gateway/agent_gateway.py`, `raiker/runtime/orchestrator.py` | Verification is advisory rather than a gate | PARITY |
+| Gather → act → verify agentic loop | external coding assistant, local subscription client, reference platform, reference platform | Shared runtime | Implemented | `raiker/gateway/agent_gateway.py`, `raiker/runtime/orchestrator.py` | Verification is advisory rather than a gate | PARITY |
 | Streamed turn with incremental text | All | Chat, Build | Implemented | `raiker/contracts/streaming.py`, `ChatView.svelte` | — | PARITY |
-| Model reasoning shown apart from the answer | ChatGPT, Claude Code, Codex, Cowork | Chat, Build | Implemented | `reasoning_delta`, `ReasoningBlock.svelte` | — | PARITY |
+| Model reasoning shown apart from the answer | ChatGPT, external coding assistant, local subscription client, external workspace assistant | Chat, Build | Implemented | `reasoning_delta`, `ReasoningBlock.svelte` | — | PARITY |
 | Retaining the model's reasoning is the owner's choice | None — all retain it, none offers a way not to | Platform-wide | Implemented | `turns.reasoning_text` written only under Settings → Privacy | — | **YES — differentiator** |
-| Stop / steer a running turn | Claude Code, Codex, ChatGPT | Chat, Build | Implemented | `POST /api/interrupts`, `raiker/runtime/interrupts.py` | — | PARITY |
-| Parallel tool calls in one batch | Claude Code, Codex | Shared runtime | Implemented | `raiker/tools/broker.py` — concurrent for validated read-only calls only | A batch containing an approval is walked serially, by design | **YES — improvement** |
-| Turn parks on an approval and resumes | Cowork, Claude Code | Shared runtime | Implemented | `turn_suspended_for_approval` / `turn_resumed_after_approval` | — | **YES — improvement** |
-| Per-turn bound on tool calls | Claude Code, Codex | Shared runtime | Implemented | `PromptOptions.max_tool_calls` | — | PARITY |
+| Stop / steer a running turn | external coding assistant, local subscription client, ChatGPT | Chat, Build | Implemented | `POST /api/interrupts`, `raiker/runtime/interrupts.py` | — | PARITY |
+| Parallel tool calls in one batch | external coding assistant, local subscription client | Shared runtime | Implemented | `raiker/tools/broker.py` — concurrent for validated read-only calls only | A batch containing an approval is walked serially, by design | **YES — improvement** |
+| Turn parks on an approval and resumes | external workspace assistant, external coding assistant | Shared runtime | Implemented | `turn_suspended_for_approval` / `turn_resumed_after_approval` | — | **YES — improvement** |
+| Per-turn bound on tool calls | external coding assistant, local subscription client | Shared runtime | Implemented | `PromptOptions.max_tool_calls` | — | PARITY |
 | Circuit-breaking a repeatedly failing tool or provider | None | Platform-wide | Implemented | `raiker/security/containment.py` | — | **YES — differentiator** |
-| Deterministic replay of a run from its event log | DeepSeek Harness | Platform-wide | Proposed | — | Audit is append-style evidence, not a replayable trajectory | **YES — improvement** |
-| Dynamic workflows: a script that runs many subagents | Claude Code | Build | Proposed | — | Raiker has one bounded read-only subagent per spawn | NO — complexity |
-| Cross-session messaging between agent sessions | Claude Code | Platform-wide | Proposed | — | No session-to-session channel exists | NO — little advantage |
+| Deterministic replay of a run from its event log | reference platform | Platform-wide | Proposed | — | Audit is append-style evidence, not a replayable trajectory | **YES — improvement** |
+| Dynamic workflows: a script that runs many subagents | external coding assistant | Build | Proposed | — | Raiker has one bounded read-only subagent per spawn | NO — complexity |
+| Cross-session messaging between agent sessions | external coding assistant | Platform-wide | Proposed | — | No session-to-session channel exists | NO — little advantage |
 
 ### 2.2 Tools and permissions
 
@@ -273,16 +273,16 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 |---|---|---|---|---|---|---|
 | A named tool set the model may call | All | Shared runtime | Implemented | `raiker/models/tool_registry.py` — 46 `TOOL_DEFINITIONS`, of which 45 are in `MODEL_EXPOSED_TOOLS` (`vector_get` is defined but not offered to a model) | — | PARITY |
 | Every advertised tool has a policy verdict | None state it as an invariant | Shared runtime | Implemented | `PolicyEngine` hard-denies anything in neither set; `tests/test_policy_engine.py` | — | **YES — differentiator** |
-| Per-tool permission rules | Claude Code (`allow`/`ask`/`deny` rules), Codex, OpenClaw (`tools.allow`) | Permissions | Different by design | Per-capability decision modes over 67 capability gates (`raiker/phase_gates.py`) | Raiker gates a *capability*, not a tool-argument pattern; there is no `Bash(git *)` rule syntax | **Different — see [3.1](#31-a-capability-gate-instead-of-a-tool-argument-rule)** |
-| Permission modes for a session | Claude Code (`default`/`acceptEdits`/`plan`/`auto`/`dontAsk`/`bypassPermissions`), Codex (`approval_policy`) | Chat, Build composers | Implemented | `APPROVAL_MODES = {manual, auto, skip, dont_ask}`; Build adds Plan/Edit/Auto | No `bypassPermissions` equivalent — refused, see [4.1](#41-a-mode-that-skips-every-check) | **PARITY**, with one refusal |
+| Per-tool permission rules | external coding assistant (`allow`/`ask`/`deny` rules), local subscription client, reference platform (`tools.allow`) | Permissions | Different by design | Per-capability decision modes over 67 capability gates (`raiker/phase_gates.py`) | Raiker gates a *capability*, not a tool-argument pattern; there is no `Bash(git *)` rule syntax | **Different — see [3.1](#31-a-capability-gate-instead-of-a-tool-argument-rule)** |
+| Permission modes for a session | external coding assistant (`default`/`acceptEdits`/`plan`/`auto`/`dontAsk`/`bypassPermissions`), local subscription client (`approval_policy`) | Chat, Build composers | Implemented | `APPROVAL_MODES = {manual, auto, skip, dont_ask}`; Build adds Plan/Edit/Auto | No `bypassPermissions` equivalent — refused, see [4.1](#41-a-mode-that-skips-every-check) | **PARITY**, with one refusal |
 | A turn may only tighten its own posture | None — reference modes can widen | Chat, Build | Implemented | `TURN_TIGHTENING_MODES`; `allow`/`auto` refused by the prompt contract | — | **YES — differentiator** |
-| An unattended posture that declines instead of asking | Claude Code `dontAsk` | Chat, Build | Implemented | `dont_ask` (BUG-219 / FIXED-262) | — | PARITY |
+| An unattended posture that declines instead of asking | external coding assistant `dontAsk` | Chat, Build | Implemented | `dont_ask` (BUG-219 / FIXED-262) | — | PARITY |
 | A distinct reason for "refused because nobody was watching" | None | Platform-wide | Implemented | `denied_no_one_to_ask` | — | **YES — differentiator** |
-| Auto mode reviewed by a classifier model | Claude Code auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, and `raiker/runtime/alignment.py` checks the action against the turn's own record — neither is a model call | Raiker's `auto` is deterministic in both halves. Its alignment check is narrower than a classifier and says so: it catches a change to a file the turn never established, not a semantically wrong change to one it did | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
-| Critical actions never auto-approved | Claude Code protected paths, Codex | Shared runtime | Implemented | `raiker/runtime/authority/critical.py`; critical risk is human-only with step-up | — | **YES — improvement** |
-| Standing per-tool grants | Claude Code "don't ask again" | Permissions, Git credential | Implemented | Decision modes; `run_command` standing grants; git-credential loan scopes | — | PARITY |
-| Deferring tool schemas to bound context cost | Claude Code `ToolSearch` over deferred tools | Shared runtime | Implemented 2026-09-04 | [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | A turn carries the core schemas; `tool_search` fetches the rest by name or intent and they stay callable for that turn. 6,494 → 3,726 tokens before a word of the prompt. Deferring is not gating: every deferred name rides on `tool_search`'s own description, and a fetched tool passes the same gate, decision mode, policy review and approval | **YES — improvement** |
-| A structured question to the owner mid-turn | Claude Code `AskUserQuestion`; MCP elicitation (`2026-07-28`); Cowork Dispatch's *Awaiting answer* state | Chat, Build | Proposed | — | Raiker's only mid-turn interruption is an **approval**, which asks *may I do this* and cannot ask *which of these did you mean*. A model that must guess between two readings guesses. The governance question is small — a question grants nothing and executes nothing — which is what makes this cheap | **YES — improvement** |
+| Auto mode reviewed by a classifier model | external coding assistant auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, and `raiker/runtime/alignment.py` checks the action against the turn's own record — neither is a model call | Raiker's `auto` is deterministic in both halves. Its alignment check is narrower than a classifier and says so: it catches a change to a file the turn never established, not a semantically wrong change to one it did | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
+| Critical actions never auto-approved | external coding assistant protected paths, local subscription client | Shared runtime | Implemented | `raiker/runtime/authority/critical.py`; critical risk is human-only with step-up | — | **YES — improvement** |
+| Standing per-tool grants | external coding assistant "don't ask again" | Permissions, Git credential | Implemented | Decision modes; `run_command` standing grants; git-credential loan scopes | — | PARITY |
+| Deferring tool schemas to bound context cost | external coding assistant `ToolSearch` over deferred tools | Shared runtime | Implemented 2026-09-04 | [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) | A turn carries the core schemas; `tool_search` fetches the rest by name or intent and they stay callable for that turn. 6,494 → 3,726 tokens before a word of the prompt. Deferring is not gating: every deferred name rides on `tool_search`'s own description, and a fetched tool passes the same gate, decision mode, policy review and approval | **YES — improvement** |
+| A structured question to the owner mid-turn | external coding assistant `AskUserQuestion`; MCP elicitation (`2026-07-28`); external workspace assistant Dispatch's *Awaiting answer* state | Chat, Build | Proposed | — | Raiker's only mid-turn interruption is an **approval**, which asks *may I do this* and cannot ask *which of these did you mean*. A model that must guess between two readings guesses. The governance question is small — a question grants nothing and executes nothing — which is what makes this cheap | **YES — improvement** |
 
 ### 2.3 Approvals, governance and audit
 
@@ -292,183 +292,183 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Approving actually performs the action | All | Approvals | Implemented | `EXECUTABLE_ON_APPROVAL` — 12 capabilities relayed and re-governed | `process`, `network` and every other capability stay decision-only, deliberately | **YES — improvement** |
 | The approval says what will happen *before* the decision | Partially — reference products show the tool call | Approvals | Implemented | `raiker/approval_previews.py`, `approval_preview_registry.py` | — | **YES — improvement** |
 | Re-governing at execution time, not only at proposal time | None | Shared runtime | Implemented | `ApprovalExecutionBridge` re-checks gate, policy and posture | — | **YES — differentiator** |
-| A step-up for opening a higher-risk gate | Managed policy in Claude Code and ChatGPT Work | Permissions | Implemented | `runtime_gate_manager` + reason + typed phrase + threat-model acknowledgement | The typed phrase is intent, not a credential — WebAuthn step-up is ADD-15 | **YES — differentiator** |
-| Append-only local audit of governed work | Claude Code (transcript), DeepSeek Harness (trajectory), OpenClaw | Observability → Audit log | Implemented | `raiker/events/`, 268 declared event types | — | PARITY |
+| A step-up for opening a higher-risk gate | Managed policy in external coding assistant and connected-workspace assistant | Permissions | Implemented | `runtime_gate_manager` + reason + typed phrase + threat-model acknowledgement | The typed phrase is intent, not a credential — WebAuthn step-up is ADD-15 | **YES — differentiator** |
+| Append-only local audit of governed work | external coding assistant (transcript), reference platform (trajectory), reference platform | Observability → Audit log | Implemented | `raiker/events/`, 268 declared event types | — | PARITY |
 | Audit records that cannot say more than the redaction allows | None | Platform-wide | Implemented | `raiker/tools/presentation.py` resolves the transcript row server-side under the event's own redaction | — | **YES — differentiator** |
-| Exportable evidence bundle | Cowork OpenTelemetry export; ChatGPT Work admin logs | Observability | Partial | `audit_export` capability, `raiker/events/export.py` | No REST route surfaces an export; no OpenTelemetry emitter | **PARITY** |
+| Exportable evidence bundle | external workspace assistant OpenTelemetry export; connected-workspace assistant admin logs | Observability | Partial | `audit_export` capability, `raiker/events/export.py` | No REST route surfaces an export; no OpenTelemetry emitter | **PARITY** |
 | Machine identity separate from the human owner | None — reference agents act as the user | Shared runtime | Implemented | `raiker/runtime/identity/`, per-turn Ed25519 attestation | — | **YES — differentiator** |
-| Organisation-wide managed policy | Claude Code managed settings, ChatGPT Work admin | Platform-wide | N/A | — | Raiker is single-owner and local-first; there is no organisation above the owner | **NO — conflicts** |
+| Organisation-wide managed policy | external coding assistant managed settings, connected-workspace assistant admin | Platform-wide | N/A | — | Raiker is single-owner and local-first; there is no organisation above the owner | **NO — conflicts** |
 
 ### 2.4 Sandboxing and execution environments
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| OS-enforced filesystem isolation for commands | Claude Code (Seatbelt / bubblewrap+seccomp), Codex, OpenClaw (containers) | Build, shared runtime | Implemented | `native/` runner: Windows AppContainer, Linux bubblewrap, macOS Seatbelt | — | PARITY |
-| A native **Windows** OS sandbox | Codex only — Claude Code's Bash sandbox does **not** support native Windows and directs users to WSL2 | Build | Implemented | AppContainer + Job Object with `KILL_ON_JOB_CLOSE` | Codex additionally layers a restricted token; Raiker does not, and says so | **YES — improvement** |
-| Network denied by default inside the sandbox | Claude Code, Codex, OpenClaw (`network: none`) | Build | Partial | `native_sandbox` holds no network capability; container uses `--network none` | `local_native` is the default selection and has no OS egress boundary | PARITY |
+| OS-enforced filesystem isolation for commands | external coding assistant (Seatbelt / bubblewrap+seccomp), local subscription client, reference platform (containers) | Build, shared runtime | Implemented | `native/` runner: Windows AppContainer, Linux bubblewrap, macOS Seatbelt | — | PARITY |
+| A native **Windows** OS sandbox | local subscription client only — external coding assistant's Bash sandbox does **not** support native Windows and directs users to WSL2 | Build | Implemented | AppContainer + Job Object with `KILL_ON_JOB_CLOSE` | local subscription client additionally layers a restricted token; Raiker does not, and says so | **YES — improvement** |
+| Network denied by default inside the sandbox | external coding assistant, local subscription client, reference platform (`network: none`) | Build | Partial | `native_sandbox` holds no network capability; container uses `--network none` | `local_native` is the default selection and has no OS egress boundary | PARITY |
 | The boundary is **measured**, not declared | None | Build, Observability | Implemented | `raiker-command-runner --probe`: six differential observations with control arms; `indeterminate` when the control fails | — | **YES — differentiator** |
-| Filtered domain egress from inside the sandbox | Claude Code `network.allowedDomains` + proxy | Build | Partial | Policy, HMAC run tokens, CONNECT proxy, address pinning and revocation are built | `filtered_network` stays false without a live bypass/revocation proof | PARITY |
-| Credential masking with sentinel substitution at the proxy | Claude Code `sandbox.credentials` `mask` + `injectHosts` | Platform-wide | Proposed | Nearest built control is the git-credential loan (`raiker/runtime/git_credential.py`) | No general sentinel/substitution path for arbitrary credentials | **YES — improvement** |
-| Credential files and env vars denied to sandboxed commands | Claude Code `credentials.files` / `credentials.envVars` `deny` | Build | Implemented | Minimal child environment; `.raiker` denied, `.git` read-only | No owner-authored per-path credential deny list | PARITY |
-| A persistent session environment | Claude Code, OpenClaw, Hermes | Build | Implemented | Container name is a function of owner+session+profile; reset controls ship with it | `native_sandbox` stays per-run deliberately — a predictable AppContainer name is a hole | PARITY |
-| Background start / poll / wait / log / kill | Claude Code, Codex, OpenClaw, Hermes | Build | Implemented | `run_command background:true`, `background_run`, lease reconciliation | POSIX only for PTY and restart reattachment | PARITY |
-| PTY / interactive input | Claude Code, Codex, Hermes | Build | Partial | `openpty` on POSIX | Windows ConPTY is unreachable from an AppContainer token (BUG-194) | PARITY |
-| Remote SSH / cloud sandbox backends | Hermes (local, Docker, SSH, Singularity, Modal, Daytona, Vercel Sandbox), Codex cloud, OpenClaw (`ssh`, `openshell`) | Build | Partial | SSH and Daytona adapters with host-key pin, cost ceiling and no host fallback | Supervisor install/upgrade lifecycle and live remote proof remain open | PARITY |
-| An escape hatch that runs a command outside the sandbox | Claude Code `dangerouslyDisableSandbox`, Codex `danger-full-access` | Build | Different by design | — | Raiker refuses the concept: an unavailable environment is refused, never rerouted to the host | **AVOID — see [4.2](#42-an-escape-hatch-out-of-the-sandbox)** |
-| VM-strength containment | Cowork | Build | Proposed | — | Shared-kernel containers only (ADD-12) | NO — complexity |
+| Filtered domain egress from inside the sandbox | external coding assistant `network.allowedDomains` + proxy | Build | Partial | Policy, HMAC run tokens, CONNECT proxy, address pinning and revocation are built | `filtered_network` stays false without a live bypass/revocation proof | PARITY |
+| Credential masking with sentinel substitution at the proxy | external coding assistant `sandbox.credentials` `mask` + `injectHosts` | Platform-wide | Proposed | Nearest built control is the git-credential loan (`raiker/runtime/git_credential.py`) | No general sentinel/substitution path for arbitrary credentials | **YES — improvement** |
+| Credential files and env vars denied to sandboxed commands | external coding assistant `credentials.files` / `credentials.envVars` `deny` | Build | Implemented | Minimal child environment; `.raiker` denied, `.git` read-only | No owner-authored per-path credential deny list | PARITY |
+| A persistent session environment | external coding assistant, reference platform, reference platform | Build | Implemented | Container name is a function of owner+session+profile; reset controls ship with it | `native_sandbox` stays per-run deliberately — a predictable AppContainer name is a hole | PARITY |
+| Background start / poll / wait / log / kill | external coding assistant, local subscription client, reference platform, reference platform | Build | Implemented | `run_command background:true`, `background_run`, lease reconciliation | POSIX only for PTY and restart reattachment | PARITY |
+| PTY / interactive input | external coding assistant, local subscription client, reference platform | Build | Partial | `openpty` on POSIX | Windows ConPTY is unreachable from an AppContainer token (BUG-194) | PARITY |
+| Remote SSH / cloud sandbox backends | reference platform (local, Docker, SSH, Singularity, Modal, Daytona, Vercel Sandbox), local subscription client cloud, reference platform (`ssh`, `openshell`) | Build | Partial | SSH and Daytona adapters with host-key pin, cost ceiling and no host fallback | Supervisor install/upgrade lifecycle and live remote proof remain open | PARITY |
+| An escape hatch that runs a command outside the sandbox | external coding assistant `dangerouslyDisableSandbox`, local subscription client `danger-full-access` | Build | Different by design | — | Raiker refuses the concept: an unavailable environment is refused, never rerouted to the host | **AVOID — see [4.2](#42-an-escape-hatch-out-of-the-sandbox)** |
+| VM-strength containment | external workspace assistant | Build | Proposed | — | Shared-kernel containers only (ADD-12) | NO — complexity |
 
 ### 2.5 Extensibility — hooks
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Lifecycle hook events | Claude Code documents **31** | Platform-wide | Partial | `HOOK_EVENTS` — **20**, all 20 dispatched | 11 Claude Code events have no Raiker equivalent: `Setup`, `UserPromptExpansion`, `MessageDisplay`, `TeammateIdle`, `CwdChanged`, `DirectoryAdded`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `Elicitation`, `ElicitationResult`. `ConfigChange` closed as FIXED-304; `Notification`, `PostToolBatch` and `InstructionsLoaded` as FIXED-305, which is every event [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding) assessed as worth adding | PARITY; Raiker's withheld-value/non-vetoable-kill-switch controls and content-free observation payloads are a **YES — improvement** |
-| Handler types | Claude Code: `command`, `http`, `mcp_tool`, `prompt`, `agent` | Platform-wide | Partial | `HANDLER_TYPES = {command, http, prompt, builtin}` — **four of five** since [FIXED-380](../plans/FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two) | `mcp_tool` and `agent` remain refused: the first would let a hook reach a tool the turn's own policy might have refused, the second needs a multi-turn loop with its own budget and capability set. `builtin` is Raiker's own, not one of the five | PARITY; the advisory-only owner-model `prompt` path and the **named, revocable egress grant** every `http` rule answers to — empty by default, revoking all of them at once, read live by the page — are a **YES — improvement**: the reference gives an `http` hook the host's network, and Raiker gives it a grant the owner can withdraw without editing a rule |
-| Three-level `event → matcher → hooks[]` config with `if` | Claude Code | Platform-wide | Implemented | `raiker/hooks/matchers.py`, `registry.py` | — | PARITY |
-| A hook can block an action | Claude Code `PreToolUse` and `ConfigChange` decisions | Shared runtime | Implemented | `DECIDING_HOOK_EVENTS = {PreToolUse, PreCompact, ConfigChange}` | `ConfigChange` currently covers authenticated account settings, not external file edits | PARITY |
-| A hook can **allow** an action the runtime refused | Claude Code (`permissionDecision: "allow"`) | Shared runtime | Different by design | `combine()` accepts only `deny` and `ask` from an authoritative handler | Deliberately absent | **AVOID — see [4.3](#43-a-hook-that-can-grant)** |
-| Turn every hook off | Claude Code `disableAllHooks` | Extensions → Hooks | Implemented | `raiker/hooks/owner_switch.py` — an owner setting, not a fourth config file | — | PARITY |
-| A read-only browser over configured hooks | Claude Code `/hooks` | Extensions → Hooks | Implemented | `GET /api/hooks` | — | PARITY |
+| Lifecycle hook events | external coding assistant documents **31** | Platform-wide | Partial | `HOOK_EVENTS` — **20**, all 20 dispatched | 11 external coding assistant events have no Raiker equivalent: `Setup`, `UserPromptExpansion`, `MessageDisplay`, `TeammateIdle`, `CwdChanged`, `DirectoryAdded`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `Elicitation`, `ElicitationResult`. `ConfigChange` closed as FIXED-304; `Notification`, `PostToolBatch` and `InstructionsLoaded` as FIXED-305, which is every event [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding) assessed as worth adding | PARITY; Raiker's withheld-value/non-vetoable-kill-switch controls and content-free observation payloads are a **YES — improvement** |
+| Handler types | external coding assistant: `command`, `http`, `mcp_tool`, `prompt`, `agent` | Platform-wide | Partial | `HANDLER_TYPES = {command, http, prompt, builtin}` — **four of five** since [FIXED-380](../plans/FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two) | `mcp_tool` and `agent` remain refused: the first would let a hook reach a tool the turn's own policy might have refused, the second needs a multi-turn loop with its own budget and capability set. `builtin` is Raiker's own, not one of the five | PARITY; the advisory-only owner-model `prompt` path and the **named, revocable egress grant** every `http` rule answers to — empty by default, revoking all of them at once, read live by the page — are a **YES — improvement**: the reference gives an `http` hook the host's network, and Raiker gives it a grant the owner can withdraw without editing a rule |
+| Three-level `event → matcher → hooks[]` config with `if` | external coding assistant | Platform-wide | Implemented | `raiker/hooks/matchers.py`, `registry.py` | — | PARITY |
+| A hook can block an action | external coding assistant `PreToolUse` and `ConfigChange` decisions | Shared runtime | Implemented | `DECIDING_HOOK_EVENTS = {PreToolUse, PreCompact, ConfigChange}` | `ConfigChange` currently covers authenticated account settings, not external file edits | PARITY |
+| A hook can **allow** an action the runtime refused | external coding assistant (`permissionDecision: "allow"`) | Shared runtime | Different by design | `combine()` accepts only `deny` and `ask` from an authoritative handler | Deliberately absent | **AVOID — see [4.3](#43-a-hook-that-can-grant)** |
+| Turn every hook off | external coding assistant `disableAllHooks` | Extensions → Hooks | Implemented | `raiker/hooks/owner_switch.py` — an owner setting, not a fourth config file | — | PARITY |
+| A read-only browser over configured hooks | external coding assistant `/hooks` | Extensions → Hooks | Implemented | `GET /api/hooks` | — | PARITY |
 | Saying which rules can actually enforce | None | Extensions → Hooks | Implemented | Per-rule "Can deny or ask" vs "Observes only", derived from the code by test | — | **YES — differentiator** |
 | Naming a malformed config's file, line and column without failing the product | None — the cited reference logs or fails silently | Extensions → Hooks | Implemented | `HooksRegistry.load` | — | **YES — differentiator** |
-| Async hooks that wake the agent on completion | Claude Code `async` / `asyncRewake` | Platform-wide | Proposed | — | Every Raiker handler is synchronous under a bounded timeout | NO — little advantage |
+| Async hooks that wake the agent on completion | external coding assistant `async` / `asyncRewake` | Platform-wide | Proposed | — | Every Raiker handler is synchronous under a bounded timeout | NO — little advantage |
 
 ### 2.6 Extensibility — plugins, skills, MCP, channels
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| A plugin manifest with validation | Claude Code `.claude-plugin/plugin.json` | Extensions → Plugins | Implemented | `raiker/plugins/manifest.py`, `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` | — | PARITY |
-| Plugin-contributed hook rules | Claude Code `hooks/hooks.json` | Extensions → Plugins | Implemented | `raiker/plugins/contributions.py`, `plugin` hook scope below every owner scope | — | **YES — improvement** |
-| Plugin-contributed skills | Claude Code `skills/` — installed **active** | Extensions → Skills | Implemented | Behind `skill:contribute`, installed **inactive**, credited to the plugin | — | **YES — differentiator** |
-| Plugin-contributed MCP servers | Claude Code `.mcp.json` — configured directly | Extensions → MCP | Different by design | `contributes.mcp_servers` produces an **offer**; nothing is a server until the owner adds it | — | **Different — see [3.3](#33-a-plugin-offers-an-mcp-server-it-does-not-add-one)** |
-| Plugin-contributed subagents | Claude Code `agents/` | Extensions → Plugins | Proposed | — | Raiker's subagent is a per-turn bounded read-only contract, not a named installable agent | NO — conflicts |
-| Plugin-contributed LSP servers | Claude Code `.lsp.json` | — | Partial | Manifest field accepted and inert | Raiker has **no language-server surface at all** to contribute to (BUG-227) | NO — little advantage |
-| Plugin-contributed background monitors | Claude Code `monitors/monitors.json` | — | Proposed | — | A monitor is a long-running command whose stdout enters the turn — an execution surface Raiker keeps closed | NO — conflicts |
-| Plugin-contributed executables on `PATH` | Claude Code `bin/` | Extensions → Plugins | Different by design | — | Putting plugin-authored binaries on a command's `PATH` is plugin code execution under another name | **AVOID — see [4.4](#44-plugin-code-on-the-command-path)** |
-| Plugin-contributed themes / output styles | Claude Code `themes/`, `output-styles/` | — | Proposed | — | Raiker's design tokens are product-owned (`docs/architecture/VISUAL_DESIGN_SPEC.md`) | NO — little advantage |
-| Plugin-contributed UI panels | No Claude Code *plugin component* is a panel — but see the row below; the frame has changed | Extensions → Plugins | Proposed | — | Named in Raiker's own `PLUGIN_SYSTEM_SPEC.md`; retired 2026-10-18 as superseded by MCP Apps (row below); plugins do not draw pages | NO — little advantage |
-| Server-contributed interactive UI, sandboxed and permission-gated | Claude, via [MCP Apps / SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp); OpenAI, via the Apps SDK it migrates from | Extensions → MCP | Proposed | — | **Corrected this pass.** A `ui://` resource is pre-declared, linked to a tool by metadata, rendered in a mandatory sandboxed iframe, and talks to the host over MCP's own JSON-RPC — so the host can prefetch, cache and security-review it before anything runs, and every message is auditable. That contract fits Raiker's model far better than a plugin-drawn page: the server is already governed, the surface is already sandboxed, and the traffic is already the shape the audit log records. Raiker's MCP client cannot reach it while pinned to `2024-11-05` | **YES — improvement** |
-| A plugin marketplace or directory | Claude Code (`claude-plugins-official`, `claude-community`), Cowork Customize | Extensions → Plugins | Different by design | Install from a path or URL with a reviewed permission diff | — | **Different — see [3.4](#34-a-reviewed-permission-diff-instead-of-a-marketplace)** |
-| Manifest authorship verification | Claude Code and Codex verify MCP transport, not manifest authorship | Extensions → Plugins | Implemented | HMAC / Ed25519 with `verified` / `present only` / `unsigned` stated either way | Default install verifies checksums only, and says so | **YES — differentiator** |
+| A plugin manifest with validation | external coding assistant `agent-plugin/plugin.json` | Extensions → Plugins | Implemented | `raiker/plugins/manifest.py`, `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` | — | PARITY |
+| Plugin-contributed hook rules | external coding assistant `hooks/hooks.json` | Extensions → Plugins | Implemented | `raiker/plugins/contributions.py`, `plugin` hook scope below every owner scope | — | **YES — improvement** |
+| Plugin-contributed skills | external coding assistant `skills/` — installed **active** | Extensions → Skills | Implemented | Behind `skill:contribute`, installed **inactive**, credited to the plugin | — | **YES — differentiator** |
+| Plugin-contributed MCP servers | external coding assistant `.mcp.json` — configured directly | Extensions → MCP | Different by design | `contributes.mcp_servers` produces an **offer**; nothing is a server until the owner adds it | — | **Different — see [3.3](#33-a-plugin-offers-an-mcp-server-it-does-not-add-one)** |
+| Plugin-contributed subagents | external coding assistant `agents/` | Extensions → Plugins | Proposed | — | Raiker's subagent is a per-turn bounded read-only contract, not a named installable agent | NO — conflicts |
+| Plugin-contributed LSP servers | external coding assistant `.lsp.json` | — | Partial | Manifest field accepted and inert | Raiker has **no language-server surface at all** to contribute to (BUG-227) | NO — little advantage |
+| Plugin-contributed background monitors | external coding assistant `monitors/monitors.json` | — | Proposed | — | A monitor is a long-running command whose stdout enters the turn — an execution surface Raiker keeps closed | NO — conflicts |
+| Plugin-contributed executables on `PATH` | external coding assistant `bin/` | Extensions → Plugins | Different by design | — | Putting plugin-authored binaries on a command's `PATH` is plugin code execution under another name | **AVOID — see [4.4](#44-plugin-code-on-the-command-path)** |
+| Plugin-contributed themes / output styles | external coding assistant `themes/`, `output-styles/` | — | Proposed | — | Raiker's design tokens are product-owned (`docs/architecture/VISUAL_DESIGN_SPEC.md`) | NO — little advantage |
+| Plugin-contributed UI panels | No external coding assistant *plugin component* is a panel — but see the row below; the frame has changed | Extensions → Plugins | Proposed | — | Named in Raiker's own `PLUGIN_SYSTEM_SPEC.md`; retired 2026-10-18 as superseded by MCP Apps (row below); plugins do not draw pages | NO — little advantage |
+| Server-contributed interactive UI, sandboxed and permission-gated | the Anthropic assistant, via [MCP Apps / SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp); OpenAI, via the Apps SDK it migrates from | Extensions → MCP | Proposed | — | **Corrected this pass.** A `ui://` resource is pre-declared, linked to a tool by metadata, rendered in a mandatory sandboxed iframe, and talks to the host over MCP's own JSON-RPC — so the host can prefetch, cache and security-review it before anything runs, and every message is auditable. That contract fits Raiker's model far better than a plugin-drawn page: the server is already governed, the surface is already sandboxed, and the traffic is already the shape the audit log records. Raiker's MCP client cannot reach it while pinned to `2024-11-05` | **YES — improvement** |
+| A plugin marketplace or directory | external coding assistant (external plugin directories), external workspace assistant Customize | Extensions → Plugins | Different by design | Install from a path or URL with a reviewed permission diff | — | **Different — see [3.4](#34-a-reviewed-permission-diff-instead-of-a-marketplace)** |
+| Manifest authorship verification | external coding assistant and local subscription client verify MCP transport, not manifest authorship | Extensions → Plugins | Implemented | HMAC / Ed25519 with `verified` / `present only` / `unsigned` stated either way | Default install verifies checksums only, and says so | **YES — differentiator** |
 | Revocation removes what a plugin contributed | Not established by cited source | Extensions → Plugins | Implemented | Contributions are deleted, not flagged | — | **YES — improvement** |
-| Owner-authored skills as Markdown | Claude Code `SKILL.md`, Cowork, Hermes | Extensions → Skills | Implemented | `raiker/skills/`, six built-ins installed on first visit | — | PARITY |
+| Owner-authored skills as Markdown | external coding assistant `SKILL.md`, external workspace assistant, reference platform | Extensions → Skills | Implemented | `raiker/skills/`, six built-ins installed on first visit | — | PARITY |
 | Conformance to the **Agent Skills** open standard | All seven reference platforms, plus 40+ other products ([agentskills.io](https://agentskills.io)) | Extensions → Skills | Implemented | `raiker/skills/conformance.py` — every installed skill is measured against the [specification](https://agentskills.io/specification) on read and the answer is on its card; `raiker/skills/package.py` parses the nested `metadata:` map, `license` and `compatibility` | **Closed 2026-08-24.** Raiker's reader stays a *superset* deliberately — a skill that installed before keeps installing, and is now **told** where it diverges rather than refused. All six built-ins were brought to conformance (their `version:` moved under `metadata:`, one description trimmed under the 1024 cap). `allowed-tools` is the divergence Raiker keeps: parsed, listed on the card, and explicitly not honoured | **YES — improvement.** Everyone implements the format; what is beyond parity is being the implementation that refuses the execution parts, says so against a named standard, and reports rather than refuses |
-| A skill grants no capability and ships no runnable code | Claude Code skills can invoke tools and spawn forks | Extensions → Skills | Different by design | `skill_load` returns instructions only; Raiker runs nothing a skill ships | — | **Different — see [3.5](#35-a-skill-is-instruction-only)** |
-| Progressive skill loading (index first, body on demand) | Claude Code | Shared runtime | Implemented | Skill index in system context; bodies via `skill_load` | — | PARITY |
-| Autonomous skill creation from experience | Hermes | Extensions → Skills | Proposed | `docs/architecture/SELF_IMPROVEMENT_MODEL.md` is specification only | A self-authored skill needs a zero-trust review gate (ADD-06) | **YES — improvement** |
-| MCP client over stdio | Claude Code, Codex, Cowork | Extensions → MCP | Implemented | `raiker/runtime/executors/mcp.py`, interpreter allowlist, workspace-relative paths | — | PARITY |
-| MCP client over remote transport | Claude Code, Codex, Cowork | Extensions → MCP | Implemented | `http` transport with owner-added URL and optional token; monitored, not allowlist-blocked. Conformant since [FIXED-378](../plans/FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport): `Accept` offers both framings (a conformant server may answer **406** without it), the `Mcp-Session-Id` is carried and released with `DELETE`, an expired session re-handshakes once, and a `401` with `WWW-Authenticate` is named as the OAuth requirement it is Extended 2026-09-05 ([FIXED-411](../plans/FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](../plans/FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)): the wire is bidirectional, so a server-initiated request is answered rather than filed as the answer to Raiker's own — `ping` with a result, everything else with `-32601`, because Raiker declares no client capabilities — and the event stream has a real parser, so an event whose payload spans several `data:` lines is rejoined and `Last-Event-ID` carries the one re-handshake | No OAuth flow; a `text/event-stream` answer is still read whole rather than incrementally, and no connection is held between turns | PARITY; **naming** what a server offers and Raiker does not use, on the server's own card, is a **YES — differentiator**: the compared clients degrade silently. Naming what a server *asked Raiker to do* and was refused — an `elicitation/create`, a `sampling/createMessage` — is the same differentiator applied to the other direction of the wire |
-| Current MCP protocol revision | Claude Code, Codex, Cowork track the spec | Extensions → MCP | Implemented | `MCP_PROTOCOL_VERSION = "2026-07-28"` with three older revisions accepted (FIXED-274); the negotiated revision is stated on each server's card | `server/discover` is not used and MCP Apps is carried as [ADD-24](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md); structured output and resource links landed as [FIXED-387](../plans/FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six). Elicitation now **reaches Raiker as the request it is** and is refused with a reason on the card ([FIXED-411](../plans/FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)); wiring it to a person still needs an answer to *whose* question a connected server's is. Each is **named on the card of a server that offers it** rather than implied by silence | PARITY |
-| MCP tool search to bound context cost | Claude Code | Shared runtime | Implemented | [FIXED-377](../plans/FIXED_ITEMS.md#fixed-377--a-projected-mcp-tool-had-no-arguments) — the projected catalogue is carried whole while it fits a measured budget and deferred whole when it does not, named in `tool_search`'s index either way | — | **YES — improvement.** All-or-nothing per catalogue, because carrying half of one server's tools would leave the model unable to tell which of them it can see typed |
-| A projected MCP tool carries the server's declared `inputSchema` | Claude Code, Codex, Cowork pass it through | Shared runtime | Implemented | [FIXED-377](../plans/FIXED_ITEMS.md#fixed-377--a-projected-mcp-tool-had-no-arguments) — stored at handshake, projected as the shape of the `arguments` object, and shown per tool on the server card | — | **YES — improvement.** Passing it through is parity; bounding depth, size and keywords before an outside program's text enters the model's tool catalogue, refusing a `$ref` that points outside its own document, and framing the server's sentence as the server's, is not |
+| A skill grants no capability and ships no runnable code | external coding assistant skills can invoke tools and spawn forks | Extensions → Skills | Different by design | `skill_load` returns instructions only; Raiker runs nothing a skill ships | — | **Different — see [3.5](#35-a-skill-is-instruction-only)** |
+| Progressive skill loading (index first, body on demand) | external coding assistant | Shared runtime | Implemented | Skill index in system context; bodies via `skill_load` | — | PARITY |
+| Autonomous skill creation from experience | reference platform | Extensions → Skills | Proposed | `docs/architecture/SELF_IMPROVEMENT_MODEL.md` is specification only | A self-authored skill needs a zero-trust review gate (ADD-06) | **YES — improvement** |
+| MCP client over stdio | external coding assistant, local subscription client, external workspace assistant | Extensions → MCP | Implemented | `raiker/runtime/executors/mcp.py`, interpreter allowlist, workspace-relative paths | — | PARITY |
+| MCP client over remote transport | external coding assistant, local subscription client, external workspace assistant | Extensions → MCP | Implemented | `http` transport with owner-added URL and optional token; monitored, not allowlist-blocked. Conformant since [FIXED-378](../plans/FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport): `Accept` offers both framings (a conformant server may answer **406** without it), the `Mcp-Session-Id` is carried and released with `DELETE`, an expired session re-handshakes once, and a `401` with `WWW-Authenticate` is named as the OAuth requirement it is Extended 2026-09-05 ([FIXED-411](../plans/FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own), [FIXED-412](../plans/FIXED_ITEMS.md#fixed-412--an-event-stream-was-read-one-line-at-a-time-and-the-rest-was-dropped)): the wire is bidirectional, so a server-initiated request is answered rather than filed as the answer to Raiker's own — `ping` with a result, everything else with `-32601`, because Raiker declares no client capabilities — and the event stream has a real parser, so an event whose payload spans several `data:` lines is rejoined and `Last-Event-ID` carries the one re-handshake | No OAuth flow; a `text/event-stream` answer is still read whole rather than incrementally, and no connection is held between turns | PARITY; **naming** what a server offers and Raiker does not use, on the server's own card, is a **YES — differentiator**: the compared clients degrade silently. Naming what a server *asked Raiker to do* and was refused — an `elicitation/create`, a `sampling/createMessage` — is the same differentiator applied to the other direction of the wire |
+| Current MCP protocol revision | external coding assistant, local subscription client, external workspace assistant track the spec | Extensions → MCP | Implemented | `MCP_PROTOCOL_VERSION = "2026-07-28"` with three older revisions accepted (FIXED-274); the negotiated revision is stated on each server's card | `server/discover` is not used and MCP Apps is carried as [ADD-24](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md); structured output and resource links landed as [FIXED-387](../plans/FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six). Elicitation now **reaches Raiker as the request it is** and is refused with a reason on the card ([FIXED-411](../plans/FIXED_ITEMS.md#fixed-411--a-server-initiated-request-was-filed-as-the-answer-to-raikers-own)); wiring it to a person still needs an answer to *whose* question a connected server's is. Each is **named on the card of a server that offers it** rather than implied by silence | PARITY |
+| MCP tool search to bound context cost | external coding assistant | Shared runtime | Implemented | [FIXED-377](../plans/FIXED_ITEMS.md#fixed-377--a-projected-mcp-tool-had-no-arguments) — the projected catalogue is carried whole while it fits a measured budget and deferred whole when it does not, named in `tool_search`'s index either way | — | **YES — improvement.** All-or-nothing per catalogue, because carrying half of one server's tools would leave the model unable to tell which of them it can see typed |
+| A projected MCP tool carries the server's declared `inputSchema` | external coding assistant, local subscription client, external workspace assistant pass it through | Shared runtime | Implemented | [FIXED-377](../plans/FIXED_ITEMS.md#fixed-377--a-projected-mcp-tool-had-no-arguments) — stored at handshake, projected as the shape of the `arguments` object, and shown per tool on the server card | — | **YES — improvement.** Passing it through is parity; bounding depth, size and keywords before an outside program's text enters the model's tool catalogue, refusing a `$ref` that points outside its own document, and framing the server's sentence as the server's, is not |
 | Building an MCP server from the product | Not established by cited source | Extensions → MCP | Implemented | `McpBuilderExecutor`, reviewed dependency-free templates | — | **YES — differentiator** |
-| Inbound channels from external messaging surfaces | OpenClaw, Hermes (27+ surfaces) | Extensions → Channels | Implemented | Pairing, enable switch, sender allowlist, inbound secret, 60/min per sender, signed outbound, owner-stored routing, exact single-use approval response | Connector-specific attachment ingestion remains a connector concern, not a routing gap | PARITY |
-| A channel message can never raise a turn's authority | Not established by cited source — OpenClaw frames channel input as guidance to the model | Shared runtime | Implemented | Untrusted content with a named sender; trust from the pairing record | — | **YES — differentiator** |
+| Inbound channels from external messaging surfaces | reference platform, reference platform (27+ surfaces) | Extensions → Channels | Implemented | Pairing, enable switch, sender allowlist, inbound secret, 60/min per sender, signed outbound, owner-stored routing, exact single-use approval response | Connector-specific attachment ingestion remains a connector concern, not a routing gap | PARITY |
+| A channel message can never raise a turn's authority | Not established by cited source — reference platform frames channel input as guidance to the model | Shared runtime | Implemented | Untrusted content with a named sender; trust from the pairing record | — | **YES — differentiator** |
 | Separating linked / enabled / trusted / reachable | None — a connector is configured and then it works | Extensions → Channels | Implemented | Four stored facts, four remedies, four rows | — | **YES — differentiator** |
 
 ### 2.7 Memory and context
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Durable memory across sessions | ChatGPT, Cowork, Hermes | Memory | Implemented | `raiker/memory/store.py`; `memory_write` / `memory_forget` behind their own gate, **off** by default | — | PARITY |
+| Durable memory across sessions | ChatGPT, external workspace assistant, reference platform | Memory | Implemented | `raiker/memory/store.py`; `memory_write` / `memory_forget` behind their own gate, **off** by default | — | PARITY |
 | A memory write is a reviewed proposal, not a side effect | None — reference products write memories automatically | Memory | Implemented | Exact text shown; credential-like text refused before the decision | — | **YES — differentiator** |
-| Semantic retrieval by meaning | ChatGPT, Cowork, Hermes (Honcho, Mem0, and other providers) | Memory | Implemented | Named provider or local `llama.cpp` spaces; one governed query embedding is shared by ambient and explicit recall; managed-file chunks carry revision-bound projections | — | **YES — improvement.** Provider/local choice, deny-safe lexical fallback, secret exclusion, exact retrieval legs and revision provenance are one control contract |
+| Semantic retrieval by meaning | ChatGPT, external workspace assistant, reference platform (Honcho, Mem0, and other providers) | Memory | Implemented | Named provider or local `llama.cpp` spaces; one governed query embedding is shared by ambient and explicit recall; managed-file chunks carry revision-bound projections | — | **YES — improvement.** Provider/local choice, deny-safe lexical fallback, secret exclusion, exact retrieval legs and revision provenance are one control contract |
 | Lexical retrieval ranked by relevance | All | Memory, Search Chat | Implemented | FTS5 + `bm25()`, with an honest FTS4/recency fallback reported on `/api/health` | — | PARITY |
-| Approximate-nearest-neighbour vector index | ChatGPT, Cowork, Hermes memory providers | Memory | Implemented | Revision-checked process-local LSH candidate index, with exact cosine ranking below 512 vectors and exact re-ranking after approximate lookup | — | PARITY |
-| Which memories shaped **this** answer, correctable there | ChatGPT and Cowork surface memory on their own page; none names the sentences one answer used | Chat | Implemented | `turn_recalls` + `GET /api/sessions/{id}/recall`; `RecallStrip.svelte` reads them live, so a corrected memory never shows a stale copy | — | **YES — differentiator** |
+| Approximate-nearest-neighbour vector index | ChatGPT, external workspace assistant, reference platform memory providers | Memory | Implemented | Revision-checked process-local LSH candidate index, with exact cosine ranking below 512 vectors and exact re-ranking after approximate lookup | — | PARITY |
+| Which memories shaped **this** answer, correctable there | ChatGPT and external workspace assistant surface memory on their own page; none names the sentences one answer used | Chat | Implemented | `turn_recalls` + `GET /api/sessions/{id}/recall`; `RecallStrip.svelte` reads them live, so a corrected memory never shows a stale copy | — | **YES — differentiator** |
 | A rebuildable index can be checked and repaired by the owner | None expose index health at all | Observability → Diagnostics | Implemented | `inspect_memory_integrity` over the text, projection, graph and conversation indexes; the one repair is offered beside the drift it repairs | — | **YES — differentiator** |
 | Retrieval says how each hit was found | None | Memory | Implemented | Per-hit `lexical` / `vector` / `graph` legs; the reply names the embedding space | — | **YES — differentiator** |
-| A knowledge graph the model can traverse | Cowork, Hermes | Memory, Knowledge Map | Implemented | `knowledge_graph` tool: `entities`, `neighbors`, gated on `graph_indexing_runtime` | — | PARITY |
+| A knowledge graph the model can traverse | external workspace assistant, reference platform | Memory, Knowledge Map | Implemented | `knowledge_graph` tool: `entities`, `neighbors`, gated on `graph_indexing_runtime` | — | PARITY |
 | Every graph edge names its evidence | None | Memory | Implemented | Each edge carries the approved memory that evidences it; archiving the evidence removes the edge | — | **YES — differentiator** |
 | Capturing what a tool returned | All keep the tool output verbatim | Memory → Observations | Different by design | `eidetic_observations` stores summary, checksum, byte count, retention class — never the material | — | **Different — see [3.6](#36-an-observation-that-is-metadata-by-construction)** |
-| Automatic context compaction | Claude Code, ChatGPT, Codex | Chat, Build | Implemented | Compaction at 90% of a known capacity; transcript unchanged | — | PARITY |
-| Owner-guided summarisation of a chosen range | Claude Code (`Summarize from here` / `up to here`) | Chat | Implemented | `POST /api/sessions/{id}/compact`, **Summarise up to here** on any owner message | — | **YES — improvement.** The owner's route and the threshold share one summarise-and-record step, so `PreCompact` decides on both and neither can be the half that skipped it |
-| Always-on project instructions | Claude Code `CLAUDE.md` and `.claude/rules/`, Codex `AGENTS.md` | Projects | Different by design | Project instructions are governed owner records in the encrypted store, not a repository file | A repository-supplied instruction file would be untrusted content granting standing context | **Different — see [3.7](#37-project-instructions-are-owner-records-not-repository-files)** |
-| Path-scoped rules that load with matching files | Claude Code `.claude/rules/` `paths` frontmatter | Projects | Proposed | — | Project instructions are whole-project | NO — little advantage |
+| Automatic context compaction | external coding assistant, ChatGPT, local subscription client | Chat, Build | Implemented | Compaction at 90% of a known capacity; transcript unchanged | — | PARITY |
+| Owner-guided summarisation of a chosen range | external coding assistant (`Summarize from here` / `up to here`) | Chat | Implemented | `POST /api/sessions/{id}/compact`, **Summarise up to here** on any owner message | — | **YES — improvement.** The owner's route and the threshold share one summarise-and-record step, so `PreCompact` decides on both and neither can be the half that skipped it |
+| Always-on project instructions | external coding assistant `PROJECT_RULES.md` and `project-rules/`, local subscription client `AGENTS.md` | Projects | Different by design | Project instructions are governed owner records in the encrypted store, not a repository file | A repository-supplied instruction file would be untrusted content granting standing context | **Different — see [3.7](#37-project-instructions-are-owner-records-not-repository-files)** |
+| Path-scoped rules that load with matching files | external coding assistant `project-rules/` `paths` frontmatter | Projects | Proposed | — | Project instructions are whole-project | NO — little advantage |
 | A retention sweep that runs by itself | ChatGPT | Memory | Partial | `expires_at` is computed and stored, enforced at read time | No sweep; cleanup is owner-confirmed (MEM-07) | PARITY |
-| Memory import / export | Claude (memory import/export) | Memory | Implemented (undocumented) | `GET /api/memory/export`, `POST /api/memory/import` (`raiker/api/routes_memory.py`), surfaced in the Memory view | Found during this reconciliation: the capability shipped and no document said so | PARITY |
+| Memory import / export | the Anthropic assistant (memory import/export) | Memory | Implemented (undocumented) | `GET /api/memory/export`, `POST /api/memory/import` (`raiker/api/routes_memory.py`), surfaced in the Memory view | Found during this reconciliation: the capability shipped and no document said so | PARITY |
 
 ### 2.8 Coding agent — Raiker Build
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Read, search, glob and stat over a workspace | Claude Code, Codex, OpenClaw, Hermes | Build | Implemented | `raiker/tools/filesystem.py` | — | PARITY |
-| Unified-diff patching as one reversible change set | Claude Code, Codex | Build | Implemented | `apply_patch`; one approval, one change set, no partial application | — | PARITY |
+| Read, search, glob and stat over a workspace | external coding assistant, local subscription client, reference platform, reference platform | Build | Implemented | `raiker/tools/filesystem.py` | — | PARITY |
+| Unified-diff patching as one reversible change set | external coding assistant, local subscription client | Build | Implemented | `apply_patch`; one approval, one change set, no partial application | — | PARITY |
 | Whitespace-tolerant, uniqueness-strict matching | Not established by cited source | Build | Implemented | Exact first, then trailing-whitespace/indentation-insensitive; two matches is a refusal | — | **YES — improvement** |
-| Reviewing the diff where the change was proposed | Claude Code, Codex | Build | Implemented | `DiffView.svelte` renders the same governed `GET /api/approvals/{id}` preview inline beside Accept/Reject; Approvals uses the same component | No per-hunk accept and no edit-then-accept: the runtime has no such decision to record ([B14](../plans/BUILD_WORKSPACE_SPEC.md)) | PARITY |
+| Reviewing the diff where the change was proposed | external coding assistant, local subscription client | Build | Implemented | `DiffView.svelte` renders the same governed `GET /api/approvals/{id}` preview inline beside Accept/Reject; Approvals uses the same component | No per-hunk accept and no edit-then-accept: the runtime has no such decision to record ([B14](../plans/BUILD_WORKSPACE_SPEC.md)) | PARITY |
 | A conversation survives a reload of the page | All | Chat, Build | Implemented | The session rides in the URL (`sessionRoute.ts`) and both surfaces restore turns, tool rows, retained working and attachment chips | — | PARITY |
-| Checkpoint before an edit | Claude Code | Shared runtime | Implemented | `raiker/checkpoints/capture.py` — pre-image before every approved mutation | — | PARITY |
-| Rewind the workspace to a checkpoint | Claude Code `/rewind` | Observability → Checkpoints | Partial | `CheckpointRestoreExecutor` exists, is registered and is tested; the CLI and web surfaces show a **restore preflight only** | No route, command or tool proposes a restore, so an owner cannot actually rewind | **PARITY** |
-| Rewind the conversation as well as the code | Claude Code (`Restore conversation` / `Restore code` / both) | Chat, Build | Partial | Branching seeds a new conversation from a checkpoint | No in-place conversation rewind | PARITY |
-| Branch a conversation from a chosen point | ChatGPT, Claude, Claude Code `/branch` | Chat | Implemented | `POST /api/checkpoints/{id}/branch`, branch-origin lineage band | — | **YES — improvement** |
-| Repository symbol index / code intelligence | Claude Code LSP plugins, Codex | Build | Partial | `raiker/graph/codemap_service.py`: real parser for Python, bounded patterns for 15 more languages | Textual `find references`; no resolved call graph, no LSP | PARITY |
+| Checkpoint before an edit | external coding assistant | Shared runtime | Implemented | `raiker/checkpoints/capture.py` — pre-image before every approved mutation | — | PARITY |
+| Rewind the workspace to a checkpoint | external coding assistant `/rewind` | Observability → Checkpoints | Partial | `CheckpointRestoreExecutor` exists, is registered and is tested; the CLI and web surfaces show a **restore preflight only** | No route, command or tool proposes a restore, so an owner cannot actually rewind | **PARITY** |
+| Rewind the conversation as well as the code | external coding assistant (`Restore conversation` / `Restore code` / both) | Chat, Build | Partial | Branching seeds a new conversation from a checkpoint | No in-place conversation rewind | PARITY |
+| Branch a conversation from a chosen point | ChatGPT, the Anthropic assistant, external coding assistant `/branch` | Chat | Implemented | `POST /api/checkpoints/{id}/branch`, branch-origin lineage band | — | **YES — improvement** |
+| Repository symbol index / code intelligence | external coding assistant LSP plugins, local subscription client | Build | Partial | `raiker/graph/codemap_service.py`: real parser for Python, bounded patterns for 15 more languages | Textual `find references`; no resolved call graph, no LSP | PARITY |
 | Git read commands | All | Build | Implemented | `git_status`, `git_diff`, `git_log` | — | PARITY |
-| Governed git write and push | Claude Code, Codex | Build | Implemented | `git_branch`, `git_commit`, `git_push` with its own gate, egress allowlist and lent credential | HTTPS GitHub remotes only; never force, never delete | **YES — improvement** |
-| Worktrees for parallel work | Claude Code (`WorktreeCreate`/`Remove`); Mux, Emdash and other agents isolate each agent in its own worktree | Build | Proposed | — | One workspace per Build session. Raiker's answer to the same need is a checkpoint plus a single reversible change set, which is stronger for *undo* and weaker for *parallelism* | NO — little advantage |
+| Governed git write and push | external coding assistant, local subscription client | Build | Implemented | `git_branch`, `git_commit`, `git_push` with its own gate, egress allowlist and lent credential | HTTPS GitHub remotes only; never force, never delete | **YES — improvement** |
+| Worktrees for parallel work | external coding assistant (`WorktreeCreate`/`Remove`); Mux, Emdash and other agents isolate each agent in its own worktree | Build | Proposed | — | One workspace per Build session. Raiker's answer to the same need is a checkpoint plus a single reversible change set, which is stronger for *undo* and weaker for *parallelism* | NO — little advantage |
 | An operating protocol carried by the coding turn | Not established by cited source | Build | Implemented | `docs/architecture/RAIKER_BUILD_PROCESS.md`; the surface is written into the audit record | — | **YES — differentiator** |
-| Code review as a first-class action | Claude Code `/code-review` | Build, CLI | Implemented | `/review` with severity filters and saved proposals; `code-review` built-in skill | — | PARITY |
-| Publishing session output as a shareable page | Claude Code Artifacts | — | N/A | — | Publishing to a hosted page is egress of workspace content by default | **NO — conflicts** |
+| Code review as a first-class action | external coding assistant `/code-review` | Build, CLI | Implemented | `/review` with severity filters and saved proposals; `code-review` built-in skill | — | PARITY |
+| Publishing session output as a shareable page | external coding assistant Artifacts | — | N/A | — | Publishing to a hosted page is egress of workspace content by default | **NO — conflicts** |
 
 ### 2.9 Assistant — Raiker Chat
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
 | Streamed conversation with Markdown rendering | All | Chat | Implemented | `ChatView.svelte`, sanitised Markdown | — | PARITY |
-| Image and document attachments | ChatGPT, Claude, Cowork | Chat, Build | Implemented | `raiker/runtime/attachments.py`, governed attachment store | — | PARITY |
-| Search across conversation history | ChatGPT, Claude, Cowork | Search Chat | Implemented | FTS5 index over titles and message bodies, showing the matched exchange | — | PARITY |
-| The model can search past conversations itself | ChatGPT, Cowork | Chat, Build | Implemented | `conversation_search`, date-narrowed, returning conversation/timestamp/turn id | — | PARITY |
+| Image and document attachments | ChatGPT, the Anthropic assistant, external workspace assistant | Chat, Build | Implemented | `raiker/runtime/attachments.py`, governed attachment store | — | PARITY |
+| Search across conversation history | ChatGPT, the Anthropic assistant, external workspace assistant | Search Chat | Implemented | FTS5 index over titles and message bodies, showing the matched exchange | — | PARITY |
+| The model can search past conversations itself | ChatGPT, external workspace assistant | Chat, Build | Implemented | `conversation_search`, date-narrowed, returning conversation/timestamp/turn id | — | PARITY |
 | The model's search and the runtime's recall agree | None — most have one path | Shared runtime | Implemented | Both call `retrieve_hybrid_memory`; asserted by test (MEM-11) | — | **YES — differentiator** |
 | An incognito path that writes nothing | ChatGPT temporary chat | Chat | Implemented | Incognito switches the recall path off | — | PARITY |
-| Export a conversation | ChatGPT, Claude | Chat | Implemented | HTML, Markdown or PDF; reasoning excluded by construction | — | **YES — improvement** |
-| Projects as named scopes | ChatGPT Projects, Claude Projects, Cowork Projects | Projects | Implemented | Project instructions, shared attachments, per-project sessions | — | PARITY |
+| Export a conversation | ChatGPT, the Anthropic assistant | Chat | Implemented | HTML, Markdown or PDF; reasoning excluded by construction | — | **YES — improvement** |
+| Projects as named scopes | ChatGPT Projects, the Anthropic assistant Projects, external workspace assistant Projects | Projects | Implemented | Project instructions, shared attachments, per-project sessions | — | PARITY |
 | Citations resolved against what was read | Partially — reference products cite sources | Chat, Knowledge Map | Implemented | Reference graph records the contributed text; a deleted source is reported missing, not dropped | — | **YES — differentiator** |
-| Voice input | ChatGPT, Claude | Chat, Build | Implemented | Dictation into the editable draft; Done never sends; no audio stored | — | **YES — improvement** |
+| Voice input | ChatGPT, the Anthropic assistant | Chat, Build | Implemented | Dictation into the editable draft; Done never sends; no audio stored | — | **YES — improvement** |
 | Dictation that never leaves the device | None — every compared platform transcribes off the machine | Models → Local | Implemented | A loopback transcription runtime the owner points Raiker at, refused if the address is not on this machine; the disclosure under the microphone states which runtime is in use | — | **YES — differentiator** |
-| Full-duplex live voice with interruption | ChatGPT, Claude | Chat | Proposed | — | Turn-based only, by decision | PARITY |
-| Read a reply aloud | ChatGPT, Claude | Chat | Implemented | Manual playback; code bodies and raw URLs excluded | — | PARITY |
-| Computer use / desktop control | Cowork, ChatGPT agent mode | — | N/A | — | Screen and input control is a capability class with no governed executor and no threat model here | **NO — conflicts** |
-| Governed **browser** control, distinct from computer use | Cowork via [Claude in Chrome](https://claude.com/docs/cowork/overview); Hermes via CDP and cloud backends | — | Proposed | — | A headless browser driven through a named tool set is a far narrower surface than screen and input control: destinations answer to the same address guard `web_fetch` uses, page text arrives through the same sanitiser, and every navigation is a governed action. Raiker has neither, and conflates the two today | **YES — improvement** |
+| Full-duplex live voice with interruption | ChatGPT, the Anthropic assistant | Chat | Proposed | — | Turn-based only, by decision | PARITY |
+| Read a reply aloud | ChatGPT, the Anthropic assistant | Chat | Implemented | Manual playback; code bodies and raw URLs excluded | — | PARITY |
+| Computer use / desktop control | external workspace assistant, ChatGPT agent mode | — | N/A | — | Screen and input control is a capability class with no governed executor and no threat model here | **NO — conflicts** |
+| Governed **browser** control, distinct from computer use | external workspace assistant via the Anthropic assistant in Chrome; reference platform via CDP and cloud backends | — | Proposed | — | A headless browser driven through a named tool set is a far narrower surface than screen and input control: destinations answer to the same address guard `web_fetch` uses, page text arrives through the same sanitiser, and every navigation is a governed action. Raiker has neither, and conflates the two today | **YES — improvement** |
 
 ### 2.10 Tasks, schedules and background work
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Delegate work that outlives the turn | Cowork Tasks, ChatGPT agent mode | Tasks | Implemented | `raiker/tasks/manager.py` | — | PARITY |
-| A recurring schedule | Cowork Routines, ChatGPT automations, Hermes cron | Tasks | Partial | Four named cadences (`continuous`, `hourly`, `daily`, `weekly`) | No time-of-day, no cron expression, no timezone binding, no one-shot | PARITY |
-| A schedule that fires while the host is closed | Cowork (hosted), ChatGPT | Tasks | Partial | The 15-second tick lives in the FastAPI lifespan | A closed laptop is a missed cadence, recorded honestly | **N/A for a local-first product** |
+| Delegate work that outlives the turn | external workspace assistant Tasks, ChatGPT agent mode | Tasks | Implemented | `raiker/tasks/manager.py` | — | PARITY |
+| A recurring schedule | external workspace assistant Routines, ChatGPT automations, reference platform cron | Tasks | Partial | Four named cadences (`continuous`, `hourly`, `daily`, `weekly`) | No time-of-day, no cron expression, no timezone binding, no one-shot | PARITY |
+| A schedule that fires while the host is closed | external workspace assistant (hosted), ChatGPT | Tasks | Partial | The 15-second tick lives in the FastAPI lifespan | A closed laptop is a missed cadence, recorded honestly | **N/A for a local-first product** |
 | A parked run reads as blocked, not failed | Not established by cited source | Tasks | Implemented | `task_blocked` with the reason and a link to the decision | — | **YES — improvement** |
 | One cycle is one governed turn | Not established by cited source | Shared runtime | Implemented | Every cycle passes policy, gates and approvals like a typed prompt | — | **YES — differentiator** |
-| Notifying the owner when background work finishes | Cowork, ChatGPT | Observability → Notifications | Partial | Notification records exist | No outbound push; a finished cycle updates the view and the log | PARITY |
-| Nested / delegated task ownership | Cowork [Dispatch](https://claude.com/docs/cowork/guide/dispatch) | Tasks | Implemented | [FIXED-286](../plans/FIXED_ITEMS.md) — a parent parks as `waiting_for_children` and settles on the last one | — | PARITY; nothing is inherited downward, so a child carries its own approvals — a **YES — improvement** over a parent decision standing in for its children's |
-| A delegating agent that routes a child task to the right **surface** | Cowork Dispatch — coding work to Code, knowledge work to Cowork | Tasks, Chat, Build | Implemented | [FIXED-381](../plans/FIXED_ITEMS.md#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) — a task carries a surface, the scheduler puts it in the cycle's prompt, and a delegating turn's `create_task` sets it per child | A Build task needs a project and is refused without one rather than run as Chat | **YES — improvement.** The routing is parity; deriving the parent from the thread the turn runs in rather than trusting a `parent_task_id` from the model, and **refusing Dispatch's ten-minute auto-deny** — a decision nobody made is not a decision — is not |
-| An unanswered permission prompt auto-denies and the task continues | Cowork Dispatch — ten minutes, then denied | Approvals | Different by design | Raiker **parks** the turn (`turn_suspended_for_approval`) and resumes it when the owner decides; `dont_ask` declines immediately and records `denied_no_one_to_ask` | Raiker never silently continues past a decision it did not get. A timeout that proceeds without the action produces a turn whose result depends on how fast someone read a notification | **AVOID** |
-| Remote sessions that continue server-side | Cowork remote sessions | — | N/A | — | Raiker runs on the owner's machine by construction | **NO — conflicts** |
+| Notifying the owner when background work finishes | external workspace assistant, ChatGPT | Observability → Notifications | Partial | Notification records exist | No outbound push; a finished cycle updates the view and the log | PARITY |
+| Nested / delegated task ownership | external workspace assistant Dispatch | Tasks | Implemented | [FIXED-286](../plans/FIXED_ITEMS.md) — a parent parks as `waiting_for_children` and settles on the last one | — | PARITY; nothing is inherited downward, so a child carries its own approvals — a **YES — improvement** over a parent decision standing in for its children's |
+| A delegating agent that routes a child task to the right **surface** | external workspace assistant Dispatch — coding work to Code, knowledge work to external workspace assistant | Tasks, Chat, Build | Implemented | [FIXED-381](../plans/FIXED_ITEMS.md#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) — a task carries a surface, the scheduler puts it in the cycle's prompt, and a delegating turn's `create_task` sets it per child | A Build task needs a project and is refused without one rather than run as Chat | **YES — improvement.** The routing is parity; deriving the parent from the thread the turn runs in rather than trusting a `parent_task_id` from the model, and **refusing Dispatch's ten-minute auto-deny** — a decision nobody made is not a decision — is not |
+| An unanswered permission prompt auto-denies and the task continues | external workspace assistant Dispatch — ten minutes, then denied | Approvals | Different by design | Raiker **parks** the turn (`turn_suspended_for_approval`) and resumes it when the owner decides; `dont_ask` declines immediately and records `denied_no_one_to_ask` | Raiker never silently continues past a decision it did not get. A timeout that proceeds without the action produces a turn whose result depends on how fast someone read a notification | **AVOID** |
+| Remote sessions that continue server-side | external workspace assistant remote sessions | — | N/A | — | Raiker runs on the owner's machine by construction | **NO — conflicts** |
 
 ### 2.11 Models and providers
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| Owner choice of model provider | Codex `model_providers`, OpenClaw, Hermes | Models | Implemented | **Three adapters** (`raiker/models/providers/`): Anthropic Messages, OpenAI-compatible and llama.cpp server. **Ten provider families** across thirteen shipped profiles (`raiker/config/model-profiles.json`): `anthropic`, `openai`, `gemini`, `openrouter`, `ollama`, `ollama-cloud`, `lm-studio`, `llama.cpp`, `huggingface` and generic `openai-compatible` | Two of the thirteen profiles carry a seeded list price, each stamped `as_of`; the rest report cost as unknown rather than as zero | PARITY |
-| Local inference | Codex `--oss`, OpenClaw, Hermes | Models | Implemented | Ollama, LM Studio, managed llama.cpp, approved-root GGUF discovery | — | **YES — improvement** |
-| Pinned model acquisition | Codex (via Ollama) | Models | Implemented | Ollama pull, revision-pinned Hugging Face GGUF download, isolated conversion | — | **YES — differentiator** |
+| Owner choice of model provider | local subscription client `model_providers`, reference platform, reference platform | Models | Implemented | **Three adapters** (`raiker/models/providers/`): Anthropic Messages, OpenAI-compatible and llama.cpp server. **Ten provider families** across thirteen shipped profiles (`raiker/config/model-profiles.json`): `anthropic`, `openai`, `gemini`, `openrouter`, `ollama`, `ollama-cloud`, `lm-studio`, `llama.cpp`, `huggingface` and generic `openai-compatible` | Two of the thirteen profiles carry a seeded list price, each stamped `as_of`; the rest report cost as unknown rather than as zero | PARITY |
+| Local inference | local subscription client `--oss`, reference platform, reference platform | Models | Implemented | Ollama, LM Studio, managed llama.cpp, approved-root GGUF discovery | — | **YES — improvement** |
+| Pinned model acquisition | local subscription client (via Ollama) | Models | Implemented | Ollama pull, revision-pinned Hugging Face GGUF download, isolated conversion | — | **YES — differentiator** |
 | A model catalogue that says when it cannot be reached | Not established by cited source — the reference clients surface a catalogue failure only when a request is made | Models → Hugging Face | Implemented | The tab opens on the most-downloaded GGUF repositories, and a Hub that does not answer is named where the results would be, with what still works and a retry ([FIXED-414](../plans/FIXED_ITEMS.md#fixed-414--the-hub-could-not-be-reached-and-the-panel-said-search-the-catalogue)) | — | **YES — improvement.** Not because naming a failure is clever, but because the alternative is the one this surface shipped with: an empty panel that reads as *ready*, and an owner who learns the truth from a search that times out. It is deliberately not an alert — the local library is unaffected and nothing is broken |
 | Exact-model reachability proven before a turn | None — reference products fail at call time | Platform-wide | Implemented | `POST /api/model-readiness/check`, per owner/profile/model/endpoint, with a TTL | — | **YES — differentiator** |
-| An ordered fallback chain with no silent hosted fallback | Claude Code `--fallback-model`, OpenClaw | Models | Implemented | Owner-ordered sequence judged as one chain | — | **YES — improvement** |
+| An ordered fallback chain with no silent hosted fallback | external coding assistant `--fallback-model`, reference platform | Models | Implemented | Owner-ordered sequence judged as one chain | — | **YES — improvement** |
 | Per-surface default model | None | Models | Implemented | Chat, Build, Tasks and Schedule each remember their own | — | **YES — differentiator** |
-| Token and cost accounting | Claude Code `/cost`, ChatGPT usage | Models | Implemented | Per-provider tokens, turns, requests, compactions, known cost, each figure's source named | Shipped list prices are unverified defaults stamped with `as_of` | PARITY |
-| Reasoning-effort control | Codex `model_reasoning_effort`, Claude Code thinking levels | Chat, Build | Implemented | Validated against the exact profile's declared values | — | PARITY |
-| A secondary fast/auxiliary model | Claude Code small-fast model | Models | Implemented | Advisor model with its own readiness key and Check advisor control | — | PARITY |
+| Token and cost accounting | external coding assistant `/cost`, ChatGPT usage | Models | Implemented | Per-provider tokens, turns, requests, compactions, known cost, each figure's source named | Shipped list prices are unverified defaults stamped with `as_of` | PARITY |
+| Reasoning-effort control | local subscription client `model_reasoning_effort`, external coding assistant thinking levels | Chat, Build | Implemented | Validated against the exact profile's declared values | — | PARITY |
+| A secondary fast/auxiliary model | external coding assistant small-fast model | Models | Implemented | Advisor model with its own readiness key and Check advisor control | — | PARITY |
 
 ### 2.12 Observability, security and data control
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
 | Encrypted local store | Not established by cited source | Platform-wide | Implemented | SQLCipher workspace database | Key-page memory locking ships **off**, with the measured reason stated on `/api/health` | **YES — differentiator** |
-| OpenTelemetry export of agent activity | [Cowork exports six event types](https://claude.com/docs/cowork/monitoring) | Observability → Overview | Implemented | [FIXED-379](../plans/FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) — `telemetry_export`, its own Tier-2 capability, delivering every governed event type to an owner-named OTLP/HTTP collector | No background sender: a delivery happens when the owner asks. Raised as [BUG-276](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button) rather than left implied | **YES — improvement.** Cowork's six include `tool_decision`, carrying a decision and its source; Raiker exports every governed event type, with metadata defined as a fixed set of index columns rather than asserted, content behind one explicit opt-in and still redacted, the credential an environment-variable *name*, and a cursor that moves on delivery rather than on attempt |
-| Prompt-injection handling for untrusted content | Claude Code, Codex, ChatGPT frame external content as data | Shared runtime | Implemented | Same framing, plus a deterministic advisory scanner that names the exact page or document and never blocks | — | **YES — differentiator** |
-| A fetched page reaches the model as text, not markup | Claude Code, ChatGPT | Shared runtime | Implemented | `raiker/runtime/web_access.py`: invisible elements removed and counted, role markers defanged | — | **YES — improvement** |
-| Web egress control | Claude Code `network.allowedDomains` (allowlist) | Settings → Web access | Different by design | Owner **blocklist** plus an address guard that cannot be switched off | — | **Different — see [3.8](#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist)** |
+| OpenTelemetry export of agent activity | external workspace assistant exports six event types | Observability → Overview | Implemented | [FIXED-379](../plans/FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) — `telemetry_export`, its own Tier-2 capability, delivering every governed event type to an owner-named OTLP/HTTP collector | No background sender: a delivery happens when the owner asks. Raised as [BUG-276](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button) rather than left implied | **YES — improvement.** external workspace assistant's six include `tool_decision`, carrying a decision and its source; Raiker exports every governed event type, with metadata defined as a fixed set of index columns rather than asserted, content behind one explicit opt-in and still redacted, the credential an environment-variable *name*, and a cursor that moves on delivery rather than on attempt |
+| Prompt-injection handling for untrusted content | external coding assistant, local subscription client, ChatGPT frame external content as data | Shared runtime | Implemented | Same framing, plus a deterministic advisory scanner that names the exact page or document and never blocks | — | **YES — differentiator** |
+| A fetched page reaches the model as text, not markup | external coding assistant, ChatGPT | Shared runtime | Implemented | `raiker/runtime/web_access.py`: invisible elements removed and counted, role markers defanged | — | **YES — improvement** |
+| Web egress control | external coding assistant `network.allowedDomains` (allowlist) | Settings → Web access | Different by design | Owner **blocklist** plus an address guard that cannot be switched off | — | **Different — see [3.8](#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist)** |
 | Redaction before storage or display | Coding agents suppress known secrets in logs | Platform-wide | Implemented | Incremental UTF-8 redaction at every split, exact loaned secrets, PEM blocks, stream boundaries | — | **YES — improvement** |
-| Owner-visible containment of a misbehaving component | Config-level disable in Claude Code and Codex | Settings → Security | Implemented | Per-subject `active`/`paused`/`killed`, revocable in one press | — | **YES — differentiator** |
+| Owner-visible containment of a misbehaving component | Config-level disable in external coding assistant and local subscription client | Settings → Security | Implemented | Per-subject `active`/`paused`/`killed`, revocable in one press | — | **YES — differentiator** |
 | Signed, verifiable releases | Not established by cited source | Platform-wide | Partial | `.github/workflows/release.yml` refuses to build without signing identities | No signed artifact has been published yet | PARITY |
 | A hardware root of trust for the owner credential | None | Platform-wide | Proposed | — | ADD-14 | **YES — differentiator** |
 
@@ -476,19 +476,19 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| A terminal client | Claude Code, Codex, OpenClaw, Hermes | CLI | Implemented | `raiker`, 100+ governed inspection commands | No rich TUI; no resume/fork flags | PARITY |
-| A local web control surface | OpenClaw Control UI, Cowork | Web dashboard | Implemented | `web`, loopback-bound | — | PARITY |
-| A desktop application | Cowork, ChatGPT, Claude Code Desktop | Desktop | Implemented | `raiker-app`, self-contained payload, tray, five-stage wizard | No signed public release yet | PARITY |
-| Slash commands in the composer | Claude Code, Codex, OpenClaw | Chat, Build | Implemented | `composerCommands.ts`; a test walks the whole set so no entry is inert | — | **YES — improvement** |
-| Owner-authored slash commands | Claude Code, Codex, OpenClaw | Chat, Build, Extensions → Skills | Implemented | Active owner-scoped skills carry an optional unique trigger; server-side expansion explicitly loads the skill | The handle grants no capability and changes no decision or approval mode | **YES — improvement** |
-| `@`-mention file completion | Claude Code, Codex | Build | Implemented | Completes against the owner-built code map, paths only, under the same gate | — | **YES — differentiator** |
-| `!` bash prefix / `#` memory prefix | Claude Code | Chat, Build composers | Different by design | — | Both would be a second route into governed execution and governed memory | **AVOID — see [4.5](#45-a-second-route-into-a-governed-action)** |
-| Keyboard shortcut reference in the product | Claude Code `/help`, Codex, OpenClaw | Chat, Build | Implemented | `/shortcuts`, built from the handlers that exist | — | PARITY |
-| Responsive layout across viewport sizes | ChatGPT, Cowork | Web dashboard | Implemented | Bottom bar below 640 px, drawer to 1023 px, full sidebar at 1024 px+ | — | PARITY |
+| A terminal client | external coding assistant, local subscription client, reference platform, reference platform | CLI | Implemented | `raiker`, 100+ governed inspection commands | No rich TUI; no resume/fork flags | PARITY |
+| A local web control surface | reference platform Control UI, external workspace assistant | Web dashboard | Implemented | `web`, loopback-bound | — | PARITY |
+| A desktop application | external workspace assistant, ChatGPT, external coding assistant Desktop | Desktop | Implemented | `raiker-app`, self-contained payload, tray, five-stage wizard | No signed public release yet | PARITY |
+| Slash commands in the composer | external coding assistant, local subscription client, reference platform | Chat, Build | Implemented | `composerCommands.ts`; a test walks the whole set so no entry is inert | — | **YES — improvement** |
+| Owner-authored slash commands | external coding assistant, local subscription client, reference platform | Chat, Build, Extensions → Skills | Implemented | Active owner-scoped skills carry an optional unique trigger; server-side expansion explicitly loads the skill | The handle grants no capability and changes no decision or approval mode | **YES — improvement** |
+| `@`-mention file completion | external coding assistant, local subscription client | Build | Implemented | Completes against the owner-built code map, paths only, under the same gate | — | **YES — differentiator** |
+| `!` bash prefix / `#` memory prefix | external coding assistant | Chat, Build composers | Different by design | — | Both would be a second route into governed execution and governed memory | **AVOID — see [4.5](#45-a-second-route-into-a-governed-action)** |
+| Keyboard shortcut reference in the product | external coding assistant `/help`, local subscription client, reference platform | Chat, Build | Implemented | `/shortcuts`, built from the handlers that exist | — | PARITY |
+| Responsive layout across viewport sizes | ChatGPT, external workspace assistant | Web dashboard | Implemented | Bottom bar below 640 px, drawer to 1023 px, full sidebar at 1024 px+ | — | PARITY |
 | An in-product user guide | Not established by cited source | Utilities → Guide | Implemented | `raiker/guide/`, served read-only from the install | — | **YES — differentiator** |
-| An interrupt reachable from anywhere | Claude Code (`Esc`), Codex, Cowork — each surfaces a stop **while a turn runs** | Top bar, every page | Implemented | `StopSwitch.svelte` → the governed `POST /api/interrupts`, cancelling at the next safe boundary rather than force-killing. It reads the same `GET /api/tasks` the workbench reads and counts it with the same `isActiveTask`, so the two surfaces cannot disagree about what "active" means | — | **YES — improvement** ([FIXED-413](../plans/FIXED_ITEMS.md#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach)). Two differences, and each is a consequence of Raiker having a governed *queue* rather than one turn. It never leaves the bar — the Security Philosophy's instant stop is not conditional on Raiker believing something is running, and none of the compared products offers a stop when they think nothing is. And it **states how much it would reach before you commit**: `STOP 3`, and a confirm reading "This stops 3 tasks." None of them can, because none of them has tasks, schedules and parked approvals to count |
-| IDE extension | Claude Code, Codex | — | Proposed | — | Phase 8 deferred | NO — little advantage |
-| A programmatic SDK or headless mode | Claude Code (`-p`, Agent SDK), Codex | — | Proposed | — | The loopback API is the only programmatic surface, and it is owner-authenticated | NO — conflicts |
+| An interrupt reachable from anywhere | external coding assistant (`Esc`), local subscription client, external workspace assistant — each surfaces a stop **while a turn runs** | Top bar, every page | Implemented | `StopSwitch.svelte` → the governed `POST /api/interrupts`, cancelling at the next safe boundary rather than force-killing. It reads the same `GET /api/tasks` the workbench reads and counts it with the same `isActiveTask`, so the two surfaces cannot disagree about what "active" means | — | **YES — improvement** ([FIXED-413](../plans/FIXED_ITEMS.md#fixed-413--the-stop-switch-shouted-on-every-page-and-could-not-say-what-it-would-reach)). Two differences, and each is a consequence of Raiker having a governed *queue* rather than one turn. It never leaves the bar — the Security Philosophy's instant stop is not conditional on Raiker believing something is running, and none of the compared products offers a stop when they think nothing is. And it **states how much it would reach before you commit**: `STOP 3`, and a confirm reading "This stops 3 tasks." None of them can, because none of them has tasks, schedules and parked approvals to count |
+| IDE extension | external coding assistant, local subscription client | — | Proposed | — | Phase 8 deferred | NO — little advantage |
+| A programmatic SDK or headless mode | external coding assistant (`-p`, Agent SDK), local subscription client | — | Proposed | — | The loopback API is the only programmatic surface, and it is owner-authenticated | NO — conflicts |
 
 ---
 
@@ -499,7 +499,7 @@ Raiker something it is not willing to lose. They are decisions, not gaps.
 
 ### 3.1 A capability gate instead of a tool-argument rule
 
-Claude Code matches permission rules against tool **arguments** — `Bash(git *)`,
+external coding assistant matches permission rules against tool **arguments** — `Bash(git *)`,
 `Edit(*.ts)`. That is expressive, and it puts the security boundary in a pattern
 language the owner has to get right; a rule that fails to match is a rule that
 silently does nothing.
@@ -512,7 +512,7 @@ cost is real and stated: Raiker cannot express "allow `git status` but ask for
 
 ### 3.2 A deterministic `auto` instead of a classifier
 
-Claude Code's auto mode has a second model review each action. Raiker's `auto`
+external coding assistant's auto mode has a second model review each action. Raiker's `auto`
 keys off the action's **risk level**
 (`raiker/runtime/authority/decision_modes.py::auto_requires_approval`): only
 `low`-risk actions run unprompted, and `critical` is human-only whatever the
@@ -549,17 +549,17 @@ consent to a new tool source.
 
 ### 3.4 A reviewed permission diff instead of a marketplace
 
-Claude Code has curated and community marketplaces with review pipelines and
+external coding assistant has curated and community marketplaces with review pipelines and
 commit-SHA pinning. Raiker installs from a path or a URL and shows the owner the
 **permission diff** before installing. A marketplace moves the trust decision to
 a reviewer the owner never meets; a permission diff keeps it with the owner and
 makes the specific grants readable. For a single-owner local product, the second
 is the right trade — and it is why Raiker verifies **manifest authorship**, which
-neither Claude Code nor Codex does.
+neither external coding assistant nor local subscription client does.
 
 ### 3.5 A skill is instruction-only
 
-Claude Code skills can invoke tools, restrict tools, and run in a forked
+external coding assistant skills can invoke tools, restrict tools, and run in a forked
 subagent. A Raiker skill is a document: `skill_load` returns instructions, and
 Raiker executes nothing a skill ships. A skill therefore grants no capability
 and opens no gate, which is what makes "installing a skill" a safe act rather
@@ -591,7 +591,7 @@ feature.
 
 ### 3.7 Project instructions are owner records, not repository files
 
-`CLAUDE.md` and `AGENTS.md` are files in the repository, so anything that can
+`PROJECT_RULES.md` and `AGENTS.md` are files in the repository, so anything that can
 write to the repository can write standing instructions into every future turn.
 Raiker's project instructions are governed owner records in the encrypted store.
 The cost is that a checked-in convention file does not travel with a clone; the
@@ -599,7 +599,7 @@ gain is that a pull request cannot grant itself standing context.
 
 ### 3.8 A blocklist plus an address guard instead of an allowlist
 
-Claude Code's sandbox reaches only `network.allowedDomains`. Raiker's web reads
+external coding assistant's sandbox reaches only `network.allowedDomains`. Raiker's web reads
 work on a fresh install and are bounded by an owner **blocklist** — plus an
 address guard the owner cannot switch off: HTTPS only, no credential in the URL,
 and every address a name resolves to must be public, re-checked on every redirect
@@ -616,7 +616,7 @@ list. **Emptying the blocklist opens none of it.**
 
 ### 4.1 A mode that skips every check
 
-Claude Code's `bypassPermissions` and Codex's `danger-full-access` exist for
+external coding assistant's `bypassPermissions` and local subscription client's `danger-full-access` exist for
 containers and CI. Raiker has no equivalent and will not add one: a governed
 agent whose governance can be turned off in one flag has governance as a setting
 rather than as a property. The equivalent need — an unattended run that does not
@@ -625,7 +625,7 @@ to do instead of allowing everything. **AVOID.**
 
 ### 4.2 An escape hatch out of the sandbox
 
-Claude Code retries a sandbox-refused command with `dangerouslyDisableSandbox`
+external coding assistant retries a sandbox-refused command with `dangerouslyDisableSandbox`
 and re-runs it under the ordinary permission flow. Raiker refuses an unavailable
 or refusing environment rather than rerouting to the host: the exact selected
 profile is probed and used, and there is no silent fallback. A boundary a failure
@@ -634,7 +634,7 @@ can step outside of is a boundary that reports enforcement it does not have.
 
 ### 4.3 A hook that can grant
 
-Claude Code hooks may return `permissionDecision: "allow"`. Raiker's `combine()`
+external coding assistant hooks may return `permissionDecision: "allow"`. Raiker's `combine()`
 accepts only `deny` and `ask` from an authoritative handler, so nothing a hook
 returns can allow an action policy refused. A hook is a subprocess configured in
 a file; making it an authority source means a file that arrived with a repository
@@ -642,14 +642,14 @@ can widen what the agent may do. **AVOID.**
 
 ### 4.4 Plugin code on the command `PATH`
 
-Claude Code plugins may ship `bin/` executables that become bare commands inside
+external coding assistant plugins may ship `bin/` executables that become bare commands inside
 the Bash tool. "No plugin code runs" is a claim Raiker's Plugins tab makes in
 those words, and a plugin-authored binary on a command's `PATH` is plugin code
 execution with an extra step. **AVOID.**
 
 ### 4.5 A second route into a governed action
 
-Claude Code's `!` prefix runs a shell command from the composer and `#` writes a
+external coding assistant's `!` prefix runs a shell command from the composer and `#` writes a
 memory. Both are convenient and both are a second path into an action that
 already has a governed one. One governed route per action is the rule the shell
 and memory control sets are built on, and a shortcut that skips the approval card
@@ -657,7 +657,7 @@ is the exact defect the approval card exists to prevent. **AVOID.**
 
 ### 4.6 Publishing session output to a hosted page
 
-Claude Code Artifacts publish session output as a hosted web page. For a
+external coding assistant Artifacts publish session output as a hosted web page. For a
 local-first product, publishing workspace content to a remote host by default
 inverts the data-control property the product is chosen for. Export to a local
 HTML, Markdown or PDF file already serves the reviewable-output need.
@@ -680,7 +680,7 @@ reachable is the same defect as shipping one:
 | ★ `THREAT_MODEL.md`'s "`EXECUTABLE_ON_APPROVAL`, an explicit two-member frozenset" | It has **twelve** members. The section was written when it had two and was never revisited, so the repository-wide threat model understated what an approval performs by a factor of six |
 | ★ The user guide's "`scripts/` for code to run", four lines below "Raiker never runs code a skill ships" | Raiker stores a skill's `scripts/` and runs none of it. The two sentences contradicted each other on the same page, and the wrong one was the reassuring one |
 | ★ `REFERENCE_PLATFORM_COMPATIBILITY.md`'s own "last reconciliation: 2026-08-24" | A date one day in the future, in four documents. Corrected to 2026-08-23 |
-| ★ `CHANNELS_SPEC.md`'s "Hermes Agent's 20+ messaging surfaces" | 27+, which this document already recorded — two documents disagreeing about the same cited source |
+| ★ `CHANNELS_SPEC.md`'s "reference personal agent's 20+ messaging surfaces" | 27+, which this document already recorded — two documents disagreeing about the same cited source |
 | The dated sections of `HANDOFF.md` | Deprecated in place with a currency banner naming what replaced them, rather than deleted: a handoff note rewritten after the fact is not a record of anything |
 | `EVENT_CATALOG.md`'s "approval resolution does not emit execution events" | It emits `approval_executed`, `approval_execution_denied` and `approval_auto_executed` |
 | The claim that web egress answers to `RAIKER_WEB_EGRESS_ALLOWLIST` | That variable no longer exists; egress answers to an owner blocklist plus a non-optional address guard |
@@ -778,7 +778,7 @@ had to be true first:
   the ask now sits on the turn that caused the change, in Chat and Build, through
   the same preflight the Checkpoints page opens — reachable, but only from one
   route, was still a route away from where the owner is standing. **YES —
-  improvement**: Claude Code's `/rewind` and Codex's undo both restore on the
+  improvement**: external coding assistant's `/rewind` and local subscription client's undo both restore on the
   spot; Raiker states the file-level impact, names a cross-principal escalation
   before the ask, and puts a human decision between the preview and the write.
 * **Audit export has a route.** `audit_export` has an executor and `POST
@@ -827,22 +827,22 @@ had to be true first:
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| ~~14~~ | ~~Hook lifecycle coverage~~ | **Done 2026-08-28 — [FIXED-304](../plans/FIXED_ITEMS.md#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) and [FIXED-305](../plans/FIXED_ITEMS.md#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site).** All four Raiker-meaningful events from Claude Code's 31 now dispatch: `ConfigChange` decides, and `Notification`, `PostToolBatch` and `InstructionsLoaded` observe. The other eleven are assessed individually in [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding) and none is pending | Authenticated owner-setting changes are interceptable without exposing values; the owner's hook kill switch stays above every rule; the three observation events carry counts and source types rather than content, so a repository-introduced `command` handler cannot read a turn's standing context or a notification's copy out of them | PARITY; the control bundle is a **YES — improvement** |
+| ~~14~~ | ~~Hook lifecycle coverage~~ | **Done 2026-08-28 — [FIXED-304](../plans/FIXED_ITEMS.md#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) and [FIXED-305](../plans/FIXED_ITEMS.md#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site).** All four Raiker-meaningful events from external coding assistant's 31 now dispatch: `ConfigChange` decides, and `Notification`, `PostToolBatch` and `InstructionsLoaded` observe. The other eleven are assessed individually in [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding) and none is pending | Authenticated owner-setting changes are interceptable without exposing values; the owner's hook kill switch stays above every rule; the three observation events carry counts and source types rather than content, so a repository-introduced `command` handler cannot read a turn's standing context or a notification's copy out of them | PARITY; the control bundle is a **YES — improvement** |
 | ~~15~~ | ~~The `prompt` hook handler (BUG-226)~~ | **Done 2026-08-28 — FIXED-303.** One bounded call through the owner-selected governed provider, no tools or nested hooks, advisory context only, and content-free audit metadata | A project cannot turn model judgment into authority or select another provider credential | **YES — improvement** over the parity feature |
 | ~~16~~ | ~~Tool search and deferred tool schemas~~ | **Done 2026-09-04 — [FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two) (built-ins) and [FIXED-377](../plans/FIXED_ITEMS.md#fixed-377--a-projected-mcp-tool-had-no-arguments) (MCP).** A turn carries the core schemas and `tool_search` fetches the rest by name or intent, revealed for the remainder of that turn: 6,494 → 3,726 tokens before a word of the prompt. The MCP half was recorded as *deliberately not built* on the reasoning that a projected MCP tool was one generic `arguments` object — FIXED-377 removed that reason by carrying the server's declared `inputSchema`, and the catalogue now joins the same rule under a **measured budget** rather than a declared list, because a connected server's catalogue is not Raiker's own and changes between turns | Deferring is not gating, and the code is written so it cannot become that: every deferred name rides on `tool_search`'s own description, the reveal is read from the result rather than the query, and a fetched tool passes the same gate, decision mode, policy review and approval. A declared schema is bounded and attributed before it reaches the model's catalogue | **YES — improvement.** The mechanism is parity; doing it with the tool that fetches a schema granting provably nothing, the split derived from the registry so a new tool cannot fall out of both halves, and an outside program's declaration bounded before it enters the one part of a turn that is trusted, is not |
 | ~~17~~ ★ | ~~**A structured question to the owner mid-turn**~~ | **Done 2026-08-29 — [FIXED-308](../plans/FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant).** `ask_owner_question` asks 1-4 questions with 2-4 options; the turn parks through the approval transport and answers through a route of its own | A question grants nothing, so it is `low` and says so; `/resolve` and `/answer` refuse each other's kind; no composer mode answers one; and only an option the model offered can come back | **YES — improvement.** Parity with `AskUserQuestion`; doing it with no authority attached, in a product where every other interruption carries authority, is not |
-| ~~18~~ | ~~OpenTelemetry export~~ | **Done 2026-09-04 — [FIXED-379](../plans/FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) and [FIXED-386](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button).** The wire, and then the cadence it runs on: a destination carries an interval drawn from the scheduler's own table, claimed exactly once on the host tick, under the same pause switch and the same governed route as the button — and **not** as a routine that prompts a model, because delivery is arithmetic over a cursor rather than a judgement. `telemetry_export` is its own Tier-2 capability delivering governed events to an owner-named OTLP collector: metadata by default, redacted content on one explicit opt-in, the credential an environment-variable *name*, and the cursor moving on delivery rather than on attempt | [Cowork exports six events this way](https://claude.com/docs/cowork/monitoring) — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacked was the wire. The owner turns the gate on, and it is inert until they also name a collector — two separate refusals in front of one wire | **YES — improvement** |
+| ~~18~~ | ~~OpenTelemetry export~~ | **Done 2026-09-04 — [FIXED-379](../plans/FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) and [FIXED-386](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button).** The wire, and then the cadence it runs on: a destination carries an interval drawn from the scheduler's own table, claimed exactly once on the host tick, under the same pause switch and the same governed route as the button — and **not** as a routine that prompts a model, because delivery is arithmetic over a cursor rather than a judgement. `telemetry_export` is its own Tier-2 capability delivering governed events to an owner-named OTLP collector: metadata by default, redacted content on one explicit opt-in, the credential an environment-variable *name*, and the cursor moving on delivery rather than on attempt | external workspace assistant exports six events this way — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacked was the wire. The owner turns the gate on, and it is inert until they also name a collector — two separate refusals in front of one wire | **YES — improvement** |
 | 19 | Credential masking with sentinel substitution | Generalise the git-credential loan into a sentinel/substitution path for owner-declared credentials. **Re-costed 2026-09-04 and it belongs behind item 7, not beside it.** `CommandRequest` already carries `credential_bindings`, and every backend — `local_strict`, `native`, `container`, `remote` — refuses a non-empty one with `selected_environment_credential_unsupported`, so delivering a credential to a child at all *is* item 7. Raiker's governed command path is also argv-only by design (every backend refuses `shell`), so the obvious sentinel shape — a shell variable the child expands — has nothing to expand it, and the design question "where does a substituted value land, if not the process table" has to be answered first | A command that authenticates without ever holding the secret is strictly better than one that holds it briefly | **YES — improvement** |
 
 ### Medium priority, high effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 20 | Deterministic replay | Make the event log replayable, as DeepSeek Harness's trajectory is | Replay turns an audit trail into a verification tool | **YES — improvement** |
+| 20 | Deterministic replay | Make the event log replayable, as reference platform's trajectory is | Replay turns an audit trail into a verification tool | **YES — improvement** |
 | 21 | Autonomous skill creation with a review gate | Implement `SELF_IMPROVEMENT_MODEL.md` behind a zero-trust review (ADD-06) | A self-authored instruction that reaches turns without review is self-granted agency | **YES — improvement** |
 | 22 | Remote supervisor install lifecycle | Complete SSH/Daytona supervisor install, upgrade and live proof | Remote backends are adapters today and readiness-blocked in practice | PARITY |
 | ~~23~~ ★ | ~~**A delegating task that owns its children and routes by surface**~~ | **Done 2026-09-04 — [FIXED-381](../plans/FIXED_ITEMS.md#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work).** A task carries a `surface`, validated against the same set a composer's is; the scheduler puts it in the cycle's prompt, which selects the standing instructions and nothing else. A Build task needs a project and is refused without one rather than quietly downgraded, and a delegating turn's parent is derived from the thread it runs in rather than named by the model | Raiker already has both surfaces under one governed turn contract, so this is scheduling rather than a new execution path — and **without** Dispatch's ten-minute auto-deny, which Raiker refuses: a decision nobody made is not a decision. BUG-220's ownership is untouched, and a child still carries its own approvals | **YES — improvement** |
-| 24 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively ([Claude in Chrome](https://claude.com/docs/cowork/overview), Hermes via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
+| 24 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively (the Anthropic assistant in Chrome, reference platform via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
 
 ### Low priority, low effort
 
@@ -865,7 +865,7 @@ had to be true first:
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
 | 31 | LSP surface (BUG-227) | Decide whether Raiker wants a language-server client at all before building one to satisfy a manifest field | The code map already answers part of the need | NO — little advantage |
-| 32 | Ephemeral micro-VMs (ADD-12) | Replace shared-kernel containers for the highest-risk work | A different class of boundary; only Cowork has one | NO — complexity |
+| 32 | Ephemeral micro-VMs (ADD-12) | Replace shared-kernel containers for the highest-risk work | A different class of boundary; only external workspace assistant has one | NO — complexity |
 | 33 | IDE extension | Phase 8 deferred | No governance effect; a surface question | NO — little advantage |
 
 ---
@@ -919,9 +919,9 @@ repository reference to its repository rather than to the workspace; a permissio
 surface that reports what the runtime would answer rather than what its table
 holds; and a citation that opens the *turn* rather than the document.
 
-The log also holds the concept-to-specification maps — Claude Code concept
-coverage and its per-page documentation mapping, Cowork delegated tasks and
-schedule, OpenClaw-style personal agent, Hermes-style agent framework, eidetic
+The log also holds the concept-to-specification maps — external coding assistant concept
+coverage and its per-page documentation mapping, external workspace assistant delegated tasks and
+schedule, reference platform-style personal agent, reference platform-style agent framework, eidetic
 memory, multi-agent, graph context, skills, memory, local inference,
 LangChain/LangGraph-style runtime, OWASP GenAI, self-improvement, mem0-style
 memory and memsearch-style semantic search — and every control-set review
@@ -949,7 +949,7 @@ Two additions to the rule, from the 2026-08-23 pass:
   specification — [MCP](https://modelcontextprotocol.io/),
   [Agent Skills](https://agentskills.io/specification) — the specification is the
   source, and a vendor's implementation of it is a second citation rather than
-  the first. It is the difference between "Claude Code does this" and "this is
+  the first. It is the difference between "external coding assistant does this" and "this is
   the format, and here is how far Raiker conforms".
 - **Record the protocol revision a client speaks.** Raiker's MCP client was five
   revisions behind the current specification, and nothing in the documentation
@@ -957,39 +957,39 @@ Two additions to the rule, from the 2026-08-23 pass:
 
 ## 8. Personal-agent source extension — 2026-10-07
 
-This is a targeted primary-documentation review of Meta Muse, Claude.ai personal
-work, OpenClaw heartbeat/automation and Hermes memory/skills. It is not a new
+This is a targeted primary-documentation review of reference personal agent, external hosted assistant personal
+work, reference platform heartbeat/automation and reference platform memory/skills. It is not a new
 full code reconciliation or an executed comparison. Source-backed design
 adaptations live in the [personal-agent spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md#reference-ideas-and-raiker-adaptations);
 PAA/PA-S and CR own implementation and outcome evidence.
 
 | Reference idea | Raiker present boundary | Target work / evidence |
 |---|---|---|
-| Meta Muse goal continuity and complete connector transactions | Current task/routine/connector paths do not establish general goal completion | PAA-01/02/05/08; PA-S02/03 |
-| Claude reusable project context, skills and recurring artifacts | Current projects/memory/skills/routines retain their own scopes; local scheduler requires running host | PAA-03/04/07/09; PA-S01/06 |
-| OpenClaw opt-in heartbeat and gateway automation | Current scheduler/channel support; no new standing-intent service claimed | PAA-04/10; PA-S04/08 |
-| Hermes user profile/session recall and agent-managed procedural skills | Current governed memory and instruction-only skills; no silent self-activation | PAA-03/09; PA-S06 |
+| reference personal agent goal continuity and complete connector transactions | Current task/routine/connector paths do not establish general goal completion | PAA-01/02/05/08; PA-S02/03 |
+| the Anthropic assistant reusable project context, skills and recurring artifacts | Current projects/memory/skills/routines retain their own scopes; local scheduler requires running host | PAA-03/04/07/09; PA-S01/06 |
+| reference platform opt-in heartbeat and gateway automation | Current scheduler/channel support; no new standing-intent service claimed | PAA-04/10; PA-S04/08 |
+| reference platform user profile/session recall and agent-managed procedural skills | Current governed memory and instruction-only skills; no silent self-activation | PAA-03/09; PA-S06 |
 
-Claude's help pages checked on 2026-10-07 describe gradual Chat/Cowork unification
+the Anthropic assistant's help pages checked on 2026-10-07 describe gradual Chat/external workspace assistant unification
 and remote scheduling with older local-task exceptions. Pin the actual surface,
 plan, date and execution host in comparisons. Do not infer remote Raiker support
 from that source. No parity claim or competitor run is added here.
 
-## 9. Meta Muse competitive track — 2026-10-12
+## 9. reference personal agent competitive track — 2026-10-12
 
-**Targeted source update only; not a new full code reconciliation.** Meta Muse is a **personal AI agent product** launched September 8, 2026. Do not conflate it with Meta's **Muse Wonder/Wonder Full model family** announced October 12, 2026 or the **Muse Code** coding surface. The [Meta Muse launch](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/), [product site](https://ai.meta.com/muse/), [security engineering note](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/) and [model announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) are primary sources for stated vendor capabilities, **not independently verified performance**.
+**Targeted source update only; not a new full code reconciliation.** reference personal agent is a **personal AI agent product** launched September 8, 2026. Do not conflate it with Meta's **reference personal agent Wonder/Wonder Full model family** announced October 12, 2026 or the **reference personal agent Code** coding surface. The reference personal agent launch, product site, security engineering note and model announcement are primary sources for stated vendor capabilities, **not independently verified performance**.
 
-| Meta Muse reference behavior | Raiker documented/code-backed baseline | Gap or different-by-design choice | Required independent proof |
+| reference personal agent reference behavior | Raiker documented/code-backed baseline | Gap or different-by-design choice | Required independent proof |
 |---|---|---|---|
-| Persistent personal goals and execution after closing the app | Tasks and schedules exist; durable personal-goal coordinator PAA-01/02 planned | Full multi-day goal orchestration not demonstrated; local-host offline behavior differs from hosted Muse | PA-S02 / CR-01/05/09/11 with restart and app-closed control |
+| Persistent personal goals and execution after closing the app | Tasks and schedules exist; durable personal-goal coordinator PAA-01/02 planned | Full multi-day goal orchestration not demonstrated; local-host offline behavior differs from hosted reference personal agent | PA-S02 / CR-01/05/09/11 with restart and app-closed control |
 | Personal context, proactive suggestions and remembered preferences | Hybrid governed memory implemented; editable personal profile PAA-03 and standing intents PAA-04 planned | Provenance, freshness, correction and useful proactive intent need end-to-end proof | PA-S01/04, CR-04/05, revoked-source and changed-preference fixtures |
 | Secure persistent VM with browser, Sentinel gate and scoped credentials (Meta's documented design) | Local/native/container command boundaries and broker exist; PAA-06 browser workflow/ADD-23 not delivered | Preserve selectable local/private/hosted inference and owner authority; isolated browser/credential containment must be demonstrated, not asserted | PA-S05, CR-03/07/11, injection, cross-owner, exfiltration, crash/resume |
 | Cross-app effects, exact permissions, destination receipts | Generic connector service and GitHub auth exist; PAA-05/08 durable effect reconciliation planned | Authentication is not authorization; ambiguous external effects and approved payload revalidation need proof | PA-S03, CR-03/07/09/11, provider receipt, duplicate prevention, revoked credential |
 | Messaging plus proactive background delivery | Inbound Telegram answered back over Telegram since 2026-10-13 (a sensitive reply held for the owner); a real bot's delivered message not yet evidenced — [BUG-315](../plans/FIXED_ITEMS.md#fixed-888--a-telegram-turns-answer-never-went-back-over-telegram-was-bug-315) closed for the product path; off-device PAA-10 planned | Real reply/quiet-hours/offline behavior unresolved | PA-S08, CR-03/05/07/10 |
-| Muse Wonder model Active Memory / Active Focus (announced today) | Raiker allows owner-selected hosted/local models and maintains governed memory | Compare model capability and agent behavior **separately**; no automatic Meta API integration assumed | Pin real supported model/version in CR-02 and measure PA-S02 recovery |
+| reference personal agent Wonder model Active Memory / Active Focus (announced today) | Raiker allows owner-selected hosted/local models and maintains governed memory | Compare model capability and agent behavior **separately**; no automatic Meta API integration assumed | Pin real supported model/version in CR-02 and measure PA-S02 recovery |
 
 
 
 **Security outcome benchmark:** Meta's published design mediates network egress, connectors and credentials through Sentinel/authd/privileged workers. Verify actual confinement under Raiker's chosen runtimes, not just policy class names. Test malicious page content, forged connector messages, protected token access, SSRF, revoked grants, user takeover, duplicate submissions and Stop. The security post is first-party architectural evidence, not an independent penetration test.
 
-**Explicit decision reference:** [RCD-10](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) remains a **recommendation pending owner acceptance**. PAA/ADD/BUG own implementation, CR/PA-S own measurement. Do not claim Raiker equals or exceeds Meta Muse without matched live trials.
+**Explicit decision reference:** [RCD-10](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) remains a **recommendation pending owner acceptance**. PAA/ADD/BUG own implementation, CR/PA-S own measurement. Do not claim Raiker equals or exceeds reference personal agent without matched live trials.

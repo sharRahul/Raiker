@@ -226,7 +226,7 @@ is why none of them was half-built:
 | ~~**Restart reattachment**~~ | **Closed on POSIX 2026-08-17** as [FIXED-238](FIXED_ITEMS.md#fixed-238--a-background-run-could-not-survive-the-restart-of-the-runtime-that-started-it), with the detached supervisor, the authenticated `AF_UNIX` control channel and the encrypted restart-safe handle shipped together. Windows unchanged and refused by name: a named pipe is reachable by name from any session on the machine, so the equivalent needs its own design and its own proof rather than the same code with a different transport. |
 | ~~**Persistent environment**~~ | **Closed for the container backend 2026-08-17** as [FIXED-239](FIXED_ITEMS.md#fixed-239--the-command-container-was-rebuilt-around-every-command-so-nothing-could-persist), together with the owner's reset and reset-and-clear-cache controls. Per-run AppContainer profiles are still created and deleted around each command, deliberately: a predictable container name is a hole, because the container SID is a pure function of the name. |
 | **Filtered domain egress** | The AppContainer loopback exemption needs elevation, and a Linux proxy-only namespace is a separate netns build. Refused with a named reason on every backend rather than partially claimed. |
-| **Credential delivery and delta quarantine; SSH; Daytona** | Unchanged. None is a Codex or Claude Code control; all three remain storage contracts and selectable-but-refused profiles. |
+| **Credential delivery and delta quarantine; SSH; Daytona** | Unchanged. None is a local subscription client or external coding assistant control; all three remain storage contracts and selectable-but-refused profiles. |
 | ~~**Container session supervisor**~~ | **Closed 2026-08-17** as part of [FIXED-239](FIXED_ITEMS.md#fixed-239--the-command-container-was-rebuilt-around-every-command-so-nothing-could-persist): the session's container is created once and reused, liveness is asked of the runtime rather than assumed, and the backend is held for the life of the service so there is somewhere to remember it. |
 | **Signature verification of the runner** | The runner's SHA-256 is recorded at build time, checked before use, and carried into the receipt. That detects corruption and casual replacement; it is **not** protection against an attacker with write access to the install directory, who could replace Raiker itself. Authenticode chain verification is not implemented. |
 
@@ -869,7 +869,7 @@ References: [hook type contract](../../raiker/hooks/contracts.py),
 ## Personal-agent direction — 2026-10-07
 
 The owner accepted the [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md),
-inspired by Meta Muse, Claude.ai, OpenClaw and Hermes Agent. New durable goals,
+inspired by reference personal agent, external hosted assistant, reference platform and reference personal agent. New durable goals,
 context, proactivity, outcome verification and reviewed learning work is owned
 by [PAA-01–PAA-11](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). Existing items in
 this ledger keep their status, dependencies and evidence; accepting the target

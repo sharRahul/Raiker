@@ -517,7 +517,7 @@ for. A finding raised by several reviews in a row says **In 3 reviews in a
 row**, so a repair that is not working is visible before you ask for it again.
 
 **Ask the model to review** (it names the model chosen in the composer, such as
-**Ask Claude Haiku 5.5 to review**) sends the same exact patch to that model and
+**Ask the Anthropic assistant Haiku 5.5 to review**) sends the same exact patch to that model and
 shows what it thinks is wrong under **Model review**. Before it is sent, every
 line passes through Raiker's credential redaction and the patch is framed as
 data, not instructions; no tools are offered. Its findings are kept to the files

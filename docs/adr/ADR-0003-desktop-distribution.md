@@ -268,11 +268,11 @@ acceptance criteria, and references.
   in-app wizard, after the owner account existed. An owner could install
   Raiker, create an account, and only then learn the computer could not run
   it; and a check after sign-in reads as configuration, not installation.
-- **Reference.** Hermes Agent's installer (a separate signed Tauri app) runs a
+- **Reference.** reference personal agent's installer (a separate signed Tauri app) runs a
   fixed list of named stages with live elapsed time, a hidden-by-default log,
   one plain sentence on failure with Retry beside it, and a completion receipt;
   it has no pre-flight check of memory or disk at all.
-- **Alternatives.** *A separate installer application* like Hermes' — Raiker
+- **Alternatives.** *A separate installer application* like reference platform' — Raiker
   downloads nothing at install time (every dependency is bundled), so a second
   application would add a signing and update surface for no download it needs
   to drive. *Checks only in the native installers* — a dragged Mac app and an
@@ -297,7 +297,7 @@ acceptance criteria, and references.
   preload with two operations (hear progress; ask for one of five named
   actions), and the shell ignores messages from any other sender. The check
   sends no packet.
-- **UX.** Hermes' patterns: step list with live timers, *N of M steps
+- **UX.** reference platform' patterns: step list with live timers, *N of M steps
   complete*, *Show details* log capped at 2,000 lines, failure as one sentence
   with Try again / Open logs / Quit and "Nothing here deletes your
   conversations or settings". The in-app wizard is a focused sheet without the

@@ -39,7 +39,7 @@ alternative would be worse.
   same policy/audit route as typed controls.
 
 - **Hooks cover part of the reference lifecycle; plugins are two kinds short;
-  channels stop below routing.** Of the three extension surfaces Claude Code
+  channels stop below routing.** Of the three extension surfaces external coding assistant
   ships:
 
   **Hooks** are complete against *Raiker's own* event list and partly covered
@@ -56,8 +56,8 @@ alternative would be worse.
   must not call a tool the originating turn could not call, so each waits for
   bounded, non-escalating authority, its own resource budget, recursion limits
   and execution-time revalidation. A rule naming either is reported as failed on
-  the Hooks tab, never accepted and ignored. Claude Code
-  [documents all five](https://code.claude.com/docs/en/hooks), so this is a real
+  the Hooks tab, never accepted and ignored. external coding assistant
+  documents all five, so this is a real
   difference from the reference. (Raiker's second handler
   type, `builtin`, is its own in-process code and is not one of the five.)
 
@@ -75,11 +75,11 @@ alternative would be worse.
   validation, iframe isolation and keyboard access, and an honest description of
   the boundary: a sandboxed iframe still runs third-party code. The plugin-panel
   defect (BUG-228) was retired on 2026-10-18 as superseded by this plan, and
-  [no compared platform ships plugin UI panels](https://code.claude.com/docs/en/plugins-reference).
+  no compared platform ships plugin UI panels.
   **LSP servers** are named in the manifest schema and have no surface at all to
   contribute to.
 
-  Claude Code plugins additionally contribute subagents, background monitors,
+  external coding assistant plugins additionally contribute subagents, background monitors,
   `bin/` executables on the Bash tool's `PATH`, themes and output styles. Raiker
   contributes none of those, and the last three
   [it will not](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused):
@@ -422,7 +422,7 @@ on the shipped build, not estimated.
 - **Hooks cover part of the reference lifecycle; channels stop short of routing.**
   Every event Raiker's own format accepts is emitted — twenty — with an owner off
   switch and a page that states which rules actually enforce. Measured against
-  [Claude Code's thirty-one](https://code.claude.com/docs/en/hooks) that is
+  external coding assistant's thirty-one that is
   **twenty of thirty-one**, which is the ceiling
   [`HOOKS_SPEC.md`](../architecture/HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding)
   assessed as worth reaching: of the eleven left, two are blocked behind a
@@ -433,7 +433,7 @@ on the shipped build, not estimated.
   `mcp_tool` and `agent` are refused by decision (above). Plugins contribute
   hook rules, skills and MCP-server offers; panels (contributed UI is MCP Apps')
   and LSP servers do not, and
-  four kinds Claude Code has — subagents, monitors, `bin/` executables, themes —
+  four kinds external coding assistant has — subagents, monitors, `bin/` executables, themes —
   Raiker
   [will not add](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused).
   Channels gained their authority contract, then their owner surface, then

@@ -7,7 +7,7 @@ proposed, reviewed, stored, and verified, and the safety boundaries that keep se
 from becoming self-granted agency.
 
 Reference inspiration: `obra/Superpowers` (composable, reusable skills that an agent accrues and
-invokes), Hermes-Agent (closed learning loop / user modelling), and Claude Code skills
+invokes), reference platform-Agent (closed learning loop / user modelling), and external coding assistant skills
 (`SKILL.md` units that load on demand). Raiker's source of truth remains this repository.
 
 ---
@@ -302,7 +302,7 @@ Until those exist, this doc is the contract to build against.
 ## Personal-agent workflow learning
 
 PAA-09 in the [delivery plan](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-adopts reusable procedural learning inspired by Hermes and Claude skills. It
+adopts reusable procedural learning inspired by reference platform and the Anthropic assistant skills. It
 begins with an independently verified outcome, proposes a versioned
 instruction-only skill, measures it on fresh fixtures and regression replay
 (Section 6), and requires owner review/activation of its dependencies and

@@ -169,19 +169,17 @@ reasoning block (Anthropic's `signature_delta`) are not text and must not.
 
 ---
 
-## Provider breadth and resilience: comparison with Hermes Agent (2026-10-18)
+## Provider breadth and resilience: comparison with reference personal agent (2026-10-18)
 
-The owner asked how [Hermes Agent](https://hermes-agent.nousresearch.com/docs/integrations/providers)
-manages many inference providers and on-device models, and for the same in
-Raiker. Hermes keeps everything in `~/.hermes/config.yaml` with keys in
-`~/.hermes/.env`; Raiker keeps the same decisions in profiles, the encrypted
-vault and governed gates. What each has:
+The owner asked how comparable personal-agent products manage many inference
+providers and on-device models, and for the same in Raiker. Raiker keeps those
+decisions in profiles, the encrypted vault and governed gates. What Raiker has:
 
-| Hermes Agent | Raiker | Status |
+| Capability | Raiker | Status |
 |---|---|---|
-| OAuth/subscription logins (Nous Portal, Codex, Copilot, Claude Max, …) | ChatGPT subscription through the local Codex client | Partial — others not planned without each vendor's sanctioned third-party flow |
+| OAuth/subscription logins | ChatGPT subscription through the local subscription client | Partial — others not planned without each vendor's sanctioned third-party flow |
 | ~20 API-key providers | Anthropic, OpenAI, Gemini, OpenRouter, Hugging Face, Ollama Cloud, **DeepSeek, Groq, Mistral, xAI, Together AI, Fireworks, NVIDIA NIM, Cerebras** | Shipped (the eight in bold added 2026-10-18 as ordinary gated profiles) |
-| Local: Ollama, LM Studio, llama.cpp, vLLM, SGLang, custom | Ollama (detected over loopback, per-model location and capabilities), LM Studio, managed llama.cpp and MLX slots, one OpenAI-compatible endpoint | Shipped; Raiker manages llama.cpp/MLX itself, which Hermes does not |
+| Local runtime support | Ollama (detected over loopback, per-model location and capabilities), LM Studio, managed llama.cpp and MLX slots, one OpenAI-compatible endpoint | Shipped |
 | Named custom endpoints (`providers:` with `extra_headers`, `extra_body`, `key_cmd`) | Four `generic-openai-compatible` slots, each named by the owner, with its own endpoint, key, catalogue and readiness | Shipped 2026-10-18 (FIXED-935); `extra_headers`/`extra_body`/`key_cmd` not exposed |
 | `fallback_providers`, turn-scoped, auth/404 immediate, 429/5xx after retries | Owner fallback sequence, turn-scoped, one transport retry, capability breaker | Shipped; reset-aware benching across turns is a gap |
 | Credential pools (same-provider key rotation) | Up to three backup keys per connection; 429 benches a key 60 s and an empty quota 1 h, and the request moves to the next key in the same turn | Shipped 2026-10-18 (FIXED-937); bench state is per process |

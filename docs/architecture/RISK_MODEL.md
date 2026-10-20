@@ -133,32 +133,32 @@ worse than not having one.
 
 Both were read for this design rather than recalled.
 
-**Claude Code** treats risk as a property of the action and checks it against
+**external coding assistant** treats risk as a property of the action and checks it against
 published rule lists — what the auto-mode classifier
-[blocks and allows by default](https://code.claude.com/docs/en/permission-modes),
+blocks and allows by default,
 plus two path classes: *protected* paths that no mode auto-writes, and *critical*
 paths that no allow rule and no `PreToolUse` hook may approve for removal. The
-lists are data an owner can print (`claude auto-mode defaults`). The signals above
+lists are data an owner can print (`external auto-mode defaults`). The signals above
 are the same idea reduced to the questions that separate the bands rather than to
 an enumeration of cases.
 
-**Codex** splits it differently and more sharply: a *sandbox mode*
+**local subscription client** splits it differently and more sharply: a *sandbox mode*
 (`read-only`, `workspace-write`, `danger-full-access`) sets the boundary and an
 *approval policy* (`untrusted`, `on-request`, `never`) says what happens when an
 action needs to leave it. Risk, in that model, is the single question *does this
 have to cross the boundary?*
-([Codex sandboxing](https://learn.chatgpt.com/docs/sandboxing).)
+([local subscription client sandboxing](https://learn.chatgpt.com/docs/sandboxing).)
 
-Raiker takes Codex's question — `crosses_sandbox_boundary` — and can answer it
+Raiker takes local subscription client's question — `crosses_sandbox_boundary` — and can answer it
 more honestly, because its OS boundary is measured rather than asserted. It takes
-Claude Code's insistence that the rules are published data. And it keeps one
+external coding assistant's insistence that the rules are published data. And it keeps one
 property neither has: **a band is recorded with the signals that produced it**, so
 an assessment can be recomputed from the audit trail months later instead of
 being trusted.
 
 ### Deliberately not built
 
-Claude Code's classifier treats a boundary the owner states in conversation
+external coding assistant's classifier treats a boundary the owner states in conversation
 ("don't push until I've reviewed it") as a block signal that stays in force until
 lifted. Raiker has nowhere to put that today: it would need a stored,
 owner-visible constraint rather than a model's recollection of a sentence, and a

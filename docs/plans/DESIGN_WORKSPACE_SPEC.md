@@ -249,7 +249,7 @@ an effect.
 This document does not authorise a multi-user design administration product,
 unbounded cloud storage, public sharing by default, automated publication,
 automatic code changes, hidden provider fallback, general-purpose raster
-painting tools, or claiming Claude Design/ChatGPT Images parity before matched
+painting tools, or claiming the Anthropic assistant Design/ChatGPT Images parity before matched
 outcome evidence exists.
 
 ## Acceptance and delivery evidence

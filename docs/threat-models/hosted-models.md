@@ -70,7 +70,7 @@ log, and the variable neither opens nor closes anything. See
 | Unsafe endpoints refused | Embedded user info (`endpoint_userinfo_rejected`), whitespace/backslashes or invalid ports (`endpoint_invalid`), and numeric hosts that are not a plain dotted IPv4 address (`endpoint_ambiguous_host`). |
 | Gate off ⇒ no provider | `provider_runtime_policy_from_gates`; an explicit revocation always wins, re-read per provider build. |
 | Owner-scoped | Connections are read by `(principal_id, profile_id)` from the encrypted vault; another principal's or another profile's connection is never consulted. |
-| Agents cannot authorize | A connection is created, changed or removed only through the authenticated owner's `PUT /api/models/{profile_id}/connection` (and the Codex sign-in route). No action, tool, plugin or model output reaches those. |
+| Agents cannot authorize | A connection is created, changed or removed only through the authenticated owner's `PUT /api/models/{profile_id}/connection` (and the local subscription client sign-in route). No action, tool, plugin or model output reaches those. |
 | Credentials | From the owner's connection, or — for a connection the owner saved to use it — the provider's own environment variable. Never from action arguments, never logged, never in artifacts or events. |
 | Hosted requires TLS | `hosted_https_required` (executor) and `hosted_http_endpoint_rejected` (endpoint policy) unless the profile sets `allow_remote_http`. Private-network HTTP is allowed. |
 | Endpoint kind pinned | Hosted executor accepts only `remote_hosted`; private-network executor only `private_network` (`endpoint_kind_not_allowed:*`). |

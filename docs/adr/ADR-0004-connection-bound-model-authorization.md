@@ -41,14 +41,12 @@ with the first, and wrong where it did not:
   already made by connecting a provider, which `HANDOFF.md` → "Security
   posture" rejects.
 
-### Hermes Agent, for comparison
+### Comparable personal-agent setup
 
-Hermes Agent's provider setup is `~/.hermes/config.yaml` (`provider`,
-`base_url`, `model`, or named `custom_providers`) plus secrets in
-`~/.hermes/.env`, set interactively with `hermes model` and checked with
-`hermes doctor`. Configuring a provider is the whole of the setup: there is no
-second host allowlist. That is the experience this ADR adopts. What Raiker keeps
-that Hermes does not have: per-owner encrypted connections, capability gates
+Comparable personal-agent implementations keep provider selection and secrets in
+user-scoped configuration and environment files. Configuring a provider is the
+whole of their setup: there is no second host allowlist. That is the experience
+this ADR adopts. Raiker additionally keeps per-owner encrypted connections, capability gates
 whose explicit revocation always wins, approvals and audit on every governed
 action, and — new here — an origin binding that an environment override or an
 agent cannot move.

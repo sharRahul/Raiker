@@ -441,11 +441,11 @@ Anthropic issues API keys only — there is no account sign-in to connect.
 
 Some Anthropic keys are **identity-linked** — a *personal* or *service account*
 key created without being scoped to one workspace (Anthropic's
-[authentication guide](https://platform.claude.com/docs/en/manage-claude/authentication)
+authentication guide
 explains the key types). They authenticate perfectly well, but each request must
 name the workspace it acts in, so the provider refuses any request that does not.
 The workspace ID starts `wrkspc_` and is in the **ID** column of **Settings →
-Workspaces** in the Claude Console. Raiker says so and offers the field rather than telling you to go and find
+Workspaces** in the the Anthropic assistant Console. Raiker says so and offers the field rather than telling you to go and find
 a different key:
 
 > *This key is identity-linked, so it acts inside one workspace. Add the
@@ -476,19 +476,19 @@ the workspace header only when you have named one.
 ### Using a ChatGPT subscription instead of a key
 
 The **ChatGPT subscription** card is a different path from the OpenAI card, and
-it is not an API key. It talks to a compatible **Codex** client installed on
-this machine, over that client's local process interface. Codex opens the
+it is not an API key. It talks to a compatible **local subscription client** client installed on
+this machine, over that client's local process interface. local subscription client opens the
 browser sign-in, holds the tokens, and knows what your plan includes; Raiker
 receives the signed-in state, the plan name, and the model identifiers — nothing
 else. No token, refresh token, device code or sign-in URL is ever stored by
 Raiker.
 
-* **Sign in with ChatGPT** starts the flow in Codex. If Codex is not installed,
+* **Sign in with ChatGPT** starts the flow in local subscription client. If local subscription client is not installed,
   the card says so; Raiker does not download or install it for you.
-* **If Codex is already signed in, Raiker does not use that account until you
+* **If local subscription client is already signed in, Raiker does not use that account until you
   say so.** The card says an account is signed in on this device and offers
   **Use this subscription** beside **Use a different account**. Reading the
-  status never connects anything — on a shared machine the account Codex holds
+  status never connects anything — on a shared machine the account local subscription client holds
   may not be yours.
 * Once connected the card names the plan — "ChatGPT Plus connected" — and keeps
   **Switch account** and **Sign out** available, so an owner with more than one

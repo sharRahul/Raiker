@@ -768,27 +768,27 @@ governed vertical slice at a time.
 
 This backlog is informed by provider documentation, not only OpenAI research:
 
-- **Claude and Claude Cowork:** projects have isolated chat history, knowledge,
-  attachments, and instructions; Cowork combines connected tools, scheduled
+- **the Anthropic assistant and external workspace assistant:** projects have isolated chat history, knowledge,
+  attachments, and instructions; external workspace assistant combines connected tools, scheduled
   work, plugins, explicit folder/tool bounds, deletion approval, computer-use
-  safeguards, and enterprise observability. Claude also separates project chat
+  safeguards, and enterprise observability. the Anthropic assistant also separates project chat
   search/memory and supports memory import/export. This reinforces items 1, 3,
   4, 5, 6, 7, and 11.
-- **Claude Code:** persistent project context, skills, isolated subagents and
+- **external coding assistant:** persistent project context, skills, isolated subagents and
   teams, MCP, lifecycle hooks, and distributable plugins separate reusable
   workflows from deterministic guardrails. This informs items 6, 8, and 9.
-- **OpenAI Codex:** skills, plugins, scheduled work, sandboxed task execution,
+- **OpenAI local subscription client:** skills, plugins, scheduled work, sandboxed task execution,
   and record/replay demonstrate the value of maintainable, testable automation.
   This informs items 4, 6, and 8.
-- **Hermes Agent:** persistent memory, self-created/reused skills, command
+- **reference personal agent:** persistent memory, self-created/reused skills, command
   approval/container isolation, cron delivery, and a messaging gateway make
   memory controls, bounded automation, and transport governance product-level
   concerns. This informs items 3, 4, 8, and 10.
-- **OpenClaw:** a single self-hosted gateway owns channel routing, sessions,
+- **reference platform:** a single self-hosted gateway owns channel routing, sessions,
   device pairing, typed events, health, and idempotent side effects. This
   informs item 10.
 
-Primary sources: [Claude support collection](https://support.claude.com/en/collections/4078531-claude), [Claude Projects](https://support.claude.com/en/articles/9517075-what-are-projects), [Claude chat search and memory](https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context), [Claude memory import/export](https://support.claude.com/en/articles/12123587-import-and-export-your-memory-from-claude), [Cowork support collection](https://support.claude.com/en/collections/19667525-claude-cowork), [Cowork project tasks](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Cowork computer use](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [Cowork OpenTelemetry](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry), [Claude Code documentation](https://code.claude.com/docs/en/), [Claude Code extensions](https://code.claude.com/docs/en/features-overview), [Claude Code hooks](https://code.claude.com/docs/en/agent-sdk/hooks), [OpenAI Codex manual](https://developers.openai.com/codex/codex-manual.md), [Hermes Agent documentation](https://hermes-agent.nousresearch.com/docs), [OpenClaw overview](https://docs.openclaw.ai/), and [OpenClaw gateway architecture](https://docs.openclaw.ai/concepts/architecture).
+Primary sources: the Anthropic assistant support collection, the Anthropic assistant Projects, the Anthropic assistant chat search and memory, the Anthropic assistant memory import/export, external workspace assistant support collection, external workspace assistant project tasks, external workspace assistant computer use, external workspace assistant OpenTelemetry, external coding assistant documentation, external coding assistant extensions, external coding assistant hooks, [OpenAI local subscription client manual](https://developers.openai.com/), reference personal agent documentation, reference platform overview, and reference platform gateway architecture.
 
 ## Next implementation slice — requires design approval
 

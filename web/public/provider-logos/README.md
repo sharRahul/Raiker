@@ -10,7 +10,7 @@ provider next to its model. They do not imply endorsement or sponsorship.
 | OpenRouter | [OpenRouter official integration demo](https://openrouterteam.github.io/sign-in-with-openrouter/) | Published integration SVG |
 | Hugging Face | [Hugging Face brand assets](https://huggingface.co/brand) | Official downloadable asset |
 | OpenAI | [OpenAI Blossom](https://commons.wikimedia.org/wiki/File:OpenAI_logo_2025_%28symbol%29.svg), attributed to OpenAI | Exact square symbol; subject to [OpenAI's marks terms](https://openai.com/brand/) |
-| ChatGPT subscription (Codex) | Same OpenAI symbol as above | The subscription is an OpenAI account reached through the local Codex client |
+| ChatGPT subscription | Same OpenAI symbol as above | The subscription is an OpenAI account reached through the local subscription client |
 | Google | [Google hosted brand icon](https://www.gstatic.com/images/branding/product/ico/googleg_lodp.ico) | Official brand asset; subject to Google's brand-feature guidance |
 
 Local runtimes and custom endpoints have no published, redistributable mark,

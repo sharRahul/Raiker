@@ -126,21 +126,21 @@ not code audits, parity claims or a promise to reproduce every feature.
 
 | Reference and source | Idea to adopt | Adaptation for Raiker | Acceptance owner |
 |---|---|---|---|
-| [Muse product](https://ai.meta.com/muse/) | Delegate a goal and keep progress moving across sessions | Durable goal with success criteria, plan revisions, task links and confirmed outcomes | PAA-01/02/08 |
-| [Meta Muse product workflow](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) | Finish workflows, show the concrete effect, distinguish pending from confirmed, recover without duplicate effects | Typed effect contracts, account/destination-bound approvals, provider receipts and reconciliation | PAA-05/08 |
-| [Claude projects](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork) | Reuse files, instructions and work context in projects | Reuse Raiker projects and personal context; distinguish filing from retrieval scope | PAA-03/07 |
-| [Claude scheduled tasks](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork) | Recurring work produces finished outputs with connected tools | Extend the existing scheduler and task threads; identify the actual host that must be running | PAA-04/07 |
-| [Claude skills](https://support.claude.com/en/articles/12512176-what-are-skills) | Package repeatable procedures and load relevant context progressively | Versioned instruction-only skills with reviewed tool dependencies and owner activation | PAA-09 |
-| [OpenClaw heartbeat](https://docs.openclaw.ai/gateway/heartbeat) | Proactive checks can stay quiet when there is nothing useful to report | Opt-in standing intent with bounded polling, deduplication and usefulness measurement | PAA-04 |
-| [OpenClaw automation](https://docs.openclaw.ai/automation/cron-jobs) and [channels](https://docs.openclaw.ai/channels) | Persistent gateway, scheduled work and delivery through familiar channels | Reuse the Raiker host, scheduler and authenticated channel gateway; preserve sender and target checks | PAA-04/10 |
-| [Hermes memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory/) | Personal context and past work improve later tasks | Governed preferences and episodes with provenance, freshness, correction and deletion | PAA-03 |
-| [Hermes skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills/) | Successful work becomes reusable procedural knowledge | Propose a skill from a verified outcome, evaluate it and review its authority before activation | PAA-09 |
+| reference personal agent product | Delegate a goal and keep progress moving across sessions | Durable goal with success criteria, plan revisions, task links and confirmed outcomes | PAA-01/02/08 |
+| reference personal agent product workflow | Finish workflows, show the concrete effect, distinguish pending from confirmed, recover without duplicate effects | Typed effect contracts, account/destination-bound approvals, provider receipts and reconciliation | PAA-05/08 |
+| the Anthropic assistant projects | Reuse files, instructions and work context in projects | Reuse Raiker projects and personal context; distinguish filing from retrieval scope | PAA-03/07 |
+| the Anthropic assistant scheduled tasks | Recurring work produces finished outputs with connected tools | Extend the existing scheduler and task threads; identify the actual host that must be running | PAA-04/07 |
+| the Anthropic assistant skills | Package repeatable procedures and load relevant context progressively | Versioned instruction-only skills with reviewed tool dependencies and owner activation | PAA-09 |
+| reference platform heartbeat | Proactive checks can stay quiet when there is nothing useful to report | Opt-in standing intent with bounded polling, deduplication and usefulness measurement | PAA-04 |
+| reference platform automation and channels | Persistent gateway, scheduled work and delivery through familiar channels | Reuse the Raiker host, scheduler and authenticated channel gateway; preserve sender and target checks | PAA-04/10 |
+| reference platform memory | Personal context and past work improve later tasks | Governed preferences and episodes with provenance, freshness, correction and deletion | PAA-03 |
+| reference platform skills | Successful work becomes reusable procedural knowledge | Propose a skill from a verified outcome, evaluate it and review its authority before activation | PAA-09 |
 
-Claude's current help pages describe a gradual unified Claude experience and
+the Anthropic assistant's current help pages describe a gradual unified the Anthropic assistant experience and
 remote scheduling, with older locally scheduled tasks retaining their host.
 Record the exact surface, plan and execution host in any comparison. Raiker's
 local scheduler does not inherit another product's remote availability.
-Muse's persistent VM is inspiration for continuity, not evidence that Raiker
+reference personal agent's persistent VM is inspiration for continuity, not evidence that Raiker
 has a persistent browser or VM; bounded browser work remains ADD-23/PAA-06.
 
 ## Existing foundations and remaining work
@@ -314,7 +314,7 @@ No login, CAPTCHA, MFA or identity-check bypass is part of the target.
 Consequential effects require the applicable exact human decision and current
 scope. Changed price, recipient, destination, arguments or plan/envelope version
 invalidates the covered proposal. Existing Raiker decision modes and critical
-approval lifecycle remain authoritative; Muse permission defaults are not copied.
+approval lifecycle remain authoritative; reference personal agent permission defaults are not copied.
 
 **Repository work (2026-10-12).** GitHub repositories follow the
 [GitHub connection specification](../architecture/GITHUB_CONNECTION_SPEC.md) (DEC-21b as
@@ -369,9 +369,9 @@ authority dependencies. No UI infers completion, readiness or allowed actions
 from model prose. Goal controls wait for backend contracts; existing work modes,
 model choice, lifecycle and permission decisions remain.
 
-## Meta Muse distinction and benchmark scope — 2026-10-12
+## reference personal agent distinction and benchmark scope — 2026-10-12
 
-The reference is **Meta Muse, the personal AI agent**, not a generic muse.ai service, **Muse Code**, or the **Muse Wonder/Wonder Full** models. Meta's [product launch](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/) documents persistent goals, cloud Secure VM/browser, background execution, app connections, remembered context and owner-reviewed consequential actions; its [security engineering description](https://research.meta.ai/blog/security-and-safety-for-ai-agents-our-approach-with-muse/) provides the vendor's containment design. The [2026-10-12 model release](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) describes Active Memory/Active Focus as model properties and is not evidence that Muse's finished-work success rate improved. Raiker adapts the experience through PAA-01/02/03/04/05/06/08/10 while retaining user-selected inference and owner-scoped authority. Exact comparison tests and permission/host differences are in [RCD-10](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). No parity claim or activation is implied.
+The reference is **reference personal agent, the personal AI agent**, not a generic reference personal agent service, **reference personal agent Code**, or the **reference personal agent Wonder/Wonder Full** models. Meta's product launch documents persistent goals, cloud Secure VM/browser, background execution, app connections, remembered context and owner-reviewed consequential actions; its security engineering description provides the vendor's containment design. The 2026-10-12 model release describes Active Memory/Active Focus as model properties and is not evidence that reference personal agent's finished-work success rate improved. Raiker adapts the experience through PAA-01/02/03/04/05/06/08/10 while retaining user-selected inference and owner-scoped authority. Exact comparison tests and permission/host differences are in [RCD-10](PERSONAL_AUTONOMOUS_AGENT_SPEC.md). No parity claim or activation is implied.
 
 ## Consolidated personal-agent delivery register
 

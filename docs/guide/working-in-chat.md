@@ -11,7 +11,7 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 At rest the composer carries four things, and nothing else:
 
 ```text
-[ + ]  [ Tools ]        Project Raiker · 2 files · 8%   Claude Sonnet 4.5  [ Send ]
+[ + ]  [ Tools ]        Project Raiker · 2 files · 8%   the Anthropic assistant Sonnet 4.5  [ Send ]
 ```
 
 `+` brings something *into* this turn. **Tools** asks Raiker to do a kind of

@@ -28,7 +28,7 @@ enters the turn.
 
 Panels are worth naming precisely, and the precise statement changed on
 2026-08-23. No *plugin component* in any compared platform is a panel —
-[Claude Code's plugin components](https://code.claude.com/docs/en/plugins-reference)
+external coding assistant's plugin components
 are skills, agents, hooks, MCP servers, LSP servers and monitors — so as a
 **plugin** contribution this is still a gap against this document rather than
 against a reference platform.
@@ -39,8 +39,8 @@ the same job from the other side. **MCP Apps**
 [`modelcontextprotocol/ext-apps`](https://github.com/modelcontextprotocol/ext-apps))
 lets an MCP *server* pre-declare a UI resource under a `ui://` scheme, link it to
 a tool through metadata, and have the host render it in a **mandatory sandboxed
-iframe** with every message travelling over MCP's own JSON-RPC; Claude
-[ships it](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
+iframe** with every message travelling over MCP's own JSON-RPC; the Anthropic assistant
+ships it
 behind a per-app owner permission.
 
 That contract suits Raiker better than a plugin-drawn page would, for three

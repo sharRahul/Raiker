@@ -239,7 +239,7 @@ first. More: [Managing the host](docs/guide/managing-the-host.md#explicit-web-se
 |---|---|
 | On this computer | Ollama, LM Studio, llama.cpp (managed GGUF), MLX on Apple silicon |
 | Your own network | vLLM and any OpenAI-compatible endpoint on your LAN or home lab |
-| Hosted | Anthropic, OpenAI, Google Gemini, OpenRouter, ChatGPT subscription (Codex) and other OpenAI-compatible providers |
+| Hosted | Anthropic, OpenAI, Google Gemini, OpenRouter, ChatGPT subscription through the local subscription client, and other OpenAI-compatible providers |
 
 Raiker detects a local runtime that is already installed. If you want local
 models and have none, Models links to the runtime's official download; Raiker

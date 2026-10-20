@@ -315,8 +315,8 @@ its own decision mode and your approval. Bundles are capped at 2 MB.
 
 The `SKILL.md` format is an open standard —
 [Agent Skills](https://agentskills.io), with a published
-[specification](https://agentskills.io/specification) — implemented by Claude,
-Claude Code, ChatGPT and Codex, Hermes Agent, OpenClaw and around forty other
+[specification](https://agentskills.io/specification) — implemented by the Anthropic assistant,
+external coding assistant, ChatGPT and local subscription client, reference personal agent, reference platform and around forty other
 products. Raiker reads the same file, requires the same two fields, and loads
 skills the same way (index first, body on demand), so a skill from elsewhere
 generally installs here.

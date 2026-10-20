@@ -3,9 +3,9 @@
 Channels allow external interfaces to send messages into Raiker sessions and receive replies, events, approvals, notifications, and task updates.
 
 **Reference and status.** The nearest reference implementations are
-[OpenClaw's channel/gateway model](https://docs.openclaw.ai/concepts/architecture)
-and Hermes Agent's [27+ messaging surfaces](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/);
-Claude Code models a channel as a local MCP server declaring a `claude/channel`
+reference platform's channel/gateway model
+and reference personal agent's 27+ messaging surfaces;
+external coding assistant models a channel as a local MCP server declaring a `external/channel`
 capability ([Model Context Protocol](https://modelcontextprotocol.io/), revision
 `2026-07-28`). How Raiker compares, and what it deliberately does differently, is
 in

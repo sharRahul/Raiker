@@ -101,7 +101,7 @@ task re-verifies them against the live pages before it ships. Items marked
 
 ### 2.2 Design inspiration — not vendor behaviour
 
-Codex and Claude Code are references for the **experience**, not for their
+local subscription client and external coding assistant are references for the **experience**, not for their
 internals, which are not documented and are not assumed here. What is taken
 from their public behaviour: sign in once from a browser or a device code; pick
 repositories rather than paste credentials; work on a local checkout with the

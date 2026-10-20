@@ -11,8 +11,8 @@ Accepted documentation and product direction; staged implementation pending.
 ## Context
 
 The owner requested that architecture and `docs/**` guide Raiker towards a
-personal autonomous agent, drawing ideas from Meta Muse, Claude.ai, OpenClaw and
-Hermes Agent. Raiker already has task/routine execution, Chat/Build, governed
+personal autonomous agent, drawing on external product research. Raiker already
+has task/routine execution, Chat/Build, governed
 memory, connectors, approvals and audit. These do not by themselves establish
 durable personal goals, proactive usefulness or reliable cross-service outcomes.
 
@@ -62,4 +62,8 @@ remote service, financial domain or model-authored skill.
 
 ## Reference clarification — 2026-10-12
 
-The named personal-agent reference is [Meta Muse](https://ai.meta.com/muse/), launched in September 2026. Do not interpret its separate [Muse Wonder model announcement](https://about.fb.com/news/2026/10/introducing-muse-wonder-models/) as implementation or benchmark proof for Raiker. The architecture direction remains accepted; the extended [Meta Muse-specific comparative decisions](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are recommendations until owner acceptance. No new executor, backend or permission default is accepted by this clarification.
+External product research informs the direction but is not an implementation or
+benchmark claim for Raiker. The architecture direction remains accepted; the
+comparative decisions in the [personal-agent specification](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+are recommendations until owner acceptance. No new executor, backend or permission
+default is accepted by this clarification.

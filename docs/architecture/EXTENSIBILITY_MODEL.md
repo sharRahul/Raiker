@@ -10,7 +10,7 @@ For how each surface compares with the reference platforms — including the
 contribution kinds Raiker deliberately refuses — see
 [`REFERENCE_PLATFORM_COMPATIBILITY.md` §2.5–2.6](REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
-Reference inspiration: Claude Code's extension layer (skills, MCP, hooks, subagents, plugins,
+Reference inspiration: external coding assistant's extension layer (skills, MCP, hooks, subagents, plugins,
 channels) sits *on top of* a fixed agentic core; Raiker adopts the same separation. Source of
 truth remains this repository.
 
@@ -97,7 +97,7 @@ plan with execution disabled).
   neither set — the default — a signature is recorded as **Present only**: the
   checksum still catches an accidental edit, but nothing was checked against an
   author. Extensions → Plugins states which of the three levels each installed
-  plugin earned and what would raise it. Neither Claude Code nor Codex verifies
+  plugin earned and what would raise it. Neither external coding assistant nor local subscription client verifies
   manifest authorship at all (LLM03, `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`).
 - Still recommended and not built: a managed allowlist of trusted publishers.
 

@@ -68,8 +68,8 @@
 > hooks sit alongside the other extension surfaces. Sections below are the full design target;
 > not every event/handler is wired yet (see the list above).
 >
-> **Reference alignment (Claude Code `hooks`), corrected 2026-08-23.** The
-> [reference](https://code.claude.com/docs/en/hooks) documents **31 events** and
+> **Reference alignment (external coding assistant `hooks`), corrected 2026-08-23.** The
+> reference documents **31 events** and
 > **5 handler types** (`command`, `http`, `mcp_tool`, `prompt`, `agent`) using a
 > three-level `EventName → matcher → hooks[]` config with an optional `if`
 > condition (e.g. `Bash(git *)`). The matcher, `if` and decision-authority
@@ -99,7 +99,7 @@
 > handler types, both counts and all 15 missing names unchanged.
 >
 > **Updated 2026-08-28.** `ConfigChange` and `prompt` now ship. The current
-> Claude Code reference also makes `ConfigChange` blockable, so the event is
+> external coding assistant reference also makes `ConfigChange` blockable, so the event is
 > parity rather than the differentiator this document previously claimed. The
 > improvement is Raiker's control set: only changed key names cross the hook
 > boundary, prompt output is advisory, content stays out of audit metadata, and

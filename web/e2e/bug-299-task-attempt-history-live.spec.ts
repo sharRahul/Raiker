@@ -16,7 +16,7 @@
  *
  * Prerequisites:
  *   1. `raiker-web --workspace <ws> --port 8765 --no-browser` with
- *      `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com`
+ *      the provider connected on the Models page
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (entered through the UI)
  */
 import { expect, test, type Page } from "@playwright/test";

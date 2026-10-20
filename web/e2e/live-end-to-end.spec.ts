@@ -7,7 +7,7 @@
  *
  * Prerequisites (see docs/plans/TO_BE_FIXED.md for the run recorded from this):
  *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
- *      with RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com
+ *      with the provider connected on the Models page
  *   2. the `hosted_model_runtime` capability enabled and a provider key stored
  *   3. a concrete model selected
  */

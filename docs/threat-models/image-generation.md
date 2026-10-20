@@ -18,12 +18,18 @@ pictures. The two are refused separately and turned on separately.
 2. resolves the model profile the action names, from the registry the owner
    configured on the Models page, and refuses a provider with no governed image
    endpoint by name;
-3. requires `RAIKER_MODEL_EGRESS_ALLOWLIST` to be non-empty and passes it down to
-   the transport, which enforces the host;
-4. resolves the credential from the owner's saved connection or their
-   environment — never from the action;
+3. requires the owner's saved connection for that profile
+   (`model_connection_required`), refuses when the owner has turned hosted models
+   off (`hosted_provider_requires_explicit_policy`), and requires the connection
+   to be bound to the provider's own image origin — `https://api.openai.com` or
+   `https://generativelanguage.googleapis.com` — so a key saved for another
+   endpoint is never sent here (`image_connection_origin_mismatch`);
+4. resolves the credential from that connection, or from the provider's
+   environment variable when the owner saved the connection to use it — never
+   from the action;
 5. builds the provider's endpoint **itself** and POSTs through
-   `sandbox.post_json`, which re-checks the allowlist;
+   `sandbox.post_json` / `post_multipart`, held to that one host and refusing
+   any redirect (`redirect_refused:<status>`);
 6. decodes the response's base64 image, bounded at 8 MB;
 7. stores the bytes in `attachments` (owner-scoped, sha256-addressed) and the
    attempt in `image_generations`.
@@ -35,11 +41,10 @@ from the provider, never taken from the request. An action argument is a thing a
 model can propose, and a proposed URL plus an owner's API key is a credential
 exfiltration primitive. The prompt cannot reach the URL.
 
-**Reach the network without egress.** They cannot: an API key is not
-authorisation to reach a host. `RAIKER_MODEL_EGRESS_ALLOWLIST` is checked before
-the call and enforced inside `post_json`, which is the POST analogue of
-`get_url` and exists so this is not a second implementation of "reach a model
-provider".
+**Reach the network on an environment key alone.** They cannot: an API key is
+not authorisation to reach a host. The owner's saved connection is, and it must
+be bound to the provider's image origin. The transport is held to that one host
+and does not follow a redirect, so the key in the header can only reach it.
 
 **Read the credential out of the record.** Artifacts carry ids, provider, model,
 size and byte count. Never the prompt, never the key, never the bytes. The
@@ -68,6 +73,7 @@ dressed up as a transport failure.
 
 ## Residual risk
 
-An owner who allowlists a wide pattern (`*`) in `RAIKER_MODEL_EGRESS_ALLOWLIST`
-weakens the host boundary for this capability along with every other model call.
-That is the allowlist's documented behaviour, not specific to this capability.
+The provider hosts are fixed in code, so there is no owner-widenable host
+pattern any more. DNS for those hosts is resolved by the operating system at
+send time; dial-time address checks are tracked in
+[`MODEL_TRANSPORT_SECURITY_HARDENING.md`](../plans/MODEL_TRANSPORT_SECURITY_HARDENING.md).

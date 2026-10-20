@@ -2,8 +2,9 @@
 
 What these tests hold is that being a *new* kind of output buys image generation
 no new powers. It is a hosted model call, so it answers to the capability gate,
-the model egress allowlist, and the owner's own credential — and it refuses in
-each of those places by name rather than quietly producing nothing.
+the owner's saved connection for the provider, and the owner's own credential —
+and it refuses in each of those places by name rather than quietly producing
+nothing.
 
 The other half is the record. A refused generation is written down with the same
 care as a successful one, because an owner who pressed Generate and got nothing
@@ -17,11 +18,14 @@ import json
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
+from raiker.auth.vault_key_file import VAULT_KEY_ENV
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.models.connections import put_model_connection
 from raiker.runtime.authority import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import (
@@ -46,7 +50,20 @@ def _ws(tmp_path: Path) -> Path:
     return ws
 
 
-def _enable(ws: Path) -> None:
+@pytest.fixture(autouse=True)
+def _vault_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Saved connections are encrypted; each test brings its own key."""
+    monkeypatch.setenv(VAULT_KEY_ENV, Fernet.generate_key().decode())
+
+
+def _connect(ws: Path, profile_id: str = "openai-hosted", **values: str) -> None:
+    """Save the owner's connection, keyed from their environment unless a key is given."""
+    put_model_connection(
+        SQLiteStore(ws), "principal_owner", profile_id, values or {"credential_source": "environment"}
+    )
+
+
+def _enable(ws: Path, *, connect: bool = True) -> None:
     bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
@@ -61,6 +78,9 @@ def _enable(ws: Path) -> None:
         CAP, "enabled_runtime", None, "test", confirmation_token="confirm"
     )
     assert result.ok is True, result.reason_code
+    if connect:
+        _connect(ws)
+        _connect(ws, "gemini-hosted-openai-compatible")
 
 
 def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
@@ -120,21 +140,19 @@ def test_a_closed_gate_refuses_before_anything_reaches_a_provider(
     ws = _ws(tmp_path)
     bootstrap_owner("owner", "Owner", workspace_root=ws)
     RuntimeControlService(ws).activate_runtime_mode("local_single_user_runtime", None, "test")
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     result = _generate(ws, profile_id="openai-hosted", prompt="a cat", size="1024x1024")
     assert result.decision != "allow" or result.error is not None
 
 
-def test_an_empty_egress_allowlist_refuses(
+def test_an_environment_key_without_a_saved_connection_refuses(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An API key is not authorisation to reach the network."""
+    """An API key is not authorisation to reach the network; a saved connection is."""
     ws = _ws(tmp_path)
-    _enable(ws)
-    monkeypatch.delenv("RAIKER_MODEL_EGRESS_ALLOWLIST", raising=False)
+    _enable(ws, connect=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     result = _generate(ws, profile_id="openai-hosted", prompt="a cat", size="1024x1024")
-    assert result.error == "egress_denied:no_allowlist"
+    assert result.error == "model_connection_required"
 
 
 def test_a_missing_credential_refuses_and_says_where_to_put_one(
@@ -142,7 +160,6 @@ def test_a_missing_credential_refuses_and_says_where_to_put_one(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     result = _generate(ws, profile_id="openai-hosted", prompt="a cat", size="1024x1024")
     assert result.error == "image_provider_credential_missing"
@@ -153,7 +170,6 @@ def test_a_provider_with_no_governed_image_endpoint_fails_closed(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "*")
     result = _generate(
         ws, profile_id="anthropic-hosted", prompt="a cat", size="1024x1024"
     )
@@ -168,7 +184,6 @@ def test_an_unsupported_size_is_refused_rather_than_forwarded(
     without understanding it."""
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "*")
     result = _generate(ws, profile_id="openai-hosted", prompt="a cat", size="9000x9000")
     assert result.error == "unsupported_size:9000x9000"
 
@@ -180,13 +195,12 @@ def test_a_refusal_is_recorded_so_the_page_can_show_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ws = _ws(tmp_path)
-    _enable(ws)
-    monkeypatch.delenv("RAIKER_MODEL_EGRESS_ALLOWLIST", raising=False)
+    _enable(ws, connect=False)
     _generate(ws, profile_id="openai-hosted", prompt="a refused cat", size="1024x1024")
     rows = SQLiteStore(ws).list_image_generations(owner_principal_id="principal_owner")
     assert len(rows) == 1
     assert rows[0]["status"] == "refused"
-    assert rows[0]["reason_code"] == "egress_denied:no_allowlist"
+    assert rows[0]["reason_code"] == "model_connection_required"
     assert rows[0]["prompt"] == "a refused cat"
     assert rows[0]["attachment_id"] is None
 
@@ -196,7 +210,6 @@ def test_a_successful_generation_stores_the_bytes_and_records_the_attempt(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     seen: dict[str, object] = {}
@@ -230,7 +243,7 @@ def test_a_successful_generation_stores_the_bytes_and_records_the_attempt(
     assert attachment["kind"] == "generated_image"
 
     # The endpoint is built from the profile, never taken from the request, and
-    # the allowlist is passed down rather than merely checked beforehand.
+    # the request is held to the provider's one image host.
     assert seen["url"] == "https://api.openai.com/v1/images/generations"
     assert seen["allowlist"] == frozenset({"api.openai.com"})
 
@@ -240,7 +253,6 @@ def test_the_credential_never_reaches_the_record(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-supersecret")
     monkeypatch.setattr(
         tier2_image,
@@ -260,7 +272,6 @@ def test_a_provider_refusal_is_named_rather_than_crashing(
     """A content-policy refusal is an ordinary event, not a broken response."""
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(
         tier2_image,
@@ -276,7 +287,6 @@ def test_an_oversized_image_is_refused_rather_than_stored(
 ) -> None:
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     huge = base64.b64encode(b"\x00" * (tier2_image.MAX_IMAGE_BYTES + 1)).decode()
     monkeypatch.setattr(
@@ -300,7 +310,6 @@ def test_the_list_route_never_returns_bytes_and_the_bytes_route_is_owner_scoped(
 
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(
         tier2_image,
@@ -385,7 +394,6 @@ def test_a_model_the_profile_does_not_declare_is_refused(
     """A chosen model is bounded by the profile, exactly as `size` is."""
     ws = _ws(tmp_path)
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     called = False

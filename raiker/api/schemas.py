@@ -464,6 +464,10 @@ class ModelConnectionRequest(StrictRequest):
     # when the primary is rate limited or out of quota. ``None`` keeps what is
     # stored; ``[]`` clears them.
     backup_api_keys: list[str] | None = Field(default=None, max_length=3)
+    # Authorize this connection with the key already set in the provider's own
+    # environment variable, rather than pasting it. The value is never sent or
+    # stored: the connection records only that its key comes from there.
+    use_environment_credential: bool = False
 
 
 class ModelRoutingRequest(StrictRequest):

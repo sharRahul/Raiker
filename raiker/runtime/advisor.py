@@ -230,14 +230,24 @@ class AdvisorService:
 
     def _default_consult_fn(self) -> ConsultFn:
         def consult(provider: str, model: str, question: str) -> str:
+            from raiker.models.connections import get_model_connection
             from raiker.models.contracts import ModelMessage
             from raiker.models.policy_state import provider_runtime_policy_from_gates
             from raiker.models.registry import ModelProfileRegistry
             from raiker.models.router import ModelRouter
 
+            principal_id = self._principal_id
             router = ModelRouter(
                 ModelProfileRegistry.load(),
-                runtime_policy=provider_runtime_policy_from_gates(self._store, self._principal_id),
+                runtime_policy=provider_runtime_policy_from_gates(self._store, principal_id),
+                # An off-machine advisor is reached through the owner's saved
+                # connection for its profile, like every other model call; no
+                # principal means no connection, and so local profiles only.
+                connection_resolver=lambda profile_id: (
+                    get_model_connection(self._store, principal_id, profile_id)
+                    if principal_id
+                    else None
+                ),
             )
             messages = [ModelMessage(role="user", content=question)]
             # No tools are offered to the advisor: it answers, it does not act.

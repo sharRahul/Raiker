@@ -145,15 +145,15 @@ Three separate things, each with its own remedy, because collapsing them into
 | Gate | What it is | Where you change it |
 |---|---|---|
 | Capability | `image_generation` — off until you turn it on | Permissions |
-| Egress | `RAIKER_MODEL_EGRESS_ALLOWLIST` must name the provider's host | Your environment |
-| Credential | A saved connection for the provider, or its API key variable | Models, or your environment |
+| Connection | A saved connection for the provider, made for its own API address (not a custom endpoint) | Models |
+| Credential | The connection's key, or the provider's key variable if you connected with **Use the key from the environment** | Models |
 
-**An API key is not authorisation to reach the network.** Connecting OpenAI on
-the Models page lets Raiker *use* your credential; allowlisting
-`api.openai.com` is what lets anything leave the machine. The two are separate
-decisions on purpose, and image generation is refused separately from chat for
-the same reason: connecting a provider to answer questions is not asking Raiker
-to spend your credit generating pictures.
+**An API key is not authorisation to reach the network.** A key that is merely
+set in your environment lets nothing leave the machine; connecting OpenAI on the
+Models page is the decision that does, and it authorises OpenAI's own address
+only. Image generation is still refused separately from chat: connecting a
+provider to answer questions is not asking Raiker to spend your credit
+generating pictures.
 
 ## Choosing a model
 

@@ -1,14 +1,25 @@
+"""Hosted / private-network connectivity checks, bound to the owner's saved connection.
+
+The action names a profile. The destination, the credential and the route the
+check takes come from the owner's connection and the provider adapter — never
+from the action — so an agent cannot turn a connectivity check into a probe of
+an address it chose.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+from cryptography.fernet import Fernet
 
+from raiker.auth.vault_key_file import VAULT_KEY_ENV
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
-from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
+from raiker.models.connections import put_model_connection
 from raiker.models.exceptions import ProviderPolicyError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.policy_state import provider_runtime_policy_from_gates
@@ -29,6 +40,12 @@ from tests.factories import governed_action
 _HOSTED = "hosted_model_runtime"
 _PRIVATE = "private_network_model_runtime"
 _DOC = "docs/threat-models/hosted-models.md"
+_OWNER = "principal_owner"
+
+
+@pytest.fixture(autouse=True)
+def _vault_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(VAULT_KEY_ENV, Fernet.generate_key().decode())
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -45,10 +62,17 @@ def _enable(ws: Path, capability: str) -> None:
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (capability, "principal_owner", utc_now(), _DOC),
+            (capability, _OWNER, utc_now(), _DOC),
         )
     result = svc.set_capability_state(capability, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
+
+
+def _owner(ws: Path) -> Principal:
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    raw = SQLiteStore(ws).get_principal(_OWNER)
+    assert raw is not None
+    return Principal(**raw)
 
 
 def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
@@ -56,7 +80,7 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
     authority = RuntimeAuthority(
         store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store)
     )
-    raw = store.get_principal("principal_owner")
+    raw = store.get_principal(_OWNER)
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -70,8 +94,15 @@ def _action(principal_id: str, capability: str, **args: object) -> GovernedActio
     )
 
 
-def _fake_prober(url: str, allowlist: frozenset[str]) -> dict:
-    return {"status": 200, "body_bytes": 42, "truncated": False}
+class _Recorder:
+    """A prober that records where the check would have gone, and sends nothing."""
+
+    def __init__(self) -> None:
+        self.endpoints: list[str] = []
+
+    def __call__(self, factory: ModelProviderFactory, profile: Any) -> dict:
+        self.endpoints.append(factory.resolve(profile, require_model=False).endpoint)
+        return {"model_count": 3}
 
 
 # ── Registry / governance ────────────────────────────────────────────────────
@@ -93,7 +124,7 @@ def test_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action(principal.principal_id, _HOSTED, operation="connectivity_check",
-                endpoint="https://api.example.com"),
+                profile_id="openai-hosted"),
         principal,
     )
     assert result.decision == "disabled_by_capability_gate"
@@ -112,88 +143,148 @@ def test_enable_requires_threat_model_ack(tmp_path: Path) -> None:
 # ── Executor behaviour ───────────────────────────────────────────────────────
 
 
-def test_probe_fails_closed_without_allowlist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(MODEL_EGRESS_ALLOWLIST_ENV, raising=False)
+def test_check_without_a_saved_connection_fails_closed(tmp_path: Path) -> None:
+    """EGR-04: a hosted profile with no connection is never contacted."""
     ws = _ws(tmp_path)
-    _enable(ws, _HOSTED)
-    authority, principal = _authority(ws)
-    result = authority.route_action(
-        _action(principal.principal_id, _HOSTED, operation="connectivity_check",
-                endpoint="https://api.openai.com"),
+    recorder = _Recorder()
+    executor = HostedModelRuntimeExecutor(ws, SQLiteStore(ws), prober=recorder)
+    result = executor.execute(
+        _action(_OWNER, _HOSTED, operation="connectivity_check", profile_id="openai-hosted"),
+        _owner(ws),
+    )
+    assert result.ok is False
+    assert result.reason_code == "model_connection_required"
+    assert recorder.endpoints == []
+
+
+def test_check_resolves_the_destination_from_the_saved_connection(tmp_path: Path) -> None:
+    """EGR-01: a saved hosted connection is checked, with no allowlist anywhere."""
+    ws = _ws(tmp_path)
+    principal = _owner(ws)
+    store = SQLiteStore(ws)
+    put_model_connection(store, _OWNER, "openai-hosted", {"api_key": "sk-test"})
+    recorder = _Recorder()
+    executor = HostedModelRuntimeExecutor(ws, store, prober=recorder)
+    result = executor.execute(
+        _action(_OWNER, _HOSTED, operation="connectivity_check", profile_id="openai-hosted"),
         principal,
     )
-    assert result.error is not None
-    assert result.error.startswith("model_egress_denied:no_allowlist")
+    assert result.ok is True, result.reason_code
+    assert recorder.endpoints == ["https://api.openai.com/v1"]
+    # Metadata only — no URL, host or credential in the artifacts.
+    assert result.artifacts == {
+        "profile_id": "openai-hosted",
+        "provider": "openai",
+        "endpoint_kind": "remote_hosted",
+        "model_count": 3,
+    }
 
 
-def test_probe_rejects_non_allowlisted_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
-    executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
-                     endpoint="https://evil.example.com")
-    result = executor.execute(action, None)  # type: ignore[arg-type]
+@pytest.mark.parametrize(
+    "argument", ["endpoint", "models_path", "url", "base_url", "path"]
+)
+def test_an_action_cannot_choose_the_destination(tmp_path: Path, argument: str) -> None:
+    """EGR-08 / EGR-09 / EGR-25: destination and probe route are not arguments."""
+    ws = _ws(tmp_path)
+    principal = _owner(ws)
+    store = SQLiteStore(ws)
+    put_model_connection(store, _OWNER, "openai-hosted", {"api_key": "sk-test"})
+    recorder = _Recorder()
+    executor = HostedModelRuntimeExecutor(ws, store, prober=recorder)
+    result = executor.execute(
+        _action(
+            _OWNER,
+            _HOSTED,
+            operation="connectivity_check",
+            profile_id="openai-hosted",
+            **{argument: "https://evil.example.com/steal"},
+        ),
+        principal,
+    )
     assert result.ok is False
-    assert result.reason_code == "model_egress_denied:evil.example.com"
+    assert result.reason_code == f"argument_not_accepted:{argument}"
+    assert recorder.endpoints == []
 
 
-def test_hosted_probe_requires_https(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
-    executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
-                     endpoint="http://api.openai.com")
-    result = executor.execute(action, None)  # type: ignore[arg-type]
+def test_hosted_check_refuses_a_private_connection(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    principal = _owner(ws)
+    store = SQLiteStore(ws)
+    put_model_connection(
+        store, _OWNER, "generic-openai-compatible", {"endpoint": "http://192.168.1.20:8000/v1"}
+    )
+    executor = HostedModelRuntimeExecutor(ws, store, prober=_Recorder())
+    result = executor.execute(
+        _action(
+            _OWNER, _HOSTED, operation="connectivity_check", profile_id="generic-openai-compatible"
+        ),
+        principal,
+    )
     assert result.ok is False
-    assert result.reason_code == "hosted_https_required"
+    assert result.reason_code == "endpoint_kind_not_allowed:private_network"
 
 
-def test_hosted_probe_rejects_local_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "*")
-    executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
-                     endpoint="https://127.0.0.1:8080")
-    result = executor.execute(action, None)  # type: ignore[arg-type]
-    assert result.ok is False
-    assert result.reason_code == "endpoint_kind_not_allowed:local_machine"
+def test_private_check_accepts_a_saved_home_lab_connection(tmp_path: Path) -> None:
+    """EGR-02 / EGR-15: a saved private-network HTTP server is checked."""
+    ws = _ws(tmp_path)
+    principal = _owner(ws)
+    store = SQLiteStore(ws)
+    put_model_connection(
+        store, _OWNER, "generic-openai-compatible", {"endpoint": "http://192.168.1.20:8000/v1"}
+    )
+    recorder = _Recorder()
+    executor = PrivateNetworkModelRuntimeExecutor(ws, store, prober=recorder)
+    result = executor.execute(
+        _action(
+            _OWNER, _PRIVATE, operation="connectivity_check", profile_id="generic-openai-compatible"
+        ),
+        principal,
+    )
+    assert result.ok is True, result.reason_code
+    assert recorder.endpoints == ["http://192.168.1.20:8000/v1"]
+    assert result.artifacts["endpoint_kind"] == "private_network"
+    assert "192.168" not in str(result.artifacts)
 
 
-def test_private_probe_accepts_allowlisted_private_host(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "192.168.1.*")
-    executor = PrivateNetworkModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_owner", _PRIVATE, operation="connectivity_check",
-                     endpoint="http://192.168.1.20:8000")
-    result = executor.execute(action, None)  # type: ignore[arg-type]
-    assert result.ok is True
-    # Metadata only — no URL/host/credentials in artifacts.
-    assert result.artifacts == {"endpoint_kind": "private_network", "status": 200, "body_bytes": 42}
+def test_another_principals_connection_is_not_reachable(tmp_path: Path) -> None:
+    """EGR-07: the lookup is keyed by the acting principal."""
+    ws = _ws(tmp_path)
+    principal = _owner(ws)
+    store = SQLiteStore(ws)
+    put_model_connection(store, "principal_someone_else", "openai-hosted", {"api_key": "sk-x"})
+    executor = HostedModelRuntimeExecutor(ws, store, prober=_Recorder())
+    result = executor.execute(
+        _action(_OWNER, _HOSTED, operation="connectivity_check", profile_id="openai-hosted"),
+        principal,
+    )
+    assert result.reason_code == "model_connection_required"
 
 
-def test_probe_governed_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
+def test_probe_governed_end_to_end(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     _enable(ws, _HOSTED)
     store = SQLiteStore(ws)
+    put_model_connection(store, _OWNER, "openai-hosted", {"api_key": "sk-test"})
     registry = build_default_executor_registry(ws, store)
-    # Inject a fake prober so CI performs no real network I/O.
-    registry.register(_HOSTED, HostedModelRuntimeExecutor(ws, prober=_fake_prober))
+    # Inject a recording prober so CI performs no real network I/O.
+    registry.register(_HOSTED, HostedModelRuntimeExecutor(ws, store, prober=_Recorder()))
     authority = RuntimeAuthority(store, EventLogWriter(store), executor_registry=registry)
-    raw = store.get_principal("principal_owner")
+    raw = store.get_principal(_OWNER)
     assert raw is not None
     principal = Principal(**raw)
     result = authority.route_action(
         _action(principal.principal_id, _HOSTED, operation="connectivity_check",
-                endpoint="https://api.openai.com"),
+                profile_id="openai-hosted"),
         principal,
     )
     assert result.decision == "allow" and result.message == "executed"
 
 
-def test_unknown_operation_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
-    executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_owner", _HOSTED, operation="chat", endpoint="https://api.openai.com")
-    result = executor.execute(action, None)  # type: ignore[arg-type]
+def test_unknown_operation_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    executor = HostedModelRuntimeExecutor(ws, SQLiteStore(ws), prober=_Recorder())
+    action = _action(_OWNER, _HOSTED, operation="chat", profile_id="openai-hosted")
+    result = executor.execute(action, _owner(ws))
     assert result.ok is False
     assert result.reason_code == "unknown_operation:chat"
 
@@ -218,38 +309,34 @@ def test_gate_enabled_yields_hosted_provider_policy(tmp_path: Path) -> None:
     assert policy.allow_policy_gated_provider is True
 
 
-def test_hosted_provider_requires_egress_allowlist(
+def test_hosted_provider_requires_a_saved_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv(MODEL_EGRESS_ALLOWLIST_ENV, raising=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-never-real")
     registry = ModelProfileRegistry.load()
     profile = registry.resolve_profile_id("openrouter-policy-gated")
     factory = ModelProviderFactory(
         policy=ProviderRuntimePolicy(allow_hosted_provider=True, allow_policy_gated_provider=True)
     )
-    with pytest.raises(ProviderPolicyError, match="model_egress_denied:no_allowlist"):
+    with pytest.raises(ProviderPolicyError, match="model_connection_required"):
         factory.create(profile, require_model=False)
 
 
-def test_hosted_provider_allowed_with_gate_and_allowlist(
+def test_hosted_provider_allowed_with_gate_and_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "openrouter.ai")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-never-real")
     registry = ModelProfileRegistry.load()
     profile = registry.resolve_profile_id("openrouter-policy-gated")
     factory = ModelProviderFactory(
-        policy=ProviderRuntimePolicy(allow_hosted_provider=True, allow_policy_gated_provider=True)
+        policy=ProviderRuntimePolicy(allow_hosted_provider=True, allow_policy_gated_provider=True),
+        connection={"credential_source": "environment"},
     )
     provider = factory.create(profile, require_model=False)
     assert provider.provider == "openrouter"
 
 
-def test_local_profiles_unaffected_by_model_egress_allowlist(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv(MODEL_EGRESS_ALLOWLIST_ENV, raising=False)
+def test_local_profiles_need_no_connection() -> None:
     registry = ModelProfileRegistry.load()
     profile = registry.resolve_profile_id("raiker-local-llama-cpp")
     provider = ModelProviderFactory().create(profile)

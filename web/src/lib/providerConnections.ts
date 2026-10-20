@@ -56,6 +56,8 @@ export interface ConnectionFields {
   label?: string;
   /** Backup keys rotated in on rate limits or empty quota; omit to keep the saved ones. */
   backupApiKeys?: string[] | null;
+  /** Use the key already set in the provider's environment variable instead of a pasted one. */
+  useEnvironmentCredential?: boolean;
 }
 
 /** Store (or replace) a provider's credential and endpoint. */
@@ -72,6 +74,7 @@ export async function saveConnection(
       (fields.workspaceId ?? "").trim(),
       (fields.label ?? "").trim(),
       fields.backupApiKeys === undefined ? null : fields.backupApiKeys,
+      fields.useEnvironmentCredential === true,
     );
     return { ok: true };
   } catch (error) {

@@ -16,7 +16,9 @@
     );
   });
 
-  const egressOpen = $derived(models?.model_egress_allowlist_configured ?? false);
+  // An off-machine model is reached only through the owner's saved connection
+  // for it; without one every request is refused.
+  const connected = $derived(current?.connection_configured ?? false);
 
   function endpointLabel(kind: string): string {
     switch (kind) {
@@ -38,14 +40,14 @@
   {:else if current.off_machine}
     <a
       class="chip"
-      class:chip-info={egressOpen}
-      class:chip-warn={!egressOpen}
+      class:chip-info={connected}
+      class:chip-warn={!connected}
       href="#/models"
       title={`${providerName(current.provider)} · ${current.model} · ${endpointLabel(current.endpoint_kind)}`}
     >
       <span class="glyph" aria-hidden="true">▲</span>
       Hosted · {providerName(current.provider)}
-      <span class="egress">{egressOpen ? "egress open" : "egress closed"}</span>
+      <span class="egress">{connected ? "connected" : "not connected"}</span>
     </a>
   {:else}
     <a

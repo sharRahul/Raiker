@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import subprocess
+import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,29 @@ from raiker.runtime.command_policy import (
 )
 
 ALLOWED_SHELL_COMMANDS = _ALLOWED_SHELL_COMMANDS
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow a redirect; urllib then raises the 3xx as an ``HTTPError``.
+
+    A redirect is a new destination, and urllib's default handler would follow
+    it with the original request headers — an ``Authorization`` header among
+    them — to wherever the response pointed. The callers that use this decide
+    destinations themselves, so a 3xx is an answer to report, not an
+    instruction to obey.
+    """
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+def _no_redirect_opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(_NoRedirect())
+
+
+def _open_without_redirects(request: urllib.request.Request, timeout: float) -> Any:
+    """Send *request* once; a 3xx comes back as an ``HTTPError``, never a second request."""
+    return _no_redirect_opener().open(request, timeout=timeout)  # noqa: S310
 
 
 class SandboxError(Exception):
@@ -268,9 +292,11 @@ def post_json(
     :func:`post_url` enforces the allowlist but returns only size metadata, and
     :func:`post_json_rpc` returns the body but deliberately enforces *no*
     allowlist because an owner-added MCP endpoint is authorised by the owner
-    adding it. A hosted image model is neither of those: it must answer to
-    ``RAIKER_MODEL_EGRESS_ALLOWLIST`` like every other model call, and its reply
-    is the image.
+    adding it. A hosted image model is neither of those: the caller holds it to
+    the provider's one fixed host, and its reply is the image.
+
+    A redirect is never followed: it is reported as ``redirect_refused:<status>``
+    rather than handed the request — and its credential — to another host.
 
     ``max_bytes`` is generous because the response carries base64 image data;
     the caller still bounds what it will store. Request headers (an API key
@@ -297,9 +323,13 @@ def post_json(
         headers={"Content-Type": "application/json", **(headers or {})},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        with _open_without_redirects(request, timeout) as resp:
             data = resp.read(max_bytes + 1)
     except urllib.error.HTTPError as exc:
+        # A 3xx arrives here too: redirects are not followed (see _NoRedirect),
+        # so the key in the header never reaches the host a response names.
+        if 300 <= exc.code < 400:
+            raise SandboxError(f"redirect_refused:{exc.code}") from None
         raise SandboxError(f"http_error:{exc.code}") from None
     except Exception as exc:
         raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
@@ -334,8 +364,8 @@ def post_multipart(
 
     **This widens no boundary.** Every check :func:`post_json` makes is made here
     in the same order and with the same reason codes: the scheme must be http or
-    https, an absent allowlist denies everything, and the host must match
-    ``RAIKER_MODEL_EGRESS_ALLOWLIST``. What changes is the encoding of the
+    https, an absent allowlist denies everything, the host must match it, and a
+    redirect is refused rather than followed. What changes is the encoding of the
     request body, not who may be reached — the caller still supplies the URL
     built from the owner's configured profile, never from an action argument.
 
@@ -400,9 +430,13 @@ def post_multipart(
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        with _open_without_redirects(request, timeout) as resp:
             data = resp.read(max_bytes + 1)
     except urllib.error.HTTPError as exc:
+        # A 3xx arrives here too: redirects are not followed (see _NoRedirect),
+        # so the key in the header never reaches the host a response names.
+        if 300 <= exc.code < 400:
+            raise SandboxError(f"redirect_refused:{exc.code}") from None
         raise SandboxError(f"http_error:{exc.code}") from None
     except Exception as exc:
         raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
@@ -433,19 +467,14 @@ def _mcp_opener(trust: Any) -> Any:
       as an ``HTTPError``, which :func:`post_json_rpc` re-checks and follows
       deliberately.
     """
-    import urllib.request
 
     from raiker.runtime.web_policy import pinned_https_opener
-
-    class _NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-            return None
 
     if trust.pin and trust.scheme == "https":
         opener = pinned_https_opener(trust.host, trust.pin)
         opener.add_handler(_NoRedirect())
         return opener
-    return urllib.request.build_opener(_NoRedirect())
+    return _no_redirect_opener()
 
 
 def post_json_rpc(

@@ -14,7 +14,7 @@
  *
  * Prerequisites:
  *   1. `python -m raiker.api.serve --workspace <ws> --port 8765 --no-browser`
- *      with RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com
+ *      with the provider connected on the Models page
  *   2. RAIKER_LIVE_ANTHROPIC_KEY in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";

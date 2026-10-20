@@ -26,8 +26,8 @@ Two surfaces, one governance:
    because sending prompt content off-machine is never low-risk), a configured
    advisor profile (unset ⇒ fail closed), and finally the provider call through
    `ModelRouter.achat`, where the provider factory **re-checks** the
-   hosted/private gate, the owner egress allowlist, and the API key exactly as
-   for any chat turn.
+   hosted/private gate, the owner's saved connection for the advisor profile,
+   and the API key exactly as for any chat turn.
 2. **Governed-action executor**
    (`raiker/runtime/executors/models_runtime.py::AdvisorModelRuntimeExecutor`,
    operation `consult`): the activation anchor for the gate. Reached only
@@ -42,7 +42,7 @@ Two surfaces, one governance:
 | Gate off ⇒ nothing runs | `advisor_model_runtime` state read from the persisted control plane; absent/disabled ⇒ `advisor_gate_disabled`. |
 | Default `ask` withholds | Decision mode `ask` (the default) and `auto` return `advisor_withheld:*` without contacting any provider; only an explicit owner `allow` lets the consult run unprompted. |
 | No advisor ⇒ no call | Unset/unknown/test-only advisor profile ⇒ `advisor_not_configured` / `advisor_profile_unknown` / `advisor_profile_not_allowed`. Placeholder-`<model>` profiles are rejected at set time (`model_required_for_profile`). |
-| Provider policy re-checked | The consult goes through the provider factory: hosted/private gate state (`provider_runtime_policy_from_gates`), owner egress allowlist (`RAIKER_MODEL_EGRESS_ALLOWLIST`, empty ⇒ deny), and env-only API keys are enforced per construction — enabling the advisor gate alone opens nothing. |
+| Provider policy re-checked | The consult goes through the provider factory: hosted/private gate state (`provider_runtime_policy_from_gates`), the owner's saved connection for the advisor profile (origin-bound; none ⇒ `model_connection_required`), and its API key are enforced per construction — enabling the advisor gate alone opens nothing. |
 | Bounded exchange | Question capped (8 000 chars), answer truncated (16 000 chars), single non-streamed call, no tools offered to the advisor. |
 | Untrusted output | The answer is wrapped as an untrusted-data block before it reaches the local model; assistant/tool content is never instruction authority (existing runtime invariant). |
 | No data leakage in audit | Broker events and stored tool actions for `consult_advisor` are scrubbed to metadata (`question_length`, answer length, profile/provider/model); executor artifacts are metadata-only. The advisor prompt/answer never enter event payloads. Credentials never leave owner env vars. |
@@ -55,15 +55,16 @@ Enabling `advisor_model_runtime` requires a HUMAN `runtime_gate_manager`, the
 `threat_model_acks` row referencing this document, and a human confirmation
 token. Because the advisor is typically hosted, a *working* consult
 additionally requires the hosted (or private-network) egress path from
-[`hosted-models.md`](hosted-models.md): that gate, the owner egress allowlist,
-and the provider key — none of which this capability grants.
+[`hosted-models.md`](hosted-models.md): that gate, the owner's saved
+connection for the advisor profile, and the provider key — none of which this
+capability grants.
 
 ## Residual risks & non-goals
 
 - A consult sends the local model's **question text** to the advisor provider —
   that content leaves the machine and is subject to the provider's data
   handling. The default-ask decision mode exists so this never happens without
-  a standing owner decision; the egress allowlist bounds *where* it can go.
+  a standing owner decision; the owner's saved connection bounds *where* it can go.
 - A malicious or compromised advisor could return adversarial text. It is
   labelled untrusted data and cannot execute anything by itself; every action
   the local model proposes afterwards still flows through the broker, policy,

@@ -576,8 +576,10 @@ fields; they are never written to source, docs, screenshots, or test fixtures.
    threat-model ack, and enable the runtime gate with a confirmation token. See
    `docs/architecture/HANDOFF.md` → "How a user turns on a hosted provider". Local backends
    (llama.cpp/Ollama/LM Studio) need no hosted gate.
-2. **Set env for the server process only** (never a file):
-   `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` and the provider key env (see matrix).
+2. **Connect the provider** on the Models page (paste the key, or set the
+   provider key env for the server process only — never a file — and tick
+   **Use the key from `<VARIABLE>`**). The saved connection authorises that
+   provider's address; there is no separate egress variable.
 3. **Select the model:** `/model use …` (CLI), or persist a `ModelSessionState`
    for `TERMINAL_MODEL_SESSION_ID` with the profile id and a concrete model.
 4. **Run:** `python -m raiker.api.serve --workspace <ws> --port 8765`, then mint a
@@ -590,7 +592,7 @@ fields; they are never written to source, docs, screenshots, or test fixtures.
 
 `Verified` = a live governed turn has been run through the web app.
 `Ready` = code path implemented; run the procedure above when a key/endpoint is
-available. Egress hosts must be added to `RAIKER_MODEL_EGRESS_ALLOWLIST`.
+available. Each provider is reached only through the owner's saved connection for it.
 
 | Provider | Profile id | Type | Egress host | Key env | Prompt caching | Status |
 |---|---|---|---|---|---|---|

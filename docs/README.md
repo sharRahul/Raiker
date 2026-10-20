@@ -59,6 +59,9 @@ Canonical technical references:
   boundaries and fail-closed behavior.
 - [Security and policy](architecture/SECURITY_AND_POLICY.md) — security
   philosophy and operational rules.
+- [Model destination authorization](adr/ADR-0004-connection-bound-model-authorization.md)
+  — why a saved model connection, not an environment allowlist, decides where a
+  model request may go.
 - [OWASP GenAI mapping](architecture/OWASP_GENAI_SECURITY_MAPPING.md) and
   [OWASP Agentic mapping](architecture/OWASP_AGENTIC_TOP10_MAPPING.md) — control
   coverage tied to the implementation.
@@ -66,6 +69,8 @@ Canonical technical references:
 ## Plans, evidence, and history
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
+- [Model transport security hardening](plans/MODEL_TRANSPORT_SECURITY_HARDENING.md)
+  — the planned dial-time address checks that follow ADR-0004
 - [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 - [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/TESTING.md) and

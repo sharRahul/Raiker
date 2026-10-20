@@ -7,12 +7,16 @@ completion answers to and adds none of its own:
 * the ``image_generation`` capability gate, checked by
   :class:`~raiker.runtime.authority.router.RuntimeAuthority` before an executor
   is reached at all;
-* ``RAIKER_MODEL_EGRESS_ALLOWLIST``, which must already name the provider's
-  host — an API key is not authorisation to reach the network, and the two
-  decisions stay separate here as everywhere else;
-* the owner's saved provider connection, or an owner environment variable.
-  A credential never arrives in an action argument, because an action argument
-  is a thing a model can propose.
+* the ``hosted_model_runtime`` gate, which an owner's explicit revocation turns
+  off here as it does for a chat;
+* the owner's saved provider connection for the profile. An API key in the
+  environment is not authorisation to reach the network on its own: without a
+  saved connection nothing is sent, and the connection must be bound to the
+  provider's own image origin, so a key saved for another endpoint is never
+  sent to this one. The key itself is the connection's, or — for a connection
+  saved to use it — the owner's environment variable. A credential never
+  arrives in an action argument, because an action argument is a thing a model
+  can propose.
 
 What it deliberately does *not* do is invent a second way to reach a provider.
 The endpoint is built from the profile the owner configured on the Models page,
@@ -35,7 +39,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id
-from raiker.models.endpoint_policy import model_egress_allowlist
+from raiker.models.endpoint_policy import canonical_origin
+from raiker.models.exceptions import ProviderPolicyError
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, post_json, post_multipart
 from raiker.storage.sqlite import SQLiteStore
@@ -48,6 +53,14 @@ if TYPE_CHECKING:
 #: than being attempted hopefully — an unsupported provider is a refusal with a
 #: name, not a request that quietly goes nowhere.
 SUPPORTED_PROVIDERS = ("openai", "gemini")
+
+#: The one origin each provider's image requests go to. Fixed here, never built
+#: from a request, and the origin a connection must be bound to before its key
+#: is sent.
+IMAGE_ORIGINS = {
+    "openai": "https://api.openai.com",
+    "gemini": "https://generativelanguage.googleapis.com",
+}
 
 #: What the owner may ask for. A free-text size would be a string this runtime
 #: forwards to a provider without understanding it.
@@ -404,12 +417,11 @@ class ImageGenerationExecutor:
                 source_generation_id=source_id or None, kind=kind, project_id=project_id,
             )
 
-        allowlist = model_egress_allowlist()
-        if not allowlist:
+        denied = self._authorize(principal, profile_id, profile, provider)
+        if denied is not None:
+            reason, summary = denied
             return self._fail(
-                action, principal, "egress_denied:no_allowlist",
-                "Image generation denied: RAIKER_MODEL_EGRESS_ALLOWLIST is empty, so no "
-                "provider host may be reached.",
+                action, principal, reason, summary,
                 profile_id=profile_id, provider=provider, model=model, prompt=prompt, size=size,
                 source_generation_id=source_id or None, kind=kind, project_id=project_id,
             )
@@ -419,7 +431,7 @@ class ImageGenerationExecutor:
             return self._fail(
                 action, principal, "image_provider_credential_missing",
                 f"Image generation denied: no credential is saved for {provider}. Connect it "
-                "on the Models page, or set its environment variable.",
+                "on the Models page.",
                 profile_id=profile_id, provider=provider, model=model, prompt=prompt, size=size,
                 source_generation_id=source_id or None, kind=kind, project_id=project_id,
             )
@@ -446,7 +458,6 @@ class ImageGenerationExecutor:
                 provider_prompt,
                 size,
                 api_key,
-                allowlist,
                 subject=subject_bytes,
                 count=variations,
             )
@@ -558,6 +569,47 @@ class ImageGenerationExecutor:
                 return raw
         return None
 
+    def _authorize(
+        self, principal: Principal, profile_id: str, profile: dict[str, Any], provider: str
+    ) -> tuple[str, str] | None:
+        """Refuse unless the owner's saved connection authorizes this provider's image origin.
+
+        The same three answers a chat gets from the provider factory, asked of the
+        fixed image endpoint: a connection must exist for the profile, the hosted
+        gate must not be revoked, and the connection must be bound to the origin
+        the request is about to be sent to.
+        """
+        from raiker.models.connections import get_model_connection
+        from raiker.models.policy_state import provider_runtime_policy_from_gates
+
+        owner = self._owner(principal)
+        connection = get_model_connection(self._store, owner, profile_id) if owner else None
+        if not connection:
+            return (
+                "model_connection_required",
+                f"Image generation denied: {provider} is not connected. Connect it on the "
+                "Models page.",
+            )
+        if not provider_runtime_policy_from_gates(self._store, owner).allow_hosted_provider:
+            return (
+                "hosted_provider_requires_explicit_policy",
+                "Image generation denied: hosted models are turned off for this account.",
+            )
+        bound = str(connection.get("endpoint", "") or "").strip() or str(
+            profile.get("endpoint") or profile.get("base_url") or ""
+        )
+        try:
+            same_origin = canonical_origin(bound) == canonical_origin(IMAGE_ORIGINS[provider])
+        except ProviderPolicyError:
+            same_origin = False
+        if not same_origin:
+            return (
+                "image_connection_origin_mismatch",
+                f"Image generation denied: this {provider} connection is saved for another "
+                "endpoint, so its key is not sent to the provider's image service.",
+            )
+        return None
+
     def _api_key(
         self, principal: Principal, profile_id: str, profile: dict[str, Any]
     ) -> str:
@@ -599,7 +651,6 @@ def _call_provider(
     prompt: str,
     size: str,
     api_key: str,
-    allowlist: frozenset[str],
     *,
     subject: bytes | None,
     count: int,
@@ -616,20 +667,24 @@ def _call_provider(
     new boundary:
 
     * **OpenAI** takes the image as a file part at ``/v1/images/edits``, so an
-      edit goes through :func:`post_multipart`, which enforces the same
-      allowlist, in the same order, with the same reason codes as
-      :func:`post_json`.
+      edit goes through :func:`post_multipart`, which makes the same checks,
+      in the same order, with the same reason codes as :func:`post_json`.
+
+    Both are held to the provider's one image host and follow no redirect, so
+    the key in the request header can only ever reach that host.
     * **Gemini** takes the image as inline base64 in the same
       ``generateContent`` body it already uses, so an edit is the ordinary JSON
       call with one more part.
     """
+    origin = IMAGE_ORIGINS.get(provider, "")
+    host = frozenset({origin.split("//", 1)[1]}) if origin else frozenset()
     if provider == "openai":
         headers = {"Authorization": f"Bearer {api_key}"}
         if subject is None:
             return post_json(
                 "https://api.openai.com/v1/images/generations",
                 {"model": model, "prompt": prompt, "size": size, "n": count},
-                egress_allowlist=allowlist,
+                egress_allowlist=host,
                 headers=headers,
                 timeout=120.0,
             )
@@ -637,7 +692,7 @@ def _call_provider(
             "https://api.openai.com/v1/images/edits",
             {"model": model, "prompt": prompt, "size": size, "n": str(count)},
             {"image": ("source.png", "image/png", subject)},
-            egress_allowlist=allowlist,
+            egress_allowlist=host,
             headers=headers,
             timeout=180.0,
         )
@@ -665,7 +720,7 @@ def _call_provider(
         return post_json(
             f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
             body,
-            egress_allowlist=allowlist,
+            egress_allowlist=host,
             headers={"x-goog-api-key": api_key},
             timeout=180.0,
         )

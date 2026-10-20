@@ -445,6 +445,7 @@ export const api = {
     workspaceId = "",
     label = "",
     backupApiKeys: string[] | null = null,
+    useEnvironmentCredential = false,
   ) =>
     contract.setModelConnection(profileId, {
       endpoint: endpoint || null,
@@ -454,6 +455,9 @@ export const api = {
       label: label || null,
       // `null` keeps what is stored; `[]` removes every backup key.
       backup_api_keys: backupApiKeys,
+      // Authorize the key already in this provider's environment variable; the
+      // value never crosses the browser. Sent only when chosen.
+      ...(useEnvironmentCredential ? { use_environment_credential: true } : {}),
     }),
   // OpenRouter routing preferences beside the saved connection; "" is the
   // account default. The key is never sent or touched.

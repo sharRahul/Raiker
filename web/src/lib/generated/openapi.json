@@ -19926,6 +19926,11 @@
             ],
             "title": "Label"
           },
+          "use_environment_credential": {
+            "default": false,
+            "title": "Use Environment Credential",
+            "type": "boolean"
+          },
           "workspace_id": {
             "anyOf": [
               {
@@ -20839,6 +20844,18 @@
             "title": "Endpoint Kind",
             "type": "string"
           },
+          "environment_credential_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Environment Credential Env"
+          },
           "image_models": {
             "default": [],
             "items": {
@@ -21708,10 +21725,6 @@
             "title": "Hosted Model Gate State",
             "type": "string"
           },
-          "model_egress_allowlist_configured": {
-            "title": "Model Egress Allowlist Configured",
-            "type": "boolean"
-          },
           "no_silent_hosted_fallback": {
             "default": true,
             "title": "No Silent Hosted Fallback",
@@ -21768,7 +21781,6 @@
           "private_network_model_gate_state",
           "hosted_model_gate_enforced",
           "private_network_model_gate_enforced",
-          "model_egress_allowlist_configured",
           "remote_profile_count"
         ],
         "title": "ModelsView",

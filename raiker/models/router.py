@@ -75,6 +75,7 @@ class ModelRouter:
         writer: EventLogWriter | None = None,
         *,
         runtime_policy: ProviderRuntimePolicy | None = None,
+        runtime_policy_resolver: Callable[[], ProviderRuntimePolicy] | None = None,
         connection_resolver: Callable[[str], dict[str, str] | None] | None = None,
         limit_window_sink: LimitWindowSink | None = None,
         client_pool: ProviderClientPool | None = None,
@@ -97,6 +98,12 @@ class ModelRouter:
 
             runtime_policy = provider_runtime_policy_from_gates(writer.store)
         self.runtime_policy = runtime_policy or ProviderRuntimePolicy()
+        # Read again for every provider this router builds, when given. A router
+        # lives for a whole turn, and a turn makes many model calls: an owner who
+        # revokes the hosted or private-network gate part-way through must stop
+        # the *next* call, not the next turn. Connections are already read per
+        # call through ``connection_resolver``; this does the same for the gates.
+        self.runtime_policy_resolver = runtime_policy_resolver
         self.connection_resolver = connection_resolver
         self.active_profile_id: str | None = None
         self.reasoning: ReasoningOptions | None = None
@@ -120,7 +127,11 @@ class ModelRouter:
         if connection is None:
             connection = self._connection(profile)
         return ModelProviderFactory(
-            policy=self.runtime_policy,
+            policy=(
+                self.runtime_policy_resolver()
+                if self.runtime_policy_resolver is not None
+                else self.runtime_policy
+            ),
             connection=connection,
             limit_window_sink=self.limit_window_sink,
             client_pool=self.client_pool,

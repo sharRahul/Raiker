@@ -86,7 +86,6 @@ function models(partial: Partial<ModelsData>): ModelsData {
     advisor_model_gate_state: "enabled_runtime",
     hosted_model_gate_state: "enabled_runtime",
     private_network_model_gate_state: "enabled_runtime",
-    model_egress_allowlist_configured: false,
     remote_profile_count: 1,
     fallback_sequence: [],
     no_silent_hosted_fallback: true,
@@ -941,6 +940,49 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     });
     render(ModelsView, { tab: "add" });
     await waitFor(() => expect(screen.getByText("Cache 5m")).toBeTruthy());
+  });
+
+  it("connects with the key already in the environment without the page ever seeing it", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      local_only: false,
+      requires_network: true,
+      endpoint_kind: "remote_hosted",
+      off_machine: true,
+      connection_configured: false,
+      environment_credential_env: "ANTHROPIC_API_KEY",
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({ profiles: [anthropic] }),
+      "PUT /api/models/anthropic-hosted/connection": { ok: true, connection_configured: true },
+    });
+    render(ModelsView, { props: { tab: "add" } });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    const dialog = screen.getByRole("dialog");
+    await fireEvent.click(within(dialog).getByRole("checkbox", { name: /ANTHROPIC_API_KEY/ }));
+    // The key box goes away: there is nothing to paste.
+    expect(within(dialog).queryByLabelText("Anthropic API key")).toBeNull();
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Connect" }));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/models/anthropic-hosted/connection",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            endpoint: null,
+            api_key: null,
+            admin_api_key: null,
+            workspace_id: null,
+            label: null,
+            backup_api_keys: null,
+            use_environment_credential: true,
+          }),
+        }),
+      ),
+    );
   });
 
   it("sends the optional usage admin key separately from the inference key", async () => {
@@ -1865,7 +1907,9 @@ describe("ModelsView action-category tabs", () => {
     const posture = await screen.findByLabelText("Off-machine provider posture");
     expect(within(posture).getByText("Hosted model gate")).toBeInTheDocument();
     expect(within(posture).getByText("Private-network gate")).toBeInTheDocument();
-    expect(within(posture).getByText("Egress allowlist")).toBeInTheDocument();
+    expect(within(posture).getByText("Connected off-machine providers")).toBeInTheDocument();
+    // The retired environment allowlist is not a posture an owner has to set.
+    expect(within(posture).queryByText("Egress allowlist")).toBeNull();
     expect(within(posture).getByText("Off-machine profiles")).toBeInTheDocument();
     // On the tab it is about, not on one of its own.
     expect(screen.getByRole("tab", { name: "Add model" })).toHaveAttribute(

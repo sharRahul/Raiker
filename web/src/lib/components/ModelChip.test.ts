@@ -32,7 +32,6 @@ function makeModels(partial: Partial<ModelsView>): ModelsView {
     advisor_model_gate_state: "enabled_runtime",
     hosted_model_gate_state: "enabled_runtime",
     private_network_model_gate_state: "enabled_runtime",
-    model_egress_allowlist_configured: false,
     remote_profile_count: 0,
     fallback_sequence: [],
     no_silent_hosted_fallback: true,
@@ -64,8 +63,8 @@ describe("ModelChip", () => {
     expect(link).toHaveAttribute("title", "GGUF · qwen2.5-7b-instruct · Local");
   });
 
-  it("shows a hosted chip with honest egress state", () => {
-    const hosted = makeProfile({
+  it("shows a hosted chip with its honest connection state", () => {
+    const base = {
       profile_id: "anthropic-hosted",
       provider: "anthropic",
       model: "claude",
@@ -74,23 +73,27 @@ describe("ModelChip", () => {
       endpoint_kind: "remote_hosted",
       off_machine: true,
       selected: true,
+    };
+    const unconnected = makeModels({
+      profiles: [makeProfile(base)],
+      current_profile_id: "anthropic-hosted",
     });
-    const closed = makeModels({ profiles: [hosted], current_profile_id: "anthropic-hosted" });
-    const { unmount } = render(ModelChip, { models: closed });
+    const { unmount } = render(ModelChip, { models: unconnected });
     expect(screen.getByRole("link", { name: /hosted · anthropic/i })).toHaveTextContent(
-      "egress closed",
+      "not connected",
     );
     unmount();
 
-    const open = makeModels({
-      profiles: [hosted],
+    // An off-machine model is reached through the owner's saved connection, and
+    // nothing else; there is no separate environment allowlist to report.
+    const connected = makeModels({
+      profiles: [makeProfile({ ...base, connection_configured: true })],
       current_profile_id: "anthropic-hosted",
-      model_egress_allowlist_configured: true,
     });
-    render(ModelChip, { models: open });
-    expect(screen.getByRole("link", { name: /hosted · anthropic/i })).toHaveTextContent(
-      "egress open",
-    );
+    render(ModelChip, { models: connected });
+    const link = screen.getByRole("link", { name: /hosted · anthropic/i });
+    expect(link).toHaveTextContent("connected");
+    expect(link).not.toHaveTextContent("not connected");
   });
 
   it("falls back to current_profile_id when no profile is flagged selected", () => {

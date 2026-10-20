@@ -368,7 +368,7 @@ approval.
 - Backend: `GET /api/models` (already carries hosted gate/egress metadata); **(new)**
   `POST /api/models/use`, `GET /api/models/health`.
 - Invariants: selecting a hosted profile with unmet preconditions fails closed and
-  renders the exact `reason_code` (`hosted_api_key_missing`, `model_egress_denied`, gate
+  renders the exact `reason_code` (`hosted_api_key_missing`, `model_connection_required`, gate
   disabled) as guidance with a deep link into the Security Settings Guarded Switch flow.
 
 ### 6.6 Extend (plugins, channels, execution environments)
@@ -413,7 +413,7 @@ affordances anywhere.
     (ask/deny) applies immediately, loosening (allow/auto) goes through step-up with a
     reason — as shipped.
   - **Environment posture (read-only):** configured/not-configured indicators for
-    `RAIKER_MODEL_EGRESS_ALLOWLIST`, provider key envs, plugin allowlists and scopes,
+    provider key envs, plugin allowlists and scopes,
     signing keys, container image allowlist. Values never shown.
   - **Secrets:** the truthful notice — redaction/deny-secrets policy shown; *"Secret
     storage is not implemented (deferred)."*

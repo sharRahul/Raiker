@@ -45,6 +45,9 @@ def owner_model_runtime(
         registry,
         writer,
         runtime_policy=provider_runtime_policy_from_gates(store, owner_principal_id),
+        runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
+            store, owner_principal_id
+        ),
         connection_resolver=lambda profile_id: get_model_connection(
             store, owner_principal_id, profile_id
         ),

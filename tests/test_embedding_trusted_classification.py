@@ -29,7 +29,6 @@ _PERSONAL = "My phone number is +44 7700 900123 and I live at 10 Downing Street.
 
 @pytest.fixture
 def harness(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[ModelProviderExecutor, Principal, list[str], SQLiteStore]:
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
     ws = tmp_path / "embed_ws"
     ws.mkdir()
     bootstrap_owner("owner", "Owner", workspace_root=ws)

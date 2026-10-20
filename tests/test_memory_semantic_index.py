@@ -44,7 +44,6 @@ from raiker.vector.backends import (
 _CAP = "model_provider_runtime"
 _TOOL = "model_provider"
 _DOC = "docs/threat-models/model-provider.md"
-_ALLOWLIST_ENV = "RAIKER_MODEL_EGRESS_ALLOWLIST"
 _PROVIDER = "openai"
 _MODEL = "text-embedding-3-small"
 _SPACE = f"{_PROVIDER}:{_MODEL}"
@@ -147,7 +146,6 @@ def test_offered_embedding_models_are_concrete_and_named() -> None:
 def test_index_memories_creates_a_selectable_semantic_space(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -169,11 +167,10 @@ def test_index_memories_creates_a_selectable_semantic_space(
     assert backend.model_label == _SPACE
 
 
-def test_local_index_needs_no_remote_egress_allowlist(
+def test_local_index_needs_no_saved_connection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A loopback embedding is governed, but it is not remote egress."""
-    monkeypatch.delenv(_ALLOWLIST_ENV, raising=False)
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -206,7 +203,6 @@ def test_a_second_run_does_not_re_embed_what_the_first_one_did(
     re-sent the same text would make "keep the index current" cost the same as
     building it from scratch every time.
     """
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -233,7 +229,6 @@ def test_query_is_embedded_once_and_a_paraphrase_reaches_the_vector_leg(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """BUG-240: the selected semantic space now embeds both sides of recall."""
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -287,7 +282,6 @@ def test_managed_file_passage_is_semantic_and_revision_safe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """BUG-240: the same governed query reaches owned document projections."""
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -360,7 +354,6 @@ def test_managed_file_passage_is_semantic_and_revision_safe(
 def test_ask_mode_drops_semantic_leg_without_parking_an_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -382,7 +375,6 @@ def test_ask_mode_drops_semantic_leg_without_parking_an_approval(
 def test_query_embedding_audit_excludes_query_and_vector(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -420,7 +412,6 @@ def test_the_space_is_named_for_the_model_the_owner_chose(
     the whole corpus — for as long as the owner kept the index current. The
     provider's own answer is kept as evidence in the artifacts.
     """
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -453,7 +444,6 @@ def test_the_space_is_named_for_the_model_the_owner_chose(
 def test_nothing_to_index_fails_closed_rather_than_reporting_success(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     calls: list[str] = []
@@ -471,7 +461,6 @@ def test_a_credential_shaped_memory_never_reaches_the_provider(
     A batch that widened it would be the worst possible place to widen it: the
     owner approves one run and every secret-shaped memory leaves the machine.
     """
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -488,7 +477,6 @@ def test_a_credential_shaped_memory_never_reaches_the_provider(
 def test_a_provider_refusal_stops_the_batch_and_reports_what_it_had_done(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)
@@ -515,7 +503,6 @@ def test_a_provider_refusal_stops_the_batch_and_reports_what_it_had_done(
 def test_the_batch_is_bounded_by_the_shared_ceiling(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     _enable(ws)
     store = SQLiteStore(ws)

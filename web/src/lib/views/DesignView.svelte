@@ -460,8 +460,12 @@
   const REASONS: Record<string, string> = {
     disabled_by_capability_gate:
       "Image generation is turned off. Turn it on in Permissions.",
-    "egress_denied:no_allowlist":
-      "No provider host is allowlisted, so nothing may leave this machine. Set RAIKER_MODEL_EGRESS_ALLOWLIST.",
+    model_connection_required:
+      "That provider is not connected. Connect it on the Models page.",
+    image_connection_origin_mismatch:
+      "That connection is saved for another endpoint, so its key is not sent to the provider's image service.",
+    hosted_provider_requires_explicit_policy:
+      "Hosted models are turned off for this account. Turn them back on in Permissions.",
     image_provider_credential_missing:
       "No credential is saved for that provider. Connect it on the Models page.",
     image_model_missing: "That provider has no image model named for it.",
@@ -476,8 +480,8 @@
   function readable(code: string | null): string {
     if (!code) return "Refused";
     if (REASONS[code]) return REASONS[code];
-    if (code.startsWith("egress_denied:"))
-      return `${code.slice("egress_denied:".length)} is not on the model egress allowlist.`;
+    if (code.startsWith("redirect_refused:"))
+      return "The provider answered with a redirect, which Raiker does not follow.";
     if (code.startsWith("image_provider_unsupported"))
       return "That provider has no governed image endpoint in this build.";
     if (code.startsWith("unsupported_size:")) return "That size is not offered.";

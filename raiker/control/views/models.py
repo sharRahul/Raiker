@@ -90,6 +90,11 @@ class ModelProfileView(View):
     off_machine: bool
     selected: bool
     connection_configured: bool = False
+    # The *name* of the environment variable holding this provider's key, when
+    # it is set and no connection is saved yet — never its value. Lets the owner
+    # authorize a key that already lives in their environment (the migration
+    # path from the retired RAIKER_MODEL_EGRESS_ALLOWLIST) without pasting it.
+    environment_credential_env: str | None = None
     usage_admin_configured: bool = False
     workspace_configured: bool = False
     # OpenRouter routing preferences saved with the connection; "" is the
@@ -369,7 +374,6 @@ class ModelsView(View):
     # `state` is untouched, so nothing that already consumes it changes meaning.
     hosted_model_gate_enforced: bool
     private_network_model_gate_enforced: bool
-    model_egress_allowlist_configured: bool
     remote_profile_count: int
     ready_provider_count: int = 0
     # BUG-270 — how many models the owner actually has set up, counted where the

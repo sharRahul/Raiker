@@ -108,14 +108,18 @@ class AgentGateway:
         self.connector_registry = ConnectorRegistry.load()
         self.store.upsert_model_profiles(self.model_registry.list_profiles())
         self.store.upsert_connector_profiles(self.connector_registry.list_profiles())
-        # Provider policy is derived from the persisted capability gates:
-        # hosted/private-network model access stays fail-closed unless the
-        # owner enabled the corresponding gate through the governed control
-        # plane. The owner egress allowlist is re-checked per provider build.
+        # Provider policy is derived from the persisted capability gates and
+        # re-read for every provider build, so an owner's revocation stops the
+        # next model call of a turn already running. Off-machine destinations
+        # are authorized by the owner's saved connection for that profile,
+        # resolved per call below.
         self.model_router = ModelRouter(
             self.model_registry,
             self.writer,
             runtime_policy=provider_runtime_policy_from_gates(self.store, principal_id),
+            runtime_policy_resolver=lambda: provider_runtime_policy_from_gates(
+                self.store, principal_id
+            ),
             connection_resolver=lambda profile_id: get_model_connection(
                 self.store, principal_id, profile_id
             ),

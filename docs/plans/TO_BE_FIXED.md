@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347 and BUG-348, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-349, BUG-350 and BUG-351, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -88,6 +88,9 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
 | [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
+| [BUG-349](#bug-349--model-requests-are-authorized-by-origin-but-the-resolved-address-is-not-checked) | Medium | Models / transport | Open — found 2026-10-20 retiring the model egress allowlist (ADR-0004); planned in [MODEL_TRANSPORT_SECURITY_HARDENING.md](MODEL_TRANSPORT_SECURITY_HARDENING.md) |
+| [BUG-350](#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token) | Medium | Connectors / skills import / transport | Open — found 2026-10-20 while removing redirects from the model helpers |
+| [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -604,6 +607,90 @@ components, then a presentation export.
 
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
+
+## BUG-349 — Model requests are authorized by origin, but the resolved address is not checked
+
+**Severity: Medium. Area: Models / transport. Status: Open — found 2026-10-20
+while retiring `RAIKER_MODEL_EGRESS_ALLOWLIST`
+([ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md),
+[FIXED-1012](FIXED_ITEMS.md#fixed-1012--off-machine-models-needed-an-environment-allowlist-as-well-as-the-owners-connection)).**
+
+**Observed.** An off-machine model request must go to the origin of the owner's
+saved connection, and `classify_endpoint` labels that origin from its text. The
+name is then resolved by httpx or urllib at connect time and the answer is never
+checked: a hosted name that resolves to `10.0.0.5`, `127.0.0.1` or
+`169.254.169.254` is dialled with the owner's key, and a second lookup can
+answer differently from any first one (DNS rebinding).
+
+**Root cause.** Neither transport has a dial-time guard. The retired allowlist
+matched hostnames too, so this predates ADR-0004 and is not made reachable by
+it; `web_policy` already has the address classifier and a pinned opener, used
+only for the agent's web reads and MCP.
+
+**Proposed fix.** [MODEL_TRANSPORT_SECURITY_HARDENING.md](MODEL_TRANSPORT_SECURITY_HARDENING.md):
+resolve once, classify every answer against the connection's declared class,
+always refuse metadata addresses, pin the dialled address (httpx backend,
+`pinned_https_opener` for urllib), and make proxy behaviour explicit. Test
+scenarios NET-01 to NET-12.
+
+**Required user-interface outcome.** A refused dial reads as a policy refusal
+with its own reason on the provider card and in the turn, distinct from a
+connection failure; local and home-lab models keep working.
+
+## BUG-350 — The connector GET helper follows redirects with the owner's token
+
+**Severity: Medium. Area: Connectors / skills import / breach monitoring /
+transport. Status: Open — found 2026-10-20 while removing redirect following
+from the model helpers.**
+
+**Observed.** `sandbox.get_url` checks its host allowlist on the URL it is
+given and then calls `urllib.request.urlopen`, whose default handler follows
+301/302/303/307/308 to any host and re-sends the request headers, an
+`Authorization` header among them. It is used by the GitHub, Gmail, Calendar
+and Slack read connectors, the skill importer and breach monitoring. A
+redirect from an allowlisted host would take an owner token to a host the
+allowlist does not name.
+
+**Evidence (2026-10-20).** Two loopback servers on different ports; the first
+answers `302` to the second. `get_url(first, egress_allowlist={first's
+host:port}, headers={"Authorization": "Bearer tok"})` returned `200`, and the
+second server — not on the allowlist — received `Authorization: Bearer tok`.
+
+**Root cause.** Redirect handling was only ever made explicit for MCP
+(`_mcp_opener`). ADR-0004 moved `post_json` and `post_multipart` to the shared
+no-redirect opener and deliberately left `get_url` alone, because changing
+connector behaviour was out of that change's scope.
+
+**Proposed fix.** Send `get_url` through `_open_without_redirects` as well, and
+for connectors whose APIs legitimately redirect (GitHub archive downloads),
+follow a redirect only after re-checking the new host against the same
+allowlist and dropping `Authorization` on a host change. Tests per connector.
+
+**Required user-interface outcome.** A refused redirect reads as
+`redirect_refused:<status>` in the connector's result, not as a fetch failure.
+
+## BUG-351 — CLI model commands cannot reach a connected hosted provider
+
+**Severity: Low. Area: CLI / models. Status: Open — compatibility consequence of
+ADR-0004, found 2026-10-20.**
+
+**Observed.** The terminal `/model` list, launch and use commands build a
+`ModelRouter` with no owner, so they read no saved connections. Before ADR-0004
+an environment key plus `RAIKER_MODEL_EGRESS_ALLOWLIST` reached a hosted
+provider from those commands; now they refuse with `model_connection_required`
+and work only for local models. Chat turns from the CLI go through
+`AgentGateway` with the owner and are unaffected.
+
+**Root cause.** `raiker/cli/commands.py` predates per-owner connections and
+never resolves the terminal's owner.
+
+**Proposed fix.** Resolve the bootstrapped local owner with
+`resolve_local_principal` and pass `connection_resolver` and
+`runtime_policy_resolver` for that owner, as `owner_model_runtime` does.
+
+**Required user-interface outcome.** `/model` in the terminal lists and
+launches the owner's connected providers, and an unconnected one says
+*connect it in Models* rather than naming an environment variable.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

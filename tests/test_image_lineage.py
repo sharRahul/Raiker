@@ -24,11 +24,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from cryptography.fernet import Fernet
 
+from raiker.auth.vault_key_file import VAULT_KEY_ENV
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.models.connections import put_model_connection
 from raiker.runtime.authority import GovernedActionResult, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import build_default_executor_registry, tier2_image
@@ -86,9 +89,15 @@ def _generate(ws: Path, **args: object) -> GovernedActionResult:
     )
 
 
-def _ready(ws: Path, monkeypatch: pytest.MonkeyPatch, host: str = "api.openai.com") -> None:
+def _ready(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both image providers connected by the owner, keyed from the environment."""
+    monkeypatch.setenv(VAULT_KEY_ENV, Fernet.generate_key().decode())
     _enable(ws)
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", host)
+    store = SQLiteStore(ws)
+    for profile_id in ("openai-hosted", "gemini-hosted-openai-compatible"):
+        put_model_connection(
+            store, "principal_owner", profile_id, {"credential_source": "environment"}
+        )
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("GEMINI_API_KEY", "g-test")
 
@@ -247,7 +256,7 @@ def test_a_gemini_edit_sends_the_subject_inline_on_the_json_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ws = _ws(tmp_path)
-    _ready(ws, monkeypatch, host="generativelanguage.googleapis.com,api.openai.com")
+    _ready(ws, monkeypatch)
     original = _seed_original(ws, monkeypatch)
     seen: dict[str, Any] = {}
 

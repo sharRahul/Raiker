@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -3087,6 +3088,34 @@ async def set_model_connection(
                 values[field] = key
             else:
                 values.pop(field, None)
+    if body.use_environment_credential:
+        # The explicit, owner-made import of an environment key into a saved
+        # connection. An environment variable alone authorizes nothing off this
+        # machine; this is the act that does.
+        env_name = profile.raw.get("api_key_env")
+        if values.get("api_key"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"reason_code": "environment_credential_with_pasted_key"},
+            )
+        if not (isinstance(env_name, str) and env_name and os.environ.get(env_name, "").strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"reason_code": "environment_credential_unavailable"},
+            )
+        values["credential_source"] = "environment"
+    endpoint_env = profile.raw.get("endpoint_env")
+    if (
+        values
+        and not values.get("endpoint")
+        and isinstance(endpoint_env, str)
+        and endpoint_env
+        and os.environ.get(endpoint_env, "").strip()
+    ):
+        # A profile whose address lives in the environment is bound to the
+        # address the owner had when they saved it. Later changes to the
+        # variable do not move the connection; saving again does.
+        values["endpoint"] = os.environ[endpoint_env].strip()
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         store.invalidate_model_readiness(

@@ -157,10 +157,9 @@ def test_launch_accepts_a_hosted_profile_configured_only_by_connection() -> None
 def test_launch_still_refuses_when_nothing_is_saved() -> None:
     """The same profile with nothing saved is still refused, fail-closed.
 
-    The refusal is `model_egress_denied:no_allowlist`, which is the earliest
-    honest one: with no saved connection and no environment allowlist there is
-    no authority to reach `api.anthropic.com` at all, so the credential question
-    is never reached. That is also the measure of GCR-01 — the connection is
+    The refusal is `model_connection_required`, which is the earliest honest
+    one: with no saved connection there is no authority to reach
+    `api.anthropic.com` at all, so the credential question is never reached. That is also the measure of GCR-01 — the connection is
     what authorises this profile's own endpoint, and `launch` could not see it.
     """
     registry = ModelProfileRegistry.load()
@@ -178,7 +177,7 @@ def test_launch_still_refuses_when_nothing_is_saved() -> None:
         client=CLIENT,
     )
     assert result.status == "failed"
-    assert result.message == "model_egress_denied:no_allowlist"
+    assert result.message == "model_connection_required"
 
 
 def test_validate_reads_the_endpoint_the_connection_names() -> None:

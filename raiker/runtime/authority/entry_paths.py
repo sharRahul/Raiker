@@ -263,8 +263,7 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("role_mutation", ENTRY_CONTROL_PLANE),
     # BUG-298 — no `policy_mutation` row: a routed gate nothing proposes is a
     # switch over nothing. Policy is process configuration the runtime reads —
-    # the same footing as the model egress allowlist, deliberately not editable
-    # from a browser session — and `docs/guide/` and `SECURITY_AND_POLICY.md`
+    # deliberately not editable from a browser session — and `docs/guide/` and `SECURITY_AND_POLICY.md`
     # say so where an owner looks.
     # ── The sensitive domains: registered, fail-closed, and reached by nothing ─
     #

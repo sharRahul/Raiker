@@ -34,14 +34,18 @@ def pool() -> ProviderClientPool:
 
 
 @pytest.fixture(autouse=True)
-def _allow_anthropic_egress(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Model egress is process configuration, and these tests resolve a host."""
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.anthropic.com")
+def _anthropic_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests resolve a hosted profile through a saved connection that uses this key."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-used-no-request-is-made")
 
 
+#: A saved connection for the hosted profile, keyed from the environment: an
+#: off-machine endpoint is reached only through one.
+_SAVED = {"credential_source": "environment"}
+
+
 def _hosted_factory(**extra: Any) -> ModelProviderFactory:
-    return ModelProviderFactory(policy=_hosted_policy(), **extra)
+    return ModelProviderFactory(policy=_hosted_policy(), connection=_SAVED, **extra)
 
 
 def _hosted_policy() -> ProviderRuntimePolicy:
@@ -142,7 +146,7 @@ def test_a_router_shares_one_connection_across_its_calls(pool: ProviderClientPoo
 
     async def body() -> None:
         registry = ModelProfileRegistry.load()
-        router = ModelRouter(registry, client_pool=pool)
+        router = ModelRouter(registry, client_pool=pool, connection_resolver=lambda _pid: _SAVED)
         router.runtime_policy = _hosted_policy()
         profile = registry.resolve("anthropic", ANTHROPIC_MODEL)
         clients = set()

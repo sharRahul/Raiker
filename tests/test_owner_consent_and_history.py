@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from raiker.models.connections import list_model_connections, put_model_connection
-from raiker.models.endpoint_policy import ProviderPolicyError, enforce_model_egress
+from raiker.models.endpoint_policy import ProviderPolicyError, authorize_model_destination
 from raiker.models.policy_state import (
     HOSTED_MODEL_GATE,
     gate_explicitly_disabled,
@@ -101,28 +101,32 @@ class TestRevocationStillWins:
 
 class TestEgressFollowsConfiguration:
     def test_an_unconfigured_host_still_fails_closed(self) -> None:
-        with pytest.raises(ProviderPolicyError, match="no_allowlist"):
-            enforce_model_egress("https://api.anthropic.com", kind="remote_hosted")
+        with pytest.raises(ProviderPolicyError, match="model_connection_required"):
+            authorize_model_destination(
+                "https://api.anthropic.com", kind="remote_hosted", connection=None
+            )
 
     def test_a_configured_endpoint_authorises_its_own_host(self) -> None:
-        enforce_model_egress(
+        authorize_model_destination(
             "https://api.anthropic.com",
             kind="remote_hosted",
-            configured_allowlist=frozenset({"api.anthropic.com"}),
+            connection={"api_key": "sk-test"},
+            default_endpoint="https://api.anthropic.com",
         )
 
     def test_configuring_one_host_does_not_open_another(self) -> None:
         # Consent is for the provider the owner configured, not a blanket
         # opening of every off-machine destination.
-        with pytest.raises(ProviderPolicyError, match="evil.example.com"):
-            enforce_model_egress(
+        with pytest.raises(ProviderPolicyError, match="model_connection_origin_mismatch"):
+            authorize_model_destination(
                 "https://evil.example.com",
                 kind="remote_hosted",
-                configured_allowlist=frozenset({"api.anthropic.com"}),
+                connection={"api_key": "sk-test"},
+                default_endpoint="https://api.anthropic.com",
             )
 
-    def test_local_endpoints_are_never_subject_to_egress(self) -> None:
-        enforce_model_egress("http://127.0.0.1:8080", kind="local_machine")
+    def test_local_endpoints_need_no_connection(self) -> None:
+        authorize_model_destination("http://127.0.0.1:8080", kind="local_machine", connection=None)
 
 
 class TestConversationHistory:

@@ -167,6 +167,7 @@ class TestReads:
     def test_models_lists_profiles_without_silent_hosted_fallback(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        # Set to prove it no longer reaches the read model at all.
         monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
         resp = client.get("/api/models", headers=_auth_headers(_token(client)))
         assert resp.status_code == 200
@@ -186,7 +187,7 @@ class TestReads:
         # reports both facts and reads "Off until connected".
         assert body["hosted_model_gate_enforced"] is False
         assert body["private_network_model_gate_enforced"] is False
-        assert body["model_egress_allowlist_configured"] is True
+        assert "model_egress_allowlist_configured" not in body
         assert "api.openai.com" not in resp.text
         ids = [p["profile_id"] for p in body["profiles"]]
         assert "raiker-local-llama-cpp" in ids

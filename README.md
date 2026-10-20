@@ -244,7 +244,11 @@ Raiker detects a local runtime that is already installed. If you want local
 models and have none, Models links to the runtime's official download; Raiker
 never runs a third-party installer for you, and never downloads a model until
 you choose one (sizes are shown first). Hosted-provider keys are stored
-encrypted. See [Connecting a model](docs/guide/connecting-a-model.md).
+encrypted. Connecting a provider once in **Models** is the whole setup: the
+connection authorizes that provider's own address and nothing else, with no
+separate allowlist to configure, and **Permissions → Hosted models** turns every
+hosted provider off again in one step. See
+[Connecting a model](docs/guide/connecting-a-model.md).
 
 ## Working offline
 

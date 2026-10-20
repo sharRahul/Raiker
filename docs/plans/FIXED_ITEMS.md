@@ -1106,6 +1106,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1017](#fixed-1017--the-advisor-ignored-the-owners-saved-connection) | Low | Models / advisor | Fixed 2026-10-20 |
 | [FIXED-1018](#fixed-1018--a-custom-endpoint-could-not-be-on-the-owners-network-or-the-internet) | Medium | Models / custom endpoints | Fixed 2026-10-20 |
 | [FIXED-1019](#fixed-1019--a-loopback-model-request-could-be-handed-to-an-environment-proxy) | Low | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1020](#fixed-1020--permissions-said-hosted-models-was-off-above-a-provider-that-had-just-answered) | Medium | Permissions / models | Fixed 2026-10-20 — found live |
 
 ---
 
@@ -35449,7 +35450,11 @@ EGR-28), `tests/test_phase_4_hosted_model_runtime.py`,
 2/2 on a fresh workspace with `RAIKER_MODEL_EGRESS_ALLOWLIST` set to an
 unrelated host — one log notice, neither the variable's value nor the key in
 the log or `/api/models`
-(`docs/screenshots/2026-10-20-model-connection-authorization/`).
+(`docs/screenshots/2026-10-20-model-connection-authorization/`). Against a real
+provider, `model-connection-anthropic-live.spec.ts` 4/4: an identity-linked
+Anthropic key and workspace ID entered in **Connect** reached *can reach* and
+answered a Haiku 4.5 turn with no allowlist anywhere
+([live record](../architecture/WEB_APP_LIVE_TEST.md#result--2026-10-20-model-connection-authorization-hosted-anthropic-haiku-45)).
 
 ## FIXED-1013 — The connectivity checks took their destination and path from the action
 
@@ -35570,3 +35575,32 @@ for liveness checks.
 owner's proxy settings. Documented in the threat model and the hardening plan.
 
 **Evidence.** `test_egr24_pooled_clients_follow_owner_proxies_except_for_loopback`.
+
+## FIXED-1020 — Permissions said Hosted models was off above a provider that had just answered
+
+**Severity: Medium. Area: Permissions / models. Status: Fixed 2026-10-20 — found live (LC-03).**
+
+**Observed (live, 2026-10-20).** With Anthropic connected and a Haiku 4.5 turn
+just answered, **Permissions → Hosted models** read *Off · Ask me* and *No —
+Raiker cannot use this on this account*, and offered only **Turn on**. The
+Models posture beside it read *On (by connection)*. The owner had no direct way
+to make the explicit revocation that outranks every connection: the only
+control on the row was the opposite one.
+
+**Root cause.** A saved connection is the owner's consent to the hosted and
+private-network gates (`provider_runtime_policy_from_gates`), but the gate view
+asked only the capability admission read, which does not know about
+connections. FIXED-322 had given the Models page the enforcing answer; the
+Permissions row still showed the stored one.
+
+**Fixed.** `CapabilityGateView` gains `enabled_by_connection`, asked of the same
+policy read every model call makes, and `enforced_enabled` includes it for the
+two model gates. The row shows **On by connection**, answers *Yes — on because
+you connected a provider in Models*, explains that turning it off stops every
+provider it covers while the connections stay saved, and offers **Turn off**.
+After it, the posture reads *Off* and a connected card reads **Policy blocked**.
+
+**Evidence.** `test_permissions_report_hosted_models_on_by_connection_and_revocable`,
+`permissionLanguage.test.ts` (on by connection, revocable), live LC-03 in
+`model-connection-anthropic-live.spec.ts`
+(`docs/screenshots/2026-10-20-model-connection-anthropic/04a`, `04`, `05`).

@@ -15,6 +15,29 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-20 (model connection authorization, hosted Anthropic Haiku 4.5)
+
+[ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md) retired
+`RAIKER_MODEL_EGRESS_ALLOWLIST`: a saved connection authorizes its own origin,
+and nothing else is set up. A fresh workspace served by `raiker-web` on
+`127.0.0.1:8765`, started with `RAIKER_MODEL_EGRESS_ALLOWLIST` set to an
+unrelated host (to prove it is ignored), `OPENAI_API_KEY` set to a sentinel
+value, and no Anthropic variable. The identity-linked Anthropic key and its
+workspace ID were typed into the Models dialog by the spec from the run's own
+environment; neither appears in a spec, command, document or screenshot.
+
+| Case | Check | Result |
+|---|---|---|
+| LC-01 | Connecting Anthropic in the UI is the whole setup — key and workspace ID in **Connect**, no allowlist, Haiku 4.5 pinned, **Test** reads *can reach* | ✅ real catalogue and one-token preflight through the saved connection |
+| LC-02 | A real turn answers through the saved connection | ✅ *Reply with exactly the word: connected* → `connected`, Haiku 4.5 |
+| LC-03 | **Permissions → Hosted models** says why it is on, and turning it off refuses the connected provider | ✅ found and fixed in this round ([FIXED-1020](../plans/FIXED_ITEMS.md#fixed-1020--permissions-said-hosted-models-was-off-above-a-provider-that-had-just-answered)): the row read *Off* and offered only **Turn on**; it now reads *On by connection*, *Yes — on because you connected a provider in Models* and offers **Turn off**. After it, the Models posture reads *Off* and the card reads **Policy blocked** — a policy refusal, not a connection failure |
+| LC-04 | Disconnecting takes the provider away | ✅ the card returns to *Not connected* and the posture's connected count drops |
+| LC-05 | An environment key becomes a connection with one owner decision | ✅ the dialog offers **Use the key from `OPENAI_API_KEY`**, the key field disappears, *Connection saved*; `/api/models` reports the connection, no allowlist field, and never the key |
+| LC-06 | The dialog in the dark theme and at 390 px | ✅ no horizontal overflow |
+| LC-07 | The retired variable is ignored and never echoed | ✅ one log line names it; neither its value, the sentinel key nor the Anthropic key appears in the server log |
+| Suites | `model-connection-anthropic-live` 4/4 and `model-connection-authorization-live` 2/2 in one run on a fresh workspace (7.8 min); `composer.spec.ts` (mocked) 16/16 | ✅ |
+| Visual review | `docs/screenshots/2026-10-20-model-connection-anthropic/` (01–06, 04a) and `docs/screenshots/2026-10-20-model-connection-authorization/` (01–04, 06, 07), inspected at original resolution; dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-09-03 (on-device dictation, the boot session probe, a three-width sweep)
 
 A workspace reset with `scripts/reset_live_workspace.py` — the checked reset

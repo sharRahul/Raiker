@@ -119,6 +119,7 @@ export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {
     governance_note: "",
     unset_resolution: "off",
     enforced_enabled: false,
+    enabled_by_connection: false,
     side_effect: "",
     ungoverned_consequence: "",
     authority_requirement: "",

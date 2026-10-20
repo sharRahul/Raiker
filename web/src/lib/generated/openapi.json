@@ -3004,6 +3004,11 @@
             "title": "Default State",
             "type": "string"
           },
+          "enabled_by_connection": {
+            "default": false,
+            "title": "Enabled By Connection",
+            "type": "boolean"
+          },
           "enforced_enabled": {
             "default": false,
             "title": "Enforced Enabled",
@@ -36181,7 +36186,7 @@
     },
     "/api/code/repos/{repo_id}/review/model": {
       "post": {
-        "description": "BR-D04 — ask a connected model to read the exact current patch, once per patch and model.\n\nThe patch is credential-redacted and framed as untrusted data, no tools are\noffered, and the reading is stored by the patch fingerprint and the model.\nIts findings are marked as the model's and never decide whether a turn is\nverified. The request reaches the provider only through the owner's own\nrouter: their gates, egress allowlist and connections apply.",
+        "description": "BR-D04 — ask a connected model to read the exact current patch, once per patch and model.\n\nThe patch is credential-redacted and framed as untrusted data, no tools are\noffered, and the reading is stored by the patch fingerprint and the model.\nIts findings are marked as the model's and never decide whether a turn is\nverified. The request reaches the provider only through the owner's own\nrouter: their gates and saved connections apply.",
         "operationId": "model_review_code_repo_patch_api_code_repos__repo_id__review_model_post",
         "parameters": [
           {
@@ -42994,7 +42999,7 @@
     },
     "/api/model-advisor": {
       "put": {
-        "description": "Persist (or clear) the user-owned advisor model profile (gate-manager only).\n\nSelecting an advisor grants nothing: the consult path is gated by the\nadvisor_model_runtime capability, its decision mode (default ask), and\nprovider policy (hosted/private gate + egress allowlist + key) per call.",
+        "description": "Persist (or clear) the user-owned advisor model profile (gate-manager only).\n\nSelecting an advisor grants nothing: the consult path is gated by the\nadvisor_model_runtime capability, its decision mode (default ask), and\nprovider policy (hosted/private gate + saved connection + key) per call.",
         "operationId": "set_model_advisor_api_model_advisor_put",
         "requestBody": {
           "content": {
@@ -44464,7 +44469,7 @@
     },
     "/api/models/{profile_id}/provider-models": {
       "get": {
-        "description": "On-demand listing of the models a provider serves for one profile.\n\nUser-initiated read; provider policy (gates, egress allowlist, API key) is\nenforced before any network contact, and failures return an honest empty\nlist — model names are never fabricated.",
+        "description": "On-demand listing of the models a provider serves for one profile.\n\nUser-initiated read; provider policy (gates, saved connection, API key) is\nenforced before any network contact, and failures return an honest empty\nlist — model names are never fabricated.",
         "operationId": "list_provider_models_api_models__profile_id__provider_models_get",
         "parameters": [
           {

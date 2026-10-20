@@ -2633,7 +2633,7 @@ async def list_provider_models(
 ) -> dict[str, Any]:
     """On-demand listing of the models a provider serves for one profile.
 
-    User-initiated read; provider policy (gates, egress allowlist, API key) is
+    User-initiated read; provider policy (gates, saved connection, API key) is
     enforced before any network contact, and failures return an honest empty
     list — model names are never fabricated.
     """
@@ -3290,7 +3290,7 @@ async def set_model_advisor(
 
     Selecting an advisor grants nothing: the consult path is gated by the
     advisor_model_runtime capability, its decision mode (default ask), and
-    provider policy (hosted/private gate + egress allowlist + key) per call.
+    provider policy (hosted/private gate + saved connection + key) per call.
     """
     session, _principal = auth_data
     result = _service(request).set_model_advisor(body.profile_id, session.principal_id)

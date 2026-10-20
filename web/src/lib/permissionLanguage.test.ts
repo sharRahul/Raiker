@@ -14,7 +14,13 @@ import {
   permissionPosture,
   rowSummary,
 } from "./permissionLanguage";
-import { capabilityLabel, DECISION_MODES } from "./capabilityModel";
+import {
+  canDisable,
+  capabilityLabel,
+  DECISION_MODES,
+  isAvailable,
+  unsetResolutionNote,
+} from "./capabilityModel";
 
 function gate(partial: Partial<CapabilityGate> = {}): CapabilityGate {
   return {
@@ -236,5 +242,23 @@ describe("the effective posture summary", () => {
       /may use this/,
     );
     expect(availabilityAnswer(gate({ state: "disabled" }), false)).toMatch(/cannot use this/);
+  });
+
+  it("says Hosted models is on because a provider is connected, and offers the revocation", () => {
+    // ADR-0004 — a saved connection is the owner's consent. The row read "Off"
+    // above a provider that had just answered, and offered only "Turn on".
+    const hosted = gate({
+      capability: "hosted_model_runtime",
+      state: "disabled",
+      source: "principal_fail_closed",
+      enforced_enabled: true,
+      enabled_by_connection: true,
+      can_current_principal_change: true,
+    });
+    expect(isAvailable(hosted)).toBe(true);
+    expect(availabilityAnswer(hosted, true)).toMatch(/connected a provider/);
+    expect(unsetResolutionNote(hosted)).toMatch(/Turning it off stops every provider/);
+    expect(unsetResolutionNote(hosted)).not.toMatch(/connected a provider/);
+    expect(canDisable(hosted)).toBe(true);
   });
 });

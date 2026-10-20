@@ -397,7 +397,11 @@ Consent by configuration is scoped, not a blanket opening:
 - Nothing an agent does can create or change a connection. Only you, signed in,
   on the Models page (or the ChatGPT sign-in) can.
 - A capability gate you **explicitly** turn off wins over a saved connection.
-  Revocation is absolute, or the control would be theatre.
+  Revocation is absolute, or the control would be theatre. **Permissions →
+  Hosted models** (and **Home-lab models**) reads **On by connection** while a
+  connection is what keeps it on, and offers **Turn off**; afterwards a
+  connected provider's card reads **Policy blocked**, and your connections stay
+  saved for when you turn it back on.
 - Deferred dangerous domains — finance, medical, pregnancy, CCTV, home
   security, and hardware — have no governed executor and stay unavailable
   regardless. SSH and Daytona execution are separate, explicit owner-profile

@@ -235,7 +235,7 @@ class ModelProfileRegistry:
         #    pick the concrete model at selection time). This makes the direct
         #    ModelRouter path (achat/aembed) consistent with the CLI `/model use`
         #    + gateway path, which already substitute the concrete model. Provider
-        #    policy (gate, egress allowlist, API key) is still enforced later by
+        #    policy (gate, saved connection, API key) is still enforced later by
         #    the provider factory, so this only fills in the model name.
         if model and "<" not in model and ">" not in model:
             for profile in self.profiles:

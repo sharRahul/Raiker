@@ -380,8 +380,8 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         SIDE_EFFECT_EXTERNAL,
         "Text would be sent to an LLM provider to be embedded, which is the same "
         "disclosure as a chat turn wearing the clothes of an index build.",
-        "An owner-enabled gate layered over the egress allowlist, the "
-        "hosted/private gate and environment-only credentials.",
+        "An owner-enabled gate layered over the owner's saved connection for "
+        "the embedding profile and the hosted/private gate.",
     ),
     _row(
         "connector_github_runtime",

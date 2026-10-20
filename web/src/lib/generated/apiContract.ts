@@ -616,6 +616,7 @@ export type CapabilityGateView = {
   governance_note: string;
   unset_resolution: string;
   enforced_enabled: boolean;
+  enabled_by_connection: boolean;
   side_effect: string;
   ungoverned_consequence: string;
   authority_requirement: string;

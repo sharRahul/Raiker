@@ -731,7 +731,7 @@ async def model_review_code_repo_patch(
     offered, and the reading is stored by the patch fingerprint and the model.
     Its findings are marked as the model's and never decide whether a turn is
     verified. The request reaches the provider only through the owner's own
-    router: their gates, egress allowlist and connections apply.
+    router: their gates and saved connections apply.
     """
     from raiker.events.writer import EventLogWriter  # noqa: PLC0415
     from raiker.models.contracts import ModelMessage  # noqa: PLC0415

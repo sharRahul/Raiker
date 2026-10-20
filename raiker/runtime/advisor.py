@@ -42,8 +42,9 @@ class AdvisorService:
     - **No advisor configured / unknown / test-only / placeholder model** →
       denied; picking an advisor is an explicit owner act (Models view).
     - **Provider policy re-checked**: the call goes through ``ModelRouter.achat``
-      with gate-derived runtime policy, so the hosted/private gate, the owner
-      egress allowlist, and the env-only API key are enforced per construction —
+      with gate-derived runtime policy, so the hosted/private gate, the owner's
+      saved connection for the advisor profile, and its API key are enforced
+      per construction —
       the advisor gate alone opens nothing.
 
     The answer is returned as an untrusted-data block for the calling model.

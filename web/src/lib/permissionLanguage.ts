@@ -113,6 +113,9 @@ export function rowSummary(
  */
 export function availabilityAnswer(gate: CapabilityGate, available: boolean): string {
   if (!available) return "No — Raiker cannot use this on this account.";
+  if (gate.enabled_by_connection) {
+    return "Yes — on because you connected a provider in Models.";
+  }
   if (isOnByDefault(gate)) {
     return "Yes — nothing is stored for it, and it ships on.";
   }

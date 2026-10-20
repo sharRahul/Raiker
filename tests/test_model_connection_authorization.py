@@ -207,11 +207,11 @@ def test_egr05_private_endpoint_from_the_environment_alone_is_denied(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An environment variable on its own never authorizes off-machine inference."""
-    monkeypatch.setenv("RAIKER_TEST_MODEL_ENDPOINT", "http://192.168.1.20:8000/v1")
+    monkeypatch.setenv("RAIKER_CUSTOM_MODEL_ENDPOINT", "http://192.168.1.20:8000/v1")
     profile = _with_raw(
         _profile("generic-openai-compatible", "llama3"),
         endpoint="",
-        endpoint_env="RAIKER_TEST_MODEL_ENDPOINT",
+        endpoint_env="RAIKER_CUSTOM_MODEL_ENDPOINT",
     )
     with pytest.raises(ProviderPolicyError, match="model_connection_required"):
         ModelProviderFactory(policy=OPEN).resolve(profile)
@@ -259,9 +259,9 @@ def test_a_connection_saved_for_one_profile_does_not_authorize_another(tmp_path:
 def test_egr10_an_environment_override_cannot_move_a_saved_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RAIKER_TEST_MODEL_ENDPOINT", "https://elsewhere.example.net/v1")
+    monkeypatch.setenv("RAIKER_CUSTOM_MODEL_ENDPOINT", "https://elsewhere.example.net/v1")
     profile = _with_raw(
-        _profile("openai-hosted", "gpt-4o"), endpoint_env="RAIKER_TEST_MODEL_ENDPOINT"
+        _profile("openai-hosted", "gpt-4o"), endpoint_env="RAIKER_CUSTOM_MODEL_ENDPOINT"
     )
     with pytest.raises(ProviderPolicyError, match="model_connection_origin_mismatch"):
         ModelProviderFactory(policy=OPEN, connection={"api_key": "sk-test"}).resolve(profile)
@@ -270,9 +270,9 @@ def test_egr10_an_environment_override_cannot_move_a_saved_connection(
 def test_egr10_a_saved_endpoint_wins_over_the_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("RAIKER_TEST_MODEL_ENDPOINT", "https://elsewhere.example.net/v1")
+    monkeypatch.setenv("RAIKER_CUSTOM_MODEL_ENDPOINT", "https://elsewhere.example.net/v1")
     profile = _with_raw(
-        _profile("generic-openai-compatible", "llama3"), endpoint_env="RAIKER_TEST_MODEL_ENDPOINT"
+        _profile("generic-openai-compatible", "llama3"), endpoint_env="RAIKER_CUSTOM_MODEL_ENDPOINT"
     )
     resolved = ModelProviderFactory(
         policy=OPEN, connection={"endpoint": "http://192.168.1.20:8000/v1"}
@@ -639,3 +639,32 @@ def test_classification_is_unchanged_for_local_private_and_hosted() -> None:
     assert classify_endpoint("http://192.168.1.20:8000/v1") == "private_network"
     assert classify_endpoint("http://gpu-box:8000/v1") == "private_network"
     assert classify_endpoint("https://api.openai.com/v1") == "remote_hosted"
+
+
+# ── Permissions says what the enforcing path answers ─────────────────────────
+
+
+def test_permissions_report_hosted_models_on_by_connection_and_revocable(tmp_path: Path) -> None:
+    """Found live: the row read "Off" above a provider that had just answered."""
+    ws, store = _workspace(tmp_path)
+    service = RuntimeControlService(ws)
+
+    unconnected = service.get_capability_gate("hosted_model_runtime", OWNER)
+    assert unconnected is not None
+    assert unconnected.enabled_by_connection is False
+
+    put_model_connection(store, OWNER, "anthropic-hosted", {"api_key": "sk-test"})
+    connected = service.get_capability_gate("hosted_model_runtime", OWNER)
+    assert connected is not None
+    assert connected.enabled_by_connection is True
+    assert connected.enforced_enabled is True
+    # Only the model gates are consented by a connection.
+    other = service.get_capability_gate("web_fetch", OWNER)
+    assert other is not None and other.enabled_by_connection is False
+
+    service.disable_capability("hosted_model_runtime", None, "owner revokes")
+    revoked = service.get_capability_gate("hosted_model_runtime", OWNER)
+    assert revoked is not None
+    assert revoked.enabled_by_connection is False
+    assert revoked.enforced_enabled is False
+    assert provider_runtime_policy_from_gates(store, OWNER).allow_hosted_provider is False

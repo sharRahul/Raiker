@@ -13,8 +13,8 @@
    *
    * The transcript reads oldest to newest, and a refusal is a turn in it rather
    * than an absence. Generating an image is a hosted model call, so it can be
-   * refused by the capability gate, by an empty egress allowlist, or by a
-   * missing credential — three states with three different remedies. The runtime
+   * refused by the capability gate, by a provider that is not connected, or by
+   * a missing credential — three states with three different remedies. The runtime
    * records every attempt, so the answer to "I pressed Generate and got nothing"
    * is in the thread, at the point it happened, and not in the audit log.
    */

@@ -249,8 +249,8 @@
   </ul>
   <p class="note">
     Nothing leaves for a capability that is off, and nothing leaves without the decision its
-    permission asks for. Model requests are also bounded by the egress allowlist the host process
-    was started with, which is deliberately not editable from a browser session.
+    permission asks for. A model request also goes only to a provider you connected on the Models
+    page, and only to that connection's own address — no tool, plugin or model can add or change one.
   </p>
 </section>
 

@@ -238,7 +238,7 @@ class AgentGateway:
         resolved through the same rules as an explicit per-turn choice
         (``_resolve_profile_for_turn``), so test-harness profiles and unresolved
         ``<model>`` placeholders are dropped and duplicates collapse. Provider
-        policy (gates, egress allowlist, API keys) is still enforced downstream by
+        policy (gates, saved connections, API keys) is still enforced downstream by
         the model router when each candidate is actually tried.
         """
         chain: list[tuple[str, str]] = []

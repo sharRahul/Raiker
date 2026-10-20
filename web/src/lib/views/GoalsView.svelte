@@ -86,7 +86,7 @@
     try {
       selected = await contract.readGoal(goalId);
       // The list card reads the same goal; keep it from saying "Working" while
-      // the detail beside it says the goal settled (seen in RT-GOAL-04).
+      // the detail beside it says the goal settled.
       const fresh = selected;
       if (list) list = { ...list, goals: list.goals.map((g) => (g.goal_id === fresh.goal_id ? fresh : g)) };
     } catch (err) {

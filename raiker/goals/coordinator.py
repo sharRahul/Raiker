@@ -225,7 +225,7 @@ class GoalCoordinator:
         if not goal.get("model_profile") or not goal.get("model"):
             # A step with no model runs on whatever an empty selection resolves
             # to, which is neither what the owner chose nor what the profile was
-            # asked about. Found live in RT-GOAL-03 (FIXED-1054).
+            # asked about (FIXED-1054).
             raise GoalError("goal_needs_model")
         if not self.store.is_configured_model(owner, str(goal["model_profile"]), str(goal["model"])):
             raise GoalError("goal_model_not_configured")
@@ -739,7 +739,7 @@ def _configured_pricing(provider: str, model: str) -> Any:
     """The shipped profile's ``pricing`` block, priced the way the spend limit prices it.
 
     Without it a model whose rate ships with Raiker (rather than one the owner
-    entered) reads as unpriced — found in the RT-GOAL-04 screenshot.
+    entered) reads as unpriced.
     """
     from raiker.models.registry import ModelProfileRegistry
 

@@ -75,7 +75,9 @@ log, and the variable neither opens nor closes anything. See
 | Hosted requires TLS | `hosted_https_required` (executor) and `hosted_http_endpoint_rejected` (endpoint policy) unless the profile sets `allow_remote_http`. Private-network HTTP is allowed. |
 | Endpoint kind pinned | Hosted executor accepts only `remote_hosted`; private-network executor only `private_network` (`endpoint_kind_not_allowed:*`). |
 | No redirects | httpx provider clients do not follow redirects (asserted); the urllib model helpers (`post_json`, `post_multipart`) refuse them (`redirect_refused:<status>`), so a key is never re-sent to a host a response names. |
-| Proxies | Provider clients honour the owner's process proxy settings, except for loopback origins, which never go to a proxy. See [`docs/plans/MODEL_TRANSPORT_SECURITY_HARDENING.md`](../plans/MODEL_TRANSPORT_SECURITY_HARDENING.md). |
+| Dial-time address | `transport_guard.resolve_for_dial` resolves the name once per new connection and classifies every answer: hosted must be public (`model_dial_refused:non_public_address`), home lab private (`public_address_for_private`, `loopback_for_private`), link-local only with the connection's opt-in (`link_local_address`), metadata services never (`metadata_address`). `GuardedNetworkBackend` dials the address that passed; TLS and `Host` keep the name, so rebinding cannot move a connection. |
+| Proxies | `transport_guard.proxy_for`: a hosted origin honours the owner's `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY` minus `NO_PROXY`; loopback and private-network origins never use a proxy. A keyed plain-HTTP request through a proxy is refused (`credential_over_http_proxy`). Models shows the route per card and in the posture. |
+| Credential origin | A credentialed request for an origin other than its client's is refused (`model_credential_origin_mismatch`). |
 | No data leakage | Events/artifacts carry metadata only — never prompts, completions, URLs, hosts, headers or keys. |
 | Budget (hosted paid) | OpenRouter additionally requires budget policy metadata (`openrouter_requires_budget_policy`). |
 | AI principals | Capability gate + `route_action` block non-human principals from enabling the gates. |
@@ -94,12 +96,12 @@ a connection is the owner's consent to use that provider, and only that one.
 - Prompts/completions sent to a hosted provider **leave the machine** and are
   subject to that provider's data handling. The connection is the boundary:
   the owner should only connect providers they trust with prompt content.
-- DNS is resolved at connect time by the HTTP client. A hosted name that
-  resolves to a private or loopback address, DNS rebinding, and cloud metadata
-  addresses are not yet checked at dial time — tracked in
-  [`MODEL_TRANSPORT_SECURITY_HARDENING.md`](../plans/MODEL_TRANSPORT_SECURITY_HARDENING.md).
+- A request the owner's proxy carries is resolved by the proxy, so its address
+  is not checked or pinned here; the proxy sees the destination host (via
+  `CONNECT`). Name-based private classification (`.local`, single-label) is a
+  hint; the resolved address is authoritative.
 - An HTTP private-network endpoint sends its key in clear text on the owner's
-  network, and through an HTTP proxy if one is configured.
+  network (never through a proxy).
 - A leaked owner environment variable leaks the API key; Raiker never writes an
   environment key to storage, events or artifacts.
 - Out of scope (still fail-closed): remote command execution over SSH/VPS,

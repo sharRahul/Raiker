@@ -468,6 +468,10 @@ class ModelConnectionRequest(StrictRequest):
     # environment variable, rather than pasting it. The value is never sent or
     # stored: the connection records only that its key comes from there.
     use_environment_credential: bool = False
+    # BUG-349 (D3) — dial a link-local answer (169.254.0.0/16, fe80::/10) for
+    # this connection, for a direct-cable home-lab server. Off by default; a
+    # cloud metadata address is refused whatever this says.
+    allow_link_local: bool = False
 
 
 class ModelRoutingRequest(StrictRequest):

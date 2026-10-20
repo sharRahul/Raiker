@@ -264,6 +264,8 @@ export function modelProfile(over: Partial<ModelProfile> = {}): ModelProfile {
     routing_sort: "",
     connection_label: "",
     backup_key_count: 0,
+    allows_link_local: false,
+    proxy_route: "",
     key_pool_status: "",
     usage_admin_configured: false,
     workspace_configured: false,

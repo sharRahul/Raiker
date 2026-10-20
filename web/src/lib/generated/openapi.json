@@ -19882,6 +19882,11 @@
             ],
             "title": "Admin Api Key"
           },
+          "allow_link_local": {
+            "default": false,
+            "title": "Allow Link Local",
+            "type": "boolean"
+          },
           "api_key": {
             "anyOf": [
               {
@@ -20780,6 +20785,11 @@
       },
       "ModelProfileView": {
         "properties": {
+          "allows_link_local": {
+            "default": false,
+            "title": "Allows Link Local",
+            "type": "boolean"
+          },
           "backup_key_count": {
             "default": 0,
             "title": "Backup Key Count",
@@ -20965,6 +20975,11 @@
             ],
             "default": null,
             "title": "Provider Running"
+          },
+          "proxy_route": {
+            "default": "",
+            "title": "Proxy Route",
+            "type": "string"
           },
           "rate_currency": {
             "anyOf": [

@@ -231,6 +231,7 @@ def test_an_openai_edit_posts_the_subject_to_the_edits_endpoint(
         egress_allowlist: frozenset[str] | None = None,
         headers: dict[str, str] | None = None,
         timeout: float = 60.0,
+        dial_kind: str | None = None,
     ) -> dict:
         seen.update(url=url, fields=fields, files=files, allowlist=egress_allowlist)
         return {"data": [{"b64_json": base64.b64encode(OTHER_PNG).decode()}]}

@@ -8,7 +8,11 @@ from urllib.parse import urlparse
 import httpx
 
 from raiker.contracts.models import ModelProfile
-from raiker.models.connections import openrouter_routing, validated_workspace_id
+from raiker.models.connections import (
+    connection_allows_link_local,
+    openrouter_routing,
+    validated_workspace_id,
+)
 from raiker.models.contracts import ModelCapabilities
 from raiker.models.endpoint_policy import (
     EndpointPolicy,
@@ -23,6 +27,7 @@ from raiker.models.providers.codex_app_server import AsyncCodexAppServerProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.subscription_limits import LimitWindowSink
 from raiker.models.transport import ProviderClientPool
+from raiker.models.transport_guard import refuse_metadata_destination
 
 
 def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
@@ -228,6 +233,11 @@ class ModelProviderFactory:
         # origin the connection was saved for.
         note_legacy_model_egress_allowlist()
         canonical_origin(endpoint)
+        # BUG-349 — a cloud metadata service is never a model destination, for
+        # any class and with no opt-in. Refused here, by name or literal, so the
+        # card says so before anything is dialled; the dial guard refuses a name
+        # that only *resolves* to one.
+        refuse_metadata_destination(endpoint)
         authorize_model_destination(
             endpoint,
             kind=endpoint_kind,
@@ -325,7 +335,9 @@ class ModelProviderFactory:
         """Raise if this profile would not run, and open nothing if it would."""
         self.resolve(profile, require_model=require_model)
 
-    def _client_for(self, endpoint: str, timeout: float) -> httpx.AsyncClient | None:
+    def _client_for(
+        self, endpoint: str, timeout: float, endpoint_kind: str | None = None
+    ) -> httpx.AsyncClient | None:
         """The client this provider should use, or ``None`` to let it open one.
 
         An explicitly injected client always wins — that is how the tests and the
@@ -336,7 +348,12 @@ class ModelProviderFactory:
             return self.client
         if self.client_pool is None:
             return None
-        return self.client_pool.client(endpoint=endpoint, timeout=timeout)
+        return self.client_pool.client(
+            endpoint=endpoint,
+            timeout=timeout,
+            endpoint_kind=endpoint_kind,
+            allow_link_local=connection_allows_link_local(self.connection),
+        )
 
     def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
         resolved = self.resolve(profile, require_model=require_model)
@@ -364,7 +381,7 @@ class ModelProviderFactory:
                 models_path=str(raw.get("models_path", "/v1/models")),
                 chat_path=str(raw.get("chat_path", "/v1/messages")),
                 extra_headers=headers,
-                client=self._client_for(endpoint, timeout),
+                client=self._client_for(endpoint, timeout, resolved.endpoint_kind),
             )
         return AsyncOpenAICompatibleProvider(
             profile_id=profile.profile_id,
@@ -381,7 +398,7 @@ class ModelProviderFactory:
             chat_path=str(raw.get("chat_path", "/v1/chat/completions")),
             embeddings_path=str(raw.get("embeddings_path", "/v1/embeddings")),
             extra_headers=headers,
-            client=self._client_for(endpoint, timeout),
+            client=self._client_for(endpoint, timeout, resolved.endpoint_kind),
             extra_body=(
                 {"provider": routing}
                 if resolved.provider == "openrouter" and (routing := openrouter_routing(self.connection))

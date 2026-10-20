@@ -35,6 +35,18 @@ def validated_workspace_id(value: str) -> str:
     return candidate
 
 
+#: BUG-349 (D3) — the owner's per-connection opt-in to dial a link-local
+#: address (``169.254.0.0/16``, ``fe80::/10``), for the rare direct-cable
+#: home-lab setup. Stored as ``"1"`` beside the endpoint; a metadata service is
+#: refused regardless.
+ALLOW_LINK_LOCAL_FIELD = "allow_link_local"
+
+
+def connection_allows_link_local(connection: dict[str, str] | None) -> bool:
+    """Whether this saved connection opted in to a link-local address."""
+    return str((connection or {}).get(ALLOW_LINK_LOCAL_FIELD, "")).strip() == "1"
+
+
 def get_model_connection(
     store: SQLiteStore, principal_id: str, profile_id: str
 ) -> dict[str, str] | None:

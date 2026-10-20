@@ -685,6 +685,7 @@ def _call_provider(
                 "https://api.openai.com/v1/images/generations",
                 {"model": model, "prompt": prompt, "size": size, "n": count},
                 egress_allowlist=host,
+                dial_kind="remote_hosted",
                 headers=headers,
                 timeout=120.0,
             )
@@ -693,6 +694,7 @@ def _call_provider(
             {"model": model, "prompt": prompt, "size": size, "n": str(count)},
             {"image": ("source.png", "image/png", subject)},
             egress_allowlist=host,
+            dial_kind="remote_hosted",
             headers=headers,
             timeout=180.0,
         )
@@ -721,6 +723,7 @@ def _call_provider(
             f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
             body,
             egress_allowlist=host,
+            dial_kind="remote_hosted",
             headers={"x-goog-api-key": api_key},
             timeout=180.0,
         )

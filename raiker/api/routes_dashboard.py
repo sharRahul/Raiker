@@ -155,6 +155,7 @@ from raiker.control.views.tasks import TASK_RECURRENCES, TaskView
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.codex_app_server import CodexSubscriptionSessions
 from raiker.models.connections import (
+    ALLOW_LINK_LOCAL_FIELD,
     clear_model_connection,
     get_model_connection,
     put_model_connection,
@@ -3088,6 +3089,8 @@ async def set_model_connection(
                 values[field] = key
             else:
                 values.pop(field, None)
+    if body.allow_link_local and values:
+        values[ALLOW_LINK_LOCAL_FIELD] = "1"
     if body.use_environment_credential:
         # The explicit, owner-made import of an environment key into a saved
         # connection. An environment variable alone authorizes nothing off this

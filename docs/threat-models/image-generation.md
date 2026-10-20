@@ -74,6 +74,7 @@ dressed up as a transport failure.
 ## Residual risk
 
 The provider hosts are fixed in code, so there is no owner-widenable host
-pattern any more. DNS for those hosts is resolved by the operating system at
-send time; dial-time address checks are tracked in
-[`MODEL_TRANSPORT_SECURITY_HARDENING.md`](../plans/MODEL_TRANSPORT_SECURITY_HARDENING.md).
+pattern any more. A direct request resolves the host once, requires every
+answer to be public and dials the address that passed
+([FIXED-1023](../plans/FIXED_ITEMS.md#fixed-1023--the-image-helpers-resolved-their-hosted-name-twice));
+a request the owner's proxy carries is resolved by that proxy and is not pinned.

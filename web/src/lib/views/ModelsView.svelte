@@ -320,6 +320,9 @@
   // Connect with the key already in this provider's environment variable. The
   // server reports only the variable's name; the value never reaches the page.
   let signInUseEnvironment = $state(false);
+  // BUG-349 (D3) — dial a link-local answer for this custom endpoint. Off by
+  // default and prefilled from the saved connection, so re-saving keeps it.
+  let signInAllowLinkLocal = $state(false);
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
@@ -361,6 +364,8 @@
     signInBackupKeys = ["", "", ""];
     signInRemoveBackups = false;
     signInUseEnvironment = false;
+    signInAllowLinkLocal =
+      models?.profiles.find((p) => p.profile_id === profileId)?.allows_link_local === true;
     // BUG-274 — a readiness answer that says "add the workspace ID to this
     // connection" has to land on the box, not three clicks away from it.
     signInAdvanced = options.advanced === true;
@@ -392,6 +397,7 @@
         workspaceId: signInWorkspaceId,
         label: signInLabel,
         useEnvironmentCredential: signInUseEnvironment,
+        allowLinkLocal: signInAllowLinkLocal,
         backupApiKeys: signInRemoveBackups
           ? []
           : signInBackupKeys.some((key) => key.trim())
@@ -471,8 +477,14 @@
     switch (list.status) {
       case "available":
         return `${name} responded and exposed ${list.models.length} model${list.models.length === 1 ? "" : "s"}.`;
-      case "policy_denied":
+      case "policy_denied": {
+        // BUG-349 — a denial is not always the gate. A refused address or a
+        // connection bound to another origin has its own repair, and "enable
+        // its gate" sent the owner to a control that was already on.
+        const denied = providerErrorGuidance(list.reason_code);
+        if (denied !== null) return `${name}: ${denied.message} ${denied.fix}`;
         return `${name}'s model list was denied by provider policy — enable its gate first.`;
+      }
       case "unsupported":
         return `${name} does not support model listing. Type a model id instead.`;
       default: {
@@ -900,9 +912,24 @@
       profile.requires_egress_policy ? "Needs your connection" : "",
       profile.runtime_gate ? capabilityLabel(profile.runtime_gate) : "",
       profile.prompt_cache_ttl ? `Cache ${profile.prompt_cache_ttl}` : "",
+      // BUG-349 (D4) — which route an off-machine request takes. A proxy is the
+      // owner's own environment; a home-lab endpoint is always dialled directly.
+      profile.off_machine
+        ? profile.proxy_route
+          ? `Through your proxy (${profile.proxy_route})`
+          : "Direct connection"
+        : "",
     ].filter((part) => part !== "");
     return parts.join(" · ");
   }
+
+  /** BUG-349 (D4) — "No", or which proxy carries how many off-machine profiles. */
+  const proxyPosture = $derived.by(() => {
+    const proxied = (models?.profiles ?? []).filter((p) => p.off_machine && p.proxy_route);
+    if (proxied.length === 0) return "No — off-machine requests are dialled directly";
+    const routes = [...new Set(proxied.map((p) => p.proxy_route))].join(", ");
+    return `Yes — ${proxied.length} hosted profile${proxied.length === 1 ? "" : "s"} via ${routes}`;
+  });
 
   function usesCloudInference(profile: ModelProfile): boolean {
     // BUG-340 — the running service's own answer (`remote_host`), with the
@@ -1230,6 +1257,12 @@
           <div>
             <dt>Off-machine profiles</dt>
             <dd><code>{models.remote_profile_count}</code></dd>
+          </div>
+          <div>
+            <!-- BUG-349 (D4) — whether hosted requests go through the owner's
+                 proxy. Home-lab and local endpoints never do. -->
+            <dt>Through your proxy</dt>
+            <dd data-testid="proxy-posture">{proxyPosture}</dd>
           </div>
         </dl>
       {/if}
@@ -1931,6 +1964,16 @@
         <label class="field">
           <span class="field-label">Endpoint</span>
           <input class="input" type="url" placeholder="http://127.0.0.1:8000/v1" bind:value={signInEndpoint} />
+        </label>
+        <!-- BUG-349 (D3) — a link-local address (169.254.x.x, fe80::) is refused
+             unless the owner says this server is theirs, on a direct cable. A
+             cloud metadata address is refused whatever this says. -->
+        <label class="field env-credential">
+          <input type="checkbox" bind:checked={signInAllowLinkLocal} data-testid="allow-link-local" />
+          <span>
+            Allow a link-local address
+            <small>(169.254.x.x or fe80:: — only for a server you own on a direct cable)</small>
+          </span>
         </label>
       {/if}
 

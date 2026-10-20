@@ -646,8 +646,13 @@
         return list.models.length === 0
           ? `${row.label} answered, and is serving no models yet.`
           : `${list.models.length} model${list.models.length === 1 ? "" : "s"} from ${row.label}.`;
-      case "policy_denied":
+      case "policy_denied": {
+        // BUG-349 — a refused address or a connection bound elsewhere has its
+        // own repair; only an unexplained denial is the gate.
+        const denied = providerErrorGuidance(list.reason_code);
+        if (denied !== null) return `${row.label}: ${denied.message} ${denied.fix}`;
         return `${row.label} is blocked by provider policy. Enable its gate in Permissions first.`;
+      }
       case "unsupported":
         return `${row.label} does not publish a model list. Type the exact model id instead.`;
       default:

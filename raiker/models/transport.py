@@ -21,14 +21,27 @@ connection is never reused *as* an authorization. That is also why a changed
 connection needs no invalidation: a new endpoint is a new key, and a new key on
 the same endpoint is a different request header on the same socket.
 
-**Proxies.** A client honours the process's own proxy settings
-(``HTTPS_PROXY``/``HTTP_PROXY``/``NO_PROXY``) — the owner's environment, which
-no action, tool or model can set — except for a loopback origin, which is never
-handed to a proxy: a local model's traffic stays on the machine, exactly as
-:mod:`raiker.models.local_service` already does for its liveness checks. A
-proxy changes the route, not the destination: the request is still for the
-connection's origin, and over HTTPS the proxy carries an end-to-end TLS tunnel
-it cannot read. Redirects are not followed (httpx's default, kept here).
+**Addresses (BUG-349).** A direct connection is opened by
+:class:`~raiker.models.transport_guard.GuardedNetworkBackend`: the origin's name
+is resolved once per new connection, every answer is classified against the
+connection's declared class, and the address that passed is the one dialled,
+while TLS and the ``Host`` header keep the name. A refused dial raises
+``model_dial_refused:<detail>`` before a socket is opened.
+
+**Proxies.** The route is decided by :func:`~raiker.models.transport_guard.proxy_for`
+rather than left to httpx's environment reading: a hosted origin honours the
+owner's ``HTTPS_PROXY``/``HTTP_PROXY``/``ALL_PROXY``/``NO_PROXY`` — the owner's
+environment, which no action, tool or model can set — and a loopback or
+private-network origin never uses a proxy. A proxy changes the route, not the
+destination, and over HTTPS it carries an end-to-end TLS tunnel it cannot read;
+a credential over *plain* HTTP through a proxy is refused
+(``model_dial_refused:credential_over_http_proxy``), because there the proxy
+reads the key. Redirects are not followed (httpx's default, kept here).
+
+**Credentials only to their origin.** A request that carries a credential
+header must be for the origin its client was opened for
+(``model_credential_origin_mismatch``), so an adapter that ever builds an
+absolute URL to another host fails closed instead of sending the key there.
 
 **Clients belong to the event loop that created them.** An ``httpx.AsyncClient``
 holds anyio connections bound to one loop, so the pool is keyed by the running
@@ -40,12 +53,22 @@ caller that would fail on them.
 from __future__ import annotations
 
 import asyncio
+import ssl
 from contextlib import suppress
 from urllib.parse import urlsplit
 
+import httpcore
 import httpx
 
-__all__ = ["ProviderClientPool", "close_provider_clients", "provider_client_pool"]
+from raiker.models.exceptions import ProviderPolicyError
+from raiker.models.transport_guard import GuardedNetworkBackend, Resolver, dial_refusal, proxy_for
+
+__all__ = [
+    "ModelTransport",
+    "ProviderClientPool",
+    "close_provider_clients",
+    "provider_client_pool",
+]
 
 #: How many connections one endpoint may hold open, and for how long they may
 #: idle. Deliberately small: Raiker is a single-owner product talking to a
@@ -64,35 +87,115 @@ def _origin(endpoint: str) -> str:
     return f"{split.scheme or 'https'}://{split.netloc}"
 
 
-def _is_loopback(endpoint: str) -> bool:
+#: Request headers that carry a provider credential. ``anthropic-workspace-id``
+#: is not one: it names where a key acts.
+_CREDENTIAL_HEADERS = ("authorization", "x-api-key", "x-goog-api-key", "api-key")
+
+
+def _declared_kind(endpoint: str) -> str:
     from raiker.models.endpoint_policy import classify_endpoint
 
-    return classify_endpoint(_origin(endpoint)) == "local_machine"
+    return classify_endpoint(_origin(endpoint))
+
+
+def _request_origin(url: httpx.URL) -> str:
+    port = url.port or {"http": 80, "https": 443}.get(url.scheme, 0)
+    host = url.host.lower().rstrip(".")
+    rendered = f"[{host}]" if ":" in host else host
+    return f"{url.scheme}://{rendered}:{port}"
+
+
+class ModelTransport(httpx.AsyncBaseTransport):
+    """The one route a model provider's requests take for one origin.
+
+    Direct, through :class:`GuardedNetworkBackend`, unless the owner's
+    environment proxies this hosted origin. Either way the two credential rules
+    are checked on every request before anything is sent.
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        *,
+        declared_kind: str,
+        allow_link_local: bool = False,
+        resolver: Resolver | None = None,
+        limits: httpx.Limits = _LIMITS,
+        ssl_context: ssl.SSLContext | None = None,
+    ) -> None:
+        self.origin = _request_origin(httpx.URL(_origin(endpoint)))
+        self.declared_kind = declared_kind
+        self.proxy = proxy_for(endpoint, declared_kind)
+        if self.proxy:
+            # The proxy resolves the destination, so there is no address here to
+            # pin; the route is the owner's own (D2/D4).
+            self._inner = httpx.AsyncHTTPTransport(proxy=self.proxy, limits=limits)
+            return
+        self._inner = httpx.AsyncHTTPTransport(limits=limits)
+        # httpx 0.28 takes no network backend, so its pool is replaced by an
+        # identical one that has the guard. `tests/test_model_transport_guard.py`
+        # pins this against the httpx/httpcore versions in `uv.lock`: an upgrade
+        # that renames `_pool` fails there, not silently in production.
+        self._inner._pool = httpcore.AsyncConnectionPool(  # noqa: SLF001
+            ssl_context=ssl_context or httpx.create_ssl_context(),
+            max_connections=limits.max_connections,
+            max_keepalive_connections=limits.max_keepalive_connections,
+            keepalive_expiry=limits.keepalive_expiry,
+            network_backend=GuardedNetworkBackend(
+                declared_kind, allow_link_local=allow_link_local, resolver=resolver
+            ),
+        )
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if any(name in request.headers for name in _CREDENTIAL_HEADERS):
+            if _request_origin(request.url) != self.origin:
+                raise ProviderPolicyError("model_credential_origin_mismatch")
+            if self.proxy and request.url.scheme == "http":
+                raise dial_refusal("credential_over_http_proxy")
+        return await self._inner.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
 
 
 class ProviderClientPool:
-    """One :class:`httpx.AsyncClient` per event loop, origin and timeout."""
+    """One :class:`httpx.AsyncClient` per event loop, origin, timeout and dial rule."""
 
     def __init__(self) -> None:
-        self._clients: dict[tuple[int, str, float], httpx.AsyncClient] = {}
+        self._clients: dict[tuple[int, str, float, str, bool], httpx.AsyncClient] = {}
         self._loops: dict[int, asyncio.AbstractEventLoop] = {}
 
-    def client(self, *, endpoint: str, timeout: float) -> httpx.AsyncClient:
-        """The client for this endpoint, opening one only when there is none."""
+    def client(
+        self,
+        *,
+        endpoint: str,
+        timeout: float,
+        endpoint_kind: str | None = None,
+        allow_link_local: bool = False,
+    ) -> httpx.AsyncClient:
+        """The client for this endpoint, opening one only when there is none.
+
+        ``endpoint_kind`` is the class the profile was validated as (OpenRouter
+        is always hosted); without it the origin's text decides, as before.
+        """
         loop = asyncio.get_running_loop()
         self._drop_dead_loops()
-        key = (id(loop), _origin(endpoint), float(timeout))
+        kind = endpoint_kind or _declared_kind(endpoint)
+        key = (id(loop), _origin(endpoint), float(timeout), kind, bool(allow_link_local))
         existing = self._clients.get(key)
         if existing is not None and not existing.is_closed:
             return existing
         # No default headers: every provider carries its own per request, so a
-        # pooled connection never becomes an authorization. No redirects, and no
-        # proxy for a loopback origin.
+        # pooled connection never becomes an authorization. No redirects. The
+        # transport decides the route, so httpx reads no proxy, netrc or
+        # certificate settings of its own (`trust_env=False`).
         created = httpx.AsyncClient(
             timeout=timeout,
-            limits=_LIMITS,
             follow_redirects=False,
-            trust_env=_is_loopback(endpoint) is False,
+            trust_env=False,
+            transport=ModelTransport(
+                endpoint, declared_kind=kind, allow_link_local=allow_link_local
+            ),
         )
         self._clients[key] = created
         self._loops[id(loop)] = loop

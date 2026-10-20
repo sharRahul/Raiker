@@ -124,8 +124,12 @@ rules for embeddings; readiness, budget, timeout and retry policy.
 
 ## Residual risk
 
-DNS is resolved by the HTTP client at connect time. A hosted name that resolves
-to a private, loopback or metadata address, and DNS rebinding between checks,
-are not refused at dial time yet. That is a transport-hardening change of its
-own, planned in
-[`MODEL_TRANSPORT_SECURITY_HARDENING.md`](../plans/MODEL_TRANSPORT_SECURITY_HARDENING.md).
+The *address* a name resolves to was left to the HTTP client by this decision.
+The follow-up transport hardening now decides it at dial time
+(`raiker/models/transport_guard.py`; [FIXED-1021](../plans/FIXED_ITEMS.md#fixed-1021--a-hosted-model-name-was-dialled-wherever-its-dns-answer-pointed-was-bug-349)
+to [FIXED-1030](../plans/FIXED_ITEMS.md#fixed-1030--a-refused-dial-and-other-classified-denials-read-as-enable-its-gate)):
+every answer is classified against the connection's class, the passing address
+is pinned, metadata services are always refused, and the proxy route is
+explicit. What remains is that a request the owner's proxy carries is resolved
+by that proxy, so it is not pinned; and a public address the owner connected is
+the owner's trust decision.

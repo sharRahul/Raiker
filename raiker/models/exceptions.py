@@ -15,6 +15,16 @@ class ProviderPolicyError(ModelProviderError):
     pass
 
 
+class ProviderDialRefusedError(ProviderPolicyError):
+    """BUG-349 — the destination's *address* is not one its connection allows.
+
+    A policy refusal, not a connection failure: the name resolved and nothing
+    was dialled, because an answer was private for a hosted connection, public
+    for a home-lab one, link-local without the owner's opt-in, or a cloud
+    metadata service. Its code is ``model_dial_refused:<detail>``.
+    """
+
+
 class ProviderWorkspaceRequiredError(ModelProviderError):
     """BUG-272 — the key is valid and needs a workspace named alongside it.
 
@@ -107,6 +117,7 @@ _PROVIDER_ERROR_CLASS_CODES: dict[str, str] = {
     "ProviderConnectionError": "provider_connection_failed",
     "ProviderConfigurationError": "provider_misconfigured",
     "ProviderPolicyError": "provider_policy_denied",
+    "ProviderDialRefusedError": "model_dial_refused",
     "ProviderResponseValidationError": "provider_invalid_response",
     "ProviderStreamError": "provider_stream_failed",
     "ProviderCancelledError": "provider_cancelled",
@@ -478,7 +489,7 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
     (
         "provider_connection_failed",
         "Raiker could not reach the provider. "
-        "Check the network and the egress allowlist, then try again.",
+        "Check the network and the endpoint on Models, then try again.",
     ),
     (
         "provider_unavailable",
@@ -518,9 +529,59 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
 )
 
 
+# BUG-349 — why a dial was refused, by detail. Each is a policy answer about
+# the address a name resolved to, not a network fault, and says which.
+_DIAL_REFUSAL_SENTENCES: dict[str, str] = {
+    "non_public_address": (
+        "Raiker refused to connect: this hosted provider's name resolved to a private, "
+        "loopback or link-local address, and a hosted connection only reaches public "
+        "addresses. This is a policy refusal, not a network fault — check the endpoint "
+        "and your DNS."
+    ),
+    "public_address_for_private": (
+        "Raiker refused to connect: this home-lab endpoint's name now resolves to a public "
+        "internet address, not your network. This is a policy refusal, not a network "
+        "fault — check the name, or connect it as a hosted provider over HTTPS."
+    ),
+    "loopback_for_private": (
+        "Raiker refused to connect: this home-lab endpoint's name resolves to this machine. "
+        "This is a policy refusal, not a network fault — reconnect it as "
+        "http://localhost:<port> instead."
+    ),
+    "link_local_address": (
+        "Raiker refused to connect: this endpoint is a link-local address. This is a "
+        "policy refusal, not a network fault — tick “Allow a link-local address” on the "
+        "connection in Models if it is a direct-cable server you own."
+    ),
+    "metadata_address": (
+        "Raiker refused to connect: that address is a cloud metadata service, which is "
+        "never a model destination. This is a policy refusal, not a network fault."
+    ),
+    "credential_over_http_proxy": (
+        "Raiker refused to send the key: this plain-HTTP endpoint would go through your "
+        "proxy, which could read it. This is a policy refusal, not a network fault — use "
+        "https://, or exclude the host with NO_PROXY."
+    ),
+}
+
+
 def provider_error_sentence(code: str) -> str:
     """One plain sentence explaining *code* and what to do about it."""
     base = code.split(":", 1)[0]
+    if base == "model_dial_refused":
+        detail = code.split(":", 1)[1] if ":" in code else ""
+        return _DIAL_REFUSAL_SENTENCES.get(
+            detail,
+            "Raiker refused to connect: the address this provider's name resolved to is "
+            "not one its connection allows. This is a policy refusal, not a network fault "
+            "— check the endpoint on Models.",
+        )
+    if base == "model_credential_origin_mismatch":
+        return (
+            "Raiker refused to send the key to an address other than the connection's own. "
+            "This is a policy refusal, not a network fault — report it, and reconnect the "
+            "provider on Models."
+        )
     for prefix, sentence in _PROVIDER_ERROR_SENTENCES:
         if base == prefix:
             return sentence

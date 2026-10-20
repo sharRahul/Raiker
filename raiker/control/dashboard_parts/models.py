@@ -48,6 +48,8 @@ from raiker.control.views.security import (
     StorageSpace,
 )
 from raiker.events.writer import EventLogWriter
+from raiker.models.connections import connection_allows_link_local
+from raiker.models.endpoint_policy import classify_endpoint
 from raiker.models.exceptions import (
     ModelProviderError,
     ProviderPolicyError,
@@ -64,6 +66,7 @@ from raiker.models.registry import ModelProfileRegistry, profile_with_model, res
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.models.tool_projection import ALWAYS_PROJECTED, DEFERRABLE_TOOL_NAMES
+from raiker.models.transport_guard import proxy_route
 from raiker.notify.index_notifier import INDEX_LABELS
 from raiker.runtime.executors.tier2_image import declared_image_models
 from raiker.runtime.model_facts_store import ModelFactsStore
@@ -87,6 +90,24 @@ def _declared(raw: Any, key: str) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
+
+
+def _profile_proxy_route(profile: Any, connection: dict[str, str] | None) -> str:
+    """``host:port`` of the proxy this profile's requests take, or "" for direct.
+
+    The same decision the transport makes (:func:`proxy_for`), for the endpoint
+    a request would actually use: the saved connection's, else the profile's.
+    """
+    raw = profile.raw or {}
+    endpoint = str((connection or {}).get("endpoint") or raw.get("endpoint") or raw.get("base_url") or "")
+    if not endpoint or "<" in endpoint:
+        return ""
+    kind = (
+        "remote_hosted"
+        if str(profile.provider).lower() == "openrouter"
+        else classify_endpoint(endpoint)
+    )
+    return proxy_route(endpoint, kind)
 
 
 def _environment_credential_env(raw: dict[str, Any]) -> str | None:
@@ -300,6 +321,8 @@ class ModelService:
                 connection_label=str((saved_connection or {}).get("label", "")),
                 backup_key_count=credential_pool.backup_count(saved_connection),
                 key_pool_status=credential_pool.describe(profile.profile_id, saved_connection),
+                allows_link_local=connection_allows_link_local(saved_connection),
+                proxy_route=_profile_proxy_route(profile, saved_connection),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))
                     if profile.raw.get("prompt_cache_ttl")

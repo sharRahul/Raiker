@@ -203,20 +203,32 @@ def load_blocklist(
 # ── The address guard (not owner-editable) ───────────────────────────────────
 
 
-def address_is_reachable(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """False for anything that is not a public, routable destination.
+def unwrap_address(
+    address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    """The address a mapped or 6to4 IPv6 form really carries.
 
-    ``is_global`` alone is not enough. An IPv4-mapped IPv6 address such as
-    ``::ffff:127.0.0.1`` reports itself as a v6 address whose v4 payload is the
-    loopback, and reading only the outer form is a documented way past this kind
-    of check — so a mapped address is unwrapped and judged on what it really is.
+    An IPv4-mapped IPv6 address such as ``::ffff:127.0.0.1`` reports itself as a
+    v6 address whose v4 payload is the loopback, and reading only the outer form
+    is a documented way past an address check — so every classifier judges the
+    unwrapped address instead.
     """
     mapped = getattr(address, "ipv4_mapped", None)
     if mapped is not None:
-        address = mapped
+        return mapped
     sixtofour = getattr(address, "sixtofour", None)
     if sixtofour is not None:
-        address = sixtofour
+        return sixtofour
+    return address
+
+
+def address_is_reachable(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """False for anything that is not a public, routable destination.
+
+    ``is_global`` alone is not enough: a mapped address is unwrapped first
+    (:func:`unwrap_address`) and judged on what it really is.
+    """
+    address = unwrap_address(address)
     return not (
         address.is_private
         or address.is_loopback
@@ -380,8 +392,14 @@ def refusal_message(reason_code: str) -> str:
 # is unchanged, and the destination cannot move between the check and the socket.
 
 
-def pinned_https_opener(host: str, address: str) -> Any:
-    """A urllib opener that dials *address* but speaks TLS as *host*."""
+def pinned_https_opener(host: str, address: str, *, direct: bool = False) -> Any:
+    """A urllib opener that dials *address* but speaks TLS as *host*.
+
+    ``direct`` leaves the process's proxy settings out of the opener. A pinned
+    connection dials the destination itself, so a proxy handler beside it would
+    ask the destination to tunnel to itself; a caller that has already decided
+    no proxy applies says so here.
+    """
     import http.client
     import ssl
     import urllib.request
@@ -416,4 +434,6 @@ def pinned_https_opener(host: str, address: str) -> Any:
         def https_open(self, req: Any) -> Any:
             return self.do_open(_PinnedConnection, req)
 
+    if direct:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _PinnedHandler)
     return urllib.request.build_opener(_PinnedHandler)

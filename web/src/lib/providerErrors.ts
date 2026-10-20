@@ -124,6 +124,12 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     message: "The address this request would use is not the one the saved connection was authorized for.",
     fix: "Reconnect the provider with the address you want Raiker to use.",
   },
+  // BUG-349 (D5) — the transport refused to attach a key to a request for an
+  // origin other than the connection's. Only an adapter bug reaches this.
+  model_credential_origin_mismatch: {
+    message: "Raiker refused to send this provider's key to an address other than the connection's own.",
+    fix: "This should not happen. Reconnect the provider, and report it if it repeats.",
+  },
   model_connection_origin_unbound: {
     message: "The saved connection does not name an address, and this profile has none of its own.",
     fix: "Reconnect the provider and enter its endpoint.",
@@ -145,6 +151,51 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     fix: "Clear the key field, or untick “Use the key from the environment”.",
   },
 };
+
+/**
+ * BUG-349 — the dial guard's refusals, by detail. Each is a policy answer
+ * about the address a name resolved to, so none of them sends the owner to
+ * check their network or open a gate: the gate is open, and the address is
+ * the problem.
+ */
+const DIAL_REFUSALS: Record<string, Omit<ProviderErrorGuidance, "code">> = {
+  non_public_address: {
+    message:
+      "Raiker refused to connect: this hosted provider's name resolved to a private, loopback or link-local address.",
+    fix: "A hosted connection only reaches public addresses. This is a policy refusal, not a network fault — check the endpoint and your DNS.",
+  },
+  public_address_for_private: {
+    message: "Raiker refused to connect: this home-lab endpoint's name now resolves to a public internet address.",
+    fix: "Check the name. If the server really is on the internet, connect it as a hosted provider over https://.",
+  },
+  loopback_for_private: {
+    message: "Raiker refused to connect: this home-lab endpoint's name resolves to this machine.",
+    fix: "Reconnect it as http://localhost:<port> — a server on this machine is a local endpoint.",
+  },
+  link_local_address: {
+    message: "Raiker refused to connect: this endpoint is a link-local address (169.254.x.x or fe80::).",
+    fix: "If it is a server you own on a direct cable, reconnect it with “Allow a link-local address” ticked.",
+  },
+  metadata_address: {
+    message: "Raiker refused to connect: that address is a cloud metadata service.",
+    fix: "A metadata service is never a model destination, so there is no setting for this. Use your model server's own address.",
+  },
+  credential_over_http_proxy: {
+    message: "Raiker refused to send the key: this plain-HTTP endpoint would go through your proxy, which could read it.",
+    fix: "Use an https:// endpoint, or exclude the host from the proxy with NO_PROXY and restart raiker-web.",
+  },
+};
+
+/** `model_dial_refused:<detail>`. */
+function dialRefusalGuidance(code: string): Omit<ProviderErrorGuidance, "code"> {
+  const detail = code.slice("model_dial_refused:".length);
+  return (
+    DIAL_REFUSALS[detail] ?? {
+      message: "Raiker refused to connect: the address this provider's name resolved to is not one its connection allows.",
+      fix: "This is a policy refusal, not a network fault. Check the endpoint on this card.",
+    }
+  );
+}
 
 /** `missing_endpoint_env:VAR`. */
 function endpointEnvGuidance(code: string): Omit<ProviderErrorGuidance, "code"> {
@@ -178,6 +229,8 @@ export function providerErrorGuidance(
   const family = reasonCode.split(":", 1)[0];
   if (GUIDANCE[family] !== undefined && GUIDANCE[reasonCode] === undefined)
     return { ...GUIDANCE[family], code: reasonCode };
+  if (reasonCode === "model_dial_refused" || reasonCode.startsWith("model_dial_refused:"))
+    return { ...dialRefusalGuidance(reasonCode), code: reasonCode };
   if (reasonCode.startsWith("missing_endpoint_env:"))
     return { ...endpointEnvGuidance(reasonCode), code: reasonCode };
   if (reasonCode.startsWith("provider_api_key_missing:"))

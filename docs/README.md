@@ -69,8 +69,6 @@ Canonical technical references:
 ## Plans, evidence, and history
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
-- [Model transport security hardening](plans/MODEL_TRANSPORT_SECURITY_HARDENING.md)
-  — the planned dial-time address checks that follow ADR-0004
 - [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 - [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/TESTING.md) and

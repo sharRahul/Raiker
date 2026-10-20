@@ -446,6 +446,7 @@ export const api = {
     label = "",
     backupApiKeys: string[] | null = null,
     useEnvironmentCredential = false,
+    allowLinkLocal = false,
   ) =>
     contract.setModelConnection(profileId, {
       endpoint: endpoint || null,
@@ -458,6 +459,9 @@ export const api = {
       // Authorize the key already in this provider's environment variable; the
       // value never crosses the browser. Sent only when chosen.
       ...(useEnvironmentCredential ? { use_environment_credential: true } : {}),
+      // BUG-349 — dial a link-local answer for this connection. Sent only when
+      // chosen; a cloud metadata address is refused whatever this says.
+      ...(allowLinkLocal ? { allow_link_local: true } : {}),
     }),
   // OpenRouter routing preferences beside the saved connection; "" is the
   // account default. The key is never sent or touched.

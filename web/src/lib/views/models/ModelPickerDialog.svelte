@@ -41,8 +41,13 @@
 
   function pickerNote(list: ProviderModelList): string {
     switch (list.status) {
-      case "policy_denied":
+      case "policy_denied": {
+        // BUG-349 — a refused address has its own repair; only an unexplained
+        // denial is the gate.
+        const denied = providerErrorGuidance(list.reason_code);
+        if (denied !== null) return `${denied.message} ${denied.fix}`;
         return "Model list denied by provider policy — enable the provider's gate first. You can still type a model id.";
+      }
       case "unsupported":
         return "This provider does not support model listing — type a model id.";
       default: {

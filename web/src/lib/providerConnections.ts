@@ -58,6 +58,8 @@ export interface ConnectionFields {
   backupApiKeys?: string[] | null;
   /** Use the key already set in the provider's environment variable instead of a pasted one. */
   useEnvironmentCredential?: boolean;
+  /** BUG-349 — dial a link-local address for this connection (direct-cable home lab). */
+  allowLinkLocal?: boolean;
 }
 
 /** Store (or replace) a provider's credential and endpoint. */
@@ -75,6 +77,7 @@ export async function saveConnection(
       (fields.label ?? "").trim(),
       fields.backupApiKeys === undefined ? null : fields.backupApiKeys,
       fields.useEnvironmentCredential === true,
+      fields.allowLinkLocal === true,
     );
     return { ok: true };
   } catch (error) {

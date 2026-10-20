@@ -1608,10 +1608,40 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     });
     render(ModelsView, { tab: "add" });
     await rowAction("Select models…");
+    // BUG-349 — a classified denial is explained by its own guidance (here the
+    // gate), not the generic sentence that was said of every denial.
     await waitFor(() =>
-      expect(screen.getByText(/denied by provider policy/i)).toBeTruthy(),
+      expect(screen.getByText(/stays off until you open its runtime gate/i)).toBeTruthy(),
     );
     expect(screen.getByLabelText("Custom model name")).toBeTruthy();
+  });
+
+  it("explains a refused dial in the picker as an address, not a gate (BUG-349)", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "openai-hosted",
+            provider: "openai",
+            model: "<model>",
+            off_machine: true,
+          }),
+        ],
+      }),
+      "GET /api/models/openai-hosted/provider-models": {
+        profile_id: "openai-hosted",
+        provider: "openai",
+        status: "policy_denied",
+        reason_code: "model_dial_refused:non_public_address",
+        models: [],
+      },
+    });
+    render(ModelsView, { tab: "add" });
+    await rowAction("Select models…");
+    await waitFor(() =>
+      expect(screen.getByText(/resolved to a private, loopback or link-local address/i)).toBeTruthy(),
+    );
+    expect(screen.queryByText(/enable the provider's gate/i)).toBeNull();
   });
 
   it("names an identity-linked key's refusal, beside the field that fixes it", async () => {

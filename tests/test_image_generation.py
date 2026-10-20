@@ -221,9 +221,11 @@ def test_a_successful_generation_stores_the_bytes_and_records_the_attempt(
         egress_allowlist: frozenset[str] | None = None,
         headers: dict[str, str] | None = None,
         timeout: float = 60.0,
+        dial_kind: str | None = None,
     ) -> dict:
         seen["url"] = url
         seen["allowlist"] = egress_allowlist
+        seen["dial_kind"] = dial_kind
         seen["headers"] = headers
         return {"data": [{"b64_json": base64.b64encode(PNG).decode()}]}
 
@@ -246,6 +248,9 @@ def test_a_successful_generation_stores_the_bytes_and_records_the_attempt(
     # the request is held to the provider's one image host.
     assert seen["url"] == "https://api.openai.com/v1/images/generations"
     assert seen["allowlist"] == frozenset({"api.openai.com"})
+    # BUG-349 — the image call is dialled as a hosted destination: resolved once,
+    # every answer public, and the address that passed is the one pinned.
+    assert seen["dial_kind"] == "remote_hosted"
 
 
 def test_the_credential_never_reaches_the_record(

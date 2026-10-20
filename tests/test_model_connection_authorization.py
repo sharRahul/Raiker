@@ -577,15 +577,25 @@ def test_egr23_the_old_allowlist_neither_opens_nor_closes_anything(
 # ── EGR-24 / EGR-26: proxies and unrelated egress ────────────────────────────
 
 
-def test_egr24_pooled_clients_follow_owner_proxies_except_for_loopback() -> None:
+def test_egr24_pooled_clients_follow_owner_proxies_except_for_loopback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # BUG-349 (D4) — the route is the transport's explicit decision, not
+    # httpx's own environment reading: the owner's proxy for a hosted origin,
+    # never for a loopback (or home-lab) one.
+    for name in ("NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy", "https_proxy"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
     pool = ProviderClientPool()
 
     async def body() -> None:
         hosted = pool.client(endpoint="https://api.openai.com/v1", timeout=30.0)
         local = pool.client(endpoint="http://127.0.0.1:11434/v1", timeout=30.0)
-        assert hosted.trust_env is True
-        assert local.trust_env is False
+        assert hosted._transport.proxy == "http://proxy.example:3128"  # type: ignore[attr-defined]
+        assert local._transport.proxy is None  # type: ignore[attr-defined]
         for client in (hosted, local):
+            # httpx reads no proxy, netrc or certificate settings of its own.
+            assert client.trust_env is False
             assert client.follow_redirects is False
             assert "authorization" not in {name.lower() for name in client.headers}
         await pool.aclose()
@@ -668,3 +678,34 @@ def test_permissions_report_hosted_models_on_by_connection_and_revocable(tmp_pat
     assert revoked.enabled_by_connection is False
     assert revoked.enforced_enabled is False
     assert provider_runtime_policy_from_gates(store, OWNER).allow_hosted_provider is False
+
+
+def test_bug349_link_local_opt_in_is_saved_with_the_connection_and_shown(
+    api: tuple[TestClient, dict[str, str], SQLiteStore],
+) -> None:
+    """D3 — the opt-in is the owner's, per connection, and the card can read it back."""
+    client, auth, store = api
+    saved = client.put(
+        "/api/models/generic-openai-compatible/connection",
+        json={"endpoint": "http://169.254.10.10:8000/v1", "allow_link_local": True},
+        headers=auth,
+    )
+    assert saved.status_code == 200, saved.text
+    connection = get_model_connection(store, OWNER, "generic-openai-compatible")
+    assert connection is not None and connection.get("allow_link_local") == "1"
+    listing = client.get("/api/models", headers=auth)
+    assert listing.status_code == 200, listing.text
+    card = next(
+        p for p in listing.json()["profiles"] if p["profile_id"] == "generic-openai-compatible"
+    )
+    assert card["allows_link_local"] is True
+    # A home-lab endpoint is never proxied, so the card says it is dialled directly.
+    assert card["proxy_route"] == ""
+    # Saving again without the tick withdraws it.
+    client.put(
+        "/api/models/generic-openai-compatible/connection",
+        json={"endpoint": "http://169.254.10.10:8000/v1"},
+        headers=auth,
+    )
+    again = get_model_connection(store, OWNER, "generic-openai-compatible")
+    assert again is not None and "allow_link_local" not in again

@@ -3895,6 +3895,7 @@ export type ModelConnectionRequest = {
   label?: string | null;
   backup_api_keys?: string[] | null;
   use_environment_credential?: boolean;
+  allow_link_local?: boolean;
 };
 
 export type ModelConversionRequestBody = {
@@ -4051,6 +4052,8 @@ export type ModelProfileView = {
   connection_label: string;
   backup_key_count: number;
   key_pool_status: string;
+  allows_link_local: boolean;
+  proxy_route: string;
   prompt_cache_ttl: string | null;
   context_window_tokens: number | null;
   context_window_source: string | null;

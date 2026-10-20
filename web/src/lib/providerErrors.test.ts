@@ -25,6 +25,21 @@ describe("providerErrorGuidance", () => {
     expect(guidance?.fix).toMatch(/Reconnect/);
   });
 
+  it("explains a refused dial by its detail, never as a gate or a network fault (BUG-349)", () => {
+    const hosted = providerErrorGuidance("model_dial_refused:non_public_address");
+    expect(hosted?.message).toMatch(/resolved to a private, loopback or link-local address/);
+    expect(hosted?.fix).toMatch(/policy refusal, not a network fault/);
+    expect(hosted?.href).toBeUndefined();
+    expect(hosted?.code).toBe("model_dial_refused:non_public_address");
+    expect(providerErrorGuidance("model_dial_refused:link_local_address")?.fix).toMatch(
+      /Allow a link-local address/,
+    );
+    expect(providerErrorGuidance("model_dial_refused:metadata_address")?.fix).toMatch(/no setting/);
+    expect(providerErrorGuidance("model_dial_refused:credential_over_http_proxy")?.fix).toMatch(/NO_PROXY/);
+    // A detail this build has not met still reads as a dial refusal.
+    expect(providerErrorGuidance("model_dial_refused:something_new")?.message).toMatch(/refused to connect/);
+  });
+
   it("routes a missing vault key to Settings", () => {
     expect(providerErrorGuidance("connector_vault_key_unset")?.href).toBe("#/settings");
   });

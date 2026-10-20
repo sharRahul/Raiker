@@ -15,6 +15,31 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-20 (model transport guard, hosted Anthropic Haiku 4.5)
+
+BUG-349 ([FIXED-1021](../plans/FIXED_ITEMS.md#fixed-1021--a-hosted-model-name-was-dialled-wherever-its-dns-answer-pointed-was-bug-349)
+to [FIXED-1030](../plans/FIXED_ITEMS.md#fixed-1030--a-refused-dial-and-other-classified-denials-read-as-enable-its-gate)):
+model requests are now checked at dial time. A fresh workspace served by
+`raiker-web` on `127.0.0.1:8765`, on a host whose outbound HTTPS goes through
+a proxy at `127.0.0.1:33773` with `api.anthropic.com` in `NO_PROXY`. The test
+name `models.raiker-live.example` was given the answer `10.0.0.5` in
+`/etc/hosts` for the round (removed afterwards) and added to the server's
+`NO_PROXY`, because a proxied name is resolved by the proxy and the guard
+would not see it. The identity-linked Anthropic key and workspace ID were typed
+into the Models dialog by the spec from the run's environment; neither appears
+in a spec, command, document, screenshot or the server log.
+
+| Case | Check | Result |
+|---|---|---|
+| MT-01 | A hosted provider is dialled directly, pinned, and says so | ✅ real catalogue and one-token preflight; Anthropic's card reads *Direct connection*, the fourteen proxied hosted cards *Through your proxy (127.0.0.1:33773)*, the posture *Yes — 14 hosted profiles via 127.0.0.1:33773* |
+| MT-02 | A real turn answers through the pinned connection | ✅ *Reply with exactly the word: pinned* → `pinned`, Haiku 4.5 |
+| MT-03 | A hosted name that resolves to a private address is refused by name | ✅ the OpenAI-compatible card, saved for `https://models.raiker-live.example/v1` with a sentinel key, reads *Raiker refused to connect: this hosted provider's name resolved to a private, loopback or link-local address … a policy refusal, not a network fault*; neither *enable its gate* nor *could not be reached* appears |
+| MT-04 | A link-local endpoint needs the owner's tick | ✅ `http://169.254.10.10:8000/v1` is refused as link-local; ticked, the same address is dialled and the card reports the server (nothing listens there), not a policy refusal |
+| MT-05 | A cloud metadata address is never a destination | ✅ saving `http://169.254.169.254/v1`, even ticked, is refused in the Connect dialog with `model_dial_refused:metadata_address` |
+| MT-06 | The opt-in in the dialog, dark theme at 390 px | ✅ prefilled from the saved connection, no horizontal overflow; the endpoint was disconnected afterwards |
+| Suites | `model-transport-guard-live` 6/6 on a fresh workspace (7.8 min); `tests/test_model_transport_guard.py` 34/34 (NET-01 … NET-12) | ✅ |
+| Visual review | `docs/screenshots/2026-10-20-model-transport-guard/` (01–08), inspected at original resolution; dated folders are local evidence and not committed | ✅ — found [BUG-352](../plans/TO_BE_FIXED.md#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card): the custom endpoint saved off the machine shows no route line |
+
 ## Result — 2026-10-20 (model connection authorization, hosted Anthropic Haiku 4.5)
 
 [ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md) retired

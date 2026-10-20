@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-349, BUG-350 and BUG-351, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352 and BUG-353, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -88,9 +88,10 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
 | [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
-| [BUG-349](#bug-349--model-requests-are-authorized-by-origin-but-the-resolved-address-is-not-checked) | Medium | Models / transport | Open — found 2026-10-20 retiring the model egress allowlist (ADR-0004); planned in [MODEL_TRANSPORT_SECURITY_HARDENING.md](MODEL_TRANSPORT_SECURITY_HARDENING.md) |
 | [BUG-350](#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token) | Medium | Connectors / skills import / transport | Open — found 2026-10-20 while removing redirects from the model helpers |
 | [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
+| [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
+| [BUG-353](#bug-353--the-pinned-https-opener-used-for-web-reads-and-mcp-does-not-work-through-a-proxy) | Medium | Web access / MCP / transport | Open — found 2026-10-20 implementing BUG-349; not yet reproduced live |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -608,35 +609,6 @@ components, then a presentation export.
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
 
-## BUG-349 — Model requests are authorized by origin, but the resolved address is not checked
-
-**Severity: Medium. Area: Models / transport. Status: Open — found 2026-10-20
-while retiring `RAIKER_MODEL_EGRESS_ALLOWLIST`
-([ADR-0004](../adr/ADR-0004-connection-bound-model-authorization.md),
-[FIXED-1012](FIXED_ITEMS.md#fixed-1012--off-machine-models-needed-an-environment-allowlist-as-well-as-the-owners-connection)).**
-
-**Observed.** An off-machine model request must go to the origin of the owner's
-saved connection, and `classify_endpoint` labels that origin from its text. The
-name is then resolved by httpx or urllib at connect time and the answer is never
-checked: a hosted name that resolves to `10.0.0.5`, `127.0.0.1` or
-`169.254.169.254` is dialled with the owner's key, and a second lookup can
-answer differently from any first one (DNS rebinding).
-
-**Root cause.** Neither transport has a dial-time guard. The retired allowlist
-matched hostnames too, so this predates ADR-0004 and is not made reachable by
-it; `web_policy` already has the address classifier and a pinned opener, used
-only for the agent's web reads and MCP.
-
-**Proposed fix.** [MODEL_TRANSPORT_SECURITY_HARDENING.md](MODEL_TRANSPORT_SECURITY_HARDENING.md):
-resolve once, classify every answer against the connection's declared class,
-always refuse metadata addresses, pin the dialled address (httpx backend,
-`pinned_https_opener` for urllib), and make proxy behaviour explicit. Test
-scenarios NET-01 to NET-12.
-
-**Required user-interface outcome.** A refused dial reads as a policy refusal
-with its own reason on the provider card and in the turn, distinct from a
-connection failure; local and home-lab models keep working.
-
 ## BUG-350 — The connector GET helper follows redirects with the owner's token
 
 **Severity: Medium. Area: Connectors / skills import / breach monitoring /
@@ -691,6 +663,56 @@ never resolves the terminal's owner.
 **Required user-interface outcome.** `/model` in the terminal lists and
 launches the owner's connected providers, and an unconnected one says
 *connect it in Models* rather than naming an environment variable.
+
+
+## BUG-352 — A custom endpoint saved off the machine shows no route on its card
+
+**Severity: Low. Area: Models / UI. Status: Open — found 2026-10-20 in the
+BUG-349 live round (MT-03, `docs/screenshots/2026-10-20-model-transport-guard/04`).**
+
+**Observed.** The OpenAI-compatible card connected to
+`https://models.raiker-live.example/v1` showed no posture line — no *Needs
+network*, and no *Direct connection* / *Through your proxy* — while every
+shipped hosted card did.
+
+**Root cause.** `ModelProfileView.off_machine` and the posture flags are read
+from the profile's own shipped endpoint (`http://127.0.0.1:8000/v1`), not from
+the endpoint the owner saved. `proxy_route` already uses the saved endpoint;
+the line that would show it is gated on `off_machine`.
+
+**Proposed fix.** Classify the saved connection's endpoint when there is one
+for `off_machine` and the posture, and check every count that reads
+`off_machine` (posture totals, `remote_profile_count`) still means what it says.
+
+**Required user-interface outcome.** A custom endpoint pointed at the owner's
+network or the internet reads like any other off-machine card, with its route.
+
+## BUG-353 — The pinned HTTPS opener used for web reads and MCP does not work through a proxy
+
+**Severity: Medium. Area: Web access / MCP / transport. Status: Open — found
+2026-10-20 implementing BUG-349 (FIXED-1023); not yet reproduced live.**
+
+**Observed (by reading).** `web_policy.pinned_https_opener(host, address)`
+builds its opener with urllib's default `ProxyHandler`. With `HTTPS_PROXY` set,
+urllib makes the connection object for the *proxy* and calls `set_tunnel` for
+the destination, but `_PinnedConnection.connect` dials the pinned destination
+address at the proxy's port and then sends `CONNECT` to it. A web read or a
+remote MCP call on a host whose only route out is a proxy would fail, or reach
+the wrong port.
+
+**Root cause.** Pinning and proxying are two routes that cannot both apply, and
+the opener was written for the direct one only. The model image path now passes
+`direct=True` and decides the route itself; `web_access` and `_mcp_opener` do
+not.
+
+**Proposed fix.** Decide the route first, as `transport_guard.proxy_for` does:
+direct → pinned opener with `direct=True`; proxied → the proxy, unpinned, with
+the address guard applied to what can still be checked. Live test on a
+proxy-only host.
+
+**Required user-interface outcome.** A web read or MCP call on a proxied host
+either works or says that the proxy route is not supported — never a bare
+fetch failure.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

@@ -1107,6 +1107,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1018](#fixed-1018--a-custom-endpoint-could-not-be-on-the-owners-network-or-the-internet) | Medium | Models / custom endpoints | Fixed 2026-10-20 |
 | [FIXED-1019](#fixed-1019--a-loopback-model-request-could-be-handed-to-an-environment-proxy) | Low | Models / transport | Fixed 2026-10-20 |
 | [FIXED-1020](#fixed-1020--permissions-said-hosted-models-was-off-above-a-provider-that-had-just-answered) | Medium | Permissions / models | Fixed 2026-10-20 — found live |
+| [FIXED-1021](#fixed-1021--a-hosted-model-name-was-dialled-wherever-its-dns-answer-pointed-was-bug-349) | Medium | Models / transport | Fixed 2026-10-20 — closes BUG-349 |
+| [FIXED-1022](#fixed-1022--a-second-dns-answer-could-move-the-dialled-address-dns-rebinding) | Medium | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1023](#fixed-1023--the-image-helpers-resolved-their-hosted-name-twice) | Low | Design / image runtime / transport | Fixed 2026-10-20 |
+| [FIXED-1024](#fixed-1024--a-cloud-metadata-service-could-be-saved-as-a-model-destination) | Medium | Models / transport | Fixed 2026-10-20 — verified live |
+| [FIXED-1025](#fixed-1025--a-link-local-home-lab-server-had-no-owner-opt-in) | Low | Models / custom endpoints | Fixed 2026-10-20 — verified live |
+| [FIXED-1026](#fixed-1026--the-proxy-route-was-httpxs-implicit-choice-and-home-lab-traffic-could-be-proxied) | Low | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1027](#fixed-1027--a-keyed-plain-http-model-request-could-go-through-a-proxy) | Low | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1028](#fixed-1028--nothing-stopped-a-key-being-attached-to-another-origin-tls-name-checking-was-untested) | Low | Models / transport | Fixed 2026-10-20 |
+| [FIXED-1029](#fixed-1029--the-models-page-did-not-say-whether-a-request-went-through-a-proxy) | Low | Models / UI | Fixed 2026-10-20 — verified live |
+| [FIXED-1030](#fixed-1030--a-refused-dial-and-other-classified-denials-read-as-enable-its-gate) | Medium | Models / UI / turns | Fixed 2026-10-20 — verified live |
 
 ---
 
@@ -35604,3 +35614,171 @@ After it, the posture reads *Off* and a connected card reads **Policy blocked**.
 `permissionLanguage.test.ts` (on by connection, revocable), live LC-03 in
 `model-connection-anthropic-live.spec.ts`
 (`docs/screenshots/2026-10-20-model-connection-anthropic/04a`, `04`, `05`).
+
+## FIXED-1021 — A hosted model name was dialled wherever its DNS answer pointed (was BUG-349)
+
+**Severity: Medium. Area: Models / transport. Status: Fixed 2026-10-20 — closes
+[BUG-349](TO_BE_FIXED.md) and the plan `MODEL_TRANSPORT_SECURITY_HARDENING.md`
+(D1, NET-01, NET-02, NET-12), which is retired with this entry.**
+
+**Observed.** ADR-0004 binds an off-machine model request to the origin of the
+owner's saved connection, but the name was resolved by httpx at connect time
+and never checked: a hosted name answering `10.0.0.5` or `127.0.0.1` was sent
+the owner's key.
+
+**Fixed.** `raiker/models/transport_guard.py` — `resolve_for_dial` resolves the
+host once and classifies **every** answer against the connection's declared
+class with `web_policy`'s classifier (`unwrap_address`, `address_is_reachable`,
+`literal_address`; no second classifier). Hosted: every answer public, else
+`model_dial_refused:non_public_address` (CGNAT `100.64/10` included). Home lab:
+private, ULA or shared space; a public answer is
+`public_address_for_private`, a loopback one `loopback_for_private`. Local:
+loopback only. One refused answer refuses the dial. An unresolvable name stays
+a connection failure.
+
+**Evidence.** `tests/test_model_transport_guard.py` NET-01, NET-02 (loopback,
+`::1`, mapped `::ffff:127.0.0.1`, CGNAT), NET-06, NET-07, NET-12; live MT-03
+(`model-transport-guard-live.spec.ts`): a hosted name resolving to `10.0.0.5`
+reads *Raiker refused to connect: this hosted provider's name resolved to a
+private, loopback or link-local address* on the card.
+
+## FIXED-1022 — A second DNS answer could move the dialled address (DNS rebinding)
+
+**Severity: Medium. Area: Models / transport. Status: Fixed 2026-10-20 (plan D2, NET-03, acceptance 2 and 6).**
+
+**Fixed.** `GuardedNetworkBackend` is the httpcore network backend of every
+directly dialled pooled client (`ModelTransport`). It dials the address that
+passed, in resolver order and only among passing answers; httpcore keeps the
+URL's name for SNI, certificate verification and `Host`. Each new connection is
+resolved once; a kept-alive connection was checked when opened, so a pooled
+request pays for no lookup. httpx 0.28 has no backend hook, so the transport's
+pool is replaced by an identical one with the guard, and a test pins that
+against the locked httpx/httpcore.
+
+**Evidence.** `test_net03_a_rebinding_answer_cannot_move_the_dialled_address`,
+`test_answers_are_tried_in_order_and_only_among_those_that_passed`,
+`test_the_pinned_dial_keeps_the_name_on_the_request` (a real loopback server:
+two requests, one lookup, one connection, `Host` is the name),
+`test_router_turn_refusal_happens_before_any_socket`,
+`test_the_pool_replacement_is_pinned_to_the_locked_httpx`; live MT-01/MT-02 — a
+real Anthropic catalogue, preflight and Haiku 4.5 turn through the pinned dial.
+
+## FIXED-1023 — The image helpers resolved their hosted name twice
+
+**Severity: Low. Area: Design / image runtime / transport. Status: Fixed 2026-10-20 (plan D2, urllib half).**
+
+**Fixed.** `post_json` and `post_multipart` take `dial_kind`; the image
+executor passes `remote_hosted`. A direct HTTPS request resolves once, checks
+every answer and dials through `web_policy.pinned_https_opener(..., direct=True)`
+(new: no proxy handler beside a pinned connection) with redirects still
+refused. A proxied request goes to the proxy unpinned.
+
+**Evidence.** `test_image_helper_refuses_a_hosted_name_that_resolves_privately`,
+`test_image_helper_dials_the_address_that_passed`,
+`test_image_helper_through_a_proxy_is_not_pinned`; `test_image_generation.py`
+asserts the generation call asks for a hosted dial.
+
+## FIXED-1024 — A cloud metadata service could be saved as a model destination
+
+**Severity: Medium. Area: Models / transport. Status: Fixed 2026-10-20 (plan D3, NET-04, NET-05).**
+
+**Fixed.** `169.254.169.254`, `fd00:ec2::254`, `100.100.100.200`,
+`metadata.google.internal` and `metadata.azure.com` are refused for every class
+with no opt-in: by name or literal when the connection is validated
+(`refuse_metadata_destination` in the factory), and by resolved answer at dial
+time.
+
+**Evidence.** NET-04, NET-05, `test_a_saved_metadata_endpoint_is_refused_on_the_card`;
+live MT-05 — saving `http://169.254.169.254/v1` with the link-local box ticked
+is refused in the Connect dialog with `model_dial_refused:metadata_address`.
+
+## FIXED-1025 — A link-local home-lab server had no owner opt-in
+
+**Severity: Low. Area: Models / custom endpoints. Status: Fixed 2026-10-20 (plan D3).**
+
+**Fixed.** Link-local answers (`169.254/16`, `fe80::/10`) are refused by default
+(`link_local_address`). The custom-endpoint dialog gains **Allow a link-local
+address**, saved as `allow_link_local` on the connection
+(`ModelConnectionRequest.allow_link_local`), shown back as
+`ModelProfileView.allows_link_local` and prefilled on reconnect. Pooled clients
+are keyed by the rule, so the opt-in never leaks to another connection.
+
+**Evidence.** `test_link_local_needs_the_owners_per_connection_opt_in`,
+`test_bug349_link_local_opt_in_is_saved_with_the_connection_and_shown`,
+`test_the_pool_keys_clients_by_dial_rule`; live MT-04 (refused, then dialled
+once ticked — the card then reports the server, not a policy refusal) and MT-06
+(prefilled, dark theme, 390 px, no overflow).
+
+## FIXED-1026 — The proxy route was httpx's implicit choice, and home-lab traffic could be proxied
+
+**Severity: Low. Area: Models / transport. Status: Fixed 2026-10-20 (plan D4, NET-08, NET-09; supersedes FIXED-1019's mechanism).**
+
+**Fixed.** `transport_guard.proxy_for` decides the route explicitly: a hosted
+origin honours `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY` minus `NO_PROXY`; a
+loopback or private-network origin is always dialled directly. Pooled clients
+use `trust_env=False` and an explicit `ModelTransport`, so httpx reads no proxy,
+netrc or certificate setting of its own.
+
+**Evidence.** NET-08 (loopback answers with both proxies set),
+`test_a_private_network_origin_bypasses_the_proxy`, NET-09 (a real CONNECT
+proxy is asked for `api.example.com:443`, never shown the key),
+`test_egr24_pooled_clients_follow_owner_proxies_except_for_loopback`.
+
+## FIXED-1027 — A keyed plain-HTTP model request could go through a proxy
+
+**Severity: Low. Area: Models / transport. Status: Fixed 2026-10-20 (plan D4, NET-10).**
+
+**Fixed.** `ModelTransport` refuses a request carrying a credential header over
+`http://` through a proxy (`model_dial_refused:credential_over_http_proxy`);
+the image helpers refuse the same. HTTPS through a proxy is a tunnel and stays.
+
+**Evidence.** `test_net10_a_keyed_plain_http_request_through_a_proxy_is_refused`.
+
+## FIXED-1028 — Nothing stopped a key being attached to another origin; TLS name checking was untested
+
+**Severity: Low. Area: Models / transport. Status: Fixed 2026-10-20 (plan D5, NET-11).**
+
+**Fixed.** `ModelTransport` refuses a credentialed request whose origin is not
+the one its client was opened for (`model_credential_origin_mismatch`), so an
+adapter that ever builds an absolute URL elsewhere fails closed. A test proves a
+certificate for another name fails the pinned handshake before any byte of the
+request — or the key — reaches the server.
+
+**Evidence.** `test_a_credential_is_only_attached_to_the_clients_own_origin`,
+`test_net11_a_certificate_for_another_name_is_refused_before_headers_are_sent`.
+
+## FIXED-1029 — The Models page did not say whether a request went through a proxy
+
+**Severity: Low. Area: Models / UI. Status: Fixed 2026-10-20 (plan D4).**
+
+**Fixed.** `ModelProfileView.proxy_route` is the proxy's `host:port` (never its
+URL, which can carry a password) or `""`. Each off-machine card's posture line
+ends *Direct connection* or *Through your proxy (host:port)*, and the
+**Off-machine provider posture** gains **Through your proxy**.
+
+**Evidence.** `test_the_models_page_names_the_proxy_without_its_password`; live
+MT-01 — on this host Anthropic reads *Direct connection* (`NO_PROXY` covers it),
+fourteen other hosted cards *Through your proxy (127.0.0.1:33773)*, and the
+posture *Yes — 14 hosted profiles via 127.0.0.1:33773*.
+
+## FIXED-1030 — A refused dial, and other classified denials, read as "enable its gate"
+
+**Severity: Medium. Area: Models / UI / turns. Status: Fixed 2026-10-20 (BUG-349's required user-interface outcome).**
+
+**Observed.** A refusal raised as a policy error lists as `policy_denied`, and
+Models **Test**, the model picker and first-run setup each said *enable its
+gate first* for every one — including `model_connection_origin_mismatch` and the
+new dial refusals, on a gate that was already on. A turn's connection failure
+also still told the owner to check the retired *egress allowlist*.
+
+**Fixed.** `ProviderDialRefusedError` (a `ProviderPolicyError`) carries
+`model_dial_refused:<detail>`. `providerErrors.ts` explains each detail; all
+three `policy_denied` branches prefer classified guidance and keep the gate
+sentence only for an unexplained denial. `provider_failure_message` says, per
+detail, that it is *a policy refusal, not a network fault*, and
+`provider_connection_failed` now names the endpoint instead of the allowlist.
+
+**Evidence.** `providerErrors.test.ts` (dial refusals),
+`ModelsView.test.ts` (*explains a refused dial in the picker as an address, not
+a gate*), `test_a_dial_refusal_keeps_its_own_code_and_sentence`; live MT-03,
+MT-04 assert neither *enable its gate* nor *could not be reached* appears.

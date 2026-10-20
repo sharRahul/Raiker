@@ -392,6 +392,19 @@ Consent by configuration is scoped, not a blanket opening:
   does not authorise any other host, port or scheme — and an environment
   override cannot move a saved connection somewhere else
   (`model_connection_origin_mismatch`).
+- A connection authorises a *name*, and Raiker also checks where that name
+  leads, every time it opens a connection. A hosted provider must resolve to
+  public addresses only; a home-lab endpoint to addresses on your network; a
+  local one to this machine. Anything else is refused before a byte is sent
+  (`model_dial_refused:<reason>` — a policy answer, not a network fault), and
+  the address that passed is the one dialled, so a name cannot be re-pointed
+  between the check and the connection. Cloud metadata services
+  (`169.254.169.254`, `metadata.google.internal`, …) are never a destination.
+  A link-local server you own on a direct cable needs **Allow a link-local
+  address** ticked on its connection.
+- A request that goes through your proxy is resolved by the proxy, so this
+  address check does not apply to it. Home-lab and local endpoints never use a
+  proxy, and a key is never sent over plain HTTP through one.
 - A connection for one provider never authorises another, and a fallback model
   needs its own connection.
 - Nothing an agent does can create or change a connection. Only you, signed in,
@@ -672,11 +685,14 @@ keeping either side of it.
 
 ## Off-machine provider posture
 
-**Models → Add model** opens with four read-only facts about everything that
+**Models → Add model** opens with five read-only facts about everything that
 would leave this machine: the hosted model gate, the private-network gate, how
-many off-machine providers you have connected, and how many off-machine profiles
-exist. It is status, not a control — endpoints and API keys are never displayed
-here.
+many off-machine providers you have connected, how many off-machine profiles
+exist, and **Through your proxy** — whether hosted requests go through the
+proxy set in Raiker's environment (`HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`,
+minus `NO_PROXY`), and which one. Each off-machine card's posture line ends
+**Direct connection** or **Through your proxy (host:port)**. It is status, not
+a control — endpoints, API keys and proxy passwords are never displayed here.
 
 The two gates report **what they answer**, not what is stored against them.
 Connecting a provider is itself consent to use it, so a gate nobody has touched

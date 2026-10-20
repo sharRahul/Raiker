@@ -45,6 +45,51 @@ class SandboxError(Exception):
     pass
 
 
+def _open_model_request(
+    request: urllib.request.Request, timeout: float, dial_kind: str | None
+) -> Any:
+    """Send one model request without redirects, pinned when it is dialled directly.
+
+    BUG-349 (D2) — ``dial_kind`` is the destination's declared class. With one,
+    the host is resolved once and every answer classified
+    (:func:`~raiker.models.transport_guard.resolve_for_dial`); a direct HTTPS
+    request then dials the address that passed while TLS keeps the name. A
+    request the owner's environment proxies goes to that proxy, which resolves
+    the name itself, so there is nothing local to pin. Without ``dial_kind`` the
+    request is only sent without redirects, as before.
+    """
+    if dial_kind is None:
+        return _open_without_redirects(request, timeout)
+    from urllib.parse import urlsplit
+
+    from raiker.models.exceptions import ProviderPolicyError
+    from raiker.models.transport_guard import proxy_for, resolve_for_dial
+    from raiker.runtime.web_policy import pinned_https_opener
+
+    url = request.full_url
+    if proxy_for(url, dial_kind):
+        if urlsplit(url).scheme == "http" and any(
+            name.lower() in {"authorization", "x-api-key", "x-goog-api-key", "api-key"}
+            for name, _value in request.header_items()
+        ):
+            raise SandboxError("model_dial_refused:credential_over_http_proxy")
+        return _open_without_redirects(request, timeout)
+    split = urlsplit(url)
+    host = split.hostname or ""
+    port = split.port or (443 if split.scheme == "https" else 80)
+    try:
+        addresses = resolve_for_dial(host, port, dial_kind)
+    except ProviderPolicyError as exc:
+        raise SandboxError(str(exc)) from None
+    except Exception as exc:  # noqa: BLE001 — an unresolvable name is a fetch failure
+        raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
+    if split.scheme != "https":
+        return _open_without_redirects(request, timeout)
+    opener = pinned_https_opener(host, addresses[0], direct=True)
+    opener.add_handler(_NoRedirect())
+    return opener.open(request, timeout=timeout)  # noqa: S310 - scheme checked by caller
+
+
 def check_command_allowlist(
     command: Sequence[str],
     allowlist: frozenset[str],
@@ -284,6 +329,7 @@ def post_json(
     headers: dict[str, str] | None = None,
     max_bytes: int = 12_000_000,
     timeout: float = 60.0,
+    dial_kind: str | None = None,
 ) -> dict:
     """POST JSON to an allowlisted host and return the bounded response body.
 
@@ -323,8 +369,10 @@ def post_json(
         headers={"Content-Type": "application/json", **(headers or {})},
     )
     try:
-        with _open_without_redirects(request, timeout) as resp:
+        with _open_model_request(request, timeout, dial_kind) as resp:
             data = resp.read(max_bytes + 1)
+    except SandboxError:
+        raise
     except urllib.error.HTTPError as exc:
         # A 3xx arrives here too: redirects are not followed (see _NoRedirect),
         # so the key in the header never reaches the host a response names.
@@ -353,6 +401,7 @@ def post_multipart(
     headers: dict[str, str] | None = None,
     max_bytes: int = 12_000_000,
     timeout: float = 60.0,
+    dial_kind: str | None = None,
 ) -> dict:
     """POST ``multipart/form-data`` to an allowlisted host, JSON response bounded.
 
@@ -430,8 +479,10 @@ def post_multipart(
         },
     )
     try:
-        with _open_without_redirects(request, timeout) as resp:
+        with _open_model_request(request, timeout, dial_kind) as resp:
             data = resp.read(max_bytes + 1)
+    except SandboxError:
+        raise
     except urllib.error.HTTPError as exc:
         # A 3xx arrives here too: redirects are not followed (see _NoRedirect),
         # so the key in the header never reaches the host a response names.

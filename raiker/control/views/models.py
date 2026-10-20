@@ -107,6 +107,12 @@ class ModelProfileView(View):
     # sentence about any key currently benched for a rate limit or quota.
     backup_key_count: int = 0
     key_pool_status: str = ""
+    # BUG-349 — the owner opted this connection in to a link-local address.
+    allows_link_local: bool = False
+    # BUG-349 (D4) — ``host:port`` of the owner's proxy this profile's requests
+    # go through, or "" when they are dialled directly (always "" for a local
+    # or home-lab endpoint). Never the proxy URL, which can carry a password.
+    proxy_route: str = ""
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None

@@ -1099,3 +1099,78 @@ class DesignTokenImportRequest(StrictRequest):
 class DesignHandoffRequest(StrictRequest):
     frame_ids: list[str] = Field(min_length=1, max_length=40)
     target: str = Field(default="", max_length=300)
+
+
+class GoalCriterionInput(StrictRequest):
+    """PA-D01 — one success criterion. ``validator`` is how its evidence is recorded."""
+
+    text: str = Field(min_length=1, max_length=300)
+    mandatory: bool = True
+    validator: str = Field(default="owner_confirms", max_length=40)
+
+
+class GoalStepInput(StrictRequest):
+    """PA-D01 — one step. ``depends_on`` and ``criteria`` are indices into this plan."""
+
+    title: str = Field(min_length=1, max_length=120)
+    instruction: str = Field(min_length=1, max_length=4000)
+    surface: str = Field(default="chat", max_length=20)
+    depends_on: list[int] = Field(default_factory=list, max_length=12)
+    criteria: list[int] = Field(default_factory=list, max_length=12)
+
+
+class CreateGoalRequest(StrictRequest):
+    title: str = Field(min_length=1, max_length=120)
+    model_profile: str | None = Field(default=None, max_length=120)
+    model: str | None = Field(default=None, max_length=200)
+    objective: str = Field(default="", max_length=4000)
+    project_id: str | None = Field(default=None, max_length=80)
+    criteria: list[GoalCriterionInput] = Field(default_factory=list, max_length=12)
+    steps: list[GoalStepInput] = Field(default_factory=list, max_length=12)
+
+
+class UpdateGoalPlanRequest(StrictRequest):
+    base_revision: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=120)
+    model_profile: str | None = Field(default=None, max_length=120)
+    model: str | None = Field(default=None, max_length=200)
+    objective: str = Field(default="", max_length=4000)
+    criteria: list[GoalCriterionInput] = Field(default_factory=list, max_length=12)
+    steps: list[GoalStepInput] = Field(default_factory=list, max_length=12)
+
+
+class GoalActionRequest(StrictRequest):
+    """An owner action on a goal, named against the revision the owner saw."""
+
+    base_revision: int = Field(ge=1)
+
+
+class GoalConfirmRequest(StrictRequest):
+    base_revision: int = Field(ge=1)
+    note: str = Field(default="", max_length=300)
+
+
+class ExecutionProfileFields(StrictRequest):
+    """PA-D02 — the fields Settings may set. Absent leaves a field as it was."""
+
+    name: str | None = Field(default=None, max_length=60)
+    allow_local: bool | None = None
+    allow_hosted: bool | None = None
+    allowed_providers: list[str] | None = Field(default=None, max_length=20)
+    memory_to_hosted: bool | None = None
+    max_step_runs: int | None = Field(default=None, ge=1, le=100)
+    max_cost_usd: float | None = Field(default=None, gt=0, le=1000)
+
+
+class CreateExecutionProfileRequest(ExecutionProfileFields):
+    template: str = Field(min_length=1, max_length=40)
+
+
+class UpdateExecutionProfileRequest(ExecutionProfileFields):
+    base_version: int = Field(ge=1)
+
+
+class ExecutionProfileBindingRequest(StrictRequest):
+    """Which profile to bind; ``None`` unbinds."""
+
+    profile_id: str | None = Field(default=None, max_length=80)

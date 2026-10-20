@@ -15,6 +15,28 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-20 (Goals and execution profiles, hosted Anthropic Haiku 4.5)
+
+PA-D01, PA-D02 and PA-D06's first slices
+([FIXED-1039](../plans/FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01)
+to [FIXED-1056](../plans/FIXED_ITEMS.md#fixed-1056--goal-and-profile-audit-events-would-have-been-dropped-without-a-word)).
+A fresh workspace served by `raiker-web` on `127.0.0.1:8765`. The
+identity-linked Anthropic key and workspace ID were typed into the Models dialog
+by the spec from the run's environment; neither appears in a spec, command,
+document, screenshot or the server log. Spec: `web/e2e/goals-execution-profiles-live.spec.ts`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-GOAL-01 | Anthropic connects through **Models → Connect** (key and workspace ID), Haiku 4.5 kept, a Chat turn answers | ✅ |
+| RT-GOAL-02 | **Work → Goals** says *No execution profile yet*; a goal drafted with two criteria and one step on Haiku reads *Steps run on claude-haiku-4-5-20251001*, offers no **Start**, and **Accept plan** answers *Choose an execution profile in Settings…* | ✅ after a fix found in this round ([FIXED-1055](../plans/FIXED_ITEMS.md#fixed-1055--a-criterions-text-box-and-a-steps-counts-toward-box-had-the-same-name)): two controls were both named *Criterion 1* |
+| RT-GOAL-03 | **Settings → Execution profiles → Create Private local** becomes *Active*; the goal is accepted (*Ready to start*); **Start** is refused naming *anthropic (hosted)*; nothing is filed | ✅ after a fix found in this round ([FIXED-1054](../plans/FIXED_ITEMS.md#fixed-1054--a-goals-steps-ran-on-whatever-an-empty-model-selection-resolved-to)): the step had no model, so Start was judged — and the step run — on the empty selection's local placeholder |
+| RT-GOAL-04 | **Create Balanced → Make active**; **Start** adopts Balanced (recorded as `goal_profile_repinned`), the host's tick runs the step on Haiku — a real three-item packing list — and the goal reads **Partly done**: *A packing list exists — Its steps finished*, *I am happy with it* open; *Answered by: anthropic — all within the profile*; the step's start event records `memory_withheld: true` | ✅ |
+| RT-GOAL-05 | Home's **Goals** board lists it under **Needs you** with *Partly done*; its link opens the goal; **Confirm met** with a note reads **Completed** and *Confirmed by you: Checked the list* | ✅ |
+| RT-GOAL-06 | A second goal started and stopped at once: **Stop goal** asks again (*Stop every step now*), then *Stopped. 0 steps had finished; 1 running task was stopped.*; its task stays `cancelled` although its in-flight model call completed | ✅ |
+| RT-GOAL-07 | Editing Balanced's step runs writes *version 2*, shown on the card and in *Saved version 2.* | ✅ |
+| Suites | `goals-execution-profiles-live` 7/7 (2.8 min); `tests/test_goals_and_execution_profiles.py`; goal and profile contract cases; `GoalsView.test.ts`, `goalPresentation.test.ts`, `ExecutionProfiles.test.ts`, `WorkbenchView.test.ts` | ✅ |
+| Visual review | 01–08 inspected at original resolution. Two defects found and fixed from the images: the list card still read *Working* beside a detail reading *Partly done*, and the budget line read *not priced: claude-haiku-4-5-20251001* because the shipped price block was not consulted (now $0.0103 for the step). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-20 (Memory Brief and recall mode, hosted Anthropic Haiku 4.5)
 
 The SQLCipher memory decision's MEM-BRIEF-01 and MEM-MODE-02

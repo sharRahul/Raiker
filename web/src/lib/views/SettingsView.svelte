@@ -14,6 +14,7 @@
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
+  import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
   import GitHubConnection from "./settings/GitHubConnection.svelte";
   import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
@@ -387,6 +388,8 @@
       <Privacy {settings} {save} />
     {:else if active === "account"}
       <Account {settings} {save} {status} />
+    {:else if active === "execution-profiles"}
+      <ExecutionProfiles />
     {:else if active === "web-access"}
       <WebAccess />
     {:else if active === "github"}

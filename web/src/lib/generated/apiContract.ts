@@ -1706,6 +1706,27 @@ export type CreateDesignDocumentRequest = {
   project_id?: string | null;
 };
 
+export type CreateExecutionProfileRequest = {
+  name?: string | null;
+  allow_local?: boolean | null;
+  allow_hosted?: boolean | null;
+  allowed_providers?: string[] | null;
+  memory_to_hosted?: boolean | null;
+  max_step_runs?: number | null;
+  max_cost_usd?: number | null;
+  template: string;
+};
+
+export type CreateGoalRequest = {
+  title: string;
+  model_profile?: string | null;
+  model?: string | null;
+  objective?: string;
+  project_id?: string | null;
+  criteria?: GoalCriterionInput[];
+  steps?: GoalStepInput[];
+};
+
 export type CreateMcpServerRequest = {
   name: string;
   template: string;
@@ -2439,6 +2460,54 @@ export type ExecutionEnvironmentsView = {
   container_options: ContainerOptions;
 };
 
+export type ExecutionProfileBinding = {
+  project_id: string;
+  profile_id: string;
+};
+
+/** Which profile to bind; ``None`` unbinds. */
+export type ExecutionProfileBindingRequest = {
+  profile_id?: string | null;
+};
+
+/** A Settings change, and how many running goals it paused at a safe boundary. */
+export type ExecutionProfileChanged = {
+  ok: boolean;
+  profile: ExecutionProfileView | null;
+  goals_paused: number;
+};
+
+/** Every profile at its latest version, the templates, and what is bound where. */
+export type ExecutionProfileList = {
+  profiles: ExecutionProfileView[];
+  templates: ExecutionProfileTemplate[];
+  active_profile_id: string | null;
+  project_bindings: ExecutionProfileBinding[];
+};
+
+export type ExecutionProfileTemplate = {
+  template: string;
+  name: string;
+  summary: string;
+  allow_local: boolean;
+  allow_hosted: boolean;
+  memory_to_hosted: boolean;
+};
+
+export type ExecutionProfileView = {
+  profile_id: string;
+  version: number;
+  name: string;
+  template: string;
+  allow_local: boolean;
+  allow_hosted: boolean;
+  allowed_providers: string[];
+  memory_to_hosted: boolean;
+  max_step_runs: number;
+  max_cost_usd: number | null;
+  created_at: string;
+};
+
 /** BUG-62 — where an executed action's result now lives. */
 export type ExecutionReceipt = {
   kind: string;
@@ -2722,6 +2791,114 @@ export type GithubRepoConnected = {
   kind: "github";
   label: string;
   branch: string | null;
+};
+
+/** An owner action on a goal, named against the revision the owner saw. */
+export type GoalActionRequest = {
+  base_revision: number;
+};
+
+export type GoalBudget = {
+  max_step_runs: number | null;
+  step_runs: number;
+  max_cost_usd: number | null;
+  spent_usd: number;
+  unpriced_models: string[];
+};
+
+export type GoalConfirmRequest = {
+  base_revision: number;
+  note?: string;
+};
+
+/** PA-D01 — one success criterion. ``validator`` is how its evidence is recorded. */
+export type GoalCriterionInput = {
+  text: string;
+  mandatory?: boolean;
+  validator?: string;
+};
+
+export type GoalCriterionView = {
+  criterion_id: string;
+  text: string;
+  mandatory: boolean;
+  validator: string;
+  evidence_kind: string | null;
+  evidence_ref: string | null;
+  evidence_note: string | null;
+  verified_at: string | null;
+};
+
+export type GoalEvent = {
+  kind: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+export type GoalList = {
+  goals: GoalView[];
+  archived: GoalView[];
+  active_profile: ExecutionProfileView | null;
+};
+
+/** PA-D01 — one step. ``depends_on`` and ``criteria`` are indices into this plan. */
+export type GoalStepInput = {
+  title: string;
+  instruction: string;
+  surface?: string;
+  depends_on?: number[];
+  criteria?: number[];
+};
+
+export type GoalStepView = {
+  step_id: string;
+  title: string;
+  instruction: string;
+  surface: string;
+  depends_on: string[];
+  criterion_ids: string[];
+  state: string;
+  reason: string;
+  task_id: string | null;
+  task_status: string | null;
+  task_summary: string | null;
+};
+
+export type GoalStopped = {
+  ok: boolean;
+  steps_done: number;
+  steps_stopped: number;
+  tasks_stopped: number;
+  goal: GoalView;
+};
+
+/** One goal: its plan, evidence, budget, profile and the actions its state allows. */
+export type GoalView = {
+  goal_id: string;
+  title: string;
+  objective: string;
+  project_id: string | null;
+  model_profile: string | null;
+  model: string | null;
+  status: string;
+  reason: string;
+  reason_text: string;
+  reason_detail: string;
+  revision: number;
+  allowed_actions: string[];
+  created_at: string;
+  updated_at: string;
+  accepted_at: string | null;
+  settled_at: string | null;
+  criteria: GoalCriterionView[];
+  steps: GoalStepView[];
+  profile: ExecutionProfileView | null;
+  profile_current: boolean;
+  profile_source: string;
+  budget: GoalBudget;
+  providers_used: string[];
+  providers_outside_profile: string[];
+  events: GoalEvent[];
 };
 
 /** The sections this install carries; ``available`` is false when a build shipped none. */
@@ -6146,6 +6323,27 @@ export type UpdateDesignDocumentRequest = {
   project_id?: string | null;
 };
 
+export type UpdateExecutionProfileRequest = {
+  name?: string | null;
+  allow_local?: boolean | null;
+  allow_hosted?: boolean | null;
+  allowed_providers?: string[] | null;
+  memory_to_hosted?: boolean | null;
+  max_step_runs?: number | null;
+  max_cost_usd?: number | null;
+  base_version: number;
+};
+
+export type UpdateGoalPlanRequest = {
+  base_revision: number;
+  title: string;
+  model_profile?: string | null;
+  model?: string | null;
+  objective?: string;
+  criteria?: GoalCriterionInput[];
+  steps?: GoalStepInput[];
+};
+
 /** Provenance, channel and recovery points; ``not_checked`` is not an assurance. */
 export type UpdateStatusView = {
   state: "source_checkout" | "no_channel" | "unsigned_build" | "not_checked" | "up_to_date" | "available" | "unreachable";
@@ -6590,6 +6788,16 @@ export const contract = {
     call<ExecutionEnvironmentProbed>("POST", `/api/execution-environments/${encodeURIComponent(profileId)}/probe`),
   resetExecutionEnvironment: (profileId: string, body: Record<string, unknown>) =>
     call<ExecutionEnvironmentReset>("POST", `/api/execution-environments/${encodeURIComponent(profileId)}/reset`, { body }),
+  listExecutionProfiles: () =>
+    request<ExecutionProfileList>("/api/execution-profiles"),
+  createExecutionProfile: (body: CreateExecutionProfileRequest) =>
+    call<ExecutionProfileChanged>("POST", "/api/execution-profiles", { body }),
+  setActiveExecutionProfile: (body: ExecutionProfileBindingRequest) =>
+    call<ExecutionProfileChanged>("PUT", "/api/execution-profiles/active", { body }),
+  bindProjectExecutionProfile: (projectId: string, body: ExecutionProfileBindingRequest) =>
+    call<ExecutionProfileChanged>("PUT", `/api/execution-profiles/projects/${encodeURIComponent(projectId)}`, { body }),
+  updateExecutionProfile: (profileId: string, body: UpdateExecutionProfileRequest) =>
+    call<ExecutionProfileChanged>("PUT", `/api/execution-profiles/${encodeURIComponent(profileId)}`, { body }),
   getExtensions: () =>
     request<ExtensionsOverviewView>("/api/extensions"),
   deleteGitCredential: () =>
@@ -6636,6 +6844,28 @@ export const contract = {
     call<GitHubSignInAttempt>("POST", `/api/github/sign-in/${encodeURIComponent(attemptId)}/cancel`),
   pollGithubSignIn: (attemptId: string) =>
     call<GitHubSignInAttempt>("POST", `/api/github/sign-in/${encodeURIComponent(attemptId)}/poll`),
+  listGoals: () =>
+    request<GoalList>("/api/goals"),
+  createGoal: (body: CreateGoalRequest) =>
+    call<GoalView>("POST", "/api/goals", { body }),
+  readGoal: (goalId: string) =>
+    request<GoalView>(`/api/goals/${encodeURIComponent(goalId)}`),
+  acceptGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/accept`, { body }),
+  archiveGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/archive`, { body }),
+  confirmGoalCriterion: (goalId: string, criterionId: string, body: GoalConfirmRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/criteria/${encodeURIComponent(criterionId)}/confirm`, { body }),
+  pauseGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/pause`, { body }),
+  updateGoalPlan: (goalId: string, body: UpdateGoalPlanRequest) =>
+    call<GoalView>("PUT", `/api/goals/${encodeURIComponent(goalId)}/plan`, { body }),
+  resumeGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/resume`, { body }),
+  startGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalView>("POST", `/api/goals/${encodeURIComponent(goalId)}/start`, { body }),
+  stopGoal: (goalId: string, body: GoalActionRequest) =>
+    call<GoalStopped>("POST", `/api/goals/${encodeURIComponent(goalId)}/stop`, { body }),
   guideIndex: () =>
     request<GuideIndex>("/api/guide"),
   guideSection: (slug: string) =>

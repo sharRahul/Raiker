@@ -53,6 +53,7 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 | `memory_forget_execution` | [Durable memory forget](memory-forget.md) |
 | `semantic_memory_runtime` | [Semantic memory search](semantic-memory.md) |
 | External memory adapter contract (no provider enabled) | [Memory adapter](memory-adapter.md) |
+| Durable goals and Settings-owned execution profiles | [Goals and execution profiles](goals-and-execution-profiles.md) |
 | `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) |
 | `code_map_indexing` | [Repository code map](code-map-indexing.md) |
 | `language_intelligence` | [Language intelligence](language-intelligence.md) |

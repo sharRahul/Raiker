@@ -39,6 +39,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: "security", label: "Security & sign-in", icon: "lock", group: "Security & data" },
   { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
   { id: "account", label: "Account", icon: "user", group: "Security & data" },
+  // PA-D02 — where a goal's work may run and what may leave with it. Settings
+  // is the only place a profile is made, changed, activated or bound.
+  { id: "execution-profiles", label: "Execution profiles", icon: "shield", group: "Security & data" },
   { id: "web-access", label: "Web access", icon: "connections", group: "Developer & runtime" },
   // ADD-27 GH-19 — Settings → Connections → GitHub replaces "Git credential";
   // the old deep link still opens it (SECTION_ALIASES).

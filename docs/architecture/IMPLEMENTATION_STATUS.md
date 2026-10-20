@@ -103,6 +103,19 @@ History search is bounded, redacted and never promoted; an external
 `MemoryAdapter` contract exists with **no provider enabled**; in-place key
 rotation is not offered ([BUG-354](../plans/TO_BE_FIXED.md#bug-354--the-workspace-key-cannot-be-rotated-in-place)).
 
+Durable **goals** and Settings-owned **execution profiles** ship as the first
+slices of PA-D01, PA-D02 and PA-D06 (implemented 2026-10-20,
+[FIXED-1039](../plans/FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01)
+to [FIXED-1056](../plans/FIXED_ITEMS.md#fixed-1056--goal-and-profile-audit-events-would-have-been-dropped-without-a-word)):
+an owner-accepted plan of steps that run as ordinary governed tasks on a named
+model, carried forward by the scheduler tick, assessed only from per-criterion
+evidence, with Stop, Pause/Resume and budgets; a profile judges the goal's model
+and every fallback before a step is filed and before it runs, and keeps
+personal memory off hosted steps where it says so. Profiles bound goal steps
+only, and goals cannot yet be started from Chat
+([BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario),
+[BUG-356](../plans/TO_BE_FIXED.md#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class)).
+
 Strict non-allow blocking, role revoke governed, and capability gate per action
 are enforced. The historical readiness records in `raiker/workspace/views.py`
 still report these compatibility flags as `False`; they describe those

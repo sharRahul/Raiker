@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353 and BUG-354, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355 and BUG-356, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -93,6 +93,8 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
 | [BUG-353](#bug-353--the-pinned-https-opener-used-for-web-reads-and-mcp-does-not-work-through-a-proxy) | Medium | Web access / MCP / transport | Open — found 2026-10-20 implementing BUG-349; not yet reproduced live |
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
+| [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
+| [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -740,6 +742,65 @@ Fail closed and leave the old key in place on any error.
 **Required user-interface outcome.** **Settings → Security & sign-in** offers
 the rotation, says which existing backups will still need the old key, and
 reports the new key fingerprint after a verified rekey.
+
+## BUG-355 — Goals ship without intake from Chat, validator-backed criteria or a restart scenario
+
+**Severity: Medium. Area: Goals / personal agent. Status: Open remainder of
+PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01)
+to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)).**
+
+**Observed.** Durable goals, their lifecycle, coordinator, evidence, Stop,
+Pause/Resume and budgets pass unit and live tests. Against
+[the personal-agent specification](PERSONAL_AUTONOMOUS_AGENT_SPEC.md) these
+remain:
+
+| Requirement | What exists | What is missing |
+|---|---|---|
+| Outcome intake | **Work → Goals** form | Starting a goal from a Chat message or a Build turn; asking only for materially missing facts |
+| Criteria validators | *Met when its steps finish* (a record the steps finished) and *You confirm it* | A Build step's `completed_verified` outcome, a destination read-back or another independent validator as evidence |
+| Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing | A goal-level lease for concurrent coordinators across hosts, and the host-restart live scenario the register names |
+| Pause | Files nothing new and parks unclaimed steps; a running step finishes its current turn | A pause that reaches a running step's next safe boundary without stopping it |
+
+**Proposed fix.** One slice per row, each with its own live evidence: a
+*Make this a goal* action in Chat that prefills intake, then a Build-verified
+validator reading the step's turn outcome, then the restart scenario through
+`scripts/build_restart_fault.py`'s pattern, then a safe-boundary pause.
+
+**Required user-interface outcome.** Each row is reachable from the surface it
+belongs to and absent until it works.
+
+## BUG-356 — Execution profiles govern goal steps only, and cover one data class
+
+**Severity: Medium. Area: Execution profiles / models / data handling. Status:
+Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02)
+to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)).**
+
+**Observed.** A profile is enforced on every goal step, before it is filed and
+before it runs, across the owner's whole fallback chain, and withholds personal
+memory from a hosted step where it says so. It does not yet reach:
+
+* **Ordinary Chat, Build and scheduled tasks.** The specification makes the
+  active profile the ceiling for all new work; today it bounds goal steps only.
+  Settings says so.
+* **Hosts.** Steps run on this host; a profile cannot yet name a private
+  always-on host or a remote executor (PA-D07).
+* **Other data classes.** Attachments, research references and selected files
+  are not yet steps' inputs, so there is nothing to withhold; when they are,
+  the profile needs a field per class.
+* **Egress and retention constraints** per provider.
+* **Placement of a custom endpoint.** A model profile's placement is its
+  `local_only` flag, so a generic OpenAI-compatible endpoint on `localhost`
+  reads as hosted and Private local refuses it. Conservative, and stated on the
+  Settings page, but wrong for that owner.
+
+**Proposed fix.** Extend enforcement to every prompt route through the
+gateway's model selection (the same chain check), classify a custom endpoint by
+its saved route (`raiker/models/endpoint_policy.py`), then add host and
+data-class fields as PA-D05/PA-D07 give steps those inputs.
+
+**Required user-interface outcome.** Settings → Execution profiles states what
+each profile governs; a refused Chat or Build turn names the profile and offers
+the Settings route, exactly as a goal step does.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

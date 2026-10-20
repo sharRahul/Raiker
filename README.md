@@ -6,8 +6,9 @@ for thinking, researching, creating, communicating, organising, coding,
 automating and completing digital work across the models, tools, files,
 projects and services you connect and authorise. Its working foundation
 combines a personal AI assistant (Chat), a coding/build agent (Build), image
-work (Design), and an extensible, owner-governed runtime;
-goal-level capabilities are planned and staged in the
+work (Design), and an extensible, owner-governed runtime. **Goals** carry an
+outcome across sessions as a plan of governed steps, under an execution profile
+you set in Settings; further goal-level capabilities are planned and staged in the
 [personal-agent architecture](docs/plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 
 Raiker runs as a desktop application on Windows, macOS and Linux. Its desktop

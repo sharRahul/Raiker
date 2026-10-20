@@ -8568,6 +8568,182 @@
         "title": "CreateDesignDocumentRequest",
         "type": "object"
       },
+      "CreateExecutionProfileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_hosted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Hosted"
+          },
+          "allow_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Local"
+          },
+          "allowed_providers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Providers"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "max_step_runs": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Step Runs"
+          },
+          "memory_to_hosted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory To Hosted"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "template": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template"
+        ],
+        "title": "CreateExecutionProfileRequest",
+        "type": "object"
+      },
+      "CreateGoalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/GoalCriterionInput"
+            },
+            "maxItems": 12,
+            "title": "Criteria",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          },
+          "objective": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Objective",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GoalStepInput"
+            },
+            "maxItems": 12,
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CreateGoalRequest",
+        "type": "object"
+      },
       "CreateMcpServerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -12285,6 +12461,230 @@
         "title": "ExecutionEnvironmentsView",
         "type": "object"
       },
+      "ExecutionProfileBinding": {
+        "properties": {
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "profile_id"
+        ],
+        "title": "ExecutionProfileBinding",
+        "type": "object"
+      },
+      "ExecutionProfileBindingRequest": {
+        "additionalProperties": false,
+        "description": "Which profile to bind; ``None`` unbinds.",
+        "properties": {
+          "profile_id": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          }
+        },
+        "title": "ExecutionProfileBindingRequest",
+        "type": "object"
+      },
+      "ExecutionProfileChanged": {
+        "description": "A Settings change, and how many running goals it paused at a safe boundary.",
+        "properties": {
+          "goals_paused": {
+            "title": "Goals Paused",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionProfileView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "profile",
+          "goals_paused"
+        ],
+        "title": "ExecutionProfileChanged",
+        "type": "object"
+      },
+      "ExecutionProfileList": {
+        "description": "Every profile at its latest version, the templates, and what is bound where.\n\n``active_profile_id`` is what new goals outside a project-bound project\ninherit; ``None`` means Settings has not chosen one, and a goal cannot be\naccepted until it does.",
+        "properties": {
+          "active_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Profile Id"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProfileView"
+            },
+            "title": "Profiles",
+            "type": "array"
+          },
+          "project_bindings": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProfileBinding"
+            },
+            "title": "Project Bindings",
+            "type": "array"
+          },
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProfileTemplate"
+            },
+            "title": "Templates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profiles",
+          "templates",
+          "active_profile_id",
+          "project_bindings"
+        ],
+        "title": "ExecutionProfileList",
+        "type": "object"
+      },
+      "ExecutionProfileTemplate": {
+        "properties": {
+          "allow_hosted": {
+            "title": "Allow Hosted",
+            "type": "boolean"
+          },
+          "allow_local": {
+            "title": "Allow Local",
+            "type": "boolean"
+          },
+          "memory_to_hosted": {
+            "title": "Memory To Hosted",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template",
+          "name",
+          "summary",
+          "allow_local",
+          "allow_hosted",
+          "memory_to_hosted"
+        ],
+        "title": "ExecutionProfileTemplate",
+        "type": "object"
+      },
+      "ExecutionProfileView": {
+        "properties": {
+          "allow_hosted": {
+            "title": "Allow Hosted",
+            "type": "boolean"
+          },
+          "allow_local": {
+            "title": "Allow Local",
+            "type": "boolean"
+          },
+          "allowed_providers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Providers",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "max_step_runs": {
+            "title": "Max Step Runs",
+            "type": "integer"
+          },
+          "memory_to_hosted": {
+            "title": "Memory To Hosted",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile_id",
+          "version",
+          "name",
+          "template",
+          "allow_local",
+          "allow_hosted",
+          "allowed_providers",
+          "memory_to_hosted",
+          "max_step_runs",
+          "max_cost_usd",
+          "created_at"
+        ],
+        "title": "ExecutionProfileView",
+        "type": "object"
+      },
       "ExecutionReceipt": {
         "description": "BUG-62 — where an executed action's result now lives.",
         "properties": {
@@ -13888,6 +14288,616 @@
           "branch"
         ],
         "title": "GithubRepoConnected",
+        "type": "object"
+      },
+      "GoalActionRequest": {
+        "additionalProperties": false,
+        "description": "An owner action on a goal, named against the revision the owner saw.",
+        "properties": {
+          "base_revision": {
+            "minimum": 1.0,
+            "title": "Base Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "base_revision"
+        ],
+        "title": "GoalActionRequest",
+        "type": "object"
+      },
+      "GoalBudget": {
+        "properties": {
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "max_step_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Step Runs"
+          },
+          "spent_usd": {
+            "title": "Spent Usd",
+            "type": "number"
+          },
+          "step_runs": {
+            "title": "Step Runs",
+            "type": "integer"
+          },
+          "unpriced_models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unpriced Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "max_step_runs",
+          "step_runs",
+          "max_cost_usd",
+          "spent_usd",
+          "unpriced_models"
+        ],
+        "title": "GoalBudget",
+        "type": "object"
+      },
+      "GoalConfirmRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base_revision": {
+            "minimum": 1.0,
+            "title": "Base Revision",
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_revision"
+        ],
+        "title": "GoalConfirmRequest",
+        "type": "object"
+      },
+      "GoalCriterionInput": {
+        "additionalProperties": false,
+        "description": "PA-D01 — one success criterion. ``validator`` is how its evidence is recorded.",
+        "properties": {
+          "mandatory": {
+            "default": true,
+            "title": "Mandatory",
+            "type": "boolean"
+          },
+          "text": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "validator": {
+            "default": "owner_confirms",
+            "maxLength": 40,
+            "title": "Validator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "GoalCriterionInput",
+        "type": "object"
+      },
+      "GoalCriterionView": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "evidence_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Kind"
+          },
+          "evidence_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Note"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "mandatory": {
+            "title": "Mandatory",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "validator": {
+            "title": "Validator",
+            "type": "string"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "text",
+          "mandatory",
+          "validator",
+          "evidence_kind",
+          "evidence_ref",
+          "evidence_note",
+          "verified_at"
+        ],
+        "title": "GoalCriterionView",
+        "type": "object"
+      },
+      "GoalEvent": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "detail",
+          "created_at"
+        ],
+        "title": "GoalEvent",
+        "type": "object"
+      },
+      "GoalList": {
+        "properties": {
+          "active_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionProfileView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archived": {
+            "items": {
+              "$ref": "#/components/schemas/GoalView"
+            },
+            "title": "Archived",
+            "type": "array"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/GoalView"
+            },
+            "title": "Goals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "goals",
+          "archived",
+          "active_profile"
+        ],
+        "title": "GoalList",
+        "type": "object"
+      },
+      "GoalStepInput": {
+        "additionalProperties": false,
+        "description": "PA-D01 — one step. ``depends_on`` and ``criteria`` are indices into this plan.",
+        "properties": {
+          "criteria": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "title": "Criteria",
+            "type": "array"
+          },
+          "depends_on": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "title": "Depends On",
+            "type": "array"
+          },
+          "instruction": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          },
+          "surface": {
+            "default": "chat",
+            "maxLength": 20,
+            "title": "Surface",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "instruction"
+        ],
+        "title": "GoalStepInput",
+        "type": "object"
+      },
+      "GoalStepView": {
+        "properties": {
+          "criterion_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Criterion Ids",
+            "type": "array"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "instruction": {
+            "title": "Instruction",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "surface": {
+            "title": "Surface",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          },
+          "task_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Status"
+          },
+          "task_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Summary"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "title",
+          "instruction",
+          "surface",
+          "depends_on",
+          "criterion_ids",
+          "state",
+          "reason",
+          "task_id",
+          "task_status",
+          "task_summary"
+        ],
+        "title": "GoalStepView",
+        "type": "object"
+      },
+      "GoalStopped": {
+        "properties": {
+          "goal": {
+            "$ref": "#/components/schemas/GoalView"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "steps_done": {
+            "title": "Steps Done",
+            "type": "integer"
+          },
+          "steps_stopped": {
+            "title": "Steps Stopped",
+            "type": "integer"
+          },
+          "tasks_stopped": {
+            "title": "Tasks Stopped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "steps_done",
+          "steps_stopped",
+          "tasks_stopped",
+          "goal"
+        ],
+        "title": "GoalStopped",
+        "type": "object"
+      },
+      "GoalView": {
+        "description": "One goal: its plan, evidence, budget, profile and the actions its state allows.",
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "allowed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/GoalBudget"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/GoalCriterionView"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/GoalEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "goal_id": {
+            "title": "Goal Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionProfileView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profile_current": {
+            "title": "Profile Current",
+            "type": "boolean"
+          },
+          "profile_source": {
+            "title": "Profile Source",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "providers_outside_profile": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Providers Outside Profile",
+            "type": "array"
+          },
+          "providers_used": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Providers Used",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_detail": {
+            "title": "Reason Detail",
+            "type": "string"
+          },
+          "reason_text": {
+            "title": "Reason Text",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GoalStepView"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "goal_id",
+          "title",
+          "objective",
+          "project_id",
+          "model_profile",
+          "model",
+          "status",
+          "reason",
+          "reason_text",
+          "reason_detail",
+          "revision",
+          "allowed_actions",
+          "created_at",
+          "updated_at",
+          "accepted_at",
+          "settled_at",
+          "criteria",
+          "steps",
+          "profile",
+          "profile_current",
+          "profile_source",
+          "budget",
+          "providers_used",
+          "providers_outside_profile",
+          "events"
+        ],
+        "title": "GoalView",
         "type": "object"
       },
       "GuideIndex": {
@@ -31750,6 +32760,175 @@
         "title": "UpdateDesignDocumentRequest",
         "type": "object"
       },
+      "UpdateExecutionProfileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_hosted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Hosted"
+          },
+          "allow_local": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Local"
+          },
+          "allowed_providers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Providers"
+          },
+          "base_version": {
+            "minimum": 1.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "max_cost_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1000.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cost Usd"
+          },
+          "max_step_runs": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Step Runs"
+          },
+          "memory_to_hosted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory To Hosted"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "base_version"
+        ],
+        "title": "UpdateExecutionProfileRequest",
+        "type": "object"
+      },
+      "UpdateGoalPlanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "base_revision": {
+            "minimum": 1.0,
+            "title": "Base Revision",
+            "type": "integer"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/GoalCriterionInput"
+            },
+            "maxItems": 12,
+            "title": "Criteria",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Profile"
+          },
+          "objective": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Objective",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/GoalStepInput"
+            },
+            "maxItems": 12,
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base_revision",
+          "title"
+        ],
+        "title": "UpdateGoalPlanRequest",
+        "type": "object"
+      },
       "UpdateStatusView": {
         "description": "Provenance, channel and recovery points; ``not_checked`` is not an assurance.",
         "properties": {
@@ -38841,6 +40020,199 @@
         "summary": "Reset Execution Environment"
       }
     },
+    "/api/execution-profiles": {
+      "get": {
+        "operationId": "list_execution_profiles_api_execution_profiles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProfileList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Execution Profiles"
+      },
+      "post": {
+        "description": "A profile from a template. The owner's first one becomes active, said in the answer.",
+        "operationId": "create_execution_profile_api_execution_profiles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExecutionProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProfileChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Execution Profile"
+      }
+    },
+    "/api/execution-profiles/active": {
+      "put": {
+        "operationId": "set_active_execution_profile_api_execution_profiles_active_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionProfileBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProfileChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Active Execution Profile"
+      }
+    },
+    "/api/execution-profiles/projects/{project_id}": {
+      "put": {
+        "description": "Bind a profile to one project; goals filed there inherit it instead of the active one.",
+        "operationId": "bind_project_execution_profile_api_execution_profiles_projects__project_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionProfileBindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProfileChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bind Project Execution Profile"
+      }
+    },
+    "/api/execution-profiles/{profile_id}": {
+      "put": {
+        "description": "Write the next version. Goals running under the old one pause at a safe boundary (PROF-03).",
+        "operationId": "update_execution_profile_api_execution_profiles__profile_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExecutionProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProfileChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Execution Profile"
+      }
+    },
     "/api/extensions": {
       "get": {
         "description": "Extension lifecycle as four independent facts per row.\n\n``installed``, ``connected``, ``enabled``, and ``usable`` are reported\nseparately so the interface never presents an extension as available on\nmetadata alone; ``blocked_reason`` names the first unmet condition.",
@@ -39683,6 +41055,509 @@
           }
         },
         "summary": "Receive Github Webhook"
+      }
+    },
+    "/api/goals": {
+      "get": {
+        "description": "Every goal with its state read back from its steps' tasks.",
+        "operationId": "list_goals_api_goals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Goals"
+      },
+      "post": {
+        "description": "Intake: a draft goal. A draft has no permission to run (PA-D01).",
+        "operationId": "create_goal_api_goals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Goal"
+      }
+    },
+    "/api/goals/{goal_id}": {
+      "get": {
+        "operationId": "read_goal_api_goals__goal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Goal"
+      }
+    },
+    "/api/goals/{goal_id}/accept": {
+      "post": {
+        "description": "Draft → ready under the execution profile Settings binds (PA-D02).",
+        "operationId": "accept_goal_api_goals__goal_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Goal"
+      }
+    },
+    "/api/goals/{goal_id}/archive": {
+      "post": {
+        "operationId": "archive_goal_api_goals__goal_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Goal"
+      }
+    },
+    "/api/goals/{goal_id}/criteria/{criterion_id}/confirm": {
+      "post": {
+        "description": "The owner records that one criterion is met — evidence that is theirs, never a model's.",
+        "operationId": "confirm_goal_criterion_api_goals__goal_id__criteria__criterion_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "criterion_id",
+            "required": true,
+            "schema": {
+              "title": "Criterion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Goal Criterion"
+      }
+    },
+    "/api/goals/{goal_id}/pause": {
+      "post": {
+        "description": "Nothing new is filed; steps not yet claimed are parked; runs in flight finish.",
+        "operationId": "pause_goal_api_goals__goal_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Goal"
+      }
+    },
+    "/api/goals/{goal_id}/plan": {
+      "put": {
+        "description": "Edit a draft's plan. Only a draft, only over the revision the owner saw.",
+        "operationId": "update_goal_plan_api_goals__goal_id__plan_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGoalPlanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Goal Plan"
+      }
+    },
+    "/api/goals/{goal_id}/resume": {
+      "post": {
+        "description": "Continue only after owner, profile, model chain and budget are rechecked.",
+        "operationId": "resume_goal_api_goals__goal_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Goal"
+      }
+    },
+    "/api/goals/{goal_id}/start": {
+      "post": {
+        "description": "The owner's intent to run: the first due steps are filed as ordinary tasks.",
+        "operationId": "start_goal_api_goals__goal_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Goal"
+      }
+    },
+    "/api/goals/{goal_id}/stop": {
+      "post": {
+        "description": "Stop every linked task and what it delegated; report what finished and what did not.",
+        "operationId": "stop_goal_api_goals__goal_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "goal_id",
+            "required": true,
+            "schema": {
+              "title": "Goal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalStopped"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Goal"
       }
     },
     "/api/guide": {

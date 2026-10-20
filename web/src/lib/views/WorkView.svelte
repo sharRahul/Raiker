@@ -10,6 +10,7 @@
   import TabStrip from "../components/TabStrip.svelte";
   import type { ProjectsList } from "../apiTypes";
   import { HUB_TABS } from "../nav";
+  import GoalsView from "./GoalsView.svelte";
   import ProjectsView from "./ProjectsView.svelte";
   import SearchChatView from "./SearchChatView.svelte";
   import TasksView from "./TasksView.svelte";
@@ -28,7 +29,7 @@
     onchanged?: () => void;
   } = $props();
 
-  const LABELS: Record<string, string> = { threads: "Threads", tasks: "Tasks", projects: "Projects" };
+  const LABELS: Record<string, string> = { threads: "Threads", goals: "Goals", tasks: "Tasks", projects: "Projects" };
   const tabs = HUB_TABS.work.map((id) => ({ id, label: LABELS[id] ?? id }));
 
   function selectTab(next: string) {
@@ -38,7 +39,9 @@
 
 <TabStrip {tabs} selected={tab} onselect={selectTab} label="Work" />
 <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
-  {#if tab === "tasks"}
+  {#if tab === "goals"}
+    <GoalsView />
+  {:else if tab === "tasks"}
     <TasksView {sessionId} {projects} {taskId} />
   {:else if tab === "projects"}
     <ProjectsView {onchanged} />

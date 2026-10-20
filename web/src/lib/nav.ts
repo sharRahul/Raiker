@@ -21,7 +21,7 @@ export const NAV_GROUPS: NavGroup[] = [
     // Quiet UI — Threads, Tasks and Projects were three rail rows for one
     // question, "what do I have going". They are one page with three tabs now;
     // their old addresses open the matching tab (ROUTE_ALIASES).
-    { id: "work", label: "Work", icon: "tasks", hint: "Threads, tasks and projects" },
+    { id: "work", label: "Work", icon: "tasks", hint: "Threads, goals, tasks and projects" },
     // Memory carries the Knowledge Map as a tab, for the same reason.
     { id: "memory", label: "Memory", icon: "activity", hint: "What Raiker remembers" },
     // A decision waiting on you is the work, not configuration. It has a
@@ -198,7 +198,9 @@ export const MORE_GROUPS: { id: ProductArea; label: string; items: NavItem[] }[]
  */
 export const HUB_TABS: Record<string, string[]> = {
   // Quiet UI — one page for everything the owner has going.
-  work: ["threads", "tasks", "projects"],
+  // PA-D06 — goals sit with the work they are made of: a goal's steps are
+  // tasks, and it is filed in a project like any other work.
+  work: ["threads", "goals", "tasks", "projects"],
   // Organised by the questions an owner actually arrives with, not
   // by which table the data lives in.
   //
@@ -243,6 +245,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "security",
     "privacy",
     "account",
+    "execution-profiles",
     "web-access",
     "github",
     "runtime",
@@ -269,6 +272,7 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   "search-chat": { route: "work", tab: "threads" },
   threads: { route: "work", tab: "threads" },
   tasks: { route: "work", tab: "tasks" },
+  goals: { route: "work", tab: "goals" },
   projects: { route: "work", tab: "projects" },
   brain: { route: "memory", tab: "map" },
   messaging: { route: "extensions", tab: "channels" },

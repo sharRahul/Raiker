@@ -4799,6 +4799,123 @@ CREATE INDEX IF NOT EXISTS idx_design_handoffs_document
   ON design_handoffs(owner_principal_id, document_id, created_at DESC);
 """
 
+# PA-D01 / PA-D02 — durable goals and Settings-owned execution profiles.
+#
+# A goal is an owner-scoped outcome: success criteria, an ordered plan of steps
+# and a server-owned status. Its steps run as ordinary tasks (``task_id``), so a
+# goal adds a coordinator around existing task execution and never a second
+# tool broker. ``revision`` is compared-and-set on every owner change, so two
+# tabs cannot both act on one plan. ``model_profile``/``model`` name the model
+# every step's task runs on — chosen by the owner, judged by the profile — so a
+# step never runs on whatever the empty selection happens to resolve to.
+# ``goal_events`` is the goal's own history:
+# ids, states and reasons only, never a step's instruction text.
+#
+# An execution profile is versioned like a design system: a change is a new
+# row, and a goal pins the id and version it was accepted under, so a later
+# change is detected rather than silently applied. A binding names the profile
+# new goals inherit — ``project_id`` '' for the owner's active profile, or one
+# project's. ``session_memory_withholds`` marks a goal step's conversation whose
+# profile keeps personal memory away from a hosted model; the context gatherer
+# reads it the way it reads Incognito.
+GOALS_AND_EXECUTION_PROFILES_MIGRATION_ID = "RAIKER-2121-goals-and-execution-profiles"
+
+GOALS_AND_EXECUTION_PROFILES_SQL = """
+CREATE TABLE IF NOT EXISTS execution_profiles (
+  profile_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  template TEXT NOT NULL,
+  allow_local INTEGER NOT NULL,
+  allow_hosted INTEGER NOT NULL,
+  allowed_providers_json TEXT NOT NULL DEFAULT '[]',
+  memory_to_hosted INTEGER NOT NULL DEFAULT 0,
+  max_step_runs INTEGER NOT NULL,
+  max_cost_usd REAL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (profile_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_execution_profiles_owner
+  ON execution_profiles(owner_principal_id, profile_id, version DESC);
+CREATE TABLE IF NOT EXISTS execution_profile_bindings (
+  owner_principal_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  bound_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, project_id)
+);
+CREATE TABLE IF NOT EXISTS goals (
+  goal_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  objective TEXT NOT NULL,
+  project_id TEXT,
+  status TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  reason_detail TEXT NOT NULL DEFAULT '',
+  revision INTEGER NOT NULL DEFAULT 1,
+  model_profile TEXT,
+  model TEXT,
+  profile_id TEXT,
+  profile_version INTEGER,
+  max_step_runs INTEGER,
+  max_cost_usd REAL,
+  step_runs INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  accepted_at TEXT,
+  settled_at TEXT,
+  archived_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_goals_owner ON goals(owner_principal_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+CREATE TABLE IF NOT EXISTS goal_criteria (
+  goal_id TEXT NOT NULL,
+  criterion_id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  mandatory INTEGER NOT NULL DEFAULT 1,
+  validator TEXT NOT NULL,
+  evidence_kind TEXT,
+  evidence_ref TEXT,
+  evidence_note TEXT,
+  verified_at TEXT,
+  PRIMARY KEY (goal_id, criterion_id)
+);
+CREATE TABLE IF NOT EXISTS goal_steps (
+  goal_id TEXT NOT NULL,
+  step_id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  instruction TEXT NOT NULL,
+  surface TEXT NOT NULL DEFAULT 'chat',
+  depends_on_json TEXT NOT NULL DEFAULT '[]',
+  criterion_ids_json TEXT NOT NULL DEFAULT '[]',
+  state TEXT NOT NULL DEFAULT 'pending',
+  reason TEXT NOT NULL DEFAULT '',
+  task_id TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (goal_id, step_id)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_steps_task ON goal_steps(task_id);
+CREATE TABLE IF NOT EXISTS goal_events (
+  event_id TEXT PRIMARY KEY,
+  goal_id TEXT NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  detail_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_goal_events_goal ON goal_events(goal_id, created_at);
+CREATE TABLE IF NOT EXISTS session_memory_withholds (
+  session_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
 # ── The migration registry (OPT-07) ─────────────────────────────────────────
 #
 # The order a fresh database is built in, as data. Before this, bootstrap wired
@@ -5065,6 +5182,9 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(BUILD_TASK_TARGETS_MIGRATION_ID, BUILD_TASK_TARGETS_SQL),
     Migration(DESIGN_DOCUMENTS_MIGRATION_ID, DESIGN_DOCUMENTS_SQL),
     Migration(MEMORY_RECALL_MODE_MIGRATION_ID, MEMORY_RECALL_MODE_SQL),
+    Migration(
+        GOALS_AND_EXECUTION_PROFILES_MIGRATION_ID, GOALS_AND_EXECUTION_PROFILES_SQL
+    ),
     # Before the backfills: converting an index and then deciding it is
     # empty enough to need populating is one read, not two rebuilds.
     RunnerStep("_migrate_text_search_engine"),

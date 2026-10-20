@@ -29,6 +29,7 @@ from raiker.execution.profiles import (
     list_execution_profiles,
     resolve_tool_profile,
 )
+from raiker.goals.store import session_memory_withheld
 from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.capture import capture_tool_observation
@@ -128,6 +129,13 @@ def _drops_argument_values(tool_name: str) -> bool:
 #: enough for a real build or test suite and short enough that a wedged one is
 #: reaped the same working day.
 _BACKGROUND_TIMEOUT_SECONDS = 7200.0
+
+#: Tools that read the owner's personal memory or past conversations back into
+#: a turn. A goal step whose execution profile withholds memory from a hosted
+#: model answers each of them ``withheld`` (PA-D02).
+_PERSONAL_MEMORY_TOOLS = frozenset(
+    {"memory_search", "memory_list", "memory_get", "conversation_search", "knowledge_graph"}
+)
 
 _CONTENT_RESULT_TOOLS = CONTENT_WITHHELD_TOOL_NAMES
 _CONTENT_RESULT_FIELDS = ("answer", "content")
@@ -2236,7 +2244,18 @@ class ToolBroker:
         context_executor = self.context_executors.get(action.tool_name)
         raw: dict[str, Any]
         profile_resolution = self._execution_profile(action.tool_name)
-        if profile_resolution.reason_code is not None:
+        memory_withheld = (
+            action.tool_name in _PERSONAL_MEMORY_TOOLS
+            and self.store is not None
+            and session_memory_withheld(self.store, session_id)
+        )
+        if memory_withheld:
+            # PA-D02 — this conversation is a goal step whose execution profile
+            # keeps personal memory away from the hosted model doing the work.
+            # The gatherer withholds ambient recall; this withholds the
+            # assistant's own reads, which would otherwise carry the same text.
+            raw = {"status": "withheld", "reason": "execution_profile", "count": 0, "results": []}
+        elif profile_resolution.reason_code is not None:
             raw = {
                 "status": "failed",
                 "error": {"type": profile_resolution.reason_code},

@@ -26,7 +26,9 @@
     TaskView,
     WorkThread,
   } from "../apiTypes";
-  import type { AttentionFeedView } from "../generated/apiContract";
+  import type { AttentionFeedView, GoalView } from "../generated/apiContract";
+  import { contract } from "../generated/apiContract";
+  import { goalBadge, homeGoalGroups, stepProgress } from "../goalPresentation";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
   import { START_WORK } from "../workSurface";
@@ -178,6 +180,14 @@
    */
   let loadSeq = 0;
 
+  let goals = $state<GoalView[]>([]);
+  const goalGroups = $derived(homeGoalGroups(goals));
+  const GOAL_GROUPS = [
+    { key: "needsYou", title: "Needs you" },
+    { key: "moving", title: "In progress" },
+    { key: "finished", title: "Finished recently" },
+  ] as const;
+
   async function load() {
     const seq = ++loadSeq;
     try {
@@ -197,6 +207,15 @@
       tasks = loadedTasks;
       approvals = loadedApprovals;
       projects = loadedProjects;
+      try {
+        // PA-D06 — goals are supplementary to the board, like readiness: a
+        // failed read leaves the last answer in place rather than erasing it.
+        const loadedGoals = await contract.listGoals();
+        if (seq !== loadSeq) return;
+        goals = Array.isArray(loadedGoals?.goals) ? loadedGoals.goals : [];
+      } catch {
+        // kept as last read
+      }
       try {
         const attention = await api.attention();
         if (seq !== loadSeq) return;
@@ -336,6 +355,31 @@
              containers to explain an absence the lead sentence above already
              states in one line. They appear when there is something in them.
              "Continue working" already worked this way; now they all do. -->
+        {#if goalGroups.needsYou.length + goalGroups.moving.length + goalGroups.finished.length > 0}
+        <section class="board card" aria-labelledby="goals-h" data-testid="home-goals">
+          <div class="card-head">
+            <h3 id="goals-h">Goals</h3>
+            <a href="#/work?tab=goals">All goals</a>
+          </div>
+          {#each GOAL_GROUPS as group (group.key)}
+            {#if goalGroups[group.key].length > 0}
+              <h4 class="goal-group">{group.title}</h4>
+              <ul class="rows">
+                {#each goalGroups[group.key] as goal (goal.goal_id)}
+                  {@const badge = goalBadge(goal.status)}
+                  <li>
+                    <div class="row-main">
+                      <a class="row-title" href={`#/work?tab=goals&record=${encodeURIComponent(goal.goal_id)}`}>{goal.title}</a>
+                      <span>{goal.reason_text || stepProgress(goal)}</span>
+                    </div>
+                    <div class="row-meta"><Badge variant={badge.variant} label={badge.label} /></div>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/each}
+        </section>
+        {/if}
         {#if runningNow.length > 0}
         <section class="board card" aria-labelledby="running-h">
           <div class="card-head">
@@ -606,6 +650,7 @@
 </section>
 
 <style>
+  .goal-group { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--text-2); }
   .workbench { display: grid; gap: var(--space-5); }
   .intro { display: grid; gap: var(--space-2); }
   /* BUG-37 — the greeting is display type: Raiker speaking to the owner, not a

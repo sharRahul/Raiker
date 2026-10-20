@@ -523,11 +523,17 @@ interface outcome that had to be true first — in
 
 ## Personal autonomous-agent scope
 
-Adopting the [personal-agent target](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) does not
-make a dedicated goal coordinator, standing-intent monitor, interactive browser
-or self-activating learned skill available. Existing tasks and schedules require
-the Raiker host to be running; model, integration and executor readiness still
-apply. No general remote availability, goal-level budget guarantee or external
-exactly-once guarantee is claimed. Unknown provider outcomes must remain unknown
+A first goal coordinator ships (**Work → Goals**): a goal's steps run as
+ordinary tasks on the goal's named model, under the execution profile Settings
+binds, with step-run and cost budgets. It advances only while the Raiker host is
+running, cannot be started from Chat, and counts *its steps finished* — not a
+validator — as evidence ([BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
+Execution profiles bound goal steps only and cover models and memory
+([BUG-356](../plans/TO_BE_FIXED.md#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class)).
+No standing-intent monitor, interactive browser or self-activating learned
+skill exists. Model, integration and executor readiness still apply. No general
+remote availability or external exactly-once guarantee is claimed; a goal's
+cost budget stops further dispatch and caps each step's run, but a turn already
+in flight when Stop lands still completes its current model call. Unknown provider outcomes must remain unknown
 until reconciled. Sensitive-domain exclusions and hosted multi-user deferral
 remain. See [PAA delivery gates](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md).

@@ -168,13 +168,28 @@ tables above cover the ones a person reading the audit log most often needs
 explained. An event type that exists in the registry and not here is documented
 by its emitting call site, not missing from the product.
 
-## Personal-agent event additions are planned
+## Goals and execution profiles
 
-PAA-01/02/04/08 must define registered, versioned goal/step/trigger/effect
-lifecycle events before implementation. Include correlation references to
-owner, goal, plan version, task/run, machine turn, action and receipt, plus
-bounded status/reason/timing/cost metadata. Do not include secrets, private
-reasoning, full personal profiles or connector bodies. Distinguish effect
-confirmation from outcome verification and notification delivery. Proposed
-logical records in the [spec](../plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md) are not current
-event names; this update registers none.
+PA-D01/PA-D02 (2026-10-20). Each is written to the owner's Inbox session with
+`actor` `goal_coordinator`; payloads carry ids, states, reasons and counts only —
+never a criterion's or a step's text. A goal's own history is also kept in the
+`goal_events` table its page reads.
+
+| Event | Meaning |
+|---|---|
+| `goal_accepted` | A draft became ready under the named execution profile id and version |
+| `goal_started` | The owner started a ready goal |
+| `goal_step_started` | A due step was filed as an ordinary task; names the step, the task and whether memory is withheld from it |
+| `goal_step_refused` | Filing a step's task was refused; the reason is the task route's own |
+| `goal_waiting` | A step waits on a decision, an answer, delegated work, a pause or the profile; the payload names which |
+| `goal_paused` / `goal_resumed` | Owner pause, budget exhaustion or a profile change; Resume after revalidation, with the step tasks reached |
+| `goal_profile_repinned` | Start or Resume adopted the profile Settings binds now, after rechecking it |
+| `goal_criterion_confirmed` | The owner recorded one criterion as met |
+| `goal_completed` / `goal_partial` / `goal_failed` | The steps settled; how many criteria have evidence and how many required ones do not |
+| `goal_stopped` | Stop reached the goal; steps finished, steps stopped, tasks stopped |
+| `goal_archived` | A draft or settled goal was hidden |
+| `execution_profile_created` / `execution_profile_changed` / `execution_profile_bound` | A Settings change to the boundary goals run under |
+
+Still planned for later PAA stages: standing-intent trigger and effect-receipt
+events. Distinguish effect confirmation from outcome verification and
+notification delivery when they are added.

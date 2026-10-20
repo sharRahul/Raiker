@@ -1125,6 +1125,24 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1036](#fixed-1036--the-memory-key-had-no-runbook-and-nothing-checked-the-key-stays-out-of-memory-mem-key-05) | Low | Memory / storage / docs | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
 | [FIXED-1037](#fixed-1037--two-contradictory-memories-that-matched-equally-came-back-in-id-order-mem-eval-06) | Medium | Memory / retrieval / evaluation | Fixed 2026-10-20 — RAIKER_SQLCIPHER_MEMORY delivery |
 | [FIXED-1038](#fixed-1038--the-answers-recall-backend-read-redacted_secret) | Low | Memory / API / UI | Fixed 2026-10-20 — found live: backend label redacted |
+| [FIXED-1039](#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) | Medium | Goals / storage | Fixed 2026-10-20 — durable owner-scoped goals |
+| [FIXED-1040](#fixed-1040--nothing-said-which-goal-states-exist-or-what-each-may-do-goal-02-pa-d01) | Medium | Goals / lifecycle | Fixed 2026-10-20 — ten states, served actions |
+| [FIXED-1041](#fixed-1041--an-owner-could-not-describe-an-outcome-its-criteria-and-its-steps-goal-03-pa-d01) | Medium | Goals / API | Fixed 2026-10-20 — intake as a draft |
+| [FIXED-1042](#fixed-1042--accepting-a-plan-named-no-boundary-for-the-work-goal-04-pa-d01-pa-d02) | Medium | Goals / execution profiles | Fixed 2026-10-20 — accept pins the profile |
+| [FIXED-1043](#fixed-1043--a-goal-could-not-start-work-and-nothing-would-carry-it-from-one-step-to-the-next-goal-05-pa-d01) | Medium | Goals / coordinator / scheduler | Fixed 2026-10-20 — steps filed as ordinary tasks |
+| [FIXED-1044](#fixed-1044--a-goal-could-not-say-what-it-was-waiting-on-goal-06-pa-d01) | Medium | Goals / read model | Fixed 2026-10-20 — named waiting reasons |
+| [FIXED-1045](#fixed-1045--nothing-could-tell-a-finished-outcome-from-finished-steps-goal-07-pa-d01) | Medium | Goals / outcome assessment | Fixed 2026-10-20 — completion from evidence |
+| [FIXED-1046](#fixed-1046--there-was-no-single-stop-for-an-outcomes-work-goal-08-pa-d01) | Medium | Goals / interrupts | Fixed 2026-10-20 — Stop reaches every step |
+| [FIXED-1047](#fixed-1047--pausing-and-continuing-an-outcome-had-no-defined-meaning-goal-09-pa-d01) | Medium | Goals / interrupts | Fixed 2026-10-20 — Pause and Resume with revalidation |
+| [FIXED-1048](#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01) | Medium | Goals / budgets | Fixed 2026-10-20 — step-run and cost budgets |
+| [FIXED-1049](#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) | Medium | Execution profiles / Settings | Fixed 2026-10-20 — Settings-owned profiles |
+| [FIXED-1050](#fixed-1050--nothing-stopped-an-outcome-reaching-a-model-the-owner-had-ruled-out-prof-02-pa-d02) | High | Execution profiles / dispatch / memory | Fixed 2026-10-20 — model chain and memory enforced |
+| [FIXED-1051](#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02) | Medium | Execution profiles / goals | Fixed 2026-10-20 — a change pauses goals |
+| [FIXED-1052](#fixed-1052--goals-had-no-page-ux-goals-01-pa-d06) | Medium | Goals / UI | Fixed 2026-10-20 — Work → Goals |
+| [FIXED-1053](#fixed-1053--home-could-not-say-which-outcomes-needed-the-owner-ux-goals-02-pa-d06) | Medium | Home / goals | Fixed 2026-10-20 — Home's Goals board |
+| [FIXED-1054](#fixed-1054--a-goals-steps-ran-on-whatever-an-empty-model-selection-resolved-to) | High | Goals / models / execution profiles | Fixed 2026-10-20 — found live: steps ran on the empty selection |
+| [FIXED-1055](#fixed-1055--a-criterions-text-box-and-a-steps-counts-toward-box-had-the-same-name) | Low | Goals / accessibility | Fixed 2026-10-20 — found live: two controls shared a name |
+| [FIXED-1056](#fixed-1056--goal-and-profile-audit-events-would-have-been-dropped-without-a-word) | Medium | Goals / audit | Fixed 2026-10-20 — audit events would have been dropped |
 
 ---
 
@@ -35870,3 +35888,185 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** The gatherer joins the labels with ` + `, so no part reaches the redactor's length; the page trims each part. The redactor is unchanged.
 
 **Evidence.** `test_each_mode_assembles_exactly_what_it_says` asserts every part is under 40 characters; `memoryRecallMode.test.ts`; live RT-MEM-03 reads *searched sqlite-fts5 + raiker-local-hash-v1*.
+
+## FIXED-1039 — An outcome could live only in a chat transcript; there was no durable goal (GOAL-01, PA-D01)
+
+**Severity: Medium. Area: Goals / storage. Status: Fixed 2026-10-20.**
+
+**Observed.** The personal-agent specification's first delivery row, PA-D01, was *Planned*: nothing could hold an outcome across sessions. A task held one objective and a run; there was no record of success criteria, a plan of steps, or which tasks were working toward the same result.
+
+**Fixed.** Migration `RAIKER-2121-goals-and-execution-profiles` adds owner-scoped `goals`, `goal_criteria`, `goal_steps` and `goal_events` (`raiker/goals/store.py`). A goal's steps link to ordinary tasks by `task_id`; every owner change names the revision it was made against and is compared-and-set, so a second tab acting on an older copy is refused with `goal_revision_stale`. `goal_events` keeps ids, states and counts only — never a step's instruction. Another owner's goal reads as never issued.
+
+**Evidence.** `tests/test_goals_and_execution_profiles.py` (`test_an_edit_over_an_older_revision_is_refused`, `test_another_owners_goal_reads_as_never_issued`); contract cases in `tests/contract_cases/goals.py`.
+
+## FIXED-1040 — Nothing said which goal states exist or what each may do (GOAL-02, PA-D01)
+
+**Severity: Medium. Area: Goals / lifecycle. Status: Fixed 2026-10-20.**
+
+**Observed.** The specification names ten goal states and requires the server to own lifecycle and permitted transitions, with waiting reasons kept apart so an approval is never called a failure. No such vocabulary existed.
+
+**Fixed.** `raiker/goals/lifecycle.py` publishes `draft`, `ready`, `running`, `waiting`, `paused`, `completed`, `partial`, `failed`, `stopped`, `archived`, the actions each allows (served as `allowed_actions` with every goal), the owner-facing reason for each wait or pause, and how a linked task's status maps to a step state. An unknown task status reads as waiting, never as finished; a missing task reads as failed.
+
+**Evidence.** `test_every_state_publishes_its_actions_and_unknown_task_status_never_reads_done`; `goalPresentation.test.ts` (*draws only the buttons the server allows*).
+
+## FIXED-1041 — An owner could not describe an outcome, its criteria and its steps (GOAL-03, PA-D01)
+
+**Severity: Medium. Area: Goals / API. Status: Fixed 2026-10-20.**
+
+**Observed.** There was no intake: no way to say what a good result is, how it will be known, and which steps lead there.
+
+**Fixed.** `POST /api/goals` creates a **draft** (up to 12 criteria and 12 steps); `PUT /api/goals/{id}/plan` edits a draft over the revision the owner saw. A step may run only after steps listed before it, so a plan can never contain a cycle; a Build step needs the goal filed in a project, the same rule Build tasks have. A draft has no permission to run — Start is not among its actions. All goal mutations are human-only and there is no model tool for any of them.
+
+**Evidence.** `test_intake_is_a_draft_with_no_permission_to_run`, `test_a_plan_cannot_depend_forward_or_reach_build_without_a_project`, `test_profile_and_goal_changes_are_human_only`; live RT-GOAL-02.
+
+## FIXED-1042 — Accepting a plan named no boundary for the work (GOAL-04, PA-D01, PA-D02)
+
+**Severity: Medium. Area: Goals / execution profiles. Status: Fixed 2026-10-20.**
+
+**Observed.** The specification requires an owner-accepted plan before anything runs, under the execution profile Settings binds. Nothing could be accepted, and nothing pinned which boundary a goal would run under.
+
+**Fixed.** `POST /api/goals/{id}/accept` moves a draft to **ready** only with at least one required criterion and one step, refuses a *met when its steps finish* criterion no step counts toward (it could never be met), and refuses with `no_execution_profile` until Settings has a profile. It pins the profile's id and version and copies its budget onto the goal.
+
+**Evidence.** `test_accept_needs_a_profile_from_settings_and_pins_its_version`, `test_a_steps_finish_criterion_with_no_step_cannot_be_accepted`; live RT-GOAL-02, RT-GOAL-03.
+
+## FIXED-1043 — A goal could not start work, and nothing would carry it from one step to the next (GOAL-05, PA-D01)
+
+**Severity: Medium. Area: Goals / coordinator / scheduler. Status: Fixed 2026-10-20.**
+
+**Observed.** The target is a coordinator around existing task execution — never a second tool broker — that selects a due step, reserves budget and starts an ordinary governed turn.
+
+**Fixed.** `raiker/goals/coordinator.py`. **Start** is the owner's intent to run; the coordinator files each step whose dependencies have finished as an ordinary queued task through the same `create_task` path a task filed by hand takes, so every tool call still goes through the policy engine, broker, approvals and runtime authority. The scheduler advances running goals on each tick before it claims due work, and again after a batch settles, so the next step is filed as soon as the one before it finishes.
+
+**Evidence.** `test_start_files_only_due_steps_as_ordinary_tasks`, `test_completion_needs_every_mandatory_criterion_not_just_finished_steps` (the second step is filed only after the first finished); live RT-GOAL-04.
+
+## FIXED-1044 — A goal could not say what it was waiting on (GOAL-06, PA-D01)
+
+**Severity: Medium. Area: Goals / read model. Status: Fixed 2026-10-20.**
+
+**Observed.** A step parked on an approval must make its goal *wait* with that reason, not fail, and a parent may not read as complete while a step is open.
+
+**Fixed.** Each pass reads every linked task back: a step waiting for a decision, an answer, delegated work or a pause makes the goal **waiting** with that named reason; one running makes it **running**; a step whose dependency failed or stopped becomes *will not start* rather than running against a missing result. The goal settles only when every step has.
+
+**Evidence.** `test_a_step_parked_on_a_decision_makes_the_goal_wait_with_that_reason`, `test_a_failed_step_blocks_its_dependants_and_nothing_met_reads_failed`; `GoalsView.test.ts`.
+
+## FIXED-1045 — Nothing could tell a finished outcome from finished steps (GOAL-07, PA-D01)
+
+**Severity: Medium. Area: Goals / outcome assessment. Status: Fixed 2026-10-20.**
+
+**Observed.** Completed must mean every mandatory criterion has evidence; partial must name what is unmet; and no model statement may complete a goal.
+
+**Fixed.** Each criterion names how it is met: **Met when its steps finish** (deterministic: every step counting toward it finished, recorded as *Its steps finished* with the tasks' ids — a record that they finished, not a judgement that the result is good) or **You confirm it** (`POST /api/goals/{id}/criteria/{criterion_id}/confirm`, recorded as *Confirmed by you* with the owner's note). A goal whose steps settled reads **completed** only when every required criterion has evidence, **partial** when some do, **failed** when none do; confirming on a partial goal reassesses it.
+
+**Evidence.** `test_completion_needs_every_mandatory_criterion_not_just_finished_steps`; live RT-GOAL-04, RT-GOAL-05.
+
+## FIXED-1046 — There was no single Stop for an outcome's work (GOAL-08, PA-D01)
+
+**Severity: Medium. Area: Goals / interrupts. Status: Fixed 2026-10-20.**
+
+**Observed.** Stop must reach every active step and what it delegated, prevent new claims, and report what had finished.
+
+**Fixed.** `POST /api/goals/{id}/stop` stops each linked task through `InterruptController` with its delegation cascade, marks unsettled steps stopped, and answers with steps finished, steps stopped and tasks stopped. The scheduler re-checks a goal step just before running it: a step whose goal is no longer running is cancelled and never starts.
+
+**Evidence.** `test_stop_reaches_every_linked_task_and_nothing_new_is_filed`, `test_the_scheduler_does_not_run_a_step_of_a_stopped_goal`; live RT-GOAL-06.
+
+## FIXED-1047 — Pausing and continuing an outcome had no defined meaning (GOAL-09, PA-D01)
+
+**Severity: Medium. Area: Goals / interrupts. Status: Fixed 2026-10-20.**
+
+**Observed.** Pause must start nothing new; continuing must recheck scope before any further work.
+
+**Fixed.** **Pause** files nothing new and parks step tasks not yet claimed; a run already in flight finishes its current turn (Stop is the control that abandons one), and the page says so. **Resume** rechecks the owner, the execution profile Settings binds now, every model the turn could fall back to, and the budget; only then are parked steps made due again, atomically on their status. A profile that changed is adopted on Resume or Start only after it admits the work, recorded as `goal_profile_repinned`.
+
+**Evidence.** `test_pause_parks_unclaimed_steps_and_resume_rechecks_the_chain`, `test_start_after_settings_switched_the_profile_adopts_the_new_one`.
+
+## FIXED-1048 — A goal had no budget across its steps (GOAL-10, PA-D01)
+
+**Severity: Medium. Area: Goals / budgets. Status: Fixed 2026-10-20.**
+
+**Observed.** Goal budgets must be reserved before dispatch and reconciled after, across every child.
+
+**Fixed.** A goal carries the profile's step-run limit and optional cost limit. A step run is reserved compared-and-set before its task is filed; when the limit is reached the goal pauses with *The goal's budget is used up*. Spend is reconciled from the usage ledger for the goal's own step conversations and priced the way the Models page prices it; a step's task carries the goal's remaining cost as its own per-run limit, so a run stops at its next safe boundary rather than only the next dispatch. Unpriced models are named.
+
+**Evidence.** `test_the_step_run_budget_pauses_the_goal_before_the_next_dispatch`, `test_a_cost_budget_caps_each_step_run`; live RT-GOAL-04 (the detail's budget line).
+
+## FIXED-1049 — There was nowhere to say where a goal's work may run (PROF-01, PA-D02)
+
+**Severity: Medium. Area: Execution profiles / Settings. Status: Fixed 2026-10-20.**
+
+**Observed.** PA-D02 was *Planned*. The specification makes Settings the only place an execution profile is created, changed, activated or bound, with templates **Private local**, **Balanced** and **Cloud-first** that remain inspectable profiles rather than hidden fallbacks.
+
+**Fixed.** `raiker/goals/profiles.py` and `/api/execution-profiles`: versioned owner-scoped profiles of model placement (this machine, hosted, or both), an optional provider list, whether personal memory may go to a hosted model, and per-goal step-run and cost limits. A change writes the next version over the version the owner saw; the first profile becomes active; each change is audited. Every field is enforced — a profile admitting no model, or memory to a hosted model it refuses, is refused or corrected where it is set. **Settings → Execution profiles** offers the templates, edits a profile, makes one active and binds one to a project.
+
+**Evidence.** `test_provider_allowlist_and_validation`; `ExecutionProfiles.test.ts`; live RT-GOAL-03, RT-GOAL-07.
+
+## FIXED-1050 — Nothing stopped an outcome reaching a model the owner had ruled out (PROF-02, PA-D02)
+
+**Severity: High. Area: Execution profiles / dispatch / memory. Status: Fixed 2026-10-20.**
+
+**Observed.** A local-only goal must stay local; a failed local model or unavailable host is a named blocker, not a reason to fall back; and a profile must decide which data classes travel with cloud work.
+
+**Fixed.** Before a step is filed — and again in the scheduler just before it runs — every model the turn could actually run on, the owner's selected model **and every fallback in their sequence**, is judged by the goal's profile. A refusal names the provider and placement (*anthropic (hosted)*), files nothing, and leaves the goal waiting with a route to Settings; a refusal at run time cancels the unstarted task and refunds the run. Under a profile that keeps memory off hosted models, a step whose chain includes one has its conversation marked: the context gatherer recalls nothing (as under Incognito) and `memory_search`, `memory_list`, `memory_get`, `conversation_search` and `knowledge_graph` answer *withheld*. The goal reads back from the usage ledger which providers actually answered.
+
+**Evidence.** `test_private_local_refuses_a_hosted_model_by_name_and_files_nothing`, `test_a_fallback_outside_the_profile_blocks_as_surely_as_the_primary`, `test_model_chain_judges_the_selected_model_and_every_fallback`, `test_the_scheduler_refuses_a_step_whose_chain_left_the_profile`, `test_balanced_withholds_memory_from_a_hosted_step_and_cloud_first_does_not`; live RT-GOAL-03, RT-GOAL-04.
+
+## FIXED-1051 — Changing the boundary would have applied silently to work in flight (PROF-03, PA-D02)
+
+**Severity: Medium. Area: Execution profiles / goals. Status: Fixed 2026-10-20.**
+
+**Observed.** A change to an active or project-bound profile must pause running goals at a safe boundary and revalidate before further work; a project may carry its own profile.
+
+**Fixed.** Saving a profile version, changing the active profile or a project binding pauses every running or waiting goal whose pinned version is no longer the one Settings states, and the answer says how many it paused. The coordinator's own pass does the same if it finds the pinned and bound versions disagree. A goal filed in a project bound to a profile is accepted under that one.
+
+**Evidence.** `test_a_profile_change_pauses_running_goals_at_a_safe_boundary`, `test_a_project_binding_wins_over_the_active_profile`; live RT-GOAL-07.
+
+## FIXED-1052 — Goals had no page (UX-GOALS-01, PA-D06)
+
+**Severity: Medium. Area: Goals / UI. Status: Fixed 2026-10-20.**
+
+**Observed.** The UX specification requires one view per goal with criteria, plan, task tree, blockers, budgets and Pause/Resume/Stop, controls only where the backend path exists, and the active profile as read-only context with a route to Settings.
+
+**Fixed.** **Work → Goals** (`GoalsView.svelte`, `goalPresentation.ts`): an intake form for outcome, criteria (how each is met, required or not) and steps (Chat or Build, runs after, counts toward); a list with state and reason; and a detail drawing the goal's own `allowed_actions`, each criterion's evidence with **Confirm met**, each step's state with **Open its task**, the pinned profile read-only (*Settings has changed it since…* when it has), the budget line, the providers that answered and the history. Progress is a count of finished steps, never a percentage. Stop asks once more. The layout reflows to one column at phone width.
+
+**Evidence.** `GoalsView.test.ts`, `goalPresentation.test.ts`, `nav.test.ts`; live RT-GOAL-02 to RT-GOAL-06.
+
+## FIXED-1053 — Home could not say which outcomes needed the owner (UX-GOALS-02, PA-D06)
+
+**Severity: Medium. Area: Home / goals. Status: Fixed 2026-10-20.**
+
+**Observed.** Home should answer what is progressing, what needs my decision and what finished.
+
+**Fixed.** Home's **Goals** board groups goals into **Needs you** (ready to start, paused, partly done, or waiting on a decision, an answer or Settings), **In progress** and **Finished recently**, each linking to the goal's own page. Like readiness, a failed read keeps the last answer rather than erasing the board; drafts stay on Work → Goals.
+
+**Evidence.** `WorkbenchView.test.ts` (*lists a goal that needs the owner*); live RT-GOAL-05.
+
+## FIXED-1054 — A goal's steps ran on whatever an empty model selection resolved to
+
+**Severity: High. Area: Goals / models / execution profiles. Status: Fixed 2026-10-20 — found live in RT-GOAL-03.**
+
+**Observed.** On a fresh host with Anthropic connected and chosen for a Chat turn, **Start** under *Private local* was not refused. The step's task carried no model, so the turn would run on the owner's stored selection — on a fresh workspace the packaged default, `ollama-local-openai-compatible` with its `<model>` placeholder — and the profile check judged that placeholder, not the model the owner meant. The step then failed against a model that was never set up, and the goal read **Failed**.
+
+**Root cause.** A Chat turn names its model per turn; it does not change the stored selection a task without a model falls back to. The goal had nowhere to say which model its steps use.
+
+**Fixed.** A goal names `model_profile` and `model`, chosen with the same model picker Tasks uses (the picker's shown model is taken when the owner does not open it, never a `<model>` placeholder). **Accept** refuses `goal_needs_model` or `goal_model_not_configured`; each step's task is filed on that model; the profile check judges that model followed by the owner's fallbacks. The goal's page says *Steps run on …*.
+
+**Evidence.** `test_accept_needs_a_configured_model_and_steps_run_on_it`, `test_model_chain_starts_from_the_goals_own_model`; live RT-GOAL-03 refuses *anthropic (hosted)* and RT-GOAL-04 runs the step on Haiku 4.5.
+
+## FIXED-1055 — A criterion's text box and a step's *counts toward* box had the same name
+
+**Severity: Low. Area: Goals / accessibility. Status: Fixed 2026-10-20 — found live in RT-GOAL-02.**
+
+**Observed.** A screen reader and the live spec both found two controls called *Criterion 1*: the criterion's text field and the checkbox under step 1 that says it counts toward criterion 1.
+
+**Fixed.** The fields are *Criterion 1 text* and *Criterion 1 is required*; the step checkboxes are *Step 2 runs after step 1* and *Step 1 counts toward criterion 1*, with the short visible label unchanged.
+
+**Evidence.** Live RT-GOAL-02 fills each by its own name.
+
+## FIXED-1056 — Goal and profile audit events would have been dropped without a word
+
+**Severity: Medium. Area: Goals / audit. Status: Fixed 2026-10-20 — found writing the event catalogue entry.**
+
+**Observed.** `AgentEvent` refuses an event type missing from `EVENT_TYPES`, and the coordinator's audit write is suppressed on failure so a logging fault cannot stop a goal. Together they meant every `goal_*` and `execution_profile_*` audit event raised and vanished: the goal's own history table recorded each change, the owner's audit log recorded none.
+
+**Fixed.** The seventeen goal and profile event types are declared in `EVENT_TYPES`, including the three the coordinator builds from the outcome name.
+
+**Evidence.** `test_every_goal_and_profile_change_reaches_the_audit_log` reads them back from the event index; `test_no_runtime_event_type_is_undeclared`.

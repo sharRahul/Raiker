@@ -478,10 +478,11 @@ and approving a task the agent proposed now creates it (**FIXED-106**).
 ## Using Raiker as a personal agent
 
 Raiker's personal-agent direction brings your context, goals, tasks and results
-together. Today you can use Chat, memory, projects, scheduled/background tasks
-and supported connectors. A dedicated durable goal coordinator, standing-intent
-monitoring and general browser automation remain planned. This page explains
-current workflows and marks the target clearly.
+together. Today you can use Chat, memory, projects, scheduled/background tasks,
+supported connectors and **goals** — an outcome Raiker carries across sessions
+under an execution profile you choose in Settings. Standing-intent monitoring
+and general browser automation remain planned. This page explains current
+workflows and marks the target clearly.
 
 ### Start with an outcome
 
@@ -510,6 +511,82 @@ control to request cancellation across work. A step already underway may finish
 before stopping. Read the actual outcome and committed effects in its thread;
 a lost notice does not mean the task failed or should be repeated.
 
+### Give Raiker a goal
+
+**Work → Goals → New goal** records an outcome you can come back to:
+
+1. **Outcome** and what a good result looks like.
+2. **Success criteria.** Each says how it is met: **Met when its steps finish**
+   (Raiker records that the steps counting toward it finished — a fact about
+   the steps, not a judgement that the result is good) or **You confirm it**
+   (you check the result and press **Confirm met**, with an optional note).
+   Mark a criterion required or optional.
+3. **Steps.** Each runs as an ordinary task in **Chat** or **Build** (a Build
+   step needs the goal filed in a project), may **run after** earlier steps,
+   and **counts toward** criteria.
+
+Saving makes a **draft**: nothing runs. **Accept plan** fixes the plan under
+your active [execution profile](#where-a-goals-work-may-run-execution-profiles)
+— or the project's, if the goal is filed in a project that has one — and
+**Start** files the first steps. From then on Raiker files each step as soon as
+the steps it runs after have finished. Every step is a task you can open, and
+every action it takes asks exactly as a task you filed by hand would; a goal
+grants nothing.
+
+The goal's page shows its state in plain words — *Working*, *Waiting* (with
+what it waits on: your decision, your answer, delegated work, Settings),
+*Paused*, *Completed*, *Partly done*, *Failed*, *Stopped* — each criterion's
+evidence, each step and its task, the profile it runs under, and its budget:
+step runs used and what it has cost, reconciled from the provider usage
+Raiker recorded, with the providers that actually answered. Progress is a count
+of finished steps; Raiker does not estimate a percentage.
+
+* **Completed** means every required criterion has evidence. Steps that
+  finished with a *You confirm it* criterion still open read **Partly done**
+  until you confirm it.
+* **Pause** starts nothing new and parks steps not yet started; a step already
+  running finishes its current turn. **Resume** rechecks the profile, your
+  models and the budget first.
+* **Stop** stops every step and what it delegated, and says how many steps
+  had finished.
+* A goal pauses on its own when its budget runs out or Settings changes its
+  profile.
+
+**Home** lists goals that need you, goals in progress and goals that finished
+recently. Goals cannot yet be started from a Chat message, and a criterion
+cannot yet use a Build step's verified outcome as its evidence
+([BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
+
+### Where a goal's work may run: execution profiles
+
+**Settings → Execution profiles** is the only place this is set; a prompt,
+memory, schedule or agent cannot choose or change it. Start from a template:
+
+| Template | Models | Personal memory |
+|---|---|---|
+| **Private local** | Only models on this machine | Nothing leaves this machine |
+| **Balanced** | Local and hosted | Stays off hosted models |
+| **Cloud-first** | Local and hosted | May go to the hosted model doing the work |
+
+You can then limit a profile to named providers and set the step runs and the
+cost each goal may use. Your first profile becomes **active**; **Make active**
+switches, and a project can be bound to its own.
+
+Before a step is filed, and again just before it runs, Raiker checks **every
+model the step could run on** — your selected model and each fallback in your
+fallback sequence — against the goal's profile. If one is outside it, nothing
+is sent: the goal waits and names the model (for example *anthropic (hosted)*),
+with a link to Settings. When the profile keeps memory off hosted models, a
+step that could reach one recalls no memory and the memory tools answer
+*withheld*, as under Incognito.
+
+Saving a profile writes a new version. Goals running under the old one pause
+until you resume them, and Resume checks them against the new one. A custom
+OpenAI-compatible endpoint counts as hosted even when it runs on this machine,
+so Private local refuses it. Profiles bound goal steps only today; ordinary
+Chat, Build and scheduled tasks are not yet held to them
+([BUG-356](../plans/TO_BE_FIXED.md#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class)).
+
 ### Give context deliberately
 
 Set your timezone in Settings and review [Memory](memory.md) for capture,
@@ -525,11 +602,10 @@ work or stop the scheduler. Held decisions remain in the inbox. See
 
 ### What the next personal-agent stages will add
 
-The target is a goal record with explicit success criteria, a durable plan and
-linked tasks that survive restarts; inspectable personal preferences; opt-in
-proactive checks; provider-confirmed effects; and proposed reusable skills from
-verified work. You should see what is progressing, what needs your decision,
-what finished and what remains blocked. These are planned outcomes, not controls
+Goals and execution profiles have shipped as a first slice. Still planned:
+starting a goal from Chat, validator-backed criteria, inspectable personal
+preferences, opt-in proactive checks, provider-confirmed effects, and proposed
+reusable skills from verified work. These are planned outcomes, not controls
 available in the current interface.
 
 Current web access reads and extracts web content; it cannot click or fill

@@ -9,7 +9,8 @@ all-purpose partner. One owner uses it to think, research, create, communicate,
 organise, code and automate work across their model connections, memory, files,
 projects and approved services. The owner controls schedules, extensions,
 permissions and approvals.
-Advanced, durable autonomous goals are being added in stages; [current
+Durable goals — an outcome Raiker carries across sessions under an execution
+profile you choose — are shipping in stages; [current
 limitations](../architecture/KNOWN_LIMITS.md) describe what is usable today.
 
 The same task-oriented guide is available in a running Raiker under
@@ -36,6 +37,7 @@ If this is your first time using Raiker, read these pages in order:
 | Understand capture, approval, recall, retention, correction, forget, and purge | [How Raiker memory works](memory.md) |
 | Plan and change code, run commands, commit, and push | [Working in Build](working-in-build.md) |
 | Use personal context, outcome requests and current background workflows | [Personal-agent workflow](tasks-and-projects.md#using-raiker-as-a-personal-agent) |
+| Give Raiker a goal, and decide where its work may run | [Goals](tasks-and-projects.md#give-raiker-a-goal) and [execution profiles](tasks-and-projects.md#where-a-goals-work-may-run-execution-profiles) |
 | Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
 | Add connectors, MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |

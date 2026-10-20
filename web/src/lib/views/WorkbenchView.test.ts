@@ -523,3 +523,27 @@ describe("WorkbenchView", () => {
     expect(screen.getByText(/Routine ·/)).toBeInTheDocument();
   });
 });
+
+describe("WorkbenchView goals (PA-D06)", () => {
+  it("lists a goal that needs the owner, linking to its own page", async () => {
+    stubFetch(
+      routes({
+        "GET /api/goals": {
+          goals: [
+            {
+              goal_id: "goal_9", title: "Plan the trip", status: "waiting", reason: "needs_decision",
+              reason_text: "A step is waiting for your decision", steps: [], allowed_actions: ["pause", "stop"],
+            },
+          ],
+          archived: [],
+          active_profile: null,
+        },
+      }),
+    );
+    render(WorkbenchView);
+    const link = await screen.findByRole("link", { name: "Plan the trip" });
+    expect(link).toHaveAttribute("href", "#/work?tab=goals&record=goal_9");
+    expect(screen.getByText("Needs you")).toBeInTheDocument();
+    expect(screen.getByText("A step is waiting for your decision")).toBeInTheDocument();
+  });
+});

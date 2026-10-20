@@ -552,6 +552,11 @@ class TaskScheduler:
         self.settle_lapsed_runs()
         if HostControl(self.workspace_root).is_paused():
             return 0
+        # PA-D01 — each running goal files the steps that are now due as
+        # ordinary queued tasks, which the claim below then picks up. A goal
+        # adds no executor of its own; this is the only place it is advanced
+        # without an owner action.
+        self._advance_goals()
         tasks = self.store.claim_due_tasks(utc_now())
         for task in tasks:
             try:
@@ -581,7 +586,17 @@ class TaskScheduler:
                         f"({type(exc).__name__}). You can run it again.",
                         claim=task.claim_generation,
                     )
+        if tasks:
+            # A step that just settled may make the next one due, or finish
+            # its goal; read it back now rather than a tick later.
+            self._advance_goals()
         return len(tasks)
+
+    def _advance_goals(self) -> None:
+        from raiker.goals.coordinator import GoalCoordinator
+
+        with suppress(Exception):
+            GoalCoordinator(self.workspace_root).reconcile_all()
 
     async def _within_limit(
         self,
@@ -621,6 +636,23 @@ class TaskScheduler:
         principal_id = task.session_id.removeprefix("sess_inbox_")
         if principal_id == task.session_id or self.store.get_principal(principal_id) is None:
             TaskManager(self.store, EventLogWriter(self.store)).fail_task(task.task_id, "Scheduled task has no valid owner.")
+            return
+        # PA-D02 — a goal step is re-checked against its goal at the moment it
+        # would run: Stop or Pause may have reached the goal since it was filed,
+        # and the owner's default model or fallbacks may have moved outside the
+        # goal's execution profile. Either way this run does not start.
+        from raiker.goals.coordinator import GoalCoordinator
+
+        refused = GoalCoordinator(self.workspace_root).guard_task(task)
+        if refused is not None:
+            reason, detail = refused
+            message = (
+                "Not run: its goal is no longer running."
+                if reason == "goal_not_running"
+                else f"Not run: the goal's execution profile does not allow {detail or 'this model'}. "
+                "Change the profile or your models in Settings."
+            )
+            TaskManager(self.store, EventLogWriter(self.store)).cancel_task(task.task_id, message)
             return
         prompt = task.objective or task.title
         turn_id = new_id("turn_")

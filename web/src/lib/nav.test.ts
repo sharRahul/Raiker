@@ -38,10 +38,12 @@ describe("nav model", () => {
     // Threads, Tasks and Projects are tabs of Work; the Knowledge Map is a tab
     // of Memory; Messaging is a tab of Extensions. Every old address still
     // opens the matching tab.
-    expect(HUB_TABS.work).toEqual(["threads", "tasks", "projects"]);
+    // PA-D06 — Goals joined them: a goal's steps are tasks.
+    expect(HUB_TABS.work).toEqual(["threads", "goals", "tasks", "projects"]);
     for (const [hash, route, tab] of [
       ["#/search-chat", "work", "threads"],
       ["#/tasks?task=t1", "work", "tasks"],
+      ["#/goals", "work", "goals"],
       ["#/projects?project=p1", "work", "projects"],
       ["#/brain", "memory", "map"],
       ["#/messaging", "extensions", "channels"],

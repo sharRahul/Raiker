@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**450 operations: 436 verified, 0 eligible, 0 deferred, 14 special.**
+**466 operations: 452 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -173,6 +173,11 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | PUT | `/api/execution-environments/{profile_id}/enabled` | dict | ExecutionEnvironmentEnabled | verified | declared by cast |
 | POST | `/api/execution-environments/{profile_id}/probe` |  | ExecutionEnvironmentProbed | verified | declared ExecutionEnvironmentProbed |
 | POST | `/api/execution-environments/{profile_id}/reset` | dict | ExecutionEnvironmentReset | verified | declared by cast |
+| GET | `/api/execution-profiles` |  | ExecutionProfileList | verified | _profiles_answer |
+| POST | `/api/execution-profiles` | CreateExecutionProfileRequest | ExecutionProfileChanged | verified | _changed |
+| PUT | `/api/execution-profiles/active` | ExecutionProfileBindingRequest | ExecutionProfileChanged | verified | _changed |
+| PUT | `/api/execution-profiles/projects/{project_id}` | ExecutionProfileBindingRequest | ExecutionProfileChanged | verified | _changed |
+| PUT | `/api/execution-profiles/{profile_id}` | UpdateExecutionProfileRequest | ExecutionProfileChanged | verified | _changed |
 | GET | `/api/extensions` |  | ExtensionsOverviewView | verified | WebReadModels.extensions_overview |
 | DELETE | `/api/git-credential` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
 | GET | `/api/git-credential` |  | GitCredentialStatus | verified | GitCredentialBroker.status |
@@ -198,6 +203,17 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/github/sign-in/{attempt_id}/cancel` |  | GitHubSignInAttempt | verified | _attempt_call |
 | POST | `/api/github/sign-in/{attempt_id}/poll` |  | GitHubSignInAttempt | verified | _attempt_call |
 | POST | `/api/github/webhook` |  |  | special | special |
+| GET | `/api/goals` |  | GoalList | verified | declared GoalList |
+| POST | `/api/goals` | CreateGoalRequest | GoalView | verified | _view |
+| GET | `/api/goals/{goal_id}` |  | GoalView | verified | _view |
+| POST | `/api/goals/{goal_id}/accept` | GoalActionRequest | GoalView | verified | _act |
+| POST | `/api/goals/{goal_id}/archive` | GoalActionRequest | GoalView | verified | _act |
+| POST | `/api/goals/{goal_id}/criteria/{criterion_id}/confirm` | GoalConfirmRequest | GoalView | verified | _view |
+| POST | `/api/goals/{goal_id}/pause` | GoalActionRequest | GoalView | verified | _act |
+| PUT | `/api/goals/{goal_id}/plan` | UpdateGoalPlanRequest | GoalView | verified | _view |
+| POST | `/api/goals/{goal_id}/resume` | GoalActionRequest | GoalView | verified | _act |
+| POST | `/api/goals/{goal_id}/start` | GoalActionRequest | GoalView | verified | _act |
+| POST | `/api/goals/{goal_id}/stop` | GoalActionRequest | GoalStopped | verified | declared GoalStopped |
 | GET | `/api/guide` |  | GuideIndex | verified | declared GuideIndex |
 | GET | `/api/guide/{slug}` |  | GuideSection | verified | declared GuideSection |
 | GET | `/api/health` |  | HealthView | verified | declared by cast |

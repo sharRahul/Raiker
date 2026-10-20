@@ -131,6 +131,10 @@ _PREFIXES = {
     "prr_",
     # DW-01 to DW-11 — a Design document, design system, agent proposal,
     # export and Build handoff.
+    # PA-D01 / PA-D02 — a goal, one entry in its history, and an execution profile.
+    "goal_",
+    "gevt_",
+    "xprof_",
     "ddoc_",
     "dsys_",
     "dprop_",

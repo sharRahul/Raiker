@@ -364,6 +364,26 @@ EVENT_TYPES = {
     "design_exported",
     "design_handed_off",
     "design_asset_imported",
+    # PA-D01 / PA-D02 — a goal's lifecycle and the Settings changes that bound
+    # it. Ids, states, reasons and counts only — never a criterion's or a
+    # step's text. A goal's own history is also kept in `goal_events`.
+    "goal_accepted",
+    "goal_started",
+    "goal_waiting",
+    "goal_paused",
+    "goal_resumed",
+    "goal_stopped",
+    "goal_archived",
+    "goal_completed",
+    "goal_partial",
+    "goal_failed",
+    "goal_criterion_confirmed",
+    "goal_profile_repinned",
+    "goal_step_started",
+    "goal_step_refused",
+    "execution_profile_created",
+    "execution_profile_changed",
+    "execution_profile_bound",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).

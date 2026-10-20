@@ -15,6 +15,7 @@ from raiker.context.models import (
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import normalize_prompt_surface
+from raiker.goals.store import session_memory_withheld
 from raiker.memory.brief import MEMORY_BRIEF_VERSION, build_memory_brief
 from raiker.memory.candidates import governed_memory_status
 from raiker.memory.retrieval import retrieve_hybrid_memory
@@ -200,7 +201,7 @@ class ContextGatherer:
         # MEM-MODE-02 — the owner's ambient-recall mode, with Incognito over
         # it. Resolved once so the brief, searched recall, project memory and
         # the disclosure all answer to the same decision.
-        disclosure = self._memory_disclosure(store, owner_principal_id)
+        disclosure = self._memory_disclosure(store, owner_principal_id, session_id)
         # A caller that is not an account has no owner whose setting applies,
         # and no owner-scoped recall either; its explicit project context keeps
         # the behaviour it always had.
@@ -278,7 +279,9 @@ class ContextGatherer:
     # --- memory recall mode (MEM-MODE-02) -------------------------------------------
 
     @staticmethod
-    def _memory_disclosure(store: SQLiteStore, owner_principal_id: str | None) -> dict[str, object]:
+    def _memory_disclosure(
+        store: SQLiteStore, owner_principal_id: str | None, session_id: str | None = None
+    ) -> dict[str, object]:
         """The mode in force, what will run, and the backend that answers.
 
         Empty for a caller that is not an account: there is no owner whose
@@ -288,7 +291,10 @@ class ContextGatherer:
             return {}
         mode = store.get_memory_recall_mode(owner_principal_id)
         incognito = store.is_memory_incognito(owner_principal_id)
-        effective = "off" if incognito else mode
+        # PA-D02 — a goal step whose execution profile keeps personal memory
+        # away from a hosted model recalls nothing, the same as Incognito.
+        withheld = session_memory_withheld(store, session_id)
+        effective = "off" if incognito or withheld else mode
         if effective == "search_when_relevant":
             from raiker.vector.backends import resolve_embedding_backend
 

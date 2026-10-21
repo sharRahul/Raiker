@@ -108,7 +108,7 @@ describe("App shell", () => {
     // The sections stay, because "where is that setting" is the other question
     // this window answers and a deep link is the shorter road to it.
     expect(
-      within(pages).getByRole("link", { name: /^security & sign-in$/i }),
+      within(pages).getByRole("link", { name: /^security$/i }),
     ).toHaveAttribute("href", "#/settings?tab=security");
     // The acting principal and mode are surfaced, honestly, from the API — the runtime
     // mode identifier is shown as a plain-English name, not the raw code.

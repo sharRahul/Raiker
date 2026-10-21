@@ -231,7 +231,7 @@ describe("WorkbenchView", () => {
 
     const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
     expect(await within(rail).findByText("There is no backup of this workspace yet.")).toBeInTheDocument();
-    expect(within(rail).getByRole("link", { name: "Make a backup" })).toHaveAttribute("href", "#/settings?tab=account");
+    expect(within(rail).getByRole("link", { name: "Make a backup" })).toHaveAttribute("href", "#/settings?tab=general");
     expect(within(rail).queryByText("Nothing needs you right now.")).toBeNull();
   });
 

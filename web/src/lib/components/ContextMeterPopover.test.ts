@@ -103,7 +103,7 @@ describe("ContextMeterPopover", () => {
     expect(screen.getByText("Unknown")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Configure/ })).toHaveAttribute(
       "href",
-      "#/models?tab=usage",
+      "#/settings?tab=advanced&kind=usage",
     );
     expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   });

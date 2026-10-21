@@ -870,7 +870,7 @@
             label: "Runs on",
             value: `${boundary.environment_name}${boundary.environment_available ? "" : " — setup required"}`,
             short: boundary.environment_name,
-            href: "#/settings?tab=runtime",
+            href: "#/settings?tab=advanced&kind=runtime",
             action: "Change",
           },
         ]

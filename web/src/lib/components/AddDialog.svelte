@@ -76,7 +76,7 @@
 <dialog
   class="add-dialog"
   bind:this={dialogElement}
-  aria-labelledby="add-dialog-title"
+  aria-label={title}
   oncancel={cancel}
   onclick={backdrop}
 >

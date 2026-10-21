@@ -6,7 +6,17 @@
   import SubscriptionLimitStrip from "../../components/SubscriptionLimitStrip.svelte";
   import { providerName } from "../../format";
 
+  /*
+   * QUI-L08 — with `provider`, the panel is one model's usage in its detail on
+   * Models: that provider's rows only, without the account-wide spending limit,
+   * which lives with the rest of usage in Settings › Advanced.
+   */
+  let { provider = null }: { provider?: string | null } = $props();
+
   let usage = $state<ProviderWeeklyUsageView | null>(null);
+  const rows = $derived(
+    (usage?.providers ?? []).filter((row) => provider === null || row.provider === provider),
+  );
   let loading = $state(true);
   let refreshing = $state(false);
   let error = $state<string | null>(null);
@@ -133,12 +143,12 @@
   }
 </script>
 
-<section class="usage-panel" aria-labelledby="provider-usage-title">
+<section class="usage-panel" class:compact={provider !== null} aria-labelledby="provider-usage-title">
   <div class="usage-heading">
     <div>
-      <p class="eyebrow">Connected providers only</p>
-      <h2 id="provider-usage-title">Rolling seven-day usage</h2>
-      <p>
+      {#if provider === null}<p class="eyebrow">Connected providers only</p>{/if}
+      <h2 id="provider-usage-title">{provider === null ? "Rolling seven-day usage" : "Usage · last 7 days"}</h2>
+      <p class:sr-only={provider !== null}>
         Tokens, turns, and known API cost come from Raiker’s ledger. Provider
         account data appears separately when the connected API can supply it.
       </p>
@@ -153,6 +163,7 @@
     </button>
   </div>
 
+  {#if provider === null}
   <section class="spend-limit" aria-labelledby="spend-limit-title" data-testid="spend-limit">
     <div class="spend-copy">
       <h3 id="spend-limit-title">Spending limit · every model, last 24 hours</h3>
@@ -192,18 +203,23 @@
     </div>
     {#if limitError}<p class="usage-error" role="alert">{limitError}</p>{/if}
   </section>
+  {/if}
 
   {#if error}<p class="usage-error" role="alert">{error}</p>{/if}
   {#if loading}
     <p class="usage-state" role="status">Loading usage…</p>
-  {:else if usage && usage.providers.length === 0}
+  {:else if usage && rows.length === 0}
     <div class="usage-empty">
-      <strong>No connected providers</strong>
-      <span>Connect a hosted account or start and check a local model server to see it here.</span>
+      {#if provider === null}
+        <strong>No connected providers</strong>
+        <span>Connect a hosted account or start and check a local model server to see it here.</span>
+      {:else}
+        <span>Nothing recorded for {providerName(provider)} in the last seven days.</span>
+      {/if}
     </div>
   {:else if usage}
     <div class="usage-list">
-      {#each usage.providers as row (row.profile_id)}
+      {#each rows as row (row.profile_id)}
         <article class="usage-row">
           <header>
             <span class="provider-mark"><ProviderLogo provider={row.provider} size={26} /></span>

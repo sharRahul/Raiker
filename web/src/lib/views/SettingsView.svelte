@@ -15,12 +15,21 @@
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
-  import GitHubConnection from "./settings/GitHubConnection.svelte";
   import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
-  import { SECTION_ALIASES, SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
+  import ModelsView from "./ModelsView.svelte";
+  import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
+  import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
+  import {
+    ADVANCED_SETTINGS,
+    SECTION_ALIASES,
+    SECTIONS_MOVED,
+    SETTINGS_SECTIONS as SECTIONS,
+    advancedSettingFromHash,
+    type AdvancedSetting,
+  } from "../settingsSections";
   /** Group names in rail order, taken from the sections themselves (the Settings grouping). */
   const GROUPS = [...new Set(SECTIONS.map((section) => section.group))];
 
@@ -31,6 +40,29 @@
     const wanted = SECTION_ALIASES[tab] ?? tab;
     return SECTIONS.some((section) => section.id === wanted) ? wanted : "general";
   });
+  /*
+   * QUI-L09 — a section that moved to another page is forwarded there, so an
+   * old link (`#/settings?tab=github`) still lands on what it named.
+   */
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    const requested = new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("tab");
+    const moved = requested === null ? undefined : SECTIONS_MOVED[requested];
+    if (moved !== undefined) window.location.replace(moved);
+  });
+  /** The open segment of Settings › Advanced, from the address. */
+  let advancedKind = $state<AdvancedSetting>(
+    typeof window === "undefined" ? "runtime" : advancedSettingFromHash(window.location.hash),
+  );
+  $effect(() => {
+    const read = () => (advancedKind = advancedSettingFromHash(window.location.hash));
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  });
+  function selectAdvanced(next: AdvancedSetting) {
+    advancedKind = next;
+    history.replaceState(history.state, "", `#/settings?tab=advanced&kind=${next}`);
+  }
   let settings = $state<Record<string, unknown>>({});
   let status = $state<{ vault: string; mfa_enrolled: boolean; username: string }>({
     vault: "missing",
@@ -378,6 +410,8 @@
   <div class="section-body">
     {#if active === "general"}
       <General {settings} {save} />
+      <!-- QUI-L09 — Account folds into General. -->
+      <Account {settings} {save} {status} />
     {:else if active === "notification"}
       <Notification {settings} {save} />
     {:else if active === "personalisation"}
@@ -386,20 +420,34 @@
       <SecurityLogin />
     {:else if active === "privacy"}
       <Privacy {settings} {save} />
-    {:else if active === "account"}
-      <Account {settings} {save} {status} />
     {:else if active === "execution-profiles"}
       <ExecutionProfiles />
     {:else if active === "web-access"}
       <WebAccess />
-    {:else if active === "github"}
-      <GitHubConnection />
-    {:else if active === "memory-engine"}
-      <MemoryEngine />
     {:else if active === "updates"}
       <Updates />
-    {:else}
-      <Runtime {principal} {settings} {save} />
+    {:else if active === "advanced"}
+      <!-- QUI-L09 — the developer and runtime settings, one segment at a time. -->
+      <div class="segmented advanced-segments" role="group" aria-label="Advanced settings">
+        {#each ADVANCED_SETTINGS as item (item.id)}
+          <button
+            type="button"
+            class="segment"
+            aria-pressed={advancedKind === item.id}
+            onclick={() => selectAdvanced(item.id)}>{item.label}</button
+          >
+        {/each}
+      </div>
+      {#if advancedKind === "runtime"}
+        <Runtime {principal} {settings} {save} />
+      {:else if advancedKind === "memory-engine"}
+        <MemoryEngine />
+      {:else if advancedKind === "models"}
+        <ModelsView view="routing" />
+      {:else}
+        <ProviderUsagePanel />
+        <ModelPricingPanel />
+      {/if}
     {/if}
     {#if unsaved}
       <div class="save-bar" role="region" aria-label="Unsaved settings changes" data-dock-clear>
@@ -456,6 +504,9 @@
   }
   .section-body {
     min-width: 0;
+  }
+  .advanced-segments {
+    margin-bottom: var(--space-4);
   }
   /* A navigation group label, which the finding names as a place
      for sentence case. Caps at 2xs with .09em tracking was four typographic

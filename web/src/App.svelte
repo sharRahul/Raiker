@@ -441,10 +441,7 @@
           {:else if current === "capabilities"}
             <LazyRoute route="capabilities" props={{ principal }} />
           {:else if current === "models"}
-            <LazyRoute
-              route="models"
-              props={{ tab: currentTab ?? "providers" }}
-            />
+            <LazyRoute route="models" />
           {:else if current === "connections"}
             <LazyRoute
               route="extensions"

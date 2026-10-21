@@ -839,7 +839,7 @@ describe("MemoryView observations (MEM-04)", () => {
     );
     expect(
       screen.getByRole("link", { name: /change the recall backend/i }),
-    ).toHaveAttribute("href", "#/settings?tab=memory-engine");
+    ).toHaveAttribute("href", "#/settings?tab=advanced&kind=memory-engine");
     // The controls themselves are not here any more.
     expect(screen.queryByLabelText(/embedding model/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/recall backend/i)).not.toBeInTheDocument();

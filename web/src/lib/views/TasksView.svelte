@@ -529,14 +529,14 @@
       label: "Runs in",
       value: environmentLabel,
       short: environmentLabel,
-      href: "#/settings?tab=runtime",
+      href: "#/settings?tab=advanced&kind=runtime",
       action: "Runtime",
     },
     {
       label: "Context",
       value: capacityLabel,
       short: capacityLabel,
-      href: "#/models?tab=models",
+      href: "#/models",
       action: "Models",
     },
   ]);

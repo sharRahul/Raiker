@@ -5,8 +5,7 @@
   import PageState from "../components/PageState.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
   import RowOverflow from "../components/RowOverflow.svelte";
-  import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
-  import TabStrip from "../components/TabStrip.svelte";
+  import AddDialog from "../components/AddDialog.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
@@ -42,9 +41,7 @@
   } from "../providerConnections";
   import { modelDecisions } from "../surfaceModel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
-  import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
-  import ModelsOverview from "./models/ModelsOverview.svelte";
   import MyModels from "./models/MyModels.svelte";
   import ModelComparison from "./models/ModelComparison.svelte";
   import { brand } from "./models/providerBrands";
@@ -53,49 +50,111 @@
   import ModelPickerDialog from "./models/ModelPickerDialog.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
-  // so a selection here is reflected there without a full page reload. `tab`
-  // comes from the hash, so every panel is a shareable location — the context
-  // popover's "Configure →" links straight to #/models?tab=usage.
+  // so a selection here is reflected there without a full page reload.
   let {
     onchanged,
-    tab = "overview",
-  }: { onchanged?: () => void; tab?: string } = $props();
+    tab = null,
+    source = null,
+    view = "page",
+  }: {
+    onchanged?: () => void;
+    /** An old tab address; `add` opens Add model. */
+    tab?: string | null;
+    /** With `tab: "add"`, the source Add model opens on (`?source=`). */
+    source?: string | null;
+    /** `routing` draws only what is serving, for Settings › Advanced. */
+    view?: "page" | "routing";
+  } = $props();
 
-  /**
-   * The page is split by *what you came to do*, not by which table the data
-   * lives in. Obtaining a model that runs on this machine and signing in to
-   * somebody else's are different jobs with different vocabulary, risks and
-   * controls, so they are separate tabs. Local is first because Raiker prefers
-   * local backends.
+  /*
+   * QUI-L08 — one page, no tabs: the execution profile card, then My models.
+   * Adding a model is a three-step dialog whose second step shows only the
+   * source chosen in the first.
    */
-  const TABS = [
-    { id: "overview", label: "Overview" },
-    { id: "models", label: "My models" },
-    { id: "add", label: "Add model" },
-    { id: "runtime", label: "Runtime & routing" },
-    { id: "usage", label: "Usage" },
+  const ADD_SOURCES = [
+    {
+      id: "local",
+      name: "On this computer",
+      category: "Source",
+      description: "A model this machine runs itself. Nothing you send leaves it.",
+    },
+    {
+      id: "account",
+      name: "An account I have",
+      category: "Source",
+      description: "Anthropic, OpenAI, Gemini or another provider, with your own key.",
+    },
+    {
+      id: "huggingface",
+      name: "Hugging Face",
+      category: "Source",
+      description: "Download an open model and run it on this computer.",
+    },
+    {
+      id: "custom",
+      name: "Custom endpoint",
+      category: "Source",
+      description: "A router such as OpenRouter, or a vLLM or home-lab server you control.",
+    },
   ];
-
-  // Which provider sections each tab owns. The three groups already existed as
-  // headings inside one scroll; the split promotes them to destinations.
-  const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
-    // One tab for acquiring a model, whichever kind it is.
-    // Local and Hosted were peers because that is how the profiles are stored,
-    // not because it is a choice anyone makes: an owner arrives wanting *a
-    // model*, and "is it on this machine" is an attribute of the answer rather
-    // than the first question. What the owner already has is `My models`;
-    // adding one is here.
-    add: ["Local", "Hosted", "Advanced"],
+  const SOURCE_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
+    local: ["Local"],
+    account: ["Hosted"],
+    custom: ["Advanced"],
   };
-  const visibleSections = $derived(TAB_SECTIONS[tab] ?? []);
-  const showsProviderCards = $derived(visibleSections.length > 0);
+  let adding = $state(false);
+  let addSource = $state<string | null>(null);
+  let changing = $state(false);
+  const visibleSections = $derived(addSource === null ? [] : (SOURCE_SECTIONS[addSource] ?? []));
 
-  function selectTab(next: string) {
-    tab = next;
-    window.location.hash = `#/models?tab=${encodeURIComponent(next)}`;
+  function openAdd(source: string | null) {
+    addSource = source;
+    adding = true;
+  }
+  function closeAdd() {
+    adding = false;
+    addSource = null;
+    if (typeof window !== "undefined" && /[?&]tab=/.test(window.location.hash)) {
+      history.replaceState(history.state, "", "#/models");
+    }
+    void load();
   }
 
   let models = $state<ModelsData | null>(null);
+  // An old address that named the Add tab, or the Hugging Face one, opens the
+  // dialog on that step.
+  const SERVING_TABS = ["runtime", "routing", "library", "downloads", "activity"];
+  const USAGE_TABS = ["usage", "pricing"];
+  function applyRequestedTab(requested: string | null) {
+    if (requested === null) return;
+    // What serves models and what they cost moved to Settings › Advanced.
+    if (SERVING_TABS.includes(requested)) {
+      window.location.replace("#/settings?tab=advanced&kind=models");
+    } else if (USAGE_TABS.includes(requested)) {
+      window.location.replace("#/settings?tab=advanced&kind=usage");
+    } else if (requested === "add" || requested === "posture") openAdd(requestedSource());
+    else if (requested === "huggingface" || requested === "discover") openAdd("huggingface");
+  }
+  /** `?source=` on an Add model link, when it names one of the four. */
+  function requestedSource(): string | null {
+    const named =
+      source ??
+      (typeof window === "undefined"
+        ? null
+        : new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("source"));
+    return ADD_SOURCES.some((item) => item.id === named) ? named : null;
+  }
+  function tabInHash(): string | null {
+    if (typeof window === "undefined" || !/^#\/models(?:[?/]|$)/.test(window.location.hash)) return null;
+    return new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("tab");
+  }
+  $effect(() => {
+    if (view !== "page") return;
+    applyRequestedTab(tab ?? tabInHash());
+    const onHash = () => applyRequestedTab(tabInHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  });
   /**
    * Every surface's decision, read once for the whole page.
    *
@@ -844,39 +903,27 @@
       (p) => p.connection_configured || p.selected,
     ),
   );
-  // A percentage of "all shipped profiles" was a meaningless denominator — a
-  // user who connects the one provider they intend to use is finished, not 10%
-  // finished. The honest headline is how many providers are actually ready.
-  //
-  // BUG-69 — and "ready" has to mean ready: a saved connection is not a
-  // proven model. This reads the server's count of proven observations and
-  // falls back to counting `ready` profiles only if the field is absent.
-  const readyCount = $derived(
-    models?.ready_provider_count ??
-      (models?.profiles ?? []).filter((p) => p.ready === true).length,
+  /** The model the global default names, for the profile card. */
+  const inForce = $derived(globalChoices.find((profile) => profile.selected) ?? null);
+  /**
+   * What the owner has: a connected account, the model in force, or a model
+   * this machine can run. The rest of the registry is what *could* be added,
+   * which is the Add model dialog's job.
+   */
+  const ownedProfiles = $derived(
+    (models?.profiles ?? []).filter(
+      (p) =>
+        p.selected ||
+        p.connection_configured ||
+        (!p.off_machine && p.model !== UNPINNED_MODEL && isChoosableModel(p)),
+    ),
   );
-  // Set up and usable, whether or not the last observation is still inside its
-  // window. This is what an owner means by "I have models"; `readyCount` is
-  // what Raiker has actually proven.
-  //
-  // BUG-270 — the local half of this is a fact the browser cannot see. Four
-  // empty llama.cpp slots carry `local-gguf…` model strings and the Ollama
-  // native default names a third-party model, so `model !== "<model>"` counted
-  // five models on a machine with none of them installed. The server now answers
-  // it from the deployment rows and the cached runtime detection; this reads
-  // that number and only falls back to the old client-side shape when an older
-  // backend sends no field.
-  const usableCount = $derived(
-    models?.usable_provider_count ??
-      (models?.profiles ?? []).filter(
-        (p) =>
-          p.configured !== false &&
-          p.model !== "<model>" &&
-          isChoosableModel(p) &&
-          (p.connection_configured || !p.off_machine),
-      ).length,
+  /** Step 3 of Add model: what the chosen source now has set up. */
+  const reviewProfiles = $derived(
+    addSource === null || addSource === "huggingface"
+      ? []
+      : configuredProfiles.filter((p) => visibleSections.includes(sectionFor(p))),
   );
-
   // Each provider's bar is its share of total spend across every provider, so
   // it needs no configured budget to mean something. Providers with no cost
   // (local runtimes, or ones never used) simply have no bar.
@@ -1053,185 +1100,176 @@
   });
 </script>
 
+{#if view === "routing"}
+  <!-- QUI-L08 — what is serving and what a turn falls back to, now in
+       Settings › Advanced. The same component, with this page's data. -->
+  {#if loadError}
+    <PageState state="error" title="Couldn't load models" detail={loadError} />
+  {:else if models === null}
+    <PageState state="loading" title="Loading models…" />
+  {:else}
+    <RuntimeTab
+      {models}
+      revision={loadRevision}
+      onreload={load}
+      gguf={frameworkProfiles("llama.cpp")}
+      mlx={frameworkProfiles("mlx")}
+      {testing}
+      {testResults}
+      {selecting}
+      ontest={(profile) => void testConnection(profile)}
+      ondetails={(profile) => (detailsFor = profile)}
+      onselect={(profile) => void select(profile.profile_id, profile.model)}
+    />
+  {/if}
+{:else}
 <div class="head-row">
   <GuideLink route="models" />
-  <button
-    type="button"
-    class="btn btn-ghost btn-sm"
-    onclick={() => void refreshProviderCatalogues()}
-    disabled={catalogueRefreshing}
-    aria-label="Refresh connected providers"
-  >
-    <Icon name="refresh" size="sm" />
-    {catalogueRefreshing ? "Refreshing…" : "Refresh connected providers"}
-  </button>
+  <div class="head-actions">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick={() => void refreshProviderCatalogues()}
+      disabled={catalogueRefreshing}
+      aria-label="Refresh connected providers"
+    >
+      <Icon name="refresh" size="sm" />
+      {catalogueRefreshing ? "Refreshing…" : "Refresh"}
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" onclick={() => openAdd(null)}>
+      <Icon name="plus" size="sm" /> Add model
+    </button>
+  </div>
 </div>
 {#if catalogueNotice}<p class="catalogue-notice" role="status">{catalogueNotice}</p>{/if}
-
-<!-- Readiness and the global default describe the page, not one panel, so
-     they sit above the strip: an owner on Pricing or Routing can still see
-     whether anything can run and change what runs by default. -->
-{#if models !== null && models.profiles.length > 0}
-  <section
-    class="setup-overview card"
-    aria-labelledby="model-setup-title"
-  >
-    <div>
-      <p class="eyebrow">Model setup</p>
-      <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-    </div>
-    <div class="setup-meter" aria-live="polite">
-      <!-- "Ready" still means an observation proved it (BUG-69). When every
-           observation has merely aged out that number is honestly zero, which
-           read as "nothing works" on an instance where models were set up and
-           selected — so the line names what is true instead. -->
-      <strong
-        >{readyCount > 0
-          ? `${readyCount} ${readyCount === 1 ? "model" : "models"} ready`
-          : usableCount > 0
-            ? `${usableCount} ${usableCount === 1 ? "model" : "models"} set up`
-            : "No model ready"}</strong
-      >
-      <span class="of"
-        >{configuredProfiles.length} of {models.profiles.length} connected</span
-      >
-      {#if totalSpend > 0}
-        <p class="total-spend">
-          {formatCost(String(totalSpend), spendCurrency)} total API cost
-        </p>
-      {/if}
-    </div>
-  </section>
-
-  <!-- The global choice belongs with the rest of the model
-       decision, which is Overview's whole subject. Above the strip it was a
-       third statement of the same fact on every tab, competing with the
-       per-surface defaults it is only the fallback for. -->
-  <section
-    class="global-model-card card"
-    class:tab-scoped={tab !== "overview"}
-    aria-labelledby="global-model-title"
-  >
-    <div class="global-model-copy">
-      <p class="eyebrow">Default</p>
-      <h2 id="global-model-title">Global model</h2>
-    </div>
-    <label class="global-model-field">
-      <!-- The card heading beside this already says "Global model", and the
-           select carries the same name for assistive technology, so printing it
-           a third time only made the card longer. -->
-      <small>Choose any configured provider and exact model.</small>
-      <select
-        aria-label="Global model"
-        value={globalChoice}
-        onchange={(event) => void selectGlobal(event.currentTarget.value)}
-        disabled={selecting}
-      >
-        <option value="" disabled>Choose a global model</option>
-        <!-- Grouped by provider, so a provider names itself once as the
-             group it is rather than in front of every one of its models. -->
-        {#each globalGroups as group (group.provider)}
-          <optgroup label={providerName(group.provider)}>
-            {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
-              <option value={JSON.stringify([profile.profile_id, profile.model])}
-                >{modelName(profile.model)}</option
-              >
-            {/each}
-          </optgroup>
-        {/each}
-      </select>
-    </label>
-  </section>
-{/if}
-
-<TabStrip
-  tabs={TABS}
-  selected={tab}
-  onselect={selectTab}
-  label="Model settings"
-/>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load models" detail={loadError} />
 {:else if models === null}
   <PageState state="loading" title="Loading models…" />
 {:else}
-  {#if tab === "overview"}<div
-      class="panel"
-      role="tabpanel"
-      id="panel-overview"
-      aria-labelledby="tab-overview"
-    >
-      <ModelsOverview {models} onopen={selectTab} />
-    </div>{/if}
-  {#if tab === "models"}<div
-      class="panel"
-      role="tabpanel"
-      id="panel-models"
-      aria-labelledby="tab-models"
-    >
-      <div class="lead-row">
-        <p class="tab-lead">
-          Every model you have set up, wherever it runs. The one in force is at
-          the top; a row asks something of you only when it needs it.
-        </p>
-        <!-- UX-MODEL-04 — the same models as a comparison. Two presentations
-             of one inventory, so choosing still happens in the list. -->
-        <div class="view-switch" role="group" aria-label="Show models as">
-          <button
-            type="button"
-            class="btn btn-sm"
-            class:btn-ghost={modelsLayout !== "list"}
-            aria-pressed={modelsLayout === "list"}
-            onclick={() => (modelsLayout = "list")}>List</button
-          >
-          <button
-            type="button"
-            class="btn btn-sm"
-            class:btn-ghost={modelsLayout !== "compare"}
-            aria-pressed={modelsLayout === "compare"}
-            onclick={() => (modelsLayout = "compare")}>Compare</button
-          >
+  <!-- While Add model is open the page behind it is out of reach, for a
+       screen reader as much as for a pointer. -->
+  <div class="models-page" inert={adding} aria-hidden={adding ? "true" : undefined}>
+  <!-- QUI-L08 — the execution profile in one card: the model in force, whether
+       it is ready, where it runs and what that means for privacy and cost, and
+       Change. It replaces the Model setup and Global model cards that stood
+       above every tab. -->
+  <section class="profile-card card" aria-labelledby="profile-card-title">
+    <div class="profile-main">
+      {#if inForce !== null}
+        <ProviderLogo provider={inForce.provider} size={36} />
+        <div class="profile-copy">
+          <p class="eyebrow">Model in use</p>
+          <h2 id="profile-card-title">{modelName(inForce.model)}</h2>
+          <p class="profile-facts">
+            <span>{providerName(inForce.provider)}</span>
+            <span>{isChoosableModel(inForce) ? (readinessLabel(inForce.readiness_state) ?? "Set up") : "Not ready"}</span>
+            <span>{inForce.off_machine ? `Sent to ${providerName(inForce.provider)}` : "Stays on this computer"}</span>
+          </p>
+          <p class="profile-tradeoff">
+            {inForce.off_machine
+              ? `What you send leaves this computer and ${providerName(inForce.provider)} bills each request to your account.`
+              : "Nothing you send leaves this computer, and there is no API cost."}
+            {#if totalSpend > 0}
+              {formatCost(String(totalSpend), spendCurrency)} spent so far.
+            {/if}
+          </p>
         </div>
-      </div>
-      {#if modelsLayout === "compare"}
-        <ModelComparison profiles={models.profiles} />
       {:else}
+        <div class="profile-copy">
+          <p class="eyebrow">Model in use</p>
+          <h2 id="profile-card-title">No default model is chosen</h2>
+          <p class="profile-tradeoff">
+            Chat and Build need a model before they can answer. Add one that runs on this computer
+            or connect an account you have.
+          </p>
+        </div>
+      {/if}
+    </div>
+    <div class="profile-actions">
+      {#if changing}
+        <label class="global-model-field">
+          <span class="sr-only">Global model</span>
+          <select
+            aria-label="Global model"
+            value={globalChoice}
+            onchange={(event) => {
+              changing = false;
+              void selectGlobal(event.currentTarget.value);
+            }}
+            disabled={selecting}
+          >
+            <option value="" disabled>Choose a model</option>
+            {#each globalGroups as group (group.provider)}
+              <optgroup label={providerName(group.provider)}>
+                {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
+                  <option value={JSON.stringify([profile.profile_id, profile.model])}
+                    >{modelName(profile.model)}</option
+                  >
+                {/each}
+              </optgroup>
+            {/each}
+          </select>
+        </label>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={() => (changing = false)}>Cancel</button>
+      {:else if globalChoices.length > 0}
+        <button type="button" class="btn btn-sm" onclick={() => (changing = true)}>Change</button>
+      {:else}
+        <button type="button" class="btn btn-primary btn-sm" onclick={() => openAdd(null)}>Add model</button>
+      {/if}
+    </div>
+  </section>
+  {#if selectError && pickerFor === null}
+    <p class="error" role="alert">{selectError}</p>
+  {/if}
+
+  <section class="my-models" aria-labelledby="my-models-title">
+    <div class="lead-row">
+      <h2 id="my-models-title">My models</h2>
+      <!-- UX-MODEL-04 — the same models as a comparison. -->
+      <div class="segmented" role="group" aria-label="Show models as">
+        <button type="button" class="segment" aria-pressed={modelsLayout === "list"} onclick={() => (modelsLayout = "list")}>List</button>
+        <button type="button" class="segment" aria-pressed={modelsLayout === "compare"} onclick={() => (modelsLayout = "compare")}>Compare</button>
+      </div>
+    </div>
+    {#if modelsLayout === "compare"}
+      <ModelComparison profiles={models.profiles} />
+    {:else}
       <MyModels
-        profiles={models.profiles}
+        profiles={ownedProfiles}
         {decisions}
         busy={selecting}
         onuse={(profile) => void select(profile.profile_id, profile.model)}
-        onstart={() => selectTab("runtime")}
+        onstart={() => (window.location.hash = "#/settings?tab=advanced&kind=models")}
         ondetails={(profile) => (detailsFor = profile)}
+        onadd={() => openAdd(null)}
         onchanged={() => void load()}
       />
-      {/if}
-    </div>{/if}
-  {#if showsProviderCards}
-    <div
-      class="panel"
-      role="tabpanel"
-      id={`panel-${tab}`}
-      aria-labelledby={`tab-${tab}`}
-    >
-      <p class="tab-lead">
-        Add a model that runs on this machine, or connect an account you hold
-        with a provider. Local first: nothing on this device leaves it. You can
-        also choose per prompt in Chat, or in the terminal client
-        (<code>/model use …</code>).
+    {/if}
+  </section>
+  </div>
+{/if}
+
+{#if adding && models !== null}
+  <!-- QUI-L04 / QUI-L08 — Add model, in three steps: choose the source; then
+       only that source; then review where data goes, what it costs, whether
+       it is ready and whether it becomes the default. -->
+  <AddDialog
+    title="Add model"
+    options={ADD_SOURCES}
+    bind:chosen={addSource}
+    searchLabel="Search ways to add a model"
+    onclose={closeAdd}
+  >
+    {#snippet steps(option)}
+      <p class="step-line" aria-label="Steps">
+        <span>1 · Source</span><span aria-current="step">2 · {option.name}</span><span>3 · Review</span>
       </p>
-      <!--
-        The four off-machine facts, on the tab where a provider is connected.
-        They were their own top-level destination — seven words of state and a
-        paragraph, one click away from the question they answer: why did this
-        provider refuse. They are stated before the connecting rather than
-        after the refusal, and they stay when there is no hosted card yet,
-        because "the gate is off" is exactly what an owner about to connect one
-        needs to know. The paragraph that sat under them is the guide's
-        *Off-machine provider posture*.
-      -->
-      {#if tab === "add"}
+      {#if option.id === "huggingface"}
+        <HuggingFacePanel />
+      {:else if models !== null}
+        {#if option.id !== "local"}
         <dl class="gates" aria-label="Off-machine provider posture">
           <div>
             <dt>Hosted model gate</dt>
@@ -1265,8 +1303,8 @@
             <dd data-testid="proxy-posture">{proxyPosture}</dd>
           </div>
         </dl>
-      {/if}
-      {#if tab === "add"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
+        {/if}
+        {#if option.id === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
           <!-- the empty-state rule/FIXED-436 — this said "Add profiles in
@@ -1821,66 +1859,34 @@
           <p class="error" role="alert">{selectError}</p>
         {/if}
       {/if}
-      <!-- Building a local model finishes here: a runtime above, and the GGUF
-           files this machine already holds below. Splitting them across two
-           tabs made the owner navigate mid-task. -->
-      <!-- Hugging Face is a way of adding a local model, not a
-           peer destination to "Local" and "Hosted". It was its own tab, which
-           gave a download-and-convert workflow the same weight as the two
-           categories every model belongs to. -->
-      {#if tab === "add"}<HuggingFacePanel />{/if}
-    </div>
-  {/if}
-
-  {#if tab === "runtime"}
-    <div
-      class="panel"
-      role="tabpanel"
-      id="panel-runtime"
-      aria-labelledby="tab-runtime"
-    >
-      <p class="tab-lead">
-        What is serving, what a turn falls back to, and where models on this
-        machine are found. The same separation holds here: choosing a model
-        and serving one are different acts, so a model can be selected and
-        stopped, running and unselected, or both at once, and each of those
-        reads differently.
-      </p>
-
-      <RuntimeTab
-        {models}
-        revision={loadRevision}
-        onreload={load}
-        gguf={frameworkProfiles("llama.cpp")}
-        mlx={frameworkProfiles("mlx")}
-        {testing}
-        {testResults}
-        {selecting}
-        ontest={(profile) => void testConnection(profile)}
-        ondetails={(profile) => (detailsFor = profile)}
-        onselect={(profile) => void select(profile.profile_id, profile.model)}
-      />
-    </div>
-  {/if}
-
-  {#if tab === "usage"}
-    <div
-      class="panel"
-      role="tabpanel"
-      id="panel-usage"
-      aria-labelledby="tab-usage"
-    >
-      <!-- What you spent and what it costs are one question asked
-           twice. Pricing was a top-level tab of its own, so an owner checking a
-           bill read the rate on one page and the usage on another and did the
-           multiplication themselves. -->
-      <ProviderUsagePanel />
-      <ModelPricingPanel />
-    </div>
-  {/if}
-
+      {/if}
+      {#if reviewProfiles.length > 0}
+        <section class="add-review" aria-labelledby="add-review-title">
+          <h3 id="add-review-title">3 · Review</h3>
+          <ul>
+            {#each reviewProfiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
+              <li>
+                <span class="review-name">{profile.model && profile.model !== UNPINNED_MODEL ? modelName(profile.model) : providerName(profile.provider)}</span>
+                <span>{profile.off_machine ? `Sent to ${providerName(profile.provider)}` : "Stays on this computer"}</span>
+                <span>{profile.off_machine ? `Billed by ${providerName(profile.provider)}` : "No API cost"}</span>
+                <span>{isChoosableModel(profile) ? (readinessLabel(profile.readiness_state) ?? "Set up") : "Not ready yet"}</span>
+                {#if profile.selected}
+                  <span class="review-default">Default</span>
+                {:else if isChoosableModel(profile) && profile.model && profile.model !== UNPINNED_MODEL}
+                  <button type="button" class="btn btn-sm" disabled={selecting} onclick={() => void select(profile.profile_id, profile.model)}>Make default</button>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+          <div class="review-actions">
+            <button type="button" class="btn btn-primary" onclick={closeAdd}>Done</button>
+          </div>
+        </section>
+      {/if}
+    {/snippet}
+  </AddDialog>
 {/if}
-
+{/if}
 
 {#if detailsFor}
   <!-- The profile as last read, not as it was when Details opened: a saved
@@ -2131,21 +2137,102 @@
 {/if}
 
 <style>
-  /* Each panel keeps the vertical rhythm the page had as one scroll, so moving
-     a section into a tab changed where it lives, not how it reads. */
-  /* A grid column left at `auto` is sized by the widest thing inside it, so one
-     unwrappable descendant made every sibling — including plain paragraphs —
-     416px wide inside a 366px page, and a phone got clipped body text. The
-     column is bound to the container instead; anything genuinely wide now
-     overflows on its own and can be given its own scroll. */
-  .panel {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
-  .panel > :global(*) {
+  /* QUI-L08 — the execution profile card. */
+  .profile-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .profile-main {
+    display: flex;
+    gap: var(--space-3);
     min-width: 0;
   }
+  .profile-copy h2 {
+    margin: 0.1rem 0 0;
+    font-size: var(--text-xl);
+    overflow-wrap: anywhere;
+  }
+  .profile-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-3);
+    margin: var(--space-1) 0 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .profile-tradeoff {
+    margin: var(--space-2) 0 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    max-width: 44rem;
+  }
+  .profile-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+  .my-models h2 {
+    margin: 0;
+    font-size: var(--text-md);
+  }
+  .step-line {
+    display: flex;
+    gap: var(--space-3);
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+    font-weight: 650;
+  }
+  .step-line [aria-current="step"] {
+    color: var(--text-1);
+  }
+  .add-review {
+    display: grid;
+    gap: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+  .add-review h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .add-review ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .add-review li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .review-name {
+    color: var(--text-1);
+    font-weight: 650;
+  }
+  .review-default {
+    font-weight: 650;
+  }
+  .review-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+
   .lead-row {
     display: flex;
     flex-wrap: wrap;
@@ -2153,45 +2240,22 @@
     justify-content: space-between;
     gap: var(--space-2) var(--space-4);
   }
-  .view-switch {
-    display: inline-flex;
-    gap: 0.25rem;
-    flex: none;
-  }
-  .tab-lead {
-    margin: 0;
-    color: var(--text-2);
-    font-size: var(--text-sm);
-    line-height: 1.5;
-    max-width: 72ch;
-  }
-  .setup-overview,
-  .global-model-card,
+
+  
   .section-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
   }
-  .setup-overview {
-    margin: var(--space-4) 0;
-  }
-  .global-model-card {
-    margin: var(--space-4) 0;
-  }
-  .global-model-copy {
-    max-width: 40rem;
-  }
+
   .global-model-field {
     display: grid;
     gap: 0.3rem;
     min-width: min(100%, 22rem);
     font-weight: 650;
   }
-  .global-model-field small {
-    color: var(--text-2);
-    font-weight: 400;
-  }
+
   .global-model-field select {
     width: 100%;
     font: inherit;
@@ -2207,8 +2271,7 @@
     align-items: end;
     margin-bottom: var(--space-3);
   }
-  .section-heading h2,
-  .setup-overview h2 {
+  .section-heading h2{
     margin: 0;
     font-size: var(--text-base);
   }
@@ -2218,23 +2281,7 @@
     font-size: var(--text-sm);
     margin: 0;
   }
-  .setup-meter {
-    min-width: 9rem;
-    text-align: right;
-  }
-  .setup-meter strong {
-    display: block;
-    font-size: var(--text-xl);
-  }
-  .setup-meter span {
-    color: var(--text-3);
-    font-size: var(--text-xs);
-  }
-  .setup-meter .total-spend {
-    color: var(--text-2);
-    font-size: var(--text-sm);
-    margin: 0.35rem 0 0;
-  }
+
   .posture-line {
     margin: 0.1rem 0 0;
     color: var(--text-3);
@@ -2700,30 +2747,16 @@
     margin: 0.1rem 0 0;
   }
   @media (max-width: 44rem) {
-    .setup-overview,
-    .global-model-card,
+    
     .section-heading {
       align-items: flex-start;
       flex-direction: column;
     }
-    .setup-meter {
-      text-align: left;
-      width: 100%;
-    }
+
     .local-row {
       flex-direction: column;
     }
-    /* These two cards sit above the tab strip so every panel can see readiness
-       and change the default. Stacked on a phone that pushed the tabs below the
-       fold, so the explanatory copy — which the headline and the labelled
-       select already carry — is dropped rather than the controls. */
-    .global-model-field small {
-      display: none;
-    }
-    .setup-overview,
-    .global-model-card {
-      gap: 8px;
-    }
+
   }
   .pc-routing { border: 1px solid var(--border); border-radius: var(--r-md); padding: .55rem .7rem; margin: .5rem 0 0; display: grid; gap: .45rem; font-size: var(--text-sm); }
   .pc-routing-check { display: flex; align-items: center; gap: .45rem; }

@@ -151,7 +151,10 @@ describe("nav model", () => {
     // Workbench fallback.
     expect(routeFromHash("#/activity")).toBe("observe");
     // ADD-27 — the old Git credential section opens Settings → GitHub.
-    expect(tabFromHash("#/settings?tab=git-credential")).toBe("github");
+    // QUI-L09 — Account folded into General; Runtime into Advanced.
+    expect(tabFromHash("#/settings?tab=account")).toBe("general");
+    expect(tabFromHash("#/settings?tab=runtime")).toBe("advanced");
+    expect(tabFromHash("#/settings?tab=memory-engine")).toBe("advanced");
     expect(tabFromHash("#/activity")).toBe("activity");
     expect(tabFromHash("#/observe?tab=work")).toBe("work");
     // Diagnostics was folded into Overview: four of its six cards restated the
@@ -169,53 +172,19 @@ describe("nav model", () => {
     expect(tabFromHash("#/checkpoints")).toBe("checkpoints");
   });
 
-  // Models grew Local, Hosted, Hugging Face, and Activity panels but `HUB_TABS`
-  // still listed only the pre-BUG-69 four, so every deep link into an
-  // unregistered panel fell through to the hub's first tab. Verified live on
-  // 2026-08-09: `#/models?tab=library` opened Providers, which is where the
-  // "Use models LM Studio already downloaded →" link and the operation tray's
-  // "View downloads" both pointed.
-  it("resolves every Models panel from a deep link", () => {
-    expect(tabFromHash("#/models?tab=overview")).toBe("overview");
-    expect(tabFromHash("#/models?tab=models")).toBe("models");
-    expect(tabFromHash("#/models?tab=add")).toBe("add");
-    expect(tabFromHash("#/models?tab=runtime")).toBe("runtime");
-    expect(tabFromHash("#/models?tab=usage")).toBe("usage");
-  });
-
-  // Bookmarks and older builds still emit the pre-split ids. They must land on
-  // the panel that now owns their content, not on the default tab.
-  //
-  // The five-tab rebuild replaced six tabs at once, so the alias map carries all six
-  // of those *and* the ids their own predecessors used — a link written before
-  // the Providers split is two renames old and must still resolve.
-  it("maps a superseded Models tab id onto the panel that replaced it", () => {
-    // The six it replaced. `local` and `hosted` land on the inventory:
-    // a link named for where a model lives was almost always followed to look
-    // at models the owner already had.
-    expect(tabFromHash("#/models?tab=local")).toBe("models");
-    expect(tabFromHash("#/models?tab=hosted")).toBe("models");
-    expect(tabFromHash("#/models?tab=huggingface")).toBe("add");
-    expect(tabFromHash("#/models?tab=activity")).toBe("runtime");
-    expect(tabFromHash("#/models?tab=routing")).toBe("runtime");
-    expect(tabFromHash("#/models?tab=pricing")).toBe("usage");
-
-    // And the generation before them.
-    expect(tabFromHash("#/models?tab=providers")).toBe("models");
-    // Posture held four read-only facts and a paragraph. The facts are stated
-    // where a provider is connected, before it can refuse; the paragraph is in
-    // the guide.
-    expect(tabFromHash("#/models?tab=posture")).toBe("add");
-    expect(tabFromHash("#/models?tab=library")).toBe("runtime");
-    expect(tabFromHash("#/models?tab=discover")).toBe("add");
-    expect(tabFromHash("#/models?tab=downloads")).toBe("runtime");
+  // QUI-L08 — Models is one page with no tabs; the page itself reads an old
+  // `?tab=` (Add model opens, serving and usage forward to Settings).
+  it("gives Models no tabs", () => {
+    expect(HUB_TABS.models).toBeUndefined();
+    expect(routeFromHash("#/models?tab=add")).toBe("models");
+    expect(tabFromHash("#/models?tab=add")).toBeNull();
   });
 
   it("falls back to a hub's first panel for an unknown or absent tab", () => {
     expect(tabFromHash("#/observe")).toBe("overview");
     expect(tabFromHash("#/observe?tab=nonsense")).toBe("overview");
     expect(tabFromHash("#/connections?tab=nonsense")).toBe("services");
-    expect(tabFromHash("#/settings?tab=runtime")).toBe("runtime");
+    expect(tabFromHash("#/settings?tab=advanced")).toBe("advanced");
     expect(tabFromHash("#/capabilities")).toBeNull();
   });
 
@@ -278,7 +247,6 @@ describe("a hub tab addressed as a path segment", () => {
   });
 
   it("reads the same aliases the query form does", () => {
-    expect(tabFromHash("#/models/providers")).toBe("models");
     expect(tabFromHash("#/observe/diagnostics")).toBe("overview");
   });
 
@@ -320,7 +288,7 @@ describe("a settings section addressed the other way", () => {
   });
 
   it("lets ?tab= win when a hash carries both", () => {
-    expect(tabFromHash("#/settings?section=privacy&tab=account")).toBe("account");
+    expect(tabFromHash("#/settings?section=privacy&tab=security")).toBe("security");
   });
 
   it("leaves the guide's own ?section= alone", () => {

@@ -24,6 +24,7 @@
   import { api, ApiError } from "../api";
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
   import { relativeTime } from "../format";
+  import { itemFromHash } from "../listDetail";
   import {
     connectionBlockedCopy,
     connectionStatus,
@@ -145,6 +146,12 @@
       githubConnected = github.states.connected_account || github.states.credential_available;
     } catch {
       githubConnected = false;
+    }
+    // A link to GitHub (Settings' old GitHub section forwards here) opens
+    // the sign-in when no account is connected yet.
+    if (!githubConnected && !adding && itemFromHash(window.location.hash) === GITHUB_ID) {
+      chosen = GITHUB_ID;
+      adding = true;
     }
   }
 

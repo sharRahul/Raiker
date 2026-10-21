@@ -18,7 +18,7 @@ export interface BackupReminder {
   readonly label: string;
 }
 
-const WHERE = "#/settings?tab=account";
+const WHERE = "#/settings?tab=general";
 
 export function backupReminder(
   backups: readonly Pick<BackupView, "created_at" | "state">[] | null,

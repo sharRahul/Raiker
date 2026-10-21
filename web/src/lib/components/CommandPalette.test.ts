@@ -43,17 +43,18 @@ describe("command palette", () => {
 
   it("names every settings section as the rail does", async () => {
     // It kept a label table of its own, with no row for Memory engine — which
-    // was therefore offered as "memory-engine".
+    // was therefore offered as "memory-engine". QUI-L09 — the section list
+    // changed; the rule did not.
     render(CommandPalette, { open: true });
 
     await fireEvent.input(screen.getByRole("textbox", { name: /search pages/i }), {
-      target: { value: "engine" },
+      target: { value: "web access" },
     });
 
-    const option = screen.getByRole("option", { name: /memory engine/i });
-    expect(option).not.toHaveTextContent("memory-engine");
+    const option = screen.getByRole("option", { name: /web access/i });
+    expect(option).not.toHaveTextContent("web-access");
     await fireEvent.click(option);
-    expect(window.location.hash).toBe("#/settings?tab=memory-engine");
+    expect(window.location.hash).toBe("#/settings?tab=web-access");
   });
 
   it("navigates with the keyboard alone", async () => {

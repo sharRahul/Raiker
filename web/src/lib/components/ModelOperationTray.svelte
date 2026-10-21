@@ -40,7 +40,7 @@
     </button>
     {#if open}<div class="tray-body">
         {#each active as item (item.operation_id)}<a
-            href="#/models?tab=runtime"
+            href="#/settings?tab=advanced&kind=models"
             ><span><strong>{item.kind}</strong> {item.target}</span><small
               >{item.phase.replaceAll(
                 "_",

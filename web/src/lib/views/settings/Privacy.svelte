@@ -87,14 +87,14 @@
       capability: "git_fetch_execution",
       carries: "Which repository is being fetched, and your Git credential for a private one.",
       destination: "GitHub, at the address the repository's remote names.",
-      where: "#/settings?tab=github",
+      where: "#/connections?tab=services&item=github-account",
       whereLabel: "GitHub",
     },
     {
       capability: "git_push_execution",
       carries: "The files and commit history in the repository being pushed.",
       destination: "The git remote the repository is configured with.",
-      where: "#/settings?tab=github",
+      where: "#/connections?tab=services&item=github-account",
       whereLabel: "GitHub",
     },
     {
@@ -213,7 +213,7 @@
     <!-- The limit an owner has to know before they rely on deletion. -->
     Forgetting a record removes it from the workspace, not from a backup already written: a backup
     is a copy of the store as it was when it was made. For a deletion you need to be permanent,
-    remove the backups made before it in <a href="#/settings?tab=account">Account → Backups</a>.
+    remove the backups made before it in <a href="#/settings?tab=general">General › Backups</a>.
   </p>
 </section>
 

@@ -69,11 +69,11 @@ describe("supported-preferences settings", () => {
     const runtime = screen.getByRole("group", { name: "Developer & runtime settings" });
 
     expect(within(experience).getByRole("button", { name: "Personalisation" })).toBeVisible();
-    expect(within(secure).getByRole("button", { name: "Account" })).toBeVisible();
     expect(within(secure).getByRole("button", { name: "Privacy" })).toBeVisible();
+    expect(within(secure).getByRole("button", { name: "Web access" })).toBeVisible();
     // A setting belongs to exactly one group.
-    expect(within(experience).queryByRole("button", { name: "Account" })).toBeNull();
-    for (const label of ["Web access", "GitHub", "Runtime configuration"]) {
+    expect(within(experience).queryByRole("button", { name: "Privacy" })).toBeNull();
+    for (const label of ["Advanced", "About & updates"]) {
       expect(within(runtime).getByRole("button", { name: label })).toBeVisible();
       expect(within(experience).queryByRole("button", { name: label })).toBeNull();
       expect(within(secure).queryByRole("button", { name: label })).toBeNull();
@@ -86,9 +86,11 @@ describe("supported-preferences settings", () => {
     // behind it is four sections rather than one card of eight fields. The
     // first of them is what a deep link lands on.
     ["personalisation", "Personalisation"], ["security", "Signing in and devices"],
-    ["privacy", "Privacy"], ["account", "Account"], ["web-access", "Web access"],
-    // ADD-27 — the old Git credential link opens Settings → GitHub.
-    ["github", "GitHub"], ["git-credential", "GitHub"], ["runtime", "Runtime configuration"], ["updates", "Updates"],
+    ["privacy", "Privacy"], ["web-access", "Web access"],
+    // QUI-L09 — Account is part of General; Runtime configuration is the first
+    // segment of Advanced, and its old address still opens it.
+    ["account", "Account"], ["advanced", "Runtime configuration"], ["runtime", "Runtime configuration"],
+    ["updates", "Updates"],
   ])("renders the %s deep link with its named heading", async (tab, heading) => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab } });
@@ -133,15 +135,38 @@ describe("supported-preferences settings", () => {
     expect(shell).not.toMatch(/margin:\s*var\(--space-5\) 0 0 16rem/);
   });
 
-  it("opens the runtime section from a supported deep link", async () => {
+  it("opens Advanced on the runtime segment from the old runtime address", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab: "runtime" } });
 
     expect(await screen.findByRole("heading", { name: "Runtime configuration" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Runtime configuration" })).toHaveAttribute(
-      "aria-current",
-      "page",
+    expect(screen.getByRole("button", { name: "Advanced" })).toHaveAttribute("aria-current", "page");
+    const segments = screen.getByRole("group", { name: "Advanced settings" });
+    expect(within(segments).getByRole("button", { name: "Runtime" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
+    expect(
+      within(segments).getAllByRole("button").map((button) => button.textContent?.trim()),
+    ).toEqual(["Runtime", "Memory engine", "Model serving", "Usage and spending"]);
+  });
+
+  it("forwards GitHub to Connections, where it is connected now (QUI-L09)", async () => {
+    const replace = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...original, hash: "#/settings?tab=github", replace },
+    });
+    try {
+      stubApi();
+      render(SettingsView, { props: { principal: "alice", tab: "github" } });
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith("#/connections?tab=services&item=github-account"),
+      );
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
   });
 
   it("offers a signed-update status page in Settings", async () => {
@@ -159,8 +184,9 @@ describe("supported-preferences settings", () => {
       "General",
       "Notifications",
       "Personalisation",
-      "Security & sign-in",
-      "Account",
+      "Security",
+      "Advanced",
+      "About & updates",
     ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
@@ -213,10 +239,10 @@ describe("supported-preferences settings", () => {
     await waitFor(() => expect((screen.getByLabelText(/unread notices inside Raiker/i) as HTMLInputElement).checked).toBe(true));
   });
 
-  it("switches to the Account section and shows account deletion", async () => {
+  it("keeps Account, with account deletion, in General", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.queryByRole("button", { name: "Account" })).toBeNull();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /delete my account/i })).toBeInTheDocument();
     });
@@ -253,7 +279,6 @@ describe("supported-preferences settings", () => {
   it("presents Display name as a structured, descriptive profile field", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Account" }));
 
     const input = await screen.findByLabelText("Display name");
     expect(input).toHaveClass("settings-input");

@@ -833,7 +833,7 @@
            needs here is whether recall is matching meaning or only words, and
            one link when it is not what they wanted. -->
       <p class="control-note">
-        <a href="#/settings?tab=memory-engine">Change the recall backend, or build a
+        <a href="#/settings?tab=advanced&kind=memory-engine">Change the recall backend, or build a
         meaning-based index</a>
       </p>
     </div>

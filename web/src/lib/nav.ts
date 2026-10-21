@@ -204,28 +204,10 @@ export const HUB_TABS: Record<string, string[]> = {
   // PA-D06 — goals sit with the work they are made of: a goal's steps are
   // tasks, and it is filed in a project like any other work.
   work: ["threads", "goals", "tasks", "projects"],
-  // Organised by the questions an owner actually arrives with, not
-  // by which table the data lives in.
-  //
-  // The six tabs it replaces — Local, Hosted, Hugging Face, Activity, Routing,
-  // Pricing — were a filing system: three of them named *where a model is
-  // stored*, which is an attribute of the answer rather than a choice anyone
-  // makes, and none of them answered "what is running my work". Overview does,
-  // first; My models is the inventory; Add model is the one errand that used to
-  // be split three ways; Runtime & routing is what is serving and what happens
-  // when it cannot; Usage is the bill and the rates that produce it, which were
-  // two tabs asking the owner to do the multiplication.
-  models: [
-    "overview",
-    "models",
-    "add",
-    "runtime",
-    "usage",
-  ],
-  // Overview leads, for the same reason it does on Models. Five
-  // equal tabs named for *kinds of thing* is a filing system, and nobody
-  // arrives here wanting to look at the MCP category: they want to know what
-  // Raiker can reach and whether anything they installed is broken.
+  // QUI-L08 — Models is one page with no tabs: the execution profile, My
+  // models, and Add model as a dialog. Its old `?tab=` addresses are read by
+  // the page itself (Add model opens; serving and usage forward to Settings ›
+  // Advanced).
   // QUI-L07 — three tabs: what is connected, the channels, and everything
   // technical as one segmented list. Overview is gone: with the catalogue in the
   // Add connection dialog, Services is short enough to be the overview.
@@ -246,16 +228,13 @@ export const HUB_TABS: Record<string, string[]> = {
   // the whole list against the rail rather than the one entry it was adding.
   settings: [
     "general",
-    "notification",
     "personalisation",
+    "notification",
     "security",
     "privacy",
-    "account",
     "execution-profiles",
     "web-access",
-    "github",
-    "runtime",
-    "memory-engine",
+    "advanced",
     "updates",
   ],
 };
@@ -295,29 +274,6 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
  * looks like a working link to the wrong place.
  */
 const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
-  // The single "Providers" scroll became Local and Hosted; "Library" was the
-  // local GGUF index, now part of Local; "Discover" was the Hub search.
-  models: {
-    // The six tabs the rebuild replaced, each pointing at whichever panel took over its
-    // content. `local` and `hosted` land on the inventory rather than on Add:
-    // a link named for where a model lives was almost always followed to look
-    // at models the owner already had.
-    local: "models",
-    hosted: "models",
-    huggingface: "add",
-    activity: "runtime",
-    routing: "runtime",
-    pricing: "usage",
-    providers: "models",
-    library: "runtime",
-    discover: "add",
-    downloads: "runtime",
-    // "Posture" was a tab holding four read-only facts and a paragraph. The
-    // facts moved onto the provider cards, where they explain what is under
-    // them; the paragraph moved to the guide. The alias keeps every link that
-    // named the tab working, which is what this map is for.
-    posture: "add",
-  },
   // "Diagnostics" read the same `diagnostics` object Overview reads and restated
   // four of its six cards from it. What was unique — runtime health transitions,
   // memory integrity and its repair, and a failed readiness check's remediation —
@@ -337,10 +293,13 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
     hooks: "advanced",
     plugins: "advanced",
   },
-  // ADD-27 GH-19 — Settings → Git credential became Settings → GitHub; every
-  // link that named the old section opens the new one.
+  // QUI-L09 — Account folded into General; Runtime configuration and Memory
+  // engine are segments of Advanced. GitHub moved to Connections, which
+  // Settings forwards to (`SECTIONS_MOVED`).
   settings: {
-    "git-credential": "github",
+    account: "general",
+    runtime: "advanced",
+    "memory-engine": "advanced",
   },
 };
 

@@ -25,9 +25,10 @@
    * The row states come from the model-decision contract, so "selected" here is the
    * same fact the composer picker draws and not a second calculation.
    */
-  import Icon from "../../components/Icon.svelte";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   import EmptyState from "../../components/EmptyState.svelte";
+  import ListDetail from "../../components/ListDetail.svelte";
+  import ProviderUsagePanel from "./ProviderUsagePanel.svelte";
   import { providerName } from "../../format";
   import { modelName } from "../../modelPresentation";
   import { isChoosableModel, openModelSetup, readinessForProfile } from "../../modelReadiness.svelte";
@@ -42,6 +43,7 @@
     onuse,
     onstart,
     ondetails,
+    onadd = () => {},
     onchanged,
   }: {
     profiles: ModelProfile[];
@@ -53,11 +55,12 @@
     /** Start the managed local runtime behind this profile. */
     onstart: (profile: ModelProfile) => void;
     ondetails: (profile: ModelProfile) => void;
+    /** Opens the Add model dialog. */
+    onadd?: () => void;
     onchanged?: () => void;
   } = $props();
 
-  let openMenu = $state("");
-  let query = $state("");
+  let selectedId = $state<string | null>(null);
 
   const key = (profile: ModelProfile) => `${profile.profile_id}\u0000${profile.model}`;
 
@@ -153,24 +156,15 @@
   }
 
   async function setSurfaceDefault(profile: ModelProfile, surface: Surface) {
-    openMenu = "";
     await rememberSurfaceModel(surface, profile.profile_id, profile.model);
     onchanged?.();
   }
 
-  const shown = $derived.by(() => {
-    const needle = query.trim().toLowerCase();
-    const matching = needle
-      ? profiles.filter(
-          (profile) =>
-            profile.model.toLowerCase().includes(needle) ||
-            providerName(profile.provider).toLowerCase().includes(needle),
-        )
-      : profiles;
-    // Selected first, then what can serve, then what cannot. An inventory is
-    // read top-down and the top is where the answer to "what is in force"
-    // belongs.
-    return [...matching].sort((left, right) => {
+  // Selected first, then what can serve, then what cannot. An inventory is
+  // read top-down and the top is where the answer to "what is in force"
+  // belongs.
+  const shown = $derived(
+    [...profiles].sort((left, right) => {
       const rank = (profile: ModelProfile) =>
         profile.selected ? 0 : isChoosableModel(profile) ? 1 : 2;
       return (
@@ -178,20 +172,9 @@
         providerName(left.provider).localeCompare(providerName(right.provider)) ||
         left.model.localeCompare(right.model)
       );
-    });
-  });
-
-  function toggleMenu(id: string) {
-    openMenu = openMenu === id ? "" : id;
-  }
-
-  function onWindowClick(event: MouseEvent) {
-    const target = event.target as HTMLElement | null;
-    if (openMenu !== "" && target?.closest(".row-menu-wrap") === null) openMenu = "";
-  }
+    }),
+  );
 </script>
-
-<svelte:window onclick={onWindowClick} />
 
 {#if profiles.length === 0}
   <EmptyState
@@ -200,166 +183,120 @@
     body="Connect a provider or set up a local model server, and every model you add appears here."
   >
     {#snippet action()}
-      <a class="btn btn-primary" href="#/models?tab=add">Add a model</a>
+      <button type="button" class="btn btn-primary" onclick={onadd}>Add a model</button>
     {/snippet}
   </EmptyState>
 {:else}
-  <div class="inventory">
-    <label class="filter">
-      <Icon name="search" size="sm" />
-      <span class="sr-only">Filter models</span>
-      <input
-        type="search"
-        bind:value={query}
-        placeholder="Filter by model or provider"
-        aria-label="Filter models"
-      />
-    </label>
-
-    <ul class="rows">
-      {#each shown as profile (key(profile))}
-        {@const rowState = rowStateOf(profile)}
-        {@const action = primary(profile)}
-        {@const defaults = defaultFor(profile)}
-        <li>
-          <div class="identity">
-            <ProviderLogo provider={profile.provider} />
-            <div class="names">
-              <span class="model">{rowName(profile)}</span>
-              <span class="where">
-                {profile.model && profile.model !== UNPINNED_MODEL
-                  ? `${providerName(profile.provider)} · `
-                  : ""}{profile.off_machine ? "Hosted" : "Local"}
-              </span>
-            </div>
+  <!-- QUI-L08 — My models in layout B: one row per model with its state in
+       words, and the chosen model's actions and usage beside the list. -->
+  <ListDetail
+    items={shown}
+    key={key}
+    label="My models"
+    matches={(profile, query) =>
+      `${profile.model} ${providerName(profile.provider)}`.toLowerCase().includes(query)}
+    searchLabel="Filter models"
+    storageKey="models"
+    autoSelectFirst={true}
+    syncAddress={false}
+    bind:selectedId
+  >
+    {#snippet row(profile)}
+      {@const rowState = rowStateOf(profile)}
+      <ProviderLogo provider={profile.provider} />
+      <span class="names">
+        <span class="model">{rowName(profile)}</span>
+        <span class="where">
+          {profile.off_machine ? "Hosted" : "Local"} · <span class="state" data-tone={rowState.tone}>{rowState.label}</span>{#if profile.selected} · Selected{/if}
+        </span>
+      </span>
+    {/snippet}
+    {#snippet detail(profile)}
+      {@const rowState = rowStateOf(profile)}
+      {@const action = primary(profile)}
+      {@const defaults = defaultFor(profile)}
+      <article class="model-detail" aria-label={rowName(profile)}>
+        <header>
+          <ProviderLogo provider={profile.provider} size={32} />
+          <div>
+            <h3>{rowName(profile)}</h3>
+            <p class="where">
+              {providerName(profile.provider)} ·
+              {profile.off_machine ? `Sent to ${providerName(profile.provider)}` : "Stays on this computer"}
+            </p>
           </div>
-
-          <div class="marks">
-            <!-- One primary status token per row, and at most one
-                 contextual one. "Selected" and the surface defaults are the
-                 contextual half; readiness is the primary. -->
-            <span class="state" data-tone={rowState.tone}>{rowState.label}</span>
-            {#if profile.selected}<span class="mark">Selected</span>{/if}
-            {#each defaults as surface (surface)}
-              <span class="mark">{surface} default</span>
-            {/each}
-          </div>
-
-          <div class="actions">
-            {#if action !== null}
-              <button
-                type="button"
-                class="btn btn-sm"
-                class:btn-primary={action.kind === "use"}
-                disabled={busy}
-                onclick={action.run}
-              >{action.label}</button>
-            {/if}
-            <div class="row-menu-wrap">
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm row-more"
-                aria-haspopup="menu"
-                aria-expanded={openMenu === key(profile)}
-                aria-label={`More actions for ${rowName(profile)}`}
-                onclick={() => toggleMenu(key(profile))}
-              ><Icon name="more" size="sm" /></button>
-              {#if openMenu === key(profile)}
-                <div class="row-menu menu-surface" role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="menu-item"
-                    onclick={() => { openMenu = ""; ondetails(profile); }}
-                  >Details and connection</button>
-                  {#each WORK_SURFACES as surface (surface)}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      class="menu-item"
-                      onclick={() => void setSurfaceDefault(profile, surface)}
-                    >Set as {SURFACE_LABEL[surface]} default</button>
-                  {/each}
-                  {#if !profile.selected && isChoosableModel(profile)}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      class="menu-item"
-                      onclick={() => { openMenu = ""; onuse(profile); }}
-                    >Use as the global model</button>
-                  {/if}
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="menu-item"
-                    onclick={() => {
-                      openMenu = "";
-                      openModelSetup(profile, readinessForProfile(profile));
-                    }}
-                  >Configure provider</button>
-                </div>
-              {/if}
-            </div>
-          </div>
-        </li>
-      {/each}
-    </ul>
-
-    {#if shown.length === 0}
-      <p class="no-match">No model matches “{query}”.</p>
-    {/if}
-  </div>
+        </header>
+        <p class="marks">
+          <span class="state" data-tone={rowState.tone}>{rowState.label}</span>
+          {#if profile.selected}<span class="mark">Selected</span>{/if}
+          {#each defaults as surface (surface)}
+            <span class="mark">{surface} default</span>
+          {/each}
+        </p>
+        <div class="detail-actions">
+          {#if action !== null}
+            <button
+              type="button"
+              class="btn btn-sm"
+              class:btn-primary={action.kind === "use"}
+              disabled={busy}
+              onclick={action.run}
+            >{action.label}</button>
+          {/if}
+          <button type="button" class="btn btn-sm btn-ghost" onclick={() => ondetails(profile)}>
+            Details and connection
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-ghost"
+            onclick={() => openModelSetup(profile, readinessForProfile(profile))}
+          >Configure provider</button>
+        </div>
+        <div class="defaults" role="group" aria-label={`Use ${rowName(profile)} by default in`}>
+          {#each WORK_SURFACES as surface (surface)}
+            <button
+              type="button"
+              class="btn btn-sm btn-ghost"
+              disabled={busy}
+              onclick={() => void setSurfaceDefault(profile, surface)}
+            >Set as {SURFACE_LABEL[surface]} default</button>
+          {/each}
+        </div>
+        <ProviderUsagePanel provider={profile.provider} />
+      </article>
+    {/snippet}
+  </ListDetail>
 {/if}
 
 <style>
-  .inventory {
+  .model-detail {
     display: grid;
     gap: var(--space-3);
   }
-  .filter {
+  .model-detail header {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    max-width: 22rem;
-    padding: 0.3rem 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--surface);
-    color: var(--text-3);
+    gap: var(--space-3);
   }
-  .filter input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text-1);
-    font: inherit;
-    font-size: var(--text-sm);
-    outline: none;
-  }
-  .rows {
-    list-style: none;
+  .model-detail h3 {
     margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 2px;
+    font-size: var(--text-lg);
+    overflow-wrap: anywhere;
   }
-  .rows li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: var(--space-3);
-    padding: 0.5rem 0.6rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--surface);
+  .model-detail .where {
+    margin: 0.1rem 0 0;
   }
-  .identity {
+  .detail-actions,
+  .defaults {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
+  .model-detail .marks {
+    justify-content: flex-start;
+    margin: 0;
+  }
+
   .names {
     display: grid;
     gap: 0.05rem;
@@ -400,37 +337,9 @@
     font-size: var(--text-2xs);
     white-space: nowrap;
   }
-  .actions {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-  .row-menu-wrap {
-    position: relative;
-  }
-  .row-more {
-    padding: 0.25rem 0.4rem;
-  }
-  .row-menu {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 4px);
-    z-index: var(--z-popover);
-    width: max-content;
-    min-width: 13rem;
-    display: grid;
-    gap: 1px;
-    padding: 0.25rem;
-  }
-  .no-match {
-    margin: 0;
-    color: var(--text-3);
-    font-size: var(--text-sm);
-  }
+
   @media (max-width: 47.9rem) {
-    .rows li {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
+
     .marks {
       grid-column: 1 / -1;
       justify-content: flex-start;

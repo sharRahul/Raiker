@@ -33,29 +33,58 @@ export interface SettingsSection {
  * subject, and the ten rows stop reading as a flat list with a divider in it.
  */
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
+  // QUI-L09 — Account folds into General: the name you are greeted by and the
+  // account it belongs to are one subject.
   { id: "general", label: "General", icon: "settings", group: "Experience" },
-  { id: "notification", label: "Notifications", icon: "bell", group: "Experience" },
   { id: "personalisation", label: "Personalisation", icon: "spark", group: "Experience" },
-  { id: "security", label: "Security & sign-in", icon: "lock", group: "Security & data" },
+  { id: "notification", label: "Notifications", icon: "bell", group: "Experience" },
+  { id: "security", label: "Security", icon: "lock", group: "Security & data" },
   { id: "privacy", label: "Privacy", icon: "shield", group: "Security & data" },
-  { id: "account", label: "Account", icon: "user", group: "Security & data" },
   // PA-D02 — where a goal's work may run and what may leave with it. Settings
   // is the only place a profile is made, changed, activated or bound.
   { id: "execution-profiles", label: "Execution profiles", icon: "shield", group: "Security & data" },
-  { id: "web-access", label: "Web access", icon: "connections", group: "Developer & runtime" },
-  // ADD-27 GH-19 — Settings → Connections → GitHub replaces "Git credential";
-  // the old deep link still opens it (SECTION_ALIASES).
-  { id: "github", label: "GitHub", icon: "branch", group: "Developer & runtime" },
-  { id: "runtime", label: "Runtime configuration", icon: "system", group: "Developer & runtime" },
-  // REM-MEM-03 — the recall engine's own configuration. Memory keeps the
-  // owner's facts and the sentence that says whether recall matches meaning;
-  // which space it searches, and building one, are engine settings.
-  { id: "memory-engine", label: "Memory engine", icon: "memory", group: "Developer & runtime" },
-  { id: "updates", label: "Updates", icon: "refresh", group: "Developer & runtime" },
+  { id: "web-access", label: "Web access", icon: "connections", group: "Security & data" },
+  // QUI-L09 — Runtime configuration, the memory engine, what serves models and
+  // what they cost are one Advanced section with a segment each. GitHub is a
+  // service you connect, so it is in Connections now.
+  { id: "advanced", label: "Advanced", icon: "system", group: "Developer & runtime" },
+  { id: "updates", label: "About & updates", icon: "refresh", group: "Developer & runtime" },
 ];
 
-/** Sections that were renamed: an old deep link opens the new one, never General. */
-export const SECTION_ALIASES: Readonly<Record<string, string>> = { "git-credential": "github" };
+/** Sections that were renamed or folded: an old deep link opens the new one, never General. */
+export const SECTION_ALIASES: Readonly<Record<string, string>> = {
+  account: "general",
+  runtime: "advanced",
+  "memory-engine": "advanced",
+};
+
+/** Sections that left Settings for another page, and where they went. */
+export const SECTIONS_MOVED: Readonly<Record<string, string>> = {
+  github: "#/connections?tab=services&item=github-account",
+  "git-credential": "#/connections?tab=services&item=github-account",
+};
+
+/** QUI-L09 — the segments of Settings › Advanced, in order. */
+export const ADVANCED_SETTINGS = [
+  { id: "runtime", label: "Runtime" },
+  { id: "memory-engine", label: "Memory engine" },
+  { id: "models", label: "Model serving" },
+  { id: "usage", label: "Usage and spending" },
+] as const;
+export type AdvancedSetting = (typeof ADVANCED_SETTINGS)[number]["id"];
+
+/**
+ * Which Advanced segment a hash names: `?kind=`, or the old section a link
+ * still carries (`?tab=runtime`, `?tab=memory-engine`). Runtime otherwise.
+ */
+export function advancedSettingFromHash(hash: string): AdvancedSetting {
+  const query = new URLSearchParams(hash.split("?", 2)[1] ?? "");
+  for (const candidate of [query.get("kind"), query.get("tab")]) {
+    const found = ADVANCED_SETTINGS.find((item) => item.id === candidate);
+    if (found !== undefined) return found.id;
+  }
+  return "runtime";
+}
 
 const BY_ID = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]));
 

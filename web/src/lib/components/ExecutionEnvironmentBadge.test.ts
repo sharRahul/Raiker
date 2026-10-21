@@ -40,5 +40,5 @@ it("names the selected container runtime and readiness", async () => {
 
   const badge = await screen.findByText("Repository review · Podman · Ready");
   expect(badge).toBeInTheDocument();
-  expect(badge).toHaveAttribute("href", "#/settings?tab=runtime");
+  expect(badge).toHaveAttribute("href", "#/settings?tab=advanced&kind=runtime");
 });

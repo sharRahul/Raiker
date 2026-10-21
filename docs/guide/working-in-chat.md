@@ -4,7 +4,7 @@ Chat is a normal conversation: your prompt right-aligned in a teal bubble,
 Raiker's reply left-aligned in a quiet neutral one, with one quiet *Working…*
 indicator that ends as soon as there is something real to show. Governance
 panels, phase labels, and event traces deliberately stay out of the transcript —
-they live in **Sessions**, **Approvals**, and **Observability**.
+they live in **Sessions**, **Approvals**, and **Diagnostics**.
 
 ## The composer
 
@@ -69,6 +69,7 @@ the runtime still judges each action when it is invoked.
 | **Use an MCP tool** | Tools from the servers you have connected |
 | **Use a connected app** | The accounts you have connected under Extensions |
 | **Generate an image** | Opens Design, which is where an image is made |
+| **Run in background** | Files what you typed as a task that starts now, and clears the composer so you can keep chatting. The task appears under **Background** and on Home's **In progress**; **Open the task** follows it. If it cannot be saved, your message is kept |
 | **Create a task** | Hands the instruction to an agent task instead of answering now |
 | **Schedule it** | Runs on a cadence, with the model chosen now |
 | **Recall from memory** | Approved memories this turn may draw on |
@@ -266,7 +267,7 @@ would let it through where one exists.
 and never its full address, and a command by the program it ran and never its
 arguments — both can carry a credential in a place that looks ordinary. The
 whole of each is kept in the audit record, where it is evidence rather than
-something on your screen. **Observability → Audit log** is where you read that.
+something on your screen. **Diagnostics → Audit log** is where you read that.
 
 ### What Raiker was thinking
 
@@ -342,7 +343,7 @@ check how a turn happened rather than what it said, and it holds:
   exchange somewhere else;
 - **each call paired with the action id** that identifies it in the audit log;
 - **the governed events the runtime recorded** for the turn, in time order —
-  the same records Observability holds, read where the turn is;
+  the same records Diagnostics holds, read where the turn is;
 - **Open the full record**, which opens this turn inside the
   [Sessions inspector](dashboard-and-observability.md).
 
@@ -384,6 +385,26 @@ never splits across a page. Every export is recorded in the event log with its
 format and counts — never its text.
 
 ## Your conversations
+
+**The strip above a conversation** holds its title (**Rename conversation**
+edits it in place), the project it is filed in as a chip that opens the
+project, **Search in conversation**, and **Context**. Search matches turns
+whose prompt or answer contains every word you type; Enter and Shift+Enter (or
+the arrows) step through the matches, the count reads *2 of 5* or *No matches*,
+and Escape closes it. It searches this conversation only; the top bar's search
+finds things across all of them.
+
+**Context** opens a panel of what this conversation is working with, closed
+until you open it. Its tabs appear only when they have something in them:
+**Context** (files used in this conversation), **Plan**, **Sources** and
+**Activity** (each step, with its state in words). On a laptop screen it opens
+over the transcript and stops above the composer; on a screen 1,920 pixels wide
+or more it sits beside the transcript.
+
+**A very long conversation** shows its newest hundred turns, with **Show 100
+earlier messages** above them; the turn you were reading stays where it was.
+Search, a Retry's original turn and a link to an exchange bring the turn they
+need into view on their own.
 
 **Threads is where your conversations are.** The sidebar lists your five most
 recent chats under **Chat**, newest first, so going back to one is a click from
@@ -439,10 +460,10 @@ grouped by the day they happened. Where the match was in a message, *"Open the
 match →"* opens the conversation **at that exchange** and marks it for a moment,
 rather than at the top; where only the title matched, *"Open →"* resumes where
 you left off. A checkpoint's **Turn** field and a turn opened from
-Observability → Sessions link back the same way. **Back to your threads**
+Diagnostics → Sessions link back the same way. **Back to your threads**
 returns to the board with your filters as you left them.
 
-**Observability → Sessions** is the complete record: every conversation with its
+**Diagnostics → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
 live there too, which is why they are not among your own conversations. It is
 for reading the record rather than for picking work up or filing it away — a
@@ -668,7 +689,7 @@ work last changed by a different principal is a critical action: it says so
 before you ask, and only a live human can resolve it.
 
 The rewind itself is captured, so it can be rewound the same way. The same
-preflight opens from Observability → Checkpoints; it is one control, reachable
+preflight opens from Diagnostics → Checkpoints; it is one control, reachable
 from the record and from the conversation.
 
 ## Known limits

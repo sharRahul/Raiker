@@ -502,7 +502,7 @@ Raiker.
   so as part of a turn** — ChatGPT reports a five-hour and a weekly window. It
   is never polled from a portal and never estimated, so a provider that reports
   nothing shows nothing. The figures appear on the provider card and in
-  **Observability → Activity**.
+  **Diagnostics → Activity**.
 
 ---
 

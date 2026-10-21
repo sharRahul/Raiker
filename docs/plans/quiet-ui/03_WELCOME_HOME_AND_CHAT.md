@@ -6,31 +6,37 @@ Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
 **First round shipped 2026-10-21** ([FIXED-1057](../FIXED_ITEMS.md#fixed-1057--home-had-no-way-to-start-work-by-asking-qui-h01)
 to [FIXED-1074](../FIXED_ITEMS.md#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering);
-live cases RT-QUI-01 to RT-QUI-09 in
-[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+live cases RT-QUI-01 to RT-QUI-09). **Second round shipped 2026-10-21**
+([FIXED-1080](../FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
+to [FIXED-1094](../FIXED_ITEMS.md#fixed-1094--setup-had-no-way-to-skip-it-qui-w06);
+live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md).
 
 | Item | State |
 |---|---|
-| QUI-H01 | **Partly done.** Done: the greeting with one true fact, the composer (text and Send), *This week*. Open: Attach and the profile chip on Home's composer (the chip waits for QUI-P02), *Continue where you left off* as one card with its next step (today a list of five threads), at most one decision row and two in-progress cards, and the 980 px single column. |
+| QUI-H01 | **Done**, except the profile chip on Home's composer, which waits for QUI-P02. Greeting with one true fact, composer with Attach, one Continue card with its next step, one decision row, at most two in-progress rows, This week, and one 980 px column. |
 | QUI-H02 | **Done**, without the companion: the companion's art does not exist yet ([08, QUI-V05](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v05--companion)). |
 | QUI-H03 | **Done.** Home is the default and Settings → General can choose Chat; the option now reads Home. |
 | QUI-H04 | **Done.** The line names the version; a count of changes needs release notes the host can read. |
 | QUI-H05 | **Done.** Stale means the newest *verified* backup is seven days old, the same window as *This week*. |
-| QUI-C01 | **Partly done.** Done: the editable title. Open: the project chip, search in conversation and the Context toggle in the same strip. |
+| QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
 | QUI-C03 | **Done**: the status line, Add instruction, Stop safely and the outcome line. Open: the task receipt on the outcome line ([06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md#qui-f16--task-receipt)). |
-| QUI-C04 | **Partly done.** Done: the placeholder and the data label. Open: the profile chip and moving schedule, research depth and answer style under More. |
+| QUI-C04 | **Partly done.** Done: the placeholder and the data label. Open: the profile chip (QUI-P02) and *More* (schedule, research depth, answer style). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
-| QUI-C07 | Open. |
+| QUI-C07 | **Done.** Tabs: Context (files in use), Plan, Sources, Activity. Memories in use are not listed yet: a turn's recall reports a count, not the records. |
 | QUI-C08 | **Done.** |
 | QUI-C09 | Already true before this round: Edit and Retry make a new turn and keep the earlier one. |
 | QUI-C10 | **Done**, without the companion. |
-| QUI-C11 | Open: background runs are still offered from the Tools menu. |
-| QUI-C12 | Open. |
+| QUI-C11 | **Done** in the composer's **Tools** menu, because *More* does not exist yet (QUI-C04). The task shows in Background work and Home's In progress. |
+| QUI-C12 | **Done.** Below 1,920 px the panel opens over the transcript and ends above the composer; from 1,920 px it sits beside it. |
 | QUI-W01 | **Needs the owner's decision**: the open-ring mark in [QUI-V04](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v04--app-mark-the-open-ring) is recorded as a recommendation, not a decision. |
-| QUI-W02 – W05 | Open: setup is still the staged form, not a setup conversation. |
-| QUI-W06 | **Done**: Settings → General → Run setup again, on the model step. A progress line already shows real steps. |
+| QUI-W02 | **Done**, without the companion pick (no art yet). The stored `welcome` stage is the Hello step; the name is saved to Settings › Account. |
+| QUI-W03 | **Done.** On this computer shows what this device can run; keys go in the provider card's secure field. |
+| QUI-W04 | **Done.** |
+| QUI-W05 | **Done.** The first message opens Chat and the conversation is renamed *Getting started*. |
+| QUI-W06 | **Done**: Skip setup, Run setup again, and a progress line of real steps (Name · Model · Privacy · Start on a desktop install). |
 
 **Starters.** The four are *Summarise a document*, *Plan my week*, *Fix a bug
 in a repository* and *Make an image* (`web/src/lib/starters.ts`). The first two

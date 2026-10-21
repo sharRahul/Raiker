@@ -64,13 +64,13 @@ A fifth row states the **inbound budget**: 60 messages per sender per minute by
 default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Allowlisting says *who* may
 speak; the budget says how often, and they are different questions — a sender
 that goes over is refused and the refusal is recorded, so a channel that goes
-quiet is answerable from Observability rather than a mystery.
+quiet is answerable from Diagnostics rather than a mystery.
 
 `record_only` is the default and keeps the message quarantined. A routed message
 is still structurally untrusted data: it never occupies the owner's instruction
 slot and cannot raise authority. New turns and interrupts require the exact
 owner identity stored on the pairing; side questions have no tool budget.
-Accepted, routed, and rejected messages appear in Observability → Activity.
+Accepted, routed, and rejected messages appear in Diagnostics → Activity.
 
 Approval response is separately off. When enabled it accepts only the bound
 owner and one exact pending relay/action pair, once. Critical and connector-write

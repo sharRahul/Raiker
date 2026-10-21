@@ -1166,6 +1166,27 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1077](#fixed-1077--send-was-a-dead-button-with-no-model-qui-q04) | Medium | Chat / models | Fixed 2026-10-21 |
 | [FIXED-1078](#fixed-1078--new-chat-and-background-were-shown-with-nothing-behind-them-qui-q05) | Low | Chat | Fixed 2026-10-21 |
 | [FIXED-1079](#fixed-1079--the-top-bars-icon-buttons-had-no-visible-tooltip-qui-q06) | Low | Top bar / accessibility | Fixed 2026-10-21 |
+| [FIXED-1080](#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01) | Medium | Home | Fixed 2026-10-21 |
+| [FIXED-1081](#fixed-1081--homes-approvals-were-a-count-tile-not-the-decision-qui-h01) | Medium | Home / approvals | Fixed 2026-10-21 |
+| [FIXED-1082](#fixed-1082--home-listed-every-running-task-qui-h01) | Low | Home | Fixed 2026-10-21 |
+| [FIXED-1083](#fixed-1083--home-was-two-columns-at-desktop-width-qui-h01) | Low | Home | Fixed 2026-10-21 |
+| [FIXED-1084](#fixed-1084--homes-composer-could-not-attach-a-file-qui-h01) | Medium | Home / Chat | Fixed 2026-10-21 |
+| [FIXED-1085](#fixed-1085--chat-did-not-show-which-project-a-conversation-was-filed-in-qui-c01) | Low | Chat | Fixed 2026-10-21 |
+| [FIXED-1086](#fixed-1086--there-was-no-way-to-find-something-inside-a-long-conversation-qui-c01) | Medium | Chat | Fixed 2026-10-21 |
+| [FIXED-1087](#fixed-1087--chat-had-no-context-panel-qui-c07) | Medium | Chat | Fixed 2026-10-21 |
+| [FIXED-1088](#fixed-1088--the-context-panel-covered-chats-send-at-laptop-width-qui-c12) | Medium | Chat / layout | Fixed 2026-10-21 — found live in RT-QUI-12 |
+| [FIXED-1089](#fixed-1089--chat-could-not-hand-its-draft-to-a-background-run-qui-c11) | Medium | Chat / tasks | Fixed 2026-10-21 |
+| [FIXED-1090](#fixed-1090--first-run-did-not-ask-the-owners-name-qui-w02) | Medium | Setup | Fixed 2026-10-21 |
+| [FIXED-1091](#fixed-1091--the-model-step-opened-on-a-provider-matrix-qui-w03) | Medium | Setup / models | Fixed 2026-10-21 |
+| [FIXED-1092](#fixed-1092--the-privacy-step-was-a-statement-with-nothing-about-how-raiker-asks-qui-w04) | Low | Setup / permissions | Fixed 2026-10-21 |
+| [FIXED-1093](#fixed-1093--setup-ended-on-three-mode-buttons-instead-of-a-first-task-qui-w05) | Medium | Setup / Chat | Fixed 2026-10-21 |
+| [FIXED-1094](#fixed-1094--setup-had-no-way-to-skip-it-qui-w06) | Low | Setup | Fixed 2026-10-21 |
+| [FIXED-1095](#fixed-1095--user-facing-copy-used-words-the-plan-retires-qui-g02) | Low | Copy | Fixed 2026-10-21 |
+| [FIXED-1096](#fixed-1096--page-size-was-not-measured-anywhere-qui-g01) | Low | Quality | Fixed 2026-10-21 |
+| [FIXED-1097](#fixed-1097--there-was-no-single-place-to-see-every-shared-state-qui-g03) | Low | Quality | Fixed 2026-10-21 |
+| [FIXED-1098](#fixed-1098--keyboard-use-and-zoom-were-not-checked-qui-g05) | Low | Accessibility | Fixed 2026-10-21 |
+| [FIXED-1099](#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06) | Medium | Chat / Build / copy | Fixed 2026-10-21 |
+| [FIXED-1100](#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04) | Medium | Chat / performance | Fixed 2026-10-21 |
 
 ---
 
@@ -36323,3 +36344,213 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** Each carries its name as a tooltip in the same words; search shows its shortcut as printed on the key.
 
 **Evidence.** `Topbar.test.ts` (*gives each icon-only control a tooltip matching its name*).
+
+## FIXED-1080 — Home offered five threads to continue instead of the one with its next step (QUI-H01)
+
+**Severity: Medium. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** Home listed the five most recent threads under *Continue working*, each a title and a time, with no next step.
+
+**Fixed.** One **Continue where you left off** card: the most recently moved thread, its real next step (what it waits on, when a routine runs next, or its turns and last update) and **Continue**, with **All threads (N)** beside the heading.
+
+**Evidence.** `WorkbenchView.test.ts` (*offers only the most recently moved thread, with its next step*); RT-QUI-10.
+
+## FIXED-1081 — Home's approvals were a count tile, not the decision (QUI-H01)
+
+**Severity: Medium. Area: Home / approvals. Status: Fixed 2026-10-21.**
+
+**Observed.** Needs your attention showed an Approvals tile with a number; the decision itself was a page away.
+
+**Fixed.** One decision row (72 px minimum): *Review send email* or *Answer a question*, what it may do, how long it has waited, and **Decide**; **View all N decisions** when there is more than one.
+
+**Evidence.** `WorkbenchView.test.ts` (*shows one decision row and a View all link, never a list*).
+
+## FIXED-1082 — Home listed every running task (QUI-H01)
+
+**Severity: Low. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** *Running now* drew every task in flight, so a busy workspace pushed the rest of Home off screen.
+
+**Fixed.** At most two in-progress rows; the header link reads **View all N** when there are more and opens the live board.
+
+**Evidence.** `WorkbenchView.test.ts` (*shows at most two running cards, then View all*).
+
+## FIXED-1083 — Home was two columns at desktop width (QUI-H01)
+
+**Severity: Low. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** Home split into a main column and an attention rail beside it.
+
+**Fixed.** One column, 980 px at most, in the order an owner reads it: greeting, composer, Continue, Needs your attention, In progress, This week, Upcoming.
+
+**Evidence.** RT-QUI-10 measures the column; `10-home-continue-card.png`.
+
+## FIXED-1084 — Home's composer could not attach a file (QUI-H01)
+
+**Severity: Medium. Area: Home / Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Home's composer took text only; a file had to be attached again after Chat opened.
+
+**Fixed.** Attach on Home uses Chat's own attachment panel and rules. Files are uploaded on Home and their references ride the hand-off, so Chat sends exactly what was picked.
+
+**Evidence.** `chatHandoff.test.ts`, `WorkbenchView.test.ts`, `ChatView.test.ts` (*sends the files attached on Home with the handed-over message*); RT-QUI-11 (a real model read the attached file).
+
+## FIXED-1085 — Chat did not show which project a conversation was filed in (QUI-C01)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** The project a chat was filed in was only visible inside the composer's context line.
+
+**Fixed.** A project chip in Chat's top strip names the project and opens it; an unfiled chat shows none.
+
+**Evidence.** `ChatView.test.ts` (*shows the project a chat is filed in as a chip that opens it*).
+
+## FIXED-1086 — There was no way to find something inside a long conversation (QUI-C01)
+
+**Severity: Medium. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Finding an earlier answer meant scrolling; Search found things across conversations only.
+
+**Fixed.** **Search in conversation** in the top strip: every word must match a prompt or answer, matches step with Enter and Shift+Enter or the arrows, the count reads *2 of 5* or *No matches*, and Escape closes it. A streaming answer does not move the view while searching.
+
+**Evidence.** `conversationSearch.test.ts`, `ChatView.test.ts` (*finds words in this conversation and steps through the matches*); RT-QUI-12.
+
+## FIXED-1087 — Chat had no context panel (QUI-C07)
+
+**Severity: Medium. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Files in use, the plan, sources and tool steps were spread through the transcript with nowhere to see them together.
+
+**Fixed.** A **Context** toggle opens a 320 px panel, closed by default, with tabs only when they have content: Context (files in use), Plan, Sources and Activity. Tabs follow the ARIA pattern with arrow keys; plan steps are named in words, not only colour.
+
+**Evidence.** `contextPanel.test.ts`, `ChatContextPanel.test.ts`, `ChatView.test.ts`; RT-QUI-12.
+
+## FIXED-1088 — The context panel covered Chat's Send at laptop width (QUI-C12)
+
+**Severity: Medium. Area: Chat / layout. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-12: at 1,280 px the panel opened over the transcript and down over the composer's model picker and Send.
+
+**Fixed.** Below 1,920 px the panel opens over the transcript and stops above the composer; from 1,920 px it sits beside the transcript.
+
+**Evidence.** RT-QUI-12 asserts the panel ends above Send at 1,280 px and sits beside the transcript at 1,920 px; `12-context-panel-1280.png`, `12-context-panel-1920.png`.
+
+## FIXED-1089 — Chat could not hand its draft to a background run (QUI-C11)
+
+**Severity: Medium. Area: Chat / tasks. Status: Fixed 2026-10-21.**
+
+**Observed.** A background run meant leaving Chat for Tasks and typing the request again.
+
+**Fixed.** **Tools → Run in background** files the draft as a task that starts now, through the same governed `POST /api/tasks` the Tasks page uses, and clears the composer. A failed save keeps the draft and says what to do; the task shows in Background work and Home's In progress.
+
+**Evidence.** `ChatView.test.ts` (*files the draft as a task that starts now*, *keeps the draft and says so*); RT-QUI-13 (the task ran against a real model).
+
+## FIXED-1090 — First run did not ask the owner's name (QUI-W02)
+
+**Severity: Medium. Area: Setup. Status: Fixed 2026-10-21.**
+
+**Observed.** Setup opened on infrastructure; the name Home and Chat greet the owner by was set only in Settings › Account.
+
+**Fixed.** Setup is a conversation that opens on Hello: *Hi, I'm Raiker. Let's set up three things, then do something useful. What should I call you?* The name is saved where Settings › Account keeps it, with the settings revision. Answered steps stay above the next as short exchanges. The companion pick waits for the companion's art (QUI-V05).
+
+**Evidence.** `setupConversation.test.ts`, `ModelSetupView.test.ts`; RT-QUI-16 (Home then greets *Good afternoon, Rahul*).
+
+## FIXED-1091 — The model step opened on a provider matrix (QUI-W03)
+
+**Severity: Medium. Area: Setup / models. Status: Fixed 2026-10-21.**
+
+**Observed.** *Choose how Raiker should think* opened straight onto every provider when nothing could be recommended.
+
+**Fixed.** *Where should I think?* with three answers: **On this computer** (what this device can run, measured locally), **An account I have** (keys go in the provider card's own secure field, never the conversation) and **Decide later**. The providers open from the first two.
+
+**Evidence.** `ModelSetupView.test.ts` (*answers Where should I think with three cards*); RT-QUI-16.
+
+## FIXED-1092 — The privacy step was a statement with nothing about how Raiker asks (QUI-W04)
+
+**Severity: Low. Area: Setup / permissions. Status: Fixed 2026-10-21.**
+
+**Observed.** *Where your model requests go* said where data travels and nothing about what Raiker would do on its own.
+
+**Fixed.** *Here is how I'll work for you.* One card for the profile (*I'll research and prepare on my own. I'll ask before I send, delete, pay or share anything.* Standard · Change) and one for where data goes. No connection requests.
+
+**Evidence.** `ModelSetupView.test.ts`; RT-QUI-16.
+
+## FIXED-1093 — Setup ended on three mode buttons instead of a first task (QUI-W05)
+
+**Severity: Medium. Area: Setup / Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** The last step offered Chat, Build and Design buttons and *Start using Raiker*.
+
+**Fixed.** The last step asks *What should we do first?* (or says Chat and Build need a model, with **Choose a model**), with the four starters and a composer. The first message goes to Chat and the conversation is kept in Threads as *Getting started*.
+
+**Evidence.** `ModelSetupView.test.ts` (*ends on the first task, kept in Threads as Getting started*), `chatHandoff.test.ts`; RT-QUI-16.
+
+## FIXED-1094 — Setup had no way to skip it (QUI-W06)
+
+**Severity: Low. Area: Setup. Status: Fixed 2026-10-21.**
+
+**Observed.** An owner who wanted to look around first had to answer or defer every step.
+
+**Fixed.** **Skip setup** is always on screen and opens a plain new chat; the progress line reads Name · Model · Privacy · Start on a desktop install.
+
+**Evidence.** `ModelSetupView.test.ts` (*skips setup into a plain new chat*); RT-QUI-16.
+
+## FIXED-1095 — User-facing copy used words the plan retires (QUI-G02)
+
+**Severity: Low. Area: Copy. Status: Fixed 2026-10-21.**
+
+**Observed.** Navigation called a destination *Observability*; thirty-odd labels and messages said *runtime* outside Settings; *destination* and *trail* appeared in page text.
+
+**Fixed.** *Observability* is **Diagnostics** in navigation, links and the guide (QUI-L11). *runtime* stays only in Settings › Developer & runtime; elsewhere it names Raiker, a local model server or a speech engine. *destination* became site, address or collector. `quietUiCopy.test.ts` now fails on any of the words in markup, navigation or Settings labels.
+
+**Evidence.** `quietUiCopy.test.ts` (*quiet UI word list*); unit and live specs updated for the new names.
+
+## FIXED-1096 — Page size was not measured anywhere (QUI-G01)
+
+**Severity: Low. Area: Quality. Status: Fixed 2026-10-21.**
+
+**Observed.** The plan's size budgets had no check.
+
+**Fixed.** `all-pages-live.spec.ts` measures every destination at 1440×900 and 1280×800 and reports what is over budget (`e2e/sizeBudgets.ts`). It reports for now and becomes a failing check once the long pages are rebuilt.
+
+**Evidence.** First report: 29 of 94 measurements over budget, all on pages the plan rebuilds (TO_BE_FIXED, QUI-G01 follow-up).
+
+## FIXED-1097 — There was no single place to see every shared state (QUI-G03)
+
+**Severity: Low. Area: Quality. Status: Fixed 2026-10-21.**
+
+**Observed.** Checking a token change in every state meant arranging a workspace in each.
+
+**Fixed.** A development-only **State gallery** (`#/state-gallery`) draws the shared pieces empty, loading, working, needing permission, failed and done, with a Light/Dark switch that restores the owner's theme on leaving. Production builds refuse the route.
+
+**Evidence.** `StateGalleryView.test.ts`.
+
+## FIXED-1098 — Keyboard use and zoom were not checked (QUI-G05)
+
+**Severity: Low. Area: Accessibility. Status: Fixed 2026-10-21.**
+
+**Observed.** Axe ran; nothing walked the app with the keyboard or zoomed it.
+
+**Fixed.** A live spec tabs through every destination and fails on focus that is invisible or unmarked, and checks Chat at 200% zoom on a 1280×800 screen with Send in view.
+
+**Evidence.** `quiet-ui-accessibility-live.spec.ts` (RT-QUI-14, RT-QUI-15); `15-chat-200-percent-zoom.png`.
+
+## FIXED-1099 — Stop, steer and continue errors blamed 'the local runtime' (QUI-G06)
+
+**Severity: Medium. Area: Chat / Build / copy. Status: Fixed 2026-10-21.**
+
+**Observed.** A failed Stop read *Stop failed (500).*; anything that did not reach the host read *Could not reach the local runtime.*
+
+**Fixed.** `errorCopy.ts`: every message names what failed, what it affected and one next step, with the status as evidence (*Stop was not sent (HTTP 500). The turn is still running. Try Stop safely again, or use STOP in the top bar.*). Applied to Stop, steer, the STOP switch, continuing after a decision, export, upload, file lookup and saving a task. A test refuses the retired forms.
+
+**Evidence.** `errorCopy.test.ts`; `TurnControl.test.ts`, `composerAttachments.test.ts`. The remaining messages are in TO_BE_FIXED.
+
+## FIXED-1100 — A long conversation rendered every turn (QUI-G04)
+
+**Severity: Medium. Area: Chat / performance. Status: Fixed 2026-10-21.**
+
+**Observed.** A thousand-turn conversation drew a thousand turns, which made typing and scrolling lag.
+
+**Fixed.** Chat draws the newest 100 turns and offers **Show 100 earlier messages**, keeping the reading position. Search, a Retry's source and a linked turn widen the window before scrolling. Settled turns off screen skip layout and paint (`content-visibility`).
+
+**Evidence.** `ChatView.test.ts` (*draws the latest hundred of a thousand turns*, *widens the window when search finds an earlier turn*).

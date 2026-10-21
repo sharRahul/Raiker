@@ -3,8 +3,10 @@
 ## Status
 
 **Proposed, 2026-10-21. Nothing in this folder has shipped unless an item says
-so.** Shipped so far: the quick fixes in [07](07_QUICK_FIXES_AND_QUALITY.md) and
-the first round of [03](03_WELCOME_HOME_AND_CHAT.md#status) (2026-10-21). These documents record the UI/UX direction agreed in the October 2026
+so.** Shipped so far: the quick fixes and most quality checks in
+[07](07_QUICK_FIXES_AND_QUALITY.md), two rounds of
+[03](03_WELCOME_HOME_AND_CHAT.md#status) (2026-10-21), and the Diagnostics name
+from [01, QUI-L11](01_LAYOUT_SYSTEM_AND_PAGES.md#qui-l11--observability-becomes-diagnostics-and-recovery). These documents record the UI/UX direction agreed in the October 2026
 design review and turn it into numbered, testable work items. They extend
 [PERSONAL_AGENT_UX_SPEC.md](../PERSONAL_AGENT_UX_SPEC.md); where the two
 disagree on layout or presentation, this folder is the newer decision. Neither

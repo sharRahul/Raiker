@@ -869,6 +869,41 @@ so the running item was probably the memory-proposal pass after the turn, but
 this was not confirmed. Triage: read `GET /api/work-in-flight` at that moment and
 check that whatever the STOP count includes is named where the owner can see it.
 
+## 2026-10-21 Quiet UI round 2 — what is still open
+
+Round 2 shipped [FIXED-1080](FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
+to [FIXED-1100](FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04).
+These parts of the same items are not done:
+
+* **QUI-G01 — 29 of 94 size measurements are over budget.** All are pages the
+  layout plan rebuilds ([01](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md), QUI-L06 – L11):
+  Permissions (3,656 px), Models › Add (3,723 px), Models › Runtime, Models ›
+  Models, Models › Usage and Overview, Connections › Connectors and Channels
+  (over 4,100 px each), Extensions › Skills, Diagnostics › Overview and
+  Activity, Memory › Map, and Settings › General, Security, Privacy and GitHub.
+  The report is in `all-pages-live.spec.ts`; it becomes a failing check when
+  those pages are rebuilt.
+* **QUI-G06 — about 200 other error messages** still give a status code, or
+  *Could not X*, without what it affected and a next step. The pattern and the
+  helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
+  export, upload, file lookup and saving a task are done.
+* **QUI-G04 — actions that paint before their request returns.** Long
+  transcripts are windowed; optimistic rename, pin and archive with a visible
+  roll-back are not built.
+* **QUI-L11 — Diagnostics and Recovery.** Only the name changed. Overview as
+  issue cards, Sessions into Threads, Checkpoints as Recovery and the other
+  moves are not built.
+* **QUI-W02 and QUI-H02 — the companion.** Its pick in Hello and its picture on
+  a first-day Home wait for the companion's art (QUI-V05).
+* **QUI-C04 and QUI-H01 — the profile chip** on both composers waits for
+  QUI-P02, and *More* (schedule, research depth, answer style) is not built.
+  **Run in background** sits in Tools until it is.
+* **Needs the owner's decision: QUI-W01** (the open-ring mark replacing the
+  eye-orb is recorded as a recommendation, not a decision) **and QUI-P02**
+  (what the profile chip on the composer means and changes).
+* **BUG-357 is still open**: RT-QUI-10 shows Home's *No default model is
+  chosen.* beside a Chat that answers with Haiku 4.5.
+
 ## Decision statements added 2026-10-05
 
 **Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.

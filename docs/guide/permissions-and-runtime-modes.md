@@ -411,15 +411,15 @@ unsupported remote or cloud profile types still fail closed.
 real executor since Workstream B, and it was unenableable only because it had no
 entry in the activation registry — a block with no requirement to satisfy. That
 entry landed with **FIXED-106**, so it turns on like any other Tier-1 capability.
-Since **FIXED-270** it also has callers: Observability → Checkpoints, and
+Since **FIXED-270** it also has callers: Diagnostics → Checkpoints, and
 `/checkpoints restore <id> --confirm`. **Audit export** is beside it for the same
 reason — a capability that had no executor at all until **FIXED-271**, and now
-answers to Observability → Audit log → Export. **Telemetry export** is its
+answers to Diagnostics → Audit log → Export. **Telemetry export** is its
 sibling and sits in **Network** rather than beside it: they carry the same
 record, and an audit export writes a file beside the log while a telemetry
 export leaves the machine.
 
-Observability used to carry a *"Disabled / deferred capabilities"* chip list, and
+Diagnostics used to carry a *"Disabled / deferred capabilities"* chip list, and
 it is gone. It did not show the domains above. It showed the **phase gates** —
 the build-out flags each capability carries in the shipped registry — which is a
 different list, and one that reads as a lie on a page: it named `web_ui` and

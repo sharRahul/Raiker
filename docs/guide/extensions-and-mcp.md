@@ -573,7 +573,7 @@ observation, and the tab says which a rule is. And a hook may only ever make an
 action **stricter**: it can deny a call or turn it into a decision, and nothing it
 returns can allow one the runtime refused.
 
-Every match, run, decision, timeout and failure is in **Observability → Audit
+Every match, run, decision, timeout and failure is in **Diagnostics → Audit
 log** as `hook_matched`, `hook_executed`, `hook_decision`, `hook_timeout` and
 `hook_failed`. The tab shows the recent ones inline.
 

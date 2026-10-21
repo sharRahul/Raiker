@@ -366,31 +366,32 @@ Two things to know:
 
 ### The screens after the account
 
-Setup runs once. It can be left at any stage and resumes where it stopped. It
-is a focused screen of its own, without the app's navigation; a link in it
-(such as **Advanced setup**) opens the app, and setup resumes at your next
-sign-in until it is finished. On the desktop app the computer and the
-installation were already checked by the installer and Raiker Setup, so
-**This device** and **Check** appear only when you run Raiker from a source
-checkout. There is no welcome or permissions screen: the app introduces Chat,
-Build and Design itself, and [Permissions](permissions-and-runtime-modes.md)
-is a page you can open any time — finishing setup grants nothing.
+Setup is a short conversation, and it runs once. Raiker asks, you answer with
+a card's buttons, and each answered step stays above the next one. It can be
+left at any step and resumes where it stopped; **Skip setup** is always at the
+top and opens a plain new chat. It is a focused screen of its own, without the
+app's navigation; a link in it (such as **Advanced setup**) opens the app, and
+setup resumes at your next sign-in until it is finished. On the desktop app the
+computer and the installation were already checked by the installer and Raiker
+Setup, so **This device** and **Check** appear only when you run Raiker from a
+source checkout, and the progress line reads *Name · Model · Privacy · Start*.
+Nothing secret is ever typed into the conversation: an API key goes in the
+provider card's own secure field.
 
-| Stage | What it is |
+| Step | What it is |
 |---|---|
+| **Name** | *Hi, I'm Raiker. Let's set up three things, then do something useful. What should I call you?* The name is saved where **Settings → Account** keeps it, and Home and Chat greet you with it. **Skip** keeps the name your account already has. |
 | **This device** *(source checkouts only)* | What this computer can run, measured on it and sent nowhere: operating system, architecture, memory, processor, graphics acceleration (never required), free storage, network, how provider keys are protected (Windows Data Protection, macOS Keychain, Linux Secret Service, or a private file), local model runtimes already installed, where your data is kept, and a local model size that will run here. A requirement that is not met is named with its fix. |
-| **Model** | Connect a provider or a runtime. It leads with the easiest working path — a runtime installed on this machine that already names a model needs no account and no key — checks the model you choose, and keeps the full provider matrix behind **Other options** — or, when the recommendation is a connected account, **Choose a model** opens it. A model you already chose as the default on Models counts as your choice here. **Advanced setup** opens [Models](connecting-a-model.md) for deeper configuration; you do not need it to finish. |
-| **Privacy** | *Where your model requests go.* A statement, not a choice: requests go only to the model you choose and the providers you connect, and nothing reaches a provider you have not set up. This is about where your words travel. [Permissions](permissions-and-runtime-modes.md) governs the actions Raiker may take. When the model you chose runs off this device — an Ollama cloud model or a hosted provider — this step names where its requests go. To keep every request on this device, choose a model that runs here; the earlier *Local only* answer was removed because nothing enforced it ([FIXED-947](../plans/FIXED_ITEMS.md#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345)). **Continue** records that you have read it. |
+| **Model** | *Where should I think?* Three answers. **On this computer** shows the model size this device can run and opens the local runtimes; **An account I have** opens the hosted providers (Anthropic, OpenAI, Google and others), each with its own secure key field; **Decide later** moves on, and Chat asks for a model when you first send. When a runtime on this machine already names a model, or an account is already connected, it is recommended above the three. The model you choose is checked, and a model you already chose as the default on Models counts as your choice. **Advanced setup** opens [Models](connecting-a-model.md); you do not need it to finish. |
+| **Privacy** | *Here is how I'll work for you.* Two cards. **How I'll ask**: *I'll research and prepare on my own. I'll ask before I send, delete, pay or share anything.* — the Standard profile, with **Change** opening [Permissions](permissions-and-runtime-modes.md). **Where your data goes**: requests go only to the model you choose and the providers you connect; when the model you chose runs off this device it names where its requests go. To keep every request on this device, choose a model that runs here ([FIXED-947](../plans/FIXED_ITEMS.md#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345)). No service asks to be connected here: connections are made when a task needs them. |
 | **Check** *(source checkouts only)* | Raiker checks its own parts from inside: the host, the interface, the encrypted database, the data format, long-term memory storage, the permission registry, the governed command runner and the credential vault — then makes one short request to the model you chose. A part that is not working says how to fix it; **Check again** reruns it. |
-| **Ready** | Finish into **Chat**, **Build** or **Design**, or **Start using Raiker** for the dashboard. The screen says what it actually set up: *Your Raiker is ready* when a model is chosen, and *Setup saved* when you deferred that choice — with each mode naming what it still needs and the page that supplies it. Every mode opens either way; exploring one before connecting a model is how you find out what it is. |
+| **Start** | *You're set. What should we do first?* — or, when you deferred the model, *Setup is saved. Chat and Build need a model before they can answer.* with **Choose a model**. Type a first task, or use one of four starters (*Summarise a document*, *Plan my week*, *Fix a bug in a repository*, *Make an image*). The first message opens Chat and that conversation is kept in Threads as *Getting started*. **Go to Home** finishes without sending anything. |
 
-Backup is offered on the last screen as optional setup rather than asked for
+Backup is offered on the last step as optional setup rather than asked for
 before your first turn, and nothing claims a backup exists until Raiker has
-written and verified an encrypted snapshot. Raiker starts conservatively and asks
-before it takes a governed action, so there is no permissions matrix to fill in
-on first run. Once setup is complete it does not appear again on its own;
-**Settings → General → Run setup again** reopens it on the model step, keeping
-every choice you already made.
+written and verified an encrypted snapshot. Once setup is complete it does not
+appear again on its own; **Settings → General → Run setup again** reopens it on
+the model step, keeping every choice you already made.
 
 ### Unlocking, afterwards
 
@@ -417,7 +418,7 @@ work; everything you set up once lives behind **More** in the top bar.
 | More | Review | Approvals |
 | More | Connect | Models, Extensions |
 | More | Settings | Settings itself, Permissions, and every Settings section as a direct link |
-| More | Diagnostics & help | Observability, Guide |
+| More | Diagnostics & help | Diagnostics, Guide |
 
 More is grouped by what you come to do — review something, connect Raiker to
 something, change a setting — with diagnostics and help last. It has no search
@@ -431,12 +432,15 @@ its ten sections were listed, the destination itself was not. A gear promises th
 settings screen everywhere else you have used a computer, so it is named for what
 it is now, and Settings leads the window.
 
-**Home** opens with a greeting for your time of day and a composer: what you
-type there opens a new chat and is sent from Chat. On a first day, with nothing
-in the workspace yet, four starters sit under it. Below is the live board: what
-is running, which agents are standing, what is scheduled, what needs a decision,
-and **This week** — the tasks and goals finished in the last seven days, by
-name. After an update, one line says so with **What's new**; **Dismiss** removes
+**Home** is one column. It opens with a greeting for your time of day and a
+composer: what you type there, and any file you add with **Add attachment**,
+opens a new chat and is sent from Chat. On a first day, with nothing in the
+workspace yet, four starters sit under it. Below are **Continue where you left
+off** — the one thread that moved most recently, with its next step and
+**Continue** (**All threads** lists the rest) — then what needs you, with at
+most one decision shown and **View all** for the others, what is running (two
+at most, then **View all**), and **This week** — the tasks and goals finished
+in the last seven days, by name. After an update, one line says so with **What's new**; **Dismiss** removes
 it. **Approvals** is a counted button
 in the top bar, visible from every page, because a decision waiting on you is
 the work, arriving many times a day, while Permissions and Models are configured
@@ -458,11 +462,11 @@ as clear.
 **"Nothing needs you right now" is a claim about all three, and it is only made
 when all three were read.** If Raiker cannot read its own readiness it says so
 and names the gap — *No approvals are waiting and no work is blocked. Raiker
-could not read its own runtime readiness, so this is not an all-clear* — rather
+could not read its own readiness, so this is not an all-clear* — rather
 than counting an unread check as zero problems. A readiness claim nobody checked
 is worse than no claim, because you would act on it.
 
-**Sessions is inside Observability**, not a destination of its own: it is the
+**Sessions is inside Diagnostics**, not a destination of its own: it is the
 complete record of every conversation *and* every task run, which is why
 **Threads** — the board you pick work up from — lists conversations and the
 threads your routines are advancing, and nothing else.
@@ -482,7 +486,7 @@ Six destinations are tabbed:
 | Memory | Overview, Memories, Suggestions, Sources, Recall & indexing, Map |
 | Models | Overview, My models, Add model, Runtime & routing, Usage |
 | Extensions | Overview, Connectors, Channels, MCP servers, Skills, Hooks, Plugins |
-| Observability | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
+| Diagnostics | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
 | Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, GitHub, Runtime configuration, Memory engine, Updates |
 
 Old links to the pages these absorbed still resolve and open the right tab —

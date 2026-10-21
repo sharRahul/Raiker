@@ -321,7 +321,8 @@ there are more.
 **Home** is the first thing Raiker opens on. Under its composer, the board
 answers one question: what is Raiker doing right now. It has three boards.
 
-- **Running now** — a governed cycle in flight. Each one can be stopped at its
+- **Running now** — a governed cycle in flight, two at most, with **View all**
+  opening the live board when there are more. Each one can be stopped at its
   next safe boundary. A repeating task appears here *while its cycle runs*, and
   carries its cadence and next slot with it.
 - **Standing agents** — work with a repeating cadence that is waiting for its
@@ -381,18 +382,18 @@ produced](../screenshots/2026-09-15-task-history/task-attempt-history.png)
 
 ## Where to watch work run
 
-**Observability → Work in action** is the live board: tasks in flight, scheduled
+**Diagnostics → Work in action** is the live board: tasks in flight, scheduled
 work with next-run times, and recorded subagents. Idle character movement there
 is visual only — it does not mean the agent is working.
 
-**Observability → Audit log** is the append-only record of every governed step,
+**Diagnostics → Audit log** is the append-only record of every governed step,
 filterable by session and event type.
 
 ## Being told when background work ends
 
 A scheduled or recurring task that finishes — or fails — writes a notification,
 so a routine that ran overnight is not something you have to remember to go and
-check. It appears on the bell and in **Observability → Notifications**, with a
+check. It appears on the bell and in **Diagnostics → Notifications**, with a
 link to **Tasks**, where the card carries the run's own conversation thread and
 its title opens the attempt history above.
 
@@ -405,7 +406,7 @@ the window you are looking at, and it never leaves this machine. If the browser
 has blocked notifications, the page says so rather than leaving a switch that
 silently does nothing.
 
-Every notice is recorded in **Observability → Notifications** whether or not
+Every notice is recorded in **Diagnostics → Notifications** whether or not
 either switch showed it, so turning both off loses nothing.
 
 **Quiet hours** are off until you turn them on. Choose when they start and end;
@@ -472,7 +473,7 @@ As of 2026-08-08, one edge remains here:
 Three limits this section used to list have shipped and are gone from it: a
 background-agent run now ends with a user-visible reason (**FIXED-13**), a
 task run no longer appears among the owner's own conversations — those are on
-**Threads**, and task sessions are in Observability → Sessions (**FIXED-15**) —
+**Threads**, and task sessions are in Diagnostics → Sessions (**FIXED-15**) —
 and approving a task the agent proposed now creates it (**FIXED-106**).
 
 ## Using Raiker as a personal agent

@@ -15,6 +15,33 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-21 (Quiet UI round 2: Home, Chat, setup and quality checks, hosted Anthropic Haiku 4.5)
+
+The second round of the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status)
+and [07](../plans/quiet-ui/07_QUICK_FIXES_AND_QUALITY.md)
+([FIXED-1080](../plans/FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
+to [FIXED-1100](../plans/FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)).
+Fresh workspaces served by `raiker-web` on `127.0.0.1:8765`. The round-1 spec
+ran first on the same workspace and connected Anthropic through the Models
+dialog, with the key and workspace ID typed from the run's environment; neither
+appears in a spec, command, document, screenshot or the server log. Specs:
+`quiet-ui-round-2-live.spec.ts`, `first-launch-live.spec.ts`,
+`quiet-ui-accessibility-live.spec.ts`, and the size report in `all-pages-live.spec.ts`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-10 | Home after work shows one **Continue where you left off** card — the latest thread, *1 turn · updated 1m ago*, **Continue**, **All threads (3)** — in one column no wider than 980 px | ✅ |
+| RT-QUI-11 | A text file attached with **Add attachment → Upload document** on Home rides the message into Chat; the turn shows the file and Haiku answers with the code word inside it (*PELICAN*) | ✅ |
+| RT-QUI-12 | In that chat **Search in conversation** for *pelican* reads *1 of 1* and marks the turn. **Context** opens the panel with *code-word.txt* under Context and a Sources tab; at 1,280 px it opens over the transcript and ends above Send, at 1,920 px it sits beside the transcript | ✅ after a fix found in this round ([FIXED-1088](../plans/FIXED_ITEMS.md#fixed-1088--the-context-panel-covered-chats-send-at-laptop-width-qui-c12)): at 1,280 px the panel covered the model picker and Send |
+| RT-QUI-13 | **Tools → Run in background** files the draft as a task: *Running in the background. Open the task*, the composer is empty, and the task page shows it. The task then ran on Haiku and its notification arrived while RT-QUI-12 was rerun | ✅ |
+| RT-QUI-14 | Tab through every destination at 1440×900: focus never lands on an invisible control and is always marked | ✅ |
+| RT-QUI-15 | Chat at 200% zoom on a 1280×800 screen (640×400 CSS px): the prompt and **Send** stay in view | ✅ |
+| RT-QUI-16 | A fresh workspace opens setup as a conversation: *Hi, I'm Raiker…* with **Skip setup** and the progress line *Name · This device · Model · Privacy · Check · Start* (source install). The name *Rahul* is saved; *Where should I think?* offers **On this computer** (*About 3B–8B parameters fits here*), **An account I have** and **Decide later**, with the earlier answer kept above; *Here is how I'll work for you.* shows the ask-before card; the last step says *Setup is saved. Chat and Build need a model before they can answer.* with **Choose a model**, the four starters and a composer kept as *Getting started*; **Go to Home** greets *Good afternoon, Rahul* | ✅ |
+| QUI-G01 | Size report at 1440×900 and 1280×800: 29 of 94 measurements over budget, all on pages the layout plan rebuilds (listed in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-21-quiet-ui-round-2--what-is-still-open)) | Report, as planned |
+| Re-run | Round 1 (`quiet-ui-home-chat-live`) 9/9 again on the new Home, setup and copy | ✅ |
+| Suites | Web unit suite (2,436); mocked `composer.spec.ts` 16/16; `svelte-check`, ESLint, design tokens, build; docs consistency tests | ✅ |
+| Visual review | `docs/screenshots/2026-10-21-quiet-ui-round-2/` (10–19), inspected at original resolution; the overlay defect above was found from the 1,280 px image. Still seen: Home's *No default model is chosen.* beside a Chat answering on Haiku (BUG-357, open). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-21 (Quiet UI Home and Chat, hosted Anthropic Haiku 4.5)
 
 QUI-H01 to QUI-W06 from the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md)
@@ -35,7 +62,7 @@ document, screenshot or the server log. Spec: `web/e2e/quiet-ui-home-chat-live.s
 | RT-QUI-06 | A long answer running: **Stop safely** and **Add instruction** are shown; Stop says the turn stopped at a safe boundary | ✅ |
 | RT-QUI-07 | Home after work reads *Good morning, Rahul*, without starters | ✅ |
 | RT-QUI-08 | With an older version recorded in this browser, Home shows *Raiker was updated to 0.0.0.* with **What's new** → Settings → About & updates; **Dismiss** removes it and it stays gone after a reload | ✅ |
-| RT-QUI-09 | **Settings → General** offers **Home** as a startup page; **Run setup again** opens setup on *Choose how Raiker should think* | ✅ |
+| RT-QUI-09 | **Settings → General** offers **Home** as a startup page; **Run setup again** opens setup on its model step (*Choose how Raiker should think*, now *Where should I think?*) | ✅ |
 | Suites | `quiet-ui-home-chat-live` 9/9 in one run (3.8 min); web unit suite; mocked `composer.spec.ts` 16/16 | ✅ |
 | Seen in passing | A model that chose to write a document ended its turn with *Completed · 1 step* (QUI-C03) | ✅ |
 | Visual review | `docs/screenshots/2026-10-21-quiet-ui-home-chat/` (01–09), inspected at original resolution; the three defects above were found from the images. Dated folders are local evidence and not committed | ✅ |

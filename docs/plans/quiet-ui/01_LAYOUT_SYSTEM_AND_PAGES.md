@@ -197,7 +197,9 @@ Target: no page (from 11,797 px).
   task or project. Live work moves to Home › In progress. Notifications is the
   top-bar centre.
 * The word Observability leaves navigation. Old addresses forward
-  (`ROUTE_ALIASES` in `web/src/lib/nav.ts`).
+  (`ROUTE_ALIASES` in `web/src/lib/nav.ts`). **Done 2026-10-21**: the
+  destination is called Diagnostics ([FIXED-1095](../FIXED_ITEMS.md#fixed-1095--user-facing-copy-used-words-the-plan-retires-qui-g02));
+  the rest of this item is open.
 
 Recovery, before restore, shows: checkpoint source and time, affected items,
 what will be undone, what remains, Create safety checkpoint, and Restore.

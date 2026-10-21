@@ -19,7 +19,7 @@ tablets, and a full sidebar on wider screens.
 | Control | **Permissions** | Capability gates and per-capability decision modes |
 | Control | **Models** | Providers, model readiness, routing, fallback, and pricing |
 | Control | **Extensions** | Connectors, MCP servers, skills, hooks, plugins, and channels |
-| Observe | **Observability** | Readiness, sessions, audit activity, checkpoints, live work, and notifications |
+| Observe | **Diagnostics** | Readiness, sessions, audit activity, checkpoints, live work, and notifications |
 | Utilities | **Guide** and **Settings** | This manual, runtime configuration, privacy, web access, and credentials |
 
 ## Understand a turn
@@ -41,7 +41,7 @@ recall and durable transcript use for that conversation.
 
 ## Observe and recover work
 
-Use **Observability** when you need evidence rather than a summary:
+Use **Diagnostics** when you need evidence rather than a summary:
 
 - **Overview** opens with **Needs your attention** — only the things that are
   wrong, most urgent first, with a link to where you act on each. When there is
@@ -114,7 +114,7 @@ what changed, and the resting state of a working install is below both: the
 runtime's readiness, how many capability gates are closed, and what
 configuration is missing, each linking to the page where you change it.
 
-**Runtime health, in detail** is the specialist view, and it is a disclosure
+**Health, in detail** is the specialist view, and it is a disclosure
 because on a healthy install it has nothing to say: the health transitions the
 runtime's own monitors recorded, the memory integrity report and the one repair
 it offers, the background passes the host runs on its own, any readiness
@@ -310,7 +310,7 @@ ones built into the build. The last two are read-only there, folded away and
 each naming who *can* change it — the environment list is set before Raiker is
 started, and the built-in list ships with the build.
 
-**Check a destination** answers without contacting the host. A refusal says why
+**Check a site** answers without contacting the host. A refusal says why
 in a sentence: when a rule refused it, which rule, as written, and which of the
 three lists it is on; otherwise whether the name points inside your network or
 does not resolve from this machine at all — two different problems with two

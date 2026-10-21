@@ -200,7 +200,7 @@ turn that made it.** The previous contents are captured before the write, and a
 rewind is a governed request rather than a button:
 
 1. Hover your own message, open `⋯`, and choose **Rewind to before this** — or
-   start from **Observability → Checkpoints** → *Preview rewind*. It is the same
+   start from **Diagnostics → Checkpoints** → *Preview rewind*. It is the same
    panel either way. From the turn it resolves *that turn's* checkpoint, not the
    most recent one; a turn that wrote none says so rather than offering a
    control that would fail.

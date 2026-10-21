@@ -15,9 +15,10 @@
  * test instead of quietly losing its fix.
  */
 
-export type GapAction =
-  | { readonly kind: "model-setup"; readonly label: string }
-  | { readonly kind: "link"; readonly label: string; readonly href: string };
+export interface GapAction {
+  readonly label: string;
+  readonly href: string;
+}
 
 export interface ReadinessGap {
   readonly id: string;
@@ -25,13 +26,17 @@ export interface ReadinessGap {
   readonly action: GapAction;
 }
 
-const DIAGNOSTICS: GapAction = { kind: "link", label: "Open diagnostics", href: "#/observe?tab=diagnostics" };
+const DIAGNOSTICS: GapAction = { label: "Open diagnostics", href: "#/observe?tab=diagnostics" };
 
 /** The runtime's own sentences this file gives plainer wording and a fix. */
 export const KNOWN_GAPS: Readonly<Record<string, { title: string; action: GapAction }>> = {
+  // The runtime's gap is the *default* model: the one tasks, goals and a chat
+  // with no choice of its own run on. A Chat with its own model still answers,
+  // so "no model is set up" was untrue once one was connected (found live,
+  // RT-QUI-07). Models is where a default is connected and chosen.
   "No model profile is selected.": {
-    title: "No model is set up.",
-    action: { kind: "model-setup", label: "Set up model" },
+    title: "No default model is chosen.",
+    action: { label: "Choose a model", href: "#/models" },
   },
   "No runtime mode is active.": {
     title: "Raiker is not accepting work right now.",

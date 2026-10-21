@@ -876,6 +876,31 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText("Plan my week")).toBeNull();
   });
 
+  // Found live in RT-QUI-03: a hand-off judged before Chat read the model it
+  // was last set to opened "Set up a model" for a model that was ready.
+  it("sends a handed-over message on the model Chat was last set to, without a setup dialog", async () => {
+    const remembered = {
+      profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-haiku-4-5",
+      selected: false, configured: true, ready: true, readiness_state: "ready",
+    };
+    stubFetch({
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        profiles: [{ ...DEFAULT_READY_PROFILE, selected: false, ready: false, readiness_state: "not_configured", model: "<model>" }, remembered],
+        chat_profiles: [remembered],
+      },
+      "GET /api/surface-models": { surfaces: { chat: { profile_id: "anthropic-hosted", model: "claude-haiku-4-5" } } },
+    });
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Done.") });
+    });
+    handOffToChat("Say done");
+    render(ChatView);
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(1));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ text: "Say done", model_profile: "anthropic-hosted" });
+    expect(setupDialog.open).toBe(false);
+  });
+
   it("shows a route-level loading state while persisted history is fetched", async () => {
     vi.stubGlobal("fetch", vi.fn(() => new Promise<never>(() => {})));
     render(ChatView, { props: { sessionId: "sess_hist" } });

@@ -162,6 +162,9 @@
   .nav-link.active { background:var(--accent-soft); color:var(--text-1); }
   /* QUI-C06 — quieter than the destinations above them: indented under Chat,
      one line each, the title cut with an ellipsis and whole in its tooltip. */
+  /* Grid items size to their content unless told otherwise, which let a long
+     title push its row past the sidebar's edge (found live, RT-QUI-04). */
+  ul, li { min-width:0; }
   .recent-chats { margin:2px 0 var(--space-1) 2.1rem; gap:0; }
   .recent-chat { display:block; padding:.28rem .5rem; border-radius:var(--r-sm); color:var(--text-3); font-size:var(--text-sm); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-decoration:none; }
   .recent-chat:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }

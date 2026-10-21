@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkbenchView from "./WorkbenchView.svelte";
 import { DIAGNOSTICS, stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
-import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
+import { resetModelSetup } from "../modelReadiness.svelte";
 import { takeChatHandoff } from "../chatHandoff";
 
 afterEach(() => {
@@ -557,12 +557,10 @@ describe("WorkbenchView", () => {
 
     const list = await screen.findByRole("list", { name: "Setup Raiker still needs" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(list).getByText("No model is set up.")).toBeInTheDocument();
+    expect(within(list).getByText("No default model is chosen.")).toBeInTheDocument();
     expect(within(list).getByText("Raiker is not accepting work right now.")).toBeInTheDocument();
     expect(screen.queryByText("Runtime issues")).toBeNull();
-
-    await fireEvent.click(within(list).getByRole("button", { name: "Set up model" }));
-    expect(setupDialog.open).toBe(true);
+    expect(within(list).getByRole("link", { name: "Choose a model" })).toHaveAttribute("href", "#/models");
     expect(within(list).getByRole("link", { name: "Open diagnostics" })).toHaveAttribute(
       "href",
       "#/observe?tab=diagnostics",

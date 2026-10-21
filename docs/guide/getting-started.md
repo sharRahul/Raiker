@@ -388,7 +388,9 @@ Backup is offered on the last screen as optional setup rather than asked for
 before your first turn, and nothing claims a backup exists until Raiker has
 written and verified an encrypted snapshot. Raiker starts conservatively and asks
 before it takes a governed action, so there is no permissions matrix to fill in
-on first run. Once setup is complete it does not appear again.
+on first run. Once setup is complete it does not appear again on its own;
+**Settings → General → Run setup again** reopens it on the model step, keeping
+every choice you already made.
 
 ### Unlocking, afterwards
 
@@ -429,8 +431,13 @@ its ten sections were listed, the destination itself was not. A gear promises th
 settings screen everywhere else you have used a computer, so it is named for what
 it is now, and Settings leads the window.
 
-**Workbench** is the live board: what is running, which agents are standing,
-what is scheduled, and what needs a decision. **Approvals** is a counted button
+**Home** opens with a greeting for your time of day and a composer: what you
+type there opens a new chat and is sent from Chat. On a first day, with nothing
+in the workspace yet, four starters sit under it. Below is the live board: what
+is running, which agents are standing, what is scheduled, what needs a decision,
+and **This week** — the tasks and goals finished in the last seven days, by
+name. After an update, one line says so with **What's new**; **Dismiss** removes
+it. **Approvals** is a counted button
 in the top bar, visible from every page, because a decision waiting on you is
 the work, arriving many times a day, while Permissions and Models are configured
 once and revisited; More lists it under **Review** too.
@@ -439,7 +446,9 @@ once and revisited; More lists it under **Review** too.
 is progress and stays on the board below with its Stop control; what reaches the
 rail is work that will not move again until you act — a run waiting on an
 approval, or a paused one — along with approvals themselves and any runtime
-readiness problem. Below those, the rail lists what else is waiting on you from
+readiness problem, each named with the action that fixes it (*No default model
+is chosen · Choose a model*). A backup is recommended there only when there is
+none, or the newest verified one is a week old. Below those, the rail lists what else is waiting on you from
 each part of Raiker's own record — memories it proposed, a channel delivery that
 did not arrive, an MCP tool held for your review, a containment signal — each
 with the one place to resolve it. An item goes away when that part of Raiker

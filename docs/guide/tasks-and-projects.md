@@ -318,8 +318,8 @@ there are more.
 
 ## The work board
 
-**Workbench** is the first thing Raiker opens on, and it answers one question:
-what is Raiker doing right now. It has three boards.
+**Home** is the first thing Raiker opens on. Under its composer, the board
+answers one question: what is Raiker doing right now. It has three boards.
 
 - **Running now** — a governed cycle in flight. Each one can be stopped at its
   next safe boundary. A repeating task appears here *while its cycle runs*, and

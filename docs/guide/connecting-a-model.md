@@ -34,11 +34,12 @@ An *invalidation* is different: something changed under the model, so that one i
 re-checked explicitly rather than in passing.
 
 The same gate protects Chat, Build, Tasks, and Schedule. With no ready model —
-one that has never been checked, or whose check **failed** — the primary action
-is disabled and **Set up model** opens the readiness dialog, whose **Check
-again** runs the exact-model check, or says there is no model to check yet when
-that is the truth. (The Workbench is not in that list because it has no
-composer to gate: it is the board over work that is already running.)
+one that has never been checked, or whose check **failed** — **Set up model**
+opens the readiness dialog, whose **Check again** runs the exact-model check, or
+says there is no model to check yet when that is the truth. In Chat, **Send**
+stays pressable: it opens the same dialog and keeps your message, which is sent
+once a model is ready unless you choose **Don't send**. Home's composer hands
+its message to Chat, so Chat's gate applies to it too.
 
 A successful profile carries a green **Ready** label, and the Models header says
 `1 model ready` (or the corresponding count). Labels such as **Not checked**,

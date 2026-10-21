@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355 and BUG-356, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355, BUG-356 and BUG-357, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -95,6 +95,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
+| [BUG-357](#bug-357--connecting-a-provider-and-using-it-in-chat-leaves-no-default-model) | Medium | Models / Home / goals | Open — found 2026-10-21 in the Quiet UI live round (RT-QUI-07); Home now names the gap truthfully ([FIXED-1074](FIXED_ITEMS.md#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering)) |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -802,6 +803,28 @@ data-class fields as PA-D05/PA-D07 give steps those inputs.
 each profile governs; a refused Chat or Build turn names the profile and offers
 the Settings route, exactly as a goal step does.
 
+## BUG-357 — Connecting a provider and using it in Chat leaves no default model
+
+**Severity: Medium. Area: Models / Home / goals. Status: Open — found
+2026-10-21 in the Quiet UI live round (RT-QUI-07).**
+
+**Observed.** On a fresh workspace, Anthropic was connected through **Models →
+Connect**, Haiku 4.5 kept, and chosen from Chat's model menu; Chat answered. Home
+then still listed a readiness gap: the runtime's `No model profile is selected.`
+(`raiker/control/dashboard_parts/models.py`, `_missing_config`), now shown as
+*No default model is chosen · Choose a model*. A Chat choice is remembered per
+surface (`surface-models`) and never sets `current_profile_id`, so a task, goal
+or chat with no model of its own still has none.
+
+**Proposed fix.** When the first hosted or local model becomes ready and no
+default exists, offer **Use as default** on the connect confirmation (never set
+it silently), and let the readiness gap's action set the default from the model
+Chat already uses.
+
+**Required user-interface outcome.** After connecting a first model, the owner
+is asked once whether it should be the default; Home's gap disappears when they
+agree, and stays, with its action, when they decline.
+
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 
 The focused regression set, documentation contracts, Ruff, mypy, and web checks passed. The complete local Python suite reached 100% but reported five failures on this Windows host:
@@ -836,6 +859,15 @@ send* while the footer read *The last model check has expired. Open Models*
 (`02-repair-request-in-composer.png`). The two lines read the same readiness
 record differently: the strip treats an aged-out observation as non-blocking
 (BUG-238), the footer still words it as a problem to fix.
+
+## 2026-10-21 verification follow-up — the top bar's STOP count after a finished turn
+
+In the Quiet UI live round, the RT-QUI-05 capture taken just after a 120-line
+answer finished shows the top bar's **STOP** control with a count of 1 while
+Chat showed no running turn. Home then listed *2 proposed memories to review*,
+so the running item was probably the memory-proposal pass after the turn, but
+this was not confirmed. Triage: read `GET /api/work-in-flight` at that moment and
+check that whatever the STOP count includes is named where the owner can see it.
 
 ## Decision statements added 2026-10-05
 

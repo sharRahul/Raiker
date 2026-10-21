@@ -15,6 +15,31 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-21 (Quiet UI Home and Chat, hosted Anthropic Haiku 4.5)
+
+QUI-H01 to QUI-W06 from the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md)
+([FIXED-1057](../plans/FIXED_ITEMS.md#fixed-1057--home-had-no-way-to-start-work-by-asking-qui-h01)
+to [FIXED-1079](../plans/FIXED_ITEMS.md#fixed-1079--the-top-bars-icon-buttons-had-no-visible-tooltip-qui-q06)).
+A fresh workspace served by `raiker-web` on `127.0.0.1:8765` at 1440×900. The
+identity-linked Anthropic key and workspace ID were typed into the Models dialog
+by the spec from the run's environment; neither appears in a spec, command,
+document, screenshot or the server log. Spec: `web/e2e/quiet-ui-home-chat-live.spec.ts`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-01 | A first-day Home reads *Welcome, Rahul*, opens with **Ask Raiker**, has no start cards, shows the four starters, and its rail names *No default model is chosen · Choose a model* and *There is no backup of this workspace yet · Make a backup* | ✅ after a fix found in this round ([FIXED-1074](../plans/FIXED_ITEMS.md#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering)) |
+| RT-QUI-02 | Anthropic connects through **Models → Connect** (key and workspace ID), Haiku 4.5 kept; Chat's composer reads *Sent to Anthropic*; an empty conversation shows four starters and **Plan my week** fills the composer without sending | ✅ |
+| RT-QUI-03 | A message typed on Home opens Chat and is answered there (*HOME HANDOFF*); **New chat** appears; no setup dialog remains | ✅ after a fix found in this round ([FIXED-1072](../plans/FIXED_ITEMS.md#fixed-1072--a-message-from-home-opened-a-stale-set-up-a-model-dialog-over-its-own-answer)): a stale *Set up a model* dialog stayed over the answer |
+| RT-QUI-04 | The sidebar lists the chat under **Chat**; opening it shows its title; **Rename conversation** → *Quiet UI live check* updates the header and the sidebar | ✅ after a fix found in this round ([FIXED-1073](../plans/FIXED_ITEMS.md#fixed-1073--long-chat-titles-ran-past-the-sidebars-edge)): long titles ran past the sidebar |
+| RT-QUI-05 | A 120-line answer; scrolling to the top shows **Jump to latest**; pressing it returns to the bottom and the button goes | ✅ |
+| RT-QUI-06 | A long answer running: **Stop safely** and **Add instruction** are shown; Stop says the turn stopped at a safe boundary | ✅ |
+| RT-QUI-07 | Home after work reads *Good morning, Rahul*, without starters | ✅ |
+| RT-QUI-08 | With an older version recorded in this browser, Home shows *Raiker was updated to 0.0.0.* with **What's new** → Settings → About & updates; **Dismiss** removes it and it stays gone after a reload | ✅ |
+| RT-QUI-09 | **Settings → General** offers **Home** as a startup page; **Run setup again** opens setup on *Choose how Raiker should think* | ✅ |
+| Suites | `quiet-ui-home-chat-live` 9/9 in one run (3.8 min); web unit suite; mocked `composer.spec.ts` 16/16 | ✅ |
+| Seen in passing | A model that chose to write a document ended its turn with *Completed · 1 step* (QUI-C03) | ✅ |
+| Visual review | `docs/screenshots/2026-10-21-quiet-ui-home-chat/` (01–09), inspected at original resolution; the three defects above were found from the images. Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-20 (Goals and execution profiles, hosted Anthropic Haiku 4.5)
 
 PA-D01, PA-D02 and PA-D06's first slices

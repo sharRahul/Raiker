@@ -37,7 +37,6 @@
   import { markVersionSeen, versionToAnnounce } from "../whatsNew";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
-  import { openModelSetup } from "../modelReadiness.svelte";
   import { readinessGaps } from "../readinessGaps";
   import { relativeFuture, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
@@ -654,13 +653,7 @@
           {#each gaps as gap (gap.id)}
             <li class="feed-item feed-blocking">
               <strong>{gap.title}</strong>
-              {#if gap.action.kind === "model-setup"}
-                <button type="button" class="btn btn-soft btn-sm gap-action" onclick={() => openModelSetup(null)}>
-                  {gap.action.label}
-                </button>
-              {:else}
-                <a href={gap.action.href}>{gap.action.label}</a>
-              {/if}
+              <a href={gap.action.href}>{gap.action.label}</a>
             </li>
           {/each}
         </ul>
@@ -784,7 +777,6 @@
   .feed-item span { color: var(--text-2); }
   .feed-containment { border-color: var(--danger-border); }
   .feed-blocking { border-color: var(--warn-border); }
-  .gap-action { justify-self: start; }
   .fact { margin: 0; font-size: var(--text-sm); }
   .whats-new {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);

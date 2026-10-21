@@ -22,6 +22,27 @@ Everything Raiker can do is still there; what changed is that it is not all on
 screen at once. The same composer appears in Build and Design, so learning it
 once is enough.
 
+Under the bar, one quiet line says **where the next message goes**: *Stays on
+this computer* for a model that runs on this device, *Sent to Anthropic* (or the
+provider's name) for a hosted one, and *Where it runs is not confirmed* when the
+runtime has not said. It follows the model chosen for the turn, and its tooltip
+gives the full sentence.
+
+### Starting a conversation
+
+An empty conversation offers four starters: **Summarise a document**, **Plan my
+week**, **Fix a bug in a repository** and **Make an image**. The first two fill
+the composer with a prompt for you to edit and send; they never send on their
+own. The last two open Build and Design. Home's composer is another way in: what
+you type there opens a new chat here and is sent from this composer, so it is
+the same act as typing it in Chat.
+
+**Send works even when no model is ready.** Pressing it opens the model dialog
+and keeps your message. Once a model is ready the message is sent, and a line
+under the composer says so meanwhile — *Your message will send as soon as a
+model is ready* — with **Don't send** beside it. Editing the message cancels the
+send.
+
 ### `+` — add to this turn
 
 | Item | What it does |
@@ -64,9 +85,11 @@ Outside the composer, on the page itself:
 
 | Control | `aria-label` | What it does |
 |---|---|---|
-| **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
+| **Title** | — | The conversation's name, at the left of the header. The pen beside it (`Rename conversation`) renames it in place; Enter keeps the new name, Escape keeps the old one. The same name appears in Work → Threads and in the sidebar. |
+| **New chat** | — | Start a fresh conversation. Shown once there is a conversation to leave. |
 | **⋯** | `Conversation actions` | Three groups. **Conversation**: **Export conversation…** and **Print / Save as PDF** (both also in Build). **Evidence**: every governed step in this conversation; each answer's own evidence is under it. **Continuity**: **Background work**, and a pointer to the per-message actions below. |
-| **Background** | `Background work: 2 running, 1 failed today` | Opens the background-work rail. Its label counts what is running and marks work that failed in the last day, read from the same list the rail shows. |
+| **Background** | `Background work: 2 running, 1 failed today` | Opens the background-work rail. Shown only while work is running, waiting or failed in the last day; **⋯ → Background work** opens the rail at any time. Its label counts what is running and marks work that failed, read from the same list the rail shows. |
+| **Jump to latest** | — | Appears when you scroll up while reading. The conversation follows a streaming answer only while you are at the bottom; this takes you back down and resumes following. |
 | **⋯ on your own message** | `More actions for this message` | The **Continuity** group: **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
 
 **Retry sends the prompt again, and that means the turn runs again.** If the
@@ -77,6 +100,13 @@ safe and you can. A turn that only read is never asked about: a question on
 every retry is a question nobody reads. The new turn is recorded as a retry of
 the one it repeats — *Retry of an earlier turn* links back to it, and the
 earlier turn is kept exactly as it was.
+
+**While a turn runs**, the composer grows a row of its own. One line above it
+says what the turn is doing now when there is something specific to say — a
+call in flight, such as *Read file · notes.txt…*, or *Waiting for your
+decision* — read from the turn's own events. **Add instruction** queues your
+words for the running turn; they arrive at its next safe boundary. **Stop
+safely** asks the turn to end at that boundary and keep what it has done.
 
 Each tab numbers the stops and steers it sends to a running turn. One that
 arrives after a later one from the same tab is refused rather than applied out
@@ -158,6 +188,12 @@ fenced code. **Your own messages are shown exactly as you typed them, and this
 is deliberate** — a prompt is an instruction whose exact characters matter, so
 Chat never re-formats one. If you write `**bold**` in a prompt, the model
 receives those asterisks and you see those asterisks.
+
+**A turn that used tools ends with one line saying how it ended**: *Completed*
+with the number of steps, *Partially completed* when some steps did not go
+through, *Outcome unknown* when a step never reported how it ended, or *Not
+done*. A plain answer has no such line, and a stopped or parked turn says so in
+its own words.
 
 A completed reply also has **Read aloud**. It is manual: Raiker never starts
 speaking because a response arrived. **Stop speaking** interrupts playback, and
@@ -349,9 +385,11 @@ format and counts — never its text.
 
 ## Your conversations
 
-**Threads is where your conversations are.** The sidebar is navigation and
-nothing else — it carries no list of recent chats and reads none, so nothing you
-have said is fetched to draw it.
+**Threads is where your conversations are.** The sidebar lists your five most
+recent chats under **Chat**, newest first, so going back to one is a click from
+anywhere; a routine's thread is not listed there. The names come from the same
+thread list Work → Threads reads, and the list is hidden when the sidebar is
+collapsed to icons.
 
 **Work → Threads** is the board: everything you have going, pinned first and then
 newest — the conversations you started **and** the threads your routines are

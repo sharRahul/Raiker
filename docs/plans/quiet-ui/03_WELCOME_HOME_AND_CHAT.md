@@ -2,6 +2,40 @@
 
 Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
+## Status
+
+**First round shipped 2026-10-21** ([FIXED-1057](../FIXED_ITEMS.md#fixed-1057--home-had-no-way-to-start-work-by-asking-qui-h01)
+to [FIXED-1074](../FIXED_ITEMS.md#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering);
+live cases RT-QUI-01 to RT-QUI-09 in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+
+| Item | State |
+|---|---|
+| QUI-H01 | **Partly done.** Done: the greeting with one true fact, the composer (text and Send), *This week*. Open: Attach and the profile chip on Home's composer (the chip waits for QUI-P02), *Continue where you left off* as one card with its next step (today a list of five threads), at most one decision row and two in-progress cards, and the 980 px single column. |
+| QUI-H02 | **Done**, without the companion: the companion's art does not exist yet ([08, QUI-V05](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v05--companion)). |
+| QUI-H03 | **Done.** Home is the default and Settings → General can choose Chat; the option now reads Home. |
+| QUI-H04 | **Done.** The line names the version; a count of changes needs release notes the host can read. |
+| QUI-H05 | **Done.** Stale means the newest *verified* backup is seven days old, the same window as *This week*. |
+| QUI-C01 | **Partly done.** Done: the editable title. Open: the project chip, search in conversation and the Context toggle in the same strip. |
+| QUI-C02 | Already true before this round; unchanged. |
+| QUI-C03 | **Done**: the status line, Add instruction, Stop safely and the outcome line. Open: the task receipt on the outcome line ([06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md#qui-f16--task-receipt)). |
+| QUI-C04 | **Partly done.** Done: the placeholder and the data label. Open: the profile chip and moving schedule, research depth and answer style under More. |
+| QUI-C05 | **Done.** |
+| QUI-C06 | **Done.** |
+| QUI-C07 | Open. |
+| QUI-C08 | **Done.** |
+| QUI-C09 | Already true before this round: Edit and Retry make a new turn and keep the earlier one. |
+| QUI-C10 | **Done**, without the companion. |
+| QUI-C11 | Open: background runs are still offered from the Tools menu. |
+| QUI-C12 | Open. |
+| QUI-W01 | **Needs the owner's decision**: the open-ring mark in [QUI-V04](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v04--app-mark-the-open-ring) is recorded as a recommendation, not a decision. |
+| QUI-W02 – W05 | Open: setup is still the staged form, not a setup conversation. |
+| QUI-W06 | **Done**: Settings → General → Run setup again, on the model step. A progress line already shows real steps. |
+
+**Starters.** The four are *Summarise a document*, *Plan my week*, *Fix a bug
+in a repository* and *Make an image* (`web/src/lib/starters.ts`). The first two
+fill the composer; the last two open Build and Design.
+
 ## Reference products
 
 * **Hermes**: chat is the home surface. First run is a guided setup

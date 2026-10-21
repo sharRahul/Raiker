@@ -4,16 +4,16 @@ import { describe, expect, it } from "vitest";
 import { KNOWN_GAPS, readinessGaps } from "./readinessGaps";
 
 describe("readinessGaps", () => {
-  it("names a missing model plainly and offers to set one up", () => {
+  it("names a missing default model plainly and links to Models", () => {
     expect(readinessGaps(["No model profile is selected."], true)).toEqual([
-      { id: "gap-0", title: "No model is set up.", action: { kind: "model-setup", label: "Set up model" } },
+      { id: "gap-0", title: "No default model is chosen.", action: { label: "Choose a model", href: "#/models" } },
     ]);
   });
 
   it("keeps the runtime's own sentence for a gap it has no plainer wording for", () => {
     const [row] = readinessGaps(["No acting principal is available."], false);
     expect(row.title).toBe("No acting principal is available.");
-    expect(row.action).toMatchObject({ kind: "link", label: "Open diagnostics" });
+    expect(row.action).toMatchObject({ label: "Open diagnostics", href: "#/observe?tab=diagnostics" });
   });
 
   it("gives one row per gap, never a count", () => {

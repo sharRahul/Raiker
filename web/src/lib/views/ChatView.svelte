@@ -102,7 +102,9 @@
   import {
     activeComposerProfile,
     blocksSending,
+    closeModelSetup,
     openModelSetup,
+    setupDialog,
     readinessForSelection,
   } from "../modelReadiness.svelte";
   import {
@@ -350,13 +352,20 @@
   // moment one is, through the same `submit()`, and is dropped if the owner
   // edits the draft or cancels.
   let sendWhenReady = $state<string | null>(null);
+  // Resolves once Chat has read the model it was last set to (or failed to).
+  let surfaceModelRead: Promise<void> = Promise.resolve();
   $effect(() => {
     if (sendWhenReady === null) return;
     if (draft.text.trim() !== sendWhenReady) {
       sendWhenReady = null;
       return;
     }
-    if (!modelBlocked && modelsKnown() && !streaming) void submit();
+    if (!modelBlocked && modelsKnown() && !streaming) {
+      // The dialog asked for a model; one is ready now, so it has nothing left
+      // to ask.
+      if (setupDialog.open) closeModelSetup();
+      void submit();
+    }
   });
   // BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI:
   // low/medium/high) or as a *mode* (Anthropic: adaptive). Offering only the
@@ -655,11 +664,11 @@
     void refreshModels();
     // Chat starts on the model Chat was last set to, not on whatever the global
     // default happens to be. An explicit per-turn choice still overrides it.
-    void surfaceModel("chat").then((remembered) => {
+    surfaceModelRead = surfaceModel("chat").then((remembered) => {
       if (remembered === null || modelProfile) return;
       modelProfile = remembered.profileId;
       model = remembered.model;
-    });
+    }).catch(() => {});
     // The authoritative decision for this surface: what is selected,
     // what will actually run, and why they differ when they do. The picker
     // needs it to keep an unavailable selection visible instead of quietly
@@ -1328,9 +1337,11 @@
     }
     if (turns.length > 0 || sessionId !== null) newConversation();
     draft.text = text;
-    // A Chat that has only just mounted has not read its models yet, and an
-    // unread model list looks like no model at all. Read it before judging.
+    // A Chat that has only just mounted has not read its models, or the model
+    // Chat was last set to, and an unread choice looks like no model at all.
+    // Both are read before the message is judged (found live, RT-QUI-03).
     if (!modelsKnown()) await refreshModels();
+    await surfaceModelRead;
     await tick();
     void submit();
   }

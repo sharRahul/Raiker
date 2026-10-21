@@ -8,7 +8,7 @@ tablets, and a full sidebar on wider screens.
 
 | Group | Destination | What it is for |
 |---|---|---|
-| Home | **Workbench** | Live view of running work, agents, schedules, and decisions that need you |
+| Home | **Home** | A composer that opens a new chat, then the live view of running work, agents, schedules, decisions that need you, and this week's finished work |
 | Work | **Chat** | Conversations, attachments, sources, memory, and approvals |
 | Work | **Build** | Repository-aware planning, edits, commands, commits, and pushes |
 | Work | **Work** → Threads | Everything you have going — chats and routines — and a full-text search across it |

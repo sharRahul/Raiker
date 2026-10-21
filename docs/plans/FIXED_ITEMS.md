@@ -1143,6 +1143,29 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1054](#fixed-1054--a-goals-steps-ran-on-whatever-an-empty-model-selection-resolved-to) | High | Goals / models / execution profiles | Fixed 2026-10-20 — found live: steps ran on the empty selection |
 | [FIXED-1055](#fixed-1055--a-criterions-text-box-and-a-steps-counts-toward-box-had-the-same-name) | Low | Goals / accessibility | Fixed 2026-10-20 — found live: two controls shared a name |
 | [FIXED-1056](#fixed-1056--goal-and-profile-audit-events-would-have-been-dropped-without-a-word) | Medium | Goals / audit | Fixed 2026-10-20 — audit events would have been dropped |
+| [FIXED-1057](#fixed-1057--home-had-no-way-to-start-work-by-asking-qui-h01) | Medium | Home / Chat | Fixed 2026-10-21 |
+| [FIXED-1058](#fixed-1058--five-start-cards-repeated-the-sidebar-and-a-first-day-had-nothing-to-start-from-qui-q02-qui-h02) | Low | Home | Fixed 2026-10-21 |
+| [FIXED-1059](#fixed-1059--home-greeted-every-visit-the-same-way-and-said-nothing-about-decisions-qui-h01) | Low | Home | Fixed 2026-10-21 |
+| [FIXED-1060](#fixed-1060--home-had-no-sense-of-progress-qui-h01) | Low | Home | Fixed 2026-10-21 |
+| [FIXED-1061](#fixed-1061--an-update-changed-raiker-without-a-word-qui-h04) | Low | Home / updates | Fixed 2026-10-21 |
+| [FIXED-1062](#fixed-1062--home-never-mentioned-that-the-workspace-had-no-backup-qui-h05) | Medium | Home / backups | Fixed 2026-10-21 |
+| [FIXED-1063](#fixed-1063--an-empty-conversation-offered-nothing-to-start-from-qui-c10) | Low | Chat | Fixed 2026-10-21 |
+| [FIXED-1064](#fixed-1064--reading-earlier-in-a-conversation-was-pulled-to-the-bottom-by-every-streamed-word-qui-c08) | Medium | Chat | Fixed 2026-10-21 |
+| [FIXED-1065](#fixed-1065--a-message-send-kept-while-no-model-was-ready-had-to-be-sent-again-by-hand-qui-c05) | Low | Chat / models | Fixed 2026-10-21 |
+| [FIXED-1066](#fixed-1066--going-back-to-a-recent-conversation-took-three-clicks-qui-c06) | Low | Sidebar / Chat | Fixed 2026-10-21 |
+| [FIXED-1067](#fixed-1067--a-conversations-name-could-only-be-changed-from-threads-qui-c01) | Low | Chat | Fixed 2026-10-21 |
+| [FIXED-1068](#fixed-1068--a-running-turn-said-only-working-and-stop-and-steer-did-not-say-what-they-do-qui-c03) | Low | Chat / turn control | Fixed 2026-10-21 |
+| [FIXED-1069](#fixed-1069--nothing-said-where-a-message-would-go-before-it-was-sent-qui-c04) | Medium | Chat / privacy | Fixed 2026-10-21 |
+| [FIXED-1070](#fixed-1070--a-turn-that-used-tools-did-not-say-how-it-ended-qui-c03) | Medium | Chat | Fixed 2026-10-21 |
+| [FIXED-1071](#fixed-1071--first-run-setup-could-not-be-run-again-and-the-startup-option-still-said-workbench-qui-w06-qui-h03) | Low | Settings / setup | Fixed 2026-10-21 |
+| [FIXED-1072](#fixed-1072--a-message-from-home-opened-a-stale-set-up-a-model-dialog-over-its-own-answer) | Medium | Chat / models | Fixed 2026-10-21 — found live in RT-QUI-03 |
+| [FIXED-1073](#fixed-1073--long-chat-titles-ran-past-the-sidebars-edge) | Low | Sidebar | Fixed 2026-10-21 — found live in RT-QUI-04 |
+| [FIXED-1074](#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering) | Medium | Home / models | Fixed 2026-10-21 — found live in RT-QUI-07 |
+| [FIXED-1075](#fixed-1075--home-showed-a-runtime-issues-count-instead-of-the-problem-qui-q01) | Medium | Home | Fixed 2026-10-21 |
+| [FIXED-1076](#fixed-1076--chats-placeholder-was-a-generic-chatbot-line-qui-q03) | Low | Chat | Fixed 2026-10-21 |
+| [FIXED-1077](#fixed-1077--send-was-a-dead-button-with-no-model-qui-q04) | Medium | Chat / models | Fixed 2026-10-21 |
+| [FIXED-1078](#fixed-1078--new-chat-and-background-were-shown-with-nothing-behind-them-qui-q05) | Low | Chat | Fixed 2026-10-21 |
+| [FIXED-1079](#fixed-1079--the-top-bars-icon-buttons-had-no-visible-tooltip-qui-q06) | Low | Top bar / accessibility | Fixed 2026-10-21 |
 
 ---
 
@@ -36070,3 +36093,233 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** The seventeen goal and profile event types are declared in `EVENT_TYPES`, including the three the coordinator builds from the outcome name.
 
 **Evidence.** `test_every_goal_and_profile_change_reaches_the_audit_log` reads them back from the event index; `test_no_runtime_event_type_is_undeclared`.
+
+## FIXED-1057 — Home had no way to start work by asking (QUI-H01)
+
+**Severity: Medium. Area: Home / Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Home opened on five start cards that only linked to other pages. Starting anything meant choosing a destination first, and the plan's Home opens with a composer.
+
+**Fixed.** Home opens with **Ask Raiker anything…**. Sending hands the message to Chat (`web/src/lib/chatHandoff.ts`), which starts a new conversation and sends it through its own `submit()`, so Home never has a second send path. A one-shot store covers a Chat that has not mounted yet; whichever side takes the message first sends it once.
+
+**Evidence.** `WorkbenchView.test.ts` (*opens with a composer that hands its message to Chat*), `ChatView.test.ts` (*sends a message handed over from Home, once, in a new conversation*), `chatHandoff.test.ts`; live RT-QUI-03.
+
+## FIXED-1058 — Five start cards repeated the sidebar, and a first day had nothing to start from (QUI-Q02, QUI-H02)
+
+**Severity: Low. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** The start row (conversation, build, design, task, projects) repeated the sidebar and the Chat · Build · Design switch on every visit, while a brand-new workspace offered no idea of what to ask.
+
+**Fixed.** The row is gone; the composer replaces it. On a first day — no threads, tasks or projects yet — four starters sit under the composer (`web/src/lib/starters.ts`): two prompts that fill the box for the owner to edit, and Build and Design.
+
+**Evidence.** `WorkbenchView.test.ts` (*shows the four starters only while the workspace has nothing in it*); live RT-QUI-01 and RT-QUI-07.
+
+## FIXED-1059 — Home greeted every visit the same way and said nothing about decisions (QUI-H01)
+
+**Severity: Low. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** The heading read *Welcome* or *Welcome back* whatever the time, without the owner's name, and a waiting decision was visible only in the side rail.
+
+**Fixed.** *Welcome, Rahul* on a first day, then *Good morning / afternoon / evening, Rahul* by the owner's clock and chosen name. One fact sits under it only when true: *1 decision waiting*, linking to Approvals (`homeSummary.ts`). Live specs match one shared `HOME_GREETING` pattern (`web/e2e/home.ts`).
+
+**Evidence.** `homeSummary.test.ts`; `WorkbenchView.test.ts` (*greets the owner by name and states a waiting decision once*); live RT-QUI-01, RT-QUI-07.
+
+## FIXED-1060 — Home had no sense of progress (QUI-H01)
+
+**Severity: Low. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** Finished work vanished from Home the moment it finished; nothing said what got done.
+
+**Fixed.** **This week** names the tasks and goals completed in the last seven days, newest first, each linking to its record. Failed, cancelled and untitled work is left out. Names, not counts.
+
+**Evidence.** `homeSummary.test.ts`, `WorkbenchView.test.ts` (*names the work finished this week*).
+
+## FIXED-1061 — An update changed Raiker without a word (QUI-H04)
+
+**Severity: Low. Area: Home / updates. Status: Fixed 2026-10-21.**
+
+**Observed.** Nothing told the owner that the version they were using had changed.
+
+**Fixed.** After the installed version changes, Home shows one line — *Raiker was updated to 1.4.0. What's new · Dismiss* — linking to Settings → About & updates. The first version a browser sees is stored silently, so a fresh install never says *Updated*. Never a modal (`whatsNew.ts`).
+
+**Evidence.** `whatsNew.test.ts`, `WorkbenchView.test.ts`; live RT-QUI-08 (shown, dismissed, gone after reload).
+
+## FIXED-1062 — Home never mentioned that the workspace had no backup (QUI-H05)
+
+**Severity: Medium. Area: Home / backups. Status: Fixed 2026-10-21.**
+
+**Observed.** Backups lived only in Settings → Account; a workspace used for weeks with no backup looked exactly like a protected one.
+
+**Fixed.** The attention rail recommends a backup when there is none, or the newest **verified** one is seven days old (`backupReminder.ts`), with **Make a backup**. A damaged or unreadable backup does not count. While a recommendation stands, the rail does not claim *Nothing needs you right now*.
+
+**Evidence.** `backupReminder.test.ts`, `WorkbenchView.test.ts` (*recommends a first backup in the attention rail*); live RT-QUI-01.
+
+## FIXED-1063 — An empty conversation offered nothing to start from (QUI-C10)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** An empty Chat showed a greeting and *Start with a question, a task, or a file.* and nothing else.
+
+**Fixed.** The same four starters as Home's first day. A prompt starter fills the composer and never sends on its own; Build and Design open their surfaces.
+
+**Evidence.** `ChatView.test.ts` (*offers four starters on an empty conversation*); live RT-QUI-02.
+
+## FIXED-1064 — Reading earlier in a conversation was pulled to the bottom by every streamed word (QUI-C08)
+
+**Severity: Medium. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Every streamed chunk scrolled the transcript to the end, so an owner scrolling up to read was dragged back down.
+
+**Fixed.** The transcript follows an answer only while the owner is within 48 px of the bottom. Scrolling up stops following and shows **Jump to latest**, which returns and resumes. Sending, opening a conversation and continuing after a decision still scroll, because the owner did them.
+
+**Evidence.** `ChatView.test.ts` (*offers Jump to latest once the owner scrolls away from the bottom*); live RT-QUI-05.
+
+## FIXED-1065 — A message Send kept while no model was ready had to be sent again by hand (QUI-C05)
+
+**Severity: Low. Area: Chat / models. Status: Fixed 2026-10-21.**
+
+**Observed.** QUI-Q04 made Send open model setup and keep the draft, but after the model was ready the owner had to press Send again.
+
+**Fixed.** The kept message is sent as soon as a model is usable, through the same `submit()`. A line says *Your message will send as soon as a model is ready* with **Don't send**; editing the message cancels it. The setup dialog closes when the message goes.
+
+**Evidence.** `ChatView.composerParity.test.ts` (*sends the kept message once a model becomes ready*, *does not send a kept message the owner cancelled*).
+
+## FIXED-1066 — Going back to a recent conversation took three clicks (QUI-C06)
+
+**Severity: Low. Area: Sidebar / Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** The sidebar listed destinations only; a recent chat was reached through Work → Threads.
+
+**Fixed.** The five most recent chats sit under **Chat** (`recentChats.ts`), newest first, refreshed when a turn finishes or a chat is renamed. Routine threads, archived and untitled ones are not listed, and the list is hidden at icon-rail width. This supersedes the earlier rule in `working-in-chat.md` that the sidebar reads no chat titles.
+
+**Evidence.** `Sidebar.test.ts` (*lists the five newest chats, and no routine threads*, *draws no list at rail width*); live RT-QUI-04.
+
+## FIXED-1067 — A conversation's name could only be changed from Threads (QUI-C01)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** Chat's header showed actions only; the conversation's title appeared nowhere on the page it named.
+
+**Fixed.** The header shows the title at the left with a pen (**Rename conversation**). Enter keeps the new name through `PUT /api/sessions/{id}/rename`; Escape keeps the old; a failed rename says so and leaves the title unchanged. A new conversation reads its stored title after its first answer.
+
+**Evidence.** `ChatView.test.ts` (*shows the conversation title and renames it*); live RT-QUI-04.
+
+## FIXED-1068 — A running turn said only Working, and Stop and Steer did not say what they do (QUI-C03)
+
+**Severity: Low. Area: Chat / turn control. Status: Fixed 2026-10-21.**
+
+**Observed.** While a turn ran, the composer offered *Stop* and *Steer* and no word about what the turn was doing.
+
+**Fixed.** One line above the controls names the call in flight (*Read file · notes.txt…*) or *Waiting for your decision*, read from the turn's own events and silent otherwise (`workingLine`). The steer field is **Add instruction** and Stop reads **Stop safely**, because it ends the turn at its next safe boundary and keeps what it did.
+
+**Evidence.** `chatPresentation.test.ts`, `TurnControl.test.ts`; live RT-QUI-06.
+
+## FIXED-1069 — Nothing said where a message would go before it was sent (QUI-C04)
+
+**Severity: Medium. Area: Chat / privacy. Status: Fixed 2026-10-21.**
+
+**Observed.** Whether a prompt stayed on the device or went to a provider was knowable only from Models.
+
+**Fixed.** A line under the composer reads *Stays on this computer*, *Sent to Anthropic* or *Where it runs is not confirmed*, from the same `inferenceLocation` Models uses, for the model chosen for the turn. Its tooltip is the full sentence.
+
+**Evidence.** `ChatView.composerParity.test.ts` (*says where the next message goes…*, *says a local model's messages stay on this computer*); live RT-QUI-02.
+
+## FIXED-1070 — A turn that used tools did not say how it ended (QUI-C03)
+
+**Severity: Medium. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** A turn whose steps partly failed read the same as one that did everything.
+
+**Fixed.** A settled turn that used tools ends with *Completed · N steps*, *Partially completed*, *Outcome unknown* (a step never reported how it ended) or *Not done*. Plain answers, stopped turns and parked turns have no such line (`turnOutcome`).
+
+**Evidence.** `chatPresentation.test.ts`, `ChatView.test.ts` (*says how a turn that used tools ended*); seen live as *Completed · 1 step* on a document the model created.
+
+## FIXED-1071 — First-run setup could not be run again, and the startup option still said Workbench (QUI-W06, QUI-H03)
+
+**Severity: Low. Area: Settings / setup. Status: Fixed 2026-10-21.**
+
+**Observed.** Once setup finished there was no way back to it, and Settings → General offered *Workbench* as a startup page that the sidebar calls Home.
+
+**Fixed.** **Settings → General → Run setup again** reopens setup on its model step, sending the whole stored setup state so every earlier choice is kept. The startup option reads **Home**.
+
+**Evidence.** `General.test.ts`; live RT-QUI-09.
+
+## FIXED-1072 — A message from Home opened a stale Set up a model dialog over its own answer
+
+**Severity: Medium. Area: Chat / models. Status: Fixed 2026-10-21 — found live in RT-QUI-03.**
+
+**Observed.** After Home handed a message to Chat, the answer arrived and a *Set up a model to continue* dialog stayed over it. Chat had judged the message before it read the model it was last set to; the global default was empty, so the turn looked blocked, Send kept it, and the remembered model then sent it — leaving the dialog behind.
+
+**Fixed.** A handed-over message waits for both the model list and Chat's remembered model before it is judged, and a kept message that is sent closes the setup dialog.
+
+**Evidence.** `ChatView.test.ts` (*sends a handed-over message on the model Chat was last set to, without a setup dialog*); live RT-QUI-03 asserts no setup dialog.
+
+## FIXED-1073 — Long chat titles ran past the sidebar's edge
+
+**Severity: Low. Area: Sidebar. Status: Fixed 2026-10-21 — found live in RT-QUI-04.**
+
+**Observed.** A recent chat titled from a long prompt widened its row past the sidebar border, and the Chat row's highlight followed it.
+
+**Fixed.** Grid items in the sidebar may shrink below their content (`min-width: 0`), so a title ends in an ellipsis and is whole in its tooltip.
+
+**Evidence.** Screenshots of RT-QUI-04 and RT-QUI-07 before and after.
+
+## FIXED-1074 — Home said No model is set up while a chat was answering
+
+**Severity: Medium. Area: Home / models. Status: Fixed 2026-10-21 — found live in RT-QUI-07.**
+
+**Observed.** After Anthropic was connected and used in Chat, Home still read *No model is set up.* The runtime's gap is the *default* model (`current_profile_id`), which a Chat with its own model does not set.
+
+**Fixed.** The gap reads **No default model is chosen.** with **Choose a model** linking to Models, where a default is connected and chosen.
+
+**Evidence.** `readinessGaps.test.ts`, `WorkbenchView.test.ts`; live RT-QUI-01 and RT-QUI-07.
+
+## FIXED-1075 — Home showed a Runtime issues count instead of the problem (QUI-Q01)
+
+**Severity: Medium. Area: Home. Status: Fixed 2026-10-21.**
+
+**Observed.** A tile read *Runtime issues · 1* and *Review configuration and readiness evidence before critical work.*, naming neither the problem nor the fix.
+
+**Fixed.** Each gap is a row: the runtime's sentence, or a plainer one for gaps met in ordinary use, with the action that fixes it (`readinessGaps.ts`). A runtime that is not ready but names no gap still gets one row. A test checks every matched sentence still exists in `raiker/control/dashboard_parts/models.py`.
+
+**Evidence.** `readinessGaps.test.ts`, `WorkbenchView.test.ts`, mocked `composer.spec.ts`.
+
+## FIXED-1076 — Chat's placeholder was a generic chatbot line (QUI-Q03)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** The composer read *How can I help you today?*.
+
+**Fixed.** It reads *What would you like Raiker to do?*; the live specs that found the composer by its placeholder use the new text.
+
+**Evidence.** Mocked `composer.spec.ts`; every live spec that types a prompt.
+
+## FIXED-1077 — Send was a dead button with no model (QUI-Q04)
+
+**Severity: Medium. Area: Chat / models. Status: Fixed 2026-10-21.**
+
+**Observed.** With no usable model Send was disabled next to *Not selected*, and nothing said what to do about it on press.
+
+**Fixed.** Send stays enabled; pressing it with no usable model opens model setup and keeps the draft — the same path a server refusal already took. See FIXED-1065 for sending it afterwards.
+
+**Evidence.** `ChatView.composerParity.test.ts`, `ChatView.test.ts`; `bug-69-model-readiness-live.spec.ts` updated.
+
+## FIXED-1078 — New chat and Background were shown with nothing behind them (QUI-Q05)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-21.**
+
+**Observed.** An empty conversation showed a disabled, faded *New chat* that read as a title, and a *Background* toggle over no background work.
+
+**Fixed.** *New chat* appears once there is a conversation to leave; the Background toggle only while work is running, waiting or failed today, and **⋯ → Background work** opens the rail at any time.
+
+**Evidence.** `backgroundWork.test.ts`, `ChatView.composerParity.test.ts`, `workProjectContinuity.test.ts`.
+
+## FIXED-1079 — The top bar's icon buttons had no visible tooltip (QUI-Q06)
+
+**Severity: Low. Area: Top bar / accessibility. Status: Fixed 2026-10-21.**
+
+**Observed.** Search, Approvals, Notifications and More had accessible names but no tooltip for a pointer user.
+
+**Fixed.** Each carries its name as a tooltip in the same words; search shows its shortcut as printed on the key.
+
+**Evidence.** `Topbar.test.ts` (*gives each icon-only control a tooltip matching its name*).

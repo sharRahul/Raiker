@@ -1,12 +1,14 @@
 # Messaging
 
-**Extensions → Channels** (messaging) is where Raiker meets you somewhere other than this browser.
+**Connections → Channels** (messaging) is where Raiker meets you somewhere other than this browser.
 
-It used to be a tab inside Extensions, next to connectors, MCP servers, skills,
-hooks and plugins. Those are all things the agent *uses*. A channel is the
-opposite direction: a place a person writes to Raiker from. That is a different
-kind of thing, and it is the one place where content Raiker did not ask for
-enters a turn — so it has its own destination and its own contract.
+It is a tab of its own beside **Services** and **Advanced**. Those hold things
+the agent *uses*. A channel is the opposite direction: a place a person writes
+to Raiker from. That is a different kind of thing, and it is the one place where
+content Raiker did not ask for enters a turn — so it has its own tab and its own
+contract. The tab lists the channels you have linked, with the chosen one's
+detail beside it; **Add channel** opens a dialog with every channel Raiker can
+link.
 
 A channel is the one place where content Raiker did not ask for enters a turn.
 That content is defined: **untrusted content with a named sender who is not you.**
@@ -14,7 +16,7 @@ Never a prompt. Never able to enable a capability, widen an approval mode, or
 approve anything. Trust comes from the pairing record, never from anything inside
 the message.
 
-The page lists every connector profile and lets you **pair** one. Pairing does not
+**Add channel** lists every connector profile and lets you **pair** one. Pairing does not
 switch it on and does not trust anyone — linked, enabled and trusted are three
 separate facts, and the page shows them separately:
 

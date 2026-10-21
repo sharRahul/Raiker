@@ -290,7 +290,7 @@ See [Security and privacy](docs/guide/security-and-privacy.md).
 Updates are verified against Raiker's release signing key before anything is
 installed, and your data is never touched by an update.
 
-- **Windows (setup.exe), macOS, AppImage:** **Settings → Updates** checks the
+- **Windows (setup.exe), macOS, AppImage:** **Settings → About & updates** checks the
   update channel you have pinned, and installs a verified update in place,
   keeping the previous version for rollback on macOS and AppImage.
 - **`.deb`, `.rpm`, `.msi`:** install the new release's package over the old
@@ -312,7 +312,7 @@ Raiker never contacts an update server until you pin a channel. See
 | System | How | Your data |
 |---|---|---|
 | Windows | Settings → Apps → Raiker → Uninstall | Kept unless you choose **Yes** when asked |
-| macOS | Move Raiker from Applications to the Bin | Kept; remove it first with Settings → Account → Delete my account |
+| macOS | Move Raiker from Applications to the Bin | Kept; remove it first with Settings → General → Delete my account |
 | Linux | `sudo apt remove raiker`, `sudo dnf remove raiker`, or delete the AppImage | Kept |
 
 Models installed with other tools (Ollama, LM Studio), folders you attached and

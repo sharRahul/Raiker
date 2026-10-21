@@ -15,6 +15,34 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-21 (Quiet UI layout system and pages, hosted Anthropic Haiku 4.5)
+
+The layouts and page plans in the [Quiet UI plan](../plans/quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#status)
+([FIXED-1101](../plans/FIXED_ITEMS.md#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14)
+to [FIXED-1123](../plans/FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08)).
+Fresh workspaces served by `raiker-web` on `127.0.0.1:8765` at 1440×900 (and
+1100×800 for the narrow window). Anthropic was connected through **Add model**,
+with the key and workspace ID typed from the run's environment; neither appears
+in a spec, command, document, screenshot or the server log. Spec:
+`web/e2e/quiet-ui-layout-live.spec.ts`, run twice on fresh workspaces, the
+second time after the readiness fix below.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-17 | The sidebar is 232 px with 40 px rows; at 1,100 px wide it is a 64 px icon rail; a page is at most 1,180 px wide | ✅ |
+| RT-QUI-18 | **Connections** opens on **Services** with *Nothing is connected yet*; **Add connection** shows the catalogue with search and categories; choosing a service shows only its steps; **GitHub sign-in** opens its sign-in window above the dialog; Advanced is one segmented list | ✅ after fixes found in this round ([FIXED-1115](../plans/FIXED_ITEMS.md#fixed-1115--sign-in-for-a-connection-opened-under-the-add-dialog-qui-l04), [FIXED-1116](../plans/FIXED_ITEMS.md#fixed-1116--add-connection-offered-github-twice-qui-l07), [FIXED-1118](../plans/FIXED_ITEMS.md#fixed-1118--the-list-separator-had-no-value-for-assistive-technology-qui-l02)) |
+| RT-QUI-19 | **Channels** lists linked channels only; **Add channel** lists every channel and opens one's pairing steps | ✅ |
+| RT-QUI-20 | **Permissions**: the category rail, rows saying their policy in words, one permission's detail beside the list with the four-way choice; the category and permission are in the address; **⋯ → Select several** turns the list into a checklist | ✅ |
+| RT-QUI-21 | **Models** on a fresh workspace: no tabs, *No default model is chosen*, Chat's four readiness steps with *Provider connected* marked and **Connect a provider**. **Add model** → **An account I have** → Anthropic → key → Haiku 4.5 → **Make default**; the profile card names Haiku 4.5 and My models lists it with its usage | ✅ after fixes found in this round ([FIXED-1119](../plans/FIXED_ITEMS.md#fixed-1119--a-rows--menu-was-cut-off-inside-a-dialog-qui-l04), [FIXED-1120](../plans/FIXED_ITEMS.md#fixed-1120--make-default-in-add-model-had-no-model-to-choose-qui-l08), [FIXED-1123](../plans/FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08)) |
+| RT-QUI-22 | A Chat turn answers on the model Add model made the default | ✅ |
+| RT-QUI-23 | **Settings**: Account inside General (*Signed in as Rahul*); **Advanced** with Runtime, Memory engine, Model serving and Usage and spending; **Security** as rows, each action opening its form in a dialog; `#/settings?tab=github` opens Connections on GitHub sign-in | ✅ after a fix found in this round ([FIXED-1117](../plans/FIXED_ITEMS.md#fixed-1117--an-old-github-settings-link-did-nothing-while-settings-was-open-qui-l09)) |
+| RT-QUI-24 | **?** opens Help beside the page on that page's article; search finds an article; a link inside opens the other article in the panel; **Escape** closes it; `#/guide?section=…` opens the panel on that article | ✅ |
+| RT-QUI-25 | Heights at 1440×900: Connections Services and Channels, Permissions, Models and Security 844 px each; Settings General 1,326 px | ✅ after a fix found in this round ([FIXED-1121](../plans/FIXED_ITEMS.md#fixed-1121--settings-general-was-twice-the-page-budget-qui-l09-qui-g01)): General was 2,117 px |
+| QUI-G01 | Size report: 8 of 70 measurements over budget (29 of 94 before), all on pages this round did not rebuild (listed in [TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-21-quiet-ui-round-2--what-is-still-open)) | Report, as planned |
+| Re-run | RT-QUI-14 and RT-QUI-15 (keyboard walk and 200% zoom) on the new pages; `all-pages-live` | ✅ |
+| Suites | Web unit suite; mocked `composer.spec.ts` 16/16; `svelte-check`, ESLint, design tokens, build; the Python tests that read web source and the docs | ✅ |
+| Visual review | `docs/screenshots/2026-10-21-quiet-ui-layout/` (17–25), inspected at original resolution. Found from the images: a doubled focus box on search fields ([FIXED-1122](../plans/FIXED_ITEMS.md#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02)) and the readiness steps sitting outside the profile card, moved inside it. Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-21 (Quiet UI round 2: Home, Chat, setup and quality checks, hosted Anthropic Haiku 4.5)
 
 The second round of the [Quiet UI plan](../plans/quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status)

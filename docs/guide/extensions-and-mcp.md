@@ -1,8 +1,17 @@
 # Extensions and MCP
 
-**Extensions** has five tabs: Connectors, MCP servers, Skills, Hooks, Plugins.
-Channels used to be a sixth; they are their own destination now — see
-[Messaging](messaging.md).
+**Connections** has three tabs:
+
+| Tab | What it holds |
+|---|---|
+| **Services** | The services you have connected — Gmail, Slack, GitHub sign-in — and **Add connection**, which holds the whole catalogue |
+| **Channels** | Linked messaging channels — see [Messaging](messaging.md) |
+| **Advanced** | **MCP servers**, **Skills**, **Hooks** and **Plugins**, chosen with the switch at the top of the list |
+
+Every tab is a list on the left and the chosen item's detail on the right; the
+chosen item is in the address (`?item=`), so a link opens it again. The page
+used to be called **Extensions**, and its old addresses — `#/extensions`,
+`#/extensions?tab=mcp` — still land on the matching tab.
 
 ## Connectors
 
@@ -521,7 +530,7 @@ your next turn; nothing needs restarting.
 
 ### What the Hooks tab tells you
 
-Extensions → **Hooks** reports what the runtime actually loaded, which is not
+Connections → Advanced → **Hooks** reports what the runtime actually loaded, which is not
 always what you wrote. Three states are worth knowing, and each is one the file
 alone cannot show you:
 
@@ -633,7 +642,7 @@ is no state where the page says revoked and the runtime still runs the rule.
 Re-installing replaces rather than adds, so an upgrade that dropped a rule drops
 it here too.
 
-Extensions → **Plugins** states what each installed plugin provides, read from the
+Connections → Advanced → **Plugins** states what each installed plugin provides, read from the
 files the runtime loads rather than from the manifest that described them. It also
 lists what a plugin *may* contribute:
 
@@ -677,7 +686,7 @@ read and the install, it is held again.
 
 A plugin that asks for `skill:contribute` may ship `SKILL.md` documents. They go
 through the same validator an upload does, land in
-`.raiker/plugins/<id>/skills/<name>/SKILL.md`, and appear on Extensions → Skills
+`.raiker/plugins/<id>/skills/<name>/SKILL.md`, and appear on Connections → Advanced → Skills
 marked **from plugin** with the plugin's id.
 
 They arrive **inactive**. Installing the plugin was consent to *offer* the skill,
@@ -695,8 +704,8 @@ A plugin's skill never overwrites one of yours. If the names collide, yours stay
 A plugin that asks for `mcp:server` may **offer** a server — a name, a transport,
 an HTTPS endpoint or a reviewed template, and the name of the environment
 variable holding the token. It is a description, not a connection: nothing is
-added, connected, or reachable until you press **Add server** on Extensions →
-MCP servers, and that runs the same governed create path as typing it in.
+added, connected, or reachable until you press **Add server** on Connections →
+Advanced → MCP servers, and that runs the same governed create path as typing it in.
 
 An offer can never carry a credential. A plaintext `http://` endpoint, a URL with
 a username or password in it, or an `auth_ref` that is not an environment

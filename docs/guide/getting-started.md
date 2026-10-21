@@ -380,7 +380,7 @@ provider card's own secure field.
 
 | Step | What it is |
 |---|---|
-| **Name** | *Hi, I'm Raiker. Let's set up three things, then do something useful. What should I call you?* The name is saved where **Settings → Account** keeps it, and Home and Chat greet you with it. **Skip** keeps the name your account already has. |
+| **Name** | *Hi, I'm Raiker. Let's set up three things, then do something useful. What should I call you?* The name is saved where **Settings → General** (Account) keeps it, and Home and Chat greet you with it. **Skip** keeps the name your account already has. |
 | **This device** *(source checkouts only)* | What this computer can run, measured on it and sent nowhere: operating system, architecture, memory, processor, graphics acceleration (never required), free storage, network, how provider keys are protected (Windows Data Protection, macOS Keychain, Linux Secret Service, or a private file), local model runtimes already installed, where your data is kept, and a local model size that will run here. A requirement that is not met is named with its fix. |
 | **Model** | *Where should I think?* Three answers. **On this computer** shows the model size this device can run and opens the local runtimes; **An account I have** opens the hosted providers (Anthropic, OpenAI, Google and others), each with its own secure key field; **Decide later** moves on, and Chat asks for a model when you first send. When a runtime on this machine already names a model, or an account is already connected, it is recommended above the three. The model you choose is checked, and a model you already chose as the default on Models counts as your choice. **Advanced setup** opens [Models](connecting-a-model.md); you do not need it to finish. |
 | **Privacy** | *Here is how I'll work for you.* Two cards. **How I'll ask**: *I'll research and prepare on my own. I'll ask before I send, delete, pay or share anything.* — the Standard profile, with **Change** opening [Permissions](permissions-and-runtime-modes.md). **Where your data goes**: requests go only to the model you choose and the providers you connect; when the model you chose runs off this device it names where its requests go. To keep every request on this device, choose a model that runs here ([FIXED-947](../plans/FIXED_ITEMS.md#fixed-947--local-only-was-a-setup-answer-nothing-enforced-was-bug-345)). No service asks to be connected here: connections are made when a task needs them. |
@@ -416,12 +416,15 @@ work; everything you set up once lives behind **More** in the top bar.
 | Sidebar | — | Home, Chat, Build, Design, Work, Memory |
 | More | Recent | the last few places you opened, newest first |
 | More | Review | Approvals |
-| More | Connect | Models, Extensions |
+| More | Connect | Models, Connections |
 | More | Settings | Settings itself, Permissions, and every Settings section as a direct link |
-| More | Diagnostics & help | Diagnostics, Guide |
+| More | Diagnostics | Diagnostics |
 
 More is grouped by what you come to do — review something, connect Raiker to
-something, change a setting — with diagnostics and help last. It has no search
+something, change a setting — with diagnostics last. Help is not a page: the
+**?** in the top bar opens a panel beside whatever you are on, starting on the
+article for that page, with search over every article; **Escape** closes it and
+the page underneath stays where it was. Old `#/guide` links open the panel. It has no search
 box of its own: **Search pages, settings and commands** at its top opens the
 command palette (`Ctrl K`, `⌘K` on a Mac), which finds every page and every
 Settings section by name. On a phone More is a full-height sheet with **Back**,
@@ -473,27 +476,30 @@ threads your routines are advancing, and nothing else.
 
 **The interface is deliberately quiet.** Pages open with their content, not a
 sentence about it: a page's one-line description is its title's tooltip, the
-way into its guide chapter is the ⓘ icon, and an empty list shows its title
-and the action that fills it. Pages that answered one question are one page
+way into its help article is the **?** in the top bar, and an empty list shows
+its title and the action that fills it. Pages that answered one question are one page
 with tabs — **Work** holds Threads, Tasks and Projects; **Memory** holds the
-Knowledge Map; **Extensions** holds messaging Channels.
+Knowledge Map; **Connections** holds messaging Channels. A page that lists
+things is a list on the left with the chosen item's detail beside it, and
+adding something is one dialog — **Add connection**, **Add channel**, **Add
+model** — rather than a catalogue on the page.
 
-Six destinations are tabbed:
+Five destinations are tabbed, and Settings has its own rail:
 
 | Destination | Tabs |
 |---|---|
 | Work | Threads, Tasks, Projects |
 | Memory | Overview, Memories, Suggestions, Sources, Recall & indexing, Map |
-| Models | Overview, My models, Add model, Runtime & routing, Usage |
-| Extensions | Overview, Connectors, Channels, MCP servers, Skills, Hooks, Plugins |
+| Connections | Services, Channels, Advanced (MCP servers, Skills, Hooks, Plugins) |
 | Diagnostics | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
-| Settings | General, Notifications, Personalisation, Security & sign-in, Privacy, Account, Web access, GitHub, Runtime configuration, Memory engine, Updates |
+| Settings | General, Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, Advanced (Runtime, Memory engine, Model serving, Usage and spending), About & updates |
 
 Old links to the pages these absorbed still resolve and open the right tab —
 `#/tasks` opens Work on Tasks, `#/brain` opens Memory on Map, `#/messaging`
-opens Extensions on Channels — and
-so does the path form — `#/extensions/mcp` opens Extensions on MCP servers,
-exactly as `#/extensions?tab=mcp` does.
+opens Connections on Channels, `#/extensions?tab=mcp` opens Connections →
+Advanced on MCP servers — and so does the path form, `#/extensions/mcp`. Models
+is one page; its old tab addresses open the matching part of it or of
+**Settings → Advanced**.
 
 The top bar carries the notification bell, **More** — Settings and every
 destination that is not on the sidebar — the host control, and the **STOP**

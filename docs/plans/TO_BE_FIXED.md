@@ -872,17 +872,19 @@ check that whatever the STOP count includes is named where the owner can see it.
 ## 2026-10-21 Quiet UI round 2 — what is still open
 
 Round 2 shipped [FIXED-1080](FIXED_ITEMS.md#fixed-1080--home-offered-five-threads-to-continue-instead-of-the-one-with-its-next-step-qui-h01)
-to [FIXED-1100](FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04).
+to [FIXED-1100](FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04);
+the layout round shipped [FIXED-1101](FIXED_ITEMS.md#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14)
+to [FIXED-1123](FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08).
 These parts of the same items are not done:
 
-* **QUI-G01 — 29 of 94 size measurements are over budget.** All are pages the
-  layout plan rebuilds ([01](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md), QUI-L06 – L11):
-  Permissions (3,656 px), Models › Add (3,723 px), Models › Runtime, Models ›
-  Models, Models › Usage and Overview, Connections › Connectors and Channels
-  (over 4,100 px each), Extensions › Skills, Diagnostics › Overview and
-  Activity, Memory › Map, and Settings › General, Security, Privacy and GitHub.
-  The report is in `all-pages-live.spec.ts`; it becomes a failing check when
-  those pages are rebuilt.
+* **QUI-G01 — 8 of 70 size measurements are still over budget** after the
+  layout round ([01 Status](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#status);
+  29 of 94 before it): Diagnostics › Overview (1,186 px at both sizes) and
+  Activity (about 6,000 px at both), Memory › Map (955 px at 1440×900),
+  Settings › Privacy (about 1,970 px at both) and Settings › General at
+  1280×800 (1,399 px against 1,200). Diagnostics waits for QUI-L11; Memory and
+  Privacy for QUI-L12. The report is in `all-pages-live.spec.ts`; it becomes a
+  failing check when those pages are rebuilt.
 * **QUI-G06 — about 200 other error messages** still give a status code, or
   *Could not X*, without what it affected and a next step. The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
@@ -893,6 +895,19 @@ These parts of the same items are not done:
 * **QUI-L11 — Diagnostics and Recovery.** Only the name changed. Overview as
   issue cards, Sessions into Threads, Checkpoints as Recovery and the other
   moves are not built.
+* **QUI-L12 and QUI-L13 — the pages that already fit, and Build and Design.**
+  Work's 64 px rows and pagination, Memory's map from search, Approvals side
+  by side, and the Build and Design rails are not built. Connections › Advanced
+  as one segmented list is done.
+* **Older live specs still drive the pages the layout round replaced.** About
+  70 specs under `web/e2e/*-live.spec.ts` (written before 2026-10-21) open
+  Models by its old tabs, Extensions tabs, Permissions rows that opened in
+  place, and the Settings sections that moved. The old addresses forward, but
+  the steps inside them (open a row in place, a provider card on the page)
+  no longer exist. `quiet-ui-layout-live`, `all-pages-live`,
+  `quiet-ui-accessibility-live`, `quiet-ui-home-chat-live` and the shared
+  helpers (`hosted-provider.ts`) are updated; the rest need the same before
+  they are run again (related to BUG-248).
 * **QUI-W02 and QUI-H02 — the companion.** Its pick in Hello and its picture on
   a first-day Home wait for the companion's art (QUI-V05).
 * **QUI-C04 and QUI-H01 — the profile chip** on both composers waits for

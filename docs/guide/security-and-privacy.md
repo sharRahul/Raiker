@@ -23,11 +23,11 @@ that token is even compared. A caller using an `Authorization: Bearer` header
 instead — the CLI and the tray — is exempt, because a header the browser never
 attaches on its own cannot be forged by another site. Changing the owner
 password signs out other devices. Individual sessions can also be revoked under
-**Settings → Security & sign-in**.
+**Settings → Security**.
 
 ### A forgotten password
 
-**Settings → Security & sign-in → Enroll in MFA** adds an authenticator code to
+**Settings → Security → Enroll in MFA** adds an authenticator code to
 your sign-in and shows a set of one-time recovery codes once, beside the
 authenticator link. Save them somewhere other than this computer: Raiker keeps
 only their hashes, so they cannot be shown again. On the lock screen, **Forgot
@@ -41,14 +41,14 @@ Two identities belong to your account and they are not interchangeable.
 
 | | What it is | Where it appears |
 |---|---|---|
-| **Username** | The sign-in handle. Fixed. | The sign-in form, and **Settings → Account**. |
+| **Username** | The sign-in handle. Fixed. | The sign-in form, and **Settings → General** (Account). |
 | **Display name** | What Raiker calls you. Change it at any time. | Greetings, the account surfaces, and the turn's own identity block. |
 | **Principal ID** | The internal authorisation key (`principal_user_…`). | Audit records and diagnostics only. |
 
 The principal ID is what ownership, policy and audit are keyed on, and changing
 your display name never moves it or re-files anything. It is not a name and
 Raiker will not present it as one: an ordinary answer, page, card or notification
-that quotes one is a defect. The one place it is shown is **Settings → Account →
+that quotes one is a defect. The one place it is shown is **Settings → General →
 Support details**, folded away, with **Copy ID** — for when someone helping you
 asks for it.
 
@@ -69,7 +69,7 @@ Nothing about what you are called grants anything.
 
 | Control | Where | What it decides |
 |---|---|---|
-| Agent runtime | **Settings → Runtime configuration** | Whether Raiker accepts new executions at all |
+| Agent runtime | **Settings → Advanced → Runtime** | Whether Raiker accepts new executions at all |
 | Capability gate | **Permissions** | Whether a category of action is available to the owner and agent |
 | Decision mode | **Permissions** | Whether an eligible action asks, is allowed, runs automatically, or is denied |
 | Turn posture | Chat or Build composer | Additional restrictions for this conversation, such as Build Plan/Edit/Auto and approval policy |
@@ -190,7 +190,7 @@ images — and links the page that reviews, exports or forgets each one. It also
 states the limit worth knowing before you rely on forgetting: a record removed
 from the workspace is not removed from a backup already written, so for a
 deletion that has to be permanent, remove the backups made before it under
-**Settings → Account → Backups**.
+**Settings → General → Backups**.
 
 **What can leave this machine** is one row per capability that can put your
 content somewhere else — hosted models, image generation, web fetch, channels,
@@ -221,7 +221,7 @@ dictation, and still yours.
 
 ### Backups
 
-**Settings → Account → Backups** makes a copy of this workspace's database,
+**Settings → General → Backups** makes a copy of this workspace's database,
 memory files, checkpoint files and uploaded files. **Back up now** takes a
 consistent snapshot of the database, encrypted with the workspace's key from the
 first byte — no unencrypted copy is ever written — copies the files the

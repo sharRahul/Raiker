@@ -2,6 +2,33 @@
 
 Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
+## Status
+
+**Layouts and four page plans shipped 2026-10-21**
+([FIXED-1101](../FIXED_ITEMS.md#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14)
+to [FIXED-1123](../FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08);
+live cases RT-QUI-17 to RT-QUI-25 in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+
+| Item | State |
+|---|---|
+| Shell | **Done.** Sidebar 232 px, 40 px rows, one 1,180 px page width, 2rem gutter (1.5rem below 1,280 px). |
+| QUI-L01 | **Done** through the shell sizes; Chat, Build and Design keep their own composers (03, L13). |
+| QUI-L02 | **Done.** `ListDetail.svelte`, used by Connections, Channels, Permissions and My models. |
+| QUI-L03 | **Done** for Security and Account: rows, with forms in dialogs (`FormDialog.svelte`). Other Settings sections keep their cards. |
+| QUI-L04 | **Done.** `AddDialog.svelte`: Add connection, Add channel, Add model. It is a page-level layer, not a top-layer modal, so a sign-in window a step opens draws above it. |
+| QUI-L05 | **Done.** The help panel. |
+| QUI-L06 | **Done.** Category rail, policy in words, the detail pane, **Select several** and **Group by technical area** in **⋯**. A **Schedules** category was added. Deviation: *Not decided here* and *How your permissions apply* stay as read-only disclosures under **Advanced** rather than help articles, because they show this account's live data. |
+| QUI-L07 | **Done.** |
+| QUI-L08 | **Done.** Deviation: the global spending limit lives in **Settings → Advanced → Usage and spending**, beside spend across providers, rather than on Models. |
+| QUI-L09 | **Done.** Deviation: Account is part of **General** rather than its own section. |
+| QUI-L10 | **Done.** The Guide page is gone; `#/guide…` opens the panel. |
+| QUI-L11 | **Open**, except the name (FIXED-1095). |
+| QUI-L12 | **Open**, except Connections › Advanced (one segmented list). |
+| QUI-L13 | **Open.** |
+| QUI-L14 | **Done.** 1,024–1,279 px shows the icon rail. |
+| Acceptance | **Partly met.** No destination shows a catalogue; old addresses forward. Size: 8 of 70 measurements still over budget (TO_BE_FIXED, QUI-G01 follow-up). |
+
 ## The problem, measured
 
 Work surfaces already fit on one screen at 1440×900 with an empty workspace:

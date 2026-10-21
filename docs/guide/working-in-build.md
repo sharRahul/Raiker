@@ -256,7 +256,7 @@ repository's own hooks are disabled for the invocation.
 the machine, so `git_push` answers to **Git push** (`git_push_execution`) rather
 than to Git writes, and it does nothing until the remote's host is on
 `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The credential is the one you select in
-**Settings → GitHub** — a stored token, your GitHub CLI sign-in, a saved Git
+**Connections → Services → GitHub sign-in** — a stored token, your GitHub CLI sign-in, a saved Git
 credential or an SSH key, each checked against the GitHub account it claims —
 and it is lent to one command at a time under a grant you make — **once**, or
 **for the conversation** that proposed the push — narrowed to the repository and
@@ -269,7 +269,7 @@ says whether it was confirmed. GitHub.com remotes only, over HTTPS or SSH.
 Raiker never forces and never deletes a branch.
 
 **Letting the agent push without asking each time** takes a **delegation**
-(Settings → GitHub → *Delegations*): one repository, the operations you allow,
+(Connections → Services → GitHub sign-in → *Delegations*): one repository, the operations you allow,
 the branches it may touch (a prefix such as `raiker/*`, never the default
 branch), how long, and how many actions. Neither a standing grant nor setting
 **Git push** to *always allow* is enough on its own. Merging, deleting a branch
@@ -281,7 +281,7 @@ repository transferred, re-created or out of reach makes the step wait. On a
 repository with a GitHub remote, creating a branch and committing follow the same
 rule: an agent does them unprompted only on a branch a delegation covers.
 
-**Handing Raiker an issue to fix** (Settings → GitHub → *Issue to pull
+**Handing Raiker an issue to fix** (Connections → Services → GitHub sign-in → *Issue to pull
 request*): choose a delegation — or none, and every write asks — the issue
 number and a work branch, then **Show the plan**. Each step says whether it
 *Runs*, *Runs under the delegation* or *Asks you first*, and merging, deleting a
@@ -379,7 +379,7 @@ it began. If, while it waited, you **revoked** one of those delegations (or it
 expired or ran out of actions), or removed, replaced or invalidated that
 credential, it is **not continued** either — *a repository delegation it started
 under was revoked or ran out, or the Git credential it would use was removed or
-replaced* — and nothing more runs. Check **Settings → GitHub**, then start a new
+replaced* — and nothing more runs. Check **Connections → Services → GitHub sign-in**, then start a new
 turn.
 
 **Stopping a turn** keeps its record. A Build turn you stop is closed as
@@ -611,7 +611,7 @@ without reaching you.
 Every refusal names the control that would allow it and links to the page that
 holds it. The usual four, in the order they are checked:
 
-1. **Agent runtime** — Settings → Runtime configuration. Is Raiker accepting new
+1. **Agent runtime** — Settings → Advanced → Runtime. Is Raiker accepting new
    executions at all?
 2. **Capability gate** — Permissions. Does this capability exist for you?
 3. **Decision mode** — Permissions, or the composer. Ask, Allow, Auto or Deny?

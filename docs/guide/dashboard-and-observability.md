@@ -18,9 +18,9 @@ tablets, and a full sidebar on wider screens.
 | Control | **Approvals** | Inspect proposed actions and decide whether they may proceed |
 | Control | **Permissions** | Capability gates and per-capability decision modes |
 | Control | **Models** | Providers, model readiness, routing, fallback, and pricing |
-| Control | **Extensions** | Connectors, MCP servers, skills, hooks, plugins, and channels |
+| Control | **Connections** | Connected services, channels, and (under Advanced) MCP servers, skills, hooks and plugins |
 | Observe | **Diagnostics** | Readiness, sessions, audit activity, checkpoints, live work, and notifications |
-| Utilities | **Guide** and **Settings** | This manual, runtime configuration, privacy, web access, and credentials |
+| Utilities | **Settings** and the **?** help panel | Runtime configuration, privacy, web access, credentials, and this manual |
 
 ## Understand a turn
 
@@ -154,7 +154,7 @@ text, and a vector the disk has mangled — not a list of the size it says it is
 was simply skipped, so that memory stopped being found by meaning. The report
 now counts them as *Damaged vectors*. **Remove damaged vectors** deletes only
 those vectors; the memories are untouched and wait to be indexed again by
-**Settings → Memory engine** with the embedding model you chose. Raiker does not
+**Settings → Advanced → Memory engine** with the embedding model you chose. Raiker does not
 send their text anywhere on its own.
 
 **The support bundle is checked after it is redacted.** Raiker re-reads the
@@ -326,7 +326,7 @@ command at a time under a grant you make once or for a session. It is redacted
 from commands, logs, errors, and output. Publishing is a separate permission
 from changing a local repository.
 
-**Settings → GitHub** says what the credential is for before it asks for
+**Connections → Services → GitHub sign-in** says what the credential is for before it asks for
 one: the hosts Raiker will offer it to, the operations it is used for, and that
 every use asks first. It is only ever offered to those hosts — a remote on
 another forge, or a redirect that sends git somewhere unexpected, is answered

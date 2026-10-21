@@ -1187,6 +1187,29 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1098](#fixed-1098--keyboard-use-and-zoom-were-not-checked-qui-g05) | Low | Accessibility | Fixed 2026-10-21 |
 | [FIXED-1099](#fixed-1099--stop-steer-and-continue-errors-blamed-the-local-runtime-qui-g06) | Medium | Chat / Build / copy | Fixed 2026-10-21 |
 | [FIXED-1100](#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04) | Medium | Chat / performance | Fixed 2026-10-21 |
+| [FIXED-1101](#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14) | Low | Layout | Fixed 2026-10-21 |
+| [FIXED-1102](#fixed-1102--lists-and-their-details-had-no-shared-shape-qui-l02) | Medium | Layout / components | Fixed 2026-10-21 |
+| [FIXED-1103](#fixed-1103--adding-something-had-no-shared-shape-qui-l04) | Medium | Layout / components | Fixed 2026-10-21 |
+| [FIXED-1104](#fixed-1104--extensions-mixed-what-raiker-uses-with-how-it-is-reached-qui-l07) | Medium | Connections / navigation | Fixed 2026-10-21 |
+| [FIXED-1105](#fixed-1105--services-listed-every-service-that-could-be-connected-qui-l07) | Medium | Connections | Fixed 2026-10-21 |
+| [FIXED-1106](#fixed-1106--channels-listed-every-channel-raiker-could-link-qui-l07) | Low | Connections / messaging | Fixed 2026-10-21 |
+| [FIXED-1107](#fixed-1107--permissions-was-one-long-page-of-rows-qui-l06) | High | Permissions | Fixed 2026-10-21 |
+| [FIXED-1108](#fixed-1108--permissions-repeated-its-controls-and-buried-bulk-changes-qui-l06) | Medium | Permissions | Fixed 2026-10-21 |
+| [FIXED-1109](#fixed-1109--models-was-five-tabs-qui-l08) | High | Models | Fixed 2026-10-21 |
+| [FIXED-1110](#fixed-1110--adding-a-model-changed-the-page-under-you-qui-l08) | Medium | Models | Fixed 2026-10-21 |
+| [FIXED-1111](#fixed-1111--serving-and-spend-lived-on-models-qui-l08-qui-l09) | Medium | Models / Settings | Fixed 2026-10-21 |
+| [FIXED-1112](#fixed-1112--settings-had-eleven-sections-with-technical-ones-mixed-in-qui-l09) | Medium | Settings | Fixed 2026-10-21 |
+| [FIXED-1113](#fixed-1113--security-showed-every-form-at-once-qui-l03-qui-l09) | Medium | Settings / security | Fixed 2026-10-21 |
+| [FIXED-1114](#fixed-1114--help-was-a-page-you-had-to-leave-your-work-for-qui-l05-qui-l10) | Medium | Help | Fixed 2026-10-21 |
+| [FIXED-1115](#fixed-1115--sign-in-for-a-connection-opened-under-the-add-dialog-qui-l04) | High | Connections | Fixed 2026-10-21 |
+| [FIXED-1116](#fixed-1116--add-connection-offered-github-twice-qui-l07) | Low | Connections | Fixed 2026-10-21 |
+| [FIXED-1117](#fixed-1117--an-old-github-settings-link-did-nothing-while-settings-was-open-qui-l09) | Low | Settings / navigation | Fixed 2026-10-21 |
+| [FIXED-1118](#fixed-1118--the-list-separator-had-no-value-for-assistive-technology-qui-l02) | Low | Accessibility | Fixed 2026-10-21 |
+| [FIXED-1119](#fixed-1119--a-rows--menu-was-cut-off-inside-a-dialog-qui-l04) | Low | Components | Fixed 2026-10-21 |
+| [FIXED-1120](#fixed-1120--make-default-in-add-model-had-no-model-to-choose-qui-l08) | Medium | Models | Fixed 2026-10-21 |
+| [FIXED-1121](#fixed-1121--settings-general-was-twice-the-page-budget-qui-l09-qui-g01) | Low | Settings | Fixed 2026-10-21 |
+| [FIXED-1122](#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02) | Low | Accessibility | Fixed 2026-10-21 |
+| [FIXED-1123](#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08) | Medium | Models | Fixed 2026-10-21 |
 
 ---
 
@@ -36554,3 +36577,233 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** Chat draws the newest 100 turns and offers **Show 100 earlier messages**, keeping the reading position. Search, a Retry's source and a linked turn widen the window before scrolling. Settled turns off screen skip layout and paint (`content-visibility`).
 
 **Evidence.** `ChatView.test.ts` (*draws the latest hundred of a thousand turns*, *widens the window when search finds an earlier turn*).
+
+## FIXED-1101 — The shell was wider and looser than the layout system (QUI-L01, QUI-L14)
+
+**Severity: Low. Area: Layout. Status: Fixed 2026-10-21.**
+
+**Observed.** The sidebar was 248px with 44px rows; page widths ran from 1100px to 1480px and widened again on 4K; between 1024 and 1279px the full sidebar squeezed the page.
+
+**Fixed.** `app.css` sets the sidebar to 232px, rows to 40px, one page width of 1180px for workspace and operational pages, and a 2rem gutter (1.5rem below 1280px). The 4K widening is gone. Between 1024 and 1279px the sidebar is a 64px icon rail (`App.svelte`, `narrowWindow`).
+
+**Evidence.** `appCss.test.ts`, `ResponsivePage.test.ts`, `visualRubric.test.ts`; RT-QUI-17.
+
+## FIXED-1102 — Lists and their details had no shared shape (QUI-L02)
+
+**Severity: Medium. Area: Layout / components. Status: Fixed 2026-10-21.**
+
+**Observed.** Each page drew its own list and detail: some opened a row in place, some stacked cards, and none kept the chosen item in the address.
+
+**Fixed.** `ListDetail.svelte` is one list on the left and the chosen item's detail on the right: a listbox with Up, Down, Home, End and Enter, search over the list, the chosen item in `?item=`, and a separator that resizes the list (remembered per page). Connections, Channels, Permissions and My models use it.
+
+**Evidence.** `ListDetail.test.ts`, `listDetail.test.ts`; RT-QUI-18.
+
+## FIXED-1103 — Adding something had no shared shape (QUI-L04)
+
+**Severity: Medium. Area: Layout / components. Status: Fixed 2026-10-21.**
+
+**Observed.** Catalogues sat on the page — every connector, every model source, every channel — so a page with three connected things listed sixty.
+
+**Fixed.** `AddDialog.svelte` is one dialog: search and category chips, then the chosen option's steps with **Back**. **Escape** goes back a step, then closes. Add connection, Add channel and Add model use it.
+
+**Evidence.** `AddDialog.test.ts`; RT-QUI-18, RT-QUI-19, RT-QUI-21.
+
+## FIXED-1104 — Extensions mixed what Raiker uses with how it is reached (QUI-L07)
+
+**Severity: Medium. Area: Connections / navigation. Status: Fixed 2026-10-21.**
+
+**Observed.** *Extensions* held services, channels, MCP servers, skills, hooks and plugins as six tabs of equal weight.
+
+**Fixed.** The page is **Connections**, with **Services**, **Channels** and **Advanced** (MCP servers, Skills, Hooks and Plugins behind one switch). `#/extensions…` addresses and their old tabs still land on the matching tab (`nav.ts`, `HUB_TAB_ALIASES`).
+
+**Evidence.** `nav.test.ts`, `ExtensionsView.test.ts`; RT-QUI-18.
+
+## FIXED-1105 — Services listed every service that could be connected (QUI-L07)
+
+**Severity: Medium. Area: Connections. Status: Fixed 2026-10-21.**
+
+**Observed.** Services opened on the whole catalogue, so what was actually connected was hard to find.
+
+**Fixed.** Services lists only connected services, including **GitHub sign-in** once signed in; **Add connection** holds the catalogue, the install, the credential and the MCP alternative. A missing vault key is one attention row. `#/settings?tab=github` opens the GitHub step here.
+
+**Evidence.** `ConnectionsView.test.ts`; RT-QUI-18.
+
+## FIXED-1106 — Channels listed every channel Raiker could link (QUI-L07)
+
+**Severity: Low. Area: Connections / messaging. Status: Fixed 2026-10-21.**
+
+**Observed.** The Channels tab listed every connector profile whether linked or not.
+
+**Fixed.** Channels lists linked channels in the list-and-detail layout and selects the first; **Add channel** holds the rest.
+
+**Evidence.** `MessagingView.test.ts`; RT-QUI-19.
+
+## FIXED-1107 — Permissions was one long page of rows (QUI-L06)
+
+**Severity: High. Area: Permissions. Status: Fixed 2026-10-21.**
+
+**Observed.** Permissions stacked Needs your attention, Common permissions and every group of rows, each row opening in place with its controls — 4,000px and more.
+
+**Fixed.** A category rail (Overview, the task groups, Schedules, Advanced) chooses what the list shows; each row says its policy in words and **Needs review** when it is Automatic; the detail pane is the one place a permission is changed (`PermissionDetail.svelte`). The category and permission are in the address.
+
+**Evidence.** `CapabilitiesView.test.ts`, `capabilityModel.test.ts`; RT-QUI-20, RT-QUI-25 (844px).
+
+## FIXED-1108 — Permissions repeated its controls and buried bulk changes (QUI-L06)
+
+**Severity: Medium. Area: Permissions. Status: Fixed 2026-10-21.**
+
+**Observed.** *Common permissions* was a second copy of some rows; bulk selection and grouping by technical area were always on the page.
+
+**Fixed.** Common permissions is gone. **Select several** and **Group by technical area** are in the **⋯** menu. *Not decided here* and *How your permissions apply* sit under **Advanced**, read-only.
+
+**Evidence.** `CapabilitiesView.test.ts`, `permissionLanguage.test.ts`; RT-QUI-20.
+
+## FIXED-1109 — Models was five tabs (QUI-L08)
+
+**Severity: High. Area: Models. Status: Fixed 2026-10-21.**
+
+**Observed.** Overview, My models, Add model, Runtime & routing and Usage were five tabs, and what was in use was on a different tab from what was set up.
+
+**Fixed.** Models is one page: a profile card (the model in use, where it runs, what it costs, **Change**) above **My models** in the list-and-detail layout. Chat's readiness steps sit under the card while a step is not done. Old tab addresses open the matching part.
+
+**Evidence.** `ModelsView.test.ts`; RT-QUI-21, RT-QUI-25 (844px).
+
+## FIXED-1110 — Adding a model changed the page under you (QUI-L08)
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-10-21.**
+
+**Observed.** Add model was a tab of provider cards, runtimes and the Hub, and a choice redrew the page.
+
+**Fixed.** **Add model** is a three-step dialog — where the model comes from (this computer, an account, Hugging Face, a custom endpoint), the details, then a review with **Make default**. The page underneath is inert while it is open.
+
+**Evidence.** `ModelsView.test.ts` (*Add model*); RT-QUI-21.
+
+## FIXED-1111 — Serving and spend lived on Models (QUI-L08, QUI-L09)
+
+**Severity: Medium. Area: Models / Settings. Status: Fixed 2026-10-21.**
+
+**Observed.** What was serving, fallbacks, long jobs and all spend sat on Models beside choosing a model.
+
+**Fixed.** A model's own usage is in its detail (`ProviderUsagePanel` with `provider`). Serving and routing are **Settings → Advanced → Model serving**; spend across providers, the spending limit and rates are **Settings → Advanced → Usage and spending**. `#/models?tab=runtime|usage|pricing` forward there.
+
+**Evidence.** `ModelsView.test.ts`, `SettingsView.test.ts`; RT-QUI-23.
+
+## FIXED-1112 — Settings had eleven sections with technical ones mixed in (QUI-L09)
+
+**Severity: Medium. Area: Settings. Status: Fixed 2026-10-21.**
+
+**Observed.** Account, GitHub, Runtime configuration and Memory engine were sections beside Notifications and Privacy.
+
+**Fixed.** Settings is General (with Account), Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, **Advanced** (Runtime, Memory engine, Model serving, Usage and spending) and About & updates. GitHub moved to Connections. Old addresses forward (`movedSettingsAddress`).
+
+**Evidence.** `SettingsView.test.ts`, `nav.test.ts`, `App.test.ts`; RT-QUI-23.
+
+## FIXED-1113 — Security showed every form at once (QUI-L03, QUI-L09)
+
+**Severity: Medium. Area: Settings / security. Status: Fixed 2026-10-21.**
+
+**Observed.** Password, two-step sign-in, devices, encryption, vault key and grants were open forms down one page.
+
+**Fixed.** Each is a row with its value and one action; the action opens the form in a dialog (`FormDialog.svelte`). The vault-key command is behind **Technical details**.
+
+**Evidence.** `SecurityLogin.test.ts`; RT-QUI-23, RT-QUI-25 (844px).
+
+## FIXED-1114 — Help was a page you had to leave your work for (QUI-L05, QUI-L10)
+
+**Severity: Medium. Area: Help. Status: Fixed 2026-10-21.**
+
+**Observed.** The Guide was a destination: opening it left the page you had a question about.
+
+**Fixed.** **?** in the top bar opens a 360px panel beside the page, on the article for that page, with search over every article and links between articles resolved in place. **Escape** closes it. `#/guide…` opens the panel; the Guide page is gone. The command palette lists articles under Help.
+
+**Evidence.** `HelpPanel.test.ts`, `CommandPalette.test.ts`; RT-QUI-24.
+
+## FIXED-1115 — Sign-in for a connection opened under the Add dialog (QUI-L04)
+
+**Severity: High. Area: Connections. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-18: choosing GitHub in Add connection opened its sign-in window beneath the dialog, where it could not be reached.
+
+**Fixed.** `AddDialog` is a page-level layer rather than a top-layer modal, so the windows a step opens draw above it; Escape is ignored while another modal is on top.
+
+**Evidence.** `AddDialog.test.ts`; RT-QUI-18.
+
+## FIXED-1116 — Add connection offered GitHub twice (QUI-L07)
+
+**Severity: Low. Area: Connections. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-18: the catalogue showed the GitHub connector and the GitHub account as two cards both called GitHub.
+
+**Fixed.** The account card is **GitHub sign-in**, in the list and the dialog.
+
+**Evidence.** `ConnectionsView.test.ts` (*lists GitHub once its account is signed in*); RT-QUI-18.
+
+## FIXED-1117 — An old GitHub settings link did nothing while Settings was open (QUI-L09)
+
+**Severity: Low. Area: Settings / navigation. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-23: following `#/settings?tab=github` from Settings stayed on Settings.
+
+**Fixed.** The forward moved into `App.svelte`, on start and on every address change.
+
+**Evidence.** `App.test.ts`; RT-QUI-23.
+
+## FIXED-1118 — The list separator had no value for assistive technology (QUI-L02)
+
+**Severity: Low. Area: Accessibility. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live by axe in RT-QUI-18: the resizable separator had no `aria-valuenow`.
+
+**Fixed.** The separator reports its measured width and minimum, read on mount and on resize.
+
+**Evidence.** `ListDetail.test.ts`; RT-QUI-14, RT-QUI-18.
+
+## FIXED-1119 — A row's ⋯ menu was cut off inside a dialog (QUI-L04)
+
+**Severity: Low. Area: Components. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-21: a ⋯ menu inside Add model opened past the dialog's edge and was clipped.
+
+**Fixed.** `RowOverflow` measures its room against the closest dialog or page content.
+
+**Evidence.** RT-QUI-21 (`quiet-ui-layout-live.spec.ts`).
+
+## FIXED-1120 — Make default in Add model had no model to choose (QUI-L08)
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-21: the review step offered **Make default** for a connected account with no model named, which failed.
+
+**Fixed.** The review lists the account's chat profiles and their models; a failure shows in the review.
+
+**Evidence.** `ModelsView.test.ts`; RT-QUI-21.
+
+## FIXED-1121 — Settings General was twice the page budget (QUI-L09, QUI-G01)
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in RT-QUI-25: General measured 2,117px at 1440×900.
+
+**Fixed.** Rows use one grid, Setup joined the Startup card, and the time-zone text is one line: 1,326px.
+
+**Evidence.** RT-QUI-25; `all-pages-live.spec.ts` size report.
+
+## FIXED-1122 — Search fields drew a second focus box (QUI-L02)
+
+**Severity: Low. Area: Accessibility. Status: Fixed 2026-10-21.**
+
+**Observed.** Found live in the screenshot review: the search frame and its field both drew a focus ring.
+
+**Fixed.** The frame marks focus (`:focus-within`); the field inside draws none. Applied to ListDetail, AddDialog and the help panel.
+
+**Evidence.** Screenshots `23-*`, `24-*`; RT-QUI-15.
+
+## FIXED-1123 — Chat's readiness steps disappeared with the Models overview (QUI-L08)
+
+**Severity: Medium. Area: Models. Status: Fixed 2026-10-21.**
+
+**Observed.** Found in the guide review: removing the Overview tab left `ReadinessSteps` unused, so a model that was not ready no longer said which step stopped it.
+
+**Fixed.** The profile card draws Chat's four steps and one next action inside the card while any step is not done, in place of its own **Add model** button; **Check it now** runs in place, other actions open Add model, Settings → Advanced → Model serving or Permissions.
+
+**Evidence.** `ModelsView.test.ts` (*the profile card's readiness steps*); RT-QUI-21 (`21-models-empty.png`).

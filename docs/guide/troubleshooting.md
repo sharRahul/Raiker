@@ -29,7 +29,7 @@ itself. They remain below because they can still appear for a provider you have
 | `model_dial_refused:credential_over_http_proxy` | A plain-HTTP hosted endpoint would carry your key through your proxy | Use `https://`, or add the host to `NO_PROXY` and restart |
 | `redirect_refused:<status>` | The provider answered with a redirect; Raiker does not follow one with your key | Check the endpoint is the provider's real API address |
 | `environment_credential_unavailable` | You asked to use the key from the environment, and Raiker's environment does not have it | Paste the key, or set the variable and restart Raiker |
-| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security & sign-in → Generate key |
+| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security → Generate key |
 | `connector_vault_key_unset` | Only on a **read**: credentials exist but the key is gone, so they cannot be decrypted | Restore the key, or clear and re-enter the affected credentials. Writes provision a key automatically; reads deliberately do not, because minting a new key would hide a real problem. |
 | `hosted_api_key_missing` | Hosted provider needs a key | Paste it into the sign-in dialog |
 | `provider_api_key_missing:<VAR>` | Key absent from dialog and environment | Paste it, or set `<VAR>` before starting |
@@ -62,8 +62,8 @@ still set.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| A surface says "enable it in Capabilities" but the gate **is** on | The gate is at `enabled_policy_gated`, not `enabled_runtime` | Turn it on again from **Permissions** and pick the runtime level. If it still will not go, the agent runtime itself is disabled — Settings → Runtime configuration → Enable |
-| `activation_blocked: runtime_mode_not_active` | The agent runtime is disabled. It no longer names one of five modes — there is one runtime | Settings → Runtime configuration → **Enable agent runtime** |
+| A surface says "enable it in Capabilities" but the gate **is** on | The gate is at `enabled_policy_gated`, not `enabled_runtime` | Turn it on again from **Permissions** and pick the runtime level. If it still will not go, the agent runtime itself is disabled — Settings → Advanced → Runtime → Enable |
+| `activation_blocked: runtime_mode_not_active` | The agent runtime is disabled. It no longer names one of five modes — there is one runtime | Settings → Advanced → Runtime → **Enable agent runtime** |
 | **Turn on** is missing entirely | Deferred capability — no governed executor exists | Nothing to do. The deferred set is named in [Capabilities with no enable path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path) |
 | `Confirm change` stays greyed out | Reason, confirmation token, or threat-model tick missing | The confirmation token is **any phrase you type** — it records intent, it is not a credential |
 | `disabled_by_capability_gate` from an API call | Gate off for your account | Permissions → find the capability → Turn on |
@@ -103,7 +103,7 @@ still set.
 | `Refusing to bind to non-loopback host … without --allow-public` | Add `--allow-public` **and** set `RAIKER_OWNER_TOKEN` |
 | Dashboard is blank or stale | `npm --prefix web run build`, then restart `raiker-web` |
 | Backend change has no effect | Restart `raiker-web` — Python is not hot-reloaded |
-| Too many device sessions listed | Settings → Security & sign-in → revoke individually, or change your password to sign out all other devices |
+| Too many device sessions listed | Settings → Security → revoke individually, or change your password to sign out all other devices |
 
 ## Environment variables
 

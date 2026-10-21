@@ -219,7 +219,7 @@ adding is the part where the two genuinely differ.
 **Where the controls are.** Memory is for your own facts — what Raiker has been
 allowed to remember, what is waiting on a decision, what has expired. Which
 embedding space recall searches, and building one, are engine configuration and
-live under **Settings → Memory engine**. Memory's **Recall & indexing** tab
+live under **Settings → Advanced → Memory engine**. Memory's **Recall & indexing** tab
 keeps the one thing you need while reading your memories — whether recall is
 matching meaning or only words — and a link to that page when it is not what you
 wanted.
@@ -227,7 +227,7 @@ wanted.
 The default lexical fallback, `raiker-local-hash-v1`, works offline and matches shared
 words. It is lexical rather than meaning-based, so paraphrases may not match.
 
-**Build a meaning-based index** (Settings → Memory engine) can create provider- or local-model embeddings
+**Build a meaning-based index** (Settings → Advanced → Memory engine) can create provider- or local-model embeddings
 for approved, non-sensitive memories. This is a governed write operation: the
 confirmation names the destination and number of memories before text leaves
 the machine. Re-running it indexes only eligible approved memories not already
@@ -443,7 +443,7 @@ will not mint a new key that opens nothing.
 machine, the same way you would a password-manager recovery key. Every backup
 needs it; none contains it.
 
-**Verify a backup.** **Settings → Account → Backups → Verify** re-reads the
+**Verify a backup.** **Settings → General → Backups → Verify** re-reads the
 backup's checksum, whether *this* key opens it and its integrity. A backup that
 reads *Unreadable* was made with a different key. See
 [Backups](security-and-privacy.md#backups).
@@ -463,7 +463,7 @@ new workspace — which generates a new key — and import them there. Records k
 their text and provenance; review history and conversations stay with the old
 workspace.
 
-**Diagnosing key-page protection.** **Settings → Security & sign-in → Database
+**Diagnosing key-page protection.** **Settings → Security → Database
 encryption** shows whether key memory is *Locked in memory*, *Disabled by user*
 or *Degraded on this host*. `GET /api/health` gives the detail: `cipher_memory_security` (what was asked for),
 `memory_security_in_force` (what the process is actually doing — once on, it

@@ -13,8 +13,8 @@ Durable goals — an outcome Raiker carries across sessions under an execution
 profile you choose — are shipping in stages; [current
 limitations](../architecture/KNOWN_LIMITS.md) describe what is usable today.
 
-The same task-oriented guide is available in a running Raiker under
-**Utilities → Guide**.
+The same task-oriented guide is available in a running Raiker from the **?**
+in the top bar, which opens it beside the page you are on.
 
 ## Start here
 
@@ -39,7 +39,7 @@ If this is your first time using Raiker, read these pages in order:
 | Use personal context, outcome requests and current background workflows | [Personal-agent workflow](tasks-and-projects.md#using-raiker-as-a-personal-agent) |
 | Give Raiker a goal, and decide where its work may run | [Goals](tasks-and-projects.md#give-raiker-a-goal) and [execution profiles](tasks-and-projects.md#where-a-goals-work-may-run-execution-profiles) |
 | Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
-| Add connectors, MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
+| Connect services, or add MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
 | Generate images, import your own, and compose editable designs to export or hand to Build | [Design](design.md) |
 | Use Raiker's desktop window, its menu and shortcuts | [The desktop window](managing-the-host.md#the-desktop-window) |

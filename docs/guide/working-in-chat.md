@@ -67,7 +67,7 @@ the runtime still judges each action when it is invoked.
 |---|---|
 | **Search the web** | Reads pages this turn needs. The request leaves this machine. |
 | **Use an MCP tool** | Tools from the servers you have connected |
-| **Use a connected app** | The accounts you have connected under Extensions |
+| **Use a connected app** | The accounts you have connected under Connections |
 | **Generate an image** | Opens Design, which is where an image is made |
 | **Run in background** | Files what you typed as a task that starts now, and clears the composer so you can keep chatting. The task appears under **Background** and on Home's **In progress**; **Open the task** follows it. If it cannot be saved, your message is kept |
 | **Create a task** | Hands the instruction to an agent task instead of answering now |
@@ -736,7 +736,7 @@ are the edges a Chat user can still hit:
   in a row on the same tool or the same provider contain it: the next call is
   refused with the reason and the failure count instead of being retried, and one
   call a minute later is let through to see whether it has recovered. Nothing is
-  taken away permanently — Settings → Security & sign-in lists what is contained
+  taken away permanently — Settings → Security lists what is contained
   and clears it in one press.
 - **A suspicious page is flagged, not withheld.** If a page, message or file this
   turn read contains text shaped like an attempt to redirect Raiker, you get a
@@ -745,7 +745,7 @@ are the edges a Chat user can still hit:
   as provenance rather than as a block.
 - **Send waits for a model check, and the check expires.** A surface will not
   send until the exact model has passed a reachability check. That check is good
-  for five minutes by default (Settings → Runtime, 1–120 minutes), and while a
+  for five minutes by default (Settings → Advanced → Runtime, 1–120 minutes), and while a
   work surface is open Raiker re-confirms it quietly in the background before it
   lapses. Changing model, endpoint or credential invalidates it immediately
   whatever the window says.

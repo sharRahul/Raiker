@@ -40,18 +40,18 @@ does not recognise makes the line say it is unknown rather than read it as
 permission, and a goal this runtime reports nothing for is left out rather than
 called impossible. **Change** opens the row that decides it.
 
-**Needs your attention** and **Common permissions** come next, when there is
-anything in them, and both are shortcuts into the registry rather than a second
-copy of it. **All permissions** holds everything, grouped by what each
-permission is for — **Files and code**, **Web and research**, **Messages and
-services**, **Memory**, **System and runtimes**. **Group by → Technical area
-(advanced)** shows the same rows under the technical domains in the table
-further down (Workspace, Git, Execution, Network, …); the choice is remembered
-in this browser, and search matches either heading whichever is shown. It has
-one toolbar:
-search by tool name, identifier, description or group; narrow by **Group**;
-**Expand groups** and **Collapse groups**; and **Clear filters** to restore the
-full list. Searching reveals matching rows even in collapsed groups.
+Below it the page is a list and a detail. The rail on the left chooses a
+category — **Overview**, then what each permission is for (**Files and code**,
+**Web and research**, **Messages and services**, **Memory**, **Schedules**) and
+**Advanced**, which holds **System and runtimes**. The middle list shows each
+permission in the category with what it is set to and, when it is set to
+**Automatic**, **Needs review**; the detail on the right is the one place each
+permission is changed. Search matches tool name, identifier, description or
+group. The **⋯** menu offers **Select several**, which turns the list into a
+checklist with one toolbar for changing many at once, and **Group by technical
+area**, which shows the same rows under the technical domains in the table
+further down (Workspace, Git, Execution, Network, …). The category and the
+chosen permission are in the address, so a link opens them again.
 
 A row states what is on and what happens — `On · Ask me`, `Off · Never` —
 without being opened. Open it to read what the capability does, whether Raiker
@@ -61,11 +61,11 @@ there. The decision controls are **Ask me**, **Allow**, **Automatic** and
 **Never**; broader access continues through the confirmation dialog and
 server-side authorization checks.
 
-**How your permissions apply** sits at the foot of the page, closed. It is the
+**How your permissions apply** sits under **Advanced**, closed. It is the
 read-only authority summary — evidence for a question you ask second, which is
 why it reads after the controls it summarises rather than before them.
 
-Only editable permissions can be selected. The **Selected** chip lets you inspect
+In **Select several**, only editable permissions can be selected. The **Selected** chip lets you inspect
 the selection, including items outside an earlier search. Bulk changes support
 **Ask me** and **Never** only; selection and other mutations are disabled while
 an update runs. Partial failures name the refused permissions and retain them
@@ -102,7 +102,7 @@ What that does *not* change:
 
 ## The runtime
 
-**Settings → Runtime configuration** states what is running rather than asking
+**Settings → Advanced → Runtime** states what is running rather than asking
 you to pick. There is no mode list: Raiker ships **one runtime**, and a fresh
 install has it on, so a gate you turn on means what it says immediately.
 
@@ -126,7 +126,7 @@ still resolves to the single runtime rather than failing.
 
 ## Where work executes
 
-**Settings → Runtime configuration** also chooses where Chat, Build and
+**Settings → Advanced → Runtime** also chooses where Chat, Build and
 scheduled work run: on this machine, or inside the native OS sandbox. Choosing a
 remote or container environment is not a way around a permission — remote
 commands still need the remote/cloud capability gate and its own credentials.
@@ -318,7 +318,7 @@ section disappears once all five are on.
 ### Not decided here
 
 Fourteen gates in the registry are not decisions this page makes, and they are
-listed read-only at the foot of it rather than as rows with controls. Each is one
+listed read-only under **Advanced** rather than as rows with controls. Each is one
 of two things, and each says which:
 
 * **Governed elsewhere** — the work happens, and a different named control
@@ -518,29 +518,19 @@ capability's configuration.
 
 There is no unrestricted mode, by design.
 
-### Getting to a permission from the top of the page
+### Finding the permissions that need a look
 
-Two sections sit above the full registry and both are shortcuts into it rather
-than a second copy of it. Neither carries its own control: two editable copies
-of one permission is how a page comes to disagree with itself, so both move you
-to the one control that exists.
-
-* **Common permissions** — the handful most owners come to change. **Manage**
-  opens that capability's own row in the list below: it clears any filter that
-  would hide it, expands its group, opens the row and puts the keyboard on it.
-* **Needs your attention** — the capabilities set to **Automatic**, because that
-  is the one mode that acts with nobody in the loop. **Review** opens the same
-  row the same way. An entry says *runs automatically, without asking you* only
-  when the capability is actually available and ready; when it is not, it says
-  so, because configuring Automatic is not evidence that anything is running.
-
-Both derive from the same list the registry renders, so a change made on a row
-is reflected in them as soon as the runtime confirms it — they cannot show you a
-mode the list below disagrees with.
+A permission set to **Automatic** acts with nobody in the loop, so its row says
+**Needs review** and its detail opens with a note saying so. The note says *runs
+automatically, without asking you* only when the capability is actually
+available and ready; when it is not, it says so, because configuring Automatic
+is not evidence that anything is running. There is no second copy of the
+control anywhere on the page: two editable copies of one permission is how a
+page comes to disagree with itself.
 
 ### The delegated-authority summary
 
-**How your permissions apply**, at the foot of **Permissions**, is a
+**How your permissions apply**, under **Permissions → Advanced**, is a
 **read-only summary** of the capabilities this account configures the most
 authority for. It restates what you set — `On · Ask me`, `Off · Never` — beside
 what that means for the agent: **Ask me**, **Allow**, **Automatic**, **Never**,
@@ -592,7 +582,7 @@ not guess a malformed edit or force an action through.
 The selected policy is remembered for later composer sessions. It does not
 change the standing capability configuration in **Permissions**, and it cannot
 run anything while the agent runtime is disabled in
-**Settings → Runtime configuration**.
+**Settings → Advanced → Runtime**.
 
 ---
 

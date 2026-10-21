@@ -174,7 +174,7 @@ A desktop installation reads the signed **desktop** channel
 raiker-app update --channel-url https://<your channel host>/desktop-stable.json --channel-key <release public key>
 ```
 
-Then **Settings → Updates → Check for updates**. An offered update is
+Then **Settings → About & updates → Check for updates**. An offered update is
 downloaded into Raiker's data folder and checked against its Ed25519-signed
 manifest — file name, version and SHA-256 — before anything runs. Then:
 
@@ -208,7 +208,7 @@ outbound request only after an update channel has been configured. No signed
 Raiker artifact has been published yet, so source-checkout users normally
 update through Git and rebuild the dashboard.
 
-The same thing is in the app, at **Settings → Updates**. It names this build's
+The same thing is in the app, at **Settings → About & updates**. It names this build's
 provenance, the pinned channel, the last explicit check and any recovery point,
 and — for a signed package on a pinned channel — offers **Update and restart**.
 Each recovery point says whether that build can open this workspace's data. An
@@ -255,7 +255,7 @@ failed attempt leaves nothing behind that would refuse the next one.
 | System | Remove the app | What happens to your data |
 |---|---|---|
 | Windows | **Settings → Apps → Raiker → Uninstall** | The uninstaller asks whether to also remove your Raiker data; **No** is the default. It stops Raiker and removes its start-at-sign-in entry first. A silent uninstall (`/S`) and every update always keep data |
-| macOS | Quit Raiker (Host → Quit), then move **Raiker** from Applications to the Bin | Kept. To remove it too, first use **Settings → Account → Delete my account**, or delete `~/Library/Application Support/Raiker` |
+| macOS | Quit Raiker (Host → Quit), then move **Raiker** from Applications to the Bin | Kept. To remove it too, first use **Settings → General → Delete my account**, or delete `~/Library/Application Support/Raiker` |
 | Linux | `sudo apt remove raiker`, `sudo dnf remove raiker`, or delete the AppImage | Kept for every user; delete `~/.local/share/raiker` to remove it |
 
 Never removed by any uninstaller: models and runtimes you installed with other

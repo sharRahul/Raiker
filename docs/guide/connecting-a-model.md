@@ -100,7 +100,7 @@ for you.
 The model you choose is remembered, and it is checked as you choose it, so it
 reads **Ready** straight away. From then on Raiker checks it again on its own
 every fifteen seconds: stop Ollama and the row says it is not running and
-Overview offers **Start the runtime**; remove the model and it says the model is
+the profile card offers **Start the runtime**; remove the model and it says the model is
 missing; start Ollama again and **Ready** comes back. An open Models page
 follows those changes without a reload, and you never have to press **Check**
 to keep a local model ready.
@@ -144,7 +144,7 @@ that.
   writes a collision-safe snapshot beneath an approved library. It runs as a
   durable background job, so a multi-gigabyte pull keeps going if you navigate
   away — the panel shows its progress and a **Cancel download**, and
-  **Models → Runtime & routing** is the same job under a different heading. Gated
+  **Settings → Advanced → Model serving** is the same job under a different heading. Gated
   repositories require your own Hub token and accepted upstream terms. On a
   machine with no route to `huggingface.co` the tab says so where the results
   would be, with a **Try again** — rather than showing an empty list you would
@@ -157,7 +157,7 @@ that.
 
 ### Downloads, conversions and other long jobs
 
-**Models → Runtime & routing** is where every durable model job lives:
+**Settings → Advanced → Model serving** is where every durable model job lives:
 downloads, conversions, runtime installs, Ollama pulls, and local deployments.
 They survive navigation and an interrupted app session, and none of them is ever
 silently retried.
@@ -190,20 +190,18 @@ the panel re-reads itself every two seconds while anything is running, and a
 
 ## What is running your work
 
-**Models → Overview** is the first thing the page says, and it answers four
-questions in order:
+The **profile card** at the top of **Models** is the first thing the page says:
+the model in use, its provider, whether it is ready, and whether what you send
+stays on this computer or goes to the provider — with what that costs so far.
+**Change** picks another model from everything you have set up. When nothing is
+chosen it says so and offers **Add model**.
 
-1. **Needs attention** — only what a person has to do something about, with the
-   one action that resolves each. When there is nothing, the section is absent;
-   that absence is the report.
-2. **What powers your work** — the model Chat, Build and Design each start on,
-   where that choice came from, and whether it is ready.
-3. **Effective now** — if a model cannot serve, the one that will answer instead
-   is named beside it. Your choice is never quietly replaced by the fallback:
-   they are two different facts and the page states both.
-4. **Other models you can use** — what else is set up and not already in use.
+The default you choose is what Chat, Build and Design start on. If it cannot
+serve, the one that will answer instead is named in **Settings → Advanced →
+Model serving** beside it. Your choice is never quietly replaced by the
+fallback: they are two different facts and the page states both.
 
-**A row that is not ready says which step stops it.** Under the model, four
+**A model that is not ready says which step stops it.** Under the profile card, four
 steps in the order you meet them — **Provider connected → Model found → Model
 chosen → Runs** — with a tick for each one passed, a warning on the one that
 needs you, and the ones after it simply waiting. Beside them is one button: the
@@ -211,15 +209,15 @@ single thing that moves the stopped step forward — **Connect a provider**,
 **Choose a model**, **Start the runtime**, **Update the credential**. **Check it
 now** runs the exact-model check on the spot, for a model you have chosen and
 never run: *not checked yet* is a different fact from *broken*, and the line
-never ticks a step nothing has checked. A ready row says **Ready** and nothing
+never ticks a step nothing has checked. A ready model says **Ready** and nothing
 else.
 
-Tasks and Schedule are not on that list because they do not hold a live default.
+Tasks and Schedule do not hold a live default.
 They capture the model chosen when the work is created, so a run that fires next
 week uses the model it was scheduled with rather than whatever you have selected
 by then.
 
-**Models → Runtime & routing** holds the same facts as a table, with **Default**
+**Settings → Advanced → Model serving** holds the same facts as a table, with **Default**
 and **Effective now** as separate columns. The fallback sequence that produces
 the difference between them is one section further down, under **Advanced
 routing** — folded, because most of the time the question is which model is
@@ -236,7 +234,7 @@ Raiker ships with profiles it can offer, and none of them is a choice you made.
 
 ## Comparing models
 
-**My models → Compare** puts every model you have set up in one table:
+**My models → Compare** (the switch beside the heading) puts every model you have set up in one table:
 **Runs** (on this device, a private server, or a hosted service — and so whether
 your prompts leave this device), **Context**, **Tools**, **Vision**, **Estimated
 cost** and **Availability**. Choosing still happens in the list; the table is
@@ -259,22 +257,27 @@ the foot of the card.
 
 ## Connect a hosted provider
 
-**Models → Add model** → the provider's card → **Connect** → paste the key →
-**Connect**. Then give it a model: **Select models…** on the card, or the same
-item in its **⋯** menu once it has one.
+**Models → Add model** → **An account I have** → the provider → paste the key →
+**Connect** → choose a model → **Make default** if it should answer new chats.
+**Add model** is one dialog in three steps — where the model comes from, the
+details that source needs, then a review — so the page underneath does not
+change while you add one.
 
-The Models page has five tabs, named for the questions you arrive with rather
-than for where a row is stored:
+The Models page is one page rather than tabs:
 
-| Tab | What it answers |
+| Part | What it answers |
 |---|---|
-| **Overview** | What is powering Chat, Build and Design, and what needs you |
-| **My models** | Every model you have set up, wherever it runs |
-| **Add model** | Connect an account, install a runtime, or fetch from the Hub |
-| **Runtime & routing** | What is serving, what a turn falls back to, and long jobs |
-| **Usage** | What you have spent, and the rates that produced it |
+| **Profile card** | What is powering Chat, Build and Design; **Change** picks another model |
+| **My models** | Every model you have set up, wherever it runs, as a list with the chosen model's detail beside it — its actions, which surfaces use it, and its usage and spend |
+| **Add model** | Run one on this computer, use an account you have, fetch from Hugging Face, or point at a custom endpoint |
 
-The off-machine gate status reads at the top of **Add model**, before you
+What is serving, what a turn falls back to, and long jobs now live in
+**Settings → Advanced → Model serving**; spend across every provider, the
+spending limit and the rates live in **Settings → Advanced → Usage and
+spending**. The old addresses (`#/models?tab=runtime`, `#/models?tab=usage`)
+open those sections.
+
+The off-machine gate status reads in the **An account I have** step, before you
 connect anything, because "the hosted gate is off" is what you need to know
 *before* a provider refuses rather than after.
 
@@ -624,7 +627,7 @@ catalogue is for an outage, not for an account Raiker may no longer reach.
 
 ## Fallback sequence
 
-Under **Advanced routing** on **Runtime & routing**, **Model fallback sequence**
+Under **Advanced routing** in **Settings → Advanced → Model serving**, **Model fallback sequence**
 orders the backends Raiker tries when the selected one is unavailable. Listing a
 hosted provider there grants nothing on its own — each candidate is still gated
 by the same policy.
@@ -642,7 +645,7 @@ reason the earlier one gave.
 
 ## Side-task models
 
-**Runtime & routing → Side-task models** gives two kinds of side work their own
+**Settings → Advanced → Model serving → Side-task models** gives two kinds of side work their own
 model, each an ordered list of up to three you have set up:
 
 - **Summarising** compacts a long conversation. A cheaper or faster model is
@@ -686,7 +689,7 @@ keeping either side of it.
 
 ## Off-machine provider posture
 
-**Models → Add model** opens with five read-only facts about everything that
+**Models → Add model → An account I have** opens with five read-only facts about everything that
 would leave this machine: the hosted model gate, the private-network gate, how
 many off-machine providers you have connected, how many off-machine profiles
 exist, and **Through your proxy** — whether hosted requests go through the

@@ -3,7 +3,7 @@
  *
  * Chat and Build each ended a failed turn the same two ways: an `ApiError`
  * became its HTTP status and nothing else, and anything else became
- * **"Could not reach the local runtime."**
+ * **a sentence saying the local runtime could not be reached**.
  *
  * Both throw away the only part an owner can act on. The runtime names every
  * provider refusal — a rejected key, an exhausted quota, a model the runtime
@@ -46,5 +46,5 @@ export function turnFailureMessage(
   if (context.produced === true) {
     return "The connection to Raiker ended before this turn finished. What it had already sent is above.";
   }
-  return "The connection to Raiker ended before this turn produced anything. Raiker itself may still be running — check Observability, or send it again.";
+  return "The connection to Raiker ended before this turn produced anything. Raiker itself may still be running — check Diagnostics, or send it again.";
 }

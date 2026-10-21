@@ -94,14 +94,14 @@ describe("ObserveView", () => {
   it("shows a loading state while the runtime status is read", async () => {
     stubFetchPending();
     render(ObserveView, { props: { tab: "overview" } });
-    expect(await screen.findByText(/reading runtime status/i)).toBeInTheDocument();
+    expect(await screen.findByText(/reading status/i)).toBeInTheDocument();
   });
 
   it("says the runtime is unreachable instead of showing stale readiness", async () => {
     stubFetch({});
     render(ObserveView, { props: { tab: "overview" } });
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/couldn't read the runtime status/i);
+    expect(alert).toHaveTextContent(/couldn't read raiker's status/i);
     expect(alert).toHaveTextContent(/nothing was started or changed/i);
     expect(screen.queryByText("Ready")).not.toBeInTheDocument();
   });
@@ -126,7 +126,7 @@ describe("ObserveView", () => {
     // of its six cards from it. Its unique half is on this page — as a
     // disclosure now, because on a healthy install it has nothing to say and
     // what it does have is already named in the attention list above.
-    expect(screen.getByText("Runtime health, in detail")).toBeInTheDocument();
+    expect(screen.getByText("Health, in detail")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /open diagnostics/i })).toBeNull();
     expect(screen.getByRole("link", { name: /open the decision queue/i }).getAttribute("href")).toBe(
       "#/approvals",
@@ -362,7 +362,7 @@ describe("ObserveView", () => {
     stubFetch(routes());
     render(ObserveView, { props: { tab: "overview" } });
     expect(
-      await screen.findByRole("tablist", { name: /observability sections/i }),
+      await screen.findByRole("tablist", { name: /diagnostics sections/i }),
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
   });

@@ -15,6 +15,7 @@ import {
   previousStage,
   PRIVACY_STATEMENT,
   recommendedPath,
+  SETUP_STAGE_LABELS,
   SETUP_STAGES,
   stagesFor,
   visibleStage,
@@ -62,11 +63,11 @@ describe("the stages first launch shows", () => {
 
   it("does not repeat the checks a desktop installer already ran (DIST-05)", () => {
     const desktop = stagesFor("desktop");
-    expect([...desktop]).toEqual(["model", "privacy", "finish"]);
+    expect([...desktop]).toEqual(["welcome", "model", "privacy", "finish"]);
     // A source checkout or server install had no installer step: it keeps the
     // device and installation checks.
     const source = stagesFor("payload");
-    expect([...source]).toEqual(["system", "model", "privacy", "verify", "finish"]);
+    expect([...source]).toEqual(["welcome", "system", "model", "privacy", "verify", "finish"]);
     expect(stagesFor(null)).toEqual(source);
     // A row stored on a stage this rail skips opens on the stage after it.
     expect(visibleStage("system", desktop)).toBe("model");
@@ -76,22 +77,22 @@ describe("the stages first launch shows", () => {
     expect(previousStage(desktop, "finish")).toBe("privacy");
     expect(nextStage(source, "privacy")).toBe("verify");
     expect(previousStage(source, "finish")).toBe("verify");
-    expect(previousStage(desktop, "model")).toBe("model");
+    expect(previousStage(desktop, "model")).toBe("welcome");
   });
 
-  it("no longer shows Welcome or Permissions (Quiet UI)", () => {
-    // Welcome introduced what the app shows a moment later; Permissions was a
-    // read-only copy of the Permissions page. Rows stored on either open on
-    // the next stage that is shown.
+  it("opens on the Hello step and no longer shows Permissions (QUI-W02)", () => {
+    // Permissions was a read-only copy of the Permissions page; a row stored
+    // on it opens on the next stage that is shown. Welcome is the Hello step,
+    // and a new workspace (stage unset or `welcome`) opens on it.
     for (const distribution of ["desktop", "payload"]) {
       const shown = stagesFor(distribution);
-      expect(shown).not.toContain("welcome");
+      expect(shown[0]).toBe("welcome");
       expect(shown).not.toContain("permissions");
     }
-    expect(visibleStage("welcome", stagesFor("desktop"))).toBe("model");
-    expect(visibleStage("welcome", stagesFor("payload"))).toBe("system");
+    expect(visibleStage("welcome", stagesFor("desktop"))).toBe("welcome");
     expect(visibleStage("permissions", stagesFor("desktop"))).toBe("finish");
-    expect(visibleStage(null, stagesFor("desktop"))).toBe("model");
+    expect(visibleStage(null, stagesFor("desktop"))).toBe("welcome");
+    expect(stagesFor("desktop").map((stage) => SETUP_STAGE_LABELS[stage])).toEqual(["Name", "Model", "Privacy", "Start"]);
   });
 });
 

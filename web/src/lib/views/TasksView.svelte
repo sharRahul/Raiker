@@ -1,5 +1,6 @@
 <script lang="ts">
   import WorkMeta from "../components/WorkMeta.svelte";
+  import { failure } from "../errorCopy";
   import { pickableProjects } from "../projectLifecycle";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
@@ -38,7 +39,7 @@
   import TaskHistory from "../components/TaskHistory.svelte";
   import RoutineCheck from "../components/RoutineCheck.svelte";
   import { taskDetailHref } from "../taskHistory";
-  import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { createAttachmentStore, wireAttachments } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
   import { resumeRun, runAgain, startRunNow, stopRun } from "../taskLifecycle";
@@ -397,15 +398,6 @@
     return `Scheduled for ${when}`;
   }
 
-  function wireAttachments(items: ComposerAttachment[]): PromptAttachment[] | undefined {
-    const attachments = items.map((item) => item.kind === "image"
-      ? { type: "image" as const, attachment_id: item.attachmentId ?? "" }
-      : item.kind === "document"
-        ? { type: "document" as const, attachment_id: item.attachmentId ?? "" }
-        : { type: "path" as const, path: item.path ?? "" });
-    return attachments.length ? attachments : undefined;
-  }
-
   function attachmentLabel(attachment: PromptAttachment): string {
     return attachment.type === "path"
       ? attachment.path
@@ -591,7 +583,7 @@
         draftKey = newIdempotencyKey();
         notice = "An earlier attempt of this task was already saved — check the queue before saving it again.";
         await load();
-      } else notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task.";
+      } else notice = failure("The task was not saved", "Your draft is kept.", "Try again.", error);
     }
     finally { creating = false; }
   }

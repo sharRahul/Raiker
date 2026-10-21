@@ -29,7 +29,7 @@ test("live empty-account Workbench review", async ({ page }) => {
   );
   await page.goto("http://127.0.0.1:8765/#/workbench");
   if (await page.getByLabel("Confirm password").isVisible()) {
-    await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 15_000 });
     await page.getByLabel("Username").fill("owner");
     await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
     await page.getByLabel("Confirm password").fill("Live-review-password-C1!");

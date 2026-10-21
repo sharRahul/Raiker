@@ -153,9 +153,26 @@ describe("WorkbenchView", () => {
     await fireEvent.click(send);
 
     expect(composed).toEqual([{ text: "Draft a reply to Anna", sessionId: null, fromHandoff: true }]);
-    expect(takeChatHandoff()).toBe("Draft a reply to Anna");
+    expect(takeChatHandoff()).toEqual({ text: "Draft a reply to Anna", attachments: [] });
     expect(window.location.hash).toBe("#/new-chat");
     window.removeEventListener("raiker:compose", listen);
+  });
+
+  it("lets Home's composer attach a file and hands it to Chat with the message", async () => {
+    stubFetch(routes());
+    window.location.hash = "#/home";
+    render(WorkbenchView);
+    const box = await screen.findByLabelText("Ask Raiker");
+    await fireEvent.click(screen.getByRole("button", { name: "Add attachment" }));
+    await fireEvent.input(screen.getByLabelText("Attachment path"), { target: { value: "notes/plan.md" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Attach" }));
+    expect(screen.getByText("plan.md")).toBeInTheDocument();
+    await fireEvent.input(box, { target: { value: "Summarise this" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(takeChatHandoff()).toEqual({
+      text: "Summarise this",
+      attachments: [expect.objectContaining({ kind: "path", path: "notes/plan.md" })],
+    });
   });
 
   // QUI-H02 — the four starters belong to a first day, and to nothing else.
@@ -352,7 +369,7 @@ describe("WorkbenchView", () => {
     // What is still true is said, and the gap is named rather than counted.
     expect(await within(rail).findByText(/this is not an all-clear/i)).toBeInTheDocument();
     expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
-    const tile = within(rail).getByText("Runtime health").closest("article");
+    const tile = within(rail).getByText("Health check").closest("article");
     await waitFor(() => expect(tile).toHaveTextContent(/unavailable \(HTTP 503\)/i));
     // Never a number. There is no number to give.
     expect(within(rail).queryByText("Runtime issues")).toBeNull();
@@ -375,7 +392,7 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
-    expect(await within(rail).findByText(/still reading its own runtime readiness/i)).toBeInTheDocument();
+    expect(await within(rail).findByText(/still reading its own readiness/i)).toBeInTheDocument();
     expect(within(rail).queryByText(/could not read/i)).toBeNull();
     expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull();
   });
@@ -411,7 +428,7 @@ describe("WorkbenchView", () => {
     await vi.waitFor(() =>
       expect(within(rail).queryByText(/nothing needs you right now/i)).toBeNull(),
     );
-    const tile = within(rail).getByText("Runtime health").closest("article");
+    const tile = within(rail).getByText("Health check").closest("article");
     expect(tile).toHaveTextContent(/last updated/i);
     expect(tile).toHaveTextContent(/refresh failed/i);
   });
@@ -631,5 +648,39 @@ describe("WorkbenchView goals (PA-D06)", () => {
     expect(link).toHaveAttribute("href", "#/work?tab=goals&record=goal_9");
     expect(screen.getByText("Needs you")).toBeInTheDocument();
     expect(screen.getByText("A step is waiting for your decision")).toBeInTheDocument();
+  });
+});
+
+describe("WorkbenchView Home layout (QUI-H01)", () => {
+  it("offers only the most recently moved thread, with its next step", async () => {
+    const older = { ...SESSION, session_id: "sess_old", title: "Older note", updated_at: "2026-07-01T00:00:00Z" };
+    stubFetch(routes({ "GET /api/work-threads": [older, SESSION] }));
+    render(WorkbenchView);
+    const continueLink = await screen.findByRole("link", { name: "Continue Draft the quarterly note" });
+    expect(continueLink).toHaveAttribute("href", "#/new-chat?session=sess_1");
+    expect(screen.queryByText("Older note")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "All threads (2)" })).toHaveAttribute("href", "#/search-chat");
+    expect(screen.getByText(/3 turns · updated/)).toBeInTheDocument();
+  });
+
+  it("shows one decision row and a View all link, never a list", async () => {
+    const second = { ...APPROVAL, approval_id: "appr_2", action_id: "act_2", tool_name: "send_email" };
+    stubFetch(routes({ "GET /api/approvals": [APPROVAL, second] }));
+    render(WorkbenchView);
+    const row = await screen.findByTestId("home-decision");
+    expect(within(row).getByText("Review write file")).toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: "Decide" })).toHaveAttribute("href", "#/approvals");
+    expect(screen.queryByText(/send email/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View all 2 decisions" })).toHaveAttribute("href", "#/approvals");
+  });
+
+  it("shows at most two running cards, then View all", async () => {
+    const runs = [1, 2, 3].map((n) => task({ task_id: `t_${n}`, title: `Run ${n}`, status: "running" }));
+    stubFetch(routes({ "GET /api/tasks": runs }));
+    render(WorkbenchView);
+    await screen.findByRole("link", { name: "Run 1" });
+    expect(screen.getByRole("link", { name: "Run 2" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Run 3" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View all 3" })).toHaveAttribute("href", "#/observe?tab=work");
   });
 });

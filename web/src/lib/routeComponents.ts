@@ -35,7 +35,8 @@ export type LazyRouteId =
   | "observe"
   | "settings"
   | "guide"
-  | "model-setup";
+  | "model-setup"
+  | "state-gallery";
 
 // The props each route takes differ, so the map is typed at the loosest shape
 // that still guarantees a Svelte component: App passes the same props it always
@@ -59,6 +60,8 @@ const LOADERS: Record<LazyRouteId, Loader> = {
   observe: () => import("./views/ObserveView.svelte"),
   settings: () => import("./views/SettingsView.svelte"),
   "model-setup": () => import("./views/ModelSetupView.svelte"),
+  // QUI-G03 — development builds only; `routeFromHash` refuses it otherwise.
+  "state-gallery": () => import("./views/StateGalleryView.svelte"),
 };
 
 const cache = new Map<LazyRouteId, RouteComponent>();

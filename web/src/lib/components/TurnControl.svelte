@@ -19,6 +19,7 @@
    * work.
    */
   import Icon from "./Icon.svelte";
+  import { failure } from "../errorCopy";
   import { api, ApiError } from "../api";
 
   let {
@@ -52,7 +53,7 @@
       });
       stopping = true;
     } catch (e) {
-      error = e instanceof ApiError ? `Stop failed (${e.status}).` : "Could not reach the local runtime.";
+      error = failure("Stop was not sent", "The turn is still running.", "Try Stop safely again, or use STOP in the top bar.", e);
     } finally {
       busy = false;
     }
@@ -79,9 +80,7 @@
       error =
         e instanceof ApiError && e.reasonCode === "steer_queue_full"
           ? "Twenty instructions are already waiting. The turn reads them at its next safe boundary — send more after that."
-          : e instanceof ApiError
-            ? `Steer failed (${e.status}).`
-            : "Could not reach the local runtime.";
+          : failure("The instruction was not added", "The turn carries on without it.", "Send it again.", e);
     } finally {
       busy = false;
     }

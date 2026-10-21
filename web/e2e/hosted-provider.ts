@@ -71,7 +71,7 @@ export async function requireFirstRunWorkspace(
   reason: string,
 ): Promise<void> {
   await page.goto(`${base}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   await expect(page.getByLabel("Username")).toBeEnabled({ timeout: 60_000 });
   const fresh = await page
     .getByLabel("Confirm password")
@@ -181,7 +181,10 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       await page.waitForTimeout(500);
       continue;
     }
-    if (
+    if (heading.startsWith("Hi, I'm Raiker")) {
+      // QUI-W02 — the Hello step. Skip keeps the name the account already has.
+      await page.getByRole("button", { name: "Skip", exact: true }).click();
+    } else if (
       // Retired stage, still answered: an instance created before Quiet UI.
       heading.startsWith("Meet Raiker") ||
       heading.startsWith("What this computer can run") ||
@@ -191,6 +194,8 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
     } else if (heading.startsWith("Checking your installation")) {
       await page.getByRole("button", { name: /^(Continue|Continue anyway)$/ }).click();
     } else if (
+      heading.startsWith("Where should I think?") ||
+      // Retired heading, still answered: an instance created before QUI-W03.
       heading.startsWith("Choose how Raiker should think") ||
       // Retired heading, still answered: an instance created before FIRST-04.
       heading.startsWith("Choose where Raiker thinks")
@@ -198,8 +203,9 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       // "Decide later" and "Continue" are the same button; which one it is
       // depends on whether a model was pinned on this screen, and either
       // advances. The model itself is connected through Models afterwards.
-      await page.getByRole("button", { name: /^(Decide later|Continue)$/ }).click();
-    } else if (heading.startsWith("Where your model requests go")) {
+      // QUI-W03 — "Decide later" is a card now, so its name carries its line.
+      await page.getByRole("button", { name: /^(Decide later|Continue$)/ }).first().click();
+    } else if (heading.startsWith("Here is how I'll work for you") || heading.startsWith("Where your model requests go")) {
       // BUG-345 — a statement now, not a choice; Continue acknowledges it.
       await page.getByRole("button", { name: "Continue", exact: true }).click();
     } else if (heading.startsWith("Choose your privacy boundary")) {
@@ -208,11 +214,10 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
       await page.getByRole("button", { name: "Balanced" }).click();
     } else if (heading.startsWith("Create your first backup")) {
       await page.getByRole("button", { name: "Set up later" }).click();
-    } else if (heading.startsWith("Your Raiker is ready") || heading.startsWith("Setup saved")) {
-      // REM-LAUNCH-01 — the last stage now says which of the two it is: a run
-      // that deferred the model reads "Setup saved" and names what is missing.
-      // Both are the final stage and both finish the same way.
-      await page.getByRole("button", { name: "Start using Raiker" }).click();
+    } else if (heading.startsWith("You're set") || heading.startsWith("Setup is saved")) {
+      // QUI-W05 — the first-task step. REM-LAUNCH-01: it says which of the two
+      // it is. Both are the final stage and both finish the same way.
+      await page.getByRole("button", { name: "Go to Home" }).click();
       await expect(title).toBeHidden({ timeout: 30_000 });
       return true;
     } else {
@@ -618,7 +623,7 @@ export async function signInAsOwner(
   credentials: { user: string; password: string } = OWNER_CREDENTIALS,
 ): Promise<void> {
   await page.goto(`${base}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   const confirm = page.getByLabel("Confirm password");
   // The field mounts disabled while the bootstrap reads resolve. Waited for
   // rather than filled optimistically: on a server that has only just started,

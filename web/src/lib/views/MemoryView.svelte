@@ -343,7 +343,7 @@
         attachment_id: "",
         truncated: false,
       };
-      actionError = "Could not reach the runtime to open this memory's source.";
+      actionError = "Could not reach Raiker to open this memory's source.";
     } finally {
       sourceLoading = false;
     }
@@ -683,7 +683,7 @@
       <div class="due-row" role="status"><Icon name="check" size="sm" /><span>{sweepResult}</span></div>
     {/if}
     {#if observations === null}
-      <div class="empty"><Icon name="info" size="xl" /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
+      <div class="empty"><Icon name="info" size="xl" /><h4>Observation capture is not reporting</h4><p>Raiker could not be asked what it captured. This is not the same as having captured nothing.</p></div>
     {:else}
       {#if observations.observations.length}
         <div class="filters">

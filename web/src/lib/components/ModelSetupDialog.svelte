@@ -113,7 +113,7 @@
       <div class="eyebrow">Model readiness</div>
       <h2 id="model-setup-title">{title}</h2>
       <p class="summary">{activeReadiness?.summary ?? "No model is set up for this action."}</p>
-      <p>{activeReadiness?.remediation ?? "Open Models to connect a provider or install a local runtime and model."}</p>
+      <p>{activeReadiness?.remediation ?? "Open Models to connect a provider or install a local model server and a model."}</p>
       {#if draftPreserved}<p class="preserved">Your draft is preserved.</p>{/if}
 
       {#if activeReadiness}

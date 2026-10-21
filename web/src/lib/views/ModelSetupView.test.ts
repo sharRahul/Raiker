@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { allProfiles, resetModels } from "../models.svelte";
 import { stubFetch } from "../test-helpers";
 import ModelSetupView from "./ModelSetupView.svelte";
+import { takeChatHandoff } from "../chatHandoff";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -77,25 +78,75 @@ const REGISTRY = [
   }),
 ];
 
+/** QUI-W03 — the providers open from "An account I have", as an owner opens them. */
+async function openProviders() {
+  await fireEvent.click(await screen.findByRole("button", { name: /An account I have/ }));
+}
+
 describe("first-run setup", () => {
-  it("opens on the model, with no welcome screen to read first (Quiet UI)", async () => {
-    // FIRST-02 — no Account stage after the account exists. Quiet UI — no
-    // Welcome either: the app introduces Chat, Build and Design itself.
-    stubFetch({
+  it("opens on Hello and saves the name Raiker will call the owner (QUI-W02)", async () => {
+    // FIRST-02 — no Account stage after the account exists. QUI-W02 — the
+    // stored `welcome` stage is the Hello step of the setup conversation.
+    const fetchMock = stubFetch({
       "GET /api/setup": { ...required, stage: "welcome" },
+      "PUT /api/setup": { ...required, status: "in_progress", stage: "model" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
       "GET /api/host/update": { installation: { distribution: "desktop", version: "1.0.0" } },
+      "GET /api/settings": { settings: { "ui.theme": "dark" }, status: { username: "owner" }, revision: "r1" },
+      "PUT /api/settings": { settings: {}, revision: "r2", merged_keys: [] },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^Hi, I'm Raiker\./ })).toBeInTheDocument();
     const rail = screen.getByRole("list", { name: "Setup progress" });
-    for (const stage of ["Model", "Privacy", "Ready"]) {
+    await waitFor(() => expect(within(rail).getAllByRole("listitem")).toHaveLength(4));
+    for (const stage of ["Name", "Model", "Privacy", "Start"]) {
       expect(within(rail).getByText(stage)).toBeInTheDocument();
     }
-    for (const gone of ["Welcome", "Permissions", "Account", "Backup"]) {
+    for (const gone of ["Welcome", "Permissions", "Account", "Backup", "Ready"]) {
       expect(within(rail).queryByText(gone)).not.toBeInTheDocument();
     }
+    expect(screen.getByRole("button", { name: "Skip setup" })).toBeInTheDocument();
+    const name = screen.getByLabelText("Your name");
+    await waitFor(() => expect(name).toHaveValue("owner"));
+    await fireEvent.input(name, { target: { value: "Rahul" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => {
+      const put = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/api/settings") && init?.method === "PUT");
+      expect(JSON.parse(String(put?.[1]?.body)).settings["account.display_name"]).toBe("Rahul");
+    });
+    // The answered step stays, as an exchange, above the next one.
+    expect(await screen.findByRole("heading", { name: "Where should I think?" })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Setup so far" })).getByText("Rahul")).toBeInTheDocument();
+  });
+
+  it("skips setup into a plain new chat (QUI-W06)", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": { ...required, stage: "welcome" },
+      "PUT /api/setup": { ...required, status: "complete", stage: "finish", model_deferred: true },
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    render(ModelSetupView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Skip setup" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/new-chat"));
+    const put = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/api/setup") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({ status: "complete", model_deferred: true });
+  });
+
+  it("answers Where should I think with three cards (QUI-W03)", async () => {
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
+      "GET /api/model-library": { roots: [], models: [] },
+    });
+    render(ModelSetupView);
+    await screen.findByRole("heading", { name: "Where should I think?" });
+    for (const card of [/On this computer/, /An account I have/, /Decide later/]) {
+      expect(screen.getByRole("button", { name: card })).toBeInTheDocument();
+    }
+    await fireEvent.click(screen.getByRole("button", { name: /An account I have/ }));
+    // The providers open, each with its own secure key field; the cards go.
+    await waitFor(() => expect(screen.queryByRole("button", { name: /An account I have/ })).toBeNull());
   });
 
   it("shows a stored account stage as the first stage rather than a blank one", async () => {
@@ -105,8 +156,8 @@ describe("first-run setup", () => {
     });
     render(ModelSetupView);
 
-    // A source checkout keeps the device check, so it opens there.
-    expect(await screen.findByRole("heading", { name: "What this computer can run" })).toBeInTheDocument();
+    // A retired stage opens on the first step, which is now Hello.
+    expect(await screen.findByRole("heading", { name: /^Hi, I'm Raiker\./ })).toBeInTheDocument();
   });
 
   it("leads with the easiest working path and keeps the matrix on request", async () => {
@@ -126,8 +177,8 @@ describe("first-run setup", () => {
 
     expect(await screen.findByText("Recommended")).toBeInTheDocument();
     expect(screen.getByText(/Ollama is installed here/)).toBeInTheDocument();
-    // The full matrix is one press away rather than the opening move.
-    expect(screen.getByRole("button", { name: "Other options" })).toBeInTheDocument();
+    // The full matrix is one press away rather than the opening move (QUI-W03).
+    expect(screen.getByRole("button", { name: /An account I have/ })).toBeInTheDocument();
   });
 
   // Found in the 2026-10-11 live round: a global model chosen on Models before
@@ -218,12 +269,12 @@ describe("first-run setup", () => {
     render(ModelSetupView);
 
     expect(
-      await screen.findByRole("heading", { name: "Choose how Raiker should think" }),
+      await screen.findByRole("heading", { name: "Where should I think?" }),
     ).toBeInTheDocument();
     // FIRST-06 — the Models page is deeper configuration, not the way out of an
     // incomplete flow.
     expect(screen.getByRole("link", { name: "Advanced setup" })).toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Decide later/ }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) =>
       String(url).endsWith("/api/setup") && init?.method === "PUT",
     )).toBe(true));
@@ -252,6 +303,7 @@ describe("first-run setup", () => {
       },
     });
     render(ModelSetupView);
+    await openProviders();
 
     // One row each, and the local runtimes are asked without being clicked.
     expect(await screen.findByText("Local GGUF")).toBeInTheDocument();
@@ -296,6 +348,7 @@ describe("first-run setup", () => {
       "POST /api/model-readiness/check": { profile_id: "anthropic-hosted", model: "claude-opus-4-5", state: "ready", ready: true },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "Anthropic" });
     await fireEvent.input(within(row).getByLabelText("Anthropic API key"), {
@@ -363,6 +416,7 @@ describe("first-run setup", () => {
       },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "Anthropic" });
     // Not offered up front: a box asking for a "workspace ID" on first run is a
@@ -415,6 +469,7 @@ describe("first-run setup", () => {
       "POST /api/models/chatgpt-codex/login": { ok: true, connection_status: "login_pending" },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
     expect(within(row).queryByLabelText(/API key/i)).not.toBeInTheDocument();
@@ -450,6 +505,7 @@ describe("first-run setup", () => {
       },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
     expect(await within(row).findByText("Pro connected")).toBeInTheDocument();
@@ -472,6 +528,7 @@ describe("first-run setup", () => {
       "GET /api/models/chatgpt-codex/status": { connection_status: "codex_missing", plan_type: null },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
     expect(await within(row).findByText("Codex is not installed on this device.")).toBeInTheDocument();
@@ -503,6 +560,7 @@ describe("first-run setup", () => {
       },
     });
     render(ModelSetupView);
+    await openProviders();
 
     const row = await screen.findByRole("group", { name: "OpenRouter" });
     await fireEvent.input(within(row).getByLabelText("OpenRouter API key"), {
@@ -536,7 +594,11 @@ describe("first-run setup", () => {
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Where your model requests go" })).toBeInTheDocument();
+    // QUI-W04 — how Raiker will ask, and where data goes; no connection requests.
+    expect(await screen.findByRole("heading", { name: "Here is how I'll work for you." })).toBeInTheDocument();
+    expect(screen.getByText(/I'll ask before I send, delete, pay or share anything/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute("href", "#/capabilities");
+    expect(screen.queryByRole("button", { name: /Connect/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Local only/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Nothing reaches a provider you have not set up/)).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -548,10 +610,8 @@ describe("first-run setup", () => {
     });
   });
 
-  it("finishes into work, with backup recommended rather than required", async () => {
-    // FIRST-08/09 — a NAS path asked for before first use is friction in front
-    // of the work, and "Open Workbench" named a place nothing else calls that.
-    stubFetch({
+  it("ends on the first task, kept in Threads as Getting started (QUI-W05)", async () => {
+    const fetchMock = stubFetch({
       "GET /api/setup": {
         ...required,
         status: "in_progress",
@@ -560,30 +620,32 @@ describe("first-run setup", () => {
         selected_model: "claude-sonnet-4",
         selected_profile_id: "p",
       },
+      "PUT /api/setup": { ...required, status: "complete", stage: "finish" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Your Raiker is ready" })).toBeInTheDocument();
-    for (const mode of ["Chat", "Build", "Design"]) {
-      expect(screen.getByRole("button", { name: mode })).toBeInTheDocument();
-    }
-    expect(screen.getByRole("button", { name: "Start using Raiker" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open Workbench" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "You're set. What should we do first?" })).toBeInTheDocument();
+    const starters = screen.getByRole("list", { name: "Ways to start" });
+    expect(within(starters).getAllByRole("listitem")).toHaveLength(4);
     // Still offered, and still real: nothing claims a backup until one verifies.
     expect(screen.getByRole("button", { name: "Set up backup" })).toBeInTheDocument();
-    // Quiet UI — no summary table restating the choices just made.
     expect(screen.queryByText("Model requests")).not.toBeInTheDocument();
+
+    await fireEvent.click(within(starters).getByRole("button", { name: "Plan my week" }));
+    const box = screen.getByLabelText("What should we do first?");
+    expect((box as HTMLTextAreaElement).value).not.toBe("");
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(window.location.hash).toBe("#/new-chat"));
+    expect(takeChatHandoff()).toMatchObject({ title: "Getting started" });
+    const put = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/api/setup") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body)).status).toBe("complete");
   });
 
   /*
    * REM-LAUNCH-01 — the last stage may not claim a readiness it has not got.
-   *
-   * "Your Raiker is ready" was unconditional, and sat directly above a summary
-   * whose Model row could read "Decide later". First run is the one place an
-   * owner has nothing to check the claim against.
    */
-  it("says setup is saved, not ready, when the model was deferred", async () => {
+  it("says setup is saved, not set, when the model was deferred", async () => {
     stubFetch({
       "GET /api/setup": {
         ...required,
@@ -596,39 +658,11 @@ describe("first-run setup", () => {
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Setup saved" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Your Raiker is ready" })).toBeNull();
-    // Exploration is still permitted — every mode opens — and the one that
-    // cannot do its work yet names the page that fixes it.
-    for (const mode of ["Chat", "Build", "Design"]) {
-      expect(screen.getByRole("button", { name: mode })).toBeEnabled();
-    }
-    expect(screen.getAllByTitle("Needs a model to answer with.")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "Connect an image provider" })).toHaveAttribute(
-      "href",
-      "#/models?tab=add",
-    );
-  });
-
-  it("keeps Design's prerequisite separate from Chat's", async () => {
-    // A chat model is not an image model, and a launch screen that requires
-    // every optional service before it will call anything ready is the defect
-    // in the other direction.
-    stubFetch({
-      "GET /api/setup": {
-        ...required,
-        status: "in_progress",
-        stage: "finish",
-        selected_model: "claude-sonnet-4",
-        selected_profile_id: "p",
-      },
-      "GET /api/models": { profiles: [], chat_profiles: [] },
-    });
-    render(ModelSetupView);
-
-    await screen.findByRole("heading", { name: "Your Raiker is ready" });
-    expect(screen.queryByTitle("Needs a model to answer with.")).toBeNull();
-    expect(screen.getByTitle("Needs a provider that returns images.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^Setup is saved\./ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /You're set/ })).toBeNull();
+    expect(screen.getByRole("link", { name: "Choose a model" })).toHaveAttribute("href", "#/models?tab=add");
+    // Exploration is still permitted: the composer and starters stay usable.
+    expect(screen.getByLabelText("What should we do first?")).toBeEnabled();
   });
 
   it("never calls a deferred backup protected", async () => {
@@ -660,22 +694,22 @@ const check = (id: string, state: string, extra: Record<string, unknown> = {}) =
 describe("DIST-05 — a desktop installation was checked while it installed", () => {
   const desktopUpdate = { installation: { distribution: "desktop", version: "1.0.0" } };
 
-  it("asks only model, privacy and done, with no device or installation stage", async () => {
+  it("asks only name, model, privacy and start, with no device or installation stage", async () => {
     const fetchMock = stubFetch({
-      "GET /api/setup": { ...required, stage: "welcome" },
+      "GET /api/setup": { ...required, stage: "model" },
       "GET /api/models": { profiles: [], chat_profiles: [] },
       "GET /api/host/update": desktopUpdate,
       "PUT /api/setup": { ...required, status: "in_progress", stage: "privacy", model_deferred: true },
     });
     render(ModelSetupView);
 
-    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Where should I think?" })).toBeInTheDocument();
     const rail = screen.getByRole("list", { name: "Setup progress" });
     await waitFor(() => expect(within(rail).queryByText("This device")).toBeNull());
     expect(within(rail).queryByText("Check")).toBeNull();
-    expect(within(rail).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(rail).getAllByRole("listitem")).toHaveLength(4);
 
-    await fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
+    await fireEvent.click(screen.getByRole("button", { name: /Decide later/ }));
     const put = fetchMock.mock.calls.find(([url, init]) => String(url).includes("/api/setup") && init?.method === "PUT");
     expect(JSON.parse(String(put?.[1]?.body)).stage).toBe("privacy");
   });
@@ -687,7 +721,7 @@ describe("DIST-05 — a desktop installation was checked while it installed", ()
       "GET /api/host/update": desktopUpdate,
     });
     render(ModelSetupView);
-    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Where should I think?" })).toBeInTheDocument();
   });
 });
 
@@ -823,7 +857,7 @@ describe("BUG-331 — the model step does not wait on every provider", () => {
       }),
     );
     render(ModelSetupView);
-    expect(await screen.findByRole("heading", { name: "Choose how Raiker should think" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Where should I think?" })).toBeInTheDocument();
     expect(screen.getByText(/Looking for the providers and runtimes/)).toBeInTheDocument();
     expect(screen.queryByText("Preparing your setup…")).toBeNull();
     answerModels(null);

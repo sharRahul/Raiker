@@ -28,6 +28,9 @@
 
 import { api, ApiError } from "./api";
 
+import { NOT_ANSWERING } from "./errorCopy";
+import type { PromptAttachment } from "./apiTypes";
+
 /** One attachment the composer is carrying, or that a turn carried. */
 export interface ComposerAttachment {
   kind: "path" | "image" | "document";
@@ -49,6 +52,19 @@ export interface ComposerAttachment {
   previewUrl?: string;
   /** Original clipboard text, retained locally for reversible inline display. */
   pastedText?: string;
+}
+
+/**
+ * What crosses the wire for a set of composer attachments: uploaded files by
+ * id, workspace files by path. `undefined` when there are none.
+ */
+export function wireAttachments(items: readonly ComposerAttachment[]): PromptAttachment[] | undefined {
+  const attachments = items.map((item): PromptAttachment => item.kind === "image"
+    ? { type: "image", attachment_id: item.attachmentId ?? "" }
+    : item.kind === "document"
+      ? { type: "document", attachment_id: item.attachmentId ?? "" }
+      : { type: "path", path: item.path ?? "" });
+  return attachments.length ? attachments : undefined;
 }
 
 /** A human file size. Bytes for the tiny cases, then KB, then MB. */
@@ -207,7 +223,7 @@ export function createAttachmentStore(): AttachmentStore {
             "Other uploads are still in progress. Add this file again in a moment."
           : e instanceof ApiError
             ? `Upload rejected (${e.reasonCode ?? e.status}).`
-            : "Upload failed — could not reach the local runtime.";
+            : `The file was not attached. ${NOT_ANSWERING}`;
     } finally {
       uploading = false;
     }

@@ -314,7 +314,7 @@ test("Diagnostics says what each kind of work does after a restart; a run is lef
   const seen = watchFailures(page);
   await signInAsOwner(page, BASE);
   await open(page, "#/observe");
-  await page.getByText("Runtime health, in detail").click();
+  await page.getByText("Health, in detail").click();
   const card = page.getByTestId("recovery-matrix");
   await expect(card).toContainText("Tasks and routines");
   await card.getByText("Tasks and routines").click();

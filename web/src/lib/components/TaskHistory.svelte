@@ -109,7 +109,7 @@
            though they were all of them is the kind of quiet shortening this
            record exists to stop. -->
       <p class="truncated" role="status">
-        Showing this task's most recent transitions. The complete trail is in the
+        Showing this task's most recent transitions. The complete record is in the
         <a href="#/observe?tab=activity">audit log</a>.
       </p>
     {/if}

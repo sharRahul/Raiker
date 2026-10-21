@@ -25,7 +25,6 @@
   } from "../apiTypes";
   import { modelName } from "../modelPresentation";
   import { inferenceLocation, inferenceSentence, type InferenceLocation } from "../inferenceLocation";
-  import { drawsImages } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import {
     CHECK_STATE_LABELS,
@@ -37,10 +36,22 @@
     stagesFor,
     visibleStage,
   } from "../firstRun";
+  import {
+    answeredExchanges,
+    ASK_LINE,
+    FIRST_TASK_NO_MODEL,
+    FIRST_TASK_READY,
+    FIRST_TASK_TITLE,
+    HELLO_LINE,
+    MODEL_QUESTION,
+    PROFILE_LINE,
+    saveOwnerName,
+  } from "../setupConversation";
+  import { handOffToChat } from "../chatHandoff";
+  import { STARTERS } from "../starters";
   import ProviderMatrix from "../components/ProviderMatrix.svelte";
   import Icon from "../components/Icon.svelte";
   import Logo from "../components/Logo.svelte";
-  import type { IconName } from "../icons";
 
   /** `desktop` when the installer already checked this computer (DIST-05). */
   let distribution = $state<string | null>(null);
@@ -94,6 +105,12 @@
       const [state, update] = await Promise.all([api.setup(), api.hostUpdate().catch(() => null)]);
       distribution = update?.installation?.distribution ?? null;
       setup = state;
+      // QUI-W02 — the name Raiker will call the owner, offered back to them.
+      void api.settings()
+        .then((view) => {
+          if (nameDraft === "") nameDraft = String(view.status.display_name || view.status.username || "");
+        })
+        .catch(() => {});
       backupTarget = state.backup_target ?? "";
     } catch {
       error = "Setup could not be loaded.";
@@ -198,6 +215,60 @@
     await save({ status: "in_progress", stage: after("privacy"), privacy_mode: PRIVACY_STATEMENT.mode });
   }
 
+  /*
+   * QUI-W02 — Hello. The name is saved where Settings › Account keeps it, and
+   * Home and Chat greet the owner with it. Skip leaves it as it was.
+   */
+  let nameDraft = $state("");
+  let ownerName = $state("");
+  async function answerName(skip = false) {
+    error = "";
+    if (!skip && nameDraft.trim() !== "") {
+      try {
+        await saveOwnerName(nameDraft);
+        ownerName = nameDraft.trim();
+      } catch {
+        error = "Your name was not saved. Setup carries on; you can set it in Settings › Account.";
+      }
+    }
+    await save({ status: "in_progress", stage: after("welcome") });
+  }
+
+  /** QUI-W03 — the three answers to "Where should I think?". */
+  function thinkHere() {
+    const local = profiles.find((profile) => profile.local_only && profile.provider_detected === true);
+    pickerRequest = recommended?.profileId ?? local?.profile_id ?? null;
+    showAllProviders = true;
+  }
+  function thinkWithAccount() {
+    pickerRequest = null;
+    showAllProviders = true;
+  }
+
+  /** QUI-W06 — Skip setup, always on screen: a plain new chat, nothing else decided. */
+  async function skipSetup() {
+    await save({ status: "complete", stage: "finish", model_deferred: picked === null });
+    window.location.hash = "#/new-chat";
+  }
+
+  /*
+   * QUI-W05 — the first task. Setup is finished, and the message goes to Chat
+   * through the same hand-off Home uses, kept in Threads as "Getting started".
+   */
+  let firstTask = $state("");
+  let firstTaskInput = $state<HTMLTextAreaElement>();
+  async function sendFirstTask(event?: Event) {
+    event?.preventDefault();
+    if (firstTask.trim() === "") return;
+    await save({ status: "complete", stage: "finish" });
+    handOffToChat(firstTask, [], FIRST_TASK_TITLE);
+    window.location.hash = "#/new-chat";
+  }
+  function useStarter(prompt: string) {
+    firstTask = prompt;
+    firstTaskInput?.focus();
+  }
+
   /** FIRST-08 — backup is offered at the end, not asked for before first use. */
   let wantsBackup = $state(false);
 
@@ -210,72 +281,15 @@
    * taken at face value — and the first thing they do with it is press Chat and
    * meet a composer that cannot send.
    *
-   * Readiness is per work mode, because the prerequisites differ: Chat and Build
-   * need a model to talk to, Design needs a provider that answers with images.
-   * Nothing is blocked — exploring a mode with no model connected is how an
-   * owner finds out what it is — but an action that cannot do its work yet says
-   * so and names the exact page that fixes it, rather than being presented as
-   * ready alongside two that are.
+   * QUI-W05 — the first-task step says "You're set" only when a model is
+   * chosen; otherwise it says Chat and Build need one and links where to choose
+   * it. Nothing is blocked: a message sent now is kept until a model is ready.
    */
   const modelChosen = $derived.by(() => {
     const state: SetupState | null = setup;
     if (state === null) return false;
     return !state.model_deferred && (state.selected_model ?? "") !== "";
   });
-  // REM-MODEL-01 — "could Raiker reach this" is answered in one place, never
-  // here from `configured` and `provider_detected`, which call a provider whose
-  // key the last check rejected usable.
-  const imageReady = $derived(drawsImages(profiles));
-
-  interface StartAction {
-    id: string;
-    label: string;
-    icon: IconName;
-    route: string;
-    ready: boolean;
-    /** What is missing, and the page that supplies it. Empty when ready. */
-    missing: string;
-    remedy: string;
-    remedyLabel: string;
-  }
-
-  const startActions = $derived<StartAction[]>([
-    {
-      id: "chat",
-      label: "Chat",
-      icon: "chat",
-      route: "#/new-chat",
-      ready: modelChosen,
-      missing: modelChosen ? "" : "Needs a model to answer with.",
-      remedy: "#/models?tab=add",
-      remedyLabel: "Choose a model",
-    },
-    {
-      id: "build",
-      label: "Build",
-      icon: "code",
-      route: "#/build",
-      ready: modelChosen,
-      missing: modelChosen ? "" : "Needs a model to answer with.",
-      remedy: "#/models?tab=add",
-      remedyLabel: "Choose a model",
-    },
-    {
-      id: "design",
-      label: "Design",
-      icon: "design",
-      route: "#/design",
-      ready: imageReady,
-      missing: imageReady ? "" : "Needs a provider that returns images.",
-      remedy: "#/models?tab=add",
-      remedyLabel: "Connect an image provider",
-    },
-  ]);
-
-  /** The heading, and the sentence under it, scoped to what is actually set up. */
-  const finishHeading = $derived(modelChosen ? "Your Raiker is ready" : "Setup saved");
-  // Quiet UI — a sentence only when something is missing.
-  const finishNote = $derived(modelChosen ? "" : "Chat and Build have nothing to answer with yet.");
 
   async function createBackup() {
     if (!backupTarget.trim()) return;
@@ -312,6 +326,13 @@
   const stageOf = (state: SetupState | null) => (state === null ? null : state.stage);
   const stage = $derived(visibleStage(stageOf(setup), stages));
   const after = (current: typeof stage) => nextStage(stages, current);
+  /** QUI-W02 – W04 — what has been asked and answered, above the current step. */
+  const exchanges = $derived(
+    answeredExchanges(stages.slice(0, Math.max(stages.indexOf(stage), 0)), {
+      name: ownerName || nameDraft,
+      model: picked,
+    }),
+  );
   const before = (current: typeof stage) => previousStage(stages, current);
   /** BUG-332 — what each provider said when its models were last listed here. */
   let catalogueRefusals = $state<Record<string, string | null>>({});
@@ -362,11 +383,12 @@
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
-  /** The full matrix opens by itself only when there is nothing to recommend. */
   let showAllProviders = $state(false);
   /** The provider whose picker the recommendation asked to open (BUG-344). */
   let pickerRequest = $state<string | null>(null);
-  const allProvidersOpen = $derived(showAllProviders || (recommended === null && !unconfirmed));
+  // QUI-W03 — the providers open from "On this computer", "An account I have"
+  // or the recommendation, never by themselves over the three answers.
+  const allProvidersOpen = $derived(showAllProviders);
 
   /*
    * DIST-05 — This device. Measured by the host, locally; the answer says what
@@ -410,7 +432,7 @@
   const mandatoryFailed = $derived(verification !== null && verification.failed.length > 0);
 
   $effect(() => {
-    if (stage === "system" && system === null && systemError === "") void loadSystem();
+    if ((stage === "system" || stage === "model") && system === null && systemError === "") void loadSystem();
     if (stage === "verify" && verification === null && !verifying && verifyError === "") void runVerification();
   });
 
@@ -436,7 +458,12 @@
   <!-- A focused sheet, without the app's navigation around it (App.svelte):
        where you are, how far there is to go, and nothing else competing. -->
   <header class="setup-top">
-    <span class="setup-brand"><Logo size={28} /><span>Set up Raiker</span></span>
+    <div class="setup-bar">
+      <span class="setup-brand"><Logo size={28} /><span>Set up Raiker</span></span>
+      {#if setup !== null}
+        <button class="quiet skip" disabled={busy} onclick={() => void skipSetup()}>Skip setup</button>
+      {/if}
+    </div>
     <ol class="stage-rail" aria-label="Setup progress">
       {#each stages as railStage, index}
         <li
@@ -452,8 +479,28 @@
 
   <div class="setup-content">
     {#if error}<p class="error" role="alert">{error}</p>{/if}
+    {#if exchanges.length > 0}
+      <!-- QUI-W02 – W04 — the setup conversation so far. -->
+      <ol class="exchanges" aria-label="Setup so far">
+        {#each exchanges as exchange (exchange.id)}
+          <li>
+            <p class="said raiker">{exchange.asked}</p>
+            <p class="said owner">{exchange.answered}</p>
+          </li>
+        {/each}
+      </ol>
+    {/if}
     {#if setup === null}
       <h2 id="setup-title">Preparing your setup…</h2>
+    {:else if stage === "welcome"}
+      <h2 id="setup-title" class="raiker-line">{HELLO_LINE}</h2>
+      <form class="card" onsubmit={(event) => { event.preventDefault(); void answerName(); }}>
+        <label>Your name<input bind:value={nameDraft} autocomplete="name" maxlength="80" /></label>
+        <div class="actions">
+          <button type="button" class="quiet" disabled={busy} onclick={() => void answerName(true)}>Skip</button>
+          <button type="submit" class="primary" disabled={busy || nameDraft.trim() === ""}>Continue</button>
+        </div>
+      </form>
     {:else if stage === "system"}
       <header>
         <h2 id="setup-title">What this computer can run</h2>
@@ -483,11 +530,41 @@
       </div>
     {:else if stage === "model"}
       <header>
-        <h2 id="setup-title">Choose how Raiker should think</h2>
+        <h2 id="setup-title" class="raiker-line">{MODEL_QUESTION}</h2>
         <!-- FIRST-04 — connect, then discover, then choose a default. What a
              provider serves is discovered once and available everywhere; there
              is no step in between where models are kept or withheld. -->
       </header>
+      {#if picked === null && !allProvidersOpen}
+        <!-- QUI-W03 — three answers. A key, when one is needed, goes in the
+             provider card's own secure field, never into this conversation. -->
+        <div class="think-choices">
+          <button class="think" onclick={thinkHere}>
+            <Icon name="system" size="md" />
+            <strong>On this computer</strong>
+            <span>
+              {#if system?.recommended_local_model}
+                About {system.recommended_local_model.parameters} parameters fits here · {system.recommended_local_model.download}
+              {:else}
+                Private and free; runs on this device.
+              {/if}
+            </span>
+            {#if system?.ready && recommended?.action === "choose" && profiles.find((p) => p.profile_id === recommended?.profileId)?.local_only}
+              <em class="tag">Recommended</em>
+            {/if}
+          </button>
+          <button class="think" onclick={thinkWithAccount}>
+            <Icon name="connections" size="md" />
+            <strong>An account I have</strong>
+            <span>Anthropic, OpenAI, Google and others. Your key stays in an encrypted store.</span>
+          </button>
+          <button class="think" disabled={busy} onclick={deferModel}>
+            <Icon name="clock" size="md" />
+            <strong>Decide later</strong>
+            <span>Look around first. Chat asks for a model when you send.</span>
+          </button>
+        </div>
+      {/if}
       {#if profilesLoading || unconfirmed}
         <!-- BUG-331 — the step is here; the providers are still answering. -->
         <p class="note providers-loading" role="status" aria-live="polite">
@@ -518,7 +595,7 @@
           {/if}
         </div>
       {/if}
-      {#if !profilesLoading && !unconfirmed && !allProvidersOpen}
+      {#if !profilesLoading && !unconfirmed && !allProvidersOpen && picked !== null}
         <div class="actions">
           <button class="quiet" onclick={() => (showAllProviders = true)}>Other options</button>
         </div>
@@ -544,23 +621,30 @@
              needed to connect a provider and pick a default is on this screen;
              the Models page is where deeper configuration lives. -->
         <a class="quiet" href="#/models">Advanced setup</a>
-        <button class="primary" disabled={busy} onclick={deferModel}>{picked === null ? "Decide later" : "Continue"}</button>
+        {#if picked !== null || allProvidersOpen}
+          <button class="primary" disabled={busy} onclick={deferModel}>{picked === null ? "Decide later" : "Continue"}</button>
+        {/if}
       </div>
     {:else if stage === "privacy"}
-      <header>
-        <!-- FIRST-07 / BUG-345 — one statement about where content travels.
-             It is not a second authority system beside Permissions, and the
-             unenforced *Local only* answer is gone. -->
-        <h2 id="setup-title">Where your model requests go</h2>
+      <!-- QUI-W04 — how Raiker will ask, and where data goes. No connection
+           requests here: services are connected when a task needs them. -->
+      <h2 id="setup-title" class="raiker-line">{ASK_LINE}</h2>
+      <div class="card ask-card">
+        <p class="eyebrow">How I'll ask</p>
+        <p>{PROFILE_LINE}</p>
+        <p class="card-foot"><strong>Standard</strong> · <a href="#/capabilities">Change</a></p>
+      </div>
+      <div class="card ask-card">
+        <!-- FIRST-07 / BUG-345 — one statement about where content travels. -->
+        <p class="eyebrow">Where your data goes</p>
         <p>{PRIVACY_STATEMENT.detail}</p>
-      </header>
-      {#if picked !== null && pickedLocation !== null && pickedLocation.kind !== "device"}
-        <!-- BUG-340 — the choice below is about the future; the model already
-             chosen has a destination of its own, and the owner sees it here. -->
-        <p class="note" role="note">
-          {picked} is selected. {inferenceSentence(pickedLocation)} To keep requests on this device, go back and choose a model that runs here.
-        </p>
-      {/if}
+        {#if picked !== null && pickedLocation !== null && pickedLocation.kind !== "device"}
+          <!-- BUG-340 — the model already chosen has a destination of its own. -->
+          <p class="note" role="note">
+            {picked} is selected. {inferenceSentence(pickedLocation)} To keep requests on this device, go back and choose a model that runs here.
+          </p>
+        {/if}
+      </div>
       <div class="actions">
         <button class="quiet" onclick={() => save({ stage: before("privacy") })}>Back</button>
         <button class="primary" disabled={busy} onclick={acknowledgePrivacy}>Continue</button>
@@ -595,31 +679,44 @@
         <button class="primary" disabled={busy || verifying} onclick={() => save({ status: "in_progress", stage: "finish" })}>{mandatoryFailed ? "Continue anyway" : "Continue"}</button>
       </div>
     {:else}
-      <header>
-        <!-- REM-LAUNCH-01 — a readiness claim scoped to what was actually set
-             up. This said "Your Raiker is ready" above a summary that could read
-             "Decide later" on the very next line. -->
-        <h2 id="setup-title">{finishHeading}</h2>
-        {#if finishNote}<p>{finishNote}</p>{/if}
-      </header>
-      <!-- FIRST-09 — finish into work. The three Work modes the welcome screen
-           introduced, as the three things to do next — each saying whether it
-           can do its work yet, and naming the page that fixes it if not. -->
-      <div class="start-work">
-        {#each startActions as action (action.id)}
-          <div class="mode-cell" class:unready={!action.ready}>
-            <button class="mode-start" disabled={busy} onclick={() => finish(action.route)}>
-              <Icon name={action.icon} size="md" />
-              <strong>{action.label}</strong>
-            </button>
-            {#if !action.ready}
-              <p class="mode-missing" title={action.missing}>
-                <a href={action.remedy}>{action.remedyLabel}</a>
-              </p>
+      <!-- QUI-W05 — the first task, in the same conversation. REM-LAUNCH-01:
+           what it says is scoped to what was actually set up. -->
+      <h2 id="setup-title" class="raiker-line">{modelChosen ? FIRST_TASK_READY : FIRST_TASK_NO_MODEL}</h2>
+      {#if !modelChosen}
+        <p class="note"><a href="#/models?tab=add">Choose a model</a> when you are ready; anything you send now is kept until one is.</p>
+      {/if}
+      <form class="card first-task" onsubmit={(event) => void sendFirstTask(event)}>
+        <label class="sr-only" for="first-task">What should we do first?</label>
+        <textarea
+          id="first-task"
+          bind:this={firstTaskInput}
+          bind:value={firstTask}
+          rows="2"
+          placeholder="What would you like Raiker to do?"
+          onkeydown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.isComposing) void sendFirstTask(event);
+          }}
+        ></textarea>
+        <div class="actions">
+          <span class="note">Kept in Threads as “{FIRST_TASK_TITLE}”.</span>
+          <button type="submit" class="primary" disabled={busy || firstTask.trim() === ""}>Send</button>
+        </div>
+      </form>
+      <ul class="starters" aria-label="Ways to start">
+        {#each STARTERS as starter (starter.id)}
+          <li>
+            {#if starter.kind === "prompt"}
+              <button type="button" class="starter" onclick={() => useStarter(starter.prompt)}>
+                <Icon name={starter.icon} size="sm" /><span>{starter.label}</span>
+              </button>
+            {:else}
+              <button type="button" class="starter" disabled={busy} onclick={() => finish(starter.href)}>
+                <Icon name={starter.icon} size="sm" /><span>{starter.label}</span>
+              </button>
             {/if}
-          </div>
+          </li>
         {/each}
-      </div>
+      </ul>
       {#if setup.backup_verified_at}
         <p class="note">Backup verified at {setup.backup_target}.</p>
       {:else if wantsBackup}
@@ -636,7 +733,7 @@
         {#if !setup.backup_verified_at && !wantsBackup}
           <button class="quiet" onclick={() => (wantsBackup = true)}>Set up backup</button>
         {/if}
-        <button class="primary" disabled={busy} onclick={() => finish("#/home")}>Start using Raiker</button>
+        <button class="quiet" disabled={busy} onclick={() => finish("#/home")}>Go to Home</button>
       </div>
     {/if}
   </div>
@@ -650,6 +747,29 @@
   /* An opaque band the full width of the window, so the model list scrolls
      under it rather than through it. */
   .setup-top { position: sticky; top: 0; z-index: 1; display: grid; gap: var(--space-4); padding: var(--space-3) 0 var(--space-4); background: var(--bg); box-shadow: 0 0 0 100vmax var(--bg); clip-path: inset(0 -100vmax); border-bottom: 1px solid transparent; }
+  .setup-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .skip { padding: .35rem .75rem; }
+  /* QUI-W02 – W05 — the setup conversation: Raiker's lines on the left, the
+     owner's answers on the right, the current step as a card under its line. */
+  .exchanges { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+  .exchanges li { display: grid; gap: var(--space-2); }
+  .said { margin: 0; max-width: 34rem; padding: var(--space-2) var(--space-3); border-radius: var(--r-lg); font-size: var(--text-sm); line-height: 1.5; }
+  .said.raiker { justify-self: start; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); }
+  .said.owner { justify-self: end; color: var(--text-1); background: var(--sunken); }
+  .raiker-line { font-size: clamp(1.35rem, 3vw, 1.9rem); line-height: 1.3; max-width: 40rem; }
+  .card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); max-width: 40rem; }
+  .card p { margin: 0; color: var(--text-2); line-height: 1.55; }
+  .card .card-foot { color: var(--text-3); font-size: var(--text-sm); }
+  .think-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+  .think { position: relative; display: grid; justify-items: start; align-content: start; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; font: inherit; cursor: pointer; }
+  .think:hover:not(:disabled) { border-color: var(--accent-border); background: var(--accent-soft); }
+  .tag { font-style: normal; font-size: var(--text-2xs); font-weight: 700; color: var(--accent); }
+  .first-task textarea { width: 100%; min-height: 3.5rem; resize: vertical; border: 0; background: transparent; color: var(--text-1); font: inherit; line-height: 1.5; }
+  .first-task textarea:focus { outline: none; }
+  .first-task .actions { justify-content: space-between; }
+  .starters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); max-width: 40rem; }
+  .starter { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; }
+  .starter:hover:not(:disabled) { border-color: var(--accent-border); }
   .setup-brand { display: flex; align-items: center; gap: .6rem; color: var(--text-1); font-size: var(--text-sm); font-weight: 750; }
   /* Scoped to the rail: the check and goal lists below are lists too. */
   .stage-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .5rem; }
@@ -665,22 +785,9 @@
   header { max-width: 45rem; } /* Shared `.eyebrow` sets size, weight, caps and tracking. First run keeps
      the mono face and a little more room under it. */
   .eyebrow { margin: 0 0 .4rem; font-family: var(--font-mono); }
-  h2 { margin: 0; color: var(--text-1); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
+  h2 { margin: 0; color: var(--text-1); font-size: clamp(1.7rem, 4vw, 2.6rem); }
   strong { color: var(--text-1); } span { font-size: var(--text-sm); line-height: 1.45; }
   .picked { margin: 0; color: var(--accent); font-size: var(--text-sm); font-weight: 650; }
-  /* The three Work modes, drawn the same way in both places they appear: as an
-     introduction on the welcome screen and as the first thing to do on the last
-     one. Chat, Build and Design are peers, so the grid gives them equal room. */
-  .modes, .start-work { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
-  .mode, .mode-start { display: grid; justify-items: start; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
-  .mode-start { cursor: pointer; width: 100%; }
-  .mode-start:hover { border-color: var(--accent-border); background: var(--accent-soft); }
-  /* REM-LAUNCH-01 — the mode stays usable; what it cannot do yet is said under
-     it, with the page that supplies the missing piece. Never colour alone. */
-  .mode-cell { display: grid; gap: var(--space-2); align-content: start; }
-  .mode-cell.unready .mode-start { border-style: dashed; }
-  .mode-missing { margin: 0; color: var(--text-3); font-size: var(--text-xs); line-height: 1.45; }
-  .mode-missing a { color: var(--accent); font-weight: 650; }
   .note { margin: 0; color: var(--text-3); font-size: var(--text-sm); line-height: 1.5; max-width: 45rem; }
   /* Recommended is one sentence with a reason, not a card competing with the
      matrix below it: the point is that most owners need read no further. */
@@ -706,5 +813,5 @@
   .check-detail, .check-remedy { grid-column: 2 / 4; color: var(--text-3); }
   .check-remedy { color: var(--text-1); font-weight: 600; }
   .path { font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; }
-  @media (max-width: 760px) { .modes, .start-work { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .think-choices, .starters { grid-template-columns: 1fr; } .stage-rail li strong { display: none; } .stage-rail li.active strong { display: block; } .summary { grid-template-columns: 1fr; } }
 </style>

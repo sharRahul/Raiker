@@ -173,7 +173,7 @@
       </p>
 
       <form class="add-row" onsubmit={add}>
-        <label class="field-label" for="blocklist-rule">Destination to block</label>
+        <label class="field-label" for="blocklist-rule">Site to block</label>
         <input
           id="blocklist-rule"
           class="input"
@@ -191,7 +191,7 @@
 
       {#if data.stored.length === 0}
         <p class="empty">
-          Nothing blocked yet. Raiker can reach any public destination that is not on
+          Nothing blocked yet. Raiker can reach any public site that is not on
           this list.
         </p>
       {:else}
@@ -217,7 +217,7 @@
     </div>
 
     <div class="card">
-      <h3>Check a destination</h3>
+      <h3>Check a site</h3>
       <p class="lead">
         Answers whether Raiker would be allowed to reach a host, without contacting it.
       </p>

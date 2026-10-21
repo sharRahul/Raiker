@@ -212,21 +212,21 @@
 </script>
 
 <div class="head-row">
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh runtime health">
+  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh health">
     <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
 
 {#if loadError}
-  <PageState state="error" title="Couldn't read runtime health" detail={loadError} />
+  <PageState state="error" title="Couldn't read Raiker's health" detail={loadError} />
 {:else if diag === null}
-  <PageState state="loading" title="Reading runtime health…" />
+  <PageState state="loading" title="Reading Raiker's health…" />
 {:else}
   <div class="grid">
     <section class="card" aria-labelledby="diag-monitor-h">
       <h2 id="diag-monitor-h">Self-monitoring</h2>
-      <p class="sub">Redacted health transitions recorded by the runtime's own monitors.</p>
+      <p class="sub">Redacted health transitions recorded by Raiker's own monitors.</p>
       {#if healthError}
         <p class="error" role="alert">{healthError}</p>
       {:else if health === null}

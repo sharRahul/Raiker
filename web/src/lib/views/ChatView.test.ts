@@ -5,10 +5,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
-import { stubFetch, openComposerAttach } from "../test-helpers";
+import { stubFetch, openComposerAttach, chooseComposerTool } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import { handOffToChat } from "../chatHandoff";
+import { resetWorkProject, setWorkProject } from "../workProject.svelte";
+import type { ProjectsList } from "../apiTypes";
 import { ApiError } from "../api";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
@@ -24,6 +26,7 @@ afterEach(() => {
   streamPromptMock.mockReset();
   resetModels();
   resetModelSetup();
+  resetWorkProject();
 });
 
 const DEFAULT_READY_PROFILE = {
@@ -876,6 +879,20 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText("Plan my week")).toBeNull();
   });
 
+  it("sends the files attached on Home with the handed-over message", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Read it.") });
+    });
+    handOffToChat("Summarise this", [{ kind: "path", label: "plan.md", detail: "notes/plan.md", path: "notes/plan.md" }]);
+    render(ChatView);
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(1));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      text: "Summarise this",
+      attachments: [{ type: "path", path: "notes/plan.md" }],
+    });
+  });
+
   // Found live in RT-QUI-03: a hand-off judged before Chat read the model it
   // was last set to opened "Set up a model" for a model that was ready.
   it("sends a handed-over message on the model Chat was last set to, without a setup dialog", async () => {
@@ -1468,5 +1485,145 @@ describe("ChatView file inspector", () => {
     await waitFor(() => expect(screen.getByText("OK")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: /notes\.md/i })).not.toBeInTheDocument();
     expect(screen.getByTitle("docs/notes.md")).toBeInTheDocument();
+  });
+});
+
+describe("ChatView top strip (QUI-C01)", () => {
+  const PROJECTS = {
+    projects: [{ project_id: "proj_1", name: "Landing page", root_subpath: ".raiker/projects/landing-page", created_at: "2026-07-01T00:00:00Z", session_count: 0, selected: false }],
+    active_project_id: null,
+  } as ProjectsList;
+
+  it("shows the project a chat is filed in as a chip that opens it, and nothing when unfiled", async () => {
+    stubFetch(MODELS_ROUTE);
+    setWorkProject("proj_1");
+    const filed = render(ChatView, { props: { projects: PROJECTS } });
+    const chip = await screen.findByRole("link", { name: "Landing page" });
+    expect(chip).toHaveAttribute("href", "#/projects?project=proj_1");
+    filed.unmount();
+    resetWorkProject();
+    render(ChatView, { props: { projects: PROJECTS } });
+    expect(screen.queryByRole("link", { name: "Landing page" })).toBeNull();
+  });
+
+  it("finds words in this conversation and steps through the matches", async () => {
+    stubFetch(MODELS_ROUTE);
+    const replies = ["Monday: call Anna.", "It covers Q3.", "Anna said yes."];
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse(replies.shift() ?? "") });
+    });
+    render(ChatView);
+    const box = await screen.findByPlaceholderText("What would you like Raiker to do?");
+    expect(screen.queryByRole("button", { name: "Search in conversation" })).toBeNull();
+    for (const [n, prompt] of ["Plan my week", "Summarise the report", "What did Anna say?"].entries()) {
+      await fireEvent.input(box, { target: { value: prompt } });
+      await fireEvent.keyDown(box, { key: "Enter" });
+      await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(n + 1));
+      await waitFor(() => expect(screen.queryByTestId("turn-control")).toBeNull());
+    }
+    await screen.findByText("Anna said yes.");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Search in conversation" }));
+    const search = screen.getByRole("searchbox", { name: "Search in conversation" });
+    await fireEvent.input(search, { target: { value: "anna" } });
+    expect(await screen.findByText("1 of 2")).toBeInTheDocument();
+    const hits = () => Array.from(document.querySelectorAll(".turn.search-hit")).map((el) => el.getAttribute("data-turn-index"));
+    expect(hits()).toEqual(["0"]);
+    await fireEvent.keyDown(search, { key: "Enter" });
+    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(hits()).toEqual(["2"]);
+    await fireEvent.input(search, { target: { value: "budget" } });
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+    await fireEvent.keyDown(search, { key: "Escape" });
+    expect(screen.queryByRole("searchbox")).toBeNull();
+  });
+
+  it("opens a context panel from the header once there is a conversation", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Done.") });
+    });
+    render(ChatView);
+    const box = await screen.findByPlaceholderText("What would you like Raiker to do?");
+    expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
+    await fireEvent.input(box, { target: { value: "Say done" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+    await screen.findByText("Done.");
+    const toggle = screen.getByRole("button", { name: "Context" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await fireEvent.click(toggle);
+    expect(screen.getByRole("complementary", { name: "Conversation context" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Close context" }));
+    expect(screen.queryByRole("complementary", { name: "Conversation context" })).toBeNull();
+  });
+});
+
+describe("ChatView Run in background (QUI-C11)", () => {
+  it("files the draft as a task that starts now and keeps the chat free", async () => {
+    const fetchMock = stubFetch({
+      ...MODELS_ROUTE,
+      "POST /api/tasks": { task_id: "task_bg", title: "Compare three laptops", status: "queued" },
+    });
+    render(ChatView);
+    const box = await screen.findByPlaceholderText("What would you like Raiker to do?");
+    await fireEvent.input(box, { target: { value: "Compare three laptops\nunder 1,500" } });
+    await chooseComposerTool("Run in background");
+    expect(await screen.findByText("Running in the background.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the task" })).toHaveAttribute("href", "#/tasks?task=task_bg");
+    expect(box).toHaveValue("");
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/api/tasks") && (init as RequestInit)?.method === "POST");
+    expect(JSON.parse(String((call?.[1] as RequestInit).body))).toMatchObject({
+      title: "Compare three laptops",
+      description: "Compare three laptops\nunder 1,500",
+      surface: "chat",
+    });
+  });
+
+  it("keeps the draft and says so when the task cannot be started", async () => {
+    stubFetch({ ...MODELS_ROUTE, "POST /api/tasks": { __status: 500, detail: "boom" } });
+    render(ChatView);
+    const box = await screen.findByPlaceholderText("What would you like Raiker to do?");
+    await fireEvent.input(box, { target: { value: "Watch the build" } });
+    await chooseComposerTool("Run in background");
+    expect(await screen.findByText(/Could not start it in the background/)).toBeInTheDocument();
+    expect(box).toHaveValue("Watch the build");
+  });
+});
+
+describe("ChatView long transcripts (QUI-G04)", () => {
+  function longHistory(count: number) {
+    return {
+      session: {
+        session_id: "sess_long", title: "Long chat", status: "open",
+        created_at: "2026-07-10T00:00:00Z", updated_at: "2026-07-10T00:01:00Z", turn_count: count,
+      },
+      turns: Array.from({ length: count }, (_, n) => ({
+        turn_id: `turn_${n}`, session_id: "sess_long", turn_type: "prompt", status: "completed",
+        prompt_text: n === 3 ? "the needle question" : `question ${n}`,
+        created_at: "2026-07-10T00:00:00Z", completed_at: "2026-07-10T00:00:10Z", summary: `answer ${n}`,
+      })),
+    };
+  }
+
+  it("draws the latest hundred of a thousand turns and offers the earlier ones", async () => {
+    stubFetch({ ...MODELS_ROUTE, "GET /api/sessions/sess_long": longHistory(1000) });
+    render(ChatView, { props: { sessionId: "sess_long" } });
+    expect(await screen.findByText("answer 999")).toBeInTheDocument();
+    expect(document.querySelectorAll(".turn")).toHaveLength(100);
+    expect(screen.queryByText("answer 899")).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Show 100 earlier messages" }));
+    expect(document.querySelectorAll(".turn")).toHaveLength(200);
+    expect(screen.getByText("answer 899")).toBeInTheDocument();
+  });
+
+  it("widens the window when search finds an earlier turn", async () => {
+    stubFetch({ ...MODELS_ROUTE, "GET /api/sessions/sess_long": longHistory(250) });
+    render(ChatView, { props: { sessionId: "sess_long" } });
+    await screen.findByText("answer 249");
+    await fireEvent.click(screen.getByRole("button", { name: "Search in conversation" }));
+    await fireEvent.input(screen.getByRole("searchbox", { name: "Search in conversation" }), { target: { value: "needle" } });
+    expect(await screen.findByText("the needle question")).toBeInTheDocument();
+    expect(document.querySelector(".turn.search-hit")?.getAttribute("data-turn-index")).toBe("3");
   });
 });

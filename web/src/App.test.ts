@@ -53,7 +53,7 @@ describe("App shell", () => {
     expect(
       await screen.findByRole(
         "heading",
-        { name: "Choose how Raiker should think" },
+        { name: "Where should I think?" },
         { timeout: 10_000 },
       ),
     ).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe("App shell", () => {
     // the three Work modes took Design back out of this list: it is a Work mode, so it is on
     // the rail and in the top bar's mode switch beside Chat and Build.
     for (const label of [
-      "Permissions", "Models", "Extensions", "Observability", "Settings",
+      "Permissions", "Models", "Extensions", "Diagnostics", "Settings",
       "Approvals", "Threads", "Tasks", "Projects", "Knowledge Map", "Messaging",
     ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
@@ -93,7 +93,7 @@ describe("App shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "More pages and settings" }));
     const pages = await screen.findByRole("dialog", { name: /^more$/i });
     for (const label of [
-      "Permissions", "Models", "Extensions", "Observability",
+      "Permissions", "Models", "Extensions", "Diagnostics",
       "Approvals",
     ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
@@ -305,9 +305,9 @@ describe("App shell", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(/runtime verification failed/i);
+      expect(screen.getByRole("alert")).toHaveTextContent(/raiker could not be checked/i);
     });
     expect(screen.queryByRole("navigation", { name: /primary/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/I cannot reach my runtime/i)).toBeInTheDocument();
+    expect(screen.getByText(/I cannot reach Raiker/i)).toBeInTheDocument();
   });
 });

@@ -78,7 +78,7 @@ describe("LoginView", () => {
     );
     render(LoginView, { props: { onAuthenticated } });
     expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
-    expect(screen.queryByText("I cannot reach my runtime.")).not.toBeInTheDocument();
+    expect(screen.queryByText("I cannot reach Raiker.")).not.toBeInTheDocument();
   });
 
   it("welcomes a first-run user and calls account creation consistently", async () => {
@@ -98,7 +98,7 @@ describe("LoginView", () => {
     );
     render(LoginView, { props: { onAuthenticated } });
     await waitFor(() =>
-      expect(screen.getByText("I cannot reach my runtime.")).toBeInTheDocument(),
+      expect(screen.getByText("I cannot reach Raiker.")).toBeInTheDocument(),
     );
   });
 
@@ -252,7 +252,7 @@ describe("LoginView", () => {
     const { rerender } = render(LoginView, { props: { onAuthenticated } });
     await rerender({ onAuthenticated, runtimeState: "verifying" });
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("Verifying runtime…");
+    expect(status).toHaveTextContent("Checking Raiker…");
     await waitFor(() => expect(document.activeElement).toBe(status));
     expect(screen.getByLabelText("Username")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeDisabled();
@@ -264,9 +264,9 @@ describe("LoginView", () => {
     const { rerender } = render(LoginView, { props: { onAuthenticated } });
     await rerender({ onAuthenticated, runtimeState: "verification_failed" });
     const alert = screen.getByRole("alert");
-    expect(alert).toHaveTextContent(/workspace remains locked/i);
+    expect(alert).toHaveTextContent(/workspace stays locked/i);
     await waitFor(() => expect(document.activeElement).toBe(alert));
-    expect(screen.getByText("I cannot reach my runtime.")).toBeInTheDocument();
+    expect(screen.getByText("I cannot reach Raiker.")).toBeInTheDocument();
     // The form stays usable so the user can retry.
     expect(screen.getByLabelText("Username")).not.toBeDisabled();
   });

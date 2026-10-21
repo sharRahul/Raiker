@@ -204,7 +204,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   });
 
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({
     timeout: 30_000,
   });
   await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);

@@ -170,7 +170,7 @@
             (state) => state.profile_id === profile.profile_id,
           )?.next_refresh_at
             ? `Next check ${capacities.sync.find((state) => state.profile_id === profile.profile_id)?.next_refresh_at}`
-            : "Scheduled when this local runtime is available"}
+            : "Scheduled for when this local model server is available"}
         </dd>
       </div>
       <div>

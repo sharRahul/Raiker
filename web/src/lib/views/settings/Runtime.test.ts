@@ -282,7 +282,7 @@ describe("Runtime configuration reading order", () => {
     expect(summary.closest("details")?.open).toBe(false);
     expect(screen.getByLabelText(/Re-confirm a model check after/)).toHaveValue(5);
     expect(screen.getByRole("link", { name: "Models" })).toHaveAttribute("href", "#/models");
-    expect(screen.getByRole("link", { name: "Observability" })).toHaveAttribute("href", "#/observe");
+    expect(screen.getByRole("link", { name: "Diagnostics" })).toHaveAttribute("href", "#/observe");
   });
 
   it("still reports the owner's readiness window to the runtime", async () => {
@@ -306,7 +306,7 @@ describe("Runtime configuration reading order", () => {
     });
 
     expect(screen.getByText("Read only")).toBeInTheDocument();
-    const ports = screen.getByLabelText(/Allowed destination ports/);
+    const ports = screen.getByLabelText(/Allowed outbound ports/);
     expect(ports.closest("details")?.open).toBe(false);
   });
 });

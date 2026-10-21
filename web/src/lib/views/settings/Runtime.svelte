@@ -459,7 +459,7 @@
              actually do to the repository — while the port list, which is 443
              unless something unusual is going on, goes below it. -->
         <div class="boundary-preview"><span>Repository</span><strong>Read only</strong><i>→</i><span>Output</span><strong>Writable</strong></div>
-        <details class="form-advanced"><summary>Advanced</summary><label>Allowed destination ports<input bind:value={egressPorts} inputmode="numeric" placeholder="443" /><small>Usually 443. Configuration alone never enables egress.</small></label></details>
+        <details class="form-advanced"><summary>Advanced</summary><label>Allowed outbound ports<input bind:value={egressPorts} inputmode="numeric" placeholder="443" /><small>Usually 443. Configuration alone never enables egress.</small></label></details>
       {/if}
       {#if environmentKind !== "container"}<label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
       <small>{environmentKind === "ssh" ? "The variable must contain the path to an OpenSSH private key; known-host verification stays strict." : "The variable must contain the Daytona API key. Every run reserves against cumulative spend; estimates remain reserved when provider billing data is unavailable."}</small>{/if}
@@ -472,7 +472,7 @@
      boundary it runs behind, which is the decision an owner comes here to make.
      The tuning below it is real and stays reachable, but it is an interval and a
      port number: it does not belong above the thing it tunes. Model readiness in
-     particular is *reported* on Models and Observability — this is only the
+     particular is *reported* on Models and Diagnostics — this is only the
      window those two re-check on, so it says where it is read rather than
      drawing a second readiness display here. -->
 <section class="settings-card advanced">
@@ -482,7 +482,7 @@
       <span>Re-confirm a model check after</span>
       <small>
         Between 1 and 120 minutes. The default is 5. Readiness itself is shown on
-        <a href="#/models">Models</a> and <a href="#/observe">Observability</a>; this is
+        <a href="#/models">Models</a> and <a href="#/observe">Diagnostics</a>; this is
         the window they re-check on.
       </small>
       <input

@@ -90,7 +90,7 @@ test("BUG-242 — Build comes back to the conversation after a reload", async ()
   await capture(page, join(SHOTS, "fixed-309-build-turn.png"));
 
   await page.reload();
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   // FIXED-353 — a reload no longer signs the owner out: the session is an
   // `HttpOnly`, `SameSite=Strict` cookie. This block used to fill in the
   // password again, with a comment saying the control session lived in memory,
@@ -122,9 +122,9 @@ test("MEM-09 — Diagnostics reports memory integrity and offers its repair", as
   // to a `diagnostics` tab that the overview absorbed.
   await page
     .getByRole("group")
-    .filter({ hasText: "Runtime health, in detail" })
+    .filter({ hasText: "Health, in detail" })
     .first()
-    .getByText("Runtime health, in detail")
+    .getByText("Health, in detail")
     .click();
   const card = page.getByRole("region", { name: "Memory integrity" });
   await expect(page.getByRole("heading", { name: "Memory integrity" })).toBeVisible({

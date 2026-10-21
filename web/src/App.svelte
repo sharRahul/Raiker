@@ -434,6 +434,8 @@
             <LazyRoute route="design" props={{ projects }} />
           {:else if current === "guide"}
             <LazyRoute route="guide" props={{ section: currentSection }} />
+          {:else if current === "state-gallery"}
+            <LazyRoute route="state-gallery" />
           {:else if current === "observe"}
             <LazyRoute
               route="observe"
@@ -451,6 +453,7 @@
             current !== "new-chat" &&
             current !== "build" &&
             current !== "guide" &&
+            current !== "state-gallery" &&
             current !== "model-setup"}
             <LazyRoute
               route="settings"

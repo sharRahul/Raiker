@@ -92,7 +92,7 @@
     }
     if (runtimeState === "verification_failed" || runtimeReachable === false) {
       return {
-        title: "I cannot reach my runtime.",
+        title: "I cannot reach Raiker.",
         sub: "Start the local Raiker server, then try again.",
       };
     }
@@ -322,7 +322,7 @@
       {#if isVerifying}
         <div class="verify" role="status" id="runtime-verify" tabindex="-1">
           <span class="spinner" aria-hidden="true"></span>
-          Verifying runtime…
+          Checking Raiker…
         </div>
       {/if}
       {#if storeState === "unavailable"}
@@ -343,7 +343,7 @@
         </p>
       {:else if runtimeState === "verification_failed"}
         <p class="error" role="alert" id="runtime-failed" tabindex="-1">
-          Runtime verification failed. The workspace remains locked.
+          Raiker could not be checked, so the workspace stays locked. Reload to try again.
         </p>
       {/if}
 
@@ -508,7 +508,7 @@
         <div id="privacy-note" class="privacy">
           <span class="privacy-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
           <div>
-            <strong>Local runtime</strong>
+            <strong>On this computer</strong>
             <p>Your credentials and session remain on this Raiker instance.</p>
           </div>
         </div>

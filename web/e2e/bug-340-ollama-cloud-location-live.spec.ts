@@ -27,7 +27,7 @@ test.describe.configure({ mode: "serial" });
 
 async function createOwner(page: Page): Promise<boolean> {
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   const username = page.getByLabel("Username");
   await expect(username).toBeEnabled({ timeout: 60_000 });
   const confirm = page.getByLabel("Confirm password");
@@ -51,11 +51,13 @@ test("choosing a cloud Ollama model in setup names ollama.com and never claims t
   await expect(title).toBeVisible({ timeout: 60_000 });
   // Welcome, then This device (when shown), until the model stage.
   for (let step = 0; step < 3; step += 1) {
-    if (/Choose how Raiker should think/.test((await title.textContent()) ?? "")) break;
+    if (/Where should I think\?/.test((await title.textContent()) ?? "")) break;
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForTimeout(500);
   }
-  await expect(title).toHaveText(/Choose how Raiker should think/, { timeout: 30_000 });
+  await expect(title).toHaveText(/Where should I think\?/, { timeout: 30_000 });
+  // QUI-W03 — the providers open from the answer to "Where should I think?".
+  await page.getByRole("button", { name: /^On this computer/ }).click();
 
   // Before a choice the runtime is offered from its own row. Nothing on the
   // screen may promise that a Cloud model stays here.
@@ -84,20 +86,20 @@ test("choosing a cloud Ollama model in setup names ollama.com and never claims t
   await capture(page, join(SHOTS, "03-chosen-cloud-model-says-where-it-runs.png"));
 
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(title).toHaveText(/Where your model requests go/, { timeout: 30_000 });
+  await expect(title).toHaveText(/Here is how I'll work for you/, { timeout: 30_000 });
   await expect(page.getByRole("note")).toContainText(`${CLOUD_LABEL} is selected. Its requests are sent to ollama.com`);
   await capture(page, join(SHOTS, "04-privacy-step-names-the-chosen-models-destination.png"));
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Past Permissions and Check to the last stage.
-  const ready = page.getByRole("heading", { name: "Your Raiker is ready" });
+  const ready = page.getByRole("heading", { name: "You're set. What should we do first?" });
   for (let step = 0; step < 4 && !(await ready.isVisible().catch(() => false)); step += 1) {
     const next = page.getByRole("button", { name: "Continue" });
     if (await next.isVisible().catch(() => false)) await next.click();
     await page.waitForTimeout(1_500);
   }
   await expect(ready).toBeVisible({ timeout: 60_000 });
-  await page.getByRole("button", { name: "Start using Raiker" }).click();
+  await page.getByRole("button", { name: "Go to Home" }).click();
   await expect(title).toBeHidden({ timeout: 30_000 });
 
   // The selection stands, and the turn is answered by the cloud model.

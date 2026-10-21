@@ -82,7 +82,7 @@ function hostDescriptors(): number {
 /** Land on the owner's dashboard, settled — not on the lock screen behind it. */
 async function openDashboard(target: Page) {
   await target.goto(`${BASE}/#/workbench`);
-  await expect(target.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(target.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   await expect(target.getByRole("heading", { name: DASHBOARD })).toBeVisible({ timeout: 30_000 });
   await expect(target.getByText("Loading status…")).toBeHidden({ timeout: 30_000 });
   await expect(target.getByText("Updating…")).toBeHidden({ timeout: 30_000 });
@@ -131,7 +131,7 @@ test("the instance surface this exercises is the product's own", async () => {
   // measurement is read against a real surface rather than an internal call.
   const login = await context.newPage();
   await login.goto(`${BASE}/#/`);
-  await expect(login.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(login.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   await login.locator("button.instance-button").click();
   await expect(login.getByLabel("Instance name")).toBeVisible({ timeout: 30_000 });
   await capture(login, join(SHOTS, "bug-50-instance-creation-surface.png"));

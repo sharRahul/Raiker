@@ -159,7 +159,7 @@
   }
 
   function connectError(e: unknown): string {
-    if (!(e instanceof ApiError)) return "Could not reach the local runtime.";
+    if (!(e instanceof ApiError)) return "Could not reach Raiker.";
     switch (e.reasonCode) {
       case "repo_outside_workspace":
         return "That folder is outside this Raiker workspace, so it was refused.";
@@ -206,7 +206,7 @@
   }
 
   function worktreeError(e: unknown): string {
-    if (!(e instanceof ApiError)) return "Could not reach the local runtime.";
+    if (!(e instanceof ApiError)) return "Could not reach Raiker.";
     switch (e.reasonCode) {
       case "branch_exists":
         return "A branch with that name already exists. Pick another name.";
@@ -451,7 +451,7 @@
         </span>
       </label>
       <p class="hint">
-        Paths are resolved inside the workspace root. Anything that resolves outside it is refused by the runtime.
+        Paths are resolved inside the workspace root. Anything that resolves outside it is refused.
       </p>
     {:else}
       <div class="github-fields">

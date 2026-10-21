@@ -46,7 +46,7 @@ function watchFailures(page: Page): { failures: string[]; consoleErrors: string[
 
 async function signIn(page: Page): Promise<"created" | "unlocked"> {
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText("Checking Raiker…")).toBeHidden({ timeout: 30_000 });
   const username = page.getByLabel("Username");
   await expect(username).toBeEnabled({ timeout: 60_000 });
   await username.fill(OWNER_CREDENTIALS.user);
@@ -101,7 +101,9 @@ test("a running Ollama is offered on first run, its chosen model is Ready, remem
   const title = page.locator("#setup-title");
   await expect(title).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(title).toHaveText(/Choose how Raiker should think/, { timeout: 30_000 });
+  await expect(title).toHaveText(/Where should I think\?/, { timeout: 30_000 });
+  // QUI-W03 — the providers open from the answer to "Where should I think?".
+  await page.getByRole("button", { name: /^On this computer/ }).click();
 
   // Running, offered — and nothing chosen on the owner's behalf. The profile
   // used to ship `gemma4:31b-cloud`, which this row printed as "Selected".
@@ -126,8 +128,8 @@ test("a running Ollama is offered on first run, its chosen model is Ready, remem
   await expect(title).toHaveText(/Checking your installation/, { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Check again" })).toBeEnabled({ timeout: 120_000 });
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Your Raiker is ready" })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Start using Raiker" }).click();
+  await expect(page.getByRole("heading", { name: "You're set. What should we do first?" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Go to Home" }).click();
   await expect(page.locator("#setup-title")).toBeHidden({ timeout: 30_000 });
 
   // Ready at once: choosing it ran the same exact-model check Check runs.

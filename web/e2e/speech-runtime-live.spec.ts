@@ -61,10 +61,10 @@ test("dictation can be made to run on this machine, and says so", async ({ page 
 
   // ── The runtime is configured where the other local runtimes are ──
   await page.goto(`${BASE}/#/models?tab=local`);
-  const speech = page.getByRole("article", { name: "Speech runtime" });
+  const speech = page.getByRole("article", { name: "Speech engine" });
   await expect(speech).toBeVisible({ timeout: 30_000 });
   await expect(speech.getByText("Not set up")).toBeVisible();
-  await speech.getByLabel("Speech runtime address").fill(runtimeUrl);
+  await speech.getByLabel("Speech engine address").fill(runtimeUrl);
   await speech.getByRole("button", { name: "Save and test" }).click();
   await expect(speech.getByText("Answered. Dictation can run on this device.")).toBeVisible({
     timeout: 60_000,

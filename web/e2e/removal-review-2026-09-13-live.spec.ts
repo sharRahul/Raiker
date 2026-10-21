@@ -64,7 +64,7 @@ test("Home does not call an unread readiness check an all-clear (NEW-HOME-01)", 
   // The next poll picks it up. What was read stays readable, and stops being
   // asserted: the tile carries when it was last true and that renewing it
   // failed, instead of a count nobody checked.
-  await expect(rail.getByText("Runtime health", { exact: true })).toBeVisible({
+  await expect(rail.getByText("Health check", { exact: true })).toBeVisible({
     timeout: 90_000,
   });
   await expect(rail.getByText(/refresh failed \(HTTP 503\)/i)).toBeVisible();

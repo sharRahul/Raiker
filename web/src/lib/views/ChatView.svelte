@@ -1,5 +1,6 @@
 <script lang="ts">
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
+  import { NOT_ANSWERING } from "../errorCopy";
   import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
   import { onMount, tick, untrack } from "svelte";
@@ -53,7 +54,9 @@
   import SourceChips from "../components/SourceChips.svelte";
   import RecallStrip from "../components/RecallStrip.svelte";
   import TurnControl from "../components/TurnControl.svelte";
-  import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { createAttachmentStore, wireAttachments, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { newIdempotencyKey } from "../idempotency";
+  import { taskDetailHref } from "../taskHistory";
   import { createFileDrop } from "../fileDrop.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
@@ -96,7 +99,10 @@
   } from "../citations";
   import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
-  import { COMPOSE_EVENT, takeChatHandoff } from "../chatHandoff";
+  import { COMPOSE_EVENT, takeChatHandoff, type ChatHandoff } from "../chatHandoff";
+  import { conversationMatches, matchLabel } from "../conversationSearch";
+  import { filesInUse } from "../contextPanel";
+  import ChatContextPanel from "../components/ChatContextPanel.svelte";
   import { STARTERS } from "../starters";
   import { inferenceLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
   import {
@@ -455,6 +461,7 @@
     "use-connector",
     "generate-image",
     "create-task",
+    "run-background",
     "schedule",
     "use-memory",
   ]);
@@ -510,8 +517,57 @@
       projectPickerOpen = true;
       return;
     }
+    if (id === "run-background") {
+      void runInBackground();
+      return;
+    }
     const route = TOOL_ROUTES[id];
     if (route !== undefined) window.location.hash = route;
+  }
+
+  /**
+   * QUI-C11 — Run in background. The draft is filed as a task that starts now,
+   * through the same governed `POST /api/tasks` the Tasks page uses; the task
+   * then shows in Background work and on Home under In progress. Nothing runs
+   * here, and a refused or failed save keeps the draft.
+   */
+  let backgroundNotice = $state<{ text: string; href: string | null } | null>(null);
+  let backgroundKey = newIdempotencyKey();
+
+  async function runInBackground() {
+    const text = draft.text.trim();
+    if (text === "") {
+      backgroundNotice = { text: "Type what Raiker should work on, then choose Run in background.", href: null };
+      return;
+    }
+    const firstLine = text.split("\n")[0];
+    const title = firstLine.length > 80 ? `${firstLine.slice(0, 79)}…` : firstLine;
+    const attachments = wireAttachments(attachStore.items);
+    try {
+      const created = await api.createTask(
+        {
+          title,
+          description: text,
+          surface: "chat",
+          ...(projectId ? { project_id: projectId } : {}),
+          ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
+          ...(attachments ? { attachments } : {}),
+        },
+        backgroundKey,
+      );
+      backgroundKey = newIdempotencyKey();
+      draft.text = "";
+      attachStore.clear();
+      backgroundNotice = { text: "Running in the background.", href: taskDetailHref(created.task_id) };
+    } catch (error) {
+      backgroundNotice = {
+        text:
+          error instanceof ApiError && error.reasonCode === "model_not_ready"
+            ? "The chosen model is not ready, so nothing was started. Your message is kept."
+            : "Could not start it in the background. Your message is kept; try again or use Tasks.",
+        href: error instanceof ApiError && error.reasonCode === "model_not_ready" ? "#/models" : "#/tasks",
+      };
+    }
   }
 
   /**
@@ -764,6 +820,7 @@
       const detail = await api.session(id);
       conversationTitle = detail.session?.title ?? "";
       const parked = parkedByTurn(detail);
+      earlierShown = 0;
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
@@ -812,6 +869,94 @@
     if (streamed.trim() !== "") return streamed;
     return turn.response?.message ?? "";
   }
+
+  // QUI-C07 — the context panel: closed by default, opened from the header.
+  let contextPanelOpen = $state(false);
+  const contextFiles = $derived(filesInUse(turns.map((turn) => turn.attachments)));
+  const contextActivity = $derived(turns.flatMap((turn) => toolActivity(turn.events)));
+
+  // QUI-C01 — search in conversation: the turns on screen that mention the
+  // words typed, stepped through in order. Search finds across conversations.
+  let searchOpen = $state(false);
+  let searchQuery = $state("");
+  let searchAt = $state(0);
+  let searchInput = $state<HTMLInputElement>();
+  const searchHits = $derived(
+    conversationMatches(turns.map((turn) => ({ prompt: turn.prompt, answer: answerText(turn) })), searchQuery),
+  );
+  const currentHit = $derived(searchHits.length > 0 ? searchHits[Math.min(searchAt, searchHits.length - 1)] : null);
+
+  async function openSearch() {
+    searchOpen = true;
+    await tick();
+    searchInput?.focus();
+  }
+
+  function closeSearch() {
+    searchOpen = false;
+    searchQuery = "";
+    searchAt = 0;
+  }
+
+  function showHit(step: number) {
+    if (searchHits.length === 0) return;
+    searchAt = (Math.min(searchAt, searchHits.length - 1) + step + searchHits.length) % searchHits.length;
+    following = false;
+    const index = searchHits[searchAt];
+    ensureShown(index);
+    void tick().then(() =>
+      document.querySelector(`[data-turn-index="${index}"]`)?.scrollIntoView?.({ block: "center" }),
+    );
+  }
+
+  /*
+   * QUI-G04 — a long conversation draws its latest turns, not all of them.
+   * A thousand turns rendered at once made typing and scrolling lag; the
+   * transcript shows the newest TURN_WINDOW and offers the earlier ones a
+   * window at a time. Search, a Retry's source and a linked turn widen the
+   * window to the turn they need before scrolling to it. Settled turns off
+   * screen also skip layout and paint (`content-visibility`, in the styles).
+   */
+  const TURN_WINDOW = 100;
+  let earlierShown = $state(0);
+  const firstShown = $derived(Math.max(0, turns.length - TURN_WINDOW - earlierShown));
+  const shownTurns = $derived(turns.slice(firstShown));
+
+  function ensureShown(index: number) {
+    if (index >= 0 && index < firstShown) earlierShown = turns.length - TURN_WINDOW - index;
+  }
+
+  async function showEarlier() {
+    const before = scrollEl?.scrollHeight ?? 0;
+    earlierShown += TURN_WINDOW;
+    await tick();
+    // Keep the turn the owner was reading where it was, rather than letting
+    // the new turns above push it down the screen.
+    if (scrollEl) scrollEl.scrollTop += scrollEl.scrollHeight - before;
+  }
+
+  function onSearchKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      showHit(event.shiftKey ? -1 : 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+    }
+  }
+
+  $effect(() => {
+    // A new query starts from its first match and shows it, as find does. Only
+    // the query re-runs this: a streaming answer must not move the view.
+    void searchQuery;
+    untrack(() => {
+      searchAt = 0;
+      if (searchHits.length > 0) {
+        searchAt = searchHits.length - 1;
+        showHit(1);
+      }
+    });
+  });
 
   async function submit(retryOf: string | null = null) {
     if (voiceControl?.active()) {
@@ -878,16 +1023,7 @@
           model_profile: modelProfile || undefined,
           model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
-          attachments:
-            sentAttachments.length > 0
-              ? sentAttachments.map((a) =>
-                  a.kind === "image"
-                    ? { type: "image" as const, attachment_id: a.attachmentId ?? "" }
-                    : a.kind === "document"
-                      ? { type: "document" as const, attachment_id: a.attachmentId ?? "" }
-                      : { type: "path" as const, path: a.path ?? "" },
-                )
-              : undefined,
+          attachments: wireAttachments(sentAttachments),
         },
         (event) => {
           if (event.kind === "final" && event.response !== null) {
@@ -907,7 +1043,8 @@
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
             // QUI-C01 — a new conversation learns the title the runtime gave it.
-            if (conversationTitle === "") void refreshTitle(event.response.session_id);
+            if (handoffTitle !== null) void nameHandedOffChat(event.response.session_id, handoffTitle);
+            else if (conversationTitle === "") void refreshTitle(event.response.session_id);
           } else if (event.kind === "error") {
             turn.error = event.text || "An error occurred.";
             turn.events = [...turn.events, event];
@@ -989,6 +1126,7 @@
   let anchorNotice = $state<string | null>(null);
 
   async function landOnAnchor(turnId: string) {
+    ensureShown(turns.findIndex((turn) => turn.response?.turn_id === turnId));
     await tick();
     anchorNotice = revealTurn(scrollEl, turnId)
       ? null
@@ -1197,7 +1335,9 @@
   }
 
   /** Bring the turn a Retry asked again into view. */
-  function showRetrySource(turnId: string) {
+  async function showRetrySource(turnId: string) {
+    ensureShown(turns.findIndex((turn) => turn.response?.turn_id === turnId));
+    await tick();
     const target = document.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`);
     if (target instanceof HTMLElement) target.scrollIntoView({ block: "center" });
   }
@@ -1224,7 +1364,7 @@
       });
       stopping = true;
     } catch {
-      exportNotice = "Could not reach the local runtime to stop the turn.";
+      exportNotice = `Stop was not sent. The turn is still running. ${NOT_ANSWERING}`;
     }
   }
 
@@ -1295,6 +1435,18 @@
     }
   }
 
+  /** QUI-W05 — the first task from setup is kept in Threads as "Getting started". */
+  async function nameHandedOffChat(id: string, title: string) {
+    handoffTitle = null;
+    try {
+      const renamed = await api.renameSession(id, title);
+      if (id === sessionId) conversationTitle = renamed.title;
+      window.dispatchEvent(new Event("raiker:chats-changed"));
+    } catch {
+      void refreshTitle(id);
+    }
+  }
+
   function startTitleEdit() {
     titleDraft = conversationTitle;
     titleNotice = null;
@@ -1330,13 +1482,20 @@
     promptEl?.focus();
   }
 
-  async function startHandedOffChat(text: string) {
+  /** QUI-W05 — a title the hand-off asked the new conversation to carry. */
+  let handoffTitle: string | null = null;
+
+  async function startHandedOffChat({ text, attachments, title }: ChatHandoff) {
     if (streaming) {
       draft.text = text;
+      if (attachments.length > 0) attachStore.set([...attachments]);
       return;
     }
     if (turns.length > 0 || sessionId !== null) newConversation();
+    handoffTitle = title ?? null;
     draft.text = text;
+    // QUI-H01 — files attached on Home's composer travel with the message.
+    if (attachments.length > 0) attachStore.set([...attachments]);
     // A Chat that has only just mounted has not read its models, or the model
     // Chat was last set to, and an unread choice looks like no model at all.
     // Both are read before the message is judged (found live, RT-QUI-03).
@@ -1355,6 +1514,7 @@
     // past its last render pins the whole file in memory.
     releaseThumbnails();
     turns = [];
+    earlierShown = 0;
     sessionId = null;
     conversationTitle = "";
     editingTitle = false;
@@ -1507,7 +1667,7 @@
     turn.error =
       error instanceof ApiError
         ? `The turn could not continue (${code ?? error.status}).`
-        : "Could not reach the local runtime to continue the turn.";
+        : `The turn did not continue. It is still waiting here. ${NOT_ANSWERING}`;
   }
 
   /**
@@ -1572,7 +1732,7 @@
       const next: ResumableTurn = resumable[0];
       await resumeParkedTurn(next.approval_id, next.outcome_status);
     } catch {
-      exportNotice = "Could not check for a decision — the local runtime is unreachable.";
+      exportNotice = `Raiker could not check whether a decision is waiting. Nothing was approved or refused. ${NOT_ANSWERING}`;
     }
   }
 
@@ -1649,6 +1809,7 @@
   style={`--surface-gap:${densityGap(surface.density)}`}
   class:with-inspector={inspector.inspecting !== null || continuity.rewindCheckpointId !== null}
   class:with-rail={backgroundWorkOpen}
+  class:with-context={contextPanelOpen}
 >
 <div class="chat">
   <header class="chat-header">
@@ -1674,7 +1835,48 @@
         {#if titleNotice}<span class="title-notice" role="alert">{titleNotice}</span>{/if}
       </div>
     {/if}
+    <!-- QUI-C01 — the project this chat is filed in, as a chip that opens it.
+         No chip when the chat is not filed anywhere. -->
+    {#if selectedProject !== null}
+      <a
+        class="project-chip"
+        href={`#/projects?project=${encodeURIComponent(selectedProject.project_id)}`}
+        title={`Filed in ${selectedProject.name}`}
+      ><Icon name="folder" size="sm" /><span>{selectedProject.name}</span></a>
+    {/if}
     <div class="header-actions">
+      {#if searchOpen}
+        <div class="conversation-search" role="search">
+          <input
+            bind:this={searchInput}
+            bind:value={searchQuery}
+            type="search"
+            aria-label="Search in conversation"
+            placeholder="Find in this chat"
+            onkeydown={onSearchKeydown}
+          />
+          {#if searchQuery.trim() !== ""}
+            <span class="search-count" aria-live="polite">{matchLabel(Math.min(searchAt, Math.max(searchHits.length - 1, 0)), searchHits.length)}</span>
+          {/if}
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Previous match" title="Previous match" disabled={searchHits.length === 0} onclick={() => showHit(-1)}>↑</button>
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Next match" title="Next match" disabled={searchHits.length === 0} onclick={() => showHit(1)}>↓</button>
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Close search" title="Close search" onclick={closeSearch}><Icon name="x" size="sm" /></button>
+        </div>
+      {:else if turns.length > 0}
+        <button type="button" class="btn btn-ghost btn-sm" aria-label="Search in conversation" title="Search in conversation" onclick={() => void openSearch()}>
+          <Icon name="search" size="sm" />
+        </button>
+      {/if}
+      {#if turns.length > 0 || contextPanelOpen}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-expanded={contextPanelOpen}
+          aria-controls="chat-context"
+          title="What this conversation is using"
+          onclick={() => (contextPanelOpen = !contextPanelOpen)}
+        >Context</button>
+      {/if}
       <!-- QUI-Q05 — offered once there is a conversation to leave. A disabled
            "New chat" on an empty one read as a faded title, not an action. -->
       {#if turns.length > 0}
@@ -1834,7 +2036,13 @@
       </ul>
     {/if}
 
-    {#each turns as turn (turn.id)}
+    {#if firstShown > 0}
+      <button type="button" class="btn btn-ghost btn-sm show-earlier" onclick={() => void showEarlier()}>
+        Show {Math.min(TURN_WINDOW, firstShown)} earlier messages
+      </button>
+    {/if}
+    {#each shownTurns as turn, shownIndex (turn.id)}
+      {@const turnIndex = firstShown + shownIndex}
       {@const answer = answerText(turn)}
       {@const toolRows = toolActivity(turn.events)}
       <!-- BUG-215 — the stream first, because a turn that is running has the
@@ -1846,7 +2054,13 @@
       {@const turnSourceList = sourcesForTurn(inspector.turnSources, turn.response?.turn_id)}
       <!-- MEM-08 — the coordinate a link can name. Present on every settled
            turn, so a search result, a citation or a checkpoint can land here. -->
-      <div class="turn" data-turn-id={turn.response?.turn_id ?? undefined}>
+      <div
+        class="turn"
+        class:search-hit={currentHit === turnIndex}
+        class:settled={!turn.streaming && turnIndex < turns.length - 2}
+        data-turn-id={turn.response?.turn_id ?? undefined}
+        data-turn-index={turnIndex}
+      >
         <div class="message-group message-group-user">
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
@@ -1879,7 +2093,7 @@
                  the earlier turn is kept exactly as it was. -->
             <p class="retry-of">
               Retry of
-              <button type="button" class="retry-link" onclick={() => showRetrySource(turn.retryOf ?? "")}
+              <button type="button" class="retry-link" onclick={() => void showRetrySource(turn.retryOf ?? "")}
                 >an earlier turn</button>
               — that turn is kept as it was.
             </p>
@@ -2354,6 +2568,12 @@
     {/snippet}
   </Composer>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
+  {#if backgroundNotice}
+    <p class="project-notice" role="status">
+      {backgroundNotice.text}
+      {#if backgroundNotice.href}<a href={backgroundNotice.href}>{backgroundNotice.href.includes("task=") ? "Open the task" : backgroundNotice.href === "#/models" ? "Open Models" : "Open Tasks"}</a>{/if}
+    </p>
+  {/if}
 </div>
   {#if backgroundWorkOpen}
     <div id="chat-background-work" class="rail-slot">
@@ -2361,6 +2581,19 @@
         projectId={projectId || null}
         {projects}
         onclose={() => (backgroundWorkOpen = false)}
+      />
+    </div>
+  {/if}
+
+  {#if contextPanelOpen}
+    <div id="chat-context" class="context-slot">
+      <ChatContextPanel
+        files={contextFiles}
+        {plan}
+        sources={inspector.turnSources}
+        activity={contextActivity}
+        onclose={() => (contextPanelOpen = false)}
+        onopensource={(source) => void inspector.openSource(source, "")}
       />
     </div>
   {/if}
@@ -2411,6 +2644,20 @@
        narrowing the transcript. */
     min-width: 0;
   }
+  .project-chip {
+    display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; max-width: 14rem;
+    padding: 0.15rem var(--space-2); border: 1px solid var(--border); border-radius: 999px;
+    color: var(--text-2); font-size: var(--text-xs); text-decoration: none; white-space: nowrap;
+  }
+  .project-chip span { overflow: hidden; text-overflow: ellipsis; }
+  .project-chip:hover { border-color: var(--accent-border); color: var(--text-1); }
+  .conversation-search { display: inline-flex; align-items: center; gap: var(--space-1); }
+  .conversation-search input {
+    width: 12rem; padding: 0.25rem var(--space-2); border: 1px solid var(--border);
+    border-radius: var(--r-sm); background: var(--surface); color: var(--text-1); font: inherit; font-size: var(--text-sm);
+  }
+  .search-count { font-size: var(--text-xs); color: var(--text-3); white-space: nowrap; }
+  .turn.search-hit { outline: 2px solid var(--accent-border); outline-offset: 6px; border-radius: var(--r-md); }
   /* Same header pattern as Build: a thin bar above the transcript that holds
      the background-work rail toggle, so the control lives in the same place on
      both conversation surfaces rather than buried in the composer. */
@@ -2455,6 +2702,25 @@
       margin: 0;
       max-width: none;
     }
+  }
+  /* QUI-C12 — the context panel opens over the transcript on a laptop and
+     sits beside it from 1,920 px up, where the transcript keeps its 720 px. */
+  .context-slot {
+    position: fixed;
+    top: calc(var(--topbar-h) + var(--space-3));
+    right: var(--space-4);
+    /* Found live (RT-QUI-12): reaching the bottom of the window it covered the
+       composer's Send. Over the transcript means above the composer. */
+    max-height: calc(100vh - var(--topbar-h) - 16rem);
+    z-index: var(--z-panel);
+    display: flex;
+  }
+  .context-slot > :global(.context-panel) { box-shadow: var(--shadow-3); }
+  @media (min-width: 120rem) {
+    .chat-layout.with-context { grid-template-columns: minmax(0, 1fr) 20rem; }
+    .chat-layout.with-rail.with-context { grid-template-columns: minmax(0, 1fr) 21rem 20rem; }
+    .context-slot { position: static; max-height: none; }
+    .context-slot > :global(.context-panel) { box-shadow: none; }
   }
   /* UX-CHAT-05 — three named groups in the conversation menu. */
   .grouped-menu { min-width: 16rem; }
@@ -2640,6 +2906,14 @@
     flex-direction: column;
     gap: var(--space-3);
   }
+  /* QUI-G04 — a settled turn off screen skips layout and paint. The last two
+     and any streaming turn are always drawn, so following the answer and
+     Jump to latest measure real heights. */
+  .turn.settled {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 16rem;
+  }
+  .show-earlier { align-self: center; }
   .message-group {
     display: flex;
     flex-direction: column;

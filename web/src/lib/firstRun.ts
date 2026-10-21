@@ -40,13 +40,15 @@ export const SETUP_STAGES = ["welcome", "system", "model", "privacy", "permissio
 export type SetupStage = (typeof SETUP_STAGES)[number];
 
 export const SETUP_STAGE_LABELS: Record<SetupStage, string> = {
-  welcome: "Welcome",
+  // QUI-W02 — the stored `welcome` stage is now the Hello step: "What should
+  // I call you?". The progress line reads Name · Model · Privacy · Start.
+  welcome: "Name",
   system: "This device",
   model: "Model",
   privacy: "Privacy",
   permissions: "Permissions",
   verify: "Check",
-  finish: "Ready",
+  finish: "Start",
 };
 
 /**
@@ -65,13 +67,12 @@ export const INSTALLER_STAGES: readonly SetupStage[] = ["system", "verify"];
 /**
  * Stages no installation shows any more (Quiet UI).
  *
- * **Welcome** introduced Chat, Build and Design before the owner had seen them,
- * which the app itself does better a moment later; **Permissions** was a
- * read-only summary of a page that exists (Permissions) and changed nothing.
- * Both stay valid stored values, and a row stored on either opens on the stage
- * that follows it.
+ * **Permissions** was a read-only summary of a page that exists (Permissions)
+ * and changed nothing. It stays a valid stored value, and a row stored on it
+ * opens on the stage that follows it. **Welcome** came back as the setup
+ * conversation's Hello step (QUI-W02).
  */
-export const RETIRED_STAGES: readonly SetupStage[] = ["welcome", "permissions"];
+export const RETIRED_STAGES: readonly SetupStage[] = ["permissions"];
 
 /** The stages this installation shows, from its distribution (`installation.json`). */
 export function stagesFor(distribution: string | null | undefined): readonly SetupStage[] {

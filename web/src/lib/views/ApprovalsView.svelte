@@ -669,7 +669,7 @@
         </dl>
       {:else}
         <p class="notice">
-          This proposal names no path, destination or command Raiker can summarise. Read the
+          This proposal names no path, address or command Raiker can summarise. Read the
           arguments below before deciding.
         </p>
       {/if}

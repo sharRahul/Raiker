@@ -55,7 +55,7 @@ describe("TurnControl", () => {
     stubFetch({});
     render(TurnControl, { sessionId: "sess_1" });
     await fireEvent.click(screen.getByRole("button", { name: "Stop safely" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Stop failed/));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Stop was not sent/));
     expect(screen.queryByText(/Stop requested/)).not.toBeInTheDocument();
   });
 

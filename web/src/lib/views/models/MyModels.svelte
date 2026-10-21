@@ -197,7 +197,7 @@
   <EmptyState
     icon="models"
     title="No models yet"
-    body="Connect a provider or set up a local runtime, and every model you add appears here."
+    body="Connect a provider or set up a local model server, and every model you add appears here."
   >
     {#snippet action()}
       <a class="btn btn-primary" href="#/models?tab=add">Add a model</a>

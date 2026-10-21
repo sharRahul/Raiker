@@ -269,7 +269,7 @@ test("Diagnostics names the attached-root watcher among its background passes", 
   // Diagnostics lives inside Observe → Overview, behind "Runtime health, in
   // detail" — a healthy install does not have to scroll past it.
   await page.goto(`${BASE}/#/observe?tab=overview`);
-  const details = page.locator("details.specialist", { hasText: "Runtime health, in detail" });
+  const details = page.locator("details.specialist", { hasText: "Health, in detail" });
   await expect(details).toBeVisible({ timeout: 60_000 });
   await details.locator("summary").click();
 

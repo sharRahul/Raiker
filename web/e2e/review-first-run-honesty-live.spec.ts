@@ -32,7 +32,7 @@ test("stage 02 labels every offered backend", async ({ page }) => {
   );
 
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 60_000 });
   await page.getByLabel("Username").fill("owner");
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");

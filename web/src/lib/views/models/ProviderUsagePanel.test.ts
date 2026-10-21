@@ -152,7 +152,7 @@ describe("ProviderUsagePanel", () => {
     render(ProviderUsagePanel);
 
     expect(await screen.findByText("1 turn · 1 model request")).toBeInTheDocument();
-    expect(screen.getByText("No API cost — local runtime.")).toBeInTheDocument();
+    expect(screen.getByText("No API cost — runs on this computer.")).toBeInTheDocument();
   });
 });
 

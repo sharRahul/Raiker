@@ -135,7 +135,7 @@
       if (error instanceof ApiError && error.reasonCode === "model_price_invalid") {
         formError = "A rate was not a valid non-negative number.";
       } else if (error instanceof ApiError && error.reasonCode === "not_authorized_gate_manager") {
-        formError = "Setting a price needs the runtime gate-manager role.";
+        formError = "Setting a price needs the gate-manager role.";
       } else {
         formError = "The override was not accepted.";
       }
@@ -358,7 +358,7 @@
 
     {#if !view.can_override}
       <p class="sub">
-        Prices are shown read-only. Recording an override needs the runtime gate-manager role.
+        Prices are shown read-only. Recording an override needs the gate-manager role.
       </p>
     {/if}
   {/if}

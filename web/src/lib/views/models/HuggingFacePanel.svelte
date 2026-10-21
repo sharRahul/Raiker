@@ -514,7 +514,7 @@
         </p>
       </div>
       <label
-        ><span>Approved destination folder</span><select
+        ><span>Approved download folder</span><select
           bind:value={destination}
           >{#each library?.roots ?? [] as root (root.path)}<option
               value={root.path}>{root.path}</option

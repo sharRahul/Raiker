@@ -18,7 +18,7 @@ test("live Observability and Sessions visual review", async ({ page }) => {
   await page.goto(`${BASE}/#/observe`);
   await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Sessions" })).toBeVisible();
-  await expect(page.getByText("Reading runtime status…")).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText("Reading status…")).toBeHidden({ timeout: 15_000 });
   await capture(page, "../../docs/plans/screenshots/working/observability-overview.png");
   await page.getByRole("tab", { name: "Sessions" }).click();
   await expect(page.getByText(/Every conversation with the runtime/)).toBeVisible();

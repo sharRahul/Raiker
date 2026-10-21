@@ -635,7 +635,7 @@
                public internet are three different destinations, and the card
                printed one label over all three. -->
           {#if s.transport === "http"}
-            <div><dt>Destination</dt><dd>{networkClassLabel(s.endpoint_url)}</dd></div>
+            <div><dt>Address</dt><dd>{networkClassLabel(s.endpoint_url)}</dd></div>
           {/if}
           <div><dt>Last connected</dt><dd>{s.last_connected_at ? formatTimestamp(s.last_connected_at) : "Never"}</dd></div>
           <!-- BUG-234 — which revision of the Model Context Protocol this

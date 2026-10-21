@@ -15,6 +15,7 @@
    * screenshot of the application chrome.
    */
   import { onMount } from "svelte";
+  import { NOT_ANSWERING } from "../errorCopy";
   import { api, ApiError } from "../api";
   import type { TranscriptExportManifest } from "../apiTypes";
   import Icon from "./Icon.svelte";
@@ -108,7 +109,7 @@
       } else if (error instanceof ApiError && error.status === 404) {
         fieldError = "This conversation is no longer available to export.";
       } else {
-        fieldError = "The export did not complete — could not reach the local runtime.";
+        fieldError = `The export did not finish. Nothing was saved. ${NOT_ANSWERING}`;
       }
     } finally {
       busy = false;

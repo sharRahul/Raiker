@@ -171,7 +171,7 @@ test("a Web access check says why in words and names the rule and its list", asy
   await expect(unresolved).not.toContainText("web_host");
   await capture(page, join(SHOTS, "06-web-access-name-that-does-not-resolve.png"), unresolved);
 
-  await page.getByLabel("Destination to block").fill("ads.example.com");
+  await page.getByLabel("Site to block").fill("ads.example.com");
   await page.getByRole("button", { name: /^Block/ }).click();
   await expect(page.getByRole("button", { name: "Unblock ads.example.com" })).toBeVisible({ timeout: 30_000 });
   await probe.fill("eu.ads.example.com");
@@ -330,8 +330,8 @@ test("Diagnostics reports its background passes, and a pass that stopped reads n
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/observe`);
   await settled(page);
-  // The passes live under Observability's "Runtime health, in detail".
-  await page.getByText("Runtime health, in detail").click();
+  // The passes live under Observability's "Health, in detail".
+  await page.getByText("Health, in detail").click();
   const passes = page.locator("section.card").filter({ hasText: "Background passes" });
   await expect(passes).toBeVisible({ timeout: 30_000 });
   await expect(passes).toContainText("Scheduled tasks", { timeout: 30_000 });

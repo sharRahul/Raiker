@@ -62,7 +62,7 @@ async function signIn(page: Page): Promise<void> {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 60_000 });
   await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");

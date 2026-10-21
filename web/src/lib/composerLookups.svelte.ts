@@ -12,6 +12,7 @@
  * leaves only the built-in commands.
  */
 import { api } from "./api";
+import { NOT_ANSWERING } from "./errorCopy";
 import type { MenuItem } from "./components/ComposerMenu.svelte";
 import type { SlashCommand } from "./composerCommands";
 
@@ -74,7 +75,7 @@ export class ComposerLookups {
     } catch {
       if (request !== this.mentionRequest) return;
       this.mentionItems = [];
-      this.mentionNotice = { text: "Could not reach the local runtime to look up files." };
+      this.mentionNotice = { text: `Files could not be looked up. ${NOT_ANSWERING}` };
     }
   };
 }

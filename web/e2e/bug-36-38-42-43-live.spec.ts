@@ -25,7 +25,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   expect(OPENROUTER_KEY).not.toBe("");
 
   await page.goto(`${BASE}/#/models`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 20_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 20_000 });
   if (await page.getByLabel("Confirm password").isVisible()) {
     await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);

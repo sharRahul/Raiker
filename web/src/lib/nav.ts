@@ -33,10 +33,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     // Messaging channels are a tab here again: a channel is one more thing
     // Raiker connects to, and its own page was a rarely visited row.
-    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, channels, MCP servers, skills, hooks and plugins" },
+    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, channels, tool servers, skills, hooks and plugins" },
   ] },
   { id: "observe", label: "Observe", collapsible: true, items: [
-    { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
+    { id: "observe", label: "Diagnostics", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
   { id: "support", label: "Support", collapsible: true, items: [
     { id: "guide", label: "Guide", icon: "info", hint: "How Raiker works, in the product" },
@@ -347,6 +347,8 @@ function rawRoute(hash: string): string {
 export function routeFromHash(hash: string): string {
   const raw = rawRoute(hash);
   if (raw === "model-setup") return raw;
+  // QUI-G03 — the state gallery exists in development builds only.
+  if (raw === "state-gallery" && import.meta.env.DEV) return raw;
   if (NAV_ITEMS.some((item) => item.id === raw)) return raw;
   return ROUTE_ALIASES[raw]?.route ?? DEFAULT_ROUTE;
 }

@@ -485,7 +485,7 @@
 
 <section class="card" aria-labelledby="security-findings-h">
   <h2 id="security-findings-h">Findings and monitoring</h2>
-  <p class="sub">What a scan found, and what the runtime is watching because it has failed before.</p>
+  <p class="sub">What a scan found, and what Raiker is watching because it has failed before.</p>
   <div class="field">
     <div class="field-head"><h3>Credential security</h3></div>
     {#if credentials.length}
@@ -493,7 +493,7 @@
     {:else}<p class="sub">No verified connector credentials yet.</p>{/if}
     {#if findings.length}<ul>{#each findings as finding}<li>{finding.severity}: {finding.summary}</li>{/each}</ul>{/if}
     {#if health.length}<p class="sub">Latest health state: {health[0].state}</p>{/if}
-    <div class="actions"><button class="btn btn-soft" onclick={scanSecurity}>Run local scan</button><button class="btn btn-soft" onclick={checkHealth}>Check runtime health</button></div>
+    <div class="actions"><button class="btn btn-soft" onclick={scanSecurity}>Run local scan</button><button class="btn btn-soft" onclick={checkHealth}>Check health</button></div>
     <label>
       Password to check
       <input type="password" bind:value={breachPassword} autocomplete="off" />

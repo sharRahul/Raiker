@@ -1,5 +1,6 @@
 <script lang="ts">
   import { shownInline } from "../inlineDecisions.svelte";
+  import { NOT_ANSWERING } from "../errorCopy";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
   import { pickableProjects } from "../projectLifecycle";
   import { workDraft } from "../workDraft.svelte";
@@ -1581,7 +1582,7 @@
     turn.error =
       error instanceof ApiError
         ? `The turn could not continue (${code ?? error.status}).`
-        : "Could not reach the local runtime to continue the turn.";
+        : `The turn did not continue. It is still waiting here. ${NOT_ANSWERING}`;
   }
 
   /** Continue the turn this approval parked, streaming into its own transcript row. */
@@ -1669,7 +1670,7 @@
       }
       await resumeTurn(resumable[0].approval_id, resumable[0].outcome_status);
     } catch {
-      review.notice = "Could not check for a decision — the local runtime is unreachable.";
+      review.notice = `Raiker could not check whether a decision is waiting. Nothing was approved or refused. ${NOT_ANSWERING}`;
     }
   }
 

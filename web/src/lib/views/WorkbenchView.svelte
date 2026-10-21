@@ -38,7 +38,8 @@
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { readinessGaps } from "../readinessGaps";
-  import { relativeFuture, relativeTime } from "../format";
+  import { humanize, relativeFuture, relativeTime } from "../format";
+  import { capabilityLabel } from "../capabilityModel";
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
   import { stopRun } from "../taskLifecycle";
@@ -126,6 +127,12 @@
   );
   const scheduled = $derived(active.filter((task) => !repeats(task) && armed(task)));
   const named = $derived((sessions ?? []).filter((s) => s.title.trim() !== ""));
+  // QUI-H01 — the one thread Home offers to continue: the most recently moved.
+  const latestThread = $derived(
+    [...named].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))[0] ?? null,
+  );
+  // QUI-H01 — at most two in-progress cards on Home; the live board has the rest.
+  const IN_PROGRESS_ON_HOME = 2;
   const hasActivity = $derived(
     named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0,
   );
@@ -292,6 +299,18 @@
     busyTask = null;
   }
 
+  /**
+   * QUI-H01 — a thread's real next step, from what the runtime reports about
+   * it: what it waits on, when a routine runs next, or when it last moved.
+   * Never an invented "next".
+   */
+  function threadNextStep(thread: WorkThread): string {
+    if (thread.waiting_on) return `Waiting on ${thread.waiting_on}`;
+    if (thread.kind === "routine" && thread.next_run_at) return `Routine · next run ${relativeFuture(thread.next_run_at)}`;
+    const place = thread.kind === "routine" ? "Routine · " : thread.project_name ? `${thread.project_name} · ` : "";
+    return `${place}${thread.turn_count} turn${thread.turn_count === 1 ? "" : "s"} · updated ${relativeTime(thread.updated_at)}`;
+  }
+
   /** What a row is waiting for, in the owner's language. */
   function detail(task: TaskView): string {
     if (task.status === "waiting_for_approval") return "Blocked on a decision you have not made yet.";
@@ -375,6 +394,157 @@
     </p>{/if}
 
   <div class="columns">
+    {#if latestThread !== null}
+      <!-- QUI-H01 — the last conversation or routine, and its real next step, as
+           one card. The full list is Work → Threads. -->
+      <section class="board card continue-card" aria-labelledby="resume-h">
+        <div class="card-head">
+          <h3 id="resume-h">Continue where you left off</h3>
+          {#if named.length > 1}<a href="#/search-chat">All threads ({named.length})</a>{/if}
+        </div>
+        <div class="continue-row">
+          <div class="row-main">
+            <a class="row-title" href={`#/new-chat?session=${encodeURIComponent(latestThread.session_id)}`}>{latestThread.title}</a>
+            <span>{threadNextStep(latestThread)}</span>
+          </div>
+          <a class="btn btn-soft btn-sm" href={`#/new-chat?session=${encodeURIComponent(latestThread.session_id)}`}
+            aria-label={`Continue ${latestThread.title}`}>Continue</a>
+        </div>
+      </section>
+    {/if}
+
+    <aside class="side-column" aria-label="Needs your attention">
+      <h3 class="attention-title">Needs your attention</h3>
+      {#if unavailable}
+        <PageState
+          state="error"
+          title="Status is unavailable"
+          detail="Refresh to retry. No work was started or changed."
+        />
+      {:else if approvals === null || tasks === null}
+        <PageState state="loading" title="Loading status…" lines={3} />
+      {:else if nothingNeedsAttention}
+        <!-- "Do not show healthy subsystem status by default." Under a
+             heading that says *Needs your attention*, three tiles reading 0 are
+             a report that there is nothing to report, and they were the largest
+             thing on an idle Home. One line instead, and each tile comes back
+             the moment its own count is not zero. -->
+        <p class="all-clear">Nothing needs you right now.</p>
+      {:else if partialAllClear}
+        <!-- NEW-HOME-01 — the same rail when readiness could not be read. Two
+             of the three things were looked at and both are clear; the third
+             is named rather than counted as zero, which is what turned a
+             failed read into "Nothing needs you right now." -->
+        <!-- "Could not read" is a claim about an answer; while the answer is
+             on its way the honest sentence is that it is still being read.
+             Neither is an all-clear. -->
+        <p class="all-clear">
+          No approvals are waiting and no work is blocked.
+          {#if health.kind === "loading"}
+            Raiker is still reading its own readiness, so this is not an all-clear yet.
+          {:else}
+            Raiker could not read its own readiness, so this is not an all-clear.
+          {/if}
+        </p>
+        <StatTile
+          label="Health check"
+          value="—"
+          detail={healthLine}
+          tone="warn"
+          icon="diagnostics"
+          href="#/observe?tab=diagnostics"
+          linkLabel="Open diagnostics"
+        />
+      {:else}
+        {#if approvals.length > 0}
+          {@const first = approvals[0]}
+          <!-- QUI-H01 — one decision row, then View all. Approvals are listed
+               in queue order, so the first is the one to take first. -->
+          <div class="decision-row" data-testid="home-decision">
+            <div class="row-main">
+              <strong>{first.tool_name === "ask_owner_question" ? "Answer a question" : `Review ${humanize(first.tool_name).toLowerCase()}`}</strong>
+              <span>{capabilityLabel(first.capability)}{first.age_seconds !== null ? ` · waiting ${relativeTime(first.created_at)}` : ""}</span>
+            </div>
+            <a class="btn btn-soft btn-sm" href="#/approvals">Decide</a>
+          </div>
+          {#if approvals.length > 1}
+            <a class="view-all" href="#/approvals">View all {approvals.length} decisions</a>
+          {/if}
+        {/if}
+        {#if !healthIsCurrent}
+        <!-- NEW-HOME-01 — an unread readiness check is its own row, and it
+             carries when it was last true. It is not a count, because there is
+             no number to give: nobody looked. -->
+        <StatTile
+          label="Health check"
+          value="—"
+          detail={healthLine}
+          tone="warn"
+          icon="diagnostics"
+          href="#/observe?tab=diagnostics"
+          linkLabel="Open diagnostics"
+        />
+        {:else if gaps.length > 0}
+        <!-- QUI-Q01 — each gap as a sentence with the action that fixes it.
+             This was a "Runtime issues" tile: a large number and a line about
+             readiness evidence that named neither the problem nor the fix. -->
+        <ul class="feed" aria-label="Setup Raiker still needs">
+          {#each gaps as gap (gap.id)}
+            <li class="feed-item feed-blocking">
+              <strong>{gap.title}</strong>
+              <a href={gap.action.href}>{gap.action.label}</a>
+            </li>
+          {/each}
+        </ul>
+        {/if}
+        {#if blocked.length > 0}
+        <!-- NEW-HOME-01 — blocked work, not all work. Every running task used
+             to appear here, so a healthy overnight routine put Home permanently
+             in a state that said something needed the owner; the board below
+             already lists running work, with the same Stop control. What is
+             left here is the work that will not move again until they act. -->
+        <StatTile
+          label="Blocked work"
+          value={blocked.length}
+          detail={blocked.length === 1
+            ? "One run is paused or waiting for your decision."
+            : "These runs are paused or waiting for your decision."}
+          tone="warn"
+          icon="tasks"
+          href="#/observe?tab=work"
+          linkLabel="Open the live board"
+        />
+        {/if}
+        {#if backupNote !== null}
+          <!-- QUI-H05 — a backup is recommended only when there is none or the
+               newest is a week old. -->
+          <p class="feed-item backup-note">
+            <span>{backupNote.text}</span>
+            <a href={backupNote.href}>{backupNote.label}</a>
+          </p>
+        {/if}
+        {#if feedItems.length > 0}
+          <!-- DEC-02 — each item names what waits and the one place it is
+               resolved; it goes when its own subsystem says it is done. -->
+          <ul class="feed" aria-label="Also waiting on you">
+            {#each feedItems as item (item.id)}
+              <li class="feed-item feed-{item.severity}">
+                <strong>{item.title}</strong>
+                <span>{item.reason}</span>
+                <a href={item.href}>{item.action_label}</a>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if feedUnknown}
+          <p class="all-clear">
+            {feedFailed
+              ? "Raiker could not read everything that may be waiting on you, so this is not a full list."
+              : `Raiker could not read ${(feed?.unknown ?? []).join(", ")}, so this is not a full list.`}
+          </p>
+        {/if}
+      {/if}
+    </aside>
     <div class="main-column">
       {#if unavailable}
         <PageState
@@ -421,10 +591,10 @@
         <section class="board card" aria-labelledby="running-h">
           <div class="card-head">
             <h3 id="running-h">Running now</h3>
-            <a href="#/observe?tab=work">Live board</a>
+            <a href="#/observe?tab=work">{runningNow.length > IN_PROGRESS_ON_HOME ? `View all ${runningNow.length}` : "Live board"}</a>
           </div>
             <ul class="rows">
-              {#each runningNow as task (task.task_id)}
+              {#each runningNow.slice(0, IN_PROGRESS_ON_HOME) as task (task.task_id)}
                 <li>
                   <div class="row-main">
                     <a class="row-title" href={taskDetailHref(task.task_id)}>{task.title}</a>
@@ -538,27 +708,6 @@
         </section>
         {/if}
 
-        {#if named.length > 0}
-          <section class="board card" aria-labelledby="resume-h">
-            <div class="card-head">
-              <h3 id="resume-h">Continue working</h3>
-              <a href="#/search-chat">All threads</a>
-            </div>
-            <ul class="resumes">
-              {#each named.slice(0, 5) as session (session.session_id)}
-                <li>
-                  <a href={`#/new-chat?session=${encodeURIComponent(session.session_id)}`}>{session.title}</a>
-                  <span>
-                    {#if session.kind === "routine"}Routine · {/if}{#if session.project_name}{session.project_name}
-                      · {/if}{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · updated
-                    {relativeTime(session.updated_at)}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-          </section>
-        {/if}
-
         {#if thisWeek.length > 0}
           <!-- QUI-H01 — the week's finished outcomes, by name. This is where
                the sense of progress lives: what got done, not how many. -->
@@ -574,144 +723,12 @@
       {/if}
     </div>
 
-    <aside class="side-column" aria-label="Needs your attention">
-      <h3 class="attention-title">Needs your attention</h3>
-      {#if unavailable}
-        <PageState
-          state="error"
-          title="Status is unavailable"
-          detail="Refresh to retry. No work was started or changed."
-        />
-      {:else if approvals === null || tasks === null}
-        <PageState state="loading" title="Loading status…" lines={3} />
-      {:else if nothingNeedsAttention}
-        <!-- "Do not show healthy subsystem status by default." Under a
-             heading that says *Needs your attention*, three tiles reading 0 are
-             a report that there is nothing to report, and they were the largest
-             thing on an idle Home. One line instead, and each tile comes back
-             the moment its own count is not zero. -->
-        <p class="all-clear">Nothing needs you right now.</p>
-      {:else if partialAllClear}
-        <!-- NEW-HOME-01 — the same rail when readiness could not be read. Two
-             of the three things were looked at and both are clear; the third
-             is named rather than counted as zero, which is what turned a
-             failed read into "Nothing needs you right now." -->
-        <!-- "Could not read" is a claim about an answer; while the answer is
-             on its way the honest sentence is that it is still being read.
-             Neither is an all-clear. -->
-        <p class="all-clear">
-          No approvals are waiting and no work is blocked.
-          {#if health.kind === "loading"}
-            Raiker is still reading its own runtime readiness, so this is not an all-clear yet.
-          {:else}
-            Raiker could not read its own runtime readiness, so this is not an all-clear.
-          {/if}
-        </p>
-        <StatTile
-          label="Runtime health"
-          value="—"
-          detail={healthLine}
-          tone="warn"
-          icon="diagnostics"
-          href="#/observe?tab=diagnostics"
-          linkLabel="Open diagnostics"
-        />
-      {:else}
-        {#if approvals.length > 0}
-        <StatTile
-          label="Approvals"
-          value={approvals.length}
-          detail={approvals.length === 0
-            ? "No decision needs your review."
-            : approvals.length === 1
-              ? "One decision blocks a governed action until you decide."
-              : "Each one blocks a governed action until you decide."}
-          tone={approvals.length > 0 ? "accent" : "neutral"}
-          icon="approvals"
-          href="#/approvals"
-          linkLabel="Review approvals"
-        />
-        {/if}
-        {#if !healthIsCurrent}
-        <!-- NEW-HOME-01 — an unread readiness check is its own row, and it
-             carries when it was last true. It is not a count, because there is
-             no number to give: nobody looked. -->
-        <StatTile
-          label="Runtime health"
-          value="—"
-          detail={healthLine}
-          tone="warn"
-          icon="diagnostics"
-          href="#/observe?tab=diagnostics"
-          linkLabel="Open diagnostics"
-        />
-        {:else if gaps.length > 0}
-        <!-- QUI-Q01 — each gap as a sentence with the action that fixes it.
-             This was a "Runtime issues" tile: a large number and a line about
-             readiness evidence that named neither the problem nor the fix. -->
-        <ul class="feed" aria-label="Setup Raiker still needs">
-          {#each gaps as gap (gap.id)}
-            <li class="feed-item feed-blocking">
-              <strong>{gap.title}</strong>
-              <a href={gap.action.href}>{gap.action.label}</a>
-            </li>
-          {/each}
-        </ul>
-        {/if}
-        {#if blocked.length > 0}
-        <!-- NEW-HOME-01 — blocked work, not all work. Every running task used
-             to appear here, so a healthy overnight routine put Home permanently
-             in a state that said something needed the owner; the board below
-             already lists running work, with the same Stop control. What is
-             left here is the work that will not move again until they act. -->
-        <StatTile
-          label="Blocked work"
-          value={blocked.length}
-          detail={blocked.length === 1
-            ? "One run is paused or waiting for your decision."
-            : "These runs are paused or waiting for your decision."}
-          tone="warn"
-          icon="tasks"
-          href="#/observe?tab=work"
-          linkLabel="Open the live board"
-        />
-        {/if}
-        {#if backupNote !== null}
-          <!-- QUI-H05 — a backup is recommended only when there is none or the
-               newest is a week old. -->
-          <p class="feed-item backup-note">
-            <span>{backupNote.text}</span>
-            <a href={backupNote.href}>{backupNote.label}</a>
-          </p>
-        {/if}
-        {#if feedItems.length > 0}
-          <!-- DEC-02 — each item names what waits and the one place it is
-               resolved; it goes when its own subsystem says it is done. -->
-          <ul class="feed" aria-label="Also waiting on you">
-            {#each feedItems as item (item.id)}
-              <li class="feed-item feed-{item.severity}">
-                <strong>{item.title}</strong>
-                <span>{item.reason}</span>
-                <a href={item.href}>{item.action_label}</a>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-        {#if feedUnknown}
-          <p class="all-clear">
-            {feedFailed
-              ? "Raiker could not read everything that may be waiting on you, so this is not a full list."
-              : `Raiker could not read ${(feed?.unknown ?? []).join(", ")}, so this is not a full list.`}
-          </p>
-        {/if}
-      {/if}
-    </aside>
   </div>
 </section>
 
 <style>
   .goal-group { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--text-2); }
-  .workbench { display: grid; gap: var(--space-5); }
+  .workbench { display: grid; gap: var(--space-5); max-width: 61.25rem; }
   .intro { display: grid; gap: var(--space-2); }
   /* BUG-37 — the greeting is display type: Raiker speaking to the owner, not a
      control label. Size, face and tracking come from the shared `.display` rule
@@ -722,7 +739,16 @@
   /* Below the start row now: freshness and a guide link are true and are not
      what anybody opened Home for. */
   .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; margin-top: var(--space-3); }
-  .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 19rem); gap: var(--space-4); align-items: start; }
+  /* QUI-H01 — one 980 px column, in the order an owner reads it: continue,
+     what needs you, what is in progress, this week, what is coming. */
+  .columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+  .continue-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+  .decision-row {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    min-height: 4.5rem; padding: var(--space-3); border: 1px solid var(--warn-border);
+    border-radius: var(--r-md); background: var(--surface);
+  }
+  .view-all { font-size: var(--text-sm); justify-self: start; }
   .main-column { display: grid; gap: var(--space-4); min-width: 0; }
   .side-column { display: grid; gap: var(--space-3); }
   .attention-title { margin: 0 0 var(--space-2); font-size: var(--text-md); }
@@ -757,12 +783,6 @@
   .row-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; color: var(--text-3); font-size: var(--text-xs); }
   .kind, .since { white-space: nowrap; }
   .row-actions { display: flex; align-items: center; gap: var(--space-2); }
-  .resumes { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
-  .resumes li { border-top: 1px solid var(--border); display: grid; gap: 0.15rem; padding: var(--row-y) 0; }
-  .resumes li span { font-size: var(--text-xs); color: var(--text-3); }
-  @media (max-width: 63.9rem) {
-    .columns { grid-template-columns: 1fr; }
-  }
   @media (max-width: 40rem) {
     .intro { flex-direction: column; }
     .rows li { grid-template-columns: minmax(0, 1fr); }

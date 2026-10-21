@@ -157,7 +157,7 @@
     if (status === "ok") return "Last run ok";
     if (status === "telemetry_credential_missing")
       return "Last run refused: the credential variable is unset";
-    if (status === "telemetry_destination_disabled") return "Last run refused: destination off";
+    if (status === "telemetry_destination_disabled") return "Last run refused: collector off";
     if (status.startsWith("telemetry_rejected_"))
       return `Last run refused by the collector (${status.slice("telemetry_rejected_".length)})`;
     if (status.includes("fetch_failed")) return "Last run could not reach the collector";
@@ -187,7 +187,7 @@
   <h2 id="otlp-h" class="section-h">Can I see this outside Raiker?</h2>
   <p>
     Governed events go to an OpenTelemetry collector as identifiers and an event type — on a
-    cadence, or on demand. Content is off unless a destination opts in, and is redacted the same
+    cadence, or on demand. Content is off unless a collector opts in, and is redacted the same
     way this screen is.
   </p>
 

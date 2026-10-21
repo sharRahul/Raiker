@@ -724,7 +724,7 @@
 <div class="provider-matrix">
   <div class="group-head">
     <h3>On this machine</h3>
-    <p>No account and no network. Raiker asks each runtime what it is serving.</p>
+    <p>No account and no network. Raiker asks each local model server what it is serving.</p>
   </div>
 
   {#each rows.filter((row) => row.kind === "gguf" || row.kind === "detect" || row.kind === "endpoint") as row (row.profileId)}

@@ -212,7 +212,7 @@ test("getting-started — every destination is where the guide says it is", asyn
   await page.getByRole("button", { name: "More pages and settings" }).click();
   const allPages = page.getByRole("dialog");
   await expect(allPages).toBeVisible({ timeout: 30_000 });
-  for (const label of ["Permissions", "Models", "Extensions", "Observability", "Guide"]) {
+  for (const label of ["Permissions", "Models", "Extensions", "Diagnostics", "Guide"]) {
     await expect(allPages.getByRole("link", { name: label, exact: true })).toHaveCount(1);
   }
   await expect(allPages.getByRole("link", { name: "Settings", exact: true })).toHaveCount(0);

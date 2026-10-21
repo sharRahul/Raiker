@@ -175,7 +175,7 @@
   {/if}
   {#if items.length === 0}<div class="empty">
       <strong>No model activity yet</strong><span
-        >Downloads, conversions, runtime installs, pulls, and deployments appear
+        >Downloads, conversions, model server installs, pulls, and deployments appear
         here.</span
       >
     </div>

@@ -63,7 +63,7 @@
   onMount(load);
 </script>
 
-<article class="runtime-row" aria-label="Speech runtime">
+<article class="runtime-row" aria-label="Speech engine">
   <span class="row-logo"><Icon name="mic" size="lg" /></span>
   <div class="row-main">
     <div class="row-heading">
@@ -85,7 +85,7 @@
           bind:value={draft}
           oninput={() => (typed = true)}
           disabled={busy}
-          aria-label="Speech runtime address"
+          aria-label="Speech engine address"
         />
       </label>
       <button class="btn btn-sm" type="button" onclick={saveAndTest} disabled={busy}>

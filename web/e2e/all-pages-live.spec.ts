@@ -14,6 +14,7 @@ import { DESTINATIONS, horizontalBleed, hubReachability, settled, WIDTHS } from 
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
 import { HOME_GREETING } from "./home";
+import { BUDGET_VIEWPORTS, measurePage, overBudget } from "./sizeBudgets";
 
 /** Wait for the routed view to have finished arriving, not merely to exist. */
 async function settle(page: import("@playwright/test").Page): Promise<void> {
@@ -94,4 +95,29 @@ test("no destination bleeds sideways at any width", async ({ page }) => {
     }
   }
   expect(bleeds).toEqual([]);
+});
+
+/**
+ * QUI-G01 — how tall each destination is and how many controls it shows, at
+ * the two laptop sizes the budget names. A report for now: it is attached to
+ * the run and printed, and fails only if nothing could be measured. Once the
+ * long pages are rebuilt the last line becomes `expect(over).toEqual([])`.
+ */
+test("size budgets report (QUI-G01)", async ({ page }, testInfo) => {
+  test.setTimeout(600_000);
+  await signInAsOwner(page, BASE);
+  const rows: { viewport: string; route: string; height: number; controls: number; over: string[] }[] = [];
+  for (const viewport of BUDGET_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    for (const { route } of DESTINATIONS) {
+      await page.goto(`${BASE}/#/${route}`);
+      await settle(page);
+      const size = await measurePage(page);
+      rows.push({ viewport: viewport.label, route, ...size, over: overBudget(route, size, viewport) });
+    }
+  }
+  const over = rows.filter((row) => row.over.length > 0).map((row) => `${row.viewport} · #/${row.route} · ${row.over.join(", ")}`);
+  await testInfo.attach("size-budgets.json", { body: JSON.stringify(rows, null, 2), contentType: "application/json" });
+  console.log(`QUI-G01: ${over.length} of ${rows.length} measurements over budget\n${over.join("\n")}`);
+  expect(rows.length).toBe(BUDGET_VIEWPORTS.length * DESTINATIONS.length);
 });

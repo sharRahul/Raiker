@@ -609,7 +609,7 @@
            take on trust: a hook can only ever make an action stricter. -->
       <h2 class="sr-only">Hooks</h2>
       <p class="note">
-        A hook can only make an action <strong>stricter</strong> — never allow one the runtime
+        A hook can only make an action <strong>stricter</strong> — never allow one Raiker
         refused, skip an approval, or reach past the tool broker.
         <GuideLink section="extensions-and-mcp" label="How hooks work" />
       </p>

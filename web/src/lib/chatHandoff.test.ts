@@ -10,8 +10,14 @@ describe("chatHandoff", () => {
     window.removeEventListener(COMPOSE_EVENT, listen);
     expect(seen).toEqual([{ text: "Plan my week", sessionId: null, fromHandoff: true }]);
     // Taken once: whichever side reads it first sends it, the other finds nothing.
-    expect(takeChatHandoff()).toBe("Plan my week");
+    expect(takeChatHandoff()).toEqual({ text: "Plan my week", attachments: [] });
     expect(takeChatHandoff()).toBeNull();
+  });
+
+  it("carries files uploaded on Home with the message", () => {
+    const file = { kind: "document" as const, label: "notes.pdf", detail: "PDF", attachmentId: "att_1" };
+    handOffToChat("Summarise this", [file]);
+    expect(takeChatHandoff()).toEqual({ text: "Summarise this", attachments: [file] });
   });
 
   it("ignores an empty message", () => {

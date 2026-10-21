@@ -57,7 +57,7 @@ test("setup chooses Ollama, and Ready's Chat opens Chat on that model", async ({
   await expect(ollama.getByText("Selected: GPT oss:20B Cloud")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Your Raiker is ready" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "You're set. What should we do first?" })).toBeVisible();
   await capture(page, join(SHOTS, "01-setup-ready.png"));
 
   await page.getByRole("button", { name: /^Chat/ }).first().click();

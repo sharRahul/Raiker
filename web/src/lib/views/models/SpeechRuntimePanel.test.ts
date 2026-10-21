@@ -20,7 +20,7 @@ it("keeps an address typed before the read resolved", async () => {
     new Promise<View>((resolve) => { pending.settle = resolve; }),
   );
   render(SpeechRuntimePanel);
-  const field = screen.getByLabelText("Speech runtime address");
+  const field = screen.getByLabelText("Speech engine address");
   await fireEvent.input(field, { target: { value: "http://127.0.0.1:8910" } });
   pending.settle({ runtime: runtime(), max_audio_bytes: 1 });
   await waitFor(() => expect(screen.getByText("Not set up")).toBeInTheDocument());
@@ -39,7 +39,7 @@ it("reports what answered at the address", async () => {
     endpoint: "http://127.0.0.1:8910",
   });
   render(SpeechRuntimePanel);
-  await fireEvent.input(await screen.findByLabelText("Speech runtime address"), {
+  await fireEvent.input(await screen.findByLabelText("Speech engine address"), {
     target: { value: "http://127.0.0.1:8910" },
   });
   await fireEvent.click(screen.getByRole("button", { name: "Save and test" }));

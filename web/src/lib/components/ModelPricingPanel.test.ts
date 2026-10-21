@@ -182,7 +182,7 @@ describe("ModelPricingPanel — BUG-21", () => {
   it("does not offer an override to someone who cannot record one", async () => {
     stubFetch(pricing({ can_override: false }));
     render(ModelPricingPanel);
-    expect(await screen.findByText(/needs the runtime gate-manager role/)).toBeInTheDocument();
+    expect(await screen.findByText(/needs the gate-manager role/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Override" })).not.toBeInTheDocument();
   });
 

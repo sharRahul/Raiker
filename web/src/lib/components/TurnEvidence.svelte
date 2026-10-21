@@ -175,7 +175,7 @@
       {/if}
 
       {#if turnId !== null && turnId !== ""}
-      <h4>What the runtime recorded</h4>
+      <h4>What Raiker recorded</h4>
       {#if loading}
         <p class="muted" role="status">Reading the record…</p>
       {:else if loadError}

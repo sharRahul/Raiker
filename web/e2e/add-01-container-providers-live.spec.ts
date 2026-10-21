@@ -49,7 +49,7 @@ test.beforeAll(async ({ browser }) => {
   context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: "light" });
   page = await context.newPage();
   await page.goto(`${BASE}/#/models`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 30_000 });
   await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");

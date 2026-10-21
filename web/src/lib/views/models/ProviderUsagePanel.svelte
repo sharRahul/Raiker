@@ -71,7 +71,7 @@
     try {
       usage = await api.weeklyModelUsage(refreshNative);
     } catch {
-      error = "Raiker could not load provider usage. Check the runtime, then try again.";
+      error = "Raiker could not load provider usage. Check that Raiker is running, then try again.";
     } finally {
       loading = false;
       refreshing = false;
@@ -199,7 +199,7 @@
   {:else if usage && usage.providers.length === 0}
     <div class="usage-empty">
       <strong>No connected providers</strong>
-      <span>Connect a hosted account or start and check a local runtime to see it here.</span>
+      <span>Connect a hosted account or start and check a local model server to see it here.</span>
     </div>
   {:else if usage}
     <div class="usage-list">
@@ -244,7 +244,7 @@
                   known cost
                 </p>
               {:else if row.observed.total_tokens > 0 && hasNoApiCost(row.provider)}
-                <p class="quiet">No API cost — local runtime.</p>
+                <p class="quiet">No API cost — runs on this computer.</p>
               {:else if row.observed.total_tokens > 0}
                 <p class="quiet">Cost unknown for the recorded model pricing.</p>
               {/if}

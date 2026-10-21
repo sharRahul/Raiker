@@ -163,7 +163,7 @@ export function hubReachability(page: import("@playwright/test").Page): {
  *
  * The rule is the product's own convention rather than a list of exceptions: a
  * label that is still loading ends in an ellipsis (`Loading projects…`,
- * `Verifying runtime…`, `Checking providers…`). A finished sentence does not.
+ * `Checking Raiker…`, `Checking providers…`). A finished sentence does not.
  * One copy, so the next surface that phrases a state this way is one edit.
  */
 export async function settled(

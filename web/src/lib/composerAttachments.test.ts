@@ -96,6 +96,6 @@ describe("pasted text attachments", () => {
     const store = createAttachmentStore();
     expect(await store.attachPastedText("x".repeat(5000))).toBe(false);
     expect(store.items).toHaveLength(0);
-    expect(store.error).toContain("Upload failed");
+    expect(store.error).toContain("The file was not attached");
   });
 });

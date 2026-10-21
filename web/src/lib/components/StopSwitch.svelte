@@ -20,6 +20,7 @@
   // one press sends one `POST /api/stop-all`, which applies each kind of work's
   // own existing stop at its safe boundary.
   import { onMount } from "svelte";
+  import { failure } from "../errorCopy";
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import { humanize } from "../format";
@@ -146,7 +147,7 @@
       void refreshCount();
     } catch (e) {
       errorText =
-        e instanceof ApiError ? `Stop failed (${e.status}).` : "Could not reach the local runtime.";
+        failure("Stop was not sent", "Running work has not been stopped.", "Press STOP again.", e);
       phase = "error";
     }
   }

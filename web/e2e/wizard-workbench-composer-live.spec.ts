@@ -44,7 +44,7 @@ async function register(page: Page): Promise<void> {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 120_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 120_000 });
   await page.getByLabel("Username").fill("owner");
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
@@ -149,7 +149,7 @@ test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage();
   try {
     await page.goto(`${BASE}/#/workbench`);
-    await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 120_000 });
+    await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 120_000 });
     await expect(page.getByLabel("Username")).toBeEnabled({ timeout: 60_000 });
     freshWorkspace = await page
       .getByLabel("Confirm password")

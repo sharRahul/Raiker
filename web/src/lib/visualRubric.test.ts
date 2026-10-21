@@ -100,6 +100,9 @@ describe("visual rubric", () => {
       "ChatView.svelte",
       "BuildView.svelte",
       "BuildSidePanel.svelte",
+      // QUI-G03 — the development-only gallery shows the bare empty state on
+      // purpose: it is a specimen, not a screen anyone lands on.
+      "StateGalleryView.svelte",
     ]);
 
     const offenders: string[] = [];

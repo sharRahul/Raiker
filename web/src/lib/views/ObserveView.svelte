@@ -182,7 +182,7 @@
       // not reach the runtime and offers a retry, rather than showing stale
       // readiness as if it were current.
       loadError =
-        error instanceof ApiError ? `Unavailable (${error.status})` : "Could not reach the runtime";
+        error instanceof ApiError ? `Unavailable (${error.status})` : "Could not reach Raiker";
       offline = !(error instanceof ApiError);
     }
   }
@@ -225,7 +225,7 @@
   onMount(load);
 </script>
 
-<TabStrip {tabs} selected={tab} onselect={selectTab} label="Observability sections" />
+<TabStrip {tabs} selected={tab} onselect={selectTab} label="Diagnostics sections" />
 
 {#if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="overview">
@@ -238,11 +238,11 @@
     {#if loadError}
       <PageState
         state="error"
-        title={offline ? "Raiker is not reachable" : "Couldn't read the runtime status"}
-        detail={`${loadError}. Nothing was started or changed. Select Refresh once the runtime is back.`}
+        title={offline ? "Raiker is not reachable" : "Couldn't read Raiker's status"}
+        detail={`${loadError}. Nothing was started or changed. Select Refresh once Raiker is back.`}
       />
     {:else if diagnostics === null}
-      <PageState state="loading" title="Reading runtime status…" />
+      <PageState state="loading" title="Reading status…" />
     {:else}
       <!-- REM-OBSERVE — exceptions first: what is wrong and what changed lead,
            and the resting state reads below, so the one tile that matters is
@@ -277,7 +277,7 @@
                the half that needs a person, which is what makes it mean
                anything the one time it appears. -->
           <StatTile
-            label="Runtime"
+            label="Raiker"
             value={ready ? "Ready" : "Not ready"}
             detail={ready
               ? `Running in ${humanize(diagnostics.runtime_mode)} mode with its readiness checks met.`
@@ -442,7 +442,7 @@
       <details class="specialist" open={repairOpen} id="runtime-health-detail">
         <summary>
           <span>
-            <strong>Runtime health, in detail</strong>
+            <strong>Health, in detail</strong>
             <small>Failed readiness checks, health transitions, memory integrity and what a restart does to each kind of work.</small>
           </span>
           <Icon name="chevron-down" size="md" />

@@ -23,7 +23,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   expect(OPENROUTER_KEY).not.toBe("");
 
   await page.goto(`${BASE}/#/models`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 20_000 });
+  await expect(page.getByText(/Checking Raiker/)).toBeHidden({ timeout: 20_000 });
   if (await page.getByLabel("Confirm password").isVisible()) {
     await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);

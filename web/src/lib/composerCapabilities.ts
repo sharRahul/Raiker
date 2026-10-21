@@ -254,6 +254,18 @@ export const COMPOSER_CAPABILITIES: readonly ComposerCapability[] = [
     priority: 60,
   },
   {
+    // QUI-C11 — the draft becomes a task that starts now, and the chat stays free.
+    id: "run-background",
+    label: "Run in background",
+    hint: "Works on what you typed as a task while you keep chatting.",
+    icon: "tasks",
+    group: "tools",
+    surfaces: ["chat"],
+    gate: "task_management_runtime",
+    enableHref: "#/capabilities",
+    priority: 55,
+  },
+  {
     id: "schedule",
     label: "Schedule it",
     hint: "Runs on a cadence, with the model chosen now.",

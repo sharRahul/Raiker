@@ -109,7 +109,7 @@
       carries: "The audit records you choose to export.",
       destination: "The telemetry destination you configured.",
       where: "#/observe",
-      whereLabel: "Observability",
+      whereLabel: "Diagnostics",
     },
   ];
 

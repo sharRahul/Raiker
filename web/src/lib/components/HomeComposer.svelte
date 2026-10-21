@@ -10,8 +10,15 @@
    * QUI-H02 — on a first day, with nothing in the workspace yet, the four
    * starters sit under it. A question starter fills the box for the owner to
    * edit; a place starter opens Build or Design.
+   *
+   * Attach uses the same panel and rules as Chat. Files are uploaded here and
+   * their references ride the hand-off, so Chat sends exactly what was picked.
    */
   import Icon from "./Icon.svelte";
+  import ComposerAttach from "./ComposerAttach.svelte";
+  import ComposerAttachPanel from "./ComposerAttachPanel.svelte";
+  import ComposerChips from "./ComposerChips.svelte";
+  import { createAttachmentStore } from "../composerAttachments.svelte";
   import { handOffToChat } from "../chatHandoff";
   import { STARTERS } from "../starters";
 
@@ -19,11 +26,16 @@
 
   let text = $state("");
   let input = $state<HTMLTextAreaElement>();
+  const attachStore = createAttachmentStore();
+  let attachOpen = $state(false);
+  let attachControl = $state<ComposerAttach | undefined>();
 
   function send(event?: Event) {
     event?.preventDefault();
-    if (text.trim() === "") return;
-    handOffToChat(text);
+    if (text.trim() === "" || attachStore.uploading) return;
+    handOffToChat(text, attachStore.take());
+    attachStore.clear();
+    attachOpen = false;
     text = "";
     window.location.hash = "#/new-chat";
   }
@@ -38,7 +50,12 @@
   }
 </script>
 
+<svelte:window onclick={(event) => attachControl?.handleOutsideClick(event)} />
+
 <form class="home-composer" onsubmit={send}>
+  {#if attachStore.items.length > 0}
+    <ComposerChips store={attachStore} />
+  {/if}
   <label class="sr-only" for="home-prompt">Ask Raiker</label>
   <textarea
     id="home-prompt"
@@ -49,9 +66,15 @@
     title="Enter to send, Shift+Enter for a new line"
     onkeydown={onKeydown}
   ></textarea>
+  {#if attachOpen}
+    <ComposerAttachPanel store={attachStore} idPrefix="home" />
+  {/if}
   <div class="home-composer-row">
-    <span class="hint">Opens a new chat</span>
-    <button type="submit" class="btn btn-primary btn-sm send" disabled={text.trim() === ""} aria-label="Send">
+    <div class="home-composer-tools">
+      <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={attachStore.full} />
+      <span class="hint">Opens a new chat</span>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm send" disabled={text.trim() === "" || attachStore.uploading} aria-label="Send">
       <Icon name="send" size="sm" />
     </button>
   </div>
@@ -100,6 +123,7 @@
   }
   textarea:focus { outline: none; }
   .home-composer-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .home-composer-tools { display: flex; align-items: center; gap: var(--space-2); }
   .hint { font-size: var(--text-xs); color: var(--text-3); }
   .send { width: 2.5rem; height: 2.5rem; padding: 0; display: inline-grid; place-items: center; border-radius: var(--r-md); }
   .starters {

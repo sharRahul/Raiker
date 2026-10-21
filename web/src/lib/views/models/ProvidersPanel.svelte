@@ -112,7 +112,7 @@
 <section class="runtime-setup" aria-labelledby="runtime-setup-title">
   <header>
     <div>
-      <p class="eyebrow">Local runtime setup</p>
+      <p class="eyebrow">Local model setup</p>
       <h2 id="runtime-setup-title">Install, connect, or pull</h2>
     </div>
     <p>

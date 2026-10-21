@@ -79,7 +79,7 @@ describe("TelemetryExport", () => {
   it.each([
     ["telemetry_credential_missing", /credential variable is unset/i],
     ["telemetry_rejected_503", /refused by the collector \(503\)/i],
-    ["telemetry_destination_disabled", /destination off/i],
+    ["telemetry_destination_disabled", /collector off/i],
     ["something_nobody_mapped", /did not complete/i],
   ])("reads %s as a sentence", async (status, expected) => {
     stubFetch(

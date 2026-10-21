@@ -20,6 +20,7 @@
    * exist precisely to name a folder that is not in it.
    */
   import { onMount } from "svelte";
+  import { NOT_ANSWERING } from "../errorCopy";
   import { api, ApiError } from "../api";
   import type { HostPathListing } from "../apiTypes";
   import Icon from "./Icon.svelte";
@@ -109,7 +110,7 @@
       failure =
         error instanceof ApiError
           ? "That location could not be read."
-          : "Could not reach the local runtime.";
+          : NOT_ANSWERING;
     } finally {
       loading = false;
     }

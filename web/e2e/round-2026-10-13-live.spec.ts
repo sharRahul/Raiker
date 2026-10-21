@@ -93,7 +93,9 @@ test("setup asks for the workspace ID, and the workspace makes the models list",
   await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
   await expect(page.locator("#setup-title")).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Choose how Raiker should think" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Where should I think?" })).toBeVisible();
+  // QUI-W03 — the providers open from the answer to "Where should I think?".
+  await page.getByRole("button", { name: /^An account I have/ }).click();
 
   // The key, typed where setup asks for it.
   await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);

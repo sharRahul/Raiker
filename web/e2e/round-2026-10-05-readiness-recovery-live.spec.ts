@@ -143,7 +143,7 @@ test("a damaged search index is named, the data said to be safe, and a rebuild r
   await page.goto(`${BASE}/#/observe?tab=overview`);
   await settled(page);
   // Diagnostics is the fold under the overview, closed on a healthy install.
-  await page.locator("details.specialist summary").filter({ hasText: "Runtime health, in detail" }).click();
+  await page.locator("details.specialist summary").filter({ hasText: "Health, in detail" }).click();
   const notice = page.getByTestId("damaged-text-indexes");
   await expect(notice).toContainText("Conversation search index is damaged", { timeout: 30_000 });
   await expect(notice).toContainText("not affected");

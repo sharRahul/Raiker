@@ -2243,3 +2243,57 @@ describe("Models modals answer to Escape", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 });
+
+// UX-MODEL-02 — the profile card says Chat's readiness as four steps and one
+// next action while any step is not done, and nothing extra once it is ready.
+describe("the profile card's readiness steps", () => {
+  const steps = (states: string[]) =>
+    ["connect", "discover", "choose", "run"].map((id, index) => ({
+      id,
+      label: ["Provider connected", "Model found", "Model chosen", "Runs"][index],
+      state: states[index],
+    }));
+  const chat = (partial: Record<string, unknown>) => ({
+    scope: { surface: "chat", project_id: null },
+    selected: { profile_id: "anthropic-hosted", model: "claude-haiku", source: "global_default" },
+    effective: { profile_id: "anthropic-hosted", model: "claude-haiku", reason: "selected" },
+    ready: true,
+    running: null,
+    problem: null,
+    revision: "abc1234567890def",
+    ...partial,
+  });
+
+  it("names the blocked step and offers only its action", async () => {
+    stubFetch({
+      "GET /api/models": models({}),
+      "GET /api/model-decisions": {
+        surfaces: {
+          chat: chat({
+            ready: false,
+            steps: steps(["blocked", "waiting", "waiting", "waiting"]),
+            next_action: { label: "Update the credential", target: "add" },
+          }),
+        },
+      },
+    });
+    render(ModelsView);
+    const line = await screen.findByRole("list", { name: "Chat readiness" });
+    const items = within(line).getAllByRole("listitem");
+    expect(items.map((item) => item.dataset.state)).toEqual(["blocked", "waiting", "waiting", "waiting"]);
+    await fireEvent.click(screen.getByRole("button", { name: "Update the credential" }));
+    expect(screen.getByRole("dialog", { name: "Add model" })).toBeInTheDocument();
+  });
+
+  it("draws nothing extra when Chat is ready", async () => {
+    stubFetch({
+      "GET /api/models": models({}),
+      "GET /api/model-decisions": {
+        surfaces: { chat: chat({ steps: steps(["done", "done", "done", "done"]), next_action: null }) },
+      },
+    });
+    render(ModelsView);
+    await screen.findByRole("heading", { name: "My models" });
+    expect(screen.queryByTestId("model-readiness-steps")).not.toBeInTheDocument();
+  });
+});

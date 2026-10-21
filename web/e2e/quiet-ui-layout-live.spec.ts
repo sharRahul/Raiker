@@ -142,6 +142,10 @@ test("RT-QUI-21 — Models: Add model in three steps connects Anthropic and make
   await open(page, "#/models");
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "No default model is chosen" })).toBeVisible({ timeout: 30_000 });
+  // Chat's readiness: four steps under the card, the stopped one marked.
+  const readiness = page.getByRole("list", { name: "Chat readiness" });
+  await expect(readiness.getByRole("listitem")).toHaveCount(4);
+  await expect(readiness.locator('[data-state="blocked"]')).toHaveCount(1);
   await capture(page, `${SHOTS}/21-models-empty.png`);
 
   await page.getByRole("button", { name: "Add model" }).first().click();

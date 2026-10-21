@@ -12,6 +12,7 @@
     CodexSubscriptionStatus,
     ModelCapacitiesView,
     ModelDecision,
+    ModelNextAction,
     ModelProfile,
     ModelsView as ModelsData,
     ProviderModelList,
@@ -48,6 +49,7 @@
   import ModelDetailsDialog from "./models/ModelDetailsDialog.svelte";
   import RuntimeTab from "./models/RuntimeTab.svelte";
   import ModelPickerDialog from "./models/ModelPickerDialog.svelte";
+  import ReadinessSteps from "./models/ReadinessSteps.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload.
@@ -164,6 +166,45 @@
    * exists to stop.
    */
   let decisions = $state<Record<string, ModelDecision> | null>(null);
+  /**
+   * UX-MODEL-02 — Chat's model decision, said as four steps and one next action
+   * on the profile card while any step is not done. "Check it now" runs the
+   * exact-pair check here; every other action opens what owns the fix.
+   */
+  const chatDecision = $derived(decisions?.chat ?? null);
+  const showReadiness = $derived(
+    chatDecision !== null &&
+      (chatDecision.steps ?? []).length > 0 &&
+      (!chatDecision.ready || chatDecision.next_action !== null),
+  );
+  let checkingReadiness = $state(false);
+  let readinessNotice = $state<string | null>(null);
+  async function takeReadinessAction(action: ModelNextAction) {
+    if (action.target === "permissions") {
+      window.location.hash = "#/capabilities";
+      return;
+    }
+    if (action.target === "runtime") {
+      window.location.hash = "#/settings?tab=advanced&kind=models";
+      return;
+    }
+    if (action.target !== "check") {
+      openAdd(null);
+      return;
+    }
+    if (chatDecision === null || !chatDecision.selected.profile_id) return;
+    checkingReadiness = true;
+    readinessNotice = null;
+    try {
+      await api.checkModelReadiness(chatDecision.selected.profile_id, chatDecision.selected.model);
+    } catch {
+      readinessNotice = "The check could not be started. Nothing was changed.";
+    } finally {
+      decisions = await modelDecisions();
+      checkingReadiness = false;
+    }
+  }
+
   let loadError = $state<string | null>(null);
   let capacities = $state<ModelCapacitiesView | null>(null);
   let capacityRefreshAttempted = false;
@@ -1184,6 +1225,18 @@
               {formatCost(String(totalSpend), spendCurrency)} spent so far.
             {/if}
           </p>
+          {#if showReadiness && chatDecision !== null}
+            <div class="profile-readiness">
+              <ReadinessSteps
+                steps={chatDecision.steps}
+                action={chatDecision.next_action}
+                busy={checkingReadiness}
+                label="Chat readiness"
+                onaction={(action) => void takeReadinessAction(action)}
+              />
+              {#if readinessNotice}<p class="error" role="alert">{readinessNotice}</p>{/if}
+            </div>
+          {/if}
         </div>
       {:else}
         <div class="profile-copy">
@@ -1193,6 +1246,18 @@
             Chat and Build need a model before they can answer. Add one that runs on this computer
             or connect an account you have.
           </p>
+          {#if showReadiness && chatDecision !== null}
+            <div class="profile-readiness">
+              <ReadinessSteps
+                steps={chatDecision.steps}
+                action={chatDecision.next_action}
+                busy={checkingReadiness}
+                label="Chat readiness"
+                onaction={(action) => void takeReadinessAction(action)}
+              />
+              {#if readinessNotice}<p class="error" role="alert">{readinessNotice}</p>{/if}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -1224,7 +1289,7 @@
         <button type="button" class="btn btn-ghost btn-sm" onclick={() => (changing = false)}>Cancel</button>
       {:else if globalChoices.length > 0}
         <button type="button" class="btn btn-sm" onclick={() => (changing = true)}>Change</button>
-      {:else}
+      {:else if !showReadiness}
         <button type="button" class="btn btn-primary btn-sm" onclick={() => openAdd(null)}>Add model</button>
       {/if}
     </div>
@@ -2292,6 +2357,9 @@
     margin: 0;
   }
 
+  .profile-readiness {
+    margin-top: var(--space-3);
+  }
   .posture-line {
     margin: 0.1rem 0 0;
     color: var(--text-3);

@@ -383,7 +383,7 @@ class ConversationCompactor:
                 content=f"Conversation to compact:{prior}\n\n{transcript}{additions}",
             ),
         ]
-        # Hermes Agent's auxiliary summarising model: the owner's side-task chain
+        # The summarising side model: the owner's side-task chain
         # first, the turn's own model last, so compaction never becomes
         # impossible because a side model is down.
         from raiker.models.side_tasks import candidates as side_task_candidates

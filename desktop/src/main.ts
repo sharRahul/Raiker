@@ -5,9 +5,9 @@
  * The shell is deliberately thin. Raiker's host — the governed runtime, its
  * authentication, its storage and every approval — is the same local service
  * the browser talks to; this process gives it a native window, menu, shortcuts
- * and notifications, and nothing in it can act on the workspace. The Hermes
- * Agent desktop app takes the same shape: an Electron window over the agent's
- * own core, sharing its sessions and configuration rather than copying them.
+ * and notifications, and nothing in it can act on the workspace: an Electron
+ * window over the agent's own core, sharing its sessions and configuration
+ * rather than copying them.
  *
  * What the window may show is fixed at start: one loopback Raiker origin.
  * Navigation elsewhere opens the owner's browser, another local Raiker instance

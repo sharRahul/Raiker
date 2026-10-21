@@ -1140,8 +1140,8 @@ class ConversationStore:
 
     #
     # `turn_sources` is a link table that was only ever read forwards: "what did
-    # this turn use". Read backwards and sideways it is the graph Obsidian's
-    # metadata cache exposes over a vault — `getBacklinksForFile` (who cites
+    # this turn use". Read backwards and sideways it is the graph a note-taking
+    # app's metadata cache exposes over a vault — `getBacklinksForFile` (who cites
     # this), `resolvedLinks` (what this cites, with a count per target), and the
     # block reference (the exact passage, not the whole document). Raiker
     # already stored all three facts per row; nothing here derives anything new,
@@ -1157,7 +1157,7 @@ class ConversationStore:
         """Which conversations cited this source, and how often.
 
         The reference count is per target-and-conversation, matching what
-        Obsidian reports for a backlink: one entry per citing document, carrying
+        a note-taking app reports for a backlink: one entry per citing document, carrying
         how many references it holds.
         """
         cleaned = locator.strip()

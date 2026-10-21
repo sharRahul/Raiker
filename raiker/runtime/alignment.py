@@ -3,10 +3,10 @@
 **The gap this closes (BUG-218).** Raiker's **Auto** approval mode meant "do not
 add a restriction of my own": the turn ran under the owner's standing
 permissions and nothing looked at whether a particular action was what the owner
-actually asked for. The reference set promises more —
-`Claude Code's auto <https://code.claude.com/docs/en/permissions>`_
-"auto-approves tool calls with background safety checks that verify actions align
-with your request", and Cowork's Auto "reviews each action for safety". An owner
+actually asked for. The reference set promises more — a coding assistant's auto
+mode "auto-approves tool calls with background safety checks that verify actions
+align with your request", and a workspace assistant's Auto "reviews each action
+for safety". An owner
 arriving from either reads Raiker's Auto as the same promise.
 
 **And the obvious implementation is worse than nothing.** A classifier that

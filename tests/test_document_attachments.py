@@ -1,7 +1,7 @@
 """Web-app task 3 (uploaded-documents slice) — governed document attachments.
 
 Uploaded bytes are untrusted data behind fail-closed, per-type validation:
-media-type allowlist, a hard size cap (32 MB, matching Claude's document limit),
+media-type allowlist, a hard size cap (32 MB, matching the hosted provider's document limit),
 and a type-specific sniff — clean UTF-8 (no NUL) for text, a ``%PDF-`` header
 pypdf can parse for PDF, a well-formed OOXML zip for .docx and .xlsx. Extraction
 is local-only (decode / pypdf / stdlib zip+XML), and the bounded extracted text

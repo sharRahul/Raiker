@@ -1,7 +1,6 @@
 """BUG-226 — the `http` hook handler, behind a named, revocable egress grant.
 
-[The Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
-documents five handler types. Raiker shipped three and refused `http`,
+The reference hook model documents five handler types. Raiker shipped three and refused `http`,
 `mcp_tool` and `agent` at parse time — for a reason rather than an omission:
 **a hook has no implicit network access.** The entry that raised this said
 `http` would follow "only once a hook can be given a named, revocable egress

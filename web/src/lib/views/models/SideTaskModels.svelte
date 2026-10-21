@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Hermes Agent's auxiliary models: a separate model for each side task, with
+   * Side-task models: a separate model for each side task, with
    * its own fallback. Summarising (conversation compaction) tries this chain,
    * then the turn's own model. Vision describes an attached image when the
    * turn's model cannot see; only models that accept images may be in it, and

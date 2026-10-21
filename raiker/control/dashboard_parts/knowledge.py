@@ -855,7 +855,7 @@ class KnowledgeService:
             if node_id not in context_nodes:
                 context_nodes.add(node_id)
                 # MEM-14 — a citation whose file has since been deleted is drawn
-                # as `missing` rather than omitted. Obsidian keeps its
+                # as `missing` rather than omitted. Note-taking apps keep
                 # unresolved links for the same reason: "this answer rested on
                 # something that is gone" is more useful than a tidier map, and
                 # dropping the node would leave the work looking ungrounded

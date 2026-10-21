@@ -1,4 +1,4 @@
-"""Separate models for side tasks — Hermes Agent's ``auxiliary.<task>`` models.
+"""Separate models for side tasks.
 
 Two side tasks a turn may need a different model for:
 

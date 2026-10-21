@@ -21,14 +21,14 @@ Four actions, because they answer four different questions:
 
 The last two exist because the first two are a graph of **claims** and a model
 building an understanding of a workspace also needs the graph of **material**.
-Obsidian's metadata cache is the reference model here, and Raiker turned out to
+A note-taking app's metadata cache is the reference model here, and Raiker turned out to
 already hold every fact it exposes — ``turn_sources`` records one row per source
 a turn used, carrying the target's locator and the bounded passage that reached
 the model, which is ``resolvedLinks``, ``getBacklinksForFile`` and a block
 reference in one table read only ever forwards. Three things were borrowed
 deliberately:
 
-* **A link is counted, not just present.** Obsidian reports how many references
+* **A link is counted, not just present.** Note-taking apps report how many references
   one document holds to another because one passing mention and nine are
   different facts; ``references`` returns ``refs`` per edge for the same reason.
 * **Unresolved references are surfaced, not dropped.** ``unresolvedLinks`` is a
@@ -220,7 +220,7 @@ def _references(
 
     Anchored on a *source*, it answers "which work used this, and what did that
     work use alongside it". Anchored on a *conversation*, it answers "what did
-    this piece of work rest on" — Obsidian's outgoing links, for a session.
+    this piece of work rest on" — a note-taking app's outgoing links, for a session.
     """
     if session_id and not locator:
         # A source with no locator — a web search, say — is a real citation with

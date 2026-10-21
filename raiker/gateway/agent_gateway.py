@@ -293,7 +293,7 @@ class AgentGateway:
     ) -> None:
         """`Stop` when the turn produced an answer, `StopFailure` when it did not.
 
-        Claude Code's `Stop` fires when the agent stops responding, and the split
+        The reference hook model's `Stop` fires when the agent stops responding, and the split
         exists because the two are not the same question. A turn parked on an
         approval has not finished — it is waiting — and a turn the owner stopped
         did what it was told. Reporting either as a clean `Stop` would let a rule

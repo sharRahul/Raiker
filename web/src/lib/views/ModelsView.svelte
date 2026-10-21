@@ -312,9 +312,9 @@
   // "workspace not recognised" answer asks them to compare.
   let signInWorkspaceId = $state("");
   let signInEndpoint = $state("");
-  /** Hermes-style named endpoints: the owner's own name for a custom endpoint. */
+  /** Named endpoints: the owner's own name for a custom endpoint. */
   let signInLabel = $state("");
-  /** Hermes credential pools: backup keys tried when the primary is throttled or spent. */
+  /** Credential pools: backup keys tried when the primary is throttled or spent. */
   let signInBackupKeys = $state<string[]>(["", "", ""]);
   let signInRemoveBackups = $state(false);
   // Connect with the key already in this provider's environment variable. The
@@ -946,7 +946,7 @@
     return `${used} model${used === 1 ? "" : "s"} used · ${turns} turn${turns === 1 ? "" : "s"}`;
   }
   /**
-   * Hermes-style named custom endpoints. Raiker ships four OpenAI-compatible
+   * Named custom endpoints. Raiker ships four OpenAI-compatible
    * slots; the first is always offered, the rest only once set up or asked for,
    * so four identical empty cards never stand in for one choice.
    */
@@ -1763,7 +1763,7 @@
                         </p>
                       {/if}
                       {#if p.provider === "openrouter" && p.connection_configured}
-                        <!-- Hermes Agent's provider_routing, as two owner choices.
+                        <!-- OpenRouter routing, as two owner choices.
                              Nothing is denied by default: denying data collection
                              leaves some free models with no provider at all. -->
                         <fieldset class="pc-routing" aria-label="OpenRouter routing">
@@ -1806,7 +1806,7 @@
                   {/each}
                 </div>
                 {#if section === "Advanced" && nextEndpoint !== null}
-                  <!-- Hermes-style named endpoints: one more server of your own
+                  <!-- Named endpoints: one more server of your own
                        (vLLM, SGLang, a home-lab host), with its own name and key. -->
                   <button type="button" class="btn btn-ghost btn-sm add-endpoint" onclick={addEndpoint}
                     >+ Add another endpoint</button
@@ -2043,7 +2043,7 @@
           />
         </label>
         {#if showApiKey}
-          <!-- Hermes Agent's credential pools: when the key above is rate
+          <!-- Credential pools: when the key above is rate
                limited or out of quota, the request moves to the next key. -->
           <fieldset class="field backup-keys">
             <legend class="field-label">Backup keys <small>(optional — tried in order when a key is rate limited or out of quota)</small></legend>

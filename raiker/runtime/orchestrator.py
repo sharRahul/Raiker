@@ -1783,7 +1783,7 @@ class RuntimeOrchestrator:
     async def _user_message(self, envelope: PromptEnvelope) -> ModelMessage:
         """The owner's prompt, with its images — seen, or described by a side model.
 
-        Hermes Agent's auxiliary vision model: when the turn's model cannot see,
+        The vision side model: when the turn's model cannot see,
         an image is no longer only withheld. The owner's vision chain describes
         it, and the description travels as text, marked as a description and as
         untrusted content. With no chain, or no model in it that answers, the

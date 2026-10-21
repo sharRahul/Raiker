@@ -3737,7 +3737,7 @@ ALTER TABLE mcp_servers ADD COLUMN server_features TEXT;
 #
 # Raiker records strictly more per governed action than the reference platforms
 # export: the decision, its source, the gate that admitted it, the approval that
-# carried it. All of it stayed inside the product. Cowork exports six event types
+# carried it. All of it stayed inside the product. A reference assistant exports six event types
 # over OpenTelemetry; Raiker exported none, because it had no wire — not because
 # it had nothing to say.
 #

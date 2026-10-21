@@ -112,7 +112,7 @@ class ModelRouter:
         return self.connection_resolver(profile.profile_id) if self.connection_resolver else None
 
     def _key_attempts(self, profile: ModelProfile) -> list[tuple[int, dict[str, str] | None]]:
-        """One factory connection per pooled key, rested keys first (Hermes credential pools)."""
+        """One factory connection per pooled key, rested keys first (credential pools)."""
         connection = self._connection(profile)
         if not connection:
             return [(1, None)]

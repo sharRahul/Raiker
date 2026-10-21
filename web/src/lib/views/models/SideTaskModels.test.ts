@@ -1,4 +1,4 @@
-// Hermes Agent's auxiliary models: a model per side task, each with its own fallback.
+// Side-task models: a model per side task, each with its own fallback.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { modelProfile, modelsView, stubFetch } from "../../test-helpers";

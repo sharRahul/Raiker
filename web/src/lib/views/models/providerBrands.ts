@@ -116,7 +116,7 @@ export function brand(provider: string): Brand {
     case "fireworks":
     case "nvidia-nim":
     case "cerebras": {
-      // Hermes-style breadth: each is an OpenAI-compatible hosted API that
+      // Provider breadth: each is an OpenAI-compatible hosted API that
       // authenticates with a bearer API key and nothing else.
       const hosted = HOSTED_API_KEYS[provider];
       return {

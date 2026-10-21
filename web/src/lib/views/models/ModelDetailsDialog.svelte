@@ -34,7 +34,7 @@
     onchanged: () => void | Promise<void>;
   } = $props();
 
-  // ── Context-length override (Hermes `model.context_length`) ──────────
+  // ── Context-length override ──────────────────────────────────────────
   let capacityTokens = $state("");
   let capacityReason = $state("");
   let capacityBusy = $state(false);
@@ -64,7 +64,7 @@
     }
   }
 
-  // ── Server check (Hermes local-server checks) ───────────────────────
+  // ── Server check (local-server checks) ─────────────────────────────
   const SELF_HOSTED = new Set(["ollama", "lm-studio", "llama.cpp", "mlx", "openai-compatible"]);
   const checkable = $derived(SELF_HOSTED.has(profile.provider) && !!profile.model && !profile.model.includes("<"));
   type ServerCheck = Awaited<ReturnType<typeof api.checkModelServer>>;
@@ -229,7 +229,7 @@
       </section>
     {/if}
     {#if capacities?.can_override && profile.model && !profile.model.includes("<")}
-      <!-- Hermes `model.context_length`: an exact window when the provider does
+      <!-- Context-length override: an exact window when the provider does
            not say, or says something wrong. Kept with a reason, in history. -->
       <form class="capacity-form" onsubmit={(e) => { e.preventDefault(); void saveCapacity(false); }}>
         <h3>Context window override</h3>

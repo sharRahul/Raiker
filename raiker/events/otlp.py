@@ -4,7 +4,7 @@ Raiker records strictly more per governed action than any compared product
 exports: the decision, where the decision came from, the gate that admitted the
 action, the approval that carried it, and the hash chain that proves the record
 was not edited afterwards. All of it stayed inside the product.
-[Cowork exports six event types this way](https://claude.com/docs/cowork/monitoring)
+A reference workspace assistant exports six event types this way
 — including `tool_decision`, which carries a decision and its source. What Raiker
 lacked was not the record. It was the wire.
 

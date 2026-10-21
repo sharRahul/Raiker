@@ -3,7 +3,7 @@
  *
  * The Knowledge Map used to draw a cited file that no longer exists exactly
  * like one still on disk, so a conversation grounded in something since deleted
- * looked identically grounded in something present. Obsidian keeps its
+ * looked identically grounded in something present. Note-taking apps keep
  * `unresolvedLinks` for the same reason this does: the more useful fact is that
  * the work rested on something that is gone.
  *

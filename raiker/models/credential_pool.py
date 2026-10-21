@@ -1,6 +1,6 @@
 """Several keys for one provider, rotated on rate limits and empty quota.
 
-Hermes Agent's credential pools: a provider connection may hold backup keys,
+A provider connection may hold backup keys,
 and a request whose key is rate limited (429) or out of quota moves to the next
 key instead of failing the turn. A key that was refused is *benched* for a
 while — a minute for a rate limit, an hour for an empty balance — so the next

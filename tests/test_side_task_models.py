@@ -1,4 +1,4 @@
-"""Hermes Agent's auxiliary models: a separate model per side task, with fallback.
+"""Side-task models: a separate model per side task, with fallback.
 
 Summarising tries the owner's chain and then the turn's own model, so
 compaction cannot become impossible because a side model is down. Vision

@@ -6,7 +6,7 @@ answer. Which meant a model could not ask the two questions a reference graph
 exists to answer — *what else used this?* and *what does this actually say?* —
 about material its own workspace had already read.
 
-The shape borrowed here is Obsidian's metadata cache, whose useful properties
+The shape borrowed here is a note-taking app's metadata cache, whose useful properties
 turned out to be three claims rather than a data structure: a link carries a
 count, an unresolved link is reported rather than dropped, and a reference
 resolves to a passage rather than to a document. Each is asserted below against
@@ -99,7 +99,7 @@ def test_a_file_names_the_conversations_that_used_it(store: SQLiteStore, tmp_pat
 
 
 def test_nine_references_and_one_are_different_facts(store: SQLiteStore, tmp_path: Path) -> None:
-    """Obsidian counts references per backlink; the reason is this case.
+    """Note-taking apps count references per backlink; the reason is this case.
 
     A conversation that leaned on a file across nine turns and one that glanced
     at it once are both "a backlink", and collapsing them would throw away the
@@ -209,7 +209,7 @@ def test_a_citation_with_nothing_to_point_at_is_left_out_of_the_count_too(
 def test_a_reference_to_a_deleted_file_is_reported_not_dropped(
     store: SQLiteStore, tmp_path: Path
 ) -> None:
-    """`unresolvedLinks` is half of Obsidian's cache, and the useful half here.
+    """`unresolvedLinks` is half of a note-taking app's cache, and the useful half here.
 
     "The answer rested on something that is now gone" is a more valuable fact
     than a shorter list, and silently omitting the row would leave a model

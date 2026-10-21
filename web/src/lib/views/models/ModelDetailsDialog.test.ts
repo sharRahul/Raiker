@@ -1,4 +1,4 @@
-// Hermes-parity local-server check and the context-window override, in Details.
+// The local-server check and the context-window override, in Details.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelCapacitiesView } from "../../apiTypes";

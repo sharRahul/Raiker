@@ -1,4 +1,4 @@
-"""Hermes Agent's credential pools: backup keys rotated on rate limits and empty quota.
+"""Credential pools: backup keys rotated on rate limits and empty quota.
 
 A connection may hold up to three backup keys. A request whose key is rate
 limited (429) or out of quota moves to the next key in the same turn; the

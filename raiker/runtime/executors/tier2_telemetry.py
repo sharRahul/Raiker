@@ -4,7 +4,7 @@ Raiker records more per governed action than any compared product exports: the
 decision, its source, the gate that admitted it, the approval that carried it,
 and a hash chain over the lot. Every bit of it stayed inside the product, so an
 owner running Raiker beside an observability stack could see none of it there.
-[Cowork exports six event types over OpenTelemetry](https://claude.com/docs/cowork/monitoring);
+A reference workspace assistant exports six event types over OpenTelemetry;
 Raiker exported none — for want of a wire, not for want of a record.
 
 This is that wire, and it is deliberately the *narrow* one:

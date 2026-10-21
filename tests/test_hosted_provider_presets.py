@@ -1,4 +1,4 @@
-"""Hermes-parity provider breadth: eight OpenAI-compatible hosted APIs.
+"""Provider breadth: eight OpenAI-compatible hosted APIs.
 
 Each is an ordinary profile, so the connect dialog, the vault, the catalogue,
 readiness, the hosted-model gate and the egress rule apply to it unchanged.

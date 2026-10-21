@@ -888,7 +888,7 @@ class ModelService:
             """Sum cost by pricing each model at its own rate.
 
             Summing tokens first and applying one model's rate would charge a
-            cheap model's tokens at an expensive model's price — Claude models
+            cheap model's tokens at an expensive model's price — one provider's models
             differ by roughly 15x, so a mixed history would be badly wrong.
             Returns None when no row could be priced at all.
             """

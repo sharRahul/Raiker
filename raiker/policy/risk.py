@@ -41,28 +41,28 @@ an action stricter cannot be turned into a way around governance.
 Both reference implementations were read rather than remembered, and they
 disagree in a way that turned out to be useful.
 
-**Claude Code** treats risk as a property of the action and checks it against
+**The external coding assistant** treats risk as a property of the action and checks it against
 published rule lists — what the auto-mode classifier blocks and allows by
 default, plus two path classes (*protected* paths that no mode auto-writes, and
 *critical* paths that no allow rule and no hook may approve for removal). The
-lists are data: `claude auto-mode defaults` prints them as JSON. The signals
+lists are data: a command prints them as JSON. The signals
 below are the same idea, reduced to the questions that actually separate the
 bands rather than to a list of cases.
 
-**Codex** splits it differently and more sharply: a *sandbox mode*
+**The hosted coding agent** splits it differently and more sharply: a *sandbox mode*
 (`read-only`, `workspace-write`, `danger-full-access`) sets the boundary, and an
 *approval policy* (`untrusted`, `on-request`, `never`) says what happens when an
 action needs to leave it. Risk, in that model, is not a property of the tool at
 all — it is the single question *does this have to cross the boundary?*
 
-Raiker takes Codex's question and can answer it better, because
+Raiker takes the coding agent's question and can answer it better, because
 `crosses_sandbox_boundary` is measured here rather than assumed: the OS boundary
-is real and probed. It takes Claude Code's insistence that the rules are
+is real and probed. It takes the coding assistant's insistence that the rules are
 published data an owner can read. And it keeps one thing neither has: a band is
 recorded with the signals that produced it, so an assessment can be recomputed
 from the audit trail months later instead of being trusted.
 
-One control from Claude Code is deliberately **not** built here and is worth
+One control from the coding assistant is deliberately **not** built here and is worth
 naming so its absence is a decision rather than an oversight: a boundary the
 owner states in conversation ("don't push until I've reviewed it") is treated by
 the reference classifier as a block signal that stays in force until lifted.
@@ -252,7 +252,7 @@ RISK_SIGNALS: tuple[RiskSignal, ...] = (
         band="high",
         question="Does it need to reach outside the boundary this turn is running in?",
         why=(
-            "Codex's model, and the sharpest of the three: an action is risky exactly when it "
+            "The hosted coding agent's model, and the sharpest of the three: an action is risky exactly when it "
             "has to leave the boundary it was given. Raiker can ask this more honestly than "
             "the reference can, because its boundary is measured rather than asserted — so "
             "'outside the sandbox' is a fact here, not a policy guess."

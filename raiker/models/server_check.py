@@ -1,4 +1,4 @@
-"""Is this local or custom server set up for Raiker? — Hermes Agent's local-server checks.
+"""Is this local or custom server set up for Raiker? — local-server checks.
 
 Two facts decide whether a self-hosted model can do agent work:
 

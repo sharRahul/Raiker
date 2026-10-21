@@ -457,10 +457,10 @@ class ModelConnectionRequest(StrictRequest):
     # where the key acts, and it is stored beside the key so the pair travels
     # together.
     workspace_id: str | None = None
-    # Hermes Agent's named custom endpoints: the owner's own name for a custom
+    # Named custom endpoints: the owner's own name for a custom
     # OpenAI-compatible endpoint ("Home GPU", "Work vLLM"). Display text only.
     label: str | None = Field(default=None, max_length=40)
-    # Hermes Agent's credential pools: up to three backup keys tried in order
+    # Credential pools: up to three backup keys tried in order
     # when the primary is rate limited or out of quota. ``None`` keeps what is
     # stored; ``[]`` clears them.
     backup_api_keys: list[str] | None = Field(default=None, max_length=3)
@@ -475,7 +475,7 @@ class ModelConnectionRequest(StrictRequest):
 
 
 class ModelRoutingRequest(StrictRequest):
-    """OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``).
+    """OpenRouter routing preferences for one saved connection.
 
     ``""`` clears a preference back to the account default. Only values
     OpenRouter defines are accepted, so nothing else reaches a request body.
@@ -521,7 +521,7 @@ class SideTaskModelEntry(StrictRequest):
 
 
 class SetSideTaskModelsRequest(StrictRequest):
-    """One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it."""
+    """One side task's ordered model chain; [] clears it."""
 
     task: Literal["summarise", "vision"]
     chain: list[SideTaskModelEntry] = Field(default_factory=list, max_length=3)

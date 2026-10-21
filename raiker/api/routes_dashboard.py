@@ -3165,8 +3165,7 @@ async def set_model_routing(
 ) -> dict[str, Any]:
     """Save OpenRouter routing preferences beside the saved connection.
 
-    Hermes Agent's ``provider_routing``, for the two preferences that matter to
-    an owner: whether a request may reach providers that store prompts, and
+    Two preferences matter to an owner: whether a request may reach providers that store prompts, and
     what to prefer when several serve the model. They describe how this
     account's requests are routed, so they live with its connection; the key is
     never re-entered and never touched.
@@ -3211,7 +3210,7 @@ async def check_model_server(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Is this local or custom server set up for agent work? (Hermes local-server checks)
+    """Is this local or custom server set up for agent work?
 
     One request with one harmless tool, through the same governed provider path
     a turn uses, and the context a loopback server says it is serving. Nothing
@@ -3265,7 +3264,7 @@ async def set_side_task_models(
 ) -> dict[str, Any]:
     """Set one side task's ordered model chain (human gate-manager only).
 
-    Hermes Agent's auxiliary models. Choosing a side model grants nothing: each
+    Choosing a side model grants nothing: each
     call still goes through provider policy, gates, egress and keys like any
     turn. A vision chain may hold only models that accept images.
     """

@@ -64,7 +64,7 @@ DOCUMENT_MEDIA_TYPES: frozenset[str] = (
 )
 
 # Hard per-document size cap. Matches the Anthropic PDF API's 32 MB request
-# limit (also ≈ claude.ai's per-file upload cap), applied to every document
+# limit (also ≈ the hosted assistant's per-file upload cap), applied to every document
 # type. Extracted text is separately bounded by ``MAX_DOCUMENT_TEXT_CHARS``, so
 # the byte cap governs only the upload size, never how much lands in context.
 MAX_DOCUMENT_BYTES = 32_000_000

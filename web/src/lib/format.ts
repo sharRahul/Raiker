@@ -214,8 +214,8 @@ export function providerName(provider: string | null | undefined): string {
 
 /**
  * What to call one profile: the owner's own name for a custom endpoint when
- * they gave one ("Home GPU"), otherwise the provider's name. Hermes Agent's
- * named endpoints, so four OpenAI-compatible endpoints are not four rows all
+ * they gave one ("Home GPU"), otherwise the provider's name. Named endpoints,
+ * so four OpenAI-compatible endpoints are not four rows all
  * called "OpenAI-compatible".
  */
 export function profileLabel(profile: { provider: string; connection_label?: string | null }): string {

@@ -10,7 +10,7 @@
  * does the owner see Raiker — and an account is never created on a computer
  * that cannot run it.
  *
- * The shape follows the Hermes Agent bootstrap installer: a fixed list of
+ * The shape is a bootstrap installer's: a fixed list of
  * named stages, each reported as it starts and ends with how long it took, a
  * hidden-by-default log, and a failure stated in one plain sentence with
  * Retry beside it. A receipt in the shell's profile records that setup
@@ -137,7 +137,7 @@ export function blockingSummary(readiness: SystemReadiness): string {
 }
 
 /**
- * One plain sentence for a raw failure, as Hermes' boot screen does: the raw
+ * One plain sentence for a raw failure, as a good boot screen gives: the raw
  * text stays available behind Show details, never as the headline.
  */
 export function plainCause(message: string): string {

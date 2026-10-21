@@ -1,4 +1,4 @@
-"""Hermes Agent's local-server checks: is this server set up for agent work?
+"""Local-server checks: is this server set up for agent work?
 
 Verified live on 2026-10-18 against this host's Ollama: ``gemma3:1b`` refused
 tools, ``gpt-oss:20b-cloud`` called the probe natively, and

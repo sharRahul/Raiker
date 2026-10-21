@@ -1,4 +1,4 @@
-"""OpenRouter routing preferences — Hermes Agent's ``provider_routing``, governed.
+"""OpenRouter routing preferences, governed.
 
 Two preferences an owner can act on: keep requests away from providers that
 store prompts (``data_collection: deny``), and what to prefer when several

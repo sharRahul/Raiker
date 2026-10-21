@@ -331,7 +331,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   const prompt = page.getByLabel("Prompt", { exact: true });
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await expect(prompt).toHaveAttribute("placeholder", "How can I help you today?");
-  // `+`, the approval-mode chip, and the model chip: Cowork's minimal composer
+  // `+`, the approval-mode chip, and the model chip: a minimal composer
   // shape, with Raiker's governance controls in it and nothing else.
   await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Approval mode:/ })).toBeVisible();

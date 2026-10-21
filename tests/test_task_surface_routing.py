@@ -4,7 +4,7 @@ BUG-220 gave a parent ownership of its children's terminal states: it parks as
 `waiting_for_children` and settles when the last one lands. What it could not do
 is say *how* a child should work. Every task cycle ran with Chat's standing
 instructions, so a child whose job is "read this repository, make the change, run
-the tests" was given the assistant's working method for it. Cowork's Dispatch
+the tests" was given the assistant's working method for it. A workspace assistant's dispatcher
 routes each piece of a brief to the surface it belongs on; Raiker already has both
 surfaces under one governed turn contract, so this is scheduling rather than a new
 execution path.

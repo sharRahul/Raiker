@@ -1,4 +1,4 @@
-"""Hermes Agent's named custom endpoints, as four OpenAI-compatible slots.
+"""Named custom endpoints, as four OpenAI-compatible slots.
 
 Each slot is its own profile — its own endpoint, key, catalogue, readiness and
 egress decision — and carries the owner's own name for it. The endpoint's

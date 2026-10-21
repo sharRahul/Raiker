@@ -1010,7 +1010,7 @@
 <style>
   :global(.content:has(.knowledge-shell)) { padding:0 !important; overflow:hidden; }
 
-  /* The graph keeps the Obsidian interaction model, drawn in Raiker's own
+  /* The graph keeps a note-taking app's interaction model, drawn in Raiker's own
      surface language. Painted in tokens only, so the base is right in both
      themes with no per-theme override block. */
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:var(--bg); color:var(--text-1); }

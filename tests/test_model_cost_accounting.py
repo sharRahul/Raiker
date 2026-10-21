@@ -50,7 +50,7 @@ class TestPriceResolution:
         assert price.as_of == "2026-07"
 
     def test_a_model_absent_from_the_table_is_unpriced_not_defaulted(self) -> None:
-        # Sibling Claude models differ by ~15x, so borrowing a neighbour's rate
+        # Sibling models from one provider differ by ~15x, so borrowing a neighbour's rate
         # would be worse than admitting the price is unknown.
         assert price_from_config(CONFIG_PRICING, "claude-opus-5") is None
 
@@ -318,7 +318,7 @@ class TestMixedModelPricing:
 
     Found live: summing every token first and applying the *currently selected*
     model's price charged cheap-model history at the expensive model's rate.
-    Claude models differ by roughly 15x, so a mixed history was badly wrong.
+    One provider's models differ by roughly 15x, so a mixed history was badly wrong.
     """
 
     CHEAP = {"models": {"cheap": {"input": 1.0, "output": 5.0}}, "currency": "USD"}

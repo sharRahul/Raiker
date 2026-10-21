@@ -1064,7 +1064,7 @@
       case "attach": attachOpen = true; break;
       case "context": contextOpen = true; void refreshContextUsage(); break;
       case "approvals": window.location.hash = "#/approvals"; break;
-      // Cowork's own two: schedule work, and see what is already running. The
+      // The workspace assistant's two: schedule work, and see what is already running. The
       // Tasks surface owns both, including the cadence chips (once / daily /
       // background agent) that make a routine a routine. `/schedule` also asks
       // that surface to open on **Schedule once**, so the command arranges the

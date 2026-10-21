@@ -281,6 +281,9 @@ def test_the_boot_probe_clears_the_cookie_that_no_longer_authenticates(
     reports "nobody" clears it, so the next load has nothing to ask with.
     """
     _register(client)
+    # Replace the live cookie rather than add a second one beside it: with both
+    # sent, which one the server reads depends on their order in the header.
+    client.cookies.delete(SESSION_COOKIE)
     client.cookies.set(SESSION_COOKIE, "not-a-live-session")
     answer = client.get("/api/auth/session-state")
     assert answer.status_code == 200, answer.text

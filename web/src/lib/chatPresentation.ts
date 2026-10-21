@@ -161,3 +161,53 @@ export function collectReasoning(events: StreamEvent[]): string {
   }
   return text;
 }
+
+/**
+ * QUI-C03 — the one line above the running turn's controls that says what it
+ * is doing now.
+ *
+ * Read from the turn's own events, never invented: a call waiting on the owner
+ * wins, then the call in flight (its label and what it acts on, both resolved
+ * server-side). Otherwise it says nothing: before the first token the
+ * transcript already shows its own "Working…", and an answer being written is
+ * on screen as it arrives. No percentages and no "thinking".
+ */
+export function workingLine(rows: readonly ToolCallRow[]): string {
+  if (rows.some((row) => row.state === "waiting")) return "Waiting for your decision";
+  const inFlight = [...rows].reverse().find((row) => row.state === "running");
+  if (inFlight) return inFlight.action ? `${inFlight.label} · ${inFlight.action}` : inFlight.label;
+  return "";
+}
+
+export interface TurnOutcome {
+  readonly label: "Completed" | "Partially completed" | "Not done" | "Outcome unknown";
+  readonly detail: string;
+  readonly tone: "done" | "partial" | "not-done" | "unknown";
+}
+
+/**
+ * QUI-C03 — one line under a settled turn that did something, saying how it
+ * ended.
+ *
+ * Only for turns that used tools: a plain answer needs no "Completed" under it.
+ * Stopped and parked turns already say so in their own words. A call that
+ * never reported an outcome makes the whole turn's outcome unknown, because
+ * Raiker cannot say whether it happened; a refused or failed call among
+ * successful ones makes it partial.
+ */
+export function turnOutcome(status: string | null | undefined, rows: readonly ToolCallRow[]): TurnOutcome | null {
+  if (!status || status === "stopped" || status === "needs_approval") return null;
+  if (status === "failed") return { label: "Not done", detail: "The turn failed before it finished.", tone: "not-done" };
+  if (status === "denied") return { label: "Not done", detail: "An action it needed was not allowed.", tone: "not-done" };
+  if (rows.length === 0) return null;
+  const unsettled = rows.filter((row) => row.state === "running" || row.state === "waiting").length;
+  const stopped = rows.filter((row) => row.state === "failed" || row.state === "denied" || row.state === "refused").length;
+  const steps = `${rows.length} step${rows.length === 1 ? "" : "s"}`;
+  if (unsettled > 0) {
+    return { label: "Outcome unknown", detail: `${unsettled} of ${steps} did not report how it ended.`, tone: "unknown" };
+  }
+  if (stopped > 0) {
+    return { label: "Partially completed", detail: `${stopped} of ${steps} did not go through.`, tone: "partial" };
+  }
+  return { label: "Completed", detail: steps, tone: "done" };
+}

@@ -15,7 +15,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("TurnControl", () => {
   it("cannot act until the conversation has an id, and says so", () => {
     render(TurnControl, { sessionId: null });
-    expect(screen.getByRole("button", { name: "Stop this turn" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stop safely" })).toBeDisabled();
     expect(screen.getByPlaceholderText("Starting…")).toBeDisabled();
   });
 
@@ -24,7 +24,7 @@ describe("TurnControl", () => {
       "POST /api/interrupts": { applied: [], safe_boundary: true, turn_control: { action: "stop", queued: 0 } },
     });
     render(TurnControl, { sessionId: "sess_1" });
-    await fireEvent.click(screen.getByRole("button", { name: "Stop this turn" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Stop safely" }));
 
     await waitFor(() => expect(screen.getByText(/Stop requested/)).toBeInTheDocument());
     expect(screen.getByText(/ends at its next safe boundary/)).toBeInTheDocument();
@@ -37,10 +37,10 @@ describe("TurnControl", () => {
       "POST /api/interrupts": { applied: [], safe_boundary: true, turn_control: { action: "steer", queued: 1 } },
     });
     render(TurnControl, { sessionId: "sess_1" });
-    await fireEvent.input(screen.getByLabelText("Add to this turn"), {
+    await fireEvent.input(screen.getByLabelText("Add instruction"), {
       target: { value: "use the changelog instead" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /Steer/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Add this instruction" }));
 
     await waitFor(() =>
       expect(screen.getByText(/1 instruction queued for this turn/)).toBeInTheDocument(),
@@ -48,13 +48,13 @@ describe("TurnControl", () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body).toMatchObject({ action_type: "steer", steer_text: "use the changelog instead" });
     // The field clears, so the same instruction cannot be sent twice by accident.
-    expect(screen.getByLabelText("Add to this turn")).toHaveValue("");
+    expect(screen.getByLabelText("Add instruction")).toHaveValue("");
   });
 
   it("says when the request itself failed instead of looking successful", async () => {
     stubFetch({});
     render(TurnControl, { sessionId: "sess_1" });
-    await fireEvent.click(screen.getByRole("button", { name: "Stop this turn" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Stop safely" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Stop failed/));
     expect(screen.queryByText(/Stop requested/)).not.toBeInTheDocument();
   });
@@ -65,10 +65,26 @@ describe("TurnControl", () => {
       "POST /api/interrupts": { __status: 429, detail: { ok: false, reason_code: "steer_queue_full" } },
     });
     render(TurnControl, { sessionId: "sess_1" });
-    await fireEvent.input(screen.getByLabelText("Add to this turn"), { target: { value: "and this" } });
-    await fireEvent.click(screen.getByRole("button", { name: /Steer/ }));
+    await fireEvent.input(screen.getByLabelText("Add instruction"), { target: { value: "and this" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Add this instruction" }));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(/already waiting.*next safe boundary/),
     );
+  });
+});
+
+// QUI-C03 — one true line about the running turn, above Add instruction and
+// Stop safely.
+describe("TurnControl activity line", () => {
+  it("shows what the turn is doing now", () => {
+    render(TurnControl, { sessionId: "sess_1", activity: "Read file · proposal.pdf" });
+    expect(screen.getByRole("status")).toHaveTextContent("Read file · proposal.pdf…");
+    expect(screen.getByRole("button", { name: "Stop safely" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Add instruction")).toBeInTheDocument();
+  });
+
+  it("draws no line when there is nothing to say", () => {
+    render(TurnControl, { sessionId: "sess_1" });
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

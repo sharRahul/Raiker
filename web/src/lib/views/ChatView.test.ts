@@ -763,6 +763,96 @@ describe("ChatView streaming transcript", () => {
     });
   });
 
+  // QUI-C08 — scrolling up to read stops the transcript following the answer,
+  // and Jump to latest brings it back.
+  it("offers Jump to latest once the owner scrolls away from the bottom", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Answered.") });
+    });
+    const { container } = render(ChatView);
+    const box = await screen.findByRole("textbox", { name: /prompt/i });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Model for this turn/ })).toBeInTheDocument());
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+    await screen.findByText("Answered.");
+    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
+
+    const thread = container.querySelector(".thread") as HTMLElement;
+    Object.defineProperty(thread, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(thread, "clientHeight", { configurable: true, value: 400 });
+    thread.scrollTop = 200;
+    await fireEvent.scroll(thread);
+    const jump = await screen.findByRole("button", { name: "Jump to latest" });
+
+    thread.scrollTop = 1600;
+    await fireEvent.click(jump);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull());
+  });
+
+  // QUI-C01 — the conversation's title is in the header and renames in place.
+  it("shows the conversation title and renames it", async () => {
+    const fetchMock = stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/sessions/sess_title": {
+        session: { session_id: "sess_title", title: "Trip plan" },
+        turns: [
+          { turn_id: "turn_1", status: "completed", prompt_text: "Plan a trip", created_at: "2026-10-11T10:00:00Z", completed_at: "2026-10-11T10:00:10Z", summary: "Here is a plan." },
+        ],
+        parked_approvals: [],
+      },
+      "PUT /api/sessions/sess_title/rename": { ok: true, session_id: "sess_title", title: "Lisbon trip" },
+    });
+    render(ChatView, { props: { sessionId: "sess_title" } });
+
+    expect(await screen.findByRole("heading", { name: "Trip plan" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Rename conversation" }));
+    const input = screen.getByRole("textbox", { name: "Conversation title" });
+    await fireEvent.input(input, { target: { value: "Lisbon trip" } });
+    await fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(await screen.findByRole("heading", { name: "Lisbon trip" })).toBeInTheDocument();
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/sessions/sess_title/rename"));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ title: "Lisbon trip" });
+  });
+
+  // QUI-C03 — a turn that used tools says how it ended, in one line.
+  it("says how a turn that used tools ended", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      const tool = (status: string, action: string) => ({
+        kind: "tool", text: "", event_type: "", response: null,
+        payload: { tool_name: "read_file", action_id: action, label: "Read file", action, status },
+      }) as unknown as StreamEvent;
+      onEvent(tool("success", "notes.txt"));
+      onEvent(tool("refused", "secrets.txt"));
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Read what I could.") });
+    });
+    render(ChatView);
+    const box = await screen.findByRole("textbox", { name: /prompt/i });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Model for this turn/ })).toBeInTheDocument());
+    await fireEvent.input(box, { target: { value: "Read my notes" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+    await screen.findByText("Read what I could.");
+    expect(screen.getByText("Partially completed")).toBeInTheDocument();
+    expect(screen.getByText(/1 of 2 steps did not go through/)).toBeInTheDocument();
+  });
+
+  // QUI-C10 — an empty conversation offers four starters; a question fills the
+  // composer and never sends on its own.
+  it("offers four starters on an empty conversation", async () => {
+    stubFetch(MODELS_ROUTE);
+    render(ChatView);
+    const starters = await screen.findByRole("list", { name: "Ways to start" });
+    expect(within(starters).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(starters).getByRole("link", { name: "Fix a bug in a repository" })).toHaveAttribute("href", "#/build");
+    await fireEvent.click(within(starters).getByRole("button", { name: "Summarise a document" }));
+    expect(screen.getByRole("textbox", { name: /prompt/i })).toHaveValue(
+      "Summarise the document I attach in five bullet points.",
+    );
+    expect(streamPromptMock).not.toHaveBeenCalled();
+  });
+
   // QUI-H01 — Home's composer hands its message to Chat. A Chat that mounts
   // after the hand-off sends it once; a mounted one sends it as a new chat.
   it("sends a message handed over from Home, once, in a new conversation", async () => {

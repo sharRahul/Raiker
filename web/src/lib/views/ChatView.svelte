@@ -85,7 +85,7 @@
   import { rememberSessionInRoute } from "../sessionRoute";
   import { evidenceLink, forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { collectReasoning, hasRunningTool, toolActivity, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity, turnOutcome, workingLine, type ToolCallRow } from "../chatPresentation";
   import { turnFailureMessage } from "../turnFailure";
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import {
@@ -97,6 +97,8 @@
   import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
   import { COMPOSE_EVENT, takeChatHandoff } from "../chatHandoff";
+  import { STARTERS } from "../starters";
+  import { inferenceLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
   import {
     activeComposerProfile,
     blocksSending,
@@ -330,10 +332,32 @@
   // described as itself and not as the default.
   const activeProfile = $derived(activeComposerProfile(profiles, modelProfile, model, allProfiles()));
   const modelReadiness = $derived(readinessForSelection(activeProfile, catalogueChoices(profiles, modelCatalogues()).length));
+  // QUI-C04 — where the next message is processed, for the model that will run it.
+  const dataLocation = $derived(
+    activeProfile === null ? null : inferenceLocation(activeProfile, model !== "" ? model : activeProfile.model),
+  );
   // BUG-238 — a stale observation never blocks: the server re-checks it
   // before admitting the turn, so the only thing that stops a send is a
   // model problem the owner can actually fix.
   const modelBlocked = $derived(blocksSending(modelReadiness));
+  // QUI-C03 — the running turn's one status line, read from its own events.
+  const runningActivity = $derived.by(() => {
+    const running = [...turns].reverse().find((turn) => turn.streaming);
+    if (!running) return "";
+    return workingLine(toolActivity(running.events));
+  });
+  // QUI-C05 — the message Send kept while no model was usable. It goes the
+  // moment one is, through the same `submit()`, and is dropped if the owner
+  // edits the draft or cancels.
+  let sendWhenReady = $state<string | null>(null);
+  $effect(() => {
+    if (sendWhenReady === null) return;
+    if (draft.text.trim() !== sendWhenReady) {
+      sendWhenReady = null;
+      return;
+    }
+    if (!modelBlocked && modelsKnown() && !streaming) void submit();
+  });
   // BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI:
   // low/medium/high) or as a *mode* (Anthropic: adaptive). Offering only the
   // first meant the provider that ships in the box had no reasoning control at
@@ -729,6 +753,7 @@
     landedAnchor = null;
     try {
       const detail = await api.session(id);
+      conversationTitle = detail.session?.title ?? "";
       const parked = parkedByTurn(detail);
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
@@ -740,7 +765,7 @@
       // the effect below, so a *second* link into the same conversation is
       // honoured too — that reload never happens, because the session id has
       // not changed.
-      if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd();
+      if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd(true);
     } catch (e) {
       historyError =
         e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
@@ -791,9 +816,13 @@
     // QUI-Q04 — Send is never a dead button. With no usable model the press
     // opens the dialog that fixes it, and the draft stays where it is.
     if (modelBlocked) {
+      // QUI-C05 — and the message is sent once a model is ready, unless the
+      // owner changes it or cancels. The line under the composer says so.
+      sendWhenReady = text;
       openModelSetup(null, modelReadiness);
       return;
     }
+    sendWhenReady = null;
     const voiceState = {
       dictated: voiceDictated,
       typedBefore: voiceTypedBefore,
@@ -828,7 +857,7 @@
     attachStore.clear();
     streaming = true;
     stopping = false;
-    void scrollToEnd();
+    void scrollToEnd(true);
     try {
       await streamPrompt(
         {
@@ -868,6 +897,8 @@
             void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
+            // QUI-C01 — a new conversation learns the title the runtime gave it.
+            if (conversationTitle === "") void refreshTitle(event.response.session_id);
           } else if (event.kind === "error") {
             turn.error = event.text || "An error occurred.";
             turn.events = [...turn.events, event];
@@ -915,7 +946,24 @@
     }
   }
 
-  async function scrollToEnd() {
+  /**
+   * QUI-C08 — the transcript follows a streaming answer only while the owner is
+   * at the bottom. Scrolling up to read stops the following, and **Jump to
+   * latest** brings it back. Sending, opening a conversation and continuing
+   * after a decision are the owner's own acts, so they always scroll.
+   */
+  let following = $state(true);
+  const FOLLOW_SLACK_PX = 48;
+
+  function onThreadScroll() {
+    if (!scrollEl) return;
+    const fromBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
+    following = fromBottom <= FOLLOW_SLACK_PX;
+  }
+
+  async function scrollToEnd(force = false) {
+    if (!force && !following) return;
+    following = true;
     await tick();
     // Guarded: jsdom (vitest) has no scrollTo implementation.
     if (typeof scrollEl?.scrollTo === "function") {
@@ -938,7 +986,7 @@
       : "That exchange is not in this conversation.";
     forgetTurnInRoute();
     if (anchorNotice === null) return;
-    void scrollToEnd();
+    void scrollToEnd(true);
   }
 
   // The anchor is honoured whenever it changes and the transcript is ready to
@@ -1217,6 +1265,62 @@
    * turn is still running the message waits in the composer instead of being
    * dropped, because `submit()` refuses to start a second turn.
    */
+  /**
+   * QUI-C01 — the conversation's title, shown and renamed in the header.
+   *
+   * It is the same title Work › Threads and the sidebar show, renamed through
+   * the same `PUT /api/sessions/{id}/rename`. A failed rename keeps the old
+   * title and says so; it never shows a name the runtime did not store.
+   */
+  let conversationTitle = $state("");
+  let editingTitle = $state(false);
+  let titleDraft = $state("");
+  let titleNotice = $state<string | null>(null);
+
+  async function refreshTitle(id: string) {
+    try {
+      const detail = await api.session(id);
+      if (id === sessionId) conversationTitle = detail.session?.title ?? "";
+    } catch {
+      // The header simply keeps no title until the next read.
+    }
+  }
+
+  function startTitleEdit() {
+    titleDraft = conversationTitle;
+    titleNotice = null;
+    editingTitle = true;
+  }
+
+  async function commitTitle() {
+    if (!editingTitle) return;
+    editingTitle = false;
+    const next = titleDraft.trim();
+    if (sessionId === null || next === "" || next === conversationTitle) return;
+    try {
+      const renamed = await api.renameSession(sessionId, next);
+      conversationTitle = renamed.title;
+      window.dispatchEvent(new Event("raiker:chats-changed"));
+    } catch {
+      titleNotice = "Could not rename this conversation. Its title is unchanged.";
+    }
+  }
+
+  function onTitleKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitTitle();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      editingTitle = false;
+    }
+  }
+
+  function useStarter(prompt: string) {
+    draft.text = prompt;
+    promptEl?.focus();
+  }
+
   async function startHandedOffChat(text: string) {
     if (streaming) {
       draft.text = text;
@@ -1241,6 +1345,9 @@
     releaseThumbnails();
     turns = [];
     sessionId = null;
+    conversationTitle = "";
+    editingTitle = false;
+    titleNotice = null;
     /*
      * Found while closing RR-PROJECT-01: the *second* chat in a project was
      * filed nowhere. `pendingProjectId` is consumed when the first conversation
@@ -1413,7 +1520,7 @@
     turn.streaming = true;
     turn.error = null;
     streaming = true;
-    void scrollToEnd();
+    void scrollToEnd(true);
     try {
       await streamResumeAfterApproval(approvalId, (event) => {
         if (event.kind === "final" && event.response !== null) {
@@ -1534,6 +1641,28 @@
 >
 <div class="chat">
   <header class="chat-header">
+    {#if sessionId !== null && (conversationTitle !== "" || editingTitle)}
+      <div class="conversation-title">
+        {#if editingTitle}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="title-input"
+            aria-label="Conversation title"
+            bind:value={titleDraft}
+            onkeydown={onTitleKeydown}
+            onblur={() => void commitTitle()}
+            maxlength="200"
+            autofocus
+          />
+        {:else}
+          <h2 class="title-text" title={conversationTitle}>{conversationTitle}</h2>
+          <button type="button" class="btn btn-ghost btn-sm" aria-label="Rename conversation" title="Rename conversation" onclick={startTitleEdit}>
+            <Icon name="pencil" size="sm" />
+          </button>
+        {/if}
+        {#if titleNotice}<span class="title-notice" role="alert">{titleNotice}</span>{/if}
+      </div>
+    {/if}
     <div class="header-actions">
       <!-- QUI-Q05 — offered once there is a conversation to leave. A disabled
            "New chat" on an empty one read as a faded title, not an action. -->
@@ -1660,7 +1789,7 @@
     </div>
   {/if}
 
-  <div class="thread" bind:this={scrollEl}>
+  <div class="thread" bind:this={scrollEl} onscroll={onThreadScroll}>
     {#if historyError !== null}
       <p class="error-line" role="alert">{historyError}</p>
     {/if}
@@ -1674,6 +1803,24 @@
         body="Start with a question, a task, or a file."
         serif={true}
       />
+      <!-- QUI-C10 — at most four starters, the same four Home offers on a
+           first day. A question fills the composer for the owner to edit; it
+           never sends on its own. Build and Design open their own surface. -->
+      <ul class="chat-starters" aria-label="Ways to start">
+        {#each STARTERS as starter (starter.id)}
+          <li>
+            {#if starter.kind === "prompt"}
+              <button type="button" class="chat-starter" onclick={() => useStarter(starter.prompt)}>
+                <Icon name={starter.icon} size="sm" /><span>{starter.label}</span>
+              </button>
+            {:else}
+              <a class="chat-starter" href={starter.href}>
+                <Icon name={starter.icon} size="sm" /><span>{starter.label}</span>
+              </a>
+            {/if}
+          </li>
+        {/each}
+      </ul>
     {/if}
 
     {#each turns as turn (turn.id)}
@@ -1778,6 +1925,16 @@
           <!-- B17/C13 — a turn the owner stopped says so. Without this the
                transcript just ends early and the owner is left wondering whether
                Raiker stopped or broke. -->
+          {#if !turn.streaming}
+            {@const outcome = turnOutcome(turn.response?.status, toolRows)}
+            {#if outcome !== null}
+              <!-- QUI-C03 — how a turn that did something ended, in one line. -->
+              <p class="outcome-line outcome-{outcome.tone}">
+                <strong>{outcome.label}</strong><span> · {outcome.detail}</span>
+              </p>
+            {/if}
+          {/if}
+
           {#if !turn.streaming && turn.response?.status === "stopped"}
             <p class="stopped-line" role="status">
               Stopped at your request — this turn ended at a safe boundary and kept what it had
@@ -1977,6 +2134,16 @@
     {/each}
   </div>
 
+  {#if !following && turns.length > 0}
+    <!-- QUI-C08 — reading further up stops the transcript following the
+         answer; this brings it back. -->
+    <div class="jump-slot">
+      <button type="button" class="btn btn-soft btn-sm jump-latest" onclick={() => void scrollToEnd(true)}>
+        <Icon name="chevron-down" size="sm" />Jump to latest
+      </button>
+    </div>
+  {/if}
+
   <Composer
     ariaLabel="Message composer"
     inputId="prompt-input"
@@ -2007,6 +2174,12 @@
     {#snippet above()}
       <ComposerChips store={attachStore} disabled={streaming} oninline={(text) => { draft.text += text; }} />
       <ModelReadinessStrip readiness={modelsKnown() ? modelReadiness : null} draftPreserved={draft.text.trim() !== ""} />
+      {#if sendWhenReady !== null}
+        <p class="send-when-ready" role="status">
+          Your message will send as soon as a model is ready.
+          <button type="button" class="btn btn-ghost btn-sm" onclick={() => (sendWhenReady = null)}>Don't send</button>
+        </p>
+      {/if}
       <SkillLinkNotice text={draft.text} />
 
       {#if shortcutsOpen}
@@ -2059,7 +2232,7 @@
     {/snippet}
 
     {#snippet turn()}
-      <TurnControl sessionId={sessionId} bind:stopping />
+      <TurnControl sessionId={sessionId} bind:stopping activity={runningActivity} />
     {/snippet}
 
     {#snippet left()}
@@ -2152,6 +2325,14 @@
            nothing; the posture stays inspectable through Permissions, which
            Tools links to. -->
       <PostureControl showEnvironment={false} exceptionOnly={true} />
+      {#if dataLocation !== null}
+        <!-- QUI-C04 — where the next message goes, said before it is sent. It
+             follows the model chosen for this turn. -->
+        <p class="data-label" title={inferenceSentence(dataLocation)}>
+          <Icon name={dataLocation.kind === "device" ? "lock" : "globe"} size="sm" />
+          <span>{inferenceLabel(dataLocation)}</span>
+        </p>
+      {/if}
     {/snippet}
 
     {#snippet hint()}
@@ -2229,6 +2410,11 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
+  /* QUI-C01 — the title sits left and takes the room; actions stay right. */
+  .conversation-title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; margin-right: auto; }
+  .title-text { margin: 0; font-size: var(--text-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32rem; }
+  .title-input { font: inherit; font-size: var(--text-md); font-weight: 600; min-width: 16rem; padding: .2rem .45rem; border: 1px solid var(--accent-border); border-radius: var(--r-sm); background: var(--surface); color: var(--text-1); }
+  .title-notice { font-size: var(--text-xs); color: var(--danger, var(--text-2)); }
   .header-actions {
     display: flex;
     align-items: center;
@@ -2510,6 +2696,49 @@
       opacity: 1;
     }
   }
+  .outcome-line { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--text-3); }
+  .outcome-line strong { font-weight: 650; color: var(--text-2); }
+  .outcome-partial strong, .outcome-unknown strong { color: var(--warn-text); }
+  .outcome-not-done strong { color: var(--danger); }
+  .data-label { margin: 0; display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-3); }
+  .send-when-ready { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-2); }
+  /* QUI-C08 — floats just above the composer without moving the layout. */
+  .jump-slot { position: relative; height: 0; display: flex; justify-content: center; z-index: 2; }
+  .jump-latest {
+    position: absolute;
+    bottom: var(--space-2);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    box-shadow: var(--shadow-1);
+  }
+  /* QUI-C10 — the four starters under an empty conversation. */
+  .chat-starters {
+    list-style: none;
+    margin: 0 auto;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    width: min(100%, 34rem);
+  }
+  .chat-starter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text-1);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .chat-starter:hover { border-color: var(--accent-border); }
   .error-line {
     color: var(--danger);
     font-size: var(--text-sm);

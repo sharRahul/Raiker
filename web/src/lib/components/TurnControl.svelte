@@ -24,7 +24,13 @@
   let {
     sessionId,
     stopping = $bindable(false),
-  }: { sessionId: string | null; stopping?: boolean } = $props();
+    activity = "",
+  }: {
+    sessionId: string | null;
+    stopping?: boolean;
+    /** QUI-C03 — what the turn is doing now, from its own events (`workingLine`). */
+    activity?: string;
+  } = $props();
 
   let steerText = $state("");
   let steerCount = $state(0);
@@ -89,16 +95,20 @@
   }
 </script>
 
+{#if activity !== ""}
+  <!-- QUI-C03 — one true line about the running turn; no progress bar. -->
+  <p class="working-line" role="status" aria-live="polite">{activity}…</p>
+{/if}
 <div class="turn-control" data-testid="turn-control">
   <form class="steer" onsubmit={steer}>
-    <label class="sr-only" for="steer-input">Add to this turn</label>
+    <label class="sr-only" for="steer-input">Add instruction</label>
     <input
       id="steer-input"
       class="steer-input"
       type="text"
       bind:value={steerText}
       onkeydown={onKeydown}
-      placeholder={ready ? "Add to this turn — it arrives at the next safe boundary" : "Starting…"}
+      placeholder={ready ? "Add an instruction — Raiker reads it at the next safe boundary" : "Starting…"}
       disabled={!ready || busy}
       autocomplete="off"
     />
@@ -107,9 +117,10 @@
       class="btn btn-ghost steer-send"
       disabled={!ready || busy || steerText.trim() === ""}
       title="Queue this for the running turn"
+      aria-label="Add this instruction"
     >
       <Icon name="send" size="sm" />
-      Steer
+      Add
     </button>
   </form>
 
@@ -118,10 +129,11 @@
     class="btn btn-danger stop"
     onclick={stop}
     disabled={!ready || busy || stopping}
-    aria-label={stopping ? "Stopping at the next safe boundary" : "Stop this turn"}
+    aria-label={stopping ? "Stopping at the next safe boundary" : undefined}
+    title="Ends the turn at its next safe boundary and keeps what it has done"
   >
     <Icon name="stop" size="sm" />
-    {stopping ? "Stopping…" : "Stop"}
+    {stopping ? "Stopping…" : "Stop safely"}
   </button>
 </div>
 
@@ -141,6 +153,7 @@
 {/if}
 
 <style>
+  .working-line { margin: 0 0 var(--space-1); font-size: var(--text-xs); color: var(--text-2); overflow-wrap: anywhere; }
   .turn-control {
     display: flex;
     align-items: center;

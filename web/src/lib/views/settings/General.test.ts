@@ -1,6 +1,9 @@
-import { fireEvent, render, screen, within } from "@testing-library/svelte";
-import { expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { afterEach, expect, it, vi } from "vitest";
 import General from "./General.svelte";
+import { stubFetch } from "../../test-helpers";
+
+afterEach(() => vi.unstubAllGlobals());
 
 it("offers the exact persisted speech language set", async () => {
   const save = vi.fn();
@@ -46,4 +49,29 @@ it("says which language setting reaches a model", async () => {
   expect(screen.getByText(/Every model turn is told this/)).toBeInTheDocument();
   await fireEvent.change(answer, { target: { value: "fr" } });
   expect(save).toHaveBeenCalledWith({ "general.answer_language": "fr" });
+});
+
+// QUI-W06 — setup can be run again, keeping every earlier choice.
+it("reopens first-run setup on its model step, keeping what was chosen", async () => {
+  const stored = {
+    owner_principal_id: "prin_owner", status: "complete", stage: "finish",
+    selected_profile_id: "anthropic-hosted", selected_model: "claude-haiku-4-5", model_deferred: false,
+    privacy_mode: "balanced", privacy_acknowledged_at: "2026-10-01T00:00:00Z", backup_mode: "later",
+    backup_target: null, backup_verified_at: null, background_service_enabled: false,
+    created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z",
+  };
+  const fetchMock = stubFetch({ "GET /api/setup": stored, "PUT /api/setup": { ...stored, status: "in_progress", stage: "model" } });
+  window.location.hash = "#/settings";
+  render(General, { settings: {}, save: vi.fn() });
+  await fireEvent.click(screen.getByRole("button", { name: "Run setup again" }));
+  await waitFor(() => expect(window.location.hash).toBe("#/model-setup"));
+  const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
+  expect(JSON.parse(String(put?.[1]?.body))).toMatchObject({
+    status: "in_progress",
+    stage: "model",
+    selected_profile_id: "anthropic-hosted",
+    selected_model: "claude-haiku-4-5",
+  });
+  // The startup page is called Home, as the sidebar calls it.
+  expect(screen.getByRole("option", { name: "Home" })).toBeInTheDocument();
 });

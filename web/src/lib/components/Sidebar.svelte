@@ -3,6 +3,8 @@
   import Logo from "./Logo.svelte";
   import { SIDEBAR_GROUPS, type NavGroup, type NavGroupId } from "../nav";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
+  import { api } from "../api";
+  import { recentChats, type RecentChat } from "../recentChats";
 
   const STORAGE_KEY = "raiker.navigation.groups";
   const COLLAPSIBLE_IDS = new Set<NavGroupId>(["knowledge"]);
@@ -44,6 +46,25 @@
     expanded = expanded.includes(group.id) ? expanded.filter((id) => id !== group.id) : [...expanded, group.id];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(expanded));
   }
+  // QUI-C06 — the five most recent chats under the Chat row, so going back to a
+  // conversation is one click from anywhere. Work › Threads has the full list.
+  let chats = $state<RecentChat[]>([]);
+  async function loadChats() {
+    try {
+      chats = recentChats(await api.workThreads(20));
+    } catch {
+      // Kept as last read: the rows are a shortcut, never the only way there.
+    }
+  }
+  $effect(() => {
+    void current;
+    void loadChats();
+  });
+  $effect(() => {
+    const refresh = () => void loadChats();
+    window.addEventListener("raiker:chats-changed", refresh);
+    return () => window.removeEventListener("raiker:chats-changed", refresh);
+  });
   function closeNavigation(restoreFocus = true) {
     deactivate?.(restoreFocus); deactivate = null; onDrawerClose();
   }
@@ -81,7 +102,16 @@
                   aria-current={current === item.id ? "page" : undefined} aria-label={item.label} title={item.hint}
                   onclick={() => { if (compact) closeNavigation(false); }}>
                   <Icon name={item.icon} size="lg" filled={current === item.id} /><span>{item.label}</span>
-                </a></li>
+                </a>
+                {#if item.id === "new-chat" && !rail && chats.length > 0}
+                  <ul class="recent-chats" aria-label="Recent chats">
+                    {#each chats as chat (chat.sessionId)}
+                      <li><a href={chat.href} class="recent-chat" title={chat.title}
+                        onclick={() => { if (compact) closeNavigation(false); }}>{chat.title}</a></li>
+                    {/each}
+                  </ul>
+                {/if}
+                </li>
             {/each}
           </ul>
         {/if}
@@ -130,6 +160,11 @@
      one it was. Two remain, and they are the two that survive a rail with no
      labels: the tinted row, and the filled glyph. */
   .nav-link.active { background:var(--accent-soft); color:var(--text-1); }
+  /* QUI-C06 — quieter than the destinations above them: indented under Chat,
+     one line each, the title cut with an ellipsis and whole in its tooltip. */
+  .recent-chats { margin:2px 0 var(--space-1) 2.1rem; gap:0; }
+  .recent-chat { display:block; padding:.28rem .5rem; border-radius:var(--r-sm); color:var(--text-3); font-size:var(--text-sm); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-decoration:none; }
+  .recent-chat:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }
   @media (max-width:1023px) {
     .drawer-scrim { display:block; position:fixed; inset:0; z-index:var(--z-scrim); border:0; background:var(--overlay); }
     .sidebar,.sidebar.desktop-hidden { position:fixed; inset:0 auto 0 0; z-index:var(--z-modal); width:min(19rem,84vw); padding:var(--space-4) var(--space-3); border-right-width:1px; transform:translateX(-105%); box-shadow:var(--shadow-2); }

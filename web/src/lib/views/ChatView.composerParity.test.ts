@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerProject, startComposerDictation } from "../test-helpers";
-import { resetModels } from "../models.svelte";
+import { refreshModels, resetModels } from "../models.svelte";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import { takeScheduleRequest } from "../scheduleHandoff";
 import { setWorkProject } from "../workProject.svelte";
@@ -368,6 +368,64 @@ describe("ChatView composer parity", () => {
     expect(setupDialog.open).toBe(true);
     expect(screen.getByLabelText("Prompt")).toHaveValue("Hello");
     expect(streamPromptMock).not.toHaveBeenCalled();
+  });
+
+  // QUI-C05 — the message Send kept is sent once a model is ready, and only
+  // while the draft still says the same thing.
+  it("sends the kept message once a model becomes ready", async () => {
+    stubFetch({ ...routes(), "GET /api/models": { profiles: [], chat_profiles: [] } });
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: null });
+    });
+    render(ChatView, { projects });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
+    await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Your message will send as soon as a model is ready.")).toBeInTheDocument();
+    expect(streamPromptMock).not.toHaveBeenCalled();
+
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+    });
+    await refreshModels();
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(1));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ text: "Hello" });
+  });
+
+  it("does not send a kept message the owner cancelled", async () => {
+    stubFetch({ ...routes(), "GET /api/models": { profiles: [], chat_profiles: [] } });
+    render(ChatView, { projects });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
+    await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Don't send" }));
+
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+    });
+    await refreshModels();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Prompt")).toHaveValue("Hello");
+  });
+
+  // QUI-C04 — where the next message goes, said in the composer before Send.
+  it("says where the next message goes for the chosen model", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+    });
+    render(ChatView, { projects });
+    expect(await screen.findByText("Sent to Anthropic")).toBeInTheDocument();
+  });
+
+  it("says a local model's messages stay on this computer", async () => {
+    const local = { ...NON_REASONING_PROFILE, selected: true, local_only: true, model_locations: { [NON_REASONING_PROFILE.model]: "device" } };
+    stubFetch({ ...routes(), "GET /api/models": { profiles: [local], chat_profiles: [local] } });
+    render(ChatView, { projects });
+    expect(await screen.findByText("Stays on this computer")).toBeInTheDocument();
   });
 
   it("sends an effort only for the active exact supported profile", async () => {

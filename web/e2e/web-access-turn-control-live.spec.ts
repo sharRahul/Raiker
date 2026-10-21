@@ -220,8 +220,8 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
   await expect(control).toBeVisible({ timeout: 60_000 });
   await capture(page, join(SHOTS, "b17-turn-control-visible.png"));
 
-  await control.getByLabel("Add to this turn").fill("Reply with exactly: STEERED MIDTURN");
-  await control.getByRole("button", { name: /Steer/ }).click();
+  await control.getByLabel("Add instruction").fill("Reply with exactly: STEERED MIDTURN");
+  await control.getByRole("button", { name: "Add this instruction" }).click();
   await expect(page.getByText(/1 instruction queued for this turn/)).toBeVisible({
     timeout: 30_000,
   });
@@ -248,7 +248,7 @@ test("B17/C13 — the owner stops a running turn, and it ends as stopped", async
 
   const control = page.getByTestId("turn-control");
   await expect(control).toBeVisible({ timeout: 60_000 });
-  await control.getByRole("button", { name: "Stop this turn" }).click();
+  await control.getByRole("button", { name: "Stop safely" }).click();
   await expect(page.getByText(/Stop requested/)).toBeVisible({ timeout: 30_000 });
   await capture(page, join(SHOTS, "b17-stop-requested.png"));
 

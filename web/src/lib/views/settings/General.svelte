@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { api } from "../../api";
   import { DISPLAY_LOCALES } from "../../format";
   import {
     TIMEZONE_KEY,
@@ -50,6 +51,35 @@
   const language = $derived((settings["general.language"] as string) ?? "");
   const answerLanguage = $derived((settings["general.answer_language"] as string) ?? "");
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
+
+  // QUI-W06 — reopen first-run setup on its model step.
+  let setupBusy = $state(false);
+  let setupError = $state<string | null>(null);
+  async function runSetupAgain() {
+    setupBusy = true;
+    setupError = null;
+    try {
+      // The update carries the whole stored state, so every earlier choice is
+      // kept; only where setup stands changes.
+      const stored = await api.setup();
+      await api.updateSetup({
+        status: "in_progress",
+        stage: "model",
+        selected_profile_id: stored.selected_profile_id,
+        selected_model: stored.selected_model,
+        model_deferred: stored.model_deferred,
+        privacy_mode: stored.privacy_mode,
+        backup_mode: stored.backup_mode,
+        backup_target: stored.backup_target,
+        background_service_enabled: stored.background_service_enabled,
+      });
+      window.location.hash = "#/model-setup";
+    } catch {
+      setupError = "Setup could not be reopened. Nothing was changed.";
+    } finally {
+      setupBusy = false;
+    }
+  }
   const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
 
   // The time zone is not a formatting preference here. It is the one
@@ -198,7 +228,7 @@
   <label>
     <span>Default startup view</span>
     <select value={startupRoute} onchange={(e) => save({ "general.startup_route": e.currentTarget.value })}>
-      <option value="workbench">Workbench</option>
+      <option value="workbench">Home</option>
       <option value="new-chat">New chat</option>
       <option value="tasks">Tasks</option>
       <option value="projects">Projects</option>
@@ -206,6 +236,22 @@
       <option value="last-visited">Last visited page</option>
     </select>
   </label>
+</section>
+
+<!-- QUI-W06 — setup can be run again. It reopens the same focused setup on
+     its model step; nothing already chosen is reset until the owner changes
+     it there. -->
+<section class="settings-card" aria-labelledby="setup-again">
+  <div class="card-heading">
+    <h3 id="setup-again">Setup</h3>
+    <p>Go through first-run setup again to choose a model and where your data may go.</p>
+  </div>
+  <div class="setup-again-row">
+    <button type="button" class="btn btn-soft btn-sm" onclick={runSetupAgain} disabled={setupBusy}>
+      {setupBusy ? "Opening…" : "Run setup again"}
+    </button>
+    {#if setupError}<span class="setup-error" role="alert">{setupError}</span>{/if}
+  </div>
 </section>
 
 <style>
@@ -221,6 +267,8 @@
   .clock { font-variant-numeric: tabular-nums; }
   .proposal { color: var(--text-2); margin: var(--space-2) 0 0; max-width: 34rem; }
   .proposal strong { color: var(--text-1); }
+  .setup-again-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .setup-error { font-size: var(--text-sm); color: var(--danger); }
   .link {
     background: none; border: 0; padding: 0; font: inherit; font-weight: 650;
     color: var(--accent); cursor: pointer; text-decoration: underline;

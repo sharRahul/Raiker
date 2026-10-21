@@ -5,6 +5,9 @@ import {
   familyIcon,
   hasRunningTool,
   toolActivity,
+  turnOutcome,
+  workingLine,
+  type ToolCallRow,
 } from "./chatPresentation";
 
 function toolEvent(payload: Record<string, unknown>): StreamEvent {
@@ -208,5 +211,45 @@ describe("a call the owner decided on", () => {
       toolEvent({ action_id: "act_8", tool_name: "git_push", status: "denied" }),
     ]);
     expect(rows[0]).toMatchObject({ state: "denied", label: "Push", action: "origin · main" });
+  });
+});
+
+// QUI-C03 — the running turn's one line, read from its own events.
+describe("workingLine", () => {
+  const row = (state: ToolCallRow["state"], label = "Read file", action = "proposal.pdf"): ToolCallRow => ({
+    actionId: `${label}:${state}`, toolName: "read_file", family: "file-read", label, action, state, reasons: [],
+  });
+
+  it("puts a decision waiting on the owner first", () => {
+    expect(workingLine([row("running"), row("waiting", "Send email", "anna@studio.com")])).toBe("Waiting for your decision");
+  });
+
+  it("names the call in flight, and otherwise says nothing", () => {
+    expect(workingLine([row("success"), row("running", "Search the web", "flights to Lisbon")])).toBe("Search the web · flights to Lisbon");
+    expect(workingLine([row("running", "Read file", "")])).toBe("Read file");
+    expect(workingLine([row("success")])).toBe("");
+    expect(workingLine([])).toBe("");
+  });
+});
+
+// QUI-C03 — how a turn that did something ended.
+describe("turnOutcome", () => {
+  const row = (state: ToolCallRow["state"]): ToolCallRow => ({
+    actionId: state + Math.random(), toolName: "read_file", family: "file-read", label: "Read file", action: "a.txt", state, reasons: [],
+  });
+
+  it("says nothing under a plain answer, a stopped turn or a parked one", () => {
+    expect(turnOutcome("completed", [])).toBeNull();
+    expect(turnOutcome("stopped", [row("success")])).toBeNull();
+    expect(turnOutcome("needs_approval", [row("waiting")])).toBeNull();
+    expect(turnOutcome(null, [row("success")])).toBeNull();
+  });
+
+  it("separates completed, partial, unknown and not done", () => {
+    expect(turnOutcome("completed", [row("success"), row("success")])).toMatchObject({ label: "Completed", detail: "2 steps" });
+    expect(turnOutcome("completed", [row("success"), row("refused")])).toMatchObject({ label: "Partially completed", detail: "1 of 2 steps did not go through." });
+    expect(turnOutcome("completed", [row("success"), row("running")])).toMatchObject({ label: "Outcome unknown" });
+    expect(turnOutcome("failed", [])).toMatchObject({ label: "Not done" });
+    expect(turnOutcome("denied", [row("denied")])).toMatchObject({ label: "Not done" });
   });
 });

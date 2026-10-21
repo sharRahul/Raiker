@@ -135,3 +135,38 @@ describe("Sidebar navigation", () => {
     expect(requested.some((url) => url.startsWith("/api/projects"))).toBe(false);
   });
 });
+
+// QUI-C06 — the owner's five most recent chats sit under the Chat row.
+describe("Sidebar recent chats", () => {
+  const thread = (id: string, title: string, updated: string, kind = "chat") => ({
+    session_id: id, title, kind, updated_at: updated, turn_count: 1, origin: "web", project_id: null,
+    project_name: null, task_id: null, task_status: null, cadence: null, next_run_at: null,
+    waiting_on: null, pinned: false, archived: false, tags: [],
+  });
+
+  it("lists the five newest chats, and no routine threads", async () => {
+    stubFetch({
+      "GET /api/work-threads": [
+        thread("s1", "Oldest", "2026-10-01T00:00:00Z"),
+        thread("s2", "Trip plan", "2026-10-02T00:00:00Z"),
+        thread("s3", "Login bug", "2026-10-03T00:00:00Z"),
+        thread("s4", "Proposal", "2026-10-04T00:00:00Z"),
+        thread("s5", "Week plan", "2026-10-05T00:00:00Z"),
+        thread("s6", "Newest", "2026-10-06T00:00:00Z"),
+        thread("r1", "Overnight research", "2026-10-07T00:00:00Z", "routine"),
+      ],
+    });
+    render(Sidebar, { current: "home" });
+    const list = await screen.findByRole("list", { name: "Recent chats" });
+    const links = within(list).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(["Newest", "Week plan", "Proposal", "Login bug", "Trip plan"]);
+    expect(links[0]).toHaveAttribute("href", "#/new-chat?session=s6");
+  });
+
+  it("draws no list at rail width", async () => {
+    stubFetch({ "GET /api/work-threads": [thread("s1", "Proposal", "2026-10-01T00:00:00Z")] });
+    render(Sidebar, { current: "home", desktopOpen: false });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole("list", { name: "Recent chats" })).toBeNull();
+  });
+});

@@ -46,6 +46,18 @@ export function inferenceSentence(location: InferenceLocation): string {
 }
 
 /**
+ * QUI-C04 — the composer's short label for where the next message goes.
+ *
+ * The same three answers `inferenceSentence` gives, in the few words that fit
+ * beside a composer; the full sentence is its tooltip.
+ */
+export function inferenceLabel(location: InferenceLocation): string {
+  if (location.kind === "device") return "Stays on this computer";
+  if (location.kind === "remote") return `Sent to ${location.destination}`;
+  return "Where it runs is not confirmed";
+}
+
+/**
  * The remote hosts a local runtime's served models reach, de-duplicated.
  * Empty when every model it describes runs on this device.
  */

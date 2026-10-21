@@ -276,6 +276,17 @@
     background: var(--surface);
     color: var(--text-3);
   }
+  /* The frame is the field: focus marks the frame, not a second box inside it. */
+  .list-search:focus-within {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+  .list-search input,
+  .list-search input:focus-visible {
+    box-shadow: none;
+    min-height: 0;
+    padding: 0;
+  }
   .list-search input {
     flex: 1;
     min-width: 0;

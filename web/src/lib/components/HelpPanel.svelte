@@ -192,6 +192,17 @@
     border-radius: var(--r-sm);
     color: var(--text-3);
   }
+  /* The frame is the field: focus marks the frame, not a second box inside it. */
+  .help-search:focus-within {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+  .help-search input,
+  .help-search input:focus-visible {
+    box-shadow: none;
+    min-height: 0;
+    padding: 0;
+  }
   .help-search input {
     flex: 1;
     min-width: 0;

@@ -763,7 +763,7 @@ describe("ModelsView state grammar", () => {
     expect(screen.queryByText(/no model pinned/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/model chosen at selection/i)).not.toBeInTheDocument();
     // The fact itself stays: a connected provider still says which model answers.
-    expect(screen.getByText("Haiku 4.5")).toBeInTheDocument();
+    expect(document.querySelector(".pc-model")).toHaveTextContent("Haiku 4.5");
     // …and only the card that has one carries the line at all.
     expect(document.querySelectorAll(".pc-model")).toHaveLength(1);
   });
@@ -1939,7 +1939,7 @@ describe("ModelsView — one page, Add model and Settings › Advanced (QUI-L08)
     expect(within(posture).queryByText("Egress allowlist")).toBeNull();
     expect(within(posture).getByText("Off-machine profiles")).toBeInTheDocument();
     // In the Add model step it is about, not on a page of its own.
-    expect(posture.closest("dialog")).not.toBeNull();
+    expect(posture.closest('[role="dialog"]')).not.toBeNull();
   });
 
   // Found live, 2026-09-06: with Anthropic connected and a model pinned, this

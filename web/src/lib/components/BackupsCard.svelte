@@ -111,23 +111,28 @@
 </script>
 
 <section class="settings-card" aria-labelledby="backups-heading" data-testid="backups-card">
-  <div class="card-heading">
-    <h3 id="backups-heading">Backups</h3>
-    <p>
-      A copy of this workspace's database, memory files, checkpoints and uploaded files, checked before it is
-      listed. The database is encrypted with this workspace's key; the files are copied as the workspace keeps
-      them. Raiker also takes one before an update changes the database, and keeps the last three.
-    </p>
-  </div>
-  <p class="sub">
-    Not included: {Object.values(NOT_INCLUDED).join(", ")}. A backup opens only with this workspace's
-    key file, <code>.raiker/app.key</code> — keep a copy of that file somewhere safe too, or the backup cannot be read.
-  </p>
-  <div class="row-actions">
+  <div class="backups-head">
+    <div class="card-heading">
+      <h3 id="backups-heading">Backups</h3>
+      <p>A checked copy of this workspace. Raiker also takes one before an update and keeps the last three.</p>
+    </div>
     <button type="button" class="btn btn-primary btn-sm" disabled={busy !== null} onclick={backUp}>
       {busy === "create" ? "Backing up…" : "Back up now"}
     </button>
   </div>
+  <!-- QUI-L09 — what a backup holds is reference, read once; folded so the
+       card is one row until there is a backup to list. -->
+  <details class="holds">
+    <summary>What a backup holds</summary>
+    <p class="sub">
+      The database, memory files, checkpoints and uploaded files, checked before it is listed. The
+      database is encrypted with this workspace's key; the files are copied as the workspace keeps them.
+    </p>
+    <p class="sub">
+      Not included: {Object.values(NOT_INCLUDED).join(", ")}. A backup opens only with this workspace's
+      key file, <code>.raiker/app.key</code> — keep a copy of that file somewhere safe too, or the backup cannot be read.
+    </p>
+  </details>
   {#if notice}<p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>{/if}
   {#if restored}
     <div class="restored" role="status" data-testid="backup-restored">
@@ -167,7 +172,9 @@
 
 <style>
   /* The Account page's card, which its scoped styles do not reach in here. */
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
+  .backups-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+  .holds summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); margin-top: var(--space-2); }
+  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--space-4) var(--card-pad-x); margin-bottom: var(--space-3); }
   .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
   .sub { color: var(--text-2); font-size: var(--text-sm); }

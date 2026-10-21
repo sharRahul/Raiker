@@ -38,6 +38,10 @@
   } from "../apiTypes";
 
   const GITHUB_ID = "github-account";
+  // The account Build works as, named apart from the GitHub connector in the
+  // catalogue (issues and pull requests over its API): two cards both called
+  // "GitHub" left the owner to guess which one they meant.
+  const GITHUB_NAME = "GitHub sign-in";
 
   interface ServiceRow {
     id: string;
@@ -70,7 +74,7 @@
 
   const services = $derived<ServiceRow[]>([
     ...(githubConnected
-      ? [{ id: GITHUB_ID, name: "GitHub", category: "Code", status: "Signed in", connector: null }]
+      ? [{ id: GITHUB_ID, name: GITHUB_NAME, category: "Code", status: "Signed in", connector: null }]
       : []),
     ...(view?.connectors ?? [])
       .filter((connector) => connector.installed)
@@ -89,9 +93,9 @@
       : [
           {
             id: GITHUB_ID,
-            name: "GitHub",
+            name: GITHUB_NAME,
             category: "Code",
-            description: "Sign in so Build can push branches and open pull requests.",
+            description: "The GitHub account Build pushes branches and opens pull requests as.",
           },
         ]),
     ...(view?.connectors ?? [])

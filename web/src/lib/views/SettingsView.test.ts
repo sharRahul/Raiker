@@ -153,21 +153,15 @@ describe("supported-preferences settings", () => {
   });
 
   it("forwards GitHub to Connections, where it is connected now (QUI-L09)", async () => {
-    const replace = vi.fn();
-    const original = window.location;
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: { ...original, hash: "#/settings?tab=github", replace },
-    });
-    try {
-      stubApi();
-      render(SettingsView, { props: { principal: "alice", tab: "github" } });
-      await waitFor(() =>
-        expect(replace).toHaveBeenCalledWith("#/connections?tab=services&item=github-account"),
-      );
-    } finally {
-      Object.defineProperty(window, "location", { configurable: true, value: original });
-    }
+    const { movedSettingsAddress } = await import("../settingsSections");
+    expect(movedSettingsAddress("#/settings?tab=github")).toBe(
+      "#/connections?tab=services&item=github-account",
+    );
+    expect(movedSettingsAddress("#/settings?tab=git-credential")).toBe(
+      "#/connections?tab=services&item=github-account",
+    );
+    expect(movedSettingsAddress("#/settings?tab=security")).toBeNull();
+    expect(movedSettingsAddress("#/models?tab=github")).toBeNull();
   });
 
   it("offers a signed-update status page in Settings", async () => {

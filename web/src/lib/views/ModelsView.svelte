@@ -918,12 +918,21 @@
         (!p.off_machine && p.model !== UNPINNED_MODEL && isChoosableModel(p)),
     ),
   );
-  /** Step 3 of Add model: what the chosen source now has set up. */
-  const reviewProfiles = $derived(
-    addSource === null || addSource === "huggingface"
-      ? []
-      : configuredProfiles.filter((p) => visibleSections.includes(sectionFor(p))),
-  );
+  /**
+   * Step 3 of Add model: what the chosen source now has set up — each model
+   * the owner keeps offered there (`chat_profiles`), or the connection itself
+   * while no model is chosen yet.
+   */
+  const reviewProfiles = $derived.by(() => {
+    if (addSource === null || addSource === "huggingface") return [];
+    const inSource = (p: ModelProfile) => visibleSections.includes(sectionFor(p));
+    const offered = (models?.chat_profiles ?? []).filter(inSource);
+    const connected = configuredProfiles.filter(
+      (p) => inSource(p) && !offered.some((pair) => pair.profile_id === p.profile_id),
+    );
+    return [...offered, ...connected];
+  });
+
   // Each provider's bar is its share of total spend across every provider, so
   // it needs no configured budget to mean something. Providers with no cost
   // (local runtimes, or ones never used) simply have no bar.
@@ -1878,6 +1887,7 @@
               </li>
             {/each}
           </ul>
+          {#if selectError}<p class="error" role="alert">{selectError}</p>{/if}
           <div class="review-actions">
             <button type="button" class="btn btn-primary" onclick={closeAdd}>Done</button>
           </div>

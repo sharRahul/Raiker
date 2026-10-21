@@ -180,13 +180,12 @@
 <section class="settings-card" aria-labelledby="time-and-place">
   <div class="card-heading">
     <h3 id="time-and-place">Time and place</h3>
-    <p>Every model turn is told the date, day and time in this zone. No web connection needed.</p>
   </div>
   <label>
     <span>Time zone</span>
     <small>
-      Used for schedules, recurring tasks and every relative instruction — tomorrow,
-      tonight, this Friday.
+      Every model turn is told the date, day and time in this zone, with no web connection.
+      Schedules and words like tomorrow or this Friday use it too.
     </small>
     <select
       aria-label="Time zone"
@@ -201,13 +200,12 @@
   </label>
   <p class="resolved" data-testid="timezone-resolved">
     <strong>{resolved.zone}</strong> · {timezoneSourceLabel(resolved.source)}
-    {#if sample}<br /><span class="clock">Right now that reads {sample}.</span>{/if}
+    {#if sample} · <span class="clock">Right now that reads {sample}.</span>{/if}
     <!-- DEC-21 — the offset a schedule is computed from, said as a number. A
          task stores the zone it was composed in (UX-TASK-02), so changing this
          does not move a task that is already scheduled. -->
-    {#if offset}<br /><span class="clock" data-testid="timezone-offset">That is {offset} right
-      now; the offset moves at a clock change. Tasks already scheduled keep the zone they
-      were set in.</span>{/if}
+    {#if offset} · <span class="clock" data-testid="timezone-offset">{offset} now; scheduled
+      tasks keep their zone.</span>{/if}
   </p>
   {#if proposal}
     <p class="proposal" data-testid="timezone-proposal">
@@ -222,7 +220,7 @@
 
 <section class="settings-card" aria-labelledby="startup-behaviour">
   <div class="card-heading">
-    <h3 id="startup-behaviour">Startup behaviour</h3>
+    <h3 id="startup-behaviour">Startup</h3>
     <p>The first page Raiker opens. Links and bookmarks are unaffected.</p>
   </div>
   <label>
@@ -236,21 +234,20 @@
       <option value="last-visited">Last visited page</option>
     </select>
   </label>
-</section>
-
-<!-- QUI-W06 — setup can be run again. It reopens the same focused setup on
-     its model step; nothing already chosen is reset until the owner changes
-     it there. -->
-<section class="settings-card" aria-labelledby="setup-again">
-  <div class="card-heading">
-    <h3 id="setup-again">Setup</h3>
-    <p>Go through first-run setup again to choose a model and where your data may go.</p>
-  </div>
-  <div class="setup-again-row">
-    <button type="button" class="btn btn-soft btn-sm" onclick={runSetupAgain} disabled={setupBusy}>
-      {setupBusy ? "Opening…" : "Run setup again"}
-    </button>
-    {#if setupError}<span class="setup-error" role="alert">{setupError}</span>{/if}
+  <!-- QUI-W06 — setup can be run again. It reopens the same focused setup on
+       its model step; nothing already chosen is reset until the owner changes
+       it there. -->
+  <div class="setup-row">
+    <div>
+      <span id="setup-again" class="row-label">Setup</span>
+      <small>Go through first-run setup again to choose a model and where your data may go.</small>
+    </div>
+    <div class="setup-again-row">
+      <button type="button" class="btn btn-soft btn-sm" onclick={runSetupAgain} disabled={setupBusy}>
+        {setupBusy ? "Opening…" : "Run setup again"}
+      </button>
+      {#if setupError}<span class="setup-error" role="alert">{setupError}</span>{/if}
+    </div>
   </div>
 </section>
 
@@ -259,14 +256,33 @@
   .section-heading h2, .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
-  label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
-  label small { color: var(--text-2); font-weight: 400; }
+  /* QUI-L03 — a setting is a row: its name and help on the left, the control
+     on the right, so a card of three choices is three rows rather than three
+     stacked forms. */
+  label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
+    column-gap: var(--space-4);
+    row-gap: .15rem;
+    align-items: center;
+    margin-top: var(--space-3);
+    font-weight: 650;
+  }
+  label > span, label > small { grid-column: 1; }
+  label > select { grid-column: 2; grid-row: 1 / span 2; }
+  label small { color: var(--text-2); font-weight: 400; font-size: var(--text-sm); }
   select { width: 100%; }
-  .resolved { color: var(--text-2); margin: var(--space-3) 0 0; max-width: 34rem; }
+  .settings-card { padding: var(--space-4) var(--card-pad-x); margin-bottom: var(--space-3); }
+  .card-heading p { font-size: var(--text-sm); }
+  .resolved { color: var(--text-2); margin: var(--space-2) 0 0; font-size: var(--text-sm); }
   .resolved strong { color: var(--text-1); }
   .clock { font-variant-numeric: tabular-nums; }
   .proposal { color: var(--text-2); margin: var(--space-2) 0 0; max-width: 34rem; }
   .proposal strong { color: var(--text-1); }
+  .setup-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-3); }
+  .setup-row > div:first-child { display: grid; gap: .15rem; }
+  .row-label { font-weight: 650; }
+  .setup-row small { color: var(--text-2); font-size: var(--text-sm); }
   .setup-again-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
   .setup-error { font-size: var(--text-sm); color: var(--danger); }
   .link {

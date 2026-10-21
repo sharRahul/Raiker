@@ -626,16 +626,19 @@ test("Settings presents one section rail rather than a wall of fields", async ({
   // The rail is the redesign: personal sections first, system configuration
   // named as such, and nothing that was folded away reachable as a stray tab.
   const rail = page.getByRole("navigation", { name: "Settings sections" });
-  for (const section of [
+  // QUI-L09 — Account folds into General, the developer settings into
+  // Advanced, and GitHub moved to Connections.
+  await expect(rail.getByRole("button")).toHaveText([
     "General",
-    "Notifications",
     "Personalisation",
-    "Security & sign-in",
-    "Account",
-    "Runtime configuration",
-  ]) {
-    await expect(rail.getByRole("button", { name: section })).toBeVisible();
-  }
+    "Notifications",
+    "Security",
+    "Privacy",
+    "Execution profiles",
+    "Web access",
+    "Advanced",
+    "About & updates",
+  ]);
   await expect(rail.getByRole("button", { name: "Storage" })).toHaveCount(0);
 
   // Personalisation is where the density and typography choices live (BUG-37),
@@ -659,8 +662,10 @@ test("Settings presents one section rail rather than a wall of fields", async ({
 test("Models names providers in plain language and offers a real model list", async ({ page }) => {
   // Local and Hosted were peers because that is how profiles are
   // stored; both are the same errand, so both are under "Add model" now.
-  await page.goto("http://raiker.test/#/models?tab=add");
-  await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
+  // QUI-L08 — Add model is a dialog; a source names the step it opens on.
+  await page.goto("http://raiker.test/#/models?tab=add&source=account");
+  const add = page.getByRole("dialog", { name: "Add model" });
+  await expect(add.getByRole("heading", { name: "Your hosted providers" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
   // One visible action per provider row. Browsing a provider's
@@ -678,50 +683,28 @@ test("Models names providers in plain language and offers a real model list", as
   await capture(page, join(shots, "models-redesign.png"));
 });
 
-test("Models opens on what is running the work, not on a filing system", async ({ page }) => {
-  // The six tabs this replaces named where a model was stored or
-  // which table a fact came out of. None answered the question every owner
-  // arrives with, which is what is powering Chat, Build and Design.
+test("Models is one page: the model in use, then My models (QUI-L08)", async ({ page }) => {
   await page.goto("http://raiker.test/#/models");
-  const strip = page.getByRole("tablist", { name: "Model settings" });
-  await expect(strip.getByRole("tab")).toHaveText([
-    "Overview",
-    "My models",
-    "Add model",
-    "Runtime & routing",
-    "Usage",
-  ]);
-  await expect(page.getByRole("heading", { name: "What powers your work" })).toBeVisible();
-  // Scoped to the section that answers the question. The overview's "Needs
-  // attention" names the same surfaces when one of them cannot run, which is
-  // the design working rather than a duplicate to disambiguate around.
-  const powers = page.getByLabel("What powers your work");
-  for (const surface of ["Chat", "Build", "Design"]) {
-    await expect(
-      powers.getByText(surface, { exact: true }),
-    ).toBeVisible();
-  }
-  await capture(page, join(shots, "models-overview.png"));
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  await expect(page.getByText("Model in use")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My models" })).toBeVisible();
+  await capture(page, join(shots, "models-one-page.png"));
 
-  // Default and Effective are separate columns, because the page
-  // used to call both of them "active".
+  // Add model asks for the source first.
+  await page.getByRole("button", { name: "Add model" }).first().click();
+  const add = page.getByRole("dialog", { name: "Add model" });
+  for (const source of ["On this computer", "An account I have", "Hugging Face", "Custom endpoint"]) {
+    await expect(add.getByRole("button", { name: new RegExp(source) })).toBeVisible();
+  }
+  await add.getByRole("button", { name: "Close" }).click();
+
+  // What serves models moved to Settings › Advanced; the old address follows.
   await page.goto("http://raiker.test/#/models?tab=runtime");
+  await expect(page).toHaveURL(/#\/settings\?tab=advanced&kind=models/);
   await expect(page.getByRole("heading", { name: "Work defaults" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Default" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Effective now" })).toBeVisible();
   await capture(page, join(shots, "models-work-defaults.png"));
-
-  // One inventory, one primary action per row.
-  await page.goto("http://raiker.test/#/models?tab=models");
-  await expect(page.getByLabel("Filter models")).toBeVisible();
-  await capture(page, join(shots, "models-inventory.png"));
-
-  // A deep link from before the rebuild still resolves to the panel that took its content.
-  await page.goto("http://raiker.test/#/models?tab=pricing");
-  await expect(page.locator('[role="tab"][data-tab="usage"]')).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
 });
 
 test("new-account Home opens with a composer over the board", async ({ page }) => {
@@ -774,16 +757,16 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["brain", "Memory", "operational"],
     ["approvals", "Approvals", "operational"],
     ["capabilities", "Permissions", "operational"],
-    ["models?tab=overview", "Models", "operational"],
-    ["extensions?tab=connectors", "Extensions", "operational"],
-    ["extensions?tab=channels", "Extensions", "operational"],
-    ["extensions?tab=mcp", "Extensions", "operational"],
-    ["extensions?tab=skills", "Extensions", "operational"],
-    ["extensions?tab=hooks", "Extensions", "operational"],
-    ["extensions?tab=plugins", "Extensions", "operational"],
+    ["models", "Models", "operational"],
+    // QUI-L07 — Extensions is Connections; old addresses open its tabs.
+    ["connections?tab=services", "Connections", "operational"],
+    ["connections?tab=channels", "Connections", "operational"],
+    ["connections?tab=advanced", "Connections", "operational"],
+    ["extensions?tab=connectors", "Connections", "operational"],
+    ["extensions?tab=hooks", "Connections", "operational"],
     // Design is a transcript with a composer, so it takes the same frame as
     // Chat and Build.
-    ["messaging", "Extensions", "operational"],
+    ["messaging", "Connections", "operational"],
     ["design", "Design", "work-surface"],
     ["observe?tab=overview", "Diagnostics", "operational"],
     ["observe?tab=sessions", "Diagnostics", "operational"],
@@ -791,28 +774,27 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["observe?tab=checkpoints", "Diagnostics", "operational"],
     ["observe?tab=work", "Diagnostics", "operational"],
     ["observe?tab=notifications", "Diagnostics", "operational"],
-    ["guide", "Guide", "reading"],
     ["settings?tab=general", "Settings", "workspace"],
   ] as const;
-  const modelTabs = ["models", "add", "runtime", "usage"] as const;
   const settingsSections = [
     "notification", "personalisation", "security", "privacy", "account",
-    "web-access", "github", "runtime",
+    "web-access", "advanced", "runtime", "updates",
   ] as const;
   const settingsLabels: Record<string, string> = {
     general: "General",
     notification: "Notifications",
     personalisation: "Personalisation",
-    security: "Security & sign-in",
+    security: "Security",
     privacy: "Privacy",
-    account: "Account",
+    // QUI-L09 — folded sections open the section that holds them now.
+    account: "General",
     "web-access": "Web access",
-    github: "GitHub",
-    runtime: "Runtime configuration",
+    advanced: "Advanced",
+    runtime: "Advanced",
+    updates: "About & updates",
   };
   const states = [
     ...canonical,
-    ...modelTabs.map((tab) => [`models?tab=${tab}`, "Models", "operational"] as const),
     ...settingsSections.map((tab) => [`settings?tab=${tab}`, "Settings", "workspace"] as const),
   ];
 
@@ -825,7 +807,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     await expect(page.locator("header .page-title"), route).toHaveAttribute("title", /\S/);
 
     const requestedTab = new URLSearchParams(route.split("?", 2)[1] ?? "").get("tab");
-    if (requestedTab && (route.startsWith("models") || route.startsWith("extensions") || route.startsWith("observe") || route.startsWith("work"))) {
+    if (requestedTab && (route.startsWith("connections") || route.startsWith("observe") || route.startsWith("work"))) {
       await expect(page.locator(`[role="tab"][data-tab="${requestedTab}"]`), route).toHaveAttribute("aria-selected", "true");
     }
     if (requestedTab && route.startsWith("settings")) {
@@ -861,31 +843,28 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
 });
 
 for (const width of [390, 1440]) {
-  test(`permissions workspace filters and remains accessible at ${width}px`, async ({ page }) => {
+  test(`permissions: categories beside one permission, accessible at ${width}px (QUI-L06)`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("http://raiker.test/#/capabilities");
-    const registry = page.getByRole("region", { name: "All permissions", exact: true });
-    await expect(registry).toBeVisible();
-    await expect(page.getByText("Showing 3 of 3 permissions")).toBeVisible();
-    // The posture chips are the page's one status filter — they were four
-    // page-width tiles at the top *and* a select down here, both setting it.
-    await page
-      .getByRole("group", { name: "Filter permissions by status" })
-      .getByRole("button", { name: /Unavailable/ })
-      .click();
-    await expect(registry.getByRole("button", { name: /Shell commands/i })).toBeVisible();
-    await expect(registry.getByRole("button", { name: /Web fetch/i })).toHaveCount(0);
-    await page.getByRole("searchbox").fill("no-such-permission");
-    await expect(page.getByText("No matching permissions")).toBeVisible();
-    await page.getByRole("button", { name: "Clear filters" }).click();
-    await registry.getByRole("button", { name: /Shell commands/i }).click();
-    await expect(registry.getByRole("button", { name: "Turn on", exact: true })).toBeVisible();
+    const rail = page.getByRole("navigation", { name: "Permission categories" });
+    await expect(rail.getByRole("button", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
+    await rail.getByRole("button", { name: /^Advanced/ }).click();
+    const list = page.getByRole("listbox", { name: /Advanced permissions/ });
+    await expect(list.getByRole("option", { name: /Shell commands/i })).toBeVisible();
+    // The row is text; the choice and Turn on are in the detail.
+    await list.getByRole("option", { name: /Shell commands/i }).click();
+    const detail = page.getByRole("article", { name: "Shell commands" });
+    await expect(detail.getByRole("group", { name: /When Raiker wants to use/ })).toBeVisible();
+    await expect(detail.getByRole("button", { name: "Turn on", exact: true })).toBeVisible();
+    await page.getByRole("searchbox", { name: "Search permissions" }).fill("no-such-permission");
+    await expect(page.getByText(/Nothing matches/)).toBeVisible();
+    await page.getByRole("searchbox", { name: "Search permissions" }).fill("");
     const audit = await new AxeBuilder({ page })
-      .include('section[aria-label="All permissions"]')
+      .include(".perm-layout")
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
       .analyze();
     expect(audit.violations).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await capture(page, join(shots, `permissions-overhaul-${width}.png`));
+    await capture(page, join(shots, `permissions-categories-${width}.png`));
   });
 }

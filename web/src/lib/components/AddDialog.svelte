@@ -7,8 +7,14 @@
    * option's steps. Choosing a source comes first, and the later steps show
    * only that source, never the whole catalogue beside them.
    *
-   * Rendered only while open (`{#if adding}<AddDialog … />{/if}`), so it opens
-   * as a modal on mount and gives focus back to whatever opened it on close.
+   * Rendered only while open (`{#if adding}<AddDialog … />{/if}`): it takes
+   * focus on mount and gives it back to whatever opened it on close.
+   *
+   * Not a native `<dialog>` opened with `showModal()`. That puts it in the
+   * browser's top layer, above every z-index, and a step inside it opens
+   * windows of its own — a provider's sign-in, its model list, a GitHub device
+   * code — which then drew *underneath* it and could not be used. It sits at
+   * `--z-panel`, below the scrim layer those windows use.
    */
   import { onMount, type Snippet } from "svelte";
   import Icon from "./Icon.svelte";
@@ -35,7 +41,7 @@
     steps: Snippet<[AddOption]>;
   } = $props();
 
-  let dialogElement = $state<HTMLDialogElement>();
+  let dialogElement = $state<HTMLDivElement>();
   let query = $state("");
   let category = $state("All");
 
@@ -55,30 +61,36 @@
   onMount(() => {
     const returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (dialogElement) {
-      if (typeof dialogElement.showModal === "function") dialogElement.showModal();
-      else dialogElement.setAttribute("open", "");
-    }
-    return () => returnFocus?.focus();
+    dialogElement?.querySelector<HTMLElement>("input, button")?.focus();
+    const onKeydown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      // A window opened from a step answers its own Escape first.
+      const modals = document.querySelectorAll('[role="dialog"][aria-modal="true"], dialog[open]');
+      if (modals.length > 0 && modals[modals.length - 1] !== dialogElement) return;
+      event.preventDefault();
+      if (chosen !== null) chosen = null;
+      else onclose();
+    };
+    window.addEventListener("keydown", onKeydown);
+    return () => {
+      window.removeEventListener("keydown", onKeydown);
+      returnFocus?.focus();
+    };
   });
-
-  function cancel(event: Event) {
-    event.preventDefault();
-    if (chosen !== null) chosen = null;
-    else onclose();
-  }
 
   function backdrop(event: MouseEvent) {
     if (event.target === event.currentTarget) onclose();
   }
 </script>
 
-<dialog
+<div class="add-backdrop" role="presentation" onclick={backdrop}>
+<div
   class="add-dialog"
+  role="dialog"
+  aria-modal="true"
+  tabindex="-1"
   bind:this={dialogElement}
   aria-label={title}
-  oncancel={cancel}
-  onclick={backdrop}
 >
   <header>
     {#if chosenOption !== null}
@@ -96,8 +108,7 @@
     <label class="add-search">
       <Icon name="search" size="sm" />
       <span class="sr-only">{searchLabel}</span>
-      <!-- svelte-ignore a11y_autofocus -->
-      <input type="search" bind:value={query} placeholder={searchLabel} autofocus />
+      <input type="search" bind:value={query} placeholder={searchLabel} />
     </label>
     {#if categories.length > 2}
       <div class="chip-row" role="group" aria-label="Categories">
@@ -140,10 +151,17 @@
       {@render steps(chosenOption)}
     </div>
   {/if}
-</dialog>
+</div>
+</div>
 
 <style>
-  .add-dialog::backdrop {
+  .add-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-panel);
+    display: grid;
+    place-items: center;
+    padding: var(--space-4);
     background: var(--overlay);
   }
   .add-dialog {

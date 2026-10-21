@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import BackupsCard from "../../components/BackupsCard.svelte";
+  import FormDialog from "../../components/FormDialog.svelte";
   import { auth, getToken, setToken, ApiError } from "../../api";
   import type { AccountDeletionPreview } from "../../generated/apiContract";
 
@@ -159,7 +160,6 @@
 
 <header class="section-heading">
   <h2>Account</h2>
-  <p>Manage how your identity appears and control this local account.</p>
 </header>
 
 {#if notice}
@@ -167,11 +167,10 @@
 {/if}
 
 <section class="settings-card">
-  <div class="card-heading"><h3>Profile</h3><p>Your username is fixed; your display name can be changed at any time.</p></div>
-  <p class="sub">Username: <strong>{status.username}</strong></p>
+  <div class="card-heading"><h3>Profile</h3><p>Signed in as <strong>{status.username}</strong>. The username is fixed; the display name can change.</p></div>
   <label>
     <span>Display name</span>
-    <small>Shown in greetings and account surfaces. This does not change your sign-in username.</small>
+    <small>Shown in greetings and account surfaces.</small>
     <input
       class="settings-input"
       aria-label="Display name"
@@ -180,9 +179,6 @@
       placeholder="How you want to be shown"
     />
   </label>
-</section>
-
-<section class="settings-card">
   <details class="support" data-testid="account-support-details">
     <summary>Support details</summary>
     <p class="sub">
@@ -204,16 +200,18 @@
 
 <BackupsCard />
 
-<section class="card danger-zone">
-  <h3>Delete account</h3>
-  <p class="sub">
-    Permanently removes this account and everything Raiker keeps for it. This cannot be undone.
-  </p>
-  {#if !confirmingDelete}
-    <button type="button" class="btn btn-danger" onclick={beginDelete}>
-      Delete my account
-    </button>
-  {:else}
+<!-- QUI-L03 — one row; the confirmation opens in a dialog. -->
+<section class="settings-card delete-row">
+  <div class="card-heading">
+    <h3>Delete account</h3>
+    <p>Permanently removes this account and everything Raiker keeps for it.</p>
+  </div>
+  <button type="button" class="btn btn-danger" onclick={beginDelete}>Delete my account</button>
+</section>
+
+{#if confirmingDelete}
+  <FormDialog title="Delete account" onclose={() => { if (!busy) confirmingDelete = false; }}>
+    <p class="sub">This cannot be undone.</p>
     <div class="impact" data-testid="account-deletion-impact">
       {#if preview}
         <h4>This removes</h4>
@@ -270,14 +268,14 @@
         screen when it is finished.
       </p>
     {/if}
-  {/if}
-</section>
+  </FormDialog>
+{/if}
 
 <style>
-  .section-heading { margin-bottom:var(--space-4); }
+  .section-heading { margin:var(--space-5) 0 var(--space-3); }
   .section-heading h2,.card-heading h3 { margin:0; }
-  .section-heading p,.card-heading p { color:var(--text-2); margin:.3rem 0 0; }
-  .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--card-pad-y) var(--card-pad-x); margin-bottom:var(--space-4); }
+  .card-heading p { color:var(--text-2); margin:.3rem 0 0; }
+  .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--space-4) var(--card-pad-x); margin-bottom:var(--space-3); }
   label {
     display:grid;
     gap:.3rem;
@@ -293,14 +291,30 @@
     gap: var(--space-2);
     margin-top: var(--space-2);
   }
-  .danger-zone {
-    border: 1px solid var(--danger);
+  .delete-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    border-color: var(--danger-border);
   }
+  /* QUI-L03 — a field is a row: its name and help on the left, the control on
+     the right. */
+  .settings-card label {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
+    column-gap: var(--space-4);
+    align-items: center;
+    max-width: none;
+    margin-top: var(--space-3);
+  }
+  .settings-card label > :not(input) { grid-column: 1; }
+  .settings-card label > input { grid-column: 2; grid-row: 1 / span 2; }
   .sub {
     color: var(--text-2);
   }
   .deleting { margin: var(--space-2) 0 0; }
-  .support summary { cursor: pointer; font-weight: 650; }
+  .support { margin-top: var(--space-3); }
+  .support summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); }
   .support .sub { margin: .5rem 0 0; max-width: 40rem; }
   .id-row { align-items: center; display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
   .id-row code { background: var(--sunken); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: var(--text-sm); overflow-wrap: anywhere; padding: .3rem .5rem; }

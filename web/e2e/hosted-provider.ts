@@ -106,16 +106,24 @@ export async function enableCapability(
   reason: string,
 ): Promise<void> {
   await page.goto(`${base}/#/capabilities`);
-  // By label rather than by placeholder: the placeholder has said "Search
-  // permissions, actions or groups…" since the page's own vocabulary changed,
-  // so this waited sixty seconds for a string the product no longer prints and
-  // then walked on with the list unrendered. The label is the stable half.
-  // Exact: since FIXED-708 a group checkbox reads "Select all Web and
-  // research capabilities", which contains this label as a substring.
-  await page.getByLabel("Search capabilities", { exact: true }).waitFor({ timeout: 60_000 });
-  const card = page.locator(".cap.card").filter({ hasText: label }).first();
-  await expect(card).toBeVisible({ timeout: 60_000 });
-  await card.locator("button.cap-toggle").click();
+  // QUI-L06 — permissions are listed by category, one open at a time beside
+  // the list, so the helper walks the categories until it finds the row.
+  const rail = page.getByRole("navigation", { name: "Permission categories" });
+  await rail.waitFor({ timeout: 60_000 });
+  const categories = rail.getByRole("button");
+  let found = false;
+  for (let index = 1; index < (await categories.count()); index += 1) {
+    await categories.nth(index).click();
+    const row = page.getByRole("option", { name: new RegExp(label) }).first();
+    if (await row.isVisible().catch(() => false)) {
+      await row.click();
+      found = true;
+      break;
+    }
+  }
+  expect(found, `no permission named ${label}`).toBe(true);
+  const card = page.getByRole("article", { name: label });
+  await expect(card).toBeVisible({ timeout: 30_000 });
   const turnOn = card.getByRole("button", { name: "Turn on", exact: true });
   // Already on: the detail offers "Turn off" instead, and pressing anything here
   // would be a change this helper was not asked to make.
@@ -249,11 +257,20 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
  * heading now: `Your hosted providers` is what the redesign actually renders,
  * and unlike a tab name it is the thing the cards are under.
  */
-export async function openHostedProviders(page: Page, base: string): Promise<void> {
-  const hosted = page.getByRole("heading", { name: "Your hosted providers" });
+export async function openHostedProviders(
+  page: Page,
+  base: string,
+  source: "account" | "custom" = "account",
+): Promise<void> {
+  // QUI-L08 — Add model is a dialog whose second step shows one source; a
+  // router such as OpenRouter is under Custom endpoint, everything else an
+  // owner signs in to under An account I have.
+  const hosted = page.getByRole("heading", {
+    name: source === "account" ? "Your hosted providers" : "Advanced connections",
+  });
   const wizard = page.locator("#setup-title");
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.goto(`${base}/#/models?tab=add`);
+    await page.goto(`${base}/#/models?tab=add&source=${source}`);
     await expect(hosted.or(wizard).first()).toBeVisible({ timeout: 30_000 });
     if (!(await dismissFirstRunModelSetup(page))) break;
   }
@@ -266,7 +283,8 @@ export async function hostedProviderCard(
   base: string,
   provider: string,
 ): Promise<Locator> {
-  await openHostedProviders(page, base);
+  const router = /OpenRouter|Hugging Face|Ollama Cloud|OpenAI-compatible/i.test(provider);
+  await openHostedProviders(page, base, router ? "custom" : "account");
   const card = page.locator("article.provider-card").filter({ hasText: provider }).first();
   await expect(card).toBeVisible({ timeout: 30_000 });
   return card;

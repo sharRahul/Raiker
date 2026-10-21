@@ -48,7 +48,7 @@ test("RT-QUI-01 — a first-day Home: greeting, composer, four starters, a backu
   await expect(starters.getByRole("listitem")).toHaveCount(4);
   const rail = page.getByRole("complementary", { name: "Needs your attention" });
   await expect(rail.getByText("There is no backup of this workspace yet.")).toBeVisible({ timeout: 30_000 });
-  await expect(rail.getByRole("link", { name: "Make a backup" })).toHaveAttribute("href", "#/settings?tab=account");
+  await expect(rail.getByRole("link", { name: "Make a backup" })).toHaveAttribute("href", "#/settings?tab=general");
   // QUI-Q01 — with no model the gap is named with its fix.
   await expect(rail.getByText("No default model is chosen.")).toBeVisible();
   await capture(page, `${SHOTS}/01-home-first-day.png`);

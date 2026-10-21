@@ -33,6 +33,24 @@ describe("AddDialog (QUI-L04)", () => {
     expect(screen.getByRole("searchbox")).toBeInTheDocument();
   });
 
+  it("is not a top-layer dialog, so a window a step opens can stand over it", () => {
+    render(AddDialogHarness);
+    const dialog = screen.getByRole("dialog", { name: "Add connection" });
+    expect(dialog.tagName).not.toBe("DIALOG");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("goes back a step on Escape, then closes", async () => {
+    const onclose = vi.fn();
+    render(AddDialogHarness, { props: { onclose } });
+    await fireEvent.click(screen.getByRole("button", { name: /Slack/ }));
+    await fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    expect(onclose).not.toHaveBeenCalled();
+    await fireEvent.keyDown(window, { key: "Escape" });
+    expect(onclose).toHaveBeenCalledTimes(1);
+  });
+
   it("closes from its close button", async () => {
     const onclose = vi.fn();
     render(AddDialogHarness, { props: { onclose } });

@@ -64,7 +64,9 @@
     if (!open || menu === undefined) return;
     // Re-measure on every open: the row may have scrolled since the last one.
     const box = menu.getBoundingClientRect();
-    const limit = root?.closest<HTMLElement>(".content")?.getBoundingClientRect().left ?? 0;
+    // The edge that clips it: a dialog the row sits in, or the page.
+    const limit =
+      root?.closest<HTMLElement>('[role="dialog"], .content')?.getBoundingClientRect().left ?? 0;
     if (box.left < limit + 8) align = "start";
   });
 

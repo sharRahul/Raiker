@@ -208,7 +208,7 @@ describe("Connections › Services (QUI-L07)", () => {
     );
     render(ConnectionsView);
     const list = await screen.findByRole("listbox", { name: "Connected services" });
-    expect(within(list).getByText("GitHub")).toBeInTheDocument();
+    expect(within(list).getByText("GitHub sign-in")).toBeInTheDocument();
   });
 
   it("registers a manifest for a connected service", async () => {

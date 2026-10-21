@@ -17,6 +17,7 @@
   import type { Snippet } from "svelte";
   import Icon from "./Icon.svelte";
   import {
+    LIST_MIN_PX,
     clampListWidth,
     hashWithItem,
     itemFromHash,
@@ -63,6 +64,17 @@
   let detailElement = $state<HTMLElement>();
   let container = $state<HTMLDivElement>();
   let listWidth = $state<number | null>(readWidth());
+  /** The list's drawn width, so the separator always says where it is. */
+  let drawnListWidth = $state(0);
+  let listColumn = $state<HTMLDivElement>();
+  $effect(() => {
+    void listWidth;
+    if (listColumn === undefined || typeof window === "undefined") return;
+    const measure = () => (drawnListWidth = listColumn?.getBoundingClientRect().width ?? 0);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  });
 
   const visible = $derived(
     matches === undefined || query.trim() === ""
@@ -168,7 +180,7 @@
   bind:this={container}
   style:grid-template-columns={listWidth === null ? undefined : `${listWidth}px auto minmax(20rem, 1fr)`}
 >
-  <div class="list-column">
+  <div class="list-column" bind:this={listColumn}>
     {#if matches !== undefined && items.length > 0}
       <label class="list-search">
         <Icon name="search" size="sm" />
@@ -222,7 +234,8 @@
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize the list"
-      aria-valuenow={listWidth ?? undefined}
+      aria-valuenow={listWidth ?? Math.round(drawnListWidth)}
+      aria-valuemin={LIST_MIN_PX}
       tabindex="0"
       onpointerdown={startDrag}
       onkeydown={onHandleKeydown}

@@ -37,6 +37,7 @@
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
   import HelpPanel from "./lib/components/HelpPanel.svelte";
   import { helpSlugFromHash, isHelpAddress, openHelp } from "./lib/help.svelte";
+  import { movedSettingsAddress } from "./lib/settingsSections";
 
   let current = $state(
     typeof window === "undefined"
@@ -193,11 +194,20 @@
       openHelp(helpSlugFromHash(window.location.hash));
       history.replaceState(history.state, "", `#/${current}`);
     }
+    // QUI-L09 — a Settings section that moved to another page (GitHub went to
+    // Connections) forwards there.
+    const movedAtStart = movedSettingsAddress(window.location.hash);
+    if (movedAtStart !== null) window.location.replace(movedAtStart);
     let shownHash = window.location.hash;
     const handler = () => {
       if (isHelpAddress(window.location.hash)) {
         openHelp(helpSlugFromHash(window.location.hash));
         history.replaceState(history.state, "", shownHash || "#/");
+        return;
+      }
+      const moved = movedSettingsAddress(window.location.hash);
+      if (moved !== null) {
+        window.location.replace(moved);
         return;
       }
       if (window.location.hash !== shownHash && !mayLeave(window.location.hash)) {

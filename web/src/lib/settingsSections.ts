@@ -64,6 +64,17 @@ export const SECTIONS_MOVED: Readonly<Record<string, string>> = {
   "git-credential": "#/connections?tab=services&item=github-account",
 };
 
+/**
+ * Where a hash that names a moved Settings section should go now, or null.
+ * The shell asks on every address change, so the forward works whether or
+ * not Settings is already open.
+ */
+export function movedSettingsAddress(hash: string): string | null {
+  if (!/^#\/?settings(?:[?/]|$)/.test(hash)) return null;
+  const tab = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab");
+  return tab === null ? null : (SECTIONS_MOVED[tab] ?? null);
+}
+
 /** QUI-L09 — the segments of Settings › Advanced, in order. */
 export const ADVANCED_SETTINGS = [
   { id: "runtime", label: "Runtime" },

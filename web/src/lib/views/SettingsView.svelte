@@ -17,7 +17,6 @@
   import ExecutionProfiles from "./settings/ExecutionProfiles.svelte";
   import MemoryEngine from "./settings/MemoryEngine.svelte";
   import Updates from "./settings/Updates.svelte";
-  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import ModelsView from "./ModelsView.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
@@ -25,7 +24,6 @@
   import {
     ADVANCED_SETTINGS,
     SECTION_ALIASES,
-    SECTIONS_MOVED,
     SETTINGS_SECTIONS as SECTIONS,
     advancedSettingFromHash,
     type AdvancedSetting,
@@ -39,16 +37,6 @@
   let active = $derived.by<string>(() => {
     const wanted = SECTION_ALIASES[tab] ?? tab;
     return SECTIONS.some((section) => section.id === wanted) ? wanted : "general";
-  });
-  /*
-   * QUI-L09 — a section that moved to another page is forwarded there, so an
-   * old link (`#/settings?tab=github`) still lands on what it named.
-   */
-  $effect(() => {
-    if (typeof window === "undefined") return;
-    const requested = new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("tab");
-    const moved = requested === null ? undefined : SECTIONS_MOVED[requested];
-    if (moved !== undefined) window.location.replace(moved);
   });
   /** The open segment of Settings › Advanced, from the address. */
   let advancedKind = $state<AdvancedSetting>(
@@ -361,10 +349,9 @@
      before showing anything — Models, Tasks and Extensions all open with a
      single guide link instead, and this now matches them. The heading stays for
      the landmark; the sentence's job belongs to the guide. -->
-<header class="settings-header">
-  <h2 class="sr-only">Settings</h2>
-  <GuideLink route="settings" />
-</header>
+<!-- QUI-L05 — the help panel behind ? opens on this page's article, so the
+     page no longer spends a line on its own guide link. -->
+<h2 class="sr-only">Settings</h2>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load settings" detail={loadError} />
@@ -459,7 +446,6 @@
 </div>
 
 <style>
-  .settings-header { margin-bottom: var(--space-4); }
   .save-status {
     min-height: 0;
     margin-bottom: var(--space-3);

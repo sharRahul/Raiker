@@ -79,7 +79,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   // four scenarios below down with it. `rememberSurfaceModel` persists the
   // choice, so the rest of this file inherits it.
   await chooseModelForTurn(page, /Haiku 4\.5/i);
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: ROWS LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: ROWS LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("ROWS LIVE", { exact: true })).toBeVisible({
     timeout: 240_000,
@@ -89,7 +89,7 @@ test("the provider key is added through the UI and a real turn answers", async (
 test("BUG-206 — a tool-using turn shows one row per call, naming what it acted on", async () => {
   test.setTimeout(420_000);
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(
     "List the files in the workspace root with list_directory, then read README.md " +
@@ -146,8 +146,10 @@ test("BUG-206 — a tool-using turn shows one row per call, naming what it acted
 
 test("BUG-206 slice E — a call that stops for a decision is that same row, waiting", async () => {
   test.setTimeout(420_000);
-  await page.getByRole("button", { name: "New chat" }).click();
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  // QUI-Q05 — "New chat" is offered only once there is a conversation to leave.
+  const newChat = page.getByRole("button", { name: "New chat" });
+  if (await newChat.isVisible()) await newChat.click();
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(
     "Use write_file to create a file called notes.md containing exactly the line " +
@@ -193,7 +195,7 @@ test("BUG-206 slice E — a call that stops for a decision is that same row, wai
 test("BUG-207 — the turn shows the model's own reasoning, not three canned sentences", async () => {
   test.setTimeout(420_000);
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
 
   // Reasoning is off unless the owner asks for it, so the control has to exist

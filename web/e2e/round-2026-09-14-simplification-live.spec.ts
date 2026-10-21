@@ -220,7 +220,7 @@ test("BUG-286 — a fresh composer names nothing, then answers with a real key",
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, new RegExp(modelMenuName(chosen), "i"));
   await page
-    .getByPlaceholder("How can I help you today?")
+    .getByPlaceholder("What would you like Raiker to do?")
     .fill("Reply with exactly: SIMPLIFICATION LIVE");
   const send = page.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeEnabled({ timeout: 120_000 });

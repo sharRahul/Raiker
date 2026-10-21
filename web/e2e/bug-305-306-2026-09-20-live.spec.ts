@@ -52,7 +52,7 @@ test("BUG-306: a turn that only answered retries without a question", async ({ p
     void dialog.dismiss();
   });
 
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill("Reply with the single word: ready");
   await page.getByRole("button", { name: "Send", exact: true }).click();

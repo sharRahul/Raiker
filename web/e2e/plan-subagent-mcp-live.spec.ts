@@ -63,7 +63,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   });
 
   await page.goto(`${BASE}/#/new-chat`);
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: PLAN LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: PLAN LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("PLAN LIVE", { exact: true })).toBeVisible({
     timeout: 180_000,
@@ -231,7 +231,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
   // the *answer* bubble, never on `main` — the prompt is echoed in the sent
   // bubble and in the recent-chat rail, and neither of those is an answer.
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     'Call the tool named mcp__echo__echo with arguments {"text": "MCP REACHED"} ' +

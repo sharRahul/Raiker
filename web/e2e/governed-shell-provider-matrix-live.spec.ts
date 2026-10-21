@@ -134,7 +134,7 @@ async function newestShellApproval(): Promise<Locator> {
 async function runGovernedBuildCommand(leg: ProviderLeg): Promise<void> {
   await page.goto(`${BASE}/#/build`);
   const newChat = page.getByRole("button", { name: "New chat", exact: true });
-  if (await newChat.isEnabled().catch(() => false)) await newChat.click();
+  if ((await newChat.isVisible()) && (await newChat.isEnabled())) await newChat.click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const prompt = page.getByLabel("Describe the change");
   await prompt.fill(

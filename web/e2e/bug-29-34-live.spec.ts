@@ -93,7 +93,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByRole("button", { name: "Add attachment" }).click();
   await page.getByLabel("Upload document").setInputFiles(attachment);
   await expect(page.locator(".attachment-row > .attachment-card").filter({ hasText: "governance-note.txt" })).toBeVisible({ timeout: 20_000 });
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: CHAT LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: CHAT LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("CHAT LIVE", { exact: true })).toBeVisible({ timeout: 180_000 });
   const chatCard = page.locator(".message-group-user .attachment-card").first();
@@ -119,7 +119,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await capture(page, join(SHOTS, "178-BUG-29-memory-lifecycle-live.png"));
 
   await page.goto(`${BASE}/#/new-chat`);
-  await page.getByPlaceholder("How can I help you today?").fill(
+  await page.getByPlaceholder("What would you like Raiker to do?").fill(
     "Use the write_file tool now to create approval-reload-live.txt containing exactly reload approval live.",
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();

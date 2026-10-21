@@ -8,11 +8,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkbenchView from "./WorkbenchView.svelte";
 import { DIAGNOSTICS, stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   resetModels();
+  resetModelSetup();
 });
 
 // C18 — "continue working" reads threads, not sessions: the owner's own
@@ -465,7 +467,8 @@ describe("WorkbenchView", () => {
     );
   });
 
-  it("counts each actionable runtime configuration gap once", async () => {
+  // QUI-Q01 — each gap is a sentence with its fix, not a count in a tile.
+  it("names each runtime configuration gap once, with the action that fixes it", async () => {
     stubFetch(
       routes({
         "GET /api/diagnostics": {
@@ -476,9 +479,18 @@ describe("WorkbenchView", () => {
     );
     render(WorkbenchView);
 
-    const tile = (await screen.findByText("Runtime issues")).closest("article");
-    await waitFor(() => expect(tile).toHaveTextContent("2"));
-    expect(tile).not.toHaveTextContent("3");
+    const list = await screen.findByRole("list", { name: "Setup Raiker still needs" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(list).getByText("No model is set up.")).toBeInTheDocument();
+    expect(within(list).getByText("Raiker is not accepting work right now.")).toBeInTheDocument();
+    expect(screen.queryByText("Runtime issues")).toBeNull();
+
+    await fireEvent.click(within(list).getByRole("button", { name: "Set up model" }));
+    expect(setupDialog.open).toBe(true);
+    expect(within(list).getByRole("link", { name: "Open diagnostics" })).toHaveAttribute(
+      "href",
+      "#/observe?tab=diagnostics",
+    );
   });
 
   it("shows a loading state for live status before it is known", async () => {

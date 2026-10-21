@@ -83,7 +83,7 @@ test("a three-mutation batch parks as decision 1 of 3, not as one call and two l
   test.setTimeout(240_000);
   await page.goto(`${BASE}/#/new-chat`);
   await page
-    .getByPlaceholder("How can I help you today?")
+    .getByPlaceholder("What would you like Raiker to do?")
     .fill("Write one.md, two.md and three.md.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
 

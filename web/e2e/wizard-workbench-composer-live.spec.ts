@@ -330,7 +330,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByLabel("Prompt", { exact: true });
   await expect(prompt).toBeVisible({ timeout: 60_000 });
-  await expect(prompt).toHaveAttribute("placeholder", "How can I help you today?");
+  await expect(prompt).toHaveAttribute("placeholder", "What would you like Raiker to do?");
   // `+`, the approval-mode chip, and the model chip: a minimal composer
   // shape, with Raiker's governance controls in it and nothing else.
   await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);

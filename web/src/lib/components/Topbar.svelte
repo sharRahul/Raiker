@@ -53,6 +53,14 @@
   let marking = $state(false);
   let notificationTrigger = $state<HTMLButtonElement>();
   const unread = $derived(notifications.filter((n) => !n.read));
+  // QUI-Q06 — icon-only controls carry their name as a tooltip too, in the
+  // same words, so a pointer user learns what each one is without guessing.
+  const approvalsLabel = $derived(
+    pendingApprovals > 0 ? `Approvals (${pendingApprovals} waiting on you)` : "Approvals",
+  );
+  const notificationsLabel = $derived(
+    unread.length > 0 ? `Notifications (${unread.length} unread)` : "Notifications",
+  );
 
   async function loadNotifications() {
     try {
@@ -157,6 +165,7 @@
       type="button"
       class="btn btn-ghost palette-button"
       aria-label={`Search and commands (${shortcutSpoken("mod", "K")})`}
+      title={`Search and commands (${shortcutLabel("mod", "K")})`}
       onclick={onOpenPalette}
     ><Icon name="search" size="md" /><kbd class="palette-key" aria-hidden="true"
       >{shortcutLabel("mod", "K")}</kbd></button>
@@ -164,9 +173,8 @@
       href="#/approvals"
       class="btn btn-ghost approvals-link"
       class:waiting={pendingApprovals > 0}
-      aria-label={pendingApprovals > 0
-        ? `Approvals (${pendingApprovals} waiting on you)`
-        : "Approvals"}
+      aria-label={approvalsLabel}
+      title={approvalsLabel}
     >
       <Icon name="approvals" size="md" />
       {#if pendingApprovals > 0}<span class="approval-count">{pendingApprovals}</span>{/if}
@@ -175,7 +183,8 @@
       <button
         type="button"
         class="btn btn-ghost bell"
-        aria-label={unread.length > 0 ? `Notifications (${unread.length} unread)` : "Notifications"}
+        aria-label={notificationsLabel}
+        title={notificationsLabel}
         aria-expanded={panelOpen}
         onclick={togglePanel}
         bind:this={notificationTrigger}
@@ -233,6 +242,7 @@
       type="button"
       class="btn btn-ghost"
       aria-label="More pages and settings"
+      title="More pages and settings"
       aria-haspopup="dialog"
       onclick={(event) => onOpenAllPages(event.currentTarget)}
     ><Icon name="more" size="md" /></button>

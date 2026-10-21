@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backgroundLabel, backgroundSummary } from "./backgroundWork";
+import { backgroundLabel, backgroundSummary, hasBackgroundWork } from "./backgroundWork";
 
 const now = new Date("2026-10-03T12:00:00Z");
 const at = (iso: string) => ({ updated_at: iso, completed_at: iso });
@@ -27,5 +27,15 @@ describe("backgroundSummary", () => {
       "Background work: 1 running, 2 failed today",
     );
     expect(backgroundLabel(null)).toBe("Background work");
+  });
+});
+
+describe("hasBackgroundWork", () => {
+  // QUI-Q05 — the toggle is drawn only when there is something behind it.
+  it("is true only when something is running, waiting or failed today", () => {
+    expect(hasBackgroundWork(null)).toBe(false);
+    expect(hasBackgroundWork({ active: 0, waiting: 0, failed: 0 })).toBe(false);
+    expect(hasBackgroundWork({ active: 1, waiting: 0, failed: 0 })).toBe(true);
+    expect(hasBackgroundWork({ active: 0, waiting: 0, failed: 1 })).toBe(true);
   });
 });

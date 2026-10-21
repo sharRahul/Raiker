@@ -100,7 +100,7 @@ test("a refused first call no longer ends the turn — the read behind it still 
   test.setTimeout(240_000);
   await page.goto(`${BASE}/#/new-chat`);
   await page
-    .getByPlaceholder("How can I help you today?")
+    .getByPlaceholder("What would you like Raiker to do?")
     .fill("Read ../escape.md and list the workspace.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
 
@@ -135,7 +135,7 @@ test("a refusal ahead of a write reaches decision 2 of 3 instead of dropping bot
   test.setTimeout(240_000);
   await page.goto(`${BASE}/#/new-chat`);
   await page
-    .getByPlaceholder("How can I help you today?")
+    .getByPlaceholder("What would you like Raiker to do?")
     .fill("Run the batch: read ../escape.md, then write one.md and three.md.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
 

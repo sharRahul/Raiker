@@ -212,7 +212,7 @@ test("a real hosted turn still answers on the host that served them", async () =
   });
 
   await page.goto(`${BASE}/#/new-chat`);
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: CACHE LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: CACHE LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   // Scoped to the transcript: the prompt is echoed in the sent bubble and in the
   // recent-chat rail, and neither of those is an answer.

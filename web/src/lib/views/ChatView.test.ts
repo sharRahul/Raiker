@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerAttach } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import { ApiError } from "../api";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
@@ -21,6 +22,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   resetModels();
+  resetModelSetup();
 });
 
 const DEFAULT_READY_PROFILE = {
@@ -61,15 +63,18 @@ function finalResponse(message: string): AgentResponse {
 }
 
 describe("ChatView streaming transcript", () => {
-  it("preserves the prompt and disables Send when the selected model is unready", async () => {
+  it("preserves the prompt and opens model setup from Send when the selected model is unready", async () => {
     stubFetch({
       "GET /api/models": { ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>), profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }], chat_profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }] },
     });
     render(ChatView);
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "keep this prompt" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
-    expect(screen.getByText("Ollama is not reachable.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Ollama is not reachable.")).toBeInTheDocument());
+    // QUI-Q04 — Send is never a dead button: it opens the dialog that fixes
+    // the model, and nothing is sent.
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+    expect(setupDialog.open).toBe(true);
     expect(box).toHaveValue("keep this prompt");
     expect(streamPromptMock).not.toHaveBeenCalled();
   });

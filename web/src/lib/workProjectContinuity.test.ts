@@ -180,8 +180,10 @@ describe("starting a chat from a project", () => {
     const select = await screen.findByLabelText<HTMLSelectElement>("Project for this chat");
     await waitFor(() => expect(select.value).toBe("proj_alpha"));
 
-    // Start a fresh conversation the way the composer's own control does.
-    await fireEvent.click(screen.getByRole("button", { name: /new chat/i }));
+    // QUI-Q05 — "New chat" is offered only once there is a conversation to
+    // leave. On this empty one it used to be a disabled button, so pressing it
+    // never ran; the composer is already the fresh conversation.
+    expect(screen.queryByRole("button", { name: /new chat/i })).toBeNull();
 
     // The composer still names the project, so the filing must still mean it.
     await waitFor(() => expect(select.value).toBe("proj_alpha"));

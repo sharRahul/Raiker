@@ -38,7 +38,7 @@ test("four closing events describe four different things", async ({ page }) => {
 
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, MODEL_LABEL);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill("In two sentences, say what a governed audit log is for.");
   await page.getByRole("button", { name: "Send", exact: true }).click();

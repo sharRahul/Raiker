@@ -54,7 +54,7 @@ test("a picture attaches as a picture and a document as a typed card", async () 
   test.setTimeout(180_000);
 
   await page.goto(`${BASE}/#/new-chat`);
-  await expect(page.getByPlaceholder("How can I help you today?")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByPlaceholder("What would you like Raiker to do?")).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("button", { name: "Add attachment" }).click();
   await page.getByLabel("Upload image").setInputFiles(IMAGE);
@@ -79,7 +79,7 @@ test("what the transcript shows back is what the composer showed", async () => {
   test.setTimeout(180_000);
 
   await page
-    .getByPlaceholder("How can I help you today?")
+    .getByPlaceholder("What would you like Raiker to do?")
     .fill("In one short line: what is happening in this photo?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" })).toBeVisible({

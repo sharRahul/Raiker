@@ -53,7 +53,7 @@ test("REM-CHAT-01: a settled turn carries its own evidence, closed until asked f
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, MODEL_LABEL);
 
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill("In one short sentence, what is a governed action?");
   await page.getByRole("button", { name: "Send", exact: true }).click();

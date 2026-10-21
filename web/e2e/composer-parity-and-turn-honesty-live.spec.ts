@@ -240,7 +240,7 @@ test("a thinking turn's working is kept, and a re-opened turn still shows it", a
   // prompt of its conversation. **New chat** is the control that makes the turn's
   // own prompt that title.
   const newChat = page.getByRole("button", { name: "New chat" });
-  if (await newChat.isEnabled().catch(() => false)) {
+  if ((await newChat.isVisible()) && (await newChat.isEnabled())) {
     await newChat.click();
     await expect(prompt).toBeVisible({ timeout: 30_000 });
   }

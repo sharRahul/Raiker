@@ -52,3 +52,14 @@ export function backgroundLabel(summary: BackgroundSummary | null): string {
   if (summary.failed) parts.push(`${summary.failed} failed today`);
   return parts.length ? `Background work: ${parts.join(", ")}` : "Background work: nothing running";
 }
+
+/**
+ * QUI-Q05 — whether Chat shows its background-work toggle at all.
+ *
+ * A toggle reading "Background" over nothing was a control with no job. It
+ * appears when something is running, waiting or failed today; the
+ * conversation menu opens the rail whenever the owner wants it regardless.
+ */
+export function hasBackgroundWork(summary: BackgroundSummary | null): boolean {
+  return summary !== null && summary.active + summary.waiting + summary.failed > 0;
+}

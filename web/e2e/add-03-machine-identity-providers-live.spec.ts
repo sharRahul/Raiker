@@ -39,7 +39,7 @@ async function chooseModel(card: Locator, preferred?: string): Promise<void> {
 
 async function runAttributedTurn(marker: string, screenshotName: string): Promise<void> {
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(`Reply with exactly: ${marker}`);
   await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -81,7 +81,7 @@ async function waitForApprovalRow(status: "pending" | "denied"): Promise<Locator
 
 async function runGovernedProposal(marker: string, screenshotName: string): Promise<void> {
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await prompt.fill(
     `Use the write_file tool now to create add03-${marker.toLowerCase()}.txt containing exactly ${marker}. Do not answer without calling the tool.`,
   );

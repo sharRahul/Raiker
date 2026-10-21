@@ -74,7 +74,7 @@
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText } from "../turnPhases";
   import { relativeTime } from "../format";
-  import { backgroundLabel, backgroundSummary, type BackgroundSummary } from "../backgroundWork";
+  import { backgroundLabel, backgroundSummary, hasBackgroundWork, type BackgroundSummary } from "../backgroundWork";
   import {
     attachmentChipsByTurn,
     mergeRestoredChips,
@@ -775,7 +775,13 @@
     }
     const sentDraft = draft;
     const text = sentDraft.text.trim();
-    if (text === "" || modelBlocked || streaming || attachStore.uploading) return;
+    if (text === "" || streaming || attachStore.uploading) return;
+    // QUI-Q04 — Send is never a dead button. With no usable model the press
+    // opens the dialog that fixes it, and the draft stays where it is.
+    if (modelBlocked) {
+      openModelSetup(null, modelReadiness);
+      return;
+    }
     const voiceState = {
       dictated: voiceDictated,
       typedBefore: voiceTypedBefore,
@@ -1497,14 +1503,18 @@
 <div class="chat">
   <header class="chat-header">
     <div class="header-actions">
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        onclick={newConversation}
-        disabled={streaming || turns.length === 0}
-      >
-        New chat
-      </button>
+      <!-- QUI-Q05 — offered once there is a conversation to leave. A disabled
+           "New chat" on an empty one read as a faded title, not an action. -->
+      {#if turns.length > 0}
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          onclick={newConversation}
+          disabled={streaming}
+        >
+          New chat
+        </button>
+      {/if}
       <!-- BUG-22 — the conversation menu. Export lives here, beside the other
            whole-conversation actions, rather than inside a per-message row. -->
       <div class="conversation-menu">
@@ -1565,6 +1575,9 @@
           </div>
         {/if}
       </div>
+      <!-- QUI-Q05 — the toggle appears when there is background work to look
+           at; the conversation menu's "Background work" opens it any time. -->
+      {#if backgroundWorkOpen || hasBackgroundWork(background)}
       <button
         type="button"
         class="btn btn-ghost btn-sm rail-toggle"
@@ -1584,6 +1597,7 @@
           <span class="rail-alert" aria-hidden="true">!</span>
         {/if}
       </button>
+      {/if}
     </div>
   </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
@@ -1937,7 +1951,7 @@
     bind:value={draft.text}
     bind:inputEl={promptEl}
     inputProps={{
-      placeholder: "How can I help you today?",
+      placeholder: "What would you like Raiker to do?",
       title: "Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file",
       disabled: streaming,
       onpaste: onComposerPaste,
@@ -2092,7 +2106,7 @@
           <button
             type="submit"
             class="btn btn-primary send"
-            disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked}
+            disabled={streaming || attachStore.uploading || draft.text.trim() === ""}
             aria-label={streaming ? "Running" : "Send"}
           >
             <Icon name="send" size="sm" />

@@ -72,7 +72,7 @@ test("a real turn reads today's weather from Open-Meteo and says how old it is",
   // The cloud model the BUG-340 first-run round chose is the one that answers.
   await page.goto(`${BASE}/#/new-chat`);
   await expect(page.getByRole("button", { name: MODEL_TURN }).first()).toBeVisible({ timeout: 60_000 });
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await prompt.fill(
     "What is today's date (YYYY-MM-DD) and day, and what is the weather here right now? " +
       "Use the weather tool, and say which provider the reading came from and when it was observed.",

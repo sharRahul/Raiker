@@ -105,7 +105,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   });
 
   await page.goto(`${BASE}/#/new-chat`);
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: VISUAL LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: VISUAL LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   // Substring, not exact: the answer is a real model's, and a live turn that
   // adds a trailing word is still a live turn. What is being proved here is that

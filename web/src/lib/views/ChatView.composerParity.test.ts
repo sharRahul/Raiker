@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerProject, startComposerDictation } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import { takeScheduleRequest } from "../scheduleHandoff";
 import { setWorkProject } from "../workProject.svelte";
 
@@ -40,6 +41,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   resetModels();
+  resetModelSetup();
 });
 
 const projects = {
@@ -279,8 +281,12 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
 
     // The rail is collapsed by default; opening it places the panel beside the
-    // chat column rather than below the composer.
-    await fireEvent.click(await screen.findByRole("button", { name: /^Background work/ }));
+    // chat column rather than below the composer. QUI-Q05 — with nothing
+    // running there is no toggle; the conversation menu opens the rail.
+    await screen.findByRole("button", { name: "Conversation actions" });
+    expect(screen.queryByRole("button", { name: /^Background work/ })).toBeNull();
+    await fireEvent.click(screen.getByRole("button", { name: "Conversation actions" }));
+    await fireEvent.click(screen.getByRole("menuitem", { name: "Background work" }));
     const rail = await screen.findByRole("complementary", { name: "Background work" });
     expect(rail.closest(".rail-slot")).toBeInTheDocument();
     expect(rail.closest(".chat")).toBeNull();
@@ -353,8 +359,14 @@ describe("ChatView composer parity", () => {
     expect(screen.queryByRole("group", { name: "Effort" })).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Not selected" }));
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
-    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(screen.getByText("No model is set up.")).toBeInTheDocument();
+    // QUI-Q04 — Send is not a dead button: pressing it opens model setup and
+    // the draft stays in the composer. Nothing is sent.
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(send).toBeEnabled();
+    await fireEvent.click(send);
+    expect(setupDialog.open).toBe(true);
+    expect(screen.getByLabelText("Prompt")).toHaveValue("Hello");
     expect(streamPromptMock).not.toHaveBeenCalled();
   });
 

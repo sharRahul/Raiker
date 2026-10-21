@@ -172,7 +172,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await capture(page, join(SHOTS, "round0810-08-readiness-chip-confirmed.png"));
 
   await visit(page, "new-chat");
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await prompt.fill("Reply with exactly: ROUND0810 LIVE");
   const send = page.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeEnabled({ timeout: 60_000 });

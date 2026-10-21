@@ -160,7 +160,7 @@ test("BUG-308: a real turn asking to run python is governed as code with the hos
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, MODEL_LABEL);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(
     `Call the shell tool once with the command "${PYTHON} hello.py", then tell me exactly what it returned.`,

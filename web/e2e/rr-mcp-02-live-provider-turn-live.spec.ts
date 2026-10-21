@@ -39,7 +39,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   // them and this was the only one that had them.
   await chooseModelForTurn(page, /Haiku 4\.5/i);
 
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: RRMCP LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: RRMCP LIVE");
   const send = page.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeEnabled({ timeout: 120_000 });
   await send.click();

@@ -86,7 +86,7 @@ test("Chat and Build offer the same composer affordances", async () => {
   test.setTimeout(120_000);
 
   await page.goto(`${BASE}/#/new-chat`);
-  await expect(page.getByPlaceholder("How can I help you today?")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByPlaceholder("What would you like Raiker to do?")).toBeVisible({ timeout: 20_000 });
   const chatAttach = page.getByRole("button", { name: "Add attachment" });
   await expect(chatAttach).toBeVisible();
   await chatAttach.click();

@@ -34,6 +34,8 @@
   import { START_WORK } from "../workSurface";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
+  import { openModelSetup } from "../modelReadiness.svelte";
+  import { readinessGaps } from "../readinessGaps";
   import { relativeFuture, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
@@ -130,6 +132,11 @@
     if (diagnostics === null) return null;
     if (diagnostics.missing_config.length > 0) return diagnostics.missing_config.length;
     return diagnostics.production_ready_local_single_user_runtime ? 0 : 1;
+  });
+  const gaps = $derived.by(() => {
+    const diagnostics = valueOf(health);
+    if (diagnostics === null) return [];
+    return readinessGaps(diagnostics.missing_config, diagnostics.production_ready_local_single_user_runtime);
   });
   const healthIsCurrent = $derived(isCurrent(health));
   const healthLine = $derived(freshnessLabel(health, "Runtime health"));
@@ -595,16 +602,24 @@
           href="#/observe?tab=diagnostics"
           linkLabel="Open diagnostics"
         />
-        {:else if runtimeIssues !== null && runtimeIssues > 0}
-        <StatTile
-          label="Runtime issues"
-          value={runtimeIssues}
-          detail="Review configuration and readiness evidence before critical work."
-          tone="warn"
-          icon="diagnostics"
-          href="#/observe?tab=diagnostics"
-          linkLabel="Review issues"
-        />
+        {:else if gaps.length > 0}
+        <!-- QUI-Q01 — each gap as a sentence with the action that fixes it.
+             This was a "Runtime issues" tile: a large number and a line about
+             readiness evidence that named neither the problem nor the fix. -->
+        <ul class="feed" aria-label="Setup Raiker still needs">
+          {#each gaps as gap (gap.id)}
+            <li class="feed-item feed-blocking">
+              <strong>{gap.title}</strong>
+              {#if gap.action.kind === "model-setup"}
+                <button type="button" class="btn btn-soft btn-sm gap-action" onclick={() => openModelSetup(null)}>
+                  {gap.action.label}
+                </button>
+              {:else}
+                <a href={gap.action.href}>{gap.action.label}</a>
+              {/if}
+            </li>
+          {/each}
+        </ul>
         {/if}
         {#if blocked.length > 0}
         <!-- NEW-HOME-01 — blocked work, not all work. Every running task used
@@ -739,4 +754,5 @@
   .feed-item span { color: var(--text-2); }
   .feed-containment { border-color: var(--danger-border); }
   .feed-blocking { border-color: var(--warn-border); }
+  .gap-action { justify-self: start; }
 </style>

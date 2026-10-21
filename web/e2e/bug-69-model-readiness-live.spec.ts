@@ -138,7 +138,7 @@ async function driveReadiness(
     new RegExp(`/provider-logos/${leg.provider.toLowerCase()}`),
   );
   await modelButton.click();
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await prompt.fill(`Reply with exactly: ${leg.marker}`);
   const send = page.getByRole("button", { name: "Send", exact: true });
 
@@ -159,9 +159,12 @@ async function driveReadiness(
     const blocked = await dialog.getByText(CLASSIFIED_NON_READY).isVisible();
     await dialog.getByRole("button", { name: "Close" }).click();
     if (blocked) {
-      // The state machine's other half: a classified refusal keeps Send
-      // disabled and the owner's draft intact.
-      await expect(send).toBeDisabled();
+      // The state machine's other half: a classified refusal sends nothing and
+      // keeps the owner's draft intact. QUI-Q04 — Send stays pressable and
+      // opens model setup instead of sending.
+      await send.click();
+      await expect(page.getByRole("dialog", { name: /model/i })).toBeVisible();
+      await page.getByRole("dialog", { name: /model/i }).getByRole("button", { name: "Close" }).click();
       await expect(prompt).toHaveValue(`Reply with exactly: ${leg.marker}`);
       return "blocked";
     }
@@ -227,8 +230,12 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   // running — so the readiness gate lives where a prompt is actually written.
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByLabel("Prompt", { exact: true }).fill("Draft a short project brief");
-  await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Set up model" })).toBeVisible();
+  // QUI-Q04 — the gate is the dialog Send opens, not a disabled button.
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: /model/i })).toBeVisible();
+  await page.getByRole("dialog", { name: /model/i }).getByRole("button", { name: "Close" }).click();
+  await expect(page.getByLabel("Prompt", { exact: true })).toHaveValue("Draft a short project brief");
   await capture(page, join(SHOTS, "bug69-composer-readiness-gate-live.png"));
 
   await page.goto(`${BASE}/#/models?tab=hosted`);

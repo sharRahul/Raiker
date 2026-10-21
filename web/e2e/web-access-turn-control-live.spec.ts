@@ -125,7 +125,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   });
 
   await page.goto(`${BASE}/#/new-chat`);
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: WEB LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: WEB LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("WEB LIVE", { exact: true })).toBeVisible({
     timeout: 180_000,
@@ -136,7 +136,7 @@ test("B12/C7 — a web read is withheld with its reason before the owner enables
   test.setTimeout(300_000);
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     `Call the web_fetch tool once with url ${ALLOWED_PAGE} and then tell me, in one ` +
@@ -166,7 +166,7 @@ test("B12/C7 — once enabled and allowed, the agent reads a real page", async (
 
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     `Call the web_fetch tool once with url ${ALLOWED_PAGE} and then quote back, ` +
@@ -187,7 +187,7 @@ test("B12/C7 — a host outside the owner's allowlist is still refused", async (
   test.setTimeout(300_000);
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     `Call the web_fetch tool once with url ${DENIED_PAGE} and then tell me in one ` +
@@ -207,7 +207,7 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
   test.setTimeout(300_000);
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     "First call the list_directory tool with arguments {}. Then, before you answer, " +
@@ -238,7 +238,7 @@ test("B17/C13 — the owner stops a running turn, and it ends as stopped", async
   test.setTimeout(300_000);
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(
     "Call list_directory with arguments {}, then call glob with arguments " +

@@ -49,7 +49,7 @@ function watchConsole(page: Page): string[] {
 async function askForATable(page: Page): Promise<void> {
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, /Haiku 4\.5/i);
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 60_000 });
   await composer.fill(
     "Three cities and their approximate populations in millions: Tokyo 37, Delhi 33, " +

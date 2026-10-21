@@ -69,7 +69,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.getByRole("button", { name: "Add attachment" }).click();
   await page.getByLabel("Upload document").setInputFiles(attachment);
   await expect(page.locator(".attachment-row > .attachment-card").filter({ hasText: "passage-proof.txt" })).toBeVisible({ timeout: 20_000 });
-  await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: COORDINATE LIVE");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Reply with exactly: COORDINATE LIVE");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("COORDINATE LIVE", { exact: true })).toBeVisible({ timeout: 180_000 });
   const chatAttachment = page.locator(".message-group-user .attachment-card").first();

@@ -48,6 +48,27 @@ describe("Topbar scope", () => {
   });
 });
 
+describe("Topbar tooltips", () => {
+  // QUI-Q06 — every icon-only control says what it is on hover, in the same
+  // words its accessible name uses.
+  it("gives each icon-only control a tooltip matching its name", async () => {
+    stubFetch({ "GET /api/notifications": NOTIFICATIONS, "GET /api/approvals": [] });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+
+    const bell = await screen.findByRole("button", { name: /^Notifications/ });
+    await waitFor(() => expect(bell).toHaveAttribute("title", "Notifications (1 unread)"));
+    const approvals = screen.getByRole("link", { name: /^Approvals/ });
+    expect(approvals).toHaveAttribute("title", approvals.getAttribute("aria-label"));
+    const more = screen.getByRole("button", { name: "More pages and settings" });
+    expect(more).toHaveAttribute("title", "More pages and settings");
+    // The search tooltip shows the shortcut as printed on the key; its
+    // accessible name spells it out for a screen reader.
+    expect(screen.getByRole("button", { name: /^Search and commands/ }).getAttribute("title")).toMatch(
+      /^Search and commands \(/,
+    );
+  });
+});
+
 describe("Topbar notifications", () => {
   it("shows the unread count on the notifications button", async () => {
     stubFetch({ "GET /api/notifications": NOTIFICATIONS });

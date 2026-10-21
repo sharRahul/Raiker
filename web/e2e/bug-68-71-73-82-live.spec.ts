@@ -65,7 +65,7 @@ async function signIn(target: Page) {
 
 /** Send one prompt in Chat and wait for *this* turn to finish. */
 async function ask(prompt: string) {
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   const before = await page.locator(".message-bubble-raiker").count();
   await composer.fill(prompt);

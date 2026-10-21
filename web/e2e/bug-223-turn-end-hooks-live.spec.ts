@@ -110,7 +110,7 @@ test("a real turn fires Stop, and the audit log is the proof", async () => {
   await useAnthropic(page);
 
   await page.goto(`${BASE}/#/new-chat`);
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   await composer.fill("Reply with exactly the word: acknowledged.");
   await page.getByRole("button", { name: "Send", exact: true }).click();

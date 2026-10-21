@@ -75,11 +75,11 @@ async function newChat() {
   await page.goto(`${BASE}/#/new-chat`);
   const reset = page.getByRole("button", { name: "New chat", exact: true });
   if (await reset.isEnabled().catch(() => false)) await reset.click();
-  await expect(page.getByPlaceholder("How can I help you today?")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByPlaceholder("What would you like Raiker to do?")).toBeVisible({ timeout: 30_000 });
 }
 
 async function ask(prompt: string) {
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   await composer.fill(prompt);
   await page.getByRole("button", { name: "Send", exact: true }).click();

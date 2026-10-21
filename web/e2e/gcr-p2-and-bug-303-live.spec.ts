@@ -50,7 +50,7 @@ test.skip(ANTHROPIC_KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is not set for this r
  * rather than about how fast the assertion ran.
  */
 async function ask(page: import("@playwright/test").Page, text: string): Promise<string> {
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(text);
   await page.getByRole("button", { name: "Send", exact: true }).click();

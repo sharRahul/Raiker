@@ -76,7 +76,7 @@ async function signIn(target: Page) {
  * it *and* a new Raiker bubble has arrived.
  */
 async function ask(prompt: string) {
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   const before = await page.locator(".message-bubble-raiker").count();
   await composer.fill(prompt);
@@ -139,8 +139,9 @@ async function newChat() {
   // Disabled when the conversation is already empty, which is the state this
   // helper wants — clicking it then would hang rather than start anything.
   const reset = page.getByRole("button", { name: "New chat", exact: true });
-  if (await reset.isEnabled().catch(() => false)) await reset.click();
-  await expect(page.getByPlaceholder("How can I help you today?")).toBeVisible({ timeout: 30_000 });
+  // QUI-Q05 — the control exists only once there is a conversation to leave.
+  if ((await reset.isVisible()) && (await reset.isEnabled())) await reset.click();
+  await expect(page.getByPlaceholder("What would you like Raiker to do?")).toBeVisible({ timeout: 30_000 });
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

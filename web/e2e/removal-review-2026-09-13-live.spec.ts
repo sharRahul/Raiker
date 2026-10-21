@@ -35,14 +35,17 @@ test("Home does not call an unread readiness check an all-clear (NEW-HOME-01)", 
   await signInAsOwner(page, BASE);
 
   // With the real endpoint answering, the rail reports readiness as a number:
-  // either a count of issues, or the all-clear when there are none. Which of
+  // either the named setup gaps, or the all-clear when there are none. Which of
   // the two depends on the workspace, and both are claims Raiker is entitled
   // to make because it read the answer.
   await page.goto(`${BASE}/#/home`);
   const rail = page.getByRole("complementary", { name: "Needs your attention" });
   await expect(rail).toBeVisible({ timeout: 30_000 });
   await expect(
-    rail.getByText("Runtime issues").or(rail.getByText(/nothing needs you right now/i)).first(),
+    rail
+      .getByRole("list", { name: "Setup Raiker still needs" })
+      .or(rail.getByText(/nothing needs you right now/i))
+      .first(),
   ).toBeVisible({ timeout: 60_000 });
   await capture(page, `${SHOTS}/home-readiness-read.png`);
 
@@ -67,7 +70,7 @@ test("Home does not call an unread readiness check an all-clear (NEW-HOME-01)", 
   await expect(rail.getByText(/this is not an all-clear/i)).toBeVisible();
   await expect(rail.getByText(/nothing needs you right now/i)).toHaveCount(0);
   // Never a number, because there is no current number to give.
-  await expect(rail.getByText("Runtime issues")).toHaveCount(0);
+  await expect(rail.getByRole("list", { name: "Setup Raiker still needs" })).toHaveCount(0);
   await capture(page, `${SHOTS}/home-readiness-unavailable.png`);
 });
 

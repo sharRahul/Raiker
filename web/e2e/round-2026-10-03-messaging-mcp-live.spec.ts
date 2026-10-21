@@ -280,11 +280,12 @@ test("Chat says what filing means, labels its background work and groups its act
   // A real answer from Anthropic, under the turn that asked for it.
   await expect(page.locator(".turn").getByText(/^filed\.?$/i).first()).toBeVisible({ timeout: 120_000 });
 
-  // UX-CHAT-04 — labelled, with what it counts in its name.
-  await expect(page.getByRole("button", { name: /^Background work:/ })).toBeVisible();
   // UX-CHAT-05 — three named groups.
   await page.getByRole("button", { name: "Conversation actions" }).click();
   const menu = page.getByRole("menu", { name: "Conversation actions" });
+  // UX-CHAT-04 / QUI-Q05 — the toggle is drawn only when background work
+  // exists; the menu always reaches the rail.
+  await expect(menu.getByRole("menuitem", { name: "Background work" })).toBeVisible();
   await expect(menu.getByRole("group", { name: "Conversation" })).toBeVisible();
   await expect(menu.getByRole("group", { name: "Evidence" })).toBeVisible();
   await expect(menu.getByRole("group", { name: "Continuity" })).toBeVisible();

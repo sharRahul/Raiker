@@ -81,7 +81,7 @@ test("GEP-02: the stop switch stops the answer being written", async ({ page }) 
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, MODEL_LABEL);
 
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(
     "Write a detailed, 1500-word history of the printing press, in numbered sections of " +
@@ -130,7 +130,7 @@ test("GEP-02: a stopped conversation answers its next turn", async ({ page }) =>
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/new-chat`);
   await chooseModelForTurn(page, MODEL_LABEL);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill("Reply with the single word: ready");
   await page.getByRole("button", { name: "Send", exact: true }).click();

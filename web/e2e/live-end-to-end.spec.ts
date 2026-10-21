@@ -52,7 +52,7 @@ test.afterAll(async () => {
 test("a real governed turn answers, and the copy action is a glyph", async () => {
   test.setTimeout(180_000);
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 20_000 });
 
   await prompt.fill(
@@ -82,7 +82,7 @@ test("an attached image opens with working zoom, rotate and reset controls", asy
   });
   await expect(page.getByTitle(/pixel\.png/)).toBeVisible({ timeout: 20_000 });
 
-  await page.getByPlaceholder("How can I help you today?").fill("Describe this image in one line.");
+  await page.getByPlaceholder("What would you like Raiker to do?").fill("Describe this image in one line.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 120_000,

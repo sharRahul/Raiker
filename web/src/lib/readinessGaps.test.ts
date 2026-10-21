@@ -1,0 +1,40 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { KNOWN_GAPS, readinessGaps } from "./readinessGaps";
+
+describe("readinessGaps", () => {
+  it("names a missing model plainly and offers to set one up", () => {
+    expect(readinessGaps(["No model profile is selected."], true)).toEqual([
+      { id: "gap-0", title: "No model is set up.", action: { kind: "model-setup", label: "Set up model" } },
+    ]);
+  });
+
+  it("keeps the runtime's own sentence for a gap it has no plainer wording for", () => {
+    const [row] = readinessGaps(["No acting principal is available."], false);
+    expect(row.title).toBe("No acting principal is available.");
+    expect(row.action).toMatchObject({ kind: "link", label: "Open diagnostics" });
+  });
+
+  it("gives one row per gap, never a count", () => {
+    expect(readinessGaps(["No model profile is selected.", "No runtime mode is active."], false)).toHaveLength(2);
+  });
+
+  it("still says something when the runtime is not ready and names no gap", () => {
+    expect(readinessGaps([], false)).toEqual([
+      expect.objectContaining({ title: "Raiker is not ready to run work." }),
+    ]);
+    expect(readinessGaps([], true)).toEqual([]);
+  });
+
+  it("matches only sentences the runtime still writes", () => {
+    // A reworded gap in the runtime must fail here, not silently lose its fix.
+    const source = readFileSync(
+      join(import.meta.dirname, "..", "..", "..", "raiker", "control", "dashboard_parts", "models.py"),
+      "utf8",
+    );
+    for (const sentence of Object.keys(KNOWN_GAPS)) {
+      expect(source, sentence).toContain(`"${sentence}"`);
+    }
+  });
+});

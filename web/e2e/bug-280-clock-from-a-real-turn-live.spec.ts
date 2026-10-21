@@ -61,7 +61,7 @@ async function setTimezone(page: Page, zone: string): Promise<void> {
 /** Send one question in a fresh conversation and return the answer text. */
 async function ask(page: Page, question: string): Promise<string> {
   await page.goto(`${BASE}/#/new-chat`);
-  const prompt = page.getByPlaceholder("How can I help you today?");
+  const prompt = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(question);
   await page.getByRole("button", { name: "Send", exact: true }).click();

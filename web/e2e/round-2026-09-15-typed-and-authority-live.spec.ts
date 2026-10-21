@@ -270,7 +270,7 @@ test("a real turn answers with a table Raiker knows is a table", async ({ page }
   // has never chosen one says so rather than guessing (BUG-292), so the choice
   // has to be made before a turn can go.
   await chooseModelForTurn(page, /Haiku 4\.5/i);
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 60_000 });
   // The prompt names the data and the destination, not the format. The point is
   // that the model reaches for the declared channel because it was told the

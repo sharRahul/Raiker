@@ -386,7 +386,7 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
 
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt", { exact: true });
-  await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");
+  await expect(chat).toHaveAttribute("placeholder", "What would you like Raiker to do?");
   // The Chat composer is deliberately minimal: no surface switch, no duplicate
   // capacity chip. What is left is what a prompt needs.
   await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
@@ -755,7 +755,12 @@ test("new-account Workbench is a board over the work, not a second composer", as
   await expect(start.getByRole("link")).toHaveCount(5);
 
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
-  await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
+  // QUI-Q01 — a readiness gap is a sentence with its fix, never a count. The
+  // fixture's runtime is not ready and names no gap, so that is what it says.
+  const gaps = page.getByRole("list", { name: "Setup Raiker still needs" });
+  await expect(gaps.getByText("Raiker is not ready to run work.")).toBeVisible();
+  await expect(gaps.getByRole("link", { name: "Open diagnostics" })).toBeVisible();
+  await expect(page.getByText("Runtime issues", { exact: true })).toHaveCount(0);
   await capture(page, join(shots, "workbench-dashboard-redesign.png"));
 });
 

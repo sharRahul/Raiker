@@ -59,7 +59,7 @@ async function signIn(target: Page) {
 
 /** Send one prompt and wait for *this* turn to finish. */
 async function ask(prompt: string) {
-  const composer = page.getByPlaceholder("How can I help you today?");
+  const composer = page.getByPlaceholder("What would you like Raiker to do?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   const before = await page.locator(".message-bubble-raiker").count();
   await composer.fill(prompt);
@@ -117,8 +117,9 @@ async function allowCapability(label: string, reason: string) {
 async function newChat() {
   await page.goto(`${BASE}/#/new-chat`);
   const reset = page.getByRole("button", { name: "New chat", exact: true });
-  if (await reset.isEnabled().catch(() => false)) await reset.click();
-  await expect(page.getByPlaceholder("How can I help you today?")).toBeVisible({ timeout: 30_000 });
+  // QUI-Q05 — the control exists only once there is a conversation to leave.
+  if ((await reset.isVisible()) && (await reset.isEnabled())) await reset.click();
+  await expect(page.getByPlaceholder("What would you like Raiker to do?")).toBeVisible({ timeout: 30_000 });
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

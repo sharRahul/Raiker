@@ -7,6 +7,8 @@
 experience for the [personal-agent architecture](PERSONAL_AUTONOMOUS_AGENT_SPEC.md).
 The [UX implementation plan](PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
 owns UX-01–UX-12 and their detailed reasons, decisions and acceptance criteria.
+The [Quiet UI redesign plan](quiet-ui/README.md) (proposed 2026-10-21) is the
+newer decision on page layout and presentation for laptop and desktop screens.
 
 The product should let a person ask for an outcome, understand its progress,
 make a concrete decision and open the result without learning runtime vocabulary.

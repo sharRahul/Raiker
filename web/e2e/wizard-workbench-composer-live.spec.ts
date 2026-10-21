@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 /**
  * Live evidence for the 2026-08-16 round: the first-run provider matrix, the
@@ -270,19 +271,14 @@ test("the Workbench is a board over the running work, not a composer", async ({ 
   test.setTimeout(300_000);
   await register(page);
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({ timeout: 60_000 });
 
   // The box is gone: it could not send anything, and it pushed the only live
   // information on the screen into a narrow rail.
-  await expect(page.getByLabel("What would you like Raiker to do?")).toHaveCount(0);
+  // QUI-H01 — Home's composer, and no mode tabs or start cards.
+  await expect(page.getByLabel("Ask Raiker")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
-  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
-    await expect(page.getByRole("heading", { name: group })).toBeVisible({ timeout: 30_000 });
-  }
-  const start = page.getByRole("navigation", { name: "Start work" });
-  for (const action of ["Start a conversation", "Start a build", "Plan a task or agent"]) {
-    await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
-  }
+  await expect(page.getByRole("navigation", { name: "Start work" })).toHaveCount(0);
   await capture(page, join(SHOTS, "r0816b-04-workbench-board.png"));
 
   // A real standing agent, so the board is proven against live rows rather than

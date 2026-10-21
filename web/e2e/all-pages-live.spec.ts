@@ -13,6 +13,7 @@ import { capture } from "./capture";
 import { DESTINATIONS, horizontalBleed, hubReachability, settled, WIDTHS } from "./destinations";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 /** Wait for the routed view to have finished arriving, not merely to exist. */
 async function settle(page: import("@playwright/test").Page): Promise<void> {
@@ -39,7 +40,7 @@ test("capture every application page from a live instance", async ({ page }) => 
   // part of arriving, from whichever stage the workspace resumes on.
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByRole("heading", { name: /Welcome (back|to your Work Dashboard)/ })).toBeVisible({
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({
     timeout: 30_000,
   });
 

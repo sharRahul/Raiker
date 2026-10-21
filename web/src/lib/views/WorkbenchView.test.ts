@@ -9,6 +9,7 @@ import WorkbenchView from "./WorkbenchView.svelte";
 import { DIAGNOSTICS, stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
+import { takeChatHandoff } from "../chatHandoff";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -45,6 +46,21 @@ const ROUTINE_THREAD = {
   tags: [],
   task_id: "t_agent",
   cadence: "daily",
+};
+
+const APPROVAL = {
+  approval_id: "appr_1",
+  action_id: "act_1",
+  status: "pending",
+  tool_name: "write_file",
+  capability: "file_write_execution",
+  risk_level: "medium",
+  session_id: "sess_abcdef123456",
+  turn_id: "turn_1",
+  created_at: "2026-07-07T00:00:00Z",
+  age_seconds: 60,
+  requires_approval: true,
+  executes_action: false,
 };
 
 function task(partial: Record<string, unknown>) {
@@ -119,47 +135,107 @@ function routes(overrides: Record<string, unknown> = {}) {
 }
 
 describe("WorkbenchView", () => {
-  it("has no composer at all — starting work is a link to the surface that owns one", async () => {
+  // QUI-H01 / QUI-Q02 — the composer replaces the five start cards. It hands
+  // its message to Chat; Home itself never sends a prompt.
+  it("opens with a composer that hands its message to Chat and opens Chat", async () => {
     stubFetch(routes());
+    const composed: unknown[] = [];
+    const listen = (event: Event) => composed.push((event as CustomEvent).detail);
+    window.addEventListener("raiker:compose", listen);
+    window.location.hash = "#/home";
     render(WorkbenchView);
 
-    await waitFor(() =>
-      expect(screen.getByRole("navigation", { name: "Start work" })).toBeInTheDocument(),
-    );
-    // The removed box: a prompt field, its mode tabs, and its send control.
-    expect(screen.queryByLabelText(/what would you like raiker to do/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Build" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /start build/i })).not.toBeInTheDocument();
-    const start = screen.getByRole("navigation", { name: "Start work" });
-    expect(within(start).getByRole("link", { name: /start a conversation/i })).toHaveAttribute(
-      "href",
-      "#/new-chat",
-    );
-    expect(within(start).getByRole("link", { name: /start a build/i })).toHaveAttribute("href", "#/build");
-    // Tasks and Projects follow the three modes in the same quiet row, and
-    // open their tabs of Work.
-    expect(within(start).getByRole("link", { name: /plan a task/i })).toHaveAttribute("href", "#/work?tab=tasks");
-    expect(within(start).getByRole("link", { name: /^projects$/i })).toHaveAttribute("href", "#/work?tab=projects");
-    expect(within(start).queryByText("Quarterly note")).not.toBeInTheDocument();
+    const box = await screen.findByLabelText("Ask Raiker");
+    expect(screen.queryByRole("navigation", { name: "Start work" })).toBeNull();
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(send).toBeDisabled();
+    await fireEvent.input(box, { target: { value: "Draft a reply to Anna" } });
+    await fireEvent.click(send);
+
+    expect(composed).toEqual([{ text: "Draft a reply to Anna", sessionId: null, fromHandoff: true }]);
+    expect(takeChatHandoff()).toBe("Draft a reply to Anna");
+    expect(window.location.hash).toBe("#/new-chat");
+    window.removeEventListener("raiker:compose", listen);
   });
 
-  it("offers the three Work modes as peers, Design included", async () => {
-    // The shell calls Chat, Build and Design three peer Work modes. Home listed
-    // two of them beside Tasks and Projects and left Design out, so the first
-    // screen an owner sees disagreed with the product it opens onto.
+  // QUI-H02 — the four starters belong to a first day, and to nothing else.
+  it("shows the four starters only while the workspace has nothing in it", async () => {
+    stubFetch(routes({ "GET /api/work-threads": [], "GET /api/projects": { projects: [], active_project_id: null } }));
+    const first = render(WorkbenchView);
+    const starters = await screen.findByRole("list", { name: "Ways to start" });
+    expect(within(starters).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(starters).getByRole("link", { name: "Make an image" })).toHaveAttribute("href", "#/design");
+    // A question starter fills the box for the owner to edit; it never sends.
+    await fireEvent.click(within(starters).getByRole("button", { name: "Plan my week" }));
+    expect(screen.getByLabelText("Ask Raiker")).toHaveValue(
+      "Help me plan my week. Ask me what is already on before you suggest anything.",
+    );
+    first.unmount();
+
     stubFetch(routes());
     render(WorkbenchView);
+    await screen.findByText(SESSION.title);
+    expect(screen.queryByRole("list", { name: "Ways to start" })).toBeNull();
+  });
 
-    const start = await screen.findByRole("navigation", { name: "Start work" });
-    const modes = within(start).getAllByRole("link").slice(0, 3);
-    expect(modes.map((link) => link.getAttribute("href"))).toEqual([
-      "#/new-chat",
-      "#/build",
-      "#/design",
-    ]);
-    // Quiet UI — each card is its title; no subtitle explains it.
-    expect(within(start).getByRole("link", { name: /start a design/i })).toBeInTheDocument();
-    expect(within(start).queryByText(/Describe an image a connected model draws/i)).not.toBeInTheDocument();
+  // QUI-H01 — a greeting for the time of day, and one fact only when true.
+  it("greets the owner by name and states a waiting decision once", async () => {
+    stubFetch(
+      routes({
+        "GET /api/settings": { status: { display_name: "Rahul", username: "rahul" }, settings: {} },
+        "GET /api/approvals": [APPROVAL],
+      }),
+    );
+    render(WorkbenchView);
+
+    expect(await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening), Rahul$/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "1 decision waiting" })).toHaveAttribute("href", "#/approvals");
+  });
+
+  // QUI-H04 — one dismissible line after an update, never on a first sighting.
+  it("says once that Raiker was updated, and the line can be dismissed", async () => {
+    localStorage.setItem("raiker.whats-new.seen-version", "1.3.0");
+    stubFetch(routes({ "GET /api/host/update": { installation: { version: "1.4.0" } } }));
+    render(WorkbenchView);
+
+    const line = await screen.findByText("Raiker was updated to 1.4.0.");
+    expect(screen.getByRole("link", { name: "What's new" })).toHaveAttribute("href", "#/settings?tab=updates");
+    await fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(line).not.toBeInTheDocument();
+    expect(localStorage.getItem("raiker.whats-new.seen-version")).toBe("1.4.0");
+    localStorage.removeItem("raiker.whats-new.seen-version");
+  });
+
+  // QUI-H05 — a backup is recommended only when there is none or it is stale,
+  // and then the rail is not an all-clear.
+  it("recommends a first backup in the attention rail", async () => {
+    stubFetch(routes({ "GET /api/backups": { backups: [], key_fingerprint: "" } }));
+    render(WorkbenchView);
+
+    const rail = await screen.findByRole("complementary", { name: "Needs your attention" });
+    expect(await within(rail).findByText("There is no backup of this workspace yet.")).toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: "Make a backup" })).toHaveAttribute("href", "#/settings?tab=account");
+    expect(within(rail).queryByText("Nothing needs you right now.")).toBeNull();
+  });
+
+  // QUI-H01 — the week's finished work, named rather than counted.
+  it("names the work finished this week", async () => {
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    stubFetch(
+      routes({
+        "GET /api/tasks": [
+          task({ task_id: "t_done", title: "Send the proposal", status: "completed", completed_at: recent, updated_at: recent }),
+          task({ task_id: "t_old", title: "Old cleanup", status: "completed", completed_at: "2026-01-01T00:00:00Z" }),
+          task({ task_id: "t_fail", title: "Broken import", status: "failed", completed_at: recent }),
+        ],
+      }),
+    );
+    render(WorkbenchView);
+
+    const week = await screen.findByRole("region", { name: "This week" });
+    expect(within(week).getByRole("link", { name: "Send the proposal" })).toHaveAttribute("href", "#/tasks?task=t_done");
+    expect(within(week).queryByText("Old cleanup")).toBeNull();
+    expect(within(week).queryByText("Broken import")).toBeNull();
   });
 
   it("separates a run in flight from a standing agent from a scheduled run", async () => {
@@ -240,14 +316,14 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     // Quiet UI — an idle Home says nothing about being idle: the greeting and
-    // the start row are the whole page.
-    expect(await screen.findByRole("heading", { name: "Welcome" })).toBeInTheDocument();
+    // the composer are the whole page.
+    expect(await screen.findByRole("heading", { name: /^(Welcome|Good (morning|afternoon|evening))/ })).toBeInTheDocument();
     expect(screen.queryByText(/Nothing is running, standing, or scheduled/)).not.toBeInTheDocument();
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
     expect(screen.queryByText("Standing agents")).not.toBeInTheDocument();
     expect(screen.queryByText("Scheduled runs")).not.toBeInTheDocument();
-    // And starting work is still one click from the same screen.
-    expect(screen.getByRole("navigation", { name: "Start work" })).toBeInTheDocument();
+    // And starting work is still one step from the same screen.
+    expect(screen.getByLabelText("Ask Raiker")).toBeInTheDocument();
   });
 
   it("says nothing needs you, rather than three tiles reading zero", async () => {

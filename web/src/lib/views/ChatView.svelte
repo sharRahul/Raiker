@@ -96,6 +96,7 @@
   } from "../citations";
   import { allProfiles, chatProfiles, refreshModels, modelCatalogues, modelsKnown } from "../models.svelte";
   import { catalogueChoices } from "../modelCatalogue";
+  import { COMPOSE_EVENT, takeChatHandoff } from "../chatHandoff";
   import {
     activeComposerProfile,
     blocksSending,
@@ -673,8 +674,16 @@
         profileId?: string;
         model?: string;
         attachments?: ComposerAttachment[];
+        fromHandoff?: boolean;
       }>).detail;
       if (detail === undefined || detail.text.trim() === "") return;
+      if (detail.fromHandoff) {
+        // QUI-H01 — Home's composer. Taken from the one-shot store so a Chat
+        // that mounts later cannot send the same message a second time.
+        const handed = takeChatHandoff();
+        if (handed !== null) void startHandedOffChat(handed);
+        return;
+      }
       if (detail.sessionId !== null && detail.sessionId !== sessionId) {
         sessionId = detail.sessionId;
         void loadHistory(detail.sessionId);
@@ -689,9 +698,12 @@
       draft.text = detail.text;
       void submit();
     };
-    window.addEventListener("raiker:compose", onCompose);
+    window.addEventListener(COMPOSE_EVENT, onCompose);
+    // QUI-H01 — a message Home handed over before this Chat existed.
+    const waiting = takeChatHandoff();
+    if (waiting !== null) void startHandedOffChat(waiting);
     return () => {
-      window.removeEventListener("raiker:compose", onCompose);
+      window.removeEventListener(COMPOSE_EVENT, onCompose);
       audioSessionCoordinator.stopAll("route");
     };
   });
@@ -1197,6 +1209,26 @@
       e.preventDefault();
       void submit();
     }
+  }
+
+  /**
+   * QUI-H01 — a message from Home's composer starts a conversation of its own.
+   * It is never appended to whatever conversation Chat last showed. While a
+   * turn is still running the message waits in the composer instead of being
+   * dropped, because `submit()` refuses to start a second turn.
+   */
+  async function startHandedOffChat(text: string) {
+    if (streaming) {
+      draft.text = text;
+      return;
+    }
+    if (turns.length > 0 || sessionId !== null) newConversation();
+    draft.text = text;
+    // A Chat that has only just mounted has not read its models yet, and an
+    // unread model list looks like no model at all. Read it before judging.
+    if (!modelsKnown()) await refreshModels();
+    await tick();
+    void submit();
   }
 
   function newConversation() {

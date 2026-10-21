@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { dismissFirstRunModelSetup, requireFirstRunWorkspace } from "./hosted-provider";
+import { HOME_GREETING } from "./home";
 
 async function unlock(page: import("@playwright/test").Page) {
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
@@ -38,28 +39,19 @@ test("live empty-account Workbench review", async ({ page }) => {
     // A brand-new instance opens the five-stage first-run wizard over the
     // Workbench, and it is modal: this review is about the screen underneath.
     await dismissFirstRunModelSetup(page);
-    await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({ timeout: 30_000 });
   } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
     await unlock(page);
   }
   await dismissFirstRunModelSetup(page);
-  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Pick up where you left off", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Resume a conversation", { exact: true })).toHaveCount(0);
-  // The composer is gone. The Workbench answers "what is Raiker doing right now"
-  // in three groups that are three different facts, and starting work is a link
-  // to the surface that owns a composer for it.
-  await expect(page.getByLabel(/What would you like Raiker to do/)).toHaveCount(0);
+  // QUI-H01 — Home opens with a composer that hands its message to Chat; the
+  // boards below it appear only when they have something in them.
+  await expect(page.getByLabel("Ask Raiker")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
-  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
-    await expect(page.getByRole("region", { name: group })).toBeVisible();
-  }
-  await expect(page.getByText("Nothing is running.")).toBeVisible();
-  const start = page.getByRole("navigation", { name: "Start work" });
-  for (const action of ["Start a conversation", "Start a build", "Plan a task or agent"]) {
-    await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
-  }
-  await expect(page.getByRole("link", { name: /Review issues/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Start work" })).toHaveCount(0);
   await capture(page, "../../docs/plans/screenshots/working/workbench-board-live.png");
   expect(consoleErrors).toEqual([]);
 });

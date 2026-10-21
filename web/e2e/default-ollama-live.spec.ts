@@ -3,6 +3,7 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
@@ -25,7 +26,7 @@ const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshot
  */
 test("a fresh workspace names no model when the runtime is not installed", async ({ page }) => {
   await signInAsOwner(page, BASE);
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({ timeout: 20_000 });
 
   await page.goto(`${BASE}/#/models`);
   // The provider is still offered for setup — it is the model claim that was

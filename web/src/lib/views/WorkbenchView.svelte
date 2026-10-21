@@ -1,6 +1,8 @@
 <script lang="ts">
   /**
-   * Workbench — the default screen: a board, not a composer.
+   * Workbench — the default screen: a board over the work, opened by a
+   * composer that hands its message to Chat (QUI-H01). Home still never sends a
+   * prompt itself: the one governed send path is Chat's.
    *
    * It answers "what is Raiker doing right now" in three groups that are three
    * different facts, not three names for the same one:
@@ -13,9 +15,7 @@
    *
    * Every row is a task the backend already owns, so the board never invents a
    * state: it reads `GET /api/tasks` and classifies by the recurrence and the
-   * scheduled time the runtime itself honours. Starting work is a link to the
-   * surface that owns the composer, so there is exactly one composer per kind of
-   * work and no second send path.
+   * scheduled time the runtime itself honours.
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../api";
@@ -26,12 +26,15 @@
     TaskView,
     WorkThread,
   } from "../apiTypes";
-  import type { AttentionFeedView, GoalView } from "../generated/apiContract";
+  import type { AttentionFeedView, BackupView, GoalView } from "../generated/apiContract";
+  import { backupReminder } from "../backupReminder";
   import { contract } from "../generated/apiContract";
   import { goalBadge, homeGoalGroups, stepProgress } from "../goalPresentation";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
-  import { START_WORK } from "../workSurface";
+  import HomeComposer from "../components/HomeComposer.svelte";
+  import { homeFact, homeGreeting, weekOutcomes } from "../homeSummary";
+  import { markVersionSeen, versionToAnnounce } from "../whatsNew";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { openModelSetup } from "../modelReadiness.svelte";
@@ -76,6 +79,10 @@
   let health = $state<Freshness<Diagnostics>>(freshnessLoading());
   let unavailable = $state(false);
   let updatedAt = $state<Date | null>(null);
+  // QUI-H05 — read with the board; `null` until read, so a failed read never
+  // recommends a backup the owner may already have.
+  let backups = $state<BackupView[] | null>(null);
+  const backupNote = $derived(backupReminder(backups, updatedAt ?? new Date()));
   let busyTask = $state<string | null>(null);
   let notice = $state<string | null>(null);
   // BUG-299 — where to look when the runtime could not say what happened.
@@ -119,9 +126,6 @@
     active.filter((task) => repeats(task) && !runningIds.has(task.task_id)),
   );
   const scheduled = $derived(active.filter((task) => !repeats(task) && armed(task)));
-  // Deliberately not "the active project": no route is scoped by one any more.
-  // What the board can honestly say is how many projects exist.
-  const projectCount = $derived(projects?.projects.length ?? 0);
   const named = $derived((sessions ?? []).filter((s) => s.title.trim() !== ""));
   const hasActivity = $derived(
     named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0,
@@ -139,6 +143,11 @@
     return readinessGaps(diagnostics.missing_config, diagnostics.production_ready_local_single_user_runtime);
   });
   const healthIsCurrent = $derived(isCurrent(health));
+  // QUI-H01 — the owner's chosen name, as Chat greets them (RR-IDENTITY-01).
+  let ownerName = $state("");
+  const greeting = $derived(homeGreeting(ownerName, tasks !== null && !hasActivity, new Date().getHours()));
+  const fact = $derived(homeFact((approvals ?? []).length));
+
   const healthLine = $derived(freshnessLabel(health, "Runtime health"));
 
   // NEW-HOME-01 — a run that is running is progress, not attention. The rail
@@ -156,6 +165,7 @@
   // "Nothing needs you right now" is a claim about three things, and it may
   // only be made when all three were looked at.
   const nothingNeedsAttention = $derived(
+    backupNote === null &&
     (approvals ?? []).length === 0 &&
       healthIsCurrent &&
       runtimeIssues === 0 &&
@@ -175,6 +185,7 @@
    * between a false all-clear and a blank rail.
    */
   const partialAllClear = $derived(
+    backupNote === null &&
     (approvals ?? []).length === 0 && blocked.length === 0 && feedItems.length === 0 && !healthIsCurrent,
   );
 
@@ -189,6 +200,8 @@
 
   let goals = $state<GoalView[]>([]);
   const goalGroups = $derived(homeGoalGroups(goals));
+  // QUI-H01 — finished outcomes named, not counted.
+  const thisWeek = $derived(weekOutcomes(tasks ?? [], goals, updatedAt ?? new Date(), taskDetailHref));
   const GOAL_GROUPS = [
     { key: "needsYou", title: "Needs you" },
     { key: "moving", title: "In progress" },
@@ -231,6 +244,13 @@
       } catch {
         if (seq !== loadSeq) return;
         feedFailed = true;
+      }
+      try {
+        const listed = await api.backups();
+        if (seq !== loadSeq) return;
+        backups = Array.isArray(listed?.backups) ? listed.backups : null;
+      } catch {
+        // kept as last read
       }
       try {
         const diagnostics = await api.diagnostics();
@@ -284,7 +304,20 @@
 
   // A board has to be live or it is a stale screenshot of one. The same 15-second
   // cadence the Tasks page uses, because it is the same data.
+  // QUI-H04 — the version to announce, once, after an update.
+  let updatedTo = $state<string | null>(null);
+  function dismissUpdate() {
+    if (updatedTo !== null) markVersionSeen(updatedTo);
+    updatedTo = null;
+  }
+
   onMount(() => {
+    void api.hostUpdate()
+      .then((view) => (updatedTo = versionToAnnounce(view.installation.version)))
+      .catch(() => {});
+    void api.settings()
+      .then((view) => (ownerName = view.status.display_name || view.status.username || ""))
+      .catch(() => {});
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(timer);
@@ -303,33 +336,31 @@
        the guide link moved below the start row: they are true, and they are
        not the reason anybody opened this page. -->
   <div class="intro">
-    <!-- Quiet UI — a greeting, and a sentence only when something is wrong. -->
-    <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome"}</h2>
+    <!-- QUI-H01 — a greeting for the owner's time of day, and one fact under
+         it only when that fact is true. "Welcome" stays for a first day. -->
+    <h2 id="workbench-title" class="display">{greeting}</h2>
+    {#if fact !== null}
+      <p class="fact"><a href="#/approvals">{fact}</a></p>
+    {/if}
     {#if unavailable}
       <p class="lead">Raiker could not read what is running. Nothing was started or changed.</p>
     {/if}
   </div>
 
-  <!-- The shell calls Chat, Build and Design three peer Work modes; this row
-       listed two of them beside Tasks and Projects and left Design out, so the
-       first screen an owner sees disagreed with the product it opens onto. The
-       three modes come first, as peers, from the same list the rest of the
-       product reads (`workSurface.ts`); the two workflow entries follow, which
-       is what they are. -->
-  <nav class="start-row" aria-label="Start work">
-    {#each START_WORK as entry (entry.mode)}
-      <a class="start-card" href={entry.route}>
-        <Icon name={entry.icon} size="md" />
-        <span><strong>{entry.title}</strong></span>
-      </a>
-    {/each}
-    <a class="start-card" href="#/work?tab=tasks" title="Run once, on a cadence, or in the background">
-      <Icon name="tasks" size="md" /><span><strong>Plan a task</strong></span>
-    </a>
-    <a class="start-card" href="#/work?tab=projects" title={projectCount === 0 ? "No projects yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}>
-      <Icon name="projects" size="md" /><span><strong>Projects</strong></span>
-    </a>
-  </nav>
+  {#if updatedTo !== null}
+    <!-- QUI-H04 — one dismissible line after an update; never a modal. -->
+    <p class="whats-new" role="status">
+      <span>Raiker was updated to {updatedTo}.</span>
+      <a href="#/settings?tab=updates" onclick={dismissUpdate}>What's new</a>
+      <button type="button" class="btn btn-ghost btn-sm" onclick={dismissUpdate}>Dismiss</button>
+    </p>
+  {/if}
+
+  <!-- QUI-H01 / QUI-Q02 — the composer replaces the five start cards. They
+       repeated the sidebar and the Chat · Build · Design switch; the composer
+       starts work in one step and opens it in Chat. QUI-H02 — on a first day
+       the four starters sit under it, and nothing else does. -->
+  <HomeComposer showStarters={tasks !== null && !hasActivity} />
 
   <div class="refresh-state">
     <GuideLink route="home" />
@@ -528,6 +559,19 @@
             </ul>
           </section>
         {/if}
+
+        {#if thisWeek.length > 0}
+          <!-- QUI-H01 — the week's finished outcomes, by name. This is where
+               the sense of progress lives: what got done, not how many. -->
+          <section class="board card week" aria-labelledby="week-h">
+            <div class="card-head">
+              <h3 id="week-h">This week</h3>
+            </div>
+            <p class="week-line">
+              {#each thisWeek.slice(0, 5) as outcome, index (outcome.id)}{#if index > 0}<span class="sep" aria-hidden="true"> · </span>{/if}<a href={outcome.href}>{outcome.title}</a>{/each}{#if thisWeek.length > 5}<span class="sep" aria-hidden="true"> · </span><span>and {thisWeek.length - 5} more</span>{/if}
+            </p>
+          </section>
+        {/if}
       {/if}
     </div>
 
@@ -639,6 +683,14 @@
           linkLabel="Open the live board"
         />
         {/if}
+        {#if backupNote !== null}
+          <!-- QUI-H05 — a backup is recommended only when there is none or the
+               newest is a week old. -->
+          <p class="feed-item backup-note">
+            <span>{backupNote.text}</span>
+            <a href={backupNote.href}>{backupNote.label}</a>
+          </p>
+        {/if}
         {#if feedItems.length > 0}
           <!-- DEC-02 — each item names what waits and the one place it is
                resolved; it goes when its own subsystem says it is done. -->
@@ -677,26 +729,6 @@
   /* Below the start row now: freshness and a guide link are true and are not
      what anybody opened Home for. */
   .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; margin-top: var(--space-3); }
-  /* Starting work is a link to the surface that owns the composer, so the board
-     never becomes a second send path. */
-  /* Three peer Work modes on the first row; the two workflow entries on a
-     second, quieter one. Peers share a row; a secondary thing does not sit in
-     the same rhythm as the thing it is secondary to. */
-  .start-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
-  .start-card {
-    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
-    gap: var(--space-3); padding: var(--space-3) var(--space-4); color: var(--text-1);
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-    box-shadow: var(--shadow-1); text-decoration: none;
-    transition: transform var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
-  }
-  .start-card:hover { transform: translateY(-1px); border-color: var(--accent-border); }
-  .start-card > :first-child { color: var(--accent); }
-  .start-card span { display: grid; gap: 0.1rem; min-width: 0; }
-  @media (prefers-reduced-motion: reduce) {
-    .start-card { transition: none; }
-    .start-card:hover { transform: none; }
-  }
   .columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 19rem); gap: var(--space-4); align-items: start; }
   .main-column { display: grid; gap: var(--space-4); min-width: 0; }
   .side-column { display: grid; gap: var(--space-3); }
@@ -737,11 +769,9 @@
   .resumes li span { font-size: var(--text-xs); color: var(--text-3); }
   @media (max-width: 63.9rem) {
     .columns { grid-template-columns: 1fr; }
-    .start-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 40rem) {
     .intro { flex-direction: column; }
-    .start-row { grid-template-columns: 1fr; }
     .rows li { grid-template-columns: minmax(0, 1fr); }
     .row-actions { justify-content: flex-start; }
   }
@@ -755,4 +785,13 @@
   .feed-containment { border-color: var(--danger-border); }
   .feed-blocking { border-color: var(--warn-border); }
   .gap-action { justify-self: start; }
+  .fact { margin: 0; font-size: var(--text-sm); }
+  .whats-new {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+    margin: 0; padding: var(--space-2) var(--space-3); max-width: 46rem;
+    border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
+    font-size: var(--text-sm); color: var(--text-2);
+  }
+  .week-line { margin: 0; font-size: var(--text-sm); color: var(--text-2); line-height: 1.6; }
+  .week-line .sep { color: var(--text-3); }
 </style>

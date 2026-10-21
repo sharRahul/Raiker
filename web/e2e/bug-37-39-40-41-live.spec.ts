@@ -50,6 +50,7 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, useAnthropic } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const REPO = join(import.meta.dirname, "..", "..");
@@ -119,7 +120,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
 test("the type scale, motion set and density tokens are live on the document", async () => {
   test.setTimeout(60_000);
   await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible();
 
   const tokens = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
@@ -212,7 +213,7 @@ test("every page holds up at 375, 768, 1024 and 1440 in both themes", async () =
 test("the finished visual language is recorded in both themes", async () => {
   test.setTimeout(180_000);
   const pages: [string, string, RegExp][] = [
-    ["workbench", "186-visual-workbench", /Welcome/],
+    ["workbench", "186-visual-workbench", HOME_GREETING],
     ["models?tab=pricing", "187-visual-models-pricing", /Pricing|Choose where Raiker thinks/],
     ["settings", "188-visual-settings-density", /Settings/],
     ["tasks", "189-visual-tasks", /Plan work/],

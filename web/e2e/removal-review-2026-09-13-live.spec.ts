@@ -45,6 +45,7 @@ test("Home does not call an unread readiness check an all-clear (NEW-HOME-01)", 
     rail
       .getByRole("list", { name: "Setup Raiker still needs" })
       .or(rail.getByText(/nothing needs you right now/i))
+      .or(rail.getByText(/no backup of this workspace|last backup was/i))
       .first(),
   ).toBeVisible({ timeout: 60_000 });
   await capture(page, `${SHOTS}/home-readiness-read.png`);

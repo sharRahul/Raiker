@@ -19,6 +19,7 @@
  * than eighteen, and a spec that cannot connect fails saying so.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { HOME_GREETING } from "./home";
 
 /**
  * The owner every live spec signs in as, unless it is *about* signing in.
@@ -633,7 +634,7 @@ export async function signInAsOwner(
     await page.getByRole("button", { name: /unlock|sign in/i }).click();
   }
   const workbench = page.getByRole("heading", {
-    name: /^Welcome(?: back| to your Work Dashboard)?$/,
+    name: HOME_GREETING,
   });
   // The wizard is identified by its own heading rather than by a button on one
   // of its stages: a workspace that left setup part-way resumes on the

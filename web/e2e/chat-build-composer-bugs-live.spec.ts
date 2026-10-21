@@ -219,17 +219,8 @@ test("composer parity — Chat, Build, and Workbench agree on what they offer", 
   await capture(page, join(SHOTS, "126-build-composer-parity-live.png"));
 
   await page.goto(`${BASE}/#/workbench`);
-  // The Workbench has no composer at all now: it could not send anything, and it
-  // re-showed every prompt in the destination surface's own composer. It is the
-  // live board over what is running, and starting work is a link to the one
-  // surface that owns a composer for that kind of work.
-  await expect(page.getByLabel(/What would you like Raiker to do/)).toHaveCount(0);
+  // QUI-H01 — Home's composer hands its message to Chat; no mode tabs.
+  await expect(page.getByLabel("Ask Raiker")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
-  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
-    await expect(page.getByRole("region", { name: group })).toBeVisible();
-  }
-  const start = page.getByRole("navigation", { name: "Start work" });
-  await expect(start.getByRole("link", { name: /Start a conversation/ })).toBeVisible();
-  await expect(start.getByRole("link", { name: /Start a build/ })).toBeVisible();
   await capture(page, join(SHOTS, "127-workbench-board-live.png"));
 });

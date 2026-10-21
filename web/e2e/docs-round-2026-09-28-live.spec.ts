@@ -165,7 +165,8 @@ test("BUG-307: nothing is refused without an inline-style allowance", async ({ p
   // Home, once its readiness read has answered: the rail says what was read.
   await page.goto(`${BASE}/#/workbench`);
   const rail = page.getByRole("complementary", { name: "Needs your attention" });
-  await expect(rail).toContainText(/Nothing needs you right now|not an all-clear/, { timeout: 90_000 });
+  // QUI-H05 — a workspace with no backup is recommended one instead.
+  await expect(rail).toContainText(/Nothing needs you right now|not an all-clear|no backup of this workspace|last backup was/, { timeout: 90_000 });
   await expect(rail).not.toContainText(/still reading/, { timeout: 90_000 });
   await capture(page, join(SHOTS, "06-home-under-strict-style-src.png"));
   const found = await refusals();

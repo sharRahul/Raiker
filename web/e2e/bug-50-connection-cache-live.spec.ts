@@ -49,6 +49,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { capture } from "./capture";
 import { hostedProviderCard, keepOffered, offeredModelIds, openModelDialog, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY, ANTHROPIC_MODEL as MODEL } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 const HOST_PID = process.env.RAIKER_LIVE_HOST_PID ?? "";
@@ -62,7 +63,7 @@ const INSTANCES = 30;
  * — which is how the first version of this spec screenshotted the login screen
  * and called it a working host.
  */
-const DASHBOARD = /^Welcome (to your Work Dashboard|back)$/;
+const DASHBOARD = HOME_GREETING;
 
 /** Routes the owner's own workspace has to keep serving after all of that. */
 const ROUTES = ["workbench", "new-chat", "build", "tasks", "sessions", "memory", "models"];

@@ -3,6 +3,7 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
@@ -24,7 +25,7 @@ test("refined surfaces read correctly in both themes", async () => {
   for (const theme of ["light", "dark"] as const) {
     await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
     await page.goto(`${BASE}/#/workbench`);
-    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible();
     await page.waitForTimeout(250);
     await capture(page, join(SHOTS, `133-visual-refresh-workbench-${theme}.png`));
 

@@ -12,6 +12,7 @@
 // redesign cannot silently outrun it.
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
+import { HOME_GREETING } from "./home";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -723,14 +724,13 @@ test("Models opens on what is running the work, not on a filing system", async (
   );
 });
 
-test("new-account Workbench is a board over the work, not a second composer", async ({ page }) => {
+test("new-account Home opens with a composer over the board", async ({ page }) => {
   await page.goto("http://raiker.test/#/workbench");
-  await expect(page.getByRole("heading", { name: "Welcome" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible();
 
-  // The removed box. The Workbench composer could not send anything: it handed
-  // the prompt to Chat, Build or Tasks, which re-showed it in that surface's own
-  // composer. What is left is the live answer to "what is Raiker doing".
-  await expect(page.getByLabel("What would you like Raiker to do?")).toHaveCount(0);
+  // QUI-H01 — one composer that hands its message to Chat; no mode tabs and no
+  // second send path of its own.
+  await expect(page.getByLabel("Ask Raiker")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
   // A fresh install used to open on three bordered rectangles saying
   // "Nothing is running", "No standing agents" and "Nothing is scheduled":
@@ -744,15 +744,8 @@ test("new-account Workbench is a board over the work, not a second composer", as
     await expect(page.getByRole("heading", { name: group })).toHaveCount(0);
   }
 
-  // Starting work is a link to the surface that owns a composer, so there is
-  // exactly one composer per kind of work. The three Work modes are peers and
-  // share a row; Tasks and Projects organise work rather than being a place it
-  // happens, so they have their own.
-  const start = page.getByRole("navigation", { name: "Start work" });
-  for (const action of ["Start a conversation", "Start a build", "Start a design", "Plan a task", "Projects"]) {
-    await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
-  }
-  await expect(start.getByRole("link")).toHaveCount(5);
+  // QUI-Q02 — the five start cards are gone; the composer replaced them.
+  await expect(page.getByRole("navigation", { name: "Start work" })).toHaveCount(0);
 
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
   // QUI-Q01 — a readiness gap is a sentence with its fix, never a count. The

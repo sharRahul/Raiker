@@ -1,8 +1,8 @@
 /**
  * Home's Work parity and the Memory hub, on the running product.
  *
- * Both claims are about what an owner sees first: that the three Work modes are
- * offered as peers on the page the session opens with, and that Memory answers
+ * Both claims are about what an owner sees first: that Home opens with a
+ * composer (QUI-H01), and that Memory answers
  * *is anything waiting on me* before it shows a category of records.
  */
 import { expect, test } from "@playwright/test";
@@ -14,29 +14,16 @@ const SHOTS = "../../docs/plans/screenshots/working";
 
 test.describe.configure({ mode: "serial" });
 
-test("Home offers Chat, Build and Design as peers", async ({ page }) => {
+test("Home opens with a composer that hands its message to Chat", async ({ page }) => {
   test.setTimeout(120_000);
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/home`);
 
-  const start = page.getByRole("navigation", { name: "Start work" });
-  await expect(start).toBeVisible({ timeout: 30_000 });
-  const links = start.getByRole("link");
-  await expect(links).toHaveCount(3);
-  await expect(links.nth(0)).toHaveAttribute("href", "#/new-chat");
-  await expect(links.nth(1)).toHaveAttribute("href", "#/build");
-  await expect(links.nth(2)).toHaveAttribute("href", "#/design");
-
-  // Tasks and Projects are workflow entries, not Work modes: their own row.
-  const organise = page.getByRole("navigation", { name: "Organise work" });
-  await expect(organise.getByRole("link")).toHaveCount(2);
-
-  // The link reaches the surface it names.
-  await links.nth(2).click();
-  await expect(page.locator('[data-work-surface="design"]')).toBeVisible({ timeout: 30_000 });
-
-  await page.goto(`${BASE}/#/home`);
-  await capture(page, `${SHOTS}/home-start-work-parity.png`, start);
+  // QUI-H01 / QUI-Q02 — the composer replaced the start cards.
+  const box = page.getByLabel("Ask Raiker");
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("navigation", { name: "Start work" })).toHaveCount(0);
+  await capture(page, `${SHOTS}/home-composer.png`);
 });
 
 test("Memory opens on what is waiting, and each tab holds one kind of thing", async ({ page }) => {

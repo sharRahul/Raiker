@@ -8,6 +8,7 @@ import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch, openComposerAttach } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
+import { handOffToChat } from "../chatHandoff";
 import { ApiError } from "../api";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
@@ -760,6 +761,29 @@ describe("ChatView streaming transcript", () => {
       session_id: "sess_retry",
       retry_of_turn_id: "turn_1",
     });
+  });
+
+  // QUI-H01 — Home's composer hands its message to Chat. A Chat that mounts
+  // after the hand-off sends it once; a mounted one sends it as a new chat.
+  it("sends a message handed over from Home, once, in a new conversation", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Planned.") });
+    });
+    handOffToChat("Plan my week");
+    render(ChatView);
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(1));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ text: "Plan my week" });
+    expect(await screen.findByText("Planned.")).toBeInTheDocument();
+
+    // Mounted now: the next hand-off starts a fresh conversation rather than
+    // continuing the one on screen.
+    handOffToChat("Draft a reply to Anna");
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledTimes(2));
+    const second = streamPromptMock.mock.calls[1][0] as Record<string, unknown>;
+    expect(second).toMatchObject({ text: "Draft a reply to Anna" });
+    expect(second.session_id ?? null).toBeNull();
+    expect(screen.queryByText("Plan my week")).toBeNull();
   });
 
   it("shows a route-level loading state while persisted history is fetched", async () => {

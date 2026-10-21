@@ -17,6 +17,7 @@ import { capture } from "./capture";
 import { join } from "node:path";
 import { signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "docs", "plans", "screenshots", "working");
 
@@ -68,7 +69,7 @@ test("Settings states one runtime instead of asking which one to run", async () 
 test("the Workbench composer carries files and schedules with a time", async () => {
   test.setTimeout(90_000);
   await page.goto(`${BASE}/#/home`);
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible({ timeout: 20_000 });
 
   // It no longer tells you to go and start in Chat to attach something.
   await expect(page.getByRole("button", { name: "Add attachment" })).toBeVisible();

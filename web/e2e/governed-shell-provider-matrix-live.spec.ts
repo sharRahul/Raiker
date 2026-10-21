@@ -14,6 +14,7 @@ import { expect, test, type BrowserContext, type Locator, type Page } from "@pla
 import { join } from "node:path";
 import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel } from "./hosted-provider";
 import { LIVE_BASE as BASE } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = join(import.meta.dirname, "..", "..", "output", "playwright");
 const PASSWORD = OWNER_CREDENTIALS.password;
@@ -67,7 +68,7 @@ async function signIn(): Promise<void> {
   } else {
     await page.getByRole("button", { name: /unlock|sign in/i }).click();
   }
-  const welcome = page.getByRole("heading", { name: /Welcome/ });
+  const welcome = page.getByRole("heading", { name: HOME_GREETING });
   const setup = page.getByRole("button", { name: /Decide later|Skip for now/ });
   await expect(welcome.or(setup).first()).toBeVisible({ timeout: 30_000 });
   if (await setup.isVisible().catch(() => false)) await dismissFirstRunModelSetup(page);

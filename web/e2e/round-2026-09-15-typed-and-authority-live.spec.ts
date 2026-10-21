@@ -25,6 +25,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { chooseModelForTurn, signInAsOwner } from "./hosted-provider";
 import { LIVE_BASE as BASE, ANTHROPIC_KEY as KEY, useAnthropic } from "./live";
+import { HOME_GREETING } from "./home";
 
 const SHOTS = "../../docs/screenshots";
 
@@ -242,9 +243,10 @@ test("Home opens on the next action, with the commentary under it", async ({ pag
   await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/workbench`);
 
-  const greeting = page.getByRole("heading", { name: /Welcome/ });
+  const greeting = page.getByRole("heading", { name: HOME_GREETING });
   await expect(greeting).toBeVisible({ timeout: 60_000 });
-  const start = page.getByRole("navigation", { name: "Start work" });
+  // QUI-H01 — the primary action is Home's composer.
+  const start = page.getByLabel("Ask Raiker");
   const freshness = page.getByText(/^Updated |^Updating…$/).first();
   await expect(start).toBeVisible();
   await expect(freshness).toBeVisible();

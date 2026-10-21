@@ -22379,7 +22379,7 @@
       },
       "ModelRoutingRequest": {
         "additionalProperties": false,
-        "description": "OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``).\n\n``\"\"`` clears a preference back to the account default. Only values\nOpenRouter defines are accepted, so nothing else reaches a request body.",
+        "description": "OpenRouter routing preferences for one saved connection.\n\n``\"\"`` clears a preference back to the account default. Only values\nOpenRouter defines are accepted, so nothing else reaches a request body.",
         "properties": {
           "data_collection": {
             "default": "",
@@ -28668,7 +28668,7 @@
       },
       "SetSideTaskModelsRequest": {
         "additionalProperties": false,
-        "description": "One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it.",
+        "description": "One side task's ordered model chain; [] clears it.",
         "properties": {
           "chain": {
             "items": {
@@ -45945,7 +45945,7 @@
     },
     "/api/model-side-tasks": {
       "put": {
-        "description": "Set one side task's ordered model chain (human gate-manager only).\n\nHermes Agent's auxiliary models. Choosing a side model grants nothing: each\ncall still goes through provider policy, gates, egress and keys like any\nturn. A vision chain may hold only models that accept images.",
+        "description": "Set one side task's ordered model chain (human gate-manager only).\n\nChoosing a side model grants nothing: each\ncall still goes through provider policy, gates, egress and keys like any\nturn. A vision chain may hold only models that accept images.",
         "operationId": "set_side_task_models_api_model_side_tasks_put",
         "requestBody": {
           "content": {
@@ -46546,7 +46546,7 @@
     },
     "/api/models/{profile_id}/routing": {
       "put": {
-        "description": "Save OpenRouter routing preferences beside the saved connection.\n\nHermes Agent's ``provider_routing``, for the two preferences that matter to\nan owner: whether a request may reach providers that store prompts, and\nwhat to prefer when several serve the model. They describe how this\naccount's requests are routed, so they live with its connection; the key is\nnever re-entered and never touched.",
+        "description": "Save OpenRouter routing preferences beside the saved connection.\n\nTwo preferences matter to an owner: whether a request may reach providers that store prompts, and\nwhat to prefer when several serve the model. They describe how this\naccount's requests are routed, so they live with its connection; the key is\nnever re-entered and never touched.",
         "operationId": "set_model_routing_api_models__profile_id__routing_put",
         "parameters": [
           {
@@ -46596,7 +46596,7 @@
     },
     "/api/models/{profile_id}/server-check": {
       "post": {
-        "description": "Is this local or custom server set up for agent work? (Hermes local-server checks)\n\nOne request with one harmless tool, through the same governed provider path\na turn uses, and the context a loopback server says it is serving. Nothing\non the server is changed.",
+        "description": "Is this local or custom server set up for agent work?\n\nOne request with one harmless tool, through the same governed provider path\na turn uses, and the context a loopback server says it is serving. Nothing\non the server is changed.",
         "operationId": "check_model_server_api_models__profile_id__server_check_post",
         "parameters": [
           {

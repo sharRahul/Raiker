@@ -4292,7 +4292,7 @@ export type ModelReadinessView = {
   ready: boolean;
 };
 
-/** OpenRouter routing preferences for one saved connection (Hermes ``provider_routing``). */
+/** OpenRouter routing preferences for one saved connection. */
 export type ModelRoutingRequest = {
   data_collection?: "" | "deny";
   sort?: "" | "price" | "throughput" | "latency";
@@ -5549,7 +5549,7 @@ export type SetSessionTagsRequest = {
   tags: string[];
 };
 
-/** One side task's ordered model chain (Hermes ``auxiliary.<task>``); [] clears it. */
+/** One side task's ordered model chain; [] clears it. */
 export type SetSideTaskModelsRequest = {
   task: "summarise" | "vision";
   chain?: SideTaskModelEntry[];

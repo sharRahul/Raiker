@@ -2709,8 +2709,7 @@
     position: fixed;
     top: calc(var(--topbar-h) + var(--space-3));
     right: var(--space-4);
-    /* Found live (RT-QUI-12): reaching the bottom of the window it covered the
-       composer's Send. Over the transcript means above the composer. */
+    /* Over the transcript means above the composer: Send stays reachable. */
     max-height: calc(100vh - var(--topbar-h) - 16rem);
     z-index: var(--z-panel);
     display: flex;

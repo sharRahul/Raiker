@@ -73,11 +73,12 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  --sidebar-w: 256px;
-  /* Collapsed the sidebar keeps its icons. 56px is a 20px icon in a 2.35rem row
-     with the row's own padding either side — wide enough that the target is the
-     same one you hit at full width, narrow enough to be worth collapsing for. */
-  --sidebar-rail-w: 56px;
+  /* QUI shell — 232 px with 40 px rows. Collapsed, or in a 1,024–1,279 px
+     window, the sidebar is a 64 px rail that keeps its icons: a 20 px icon in a
+     40 px row with room either side, the same target as at full width. */
+  --sidebar-w: 232px;
+  --sidebar-rail-w: 64px;
+  --nav-row-h: 40px;
   --topbar-h: 56px;
   /* DESK-06 — room the macOS window buttons (close, minimise, zoom) occupy at
      the window's top-left in Raiker's desktop window. */
@@ -92,12 +93,15 @@
   /* Desktop canvases share one vocabulary. A view chooses the kind of work it
      contains; it does not invent a width from the monitor it happens to be on. */
   --page-reading: 72rem;
-  --page-workspace: 90rem;
-  --page-operational: 112rem;
+  /* QUI shell — one standard content width, 1,180 px, for settings and
+     list-and-detail pages alike. */
+  --page-workspace: 73.75rem;
+  --page-operational: 73.75rem;
   --prose-measure: 68ch;
   --grid-columns: 12;
   --grid-gap: var(--space-4);
-  --content-gutter: clamp(1.25rem, 2vw, 2.5rem);
+  /* QUI shell — 32 px on a desktop window, 24 px on a narrow one (below). */
+  --content-gutter: 2rem;
 
   /* The widths above are the 1080p–1440p composition. A 4K or 8K
      monitor is a different composition, not the same one scaled up: see the
@@ -452,32 +456,11 @@
 }
 
 /* System preference drives the default when the user hasn't chosen. */
-/* ── 4K/8K as composition classes ──
-   A large monitor gives a *spatial* surface more room to hold its object: more
-   of a diff beside more of a file tree, more of a graph, more of an
-   operational table. It gives prose nothing — a 200-character line is harder
-   to read on a better screen, not easier — and it gives a control nothing at
-   all, because a button that grows with the monitor is the same button further
-   from the pointer.
-
-   So exactly two tokens move here: the workspace and operational canvases.
-   `--page-reading`, `--prose-measure`, the type scale, the spacing scale and
-   every control dimension are deliberately absent from these blocks, and
-   `visualRubric.test.ts` fails if one of them appears. Work surfaces (Chat,
-   Build, Design, the Knowledge Map) are already `width: 100%` and take the room
-   as it arrives; what they do with it is composed per surface. */
-@media (min-width: 2200px) {
-  :root {
-    --page-workspace: 108rem;
-    --page-operational: 140rem;
-  }
-}
-@media (min-width: 3400px) {
-  :root {
-    --page-workspace: 120rem;
-    --page-operational: 168rem;
-  }
-}
+/* ── Large displays ──
+   QUI-L14 — from 1,920 px up, content keeps its maximum widths and the extra
+   room becomes margin. A larger monitor never makes a line longer or a control
+   bigger; work surfaces (Chat, Build, Design, the Knowledge Map) are already
+   `width: 100%` and compose the room themselves. */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
@@ -1091,6 +1074,13 @@ code,
   cursor: not-allowed;
 }
 
+/* QUI shell — a narrow desktop window keeps 24 px either side of the page. */
+@media (max-width: 1279px) {
+  :root {
+    --content-gutter: 1.5rem;
+  }
+}
+
 /* Touch targets: on narrow (touch-first) screens shared shell controls meet
    the WCAG-aligned 44px minimum without changing desktop density. A pointer
    that cannot be precise gets the same treatment whatever the window is: a
@@ -1476,6 +1466,38 @@ dialog li { font-size: var(--text-sm); line-height: 1.5; }
   background: var(--accent-soft);
   border-color: var(--accent-border);
   color: var(--accent);
+}
+
+/* QUI-L07 — a segmented control: one choice among a few, side by side, for a
+   list that would otherwise be several tabs. The pressed segment is marked by
+   fill and by `aria-pressed`, never by colour alone. */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+.segment {
+  border: 0;
+  border-radius: calc(var(--r-sm) - 2px);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+.segment:hover {
+  color: var(--text-1);
+}
+.segment[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text-1);
+  box-shadow: var(--shadow-1);
 }
 
 /* Label/value rows for detail panels. Machine values carry .mono; everything

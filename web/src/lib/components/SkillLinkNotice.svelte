@@ -45,7 +45,7 @@
     if (e instanceof ApiError) {
       const code = e.reasonCode ?? "";
       if (code === "skill_archive_url_unsupported")
-        return "A .skill archive can't be imported from a link — download it, then upload it in Extensions → Skills.";
+        return "A .skill archive can't be imported from a link — download it, then upload it in Connections › Advanced › Skills.";
       if (code === "skill_missing_description" || code === "skill_invalid_name")
         return "That document isn't a valid skill.";
       if (code.startsWith("skill_fetch_failed")) return "That link couldn't be read.";
@@ -87,7 +87,7 @@
     <Icon name="spark" size="sm" />
     <div class="body">
       {#if installed !== null}
-        <p><strong>“{installed}”</strong> is installed. <a href="#/extensions?tab=skills">Open Skills</a></p>
+        <p><strong>“{installed}”</strong> is installed. <a href="#/connections?tab=advanced&kind=skills">Open Skills</a></p>
       {:else if verified !== null}
         <p>
           <strong>{verified.name}</strong> — {verified.description}
@@ -100,7 +100,7 @@
       {:else if isArchiveLink(link)}
         <p>
           That looks like a <code>.skill</code> bundle. Download it, then upload the file in
-          <a href="#/extensions?tab=skills">Extensions → Skills</a>.
+          <a href="#/connections?tab=advanced&kind=skills">Connections › Advanced › Skills</a>.
         </p>
       {:else}
         <p>

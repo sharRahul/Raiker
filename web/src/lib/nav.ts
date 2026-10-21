@@ -33,7 +33,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     // Messaging channels are a tab here again: a channel is one more thing
     // Raiker connects to, and its own page was a rarely visited row.
-    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, channels, tool servers, skills, hooks and plugins" },
+    // QUI-L07 — Extensions was named for the plumbing. It lists the services
+    // and channels Raiker is connected to; MCP servers, skills, hooks and
+    // plugins are one segmented list under Advanced.
+    { id: "connections", label: "Connections", icon: "connections", hint: "Services and channels Raiker is connected to" },
   ] },
   { id: "observe", label: "Observe", collapsible: true, items: [
     { id: "observe", label: "Diagnostics", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
@@ -162,7 +165,7 @@ export const PRODUCT_AREAS: Record<string, ProductArea> = {
   memory: "work",
   approvals: "review",
   models: "connect",
-  extensions: "connect",
+  connections: "connect",
   capabilities: "settings",
   settings: "settings",
   observe: "diagnostics",
@@ -223,7 +226,10 @@ export const HUB_TABS: Record<string, string[]> = {
   // equal tabs named for *kinds of thing* is a filing system, and nobody
   // arrives here wanting to look at the MCP category: they want to know what
   // Raiker can reach and whether anything they installed is broken.
-  extensions: ["overview", "connectors", "channels", "mcp", "skills", "hooks", "plugins"],
+  // QUI-L07 — three tabs: what is connected, the channels, and everything
+  // technical as one segmented list. Overview is gone: with the catalogue in the
+  // Add connection dialog, Services is short enough to be the overview.
+  connections: ["services", "channels", "advanced"],
   observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Memory carried approved records, proposals, observations, a document
   // library, two recall controls and an import/export drawer at one visual
@@ -261,8 +267,9 @@ export const HUB_TABS: Record<string, string[]> = {
  * than silently falling back to the Workbench.
  */
 const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
-  connections: { route: "extensions", tab: "connectors" },
-  mcp: { route: "extensions", tab: "mcp" },
+  // QUI-L07 — Extensions became Connections; its address keeps working.
+  extensions: { route: "connections", tab: "services" },
+  mcp: { route: "connections", tab: "advanced" },
   activity: { route: "observe", tab: "activity" },
   checkpoints: { route: "observe", tab: "checkpoints" },
   diagnostics: { route: "observe", tab: "overview" },
@@ -275,8 +282,8 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   goals: { route: "work", tab: "goals" },
   projects: { route: "work", tab: "projects" },
   brain: { route: "memory", tab: "map" },
-  messaging: { route: "extensions", tab: "channels" },
-  channels: { route: "extensions", tab: "channels" },
+  messaging: { route: "connections", tab: "channels" },
+  channels: { route: "connections", tab: "channels" },
 };
 
 /**
@@ -318,6 +325,18 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   observe: {
     diagnostics: "overview",
   },
+  // QUI-L07 — the seven Extensions tabs, on the three Connections tabs. The
+  // four technical kinds land on Advanced with their segment selected
+  // (`advancedKindFromHash`).
+  connections: {
+    overview: "services",
+    connectors: "services",
+    github: "services",
+    mcp: "advanced",
+    skills: "advanced",
+    hooks: "advanced",
+    plugins: "advanced",
+  },
   // ADD-27 GH-19 — Settings → Git credential became Settings → GitHub; every
   // link that named the old section opens the new one.
   settings: {
@@ -328,7 +347,7 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
 /**
  * The path part of a hash, without the leading `#/` and without a `?query`.
  *
- * A hub tab may be addressed two ways — `#/extensions?tab=mcp` and
+ * A hub tab may be addressed two ways — `#/connections?tab=advanced&kind=mcp` and
  * `#/extensions/mcp` — so this returns the segments, and the two readers below
  * decide what each means.
  */
@@ -411,6 +430,27 @@ export function tabFromHash(hash: string): string | null {
   const aliased = ROUTE_ALIASES[raw];
   if (aliased !== undefined && aliased.route === route) return aliased.tab;
   return tabs[0];
+}
+
+/** The four kinds Connections › Advanced lists, in its segment order. */
+export const ADVANCED_KINDS = ["mcp", "skills", "hooks", "plugins"] as const;
+export type AdvancedKind = (typeof ADVANCED_KINDS)[number];
+
+/**
+ * QUI-L07 — which segment of Connections › Advanced a hash selects. Read from
+ * `?kind=`, or from an old Extensions tab (`#/connections?tab=advanced&kind=hooks`) or the
+ * `#/mcp` page, so every old link opens the list it named. MCP servers when
+ * nothing says otherwise.
+ */
+export function advancedKindFromHash(hash: string): AdvancedKind {
+  const query = new URLSearchParams(hash.split("?", 2)[1] ?? "");
+  const segments = rawSegments(hash);
+  for (const candidate of [query.get("kind"), query.get("tab"), segments[2], segments[1]]) {
+    if (candidate !== null && candidate !== undefined && (ADVANCED_KINDS as readonly string[]).includes(candidate)) {
+      return candidate as AdvancedKind;
+    }
+  }
+  return "mcp";
 }
 
 // Routes that own a page but deliberately have no sidebar entry. Without them

@@ -80,7 +80,7 @@
       capability: "external_channel_runtime",
       carries: "The message Raiker sends, and the conversation it replies in.",
       destination: "The messaging account and conversation you paired.",
-      where: "#/extensions?tab=channels",
+      where: "#/connections?tab=channels",
       whereLabel: "Channels",
     },
     {
@@ -101,7 +101,7 @@
       capability: "mcp_connector_runtime",
       carries: "The arguments of each tool call Raiker makes to that server.",
       destination: "The MCP server, which may be on this machine or elsewhere.",
-      where: "#/extensions?tab=mcp",
+      where: "#/connections?tab=advanced&kind=mcp",
       whereLabel: "MCP servers",
     },
     {

@@ -16,6 +16,8 @@
    */
   import { onMount } from "svelte";
   import GuideLink from "../components/GuideLink.svelte";
+  import ListDetail from "../components/ListDetail.svelte";
+  import AddDialog from "../components/AddDialog.svelte";
   import { api, ApiError } from "../api";
   import type { ChannelProfile, ChannelsView } from "../apiTypes";
   import {
@@ -35,7 +37,7 @@
   let channelsError = $state<string | null>(null);
   let channelBusy = $state<string | null>(null);
   let channelNotice = $state<string | null>(null);
-  let pairingFor = $state<string | null>(null);
+  let addingChannel = $state(false);
   let pairSenders = $state("");
   let destinationFor = $state<string | null>(null);
   let destinationUrl = $state("");
@@ -141,8 +143,8 @@
       // to be read as "working".
       `Paired ${profile.display_name}. It is switched off until you turn it on.`,
     ).then(() => {
-      pairingFor = null;
       pairSenders = "";
+      if (channelsError === null) addingChannel = false;
     });
   }
 
@@ -279,37 +281,22 @@
     A channel message is <strong>untrusted content with a named sender who is not you</strong>,
     and cannot raise a turn's authority. Linked, enabled, trusted and reachable are separate —
     each channel says which of them it has. The extension behind one is in
-    <a href="#/extensions?tab=connectors">Extensions → Connectors</a>.
+    <a href="#/connections?tab=services">Connections › Services</a>.
   </p>
   {#if channels === null}
     <p class="note">{channelsError ?? "Reading connector profiles…"}</p>
   {:else if channels.error}
     <p class="note">The connector registry could not be read, so nothing is offered here.</p>
   {:else}
-    <ul class="hook-list">
-      {#each channels.profiles as profile (profile.connector_id)}
-        <li>
-          <div class="channel-head">
-            <strong>{profile.display_label ?? profile.display_name}</strong>
-            <span class="hook-tag" class:hook-tag-dead={!profile.linked}>
-              {profile.linked
-                ? profile.enabled
-                  ? profile.paused
-                    ? "Paused"
-                    : "On"
-                  : "Linked, off"
-                : "Not linked"}
-            </span>
-            {#if profile.requires_sender_allowlist && profile.linked}
-              <span class="hook-tag" class:hook-tag-dead={profile.sender_count === 0}>
-                {profile.sender_count} sender{profile.sender_count === 1 ? "" : "s"}
-              </span>
-            {/if}
-            {#if profile.linked}
-              <span class="hook-tag">{routeLabel(profile.routing_mode)}</span>
-              {#if profile.approval_relay_enabled}<span class="hook-tag">Approval relay</span>{/if}
-            {/if}
-          </div>
+    <!-- QUI-L07 — the page lists the channels that are linked; linking a new
+         one happens in the Add channel dialog. -->
+    <div class="channels-head">
+      <button type="button" class="btn btn-primary" onclick={() => (addingChannel = true)}>
+        Add channel
+      </button>
+    </div>
+    {#snippet channelFacts(profile: ChannelProfile)}
+
           <span class="note">
             {profile.transport} · {profile.auth_method}{profile.requires_network
               ? " · needs network"
@@ -356,7 +343,44 @@
             </details>
           {/if}
 
-          {#if profile.linked}
+    {/snippet}
+    <ListDetail
+      items={channels.profiles.filter((profile) => profile.linked)}
+      key={(profile) => profile.connector_id}
+      label="Linked channels"
+      storageKey="connections-channels"
+      autoSelectFirst={true}
+    >
+      {#snippet row(profile)}
+          <div class="channel-head">
+            <strong>{profile.display_label ?? profile.display_name}</strong>
+            <span class="hook-tag" class:hook-tag-dead={!profile.linked}>
+              {profile.linked
+                ? profile.enabled
+                  ? profile.paused
+                    ? "Paused"
+                    : "On"
+                  : "Linked, off"
+                : "Not linked"}
+            </span>
+            {#if profile.requires_sender_allowlist && profile.linked}
+              <span class="hook-tag" class:hook-tag-dead={profile.sender_count === 0}>
+                {profile.sender_count} sender{profile.sender_count === 1 ? "" : "s"}
+              </span>
+            {/if}
+            {#if profile.linked}
+              <span class="hook-tag">{routeLabel(profile.routing_mode)}</span>
+              {#if profile.approval_relay_enabled}<span class="hook-tag">Approval relay</span>{/if}
+            {/if}
+          </div>
+      {/snippet}
+      {#snippet empty()}
+        <p class="note">No channel is linked. Add one to reach Raiker from Telegram, a webhook or another app.</p>
+      {/snippet}
+      {#snippet detail(profile)}
+        <div class="channel-detail">
+          <h3 class="channel-title">{profile.display_label ?? profile.display_name}</h3>
+          {@render channelFacts(profile)}
             <!-- UX-MSG-03 — the order is the contract. Connected → owner verified
                  → allowed senders → routing → test → on, each a fact the server
                  reports, the first unfinished one carrying its own control. -->
@@ -724,19 +748,27 @@
                 </ul>
               {/if}
             </section>
-          {:else}
-            <div class="channel-actions">
-              <button
-                type="button"
-                class="btn btn-sm"
-                disabled={channelBusy !== null}
-                onclick={() => {
-                  pairingFor = pairingFor === profile.connector_id ? null : profile.connector_id;
-                  pairSenders = "";
-                }}
-              >Pair</button>
-            </div>
-            {#if pairingFor === profile.connector_id}
+        </div>
+      {/snippet}
+    </ListDetail>
+    {#if addingChannel}
+      <AddDialog
+        title="Add channel"
+        options={channels.profiles
+          .filter((profile) => !profile.linked)
+          .map((profile) => ({
+            id: profile.connector_id,
+            name: profile.display_name,
+            category: profile.requires_network ? "Over the network" : "On this machine",
+            description: channelSteps(profile)[0].detail,
+          }))}
+        searchLabel="Search channels"
+        onclose={() => (addingChannel = false)}
+      >
+        {#snippet steps(option)}
+          {@const profile = channels?.profiles.find((row) => row.connector_id === option.id)}
+          {#if profile}
+            {@render channelFacts(profile)}
               <form
                 class="channel-form"
                 onsubmit={(event) => {
@@ -766,11 +798,10 @@
                   decisions you make afterwards.
                 </p>
               </form>
-            {/if}
           {/if}
-        </li>
-      {/each}
-    </ul>
+        {/snippet}
+      </AddDialog>
+    {/if}
   {/if}
 </section>
 
@@ -861,8 +892,22 @@
 
 
 <style>
+  .channels-head {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-3);
+  }
+  .channel-detail {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .channel-title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
   .hook-list, .event-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-  .hook-list > li, .event-list > li { display: grid; gap: 0.3rem; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); }
+   .event-list > li { display: grid; gap: 0.3rem; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--r-md); }
   .event-dead { opacity: 0.62; }
   .hook-tag { display: inline-flex; align-items: center; font-size: var(--text-2xs); font-weight: 650; padding: 0.05rem 0.5rem; border: 1px solid var(--accent-border); border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
   .hook-tag-dead { border-color: var(--border); background: var(--sunken); color: var(--text-3); }

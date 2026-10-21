@@ -19,7 +19,7 @@ const SHOTS = "../../docs/plans/screenshots/working";
 
 test.describe.configure({ mode: "serial" });
 
-test("a 4K display widens the canvas and leaves prose and controls alone", async ({ page }) => {
+test("a 4K display keeps the canvas widths and leaves prose and controls alone (QUI-L14)", async ({ page }) => {
   test.setTimeout(180_000);
   await signInAsOwner(page, BASE);
 
@@ -46,10 +46,10 @@ test("a 4K display widens the canvas and leaves prose and controls alone", async
   await page.setViewportSize({ width: 3840, height: 2160 });
   const display4k = await composition();
 
-  // The canvases grow …
-  expect(display4k.workspace).not.toBe(laptop.workspace);
-  expect(display4k.operational).not.toBe(laptop.operational);
-  // … and nothing an owner reads or presses does.
+  // Extra room becomes margin: neither the canvases nor anything an owner
+  // reads or presses grows with the monitor.
+  expect(display4k.workspace).toBe(laptop.workspace);
+  expect(display4k.operational).toBe(laptop.operational);
   expect(display4k.reading).toBe(laptop.reading);
   expect(display4k.measure).toBe(laptop.measure);
   expect(display4k.body).toBe(laptop.body);

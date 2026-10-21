@@ -85,7 +85,7 @@ describe("App shell", () => {
     // the three Work modes took Design back out of this list: it is a Work mode, so it is on
     // the rail and in the top bar's mode switch beside Chat and Build.
     for (const label of [
-      "Permissions", "Models", "Extensions", "Diagnostics", "Settings",
+      "Permissions", "Models", "Connections", "Diagnostics", "Settings",
       "Approvals", "Threads", "Tasks", "Projects", "Knowledge Map", "Messaging",
     ]) {
       expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
@@ -93,7 +93,7 @@ describe("App shell", () => {
     await fireEvent.click(screen.getByRole("button", { name: "More pages and settings" }));
     const pages = await screen.findByRole("dialog", { name: /^more$/i });
     for (const label of [
-      "Permissions", "Models", "Extensions", "Diagnostics",
+      "Permissions", "Models", "Connections", "Diagnostics",
       "Approvals",
     ]) {
       expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();

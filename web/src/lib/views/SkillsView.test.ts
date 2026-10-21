@@ -263,7 +263,7 @@ describe("SkillsView — skills a plugin contributed", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Manage plugin" })).toHaveAttribute(
       "href",
-      "#/extensions?tab=plugins",
+      "#/connections?tab=advanced&kind=plugins",
     );
   });
 

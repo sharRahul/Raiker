@@ -218,7 +218,7 @@ export const COMPOSER_CAPABILITIES: readonly ComposerCapability[] = [
     group: "tools",
     surfaces: ["chat", "build", "tasks"],
     gate: "mcp_connector_runtime",
-    enableHref: "#/extensions?tab=mcp",
+    enableHref: "#/connections?tab=advanced&kind=mcp",
     priority: 30,
   },
   {
@@ -228,7 +228,7 @@ export const COMPOSER_CAPABILITIES: readonly ComposerCapability[] = [
     icon: "connections",
     group: "tools",
     surfaces: ["chat", "build", "tasks"],
-    enableHref: "#/extensions?tab=connectors",
+    enableHref: "#/connections?tab=services",
     priority: 40,
   },
   {

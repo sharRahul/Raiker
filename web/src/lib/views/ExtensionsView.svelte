@@ -1,48 +1,28 @@
 <script lang="ts">
   /**
-   * Extensions hub — one destination for connectors, MCP servers, and the
-   * surfaces that are not available yet.
+   * QUI-L07 — Connections: what Raiker is connected to.
    *
-   * The hub's own tab is Overview: it reads the server's lifecycle aggregate and
-   * shows the four facts per extension, so nothing appears available from
-   * metadata alone. The Connectors and MCP tabs mount the existing governed
-   * views unchanged — this consolidates navigation, it does not re-implement or
-   * loosen any mutation path.
+   * Three tabs. **Services** lists the services that are connected and adds
+   * new ones in a dialog; **Channels** does the same for messaging channels;
+   * **Advanced** is MCP servers, skills, hooks and plugins as one segmented
+   * list. Each mounts the existing governed views unchanged — this is layout,
+   * not a second mutation path.
    */
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import ConnectionsView from "./ConnectionsView.svelte";
   import McpView from "./McpView.svelte";
   import SkillsView from "./SkillsView.svelte";
-  import LifecycleTrack from "../components/LifecycleTrack.svelte";
-  import PageState from "../components/PageState.svelte";
-  import SidePanel from "../components/SidePanel.svelte";
-  import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
-  import Icon from "../components/Icon.svelte";
   import GuideLink from "../components/GuideLink.svelte";
-  import { api, ApiError } from "../api";
-  import type {
-    ApprovalView,
-    ExtensionView,
-    ExtensionsOverview,
-    HooksView,
-    PluginContributions,
-    PluginsView,
-    SkillView,
-  } from "../apiTypes";
-  import { relativeTime } from "../format";
-  import { HUB_TABS } from "../nav";
   import LazyRoute from "../components/LazyRoute.svelte";
-  import {
-    extensionExceptions,
-    extensionReach,
-    extensionInventory,
-    reachSentence,
-  } from "../extensionsOverview";
+  import { api, ApiError } from "../api";
+  import type { HooksView, PluginContributions, PluginsView } from "../apiTypes";
+  import { relativeTime } from "../format";
+  import { ADVANCED_KINDS, HUB_TABS, advancedKindFromHash, type AdvancedKind } from "../nav";
 
-  let { tab = "connectors" }: { tab?: string } = $props();
+  let { tab = "services", kind: initialKind = undefined }: { tab?: string; kind?: AdvancedKind } =
+    $props();
 
-  let overview = $state<ExtensionsOverview | null>(null);
   // BUG-79 — reads the installed records and this workspace's own signing
   // posture, so `verified` and `present only` never look identical.
   let plugins = $state<PluginsView | null>(null);
@@ -92,19 +72,6 @@
     }
   }
 
-  // REM-EXT-01 — skills are read here as well as inside `SkillsView`, because
-  // the overview's inventory cannot say what is installed without them and the
-  // tab that lists them may never be opened.
-  let skills = $state<SkillView[] | null>(null);
-  async function loadSkills() {
-    try {
-      skills = await api.skills();
-    } catch {
-      // A failed read leaves the row out rather than reporting zero skills.
-      skills = null;
-    }
-  }
-
   async function loadPlugins() {
     try {
       plugins = await api.plugins();
@@ -115,20 +82,6 @@
         error instanceof ApiError ? error.message : "Plugin records are unavailable.";
     }
   }
-  let loadError = $state<string | null>(null);
-  let selected = $state<ExtensionView | null>(null);
-  let filter = $state<"all" | "usable" | "blocked">("all");
-
-  // Reverse approval link: a connector call waiting on a decision should say so
-  // here, not only in the queue. Matched on capability, which is what the
-  // approval is actually raised against.
-  let approvals = $state<ApprovalView[]>([]);
-  const pendingForSelected = $derived(
-    selected?.capability == null
-      ? []
-      : approvals.filter((approval) => approval.capability === selected?.capability),
-  );
-
   // `.raiker/plugins/<id>/hooks.json` → `<id>`. Two plugins load at the same
   // scope, so "plugin" alone no longer identifies which one wrote a rule.
   function pluginName(source: string | null): string {
@@ -182,425 +135,74 @@
   };
   const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 
-  const tabs = HUB_TABS.extensions.map((id) => ({
+  const tabs = HUB_TABS.connections.map((id) => ({
     id,
-    label: {
-      overview: "Overview",
-      connectors: "Connectors",
-      channels: "Channels",
-      mcp: "MCP servers",
-      skills: "Skills",
-      hooks: "Hooks",
-      plugins: "Plugins",
-    }[id] as string,
+    label: { services: "Services", channels: "Channels", advanced: "Advanced" }[id] as string,
   }));
 
-  // What Raiker can reach, and what is installed and broken. Derived
-  // from the same readiness the tabs render, so the overview cannot disagree
-  // with the row underneath it.
-  // REM-EXT-01 — what is installed, beside what is wrong with it. Counted from
-  // four reads because `/api/extensions` covers two of the five kinds; see
-  // `extensionInventory`. The lead sentence counts the same set, so the page
-  // cannot say "nothing is installed" above a list of what is.
-  const inventoryInputs = $derived({
-    extensions: overview?.extensions,
-    skills,
-    hooks: hooks === null ? null : { rule_count: hooks.rule_count, active: hooks.active },
-    plugins: plugins?.plugins,
-  });
-  const reach = $derived(extensionReach(inventoryInputs));
-  const exceptions = $derived(extensionExceptions(overview?.extensions));
-  const inventory = $derived(extensionInventory(inventoryInputs));
+  const KIND_NAMES: Record<AdvancedKind, string> = {
+    mcp: "MCP servers",
+    skills: "Skills",
+    hooks: "Hooks",
+    plugins: "Plugins",
+  };
 
-  const visible = $derived(
-    (overview?.extensions ?? []).filter((extension) =>
-      filter === "all"
-        ? true
-        : filter === "usable"
-          ? extension.usable
-          : !extension.usable,
-    ),
+  // The prop names the first segment shown; the owner's choice wins after.
+  let kind = $state<AdvancedKind>(
+    untrack(() => initialKind) ??
+      (typeof window === "undefined" ? "mcp" : advancedKindFromHash(window.location.hash)),
   );
 
   function selectTab(next: string) {
-    window.location.hash = `#/extensions?tab=${encodeURIComponent(next)}`;
+    window.location.hash = `#/connections?tab=${encodeURIComponent(next)}`;
   }
 
-  function blockedCopy(extension: ExtensionView): string {
-    switch (extension.blocked_reason) {
-      case "not_installed":
-        return "Not installed yet. Install it on the Connectors tab.";
-      case "reauthentication_required":
-        return "The stored credential expired. Reconnect the account to continue.";
-      case "account_not_connected":
-        return "Installed, but no account credential is stored for it.";
-      case "not_enabled_for_session":
-        return "Connected, but not enabled for this session.";
-      case "capability_gate_closed":
-        return "Its capability gate is turned off, so the runtime refuses every call. Turn it on in Permissions.";
-      // BUG-11 — enabled is not the same as enabled at runtime level, and the
-      // two need different actions from the owner.
-      case "capability_below_runtime_level":
-        return "Its capability is enabled, but below runtime level. Set it to “enabled runtime” in Permissions.";
-      case "capability_decision_mode_deny":
-        return "Its decision mode is set to Deny, so every proposed call is refused. Change the mode in Permissions.";
-      case "egress_host_not_allowlisted":
-        return "Its host is not on the connector egress allowlist.";
-      case "connection_killed":
-        return "The connection was killed and will not restart on its own.";
-      case "circuit_breaker_paused":
-        return "The monitor paused this connection after an anomaly.";
-      case "not_connected":
-        return "No successful handshake yet, so no tools are available.";
-      default:
-        return "Ready to use in a governed turn.";
-    }
-  }
-
-  function steps(extension: ExtensionView) {
-    return [
-      {
-        label: "Installed",
-        met: extension.installed,
-        note: extension.installed ? "Present in this workspace" : "Not added yet",
-      },
-      {
-        label: "Account connected",
-        met: extension.connected,
-        note: extension.connected
-          ? "A credential is stored in the vault"
-          : "No stored credential — the value is never shown here either way",
-      },
-      {
-        label: "Enabled for the session",
-        met: extension.enabled,
-        note: extension.enabled ? "Turned on for this session" : "Turned off",
-      },
-      {
-        label: "Usable now",
-        met: extension.usable,
-        note: extension.usable
-          ? "The runtime will accept a governed call"
-          : "The runtime still refuses calls",
-      },
-    ];
-  }
-
-  async function load() {
-    loadError = null;
-    try {
-      overview = await api.extensions();
-      if (selected !== null) {
-        selected =
-          overview.extensions.find((e) => e.extension_id === selected?.extension_id) ?? null;
-      }
-    } catch (error) {
-      overview = null;
-      loadError =
-        error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
-    }
-    try { approvals = await api.approvals(); } catch { approvals = []; }
+  function selectKind(next: AdvancedKind) {
+    kind = next;
+    history.replaceState(history.state, "", `#/connections?tab=advanced&kind=${next}`);
   }
 
   onMount(() => {
-    void load();
+    const read = () => (kind = advancedKindFromHash(window.location.hash));
+    window.addEventListener("hashchange", read);
     void loadPlugins();
     void loadHooks();
-    void loadSkills();
+    return () => window.removeEventListener("hashchange", read);
   });
 </script>
 
-<TabStrip {tabs} selected={tab} onselect={selectTab} label="Extension categories" />
+<TabStrip {tabs} selected={tab} onselect={selectTab} label="Connection categories" />
 
-{#if tab === "overview"}
-  <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
-    <section class="hub-overview" aria-labelledby="extensions-reach">
-      <div class="overview-head">
-        <div>
-          <h2 id="extensions-reach">What Raiker can reach</h2>
-          <p class="lead">{reachSentence(reach)}</p>
-        </div>
-        <GuideLink route="extensions" />
-      </div>
-
-      {#if loadError}
-        <PageState state="error" title="Couldn't load extension readiness" detail={loadError} />
-      {:else if overview === null}
-        <PageState state="loading" title="Reading what is installed…" />
-      {:else if exceptions.length === 0 && reach.installed > 0}
-        <!-- Nothing needs a person, said once. A card per working
-             extension would report "nothing is wrong" in the most expensive way
-             available, and train the owner to skim past the one that is not.
-             And only when there is something to say it about: with nothing
-             installed the lead above has already said so, and repeating it in
-             a second line with a tick is the same sentence twice. -->
-        <p class="all-well">
-          <Icon name="check" size="sm" />
-          <span>Everything installed is usable.</span>
-        </p>
-      {:else}
-        <h3 class="exceptions-title">
-          {exceptions.length === 1
-            ? "One extension needs attention"
-            : `${exceptions.length} extensions need attention`}
-        </h3>
-        <ul class="exceptions">
-          {#each exceptions as item (item.extensionId)}
-            <li>
-              <div class="exception-copy">
-                <strong>{item.name}</strong>
-                <span>{item.reason}</span>
-              </div>
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => selectTab(item.tab)}
-              >
-                Open {tabs.find((entry) => entry.id === item.tab)?.label ?? item.tab}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-
-    {#if inventory.length > 0}
-      <!-- REM-EXT-01 — the inventory, which this hub asked the owner to
-           assemble by opening five tabs in turn. A count per kind, not a card
-           per extension: the exceptions above already name everything that
-           needs a person. -->
-      <section class="hub-overview" aria-labelledby="extensions-installed">
-        <div class="overview-head">
-          <div>
-            <h2 id="extensions-installed">What is installed</h2>
-            <p class="lead">Each row opens the tab that lists it.</p>
-          </div>
-        </div>
-        <ul class="inventory">
-          {#each inventory as row (row.kind)}
-            <li>
-              <button type="button" class="btn btn-ghost" onclick={() => selectTab(row.tab)}>
-                <strong>{row.label}</strong>
-                <span class="note">
-                  {row.usable} of {row.installed} usable
-                </span>
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
-
-    <section class="hub-overview" aria-labelledby="extensions-add">
-      <div class="overview-head">
-        <div>
-          <h2 id="extensions-add">Add something</h2>
-          <p class="lead">
-            Each of these is governed the same way: connecting one stores a
-            credential and grants nothing until a capability says so.
-          </p>
-        </div>
-      </div>
-      <ul class="add-routes">
-        {#each tabs.filter((entry) => entry.id !== "overview") as entry (entry.id)}
-          <li>
-            <button type="button" class="btn btn-ghost" onclick={() => selectTab(entry.id)}>
-              {entry.label}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  </div>
-{:else if tab === "connectors"}
-  <div id="panel-connectors" role="tabpanel" aria-labelledby="tab-connectors">
-    <section class="overview" aria-labelledby="lifecycle-h">
-      <div class="overview-head">
-        <div>
-          <h2 id="lifecycle-h">Readiness</h2>
-  <GuideLink route="extensions" />
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-          <Icon name="refresh" size="sm" /> Refresh
-        </button>
-      </div>
-
-      {#if loadError}
-        <PageState state="error" title="Couldn't load extension readiness" detail={loadError} />
-      {:else if overview === null}
-        <PageState state="loading" title="Reading extension readiness…" />
-      {:else}
-        <div class="tiles">
-          <!-- "some extensions work" is the resting state of any
-               install that has been set up, so it is plain metadata beside the
-               three counts next to it. -->
-          <StatTile
-            label="Usable now"
-            value={overview.counts.usable}
-            detail="Every condition confirmed by the server."
-          />
-          <StatTile
-            label="Installed"
-            value={overview.counts.installed}
-            detail="Present in the workspace, whatever their credential state."
-          />
-          <StatTile
-            label="Connected"
-            value={overview.counts.connected}
-            detail="An account credential is stored — its value is never shown."
-          />
-          <StatTile
-            label="Credential vault"
-            value={overview.vault_configured ? "Configured" : "Not configured"}
-            detail={overview.vault_configured
-              ? "Credentials can be encrypted at rest."
-              : "Linking an account fails closed until the vault key is set."}
-            tone={overview.vault_configured ? "neutral" : "warn"}
-          />
-        </div>
-
-        <div class="chip-row filters" role="group" aria-label="Filter extensions">
-          {#each [["all", "All"], ["usable", "Usable"], ["blocked", "Blocked"]] as [id, label] (id)}
-            <button
-              type="button"
-              class="chip"
-              onclick={() => (filter = id as typeof filter)}
-              aria-pressed={filter === id}
-            >{label}</button>
-          {/each}
-        </div>
-
-        <div class="split">
-          <ul class="extension-list">
-            {#each visible as extension (extension.extension_id)}
-              <li>
-                <button
-                  type="button"
-                  class="extension-row"
-                  class:selected={selected?.extension_id === extension.extension_id}
-                  onclick={() => (selected = extension)}
-                  aria-label={`Open ${extension.display_name} details`}
-                >
-                  <span class="row-main">
-                    <span class="name">{extension.display_name}</span>
-                    <span class="category">{extension.category}</span>
-                  </span>
-                  <!--
-                    BUG-278 — four pills reading "installed connected enabled
-                    usable" said the opposite of the counters above them.
-
-                    They are the same four conditions the side panel's
-                    `LifecycleTrack` renders, and met/unmet was carried by colour
-                    alone: on a workspace where nothing is installed, twenty-six
-                    rows of grey pills read as twenty-six connectors that *are*
-                    installed and connected, directly under a card saying
-                    "INSTALLED 0 · CONNECTED 0". In greyscale, or to a
-                    colour-blind owner, there was no other channel at all.
-
-                    So each pill carries the marker the side panel already uses —
-                    `✓` met, `○` not — and says which for a screen reader. Not a
-                    new vocabulary: the same one, two components apart, which is
-                    what it should have been.
-                  -->
-                  <span class="facts">
-                    {#each [
-                      ["installed", extension.installed, false],
-                      ["connected", extension.connected, false],
-                      ["enabled", extension.enabled, false],
-                      ["usable", extension.usable, true],
-                    ] as [label, met, strong] (label)}
-                      <span class="fact" class:strong class:on={met}>
-                        <span class="mark" aria-hidden="true">{met ? "✓" : "○"}</span>{label}
-                        <span class="sr-only">: {met ? "yes" : "no"}</span>
-                      </span>
-                    {/each}
-                  </span>
-                </button>
-              </li>
-            {:else}
-              <li class="empty-row">No extension matches this filter.</li>
-            {/each}
-          </ul>
-
-          <SidePanel
-            open={selected !== null}
-            title={selected?.display_name ?? ""}
-            subtitle={selected?.category ?? null}
-            onclose={() => (selected = null)}
-          >
-            {#if selected}
-              <p>{selected.detail}</p>
-              <LifecycleTrack steps={steps(selected)} blockedReason={selected.blocked_reason} />
-              <p class="reason" class:blocked={selected.blocked_reason !== null}>
-                {blockedCopy(selected)}
-              </p>
-              {#if pendingForSelected.length > 0}
-                <p class="pending-approval" role="status">
-                  {pendingForSelected.length === 1 ? "One call is" : `${pendingForSelected.length} calls are`}
-                  waiting on your decision before this connector can act.
-                  <a href="#/approvals">Review the decision queue</a>
-                </p>
-              {/if}
-              <dl class="property-list">
-                {#if selected.capability}
-                  <dt>Capability</dt><dd class="mono">{selected.capability}</dd>
-                {/if}
-                {#if selected.gate_state}
-                  <dt>Gate state</dt><dd>{selected.gate_state}</dd>
-                {/if}
-                {#if selected.decision_mode}
-                  <dt>Decision mode</dt><dd>{selected.decision_mode}</dd>
-                {/if}
-                {#if selected.egress_host}
-                  <dt>Egress host</dt>
-                  <dd>
-                    <span class="mono">{selected.egress_host}</span>
-                    {#if selected.egress_allowed !== null}
-                      · {selected.egress_allowed ? "on the allowlist" : "not allowlisted"}
-                    {/if}
-                  </dd>
-                {/if}
-                {#if selected.transport}
-                  <dt>Transport</dt><dd>{selected.transport}</dd>
-                {/if}
-                {#if selected.monitor_state}
-                  <dt>Monitor</dt><dd>{selected.monitor_state}</dd>
-                {/if}
-                {#if selected.kind === "mcp_server"}
-                  <dt>Tools discovered</dt><dd>{selected.tool_count}</dd>
-                {/if}
-                {#if selected.last_activity_at}
-                  <dt>Last activity</dt>
-                  <dd title={selected.last_activity_at}>{relativeTime(selected.last_activity_at)}</dd>
-                {/if}
-              </dl>
-              <p class="note">
-                This panel reports state; it never grants it.
-                <GuideLink section="extensions-and-mcp" label="How a server is governed" />
-              </p>
-            {/if}
-          </SidePanel>
-        </div>
-      {/if}
-    </section>
-
-    <hr />
+{#if tab === "services"}
+  <div id="panel-services" role="tabpanel" aria-labelledby="tab-services">
     <ConnectionsView />
   </div>
 {:else if tab === "channels"}
-  <!-- Quiet UI — messaging channels are a tab here, not a page of their own. -->
   <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
     <LazyRoute route="messaging" />
   </div>
-{:else if tab === "mcp"}
-  <div id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp">
-    <McpView />
-  </div>
-{:else if tab === "skills"}
-  <div id="panel-skills" role="tabpanel" aria-labelledby="tab-skills">
-    <SkillsView />
-  </div>
-{:else if tab === "hooks"}
+{:else if tab === "advanced"}
+  <div id="panel-advanced" role="tabpanel" aria-labelledby="tab-advanced">
+    <div class="advanced-head">
+      <!-- One segmented list instead of four tabs: these are the technical
+           ways Raiker reaches tools, and an owner opens them rarely. -->
+      <div class="segmented" role="group" aria-label="Advanced connections">
+        {#each ADVANCED_KINDS as id (id)}
+          <button
+            type="button"
+            class="segment"
+            aria-pressed={kind === id}
+            onclick={() => selectKind(id)}>{KIND_NAMES[id]}</button
+          >
+        {/each}
+      </div>
+      <GuideLink section="extensions-and-mcp" label="How these are governed" />
+    </div>
+    {#if kind === "mcp"}
+      <McpView />
+    {:else if kind === "skills"}
+      <SkillsView />
+    {:else if kind === "hooks"}
   <div id="panel-hooks" role="tabpanel" aria-labelledby="tab-hooks">
     <section class="card">
       <!-- The tab strip already says "Hooks", and what a hook *is* was five
@@ -826,7 +428,7 @@
       </p>
     </section>
   </div>
-{:else if tab === "plugins"}
+    {:else if kind === "plugins"}
   <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">
     <section class="card" data-testid="plugin-signing-posture">
       <h2>Plugin supply chain</h2>
@@ -856,19 +458,19 @@
                   <span class="note">{provides(plugin.contributions)}</span>
                   {#if contributedEvents(plugin.contributions).length > 0}
                     <span class="note">
-                      <a href="#/extensions?tab=hooks">See the rules on the Hooks tab →</a>
+                      <a href="#/connections?tab=advanced&kind=hooks">See the rules in Hooks →</a>
                     </span>
                   {/if}
                   {#if contributedSkills(plugin.contributions) > 0}
                     <span class="note">
                       Its skills install switched off.
-                      <a href="#/extensions?tab=skills">Activate them on the Skills tab →</a>
+                      <a href="#/connections?tab=advanced&kind=skills">Turn them on in Skills →</a>
                     </span>
                   {/if}
                   {#if offeredServers(plugin.contributions) > 0}
                     <span class="note">
                       An offered server is inert until you add it.
-                      <a href="#/extensions?tab=mcp">Review it on the MCP servers tab →</a>
+                      <a href="#/connections?tab=advanced&kind=mcp">Review it in MCP servers →</a>
                     </span>
                   {/if}
                   <span class="note">{plugin.signature.explanation}</span>
@@ -929,72 +531,20 @@
       </section>
     {/if}
   </div>
+    {/if}
+  </div>
 {/if}
 
+
 <style>
-  /* The composed lead. It shares the page's card language rather
-     than inventing a second one: what differs is that it answers a question
-     instead of listing a category. */
-  .hub-overview {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    padding: var(--card-pad-y) var(--card-pad-x);
+  .advanced-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
     margin-bottom: var(--space-4);
   }
-  .hub-overview .overview-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  .hub-overview h2 { margin: 0; }
-  .hub-overview h3.exceptions-title {
-    margin: var(--space-4) 0 var(--space-2);
-    font-size: var(--text-sm);
-  }
-  .hub-overview .lead { margin: .3rem 0 0; color: var(--text-2); max-width: 46rem; }
-  /* REM-EXT-01 — the inventory reads as a row of destinations, at the same
-     weight as the Add routes below it, because both are navigation. */
-  .inventory {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: var(--space-4) 0 0;
-    padding: 0;
-  }
-  .inventory button { display: grid; gap: .1rem; text-align: left; }
-  .all-well {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    margin: var(--space-3) 0 0;
-    color: var(--text-2);
-    font-size: var(--text-sm);
-  }
-  .exceptions { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-  .exceptions li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    background: var(--sunken);
-  }
-  .exception-copy { display: grid; gap: .15rem; min-width: 0; }
-  .exception-copy strong { color: var(--text-1); }
-  .exception-copy span { color: var(--text-2); font-size: var(--text-sm); }
-  .add-routes {
-    list-style: none;
-    margin: var(--space-3) 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
+
 
   .hook-list,
   .event-list,
@@ -1209,87 +759,9 @@
     background: var(--danger-soft, var(--warn-soft));
     color: var(--danger, var(--warn));
   }
-  .overview { margin-bottom: var(--space-5); }
-  .overview-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-  .overview-head h2 { margin: 0 0 0.2rem; }
-.tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-  }
-  .filters { margin-bottom: var(--space-3); }
-  .split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
-    gap: var(--space-4);
-    align-items: start;
-  }
-  @media (max-width: 63.9rem) { .split { grid-template-columns: 1fr; } }
-  .extension-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
-  .extension-row {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    text-align: left;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    color: inherit;
-    font: inherit;
-    padding: var(--space-3) var(--space-4);
-    cursor: pointer;
-    transition: border-color 120ms var(--ease), background 120ms var(--ease);
-  }
-  .extension-row:hover { background: var(--sunken); }
-  .extension-row.selected {
-    border-color: var(--accent-border);
-    box-shadow: 0 0 0 1px var(--accent-border);
-  }
-  .row-main { display: grid; gap: 0.1rem; min-width: 0; }
-  .name { font-weight: 650; }
-  .category { color: var(--text-3); font-size: var(--text-xs); }
-  .facts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
-  .fact {
-    border: 1px solid var(--border);
-    border-radius: var(--r-pill);
-    color: var(--text-3);
-    font-size: var(--text-2xs);
-    font-weight: 650;
-    padding: 0.1rem 0.5rem;
-    text-transform: lowercase;
-  }
-  .fact.on { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
-  .fact.strong.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
-  /* BUG-278 — the marker is the channel that is not colour. It sits inside the
-     pill so the row stays one line at every width the list is used at. */
-  .fact .mark { margin-right: 0.28rem; font-weight: 700; }
-  .empty-row { color: var(--text-3); padding: var(--space-4); }
-  /* A persistent normal state is neutral. Success colour is spent on
-     something that just happened or on a decision that was just confirmed; used
-     as the standing representation of "connected", "enabled", "verified" or
-     "ready" it is on screen constantly, which is the one condition under which
-     a colour stops carrying information. Exceptions keep their tone. */
-  .reason { color: var(--text-2); font-weight: 600; margin: 0; }
-  .reason.blocked { color: var(--warn); }
-  .pending-approval {
-    margin: 0;
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--accent-border);
-    background: var(--accent-soft);
-    border-radius: var(--r-sm);
-    font-size: var(--text-sm);
-  }
+
   .note { color: var(--text-3); font-size: var(--text-sm); margin: 0; }
-  hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
+
 
   /* A connector row: identity and state on one line, the controls under it, and
      the form under those — so the row reads the same whether it is 1440px wide

@@ -1,42 +1,16 @@
-// The Extensions hub consolidates connectors and MCP into one destination. Its
-// job is to never let metadata alone imply that something works: installed,
-// connected, enabled, and usable are four separate facts, and anything not
-// usable says which condition is unmet.
-import { render, screen, waitFor } from "@testing-library/svelte";
+// QUI-L07 — Connections: Services, Channels, and Advanced (MCP servers, skills,
+// hooks and plugins as one segmented list). The readiness facts of a connected
+// service are tested with Services, in ConnectionsView.test.ts.
+import { render, screen } from "@testing-library/svelte";
 import { fireEvent, within } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ExtensionsView from "./ExtensionsView.svelte";
-import { stubFetch, stubFetchPending } from "../test-helpers";
+import { stubFetch } from "../test-helpers";
 import type { ExtensionView } from "../apiTypes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-function extension(partial: Partial<ExtensionView>): ExtensionView {
-  return {
-    extension_id: "connector:gmail",
-    kind: "connector",
-    display_name: "Gmail",
-    category: "Email",
-    installed: false,
-    connected: false,
-    enabled: false,
-    usable: false,
-    blocked_reason: "not_installed",
-    detail: "Read-only mail access",
-    capability: "connector_gmail_runtime",
-    gate_state: "disabled",
-    decision_mode: "ask",
-    egress_host: "gmail.googleapis.com",
-    egress_allowed: false,
-    transport: null,
-    monitor_state: null,
-    tool_count: 0,
-    last_activity_at: null,
-    ...partial,
-  };
-}
 
 function overview(extensions: ExtensionView[], counts: Partial<Record<string, number>> = {}) {
   return {
@@ -58,187 +32,7 @@ function overview(extensions: ExtensionView[], counts: Partial<Record<string, nu
   };
 }
 
-describe("the Extensions overview (the hub Overview)", () => {
-  it("leads with what Raiker can reach, not with a category", async () => {
-    // Five equal tabs named for kinds of thing is a filing system. Nobody
-    // arrives here wanting to look at the MCP category.
-    stubFetch(
-      overview([
-        extension({ extension_id: "a", installed: true, connected: true, enabled: true, usable: true, tool_count: 3 }),
-        extension({ extension_id: "b", installed: true, connected: true, enabled: true, usable: true, tool_count: 2 }),
-      ]),
-    );
-    render(ExtensionsView, { props: { tab: "overview" } });
-
-    expect(
-      await screen.findByText("2 of 2 installed extensions can be used, offering 5 tools."),
-    ).toBeInTheDocument();
-  });
-
-  it("says nothing needs a person once, rather than a card per healthy row", async () => {
-    // A wall of green cards reports "nothing is wrong" in the most
-    // expensive way available, and trains the owner to skim past the one that
-    // is not green.
-    stubFetch(
-      overview([
-        extension({ installed: true, connected: true, enabled: true, usable: true }),
-      ]),
-    );
-    render(ExtensionsView, { props: { tab: "overview" } });
-
-    expect(await screen.findByText("Everything installed is usable.")).toBeInTheDocument();
-    expect(screen.queryByText(/needs attention/)).not.toBeInTheDocument();
-  });
-
-  it("names what is broken, in the runtime's words, beside the tab that fixes it", async () => {
-    stubFetch(
-      overview([
-        extension({ extension_id: "ok", installed: true, connected: true, enabled: true, usable: true }),
-        extension({
-          extension_id: "mcp:widget",
-          kind: "mcp_server",
-          display_name: "Widget server",
-          installed: true,
-          usable: false,
-          blocked_reason: "Server exited at start.",
-        }),
-      ]),
-    );
-    render(ExtensionsView, { props: { tab: "overview" } });
-
-    expect(await screen.findByText("One extension needs attention")).toBeInTheDocument();
-    expect(screen.getByText("Widget server")).toBeInTheDocument();
-    expect(screen.getByText("Server exited at start.")).toBeInTheDocument();
-    // A remedy that is a dead end is not a remedy.
-    expect(screen.getByRole("button", { name: "Open MCP servers" })).toBeInTheDocument();
-  });
-
-  it("does not report a thing the owner has not installed as a fault", async () => {
-    stubFetch(overview([extension({ installed: false, usable: false })]));
-    render(ExtensionsView, { props: { tab: "overview" } });
-
-    expect(
-      await screen.findByText(
-        "Nothing is installed yet. Connect an account, add an MCP server, or install a skill.",
-      ),
-    ).toBeInTheDocument();
-    // And it says it once. Found in the live capture: the lead sentence and a
-    // second ticked line underneath were the same sentence twice, which is the
-    // duplication the exception-led rule exists to remove.
-    expect(screen.queryByText(/Everything installed is usable/)).not.toBeInTheDocument();
-  });
-});
-
 describe("ExtensionsView", () => {
-  it("shows a loading state while readiness is fetched", async () => {
-    stubFetchPending();
-    render(ExtensionsView, { props: { tab: "connectors" } });
-    expect(await screen.findByText(/reading extension readiness/i)).toBeInTheDocument();
-  });
-
-  it("shows an error state without claiming anything is usable", async () => {
-    stubFetch({});
-    render(ExtensionsView, { props: { tab: "connectors" } });
-    // The governed connector view mounted below raises its own alert; the
-    // readiness alert must be present alongside it, not instead of it.
-    const alerts = await screen.findAllByRole("alert");
-    expect(
-      alerts.some((alert) => /couldn't load extension readiness/i.test(alert.textContent ?? "")),
-    ).toBe(true);
-    expect(screen.queryByText("Usable now")).not.toBeInTheDocument();
-  });
-
-  it("renders the four lifecycle facts separately for each extension", async () => {
-    stubFetch(overview([extension({ installed: true, blocked_reason: "account_not_connected" })]));
-    render(ExtensionsView, { props: { tab: "connectors" } });
-
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    const row = screen.getByLabelText("Open Gmail details");
-    expect(row).toHaveTextContent("installed");
-    expect(row).toHaveTextContent("connected");
-    expect(row).toHaveTextContent("enabled");
-    expect(row).toHaveTextContent("usable");
-  });
-
-  it("names the unmet condition in the detail panel", async () => {
-    stubFetch(
-      overview([
-        extension({ installed: true, connected: true, blocked_reason: "not_enabled_for_session" }),
-      ]),
-    );
-    render(ExtensionsView, { props: { tab: "connectors" } });
-
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
-
-    expect(await screen.findByText(/not enabled for this session/i)).toBeInTheDocument();
-    expect(screen.getByText(/Blocked at/)).toHaveTextContent("Enabled for the session");
-  });
-
-  it("says an extension is usable only when the server confirms every condition", async () => {
-    stubFetch(
-      overview([
-        extension({
-          installed: true,
-          connected: true,
-          enabled: true,
-          usable: true,
-          blocked_reason: null,
-        }),
-      ]),
-    );
-    render(ExtensionsView, { props: { tab: "connectors" } });
-
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
-
-    expect(await screen.findByText(/all four conditions are met/i)).toBeInTheDocument();
-    expect(screen.getByText(/ready to use in a governed turn/i)).toBeInTheDocument();
-  });
-
-  it("never shows a credential value, only whether one is stored", async () => {
-    stubFetch(overview([extension({ installed: true, connected: true })]));
-    render(ExtensionsView, { props: { tab: "connectors" } });
-
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
-
-    expect(
-      await screen.findByText(/a credential is stored in the vault/i),
-    ).toBeInTheDocument();
-  });
-
-  it("points at the decision queue when a call is waiting on approval", async () => {
-    stubFetch({
-      ...overview([extension({ installed: true, connected: true, enabled: true })]),
-      "GET /api/approvals": [
-        { approval_id: "appr_1", capability: "connector_gmail_runtime", is_expired: false },
-      ],
-    });
-    render(ExtensionsView, { props: { tab: "connectors" } });
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
-
-    expect(await screen.findByText(/one call is\s+waiting on your decision/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /review the decision queue/i })).toHaveAttribute(
-      "href",
-      "#/approvals",
-    );
-  });
-
-  it("shows no approval pointer when nothing is pending for that capability", async () => {
-    stubFetch({
-      ...overview([extension({ installed: true })]),
-      "GET /api/approvals": [
-        { approval_id: "appr_1", capability: "connector_slack_runtime", is_expired: false },
-      ],
-    });
-    render(ExtensionsView, { props: { tab: "connectors" } });
-    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
-    expect(screen.queryByText(/waiting on your decision/i)).not.toBeInTheDocument();
-  });
-
   it("separates what a plugin may contribute from what it does not yet", async () => {
     // BUG-221 — hooks are contributable now, panels are not. One list saying
     // which is which beats a card that implies a plugin contributes nothing.
@@ -252,7 +46,7 @@ describe("ExtensionsView", () => {
         ],
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
 
     const heading = await screen.findByText(/what a plugin may contribute/i);
     // Scoped to the card: "Hooks" is also a tab label, and asserting against the
@@ -300,7 +94,7 @@ describe("ExtensionsView", () => {
         contribution_kinds: [],
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
 
     expect(
       await screen.findByText(/provides 2 hook rules on PostToolUse, PreToolUse/i),
@@ -351,7 +145,7 @@ describe("ExtensionsView", () => {
         contribution_kinds: [],
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
 
     expect(await screen.findByTestId("plugin-code-runtime")).toHaveTextContent(
       /with this machine's network/,
@@ -398,15 +192,15 @@ describe("ExtensionsView", () => {
         contribution_kinds: [],
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
 
     expect(
       await screen.findByText(/provides 2 skills \(acme-release, acme-review\)/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/Its skills install switched off/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Activate them on the Skills tab/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Turn them on in Skills/i })).toHaveAttribute(
       "href",
-      "#/extensions?tab=skills",
+      "#/connections?tab=advanced&kind=skills",
     );
   });
 
@@ -427,7 +221,7 @@ describe("ExtensionsView", () => {
         },
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
     expect(await screen.findByText(/presence marker only/i)).toBeInTheDocument();
     expect(screen.getByText(/RAIKER_PLUGIN_SIGNING_KEY/)).toBeInTheDocument();
     expect(screen.getByText(/no plugin code runs in this browser/i)).toBeInTheDocument();
@@ -467,31 +261,43 @@ describe("ExtensionsView", () => {
         },
       },
     });
-    render(ExtensionsView, { props: { tab: "plugins" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "plugins" } });
     expect(await screen.findByText("example.plugin")).toBeInTheDocument();
     expect(screen.getByTitle("signature_present")).toHaveTextContent("Present only");
   });
 
   it("mounts the Skills tab as its own destination", async () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
-    render(ExtensionsView, { props: { tab: "skills" } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "skills" } });
     expect(await screen.findByRole("heading", { name: "Skills" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add a skill/i })).toBeInTheDocument();
   });
 
-  it("exposes each tab through the ARIA tabs pattern", async () => {
+  it("has three tabs, Services, Channels and Advanced (QUI-L07)", async () => {
     stubFetch(overview([]));
-    render(ExtensionsView, { props: { tab: "connectors" } });
-    const tablist = await screen.findByRole("tablist", { name: /extension categories/i });
-    expect(tablist).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Connectors" })).toHaveAttribute(
-      "aria-selected",
+    render(ExtensionsView, { props: { tab: "services" } });
+    const tablist = await screen.findByRole("tablist", { name: /connection categories/i });
+    expect(within(tablist).getAllByRole("tab").map((tab) => tab.textContent?.trim())).toEqual([
+      "Services",
+      "Channels",
+      "Advanced",
+    ]);
+    expect(screen.getByRole("tab", { name: "Services" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("lists MCP servers, skills, hooks and plugins as one segmented list under Advanced", async () => {
+    stubFetch({ "GET /api/skills": { skills: [] } });
+    render(ExtensionsView, { props: { tab: "advanced", kind: "mcp" } });
+    const group = await screen.findByRole("group", { name: "Advanced connections" });
+    expect(within(group).getByRole("button", { name: "MCP servers" })).toHaveAttribute(
+      "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "MCP servers" })).toHaveAttribute(
-      "aria-selected",
-      "false",
+    await fireEvent.click(within(group).getByRole("button", { name: "Skills" }));
+    expect(within(group).getByRole("button", { name: "Skills" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    expect(screen.getByRole("tab", { name: "Skills" })).toHaveAttribute("aria-selected", "false");
+    expect(window.location.hash).toBe("#/connections?tab=advanced&kind=skills");
   });
 });

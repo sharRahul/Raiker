@@ -12,7 +12,7 @@ describe("the More window", () => {
     const headings = within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual(["Review", "Connect", "Settings", "Diagnostics & help"]);
     const connect = within(dialog).getByRole("heading", { name: "Connect" }).closest("section")!;
-    for (const label of ["Models", "Extensions"]) {
+    for (const label of ["Models", "Connections"]) {
       expect(within(connect as HTMLElement).getByRole("link", { name: label })).toBeInTheDocument();
     }
     const settings = within(dialog).getByRole("heading", { name: "Settings" }).closest("section")!;

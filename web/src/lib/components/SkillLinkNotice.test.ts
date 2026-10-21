@@ -67,7 +67,7 @@ describe("SkillLinkNotice", () => {
     await waitFor(() =>
       expect(screen.getByRole("link", { name: "Open Skills" })).toHaveAttribute(
         "href",
-        "#/extensions?tab=skills",
+        "#/connections?tab=advanced&kind=skills",
       ),
     );
   });

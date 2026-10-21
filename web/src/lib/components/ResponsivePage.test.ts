@@ -10,8 +10,8 @@ describe("ResponsivePage bounds", () => {
   it("declares reading, workspace, operational, and work-surface planes", () => {
     expect(source).toContain('"reading" | "workspace" | "operational" | "work-surface"');
     expect(stylesheet).toContain("--page-reading: 72rem");
-    expect(stylesheet).toContain("--page-workspace: 90rem");
-    expect(stylesheet).toContain("--page-operational: 112rem");
+    expect(stylesheet).toContain("--page-workspace: 73.75rem");
+    expect(stylesheet).toContain("--page-operational: 73.75rem");
     expect(stylesheet).toContain("--prose-measure: 68ch");
     expect(source).toMatch(/\.page\.operational/);
     expect(source).toMatch(/\.page\.work-surface/);
@@ -21,7 +21,7 @@ describe("ResponsivePage bounds", () => {
   it("maps conversation canvases and operational hubs to their intended planes", () => {
     expect(app).toContain('current === "new-chat" || current === "build"');
     expect(app).toContain('? "work-surface" as const');
-    expect(app).toContain('current === "models" || current === "extensions" || current === "observe"');
+    expect(app).toContain('current === "models" || current === "connections" || current === "observe"');
     expect(app).toContain('? "operational" as const');
   });
 

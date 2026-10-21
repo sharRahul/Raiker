@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { SETTINGS_SECTIONS } from "./settingsSections";
 import {
+  advancedKindFromHash,
   DEFAULT_ROUTE,
   HUB_TABS,
   NAV_GROUPS,
@@ -46,8 +47,8 @@ describe("nav model", () => {
       ["#/goals", "work", "goals"],
       ["#/projects?project=p1", "work", "projects"],
       ["#/brain", "memory", "map"],
-      ["#/messaging", "extensions", "channels"],
-      ["#/channels", "extensions", "channels"],
+      ["#/messaging", "connections", "channels"],
+      ["#/channels", "connections", "channels"],
     ] as const) {
       expect(routeFromHash(hash), hash).toBe(route);
       expect(tabFromHash(hash), hash).toBe(tab);
@@ -93,33 +94,37 @@ describe("nav model", () => {
     ]);
   });
 
-  it("consolidates connectors and MCP into one Extensions destination", () => {
+  it("names the connected services and channels Connections, with three tabs (QUI-L07)", () => {
     // Approvals left this group for Core when Manage moved behind the gear: a
     // decision waiting on you arrives many times a day, while Permissions and
     // Models are configured once.
     expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
       "capabilities",
       "models",
-      "extensions",
+      "connections",
     ]);
-    // Channels are a tab of Extensions again (Quiet UI).
-    expect(routeFromHash("#/channels")).toBe("extensions");
-    expect(tabFromHash("#/extensions?tab=channels")).toBe("channels");
-    // Hooks sits with the other extension surfaces rather than under Permissions:
-    // a hook is something the owner installs, and it can only ever tighten what
-    // Permissions already allows.
-    expect(HUB_TABS.extensions).toEqual([
-      // Overview leads, as it does on Models. Five tabs named for
-      // kinds of thing is a filing system; nobody arrives wanting to look at
-      // the MCP category.
-      "overview",
-      "connectors",
-      "channels",
-      "mcp",
-      "skills",
-      "hooks",
-      "plugins",
-    ]);
+    expect(navItem("connections").label).toBe("Connections");
+    expect(HUB_TABS.connections).toEqual(["services", "channels", "advanced"]);
+    expect(routeFromHash("#/channels")).toBe("connections");
+    expect(tabFromHash("#/connections?tab=channels")).toBe("channels");
+  });
+
+  it("opens every old Extensions address on its Connections tab and segment (QUI-L07)", () => {
+    for (const [hash, tab, kind] of [
+      ["#/extensions", "services", "mcp"],
+      ["#/extensions?tab=overview", "services", "mcp"],
+      ["#/extensions?tab=connectors", "services", "mcp"],
+      ["#/extensions?tab=mcp", "advanced", "mcp"],
+      ["#/extensions?tab=skills", "advanced", "skills"],
+      ["#/extensions?tab=hooks", "advanced", "hooks"],
+      ["#/extensions/plugins", "advanced", "plugins"],
+      ["#/mcp", "advanced", "mcp"],
+      ["#/connections?tab=advanced&kind=hooks", "advanced", "hooks"],
+    ] as const) {
+      expect(routeFromHash(hash), hash).toBe("connections");
+      expect(tabFromHash(hash), hash).toBe(tab);
+      expect(advancedKindFromHash(hash), hash).toBe(kind);
+    }
   });
 
   it("keeps every governed surface reachable from the nav", () => {
@@ -132,7 +137,7 @@ describe("nav model", () => {
       "approvals",
       "capabilities",
       "models",
-      "extensions",
+      "connections",
       "observe",
       "settings",
     ]) {
@@ -156,10 +161,10 @@ describe("nav model", () => {
     expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("overview");
     expect(routeFromHash("#/sessions?session=sess_1")).toBe("observe");
     expect(tabFromHash("#/sessions?session=sess_1")).toBe("sessions");
-    expect(routeFromHash("#/mcp")).toBe("extensions");
-    expect(tabFromHash("#/mcp")).toBe("mcp");
-    expect(routeFromHash("#/connections")).toBe("extensions");
-    expect(tabFromHash("#/connections")).toBe("connectors");
+    expect(routeFromHash("#/mcp")).toBe("connections");
+    expect(tabFromHash("#/mcp")).toBe("advanced");
+    expect(routeFromHash("#/connections")).toBe("connections");
+    expect(tabFromHash("#/connections")).toBe("services");
     expect(routeFromHash("#/checkpoints")).toBe("observe");
     expect(tabFromHash("#/checkpoints")).toBe("checkpoints");
   });
@@ -209,7 +214,7 @@ describe("nav model", () => {
   it("falls back to a hub's first panel for an unknown or absent tab", () => {
     expect(tabFromHash("#/observe")).toBe("overview");
     expect(tabFromHash("#/observe?tab=nonsense")).toBe("overview");
-    expect(tabFromHash("#/extensions?tab=plugins")).toBe("plugins");
+    expect(tabFromHash("#/connections?tab=nonsense")).toBe("services");
     expect(tabFromHash("#/settings?tab=runtime")).toBe("runtime");
     expect(tabFromHash("#/capabilities")).toBeNull();
   });
@@ -278,14 +283,12 @@ describe("a hub tab addressed as a path segment", () => {
   });
 
   it("falls back to the hub's first panel for a segment it does not have", () => {
-    expect(routeFromHash("#/extensions/nonsense")).toBe("extensions");
-    // The hub's first panel, which is Overview since the hub Overview — and a better
-    // landing for a link nobody can resolve than a category chosen at random.
-    expect(tabFromHash("#/extensions/nonsense")).toBe("overview");
+    expect(routeFromHash("#/connections/nonsense")).toBe("connections");
+    expect(tabFromHash("#/connections/nonsense")).toBe("services");
   });
 
   it("lets the query win when a hash somehow carries both", () => {
-    expect(tabFromHash("#/extensions/skills?tab=mcp")).toBe("mcp");
+    expect(tabFromHash("#/connections/channels?tab=advanced")).toBe("advanced");
   });
 
   it("leaves a route with no tabs alone", () => {

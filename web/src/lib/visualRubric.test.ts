@@ -382,25 +382,15 @@ describe("visual rubric", () => {
       }
     }
   });
-  it("gives a bigger monitor more room, not bigger controls (the large-display classes)", () => {
-    // A 4K display is a different composition, not the same one scaled up. The
-    // wide blocks are allowed to move the canvas widths and nothing else: prose
-    // measure, the type scale, the spacing scale and every control dimension
-    // stay exactly where they are, because a line that grows with the monitor is
-    // harder to read and a button that grows with it is further from the
-    // pointer.
-    const wide = [...stylesheet.matchAll(/@media \(min-width: (2200px|3400px)\)\s*\{([\s\S]*?)\n\}/g)];
-    expect(wide.length, "app.css declares no wide-display composition").toBe(2);
-    const ALLOWED = new Set(["--page-workspace", "--page-operational"]);
+  it("keeps maximum widths on a large display (QUI-L14)", () => {
+    // From 1,920 px up the extra room becomes margin: no media block widens a
+    // canvas, the prose measure, the type scale or a control with the monitor.
+    const wide = [...stylesheet.matchAll(/@media \(min-width: (\d+)px\)\s*\{([\s\S]*?)\n\}/g)];
     for (const [, width, body] of wide) {
-      const touched = [...body.matchAll(/(--[\w-]+):/g)].map((match) => match[1]);
-      expect(touched.length, `the ${width} block declares nothing`).toBeGreaterThan(0);
-      for (const token of touched) {
-        expect(
-          ALLOWED.has(token),
-          `the ${width} block moves ${token}; only the canvas widths may change with the display`,
-        ).toBe(true);
-      }
+      expect(
+        /--page-(workspace|operational|reading)\s*:/.test(body),
+        `the ${width}px block widens a page canvas`,
+      ).toBe(false);
     }
   });
 

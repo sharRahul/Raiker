@@ -78,6 +78,13 @@ describe("MessagingView", () => {
     ...overrides,
   });
 
+
+  /** QUI-L07 — a channel that is not linked is reached through Add channel. */
+  async function openAddChannel(name = "Webhooks") {
+    await fireEvent.click(await screen.findByRole("button", { name: "Add channel" }));
+    await fireEvent.click(screen.getByRole("button", { name: new RegExp(name) }));
+  }
+
   // DEC-14 step 1 — what a channel carries is read before it is set up.
   it("says what a channel carries and its reply limit, before setup", async () => {
     const view = channelsView();
@@ -96,6 +103,7 @@ describe("MessagingView", () => {
     };
     stubFetch({ "GET /api/channels": view });
     render(MessagingView);
+    await openAddChannel();
     const block = await screen.findByTestId("channel-capabilities");
     expect(within(block).getByText(/What this channel carries · text up to 4,096 characters/)).toBeInTheDocument();
     expect(within(block).getByText("Direct messages and group chats")).toBeInTheDocument();
@@ -108,7 +116,7 @@ describe("MessagingView", () => {
     (view.profiles[0] as Record<string, unknown>).capabilities = null;
     stubFetch({ "GET /api/channels": view });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await openAddChannel();
     expect(screen.queryByTestId("channel-capabilities")).toBeNull();
   });
 
@@ -148,10 +156,9 @@ describe("MessagingView", () => {
   it("offers pairing, and says pairing is not switching on", async () => {
     stubFetch({ "GET /api/channels": channelsView() });
     render(MessagingView);
-    await screen.findByText("Webhooks");
-    const profiles = screen.getByTestId("channel-profiles");
-    expect(within(profiles).getByText("Webhooks").closest("li")).toHaveTextContent("Not linked");
-    await fireEvent.click(within(profiles).getByRole("button", { name: "Pair" }));
+    // The page lists linked channels only; a channel to pair is in Add channel.
+    expect(await screen.findByText(/No channel is linked/)).toBeInTheDocument();
+    await openAddChannel();
     expect(
       screen.getByText(/Pairing does not switch it on, and it does not trust anyone/i),
     ).toBeInTheDocument();
@@ -176,9 +183,9 @@ describe("MessagingView", () => {
       }),
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await screen.findByRole("option", { name: /Webhooks/ });
     const profiles = screen.getByTestId("channel-profiles");
-    const row = within(profiles).getByText("Webhooks").closest("li");
+    const row = within(profiles).getByRole("option", { name: /Webhooks/ });
     expect(row).toHaveTextContent("Linked, off");
     expect(row).toHaveTextContent("2 senders");
     expect(within(profiles).getByRole("button", { name: "Turn on" })).toBeInTheDocument();
@@ -205,7 +212,7 @@ describe("MessagingView", () => {
       },
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await screen.findByRole("option", { name: /Webhooks/ });
     const profiles = screen.getByTestId("channel-profiles");
     await fireEvent.click(within(profiles).getByRole("button", { name: "Turn on" }));
     await waitFor(() =>
@@ -243,7 +250,7 @@ describe("MessagingView", () => {
       "PUT /api/channels/pairings/chp_1/paused": { ok: true, pairing_id: "chp_1", paused: true, revision: "rev-b" },
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await screen.findByRole("option", { name: /Webhooks/ });
     const profiles = screen.getByTestId("channel-profiles");
     await fireEvent.click(within(profiles).getByRole("button", { name: "Pause" }));
     await waitFor(() =>
@@ -381,9 +388,9 @@ describe("MessagingView", () => {
       }),
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await screen.findByRole("option", { name: /Webhooks/ });
     const profiles = screen.getByTestId("channel-profiles");
-    const row = within(profiles).getByText("Webhooks").closest("li");
+    const row = within(profiles).getByRole("option", { name: /Webhooks/ });
     expect(row).toHaveTextContent("Paused");
     expect(within(profiles).getByRole("button", { name: "Resume" })).toBeInTheDocument();
   });
@@ -408,7 +415,7 @@ describe("MessagingView", () => {
       "POST /api/channels/deliver-test": { ok: true, delivered: true, connector_id: "channel.webhooks", channel_type: "webhooks", sent_bytes: 10, status: 200, signed: false },
     });
     render(MessagingView);
-    await screen.findByText("Webhooks");
+    await screen.findByRole("option", { name: /Webhooks/ });
     const profiles = screen.getByTestId("channel-profiles");
     expect(within(profiles).getByText("hooks.example.com")).toBeInTheDocument();
     expect(

@@ -77,8 +77,8 @@ describe("global mobile accessibility styles", () => {
 describe("shared design primitives", () => {
   it("defines the shared desktop canvas and twelve-column grid tokens", () => {
     expect(stylesheet).toContain("--page-reading: 72rem");
-    expect(stylesheet).toContain("--page-workspace: 90rem");
-    expect(stylesheet).toContain("--page-operational: 112rem");
+    expect(stylesheet).toContain("--page-workspace: 73.75rem");
+    expect(stylesheet).toContain("--page-operational: 73.75rem");
     expect(stylesheet).toContain("--grid-columns: 12");
     expect(stylesheet).toContain("--grid-gap: var(--space-4)");
   });

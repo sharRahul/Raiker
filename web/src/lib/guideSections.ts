@@ -26,7 +26,7 @@ const SECTIONS: Record<string, GuideTarget> = {
   extensions: { slug: "extensions-and-mcp", label: "How extensions work" },
   messaging: { slug: "messaging", label: "How a channel is governed" },
   design: { slug: "design", label: "How image generation is governed" },
-  connections: { slug: "extensions-and-mcp", label: "How connectors work" },
+  connections: { slug: "extensions-and-mcp", label: "How connections work" },
   "new-chat": { slug: "working-in-chat", label: "How Chat works" },
   // REM-GUIDE — two surfaces had no way into the guide at all, and one of them
   // left `working-in-build.md` as a chapter the product shipped and could not

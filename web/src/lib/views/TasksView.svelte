@@ -238,8 +238,8 @@
     "web-read": "#/capabilities",
     "web-extract": "#/capabilities",
     weather: "#/settings?tab=general",
-    "use-mcp": "#/extensions?tab=mcp",
-    "use-connector": "#/extensions?tab=connectors",
+    "use-mcp": "#/connections?tab=advanced&kind=mcp",
+    "use-connector": "#/connections?tab=services",
   };
 
   let attachOpen = $state(false);

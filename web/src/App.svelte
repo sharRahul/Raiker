@@ -65,6 +65,12 @@
   const activeItem = $derived(navItem(current));
   let compactNavigation = $state(false);
   let desktopNavigationOpen = $state(true);
+  // QUI-L14 — a 1,024–1,279 px window draws the sidebar as its 64 px icon rail.
+  // The toggle can still widen it for a moment; that choice is not saved, so a
+  // wider window goes back to the owner's own setting.
+  let narrowWindow = $state(false);
+  let narrowNavigationOpen = $state(false);
+  const sidebarOpen = $derived(narrowWindow ? narrowNavigationOpen : desktopNavigationOpen);
   let navigationDrawerOpen = $state(false);
   let navigationTrigger = $state<HTMLElement | null>(null);
   // The gear's window. Manage, Observe and Support left the sidebar for it, so
@@ -93,7 +99,7 @@
       ? "work-surface" as const
       : current === "guide"
         ? "reading" as const
-        : current === "models" || current === "extensions" || current === "observe" ||
+        : current === "models" || current === "connections" || current === "observe" ||
             current === "home" || current === "work" ||
             current === "memory" || current === "approvals" ||
             current === "capabilities"
@@ -105,6 +111,10 @@
     navigationTrigger = trigger;
     if (compactNavigation) {
       navigationDrawerOpen = !navigationDrawerOpen;
+      return;
+    }
+    if (narrowWindow) {
+      narrowNavigationOpen = !narrowNavigationOpen;
       return;
     }
     desktopNavigationOpen = !desktopNavigationOpen;
@@ -171,6 +181,15 @@
     };
     updateNavigationMode();
     navigationQuery?.addEventListener("change", updateNavigationMode);
+    const narrowQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia("(min-width: 1024px) and (max-width: 1279px)")
+      : null;
+    const updateNarrowWindow = () => {
+      narrowWindow = narrowQuery?.matches ?? false;
+      narrowNavigationOpen = false;
+    };
+    updateNarrowWindow();
+    narrowQuery?.addEventListener("change", updateNarrowWindow);
     // DEC-09 step 5 — the address the shell last showed, so a page that asks
     // to stay (unsaved work) can be stayed on: the address is put back without
     // a second hashchange and nothing below runs.
@@ -231,6 +250,7 @@
       window.removeEventListener("keydown", openPalette);
       window.removeEventListener(DESKTOP_COMMAND_EVENT, onDesktopCommand);
       navigationQuery?.removeEventListener("change", updateNavigationMode);
+      narrowQuery?.removeEventListener("change", updateNarrowWindow);
     };
   });
 
@@ -327,10 +347,10 @@
     <LazyRoute route="model-setup" />
   </main>
 {:else}
-  <div class="app-shell" data-navigation-open={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}>
+  <div class="app-shell" data-navigation-open={compactNavigation ? navigationDrawerOpen : sidebarOpen}>
     <Sidebar
       {current}
-      desktopOpen={desktopNavigationOpen}
+      desktopOpen={sidebarOpen}
       drawerOpen={navigationDrawerOpen}
       compact={compactNavigation}
       returnFocusTo={navigationTrigger}
@@ -343,7 +363,7 @@
         hint={activeItem.hint}
         {current}
         quietHeader={pageLayout === "work-surface"}
-        navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
+        navigationOpen={compactNavigation ? navigationDrawerOpen : sidebarOpen}
         {compactNavigation}
         onNavigationToggle={toggleNavigation}
         onOpenAllPages={openAllPages}
@@ -425,10 +445,10 @@
               route="models"
               props={{ tab: currentTab ?? "providers" }}
             />
-          {:else if current === "extensions"}
+          {:else if current === "connections"}
             <LazyRoute
               route="extensions"
-              props={{ tab: currentTab ?? "connectors" }}
+              props={{ tab: currentTab ?? "services" }}
             />
           {:else if current === "design"}
             <LazyRoute route="design" props={{ projects }} />

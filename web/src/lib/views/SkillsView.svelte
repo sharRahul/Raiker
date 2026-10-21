@@ -102,7 +102,7 @@
       "Use 1–40 lowercase letters, numbers, or dashes, starting with a letter.",
     skill_command_in_use: "That slash command already loads another skill.",
     skill_provided_by_plugin:
-      "This skill comes from a plugin, so it cannot be renamed or deleted here. Revoke the plugin on Extensions → Plugins to remove it.",
+      "This skill comes from a plugin, so it cannot be renamed or deleted here. Revoke the plugin in Connections › Advanced › Plugins to remove it.",
     unknown_skill: "That skill is no longer installed.",
     invalid_base64: "The file could not be read.",
   };
@@ -571,7 +571,7 @@
                   <!-- Deleting the row would not remove the skill: the plugin's
                        file is still on disk and the next sync restores it.
                        Revoking the plugin is the control that removes it. -->
-                  <a class="btn btn-sm" href="#/extensions?tab=plugins">Manage plugin</a>
+                  <a class="btn btn-sm" href="#/connections?tab=advanced&kind=plugins">Manage plugin</a>
                 {:else}
                   <button
                     type="button"

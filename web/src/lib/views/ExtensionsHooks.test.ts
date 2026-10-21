@@ -1,4 +1,4 @@
-// The Hooks panel. Hooks are the one extension surface whose backend really
+// Connections › Advanced › Hooks. Hooks are the one extension surface whose backend really
 // enforces something — a `PreToolUse` deny short-circuits to a denied policy
 // decision — and until this panel they were configured by editing JSON on disk
 // and observed only by reading the audit log by hand.
@@ -96,7 +96,7 @@ function routes(view: HooksView) {
   };
 }
 
-describe("Extensions → Hooks", () => {
+describe("Connections › Advanced › Hooks", () => {
   it("says a configuration file could not be read instead of showing nothing", async () => {
     stubFetch(
       routes(
@@ -115,7 +115,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     // Silence here would leave the owner believing a guard is in place.
     const posture = await screen.findByText(/could not be read/i);
@@ -153,7 +153,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(
       await screen.findByText(/never emits SessionEnd, so this rule is configured but never fires/i),
@@ -188,7 +188,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(await screen.findByText("Can deny or ask")).toBeInTheDocument();
     expect(screen.getByText("Observes only")).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     // The rule parses and matches, then fails every time. Showing it as
     // enforcing would be the surface asserting a guard that is not there.
@@ -249,7 +249,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(await screen.findByText("acme-guard")).toBeInTheDocument();
     expect(screen.getByText("beta-watch")).toBeInTheDocument();
@@ -257,7 +257,7 @@ describe("Extensions → Hooks", () => {
 
   it("names the plugin directory among the places hooks come from", async () => {
     stubFetch(routes(hooks()));
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     const footer = await screen.findByText(/hooks are configured in a file, not here/i);
     expect(footer.closest("section")).toHaveTextContent(".raiker/plugins/");
@@ -265,7 +265,7 @@ describe("Extensions → Hooks", () => {
 
   it("publishes what a rule may name, because the file is written by hand", async () => {
     stubFetch(routes(hooks()));
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     const catalogue = await screen.findByRole("heading", { name: "What fires, and what it can change" });
     const section = catalogue.closest("section") as HTMLElement;
@@ -312,7 +312,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(await screen.findByText("tool-free model advisory")).toBeInTheDocument();
     // The handler-types card says the same thing in a clause rather than in a
@@ -323,7 +323,7 @@ describe("Extensions → Hooks", () => {
 
   it("keeps the rules listed when the owner turns hooks off", async () => {
     stubFetch(routes(hooks({ active: false, disabled: true, rule_count: 1, rules: [rule({})] })));
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     // Off is a state to display, not a reason to hide what would otherwise run.
     expect(await screen.findByText(/Hooks are turned off/i)).toBeInTheDocument();
@@ -337,7 +337,7 @@ describe("Extensions → Hooks", () => {
 
   it("says nothing is configured rather than looking like it never checked", async () => {
     stubFetch(routes(hooks({ active: false })));
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(
       await screen.findByText(/No hooks are configured, so the runtime behaves exactly as it does without them/i),
@@ -361,7 +361,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     await waitFor(() => expect(screen.getByText("failed")).toBeInTheDocument());
     expect(screen.getByText("record-tool-use")).toBeInTheDocument();
@@ -394,7 +394,7 @@ describe("Extensions → Hooks", () => {
         }),
       ),
     );
-    render(ExtensionsView, { tab: "hooks" });
+    render(ExtensionsView, { tab: "advanced", kind: "hooks" });
 
     expect(
       await screen.findByText(/this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST/),

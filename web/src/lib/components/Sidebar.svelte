@@ -151,7 +151,7 @@
   .group-toggle:hover { background:var(--sunken); color:var(--text-1); }
   .group-toggle[aria-expanded="true"] :global(svg) { transform:rotate(90deg); }
   ul { list-style:none; margin:0; padding:0; display:grid; gap:2px; }
-  .nav-link { display:flex; align-items:center; gap:.65rem; min-height:2.35rem; padding:.42rem .55rem; border-radius:var(--r-sm); color:var(--text-2); font-size:var(--text-md); font-weight:550; text-decoration:none; transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease); }
+  .nav-link { display:flex; align-items:center; gap:.65rem; min-height:var(--nav-row-h); padding:0 .55rem; border-radius:var(--r-sm); color:var(--text-2); font-size:var(--text-md); font-weight:550; text-decoration:none; transition:background var(--motion-fast) var(--ease),color var(--motion-fast) var(--ease); }
   .nav-link:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }
   /* The current row carried five cues at once: a group bar in the
      gutter, a tinted background, accent text, a heavier weight, and the word

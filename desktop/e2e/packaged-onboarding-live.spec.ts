@@ -3,7 +3,8 @@
  * DIST-05/06 — an owner installs Raiker and completes first-run setup in the
  * installed window, with no terminal, browser or developer tool. The Setup
  * window checks the computer and verifies the installation first, so the
- * in-app wizard asks only what an owner decides: a model and where requests may go.
+ * in-app setup conversation asks only what an owner decides: a name, where
+ * Raiker should think, and how it will ask before acting.
  *
  * Same inputs as `packaged-live.spec.ts`: RAIKER_PACKAGED_APP names the
  * installed executable and RAIKER_HOME an empty profile. No model credential is
@@ -48,20 +49,32 @@ test("an owner completes first-run setup in the installed window", async () => {
     await page.getByLabel("Confirm password").fill(password);
     await page.getByRole("button", { name: "Create a User Account" }).click();
 
-    // Quiet UI — no welcome stage, and the installer already checked this
-    // computer: setup opens on the model.
-    await expect(page.getByRole("heading", { name: "Choose how Raiker should think" })).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole("list", { name: "Setup progress" }).getByText("This device")).toHaveCount(0);
-    await page.screenshot({ path: join(SHOTS, "onboarding-1-model.png") });
-    await page.getByRole("button", { name: "Decide later" }).click();
-
-    await expect(page.getByRole("heading", { name: "Where your model requests go" })).toBeVisible();
+    // QUI-W02 — first run is a setup conversation. It opens on Hello, and the
+    // installer already checked this computer, so the device step is absent.
+    const title = page.locator("#setup-title");
+    await expect(title).toHaveText(/^Hi, I'm Raiker/, { timeout: 60_000 });
+    await expect(page.locator(".stage-rail")).not.toContainText("This device");
+    await page.screenshot({ path: join(SHOTS, "onboarding-1-hello.png") });
+    await page.getByLabel("Your name").fill("Owner");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-    await expect(page.getByRole("heading", { name: "Setup saved" })).toBeVisible();
+    await expect(title).toHaveText("Where should I think?", { timeout: 60_000 });
+    await page.getByRole("button", { name: /^Decide later/ }).click();
+
+    await expect(title).toHaveText("Here is how I'll work for you.", { timeout: 30_000 });
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    await expect(title).not.toHaveText("Here is how I'll work for you.", { timeout: 30_000 });
+    if ((await title.textContent())?.includes("Checking your installation")) {
+      const proceed = page.getByRole("button", { name: /^(Continue|Continue anyway)$/ });
+      await expect(proceed).toBeEnabled({ timeout: 120_000 });
+      await proceed.click();
+    }
+    await expect(title).toHaveText(/^Setup is saved\./, { timeout: 30_000 });
     await page.screenshot({ path: join(SHOTS, "onboarding-2-ready.png") });
-    await page.getByRole("button", { name: "Start using Raiker" }).click();
+    await page.getByRole("button", { name: "Go to Home" }).click();
     await expect(page).toHaveURL(/#\/home/);
+    await expect(page.getByRole("heading", { name: /, Owner$/ })).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: join(SHOTS, "onboarding-3-home.png") });
   } finally {
     spawnSync(hostPath(), ["quit", "--force"], { encoding: "utf-8", env });

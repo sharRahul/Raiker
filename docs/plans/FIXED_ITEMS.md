@@ -1210,6 +1210,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1121](#fixed-1121--settings-general-was-twice-the-page-budget-qui-l09-qui-g01) | Low | Settings | Fixed 2026-10-21 |
 | [FIXED-1122](#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02) | Low | Accessibility | Fixed 2026-10-21 |
 | [FIXED-1123](#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08) | Medium | Models | Fixed 2026-10-21 |
+| [FIXED-1124](#fixed-1124--the-packaged-desktop-check-still-walked-the-old-setup-wizard-qui-w02) | Medium | Desktop / release checks | Fixed 2026-10-21 |
 
 ---
 
@@ -36807,3 +36808,13 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** The profile card draws Chat's four steps and one next action inside the card while any step is not done, in place of its own **Add model** button; **Check it now** runs in place, other actions open Add model, Settings → Advanced → Model serving or Permissions.
 
 **Evidence.** `ModelsView.test.ts` (*the profile card's readiness steps*); RT-QUI-21 (`21-models-empty.png`).
+
+## FIXED-1124 — The packaged desktop check still walked the old setup wizard (QUI-W02)
+
+**Severity: Medium. Area: Desktop / release checks. Status: Fixed 2026-10-21.**
+
+**Observed.** The Desktop package workflow failed on all four targets at *Open the installed window, reach first run, and complete onboarding*: `desktop/e2e/packaged-onboarding-live.spec.ts` still waited for *Choose how Raiker should think* and *Start using Raiker*, which the setup conversation (QUI-W02) replaced. The workflow runs only when packaged inputs change, so the first push touching `uv.lock` after that round surfaced it.
+
+**Fixed.** The spec walks the conversation an owner now sees: *Hi, I'm Raiker…* with a name, *Where should I think?* → **Decide later**, *Here is how I'll work for you.*, *Setup is saved.*, then **Go to Home**, which greets the owner by name. The device step stays absent, because the installer already checked the computer.
+
+**Evidence.** Desktop package workflow on the next push; `npm run check` and lint in `desktop/`.

@@ -904,6 +904,16 @@ These parts of the same items are not done:
 * **BUG-357 is still open**: RT-QUI-10 shows Home's *No default model is
   chosen.* beside a Chat that answers with Haiku 4.5.
 
+## 2026-10-21 verification follow-up — the Python CI job is at its 45-minute limit
+
+On `main`, CI run 39606078093 spent 40 min 42 s in `pytest` alone, and the next
+run (39612791351, attempt 1) was cancelled at the job's `timeout-minutes: 45`
+partway through the tests; attempt 2 passed. No Python changed in either push,
+so the suite itself is now at the limit, and runner speed decides the result.
+Triage: split the job (for example the SQLite cache, memory-security and import
+isolation tests, the slowest by far) or shard the suite, rather than raising the
+limit.
+
 ## Decision statements added 2026-10-05
 
 **Basis:** repository snapshot `2898b247c9e02d537c6f61e866ed670578e49b42`.

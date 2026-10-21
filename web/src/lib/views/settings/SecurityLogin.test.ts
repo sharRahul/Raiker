@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SecurityLogin from "./SecurityLogin.svelte";
 import { setToken } from "../../api";
@@ -23,7 +23,45 @@ function stub(routes: Record<string, (init?: RequestInit) => unknown>) {
   );
 }
 
-describe("Security & Login settings", () => {
+/** QUI-L09 — one row per setting; its action opens the form in a dialog. */
+function settingRow(label: string): HTMLElement {
+  const row = screen
+    .getAllByRole("heading", { name: label })
+    .map((heading) => heading.closest(".setting-row"))
+    .find((found) => found !== null);
+  if (!(row instanceof HTMLElement)) throw new Error(`no row for ${label}`);
+  return row;
+}
+
+async function openRow(label: string, action: string | RegExp) {
+  await waitFor(() => settingRow(label));
+  await fireEvent.click(within(settingRow(label)).getByRole("button", { name: action }));
+  return within(screen.getByRole("dialog"));
+}
+
+describe("Security settings", () => {
+  it("is a list of rows, each with its value and one action", async () => {
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "missing", mfa_enrolled: false, username: "alice" } }),
+    });
+    render(SecurityLogin);
+    for (const [label, action] of [
+      ["Password", "Change"],
+      ["Two-step sign-in", "Turn on"],
+      ["Devices", "Manage"],
+      ["Encryption", "Details"],
+      ["Vault key", "Set up"],
+      ["Standing approval grants", "Manage"],
+    ]) {
+      expect(await screen.findByRole("heading", { name: label })).toBeInTheDocument();
+      expect(within(settingRow(label)).getAllByRole("button")).toHaveLength(1);
+      expect(within(settingRow(label)).getByRole("button")).toHaveTextContent(action);
+    }
+    // No form is open on the page itself.
+    expect(screen.queryByLabelText("Current password")).toBeNull();
+    expect(screen.queryByLabelText("Vault key")).toBeNull();
+  });
+
   it("shows encrypted storage separately from key-memory locking", async () => {
     stub({
       "GET /api/settings": () => ({ settings: {}, status: { vault: "configured_valid", mfa_enrolled: false, username: "alice" } }),
@@ -43,10 +81,11 @@ describe("Security & Login settings", () => {
 
     render(SecurityLogin);
 
-    expect(await screen.findByText("Encrypted")).toBeInTheDocument();
-    expect(screen.getByText("Database encryption")).toBeInTheDocument();
-    expect(screen.getByText("Degraded on this host")).toBeInTheDocument();
-    expect(screen.getByText(/4\.12\.0/)).toBeInTheDocument();
+    await waitFor(() => expect(within(settingRow("Encryption")).getByText("On")).toBeInTheDocument());
+    const dialog = await openRow("Encryption", "Details");
+    expect(dialog.getByText("Encrypted")).toBeInTheDocument();
+    expect(dialog.getByText("Degraded on this host")).toBeInTheDocument();
+    expect(dialog.getByText(/4\.12\.0/)).toBeInTheDocument();
   });
 
   it("shows the fail-closed pill when the vault is missing", async () => {
@@ -61,14 +100,13 @@ describe("Security & Login settings", () => {
     });
     render(SecurityLogin);
     await waitFor(() => {
-      expect(screen.getByText(/Missing \/ Fail-Closed Active/)).toBeInTheDocument();
+      expect(within(settingRow("Vault key")).getByText(/Missing — connections fail closed/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/Not enrolled/)).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText("Credential security")).toBeInTheDocument();
-      expect(screen.getByText(/github.*warning/i)).toBeInTheDocument();
-      expect(screen.getByText(/Credential-like content detected/i)).toBeInTheDocument();
-    });
+    expect(within(settingRow("Two-step sign-in")).getByText("Off")).toBeInTheDocument();
+    await waitFor(() => expect(within(settingRow("Security scan")).getByText("1 finding")).toBeInTheDocument());
+    const dialog = await openRow("Security scan", "Review");
+    expect(dialog.getByText(/github.*warning/i)).toBeInTheDocument();
+    expect(dialog.getByText(/Credential-like content detected/i)).toBeInTheDocument();
   });
 
   it("saves a vault key via elevated re-auth and flips the pill to valid", async () => {
@@ -82,12 +120,12 @@ describe("Security & Login settings", () => {
       "PUT /api/vault/key": () => ({ state: "configured_valid" }),
     });
     render(SecurityLogin);
-    await waitFor(() => expect(screen.getByLabelText("Vault key")).toBeInTheDocument());
-    await fireEvent.input(screen.getByLabelText("Vault key"), { target: { value: "some-fernet-key" } });
-    await fireEvent.input(screen.getByLabelText(/Confirm password/), { target: { value: "pw" } });
-    await fireEvent.click(screen.getByRole("button", { name: /save key/i }));
+    const dialog = await openRow("Vault key", "Set up");
+    await fireEvent.input(dialog.getByLabelText("Vault key"), { target: { value: "some-fernet-key" } });
+    await fireEvent.input(dialog.getByLabelText(/Confirm password/), { target: { value: "pw" } });
+    await fireEvent.click(dialog.getByRole("button", { name: /save key/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Active \/ Valid/)).toBeInTheDocument();
+      expect(within(settingRow("Vault key")).getByText("Set")).toBeInTheDocument();
     });
   });
 
@@ -104,7 +142,8 @@ describe("Security & Login settings", () => {
       }),
     });
     render(SecurityLogin);
-    await fireEvent.click(await screen.findByRole("button", { name: "Enroll in MFA" }));
+    const dialog = await openRow("Two-step sign-in", "Turn on");
+    await fireEvent.click(dialog.getByRole("button", { name: "Enroll in MFA" }));
 
     const codes = await screen.findByRole("list", { name: "Recovery codes" });
     expect(codes).toHaveTextContent("aaaa-1111");
@@ -147,11 +186,12 @@ describe("Security & Login settings", () => {
       },
     });
     render(SecurityLogin);
-    await waitFor(() => {
-      expect(screen.getByText("Standing approval grants")).toBeInTheDocument();
-      expect(screen.getByText("write_file")).toBeInTheDocument();
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() =>
+      expect(within(settingRow("Standing approval grants")).getByText("1 active")).toBeInTheDocument(),
+    );
+    const dialog = await openRow("Standing approval grants", "Manage");
+    expect(dialog.getByText("write_file")).toBeInTheDocument();
+    await fireEvent.click(dialog.getByRole("button", { name: "Revoke" }));
     await waitFor(() => expect(screen.getByText("No standing grants.")).toBeInTheDocument());
   });
 
@@ -168,6 +208,7 @@ describe("Security & Login settings", () => {
       },
     });
     render(SecurityLogin);
+    await openRow("Security scan", "Review");
     const button = await screen.findByRole("button", { name: "Check breach corpus" });
     await fireEvent.input(screen.getByLabelText("Password to check"), { target: { value: "example-password" } });
     expect(button).toBeDisabled();

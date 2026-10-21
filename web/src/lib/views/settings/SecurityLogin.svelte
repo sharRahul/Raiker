@@ -13,6 +13,28 @@
   // Security & Login settings section: Vault Key configuration (masked + reveal +
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
   // governed backend directly; no fabricated state.
+  import FormDialog from "../../components/FormDialog.svelte";
+
+  /*
+   * QUI-L09 / QUI-L03 — Security as rows: a label, the current value and one
+   * action. The forms behind the actions open in a dialog, one at a time, so
+   * the page is a short list rather than five forms open at once.
+   */
+  type Panel =
+    | "password"
+    | "mfa"
+    | "devices"
+    | "encryption"
+    | "vault"
+    | "scan"
+    | "monitored"
+    | "grants";
+  let panel = $state<Panel | null>(null);
+  function openPanel(next: Panel) {
+    notice = null;
+    panel = next;
+  }
+
   let vaultState = $state<string>("missing");
   let mfaEnrolled = $state(false);
   let requireMfaForVault = $state(false);
@@ -306,19 +328,75 @@
   The emergency pause is not here: it is the STOP switch in the context bar,
   on every screen rather than behind a settings tab.
 -->
+<!--
+  REM-SET-SECURITY — four groups, because these are four lifecycles. QUI-L09 —
+  each setting is one row; its form opens in a dialog.
+-->
+{#if notice && panel === null}
+  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+{/if}
+
 <section class="card" aria-labelledby="security-signin-h">
   <h2 id="security-signin-h">Signing in and devices</h2>
-  <p class="sub">How you unlock this instance, and which devices currently hold a session.</p>
+  <div class="setting-row">
+    <h3>Password</h3>
+    <span class="setting-value">Set</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("password")}>Change</button>
+  </div>
+  <div class="setting-row">
+    <h3>Two-step sign-in</h3>
+    <span class="setting-value">{mfaEnrolled ? "On" : "Off"}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("mfa")}>{mfaEnrolled ? "Manage" : "Turn on"}</button>
+  </div>
+  <div class="setting-row">
+    <h3>Devices</h3>
+    <span class="setting-value">{sessions.length} signed in</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("devices")}>Manage</button>
+  </div>
+</section>
 
-  {#if notice}
-    <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">
-      {notice.text}
-    </p>
-  {/if}
+<section class="card" aria-labelledby="security-vault-h">
+  <h2 id="security-vault-h">Encryption and the vault</h2>
+  <div class="setting-row" data-testid="storage-posture">
+    <h3>Encryption</h3>
+    <span class="setting-value">{storageHealth === null ? "Unknown" : storageHealth.store === "ok" ? "On" : "Unavailable"}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("encryption")}>Details</button>
+  </div>
+  <div class="setting-row">
+    <h3>Vault key</h3>
+    <span class="setting-value">{vaultState === "configured_valid" ? "Set" : "Missing — connections fail closed"}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("vault")}>{vaultState === "configured_valid" ? "Change" : "Set up"}</button>
+  </div>
+</section>
 
-  <!-- Password reset -->
-  <div class="field">
-    <div class="field-head"><h3>Password</h3></div>
+<section class="card" aria-labelledby="security-findings-h">
+  <h2 id="security-findings-h">Findings and monitoring</h2>
+  <div class="setting-row">
+    <h3>Security scan</h3>
+    <span class="setting-value">{findings.length === 0 ? "No findings" : `${findings.length} ${findings.length === 1 ? "finding" : "findings"}`}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("scan")}>Review</button>
+  </div>
+  <div class="setting-row" data-testid="capability-containment">
+    <h3>Monitored capabilities</h3>
+    <span class="setting-value">{containment === null ? "Unknown" : containment.subjects.filter((subject) => subject.state !== "active").length === 0 ? "Nothing contained" : `${containment.subjects.filter((subject) => subject.state !== "active").length} contained`}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("monitored")}>Manage</button>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="security-standing-h">
+  <h2 id="security-standing-h">Standing access</h2>
+  <div class="setting-row">
+    <h3>Standing approval grants</h3>
+    <span class="setting-value">{grants.filter((grant) => !grant.revoked).length === 0 ? "None" : `${grants.filter((grant) => !grant.revoked).length} active`}</span>
+    <button type="button" class="btn btn-sm" onclick={() => openPanel("grants")}>Manage</button>
+  </div>
+</section>
+
+{#if panel === "password"}
+  <FormDialog title="Change password" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
     <label>
       Current password
       <input type="password" bind:value={oldPassword} autocomplete="current-password" />
@@ -333,13 +411,13 @@
       </button>
     </div>
     <p class="sub">Changing your password signs out all your other devices.</p>
-  </div>
-  <!-- MFA -->
-  <div class="field">
-    <div class="field-head">
-      <h3>Multi-factor authentication (TOTP)</h3>
-      <span class="pill" class:pill-ok={mfaEnrolled}>{mfaEnrolled ? "Enrolled" : "Not enrolled"}</span>
-    </div>
+  </FormDialog>
+{:else if panel === "mfa"}
+  <FormDialog title="Two-step sign-in" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
+    <p class="sub">An authenticator code (TOTP) in addition to your password.</p>
     {#if !mfaEnrolled}
       {#if enrollUri === null}
         <button type="button" class="btn btn-soft" onclick={startEnroll}>Enroll in MFA</button>
@@ -370,10 +448,12 @@
       Require MFA for Vault operations
       {#if !mfaEnrolled}<span class="sub">(enroll in MFA to enable)</span>{/if}
     </label>
-  </div>
-  <!-- Active device sessions -->
-  <div class="field">
-    <div class="field-head"><h3>Active device sessions</h3></div>
+  </FormDialog>
+{:else if panel === "devices"}
+  <FormDialog title="Signed-in devices" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
     {#if sessions.length === 0}
       <p class="sub">No active sessions.</p>
     {:else}
@@ -393,14 +473,9 @@
         {/each}
       </ul>
     {/if}
-  </div>
-</section>
-
-<section class="card" aria-labelledby="security-vault-h">
-  <h2 id="security-vault-h">Encryption and the vault</h2>
-  <p class="sub">Where stored secrets live, and what has to be true before one can be read.</p>
-  <div class="field storage-posture" data-testid="storage-posture">
-    <div class="field-head"><h3>Database encryption</h3></div>
+  </FormDialog>
+{:else if panel === "encryption"}
+  <FormDialog title="Encryption" onclose={() => (panel = null)}>
     {#if storageHealth === null}
       <p class="sub">Storage posture is unavailable right now.</p>
     {:else}
@@ -427,19 +502,13 @@
           : ""}
       </p>
     {/if}
-  </div>
-  <!-- Vault Key -->
-  <div class="field">
-    <div class="field-head">
-      <h3>Connector Vault Key</h3>
-      <span
-        class="pill"
-        class:pill-ok={vaultState === "configured_valid"}
-        class:pill-danger={vaultState !== "configured_valid"}
-      >
-        {vaultState === "configured_valid" ? "Active / Valid" : "Missing / Fail-Closed Active"}
-      </span>
-    </div>
+  </FormDialog>
+{:else if panel === "vault"}
+  <FormDialog title="Vault key" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
+    <p class="sub">Encrypts the credentials of the services you connect. Without it, linking an account fails closed.</p>
     <label>
       Vault key
       <input
@@ -452,10 +521,16 @@
       />
     </label>
     <p id="vault-key-format" class="sub hint">
-      Must be a <strong>Fernet key</strong>: 32 random bytes, URL-safe base64 (44 characters, ends with
-      <code>=</code>). A passphrase will not work. Generate one below, or run:
-      <code class="cmd">python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>
+      A 44-character key that ends with <code>=</code>. A passphrase will not work; Generate key
+      makes one.
     </p>
+    <details class="technical">
+      <summary>Technical details</summary>
+      <p class="sub">
+        It is a <strong>Fernet key</strong>: 32 random bytes, URL-safe base64. To make one yourself, run
+        <code class="cmd">python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>
+      </p>
+    </details>
     <div class="key-tools">
       <button type="button" class="btn btn-soft btn-sm" onclick={generateVaultKey}>Generate key</button>
       <button type="button" class="link" onclick={() => (revealed = !revealed)}>
@@ -480,14 +555,12 @@
         Clear key
       </button>
     </div>
-  </div>
-</section>
-
-<section class="card" aria-labelledby="security-findings-h">
-  <h2 id="security-findings-h">Findings and monitoring</h2>
-  <p class="sub">What a scan found, and what Raiker is watching because it has failed before.</p>
-  <div class="field">
-    <div class="field-head"><h3>Credential security</h3></div>
+  </FormDialog>
+{:else if panel === "scan"}
+  <FormDialog title="Security scan" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
     {#if credentials.length}
       <ul>{#each credentials as credential}<li>{credential.provider} — {credential.status} <button class="link" onclick={() => verifyCredential(credential.provider)}>Verify replacement</button></li>{/each}</ul>
     {:else}<p class="sub">No verified connector credentials yet.</p>{/if}
@@ -505,9 +578,12 @@
     <button type="button" class="btn btn-soft" disabled={!breachPassword || !breachOptIn} onclick={checkBreach}>
       Check breach corpus
     </button>
-  </div>
-  <div class="field" data-testid="capability-containment">
-    <div class="field-head"><h3>Monitored capabilities</h3></div>
+  </FormDialog>
+{:else if panel === "monitored"}
+  <FormDialog title="Monitored capabilities" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
     {#if containment === null}
       <p class="sub">Containment state is unavailable right now.</p>
     {:else if containment.subjects.length === 0}
@@ -556,15 +632,13 @@
       </ul>
     {/if}
     <div class="actions"><button class="btn btn-soft" onclick={loadContainment}>Refresh</button></div>
-  </div>
-</section>
-
-<section class="card" aria-labelledby="security-standing-h">
-  <h2 id="security-standing-h">Standing access</h2>
-  <p class="sub">What may run without asking you each time, and how to take it back.</p>
-  <!-- Scoped standing approval grants (ZT-5) -->
-  <div class="field">
-    <div class="field-head"><h3>Standing approval grants</h3></div>
+  </FormDialog>
+{:else if panel === "grants"}
+  <FormDialog title="Standing approval grants" onclose={() => (panel = null)}>
+      {#if notice}
+        <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+      {/if}
+    <p class="sub">What may run without asking you each time, and how to take it back.</p>
     <div class="grant-form">
       <input
         placeholder="Action type (e.g. write_file)"
@@ -606,27 +680,39 @@
         {/each}
       </ul>
     {/if}
-  </div>
-</section>
+  </FormDialog>
+{/if}
 
 <style>
+  /* QUI-L03 — a setting is a row: label, current value, one action. */
+  .setting-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) minmax(0, 1.4fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    border-top: 1px solid var(--border);
+  }
+  .setting-row:first-of-type {
+    border-top: none;
+  }
+  .setting-row h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .setting-value {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .technical summary {
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
   /* REM-SET-SECURITY — four cards where there was one, so they need the gap
      between them that a single card never did. */
   section.card + section.card { margin-top: var(--space-4); }
 
-  .field {
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--border);
-  }
-  .field:first-of-type {
-    border-top: none;
-  }
-  .field-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
   .posture-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -764,7 +850,7 @@
     padding: 0.05rem 0.3rem;
     border-radius: 4px;
   }
-  .hint code.cmd {
+  .technical code.cmd {
     display: block;
     margin-top: var(--space-2);
     padding: var(--space-2);

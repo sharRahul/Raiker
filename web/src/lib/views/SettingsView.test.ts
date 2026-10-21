@@ -111,14 +111,15 @@ describe("supported-preferences settings", () => {
     ]) {
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
-    // Nothing was removed on the way out of the single stack.
+    // Nothing was removed on the way out of the single stack: each is a row
+    // whose form opens in a dialog (QUI-L09).
     for (const control of [
       "Password",
-      "Multi-factor authentication (TOTP)",
-      "Active device sessions",
-      "Database encryption",
-      "Connector Vault Key",
-      "Credential security",
+      "Two-step sign-in",
+      "Devices",
+      "Encryption",
+      "Vault key",
+      "Security scan",
       "Monitored capabilities",
       "Standing approval grants",
     ]) {

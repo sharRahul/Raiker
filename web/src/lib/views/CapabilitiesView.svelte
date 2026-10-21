@@ -4,7 +4,9 @@
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
-  import PermissionRow from "../components/PermissionRow.svelte";
+  import PermissionDetail from "../components/PermissionDetail.svelte";
+  import ListDetail from "../components/ListDetail.svelte";
+  import RowOverflow from "../components/RowOverflow.svelte";
   import StepUpDialog from "../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
   import GuideLink from "../components/GuideLink.svelte";
@@ -13,7 +15,6 @@
   import {
     canEnable,
     capabilityDescription,
-    capabilityDomain,
     capabilityLabel,
     BUILD_PRESET,
     buildPresetPending,
@@ -36,7 +37,6 @@
   import { explainReasonCode } from "../reasonCodes";
   import {
     BEHAVIOUR_COPY,
-    commonGates,
     permissionAttention,
     permissionPosture,
     rowSummary,
@@ -78,10 +78,6 @@
 
   let gates = $state<CapabilityGate[] | null>(null);
   let loadError = $state<string | null>(null);
-  let search = $state("");
-  let expanded = $state<string | null>(null);
-  let statusFilter = $state("all");
-  let domainFilter = $state("all");
   let refreshing = $state(false);
   /**
    * UX-PERM-01 — the registry leads with what each permission is *for*. The
@@ -100,9 +96,8 @@
   function chooseGrouping(next: RegistryGrouping) {
     if (next === grouping) return;
     grouping = next;
-    // A group name from the other grouping would filter or fold nothing.
-    domainFilter = "all";
-    collapsedDomains = [];
+    // A category from the other grouping names nothing; start from Overview.
+    chooseCategory(OVERVIEW_ID);
     try {
       window.localStorage.setItem(GROUPING_KEY, next);
     } catch {
@@ -110,31 +105,41 @@
     }
   }
 
-  /**
-   * Domain groups the owner has folded away.
-   *
-   * The registry holds 66 gates across a dozen domains and every one of them
-   * rendered expanded, so finding the capability you came for meant scrolling
-   * past every capability you did not. Collapsed by name rather than by index,
-   * so filtering the list does not fold a different group than the one that was
-   * closed.
-   *
-   * A search overrides it: typing is asking to see matches, and answering that
-   * with a folded group would be the page arguing with the query.
-   */
-  let collapsedDomains = $state<string[]>([]);
-  const searching = $derived(search.trim() !== "");
-  const filtering = $derived(searching || statusFilter !== "all" || domainFilter !== "all");
-
-  function isCollapsed(domain: string): boolean {
-    return !searching && collapsedDomains.includes(domain);
-  }
-  function toggleDomain(domain: string) {
-    collapsedDomains = collapsedDomains.includes(domain)
-      ? collapsedDomains.filter((d) => d !== domain)
-      : [...collapsedDomains, domain];
-  }
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  /*
+   * QUI-L06 — categories beside the permissions in them. Overview first, the
+   * task groups next, and the system ones last under Advanced. The category is
+   * in the address (`?category=`), and the permission open in the detail pane
+   * is too (`?item=`, from ListDetail).
+   */
+  const OVERVIEW_ID = "overview";
+  const ADVANCED_ID = "advanced";
+  const ADVANCED_GROUP = "System and runtimes";
+  function slug(group: string): string {
+    return group === ADVANCED_GROUP && grouping === "task"
+      ? ADVANCED_ID
+      : group.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+  function categoryFromHash(): string {
+    if (typeof window === "undefined") return OVERVIEW_ID;
+    const requested = new URLSearchParams(window.location.hash.split("?", 2)[1] ?? "").get("category");
+    return requested !== null && /^[a-z0-9-]{1,64}$/.test(requested) ? requested : OVERVIEW_ID;
+  }
+  let category = $state(categoryFromHash());
+  let selectedCapability = $state<string | null>(null);
+  let bulkMode = $state(false);
+  function chooseCategory(id: string) {
+    if (id !== category) selectedCapability = null;
+    category = id;
+    selectedCaps = new Set();
+    if (typeof window === "undefined") return;
+    const next = id === OVERVIEW_ID ? "#/capabilities" : `#/capabilities?category=${id}`;
+    if (window.location.hash !== next) history.replaceState(history.state, "", next);
+  }
+  function categoryIdOf(capability: string): string {
+    return slug(capabilityGroup(capability, grouping));
+  }
 
   /*
    * The per-capability decision mode is the primary control here. It arrives
@@ -191,7 +196,24 @@
    * both fold away while one is running.
    */
   const attention = $derived(permissionAttention(governedGates));
-  const common = $derived(commonGates(governedGates));
+  const groups = $derived(groupGates(governedGates, grouping));
+  const categories = $derived([
+    { id: OVERVIEW_ID, label: "Overview", count: 0, review: 0 },
+    ...groups.map((group) => ({
+      id: slug(group.domain),
+      label: slug(group.domain) === ADVANCED_ID ? "Advanced" : group.domain,
+      count: group.gates.length,
+      review: group.gates.filter((gate) =>
+        attention.some((item) => item.capability === gate.capability),
+      ).length,
+    })),
+  ]);
+  const categoryGates = $derived(
+    groups.find((group) => slug(group.domain) === category)?.gates ?? [],
+  );
+  const categoryLabel = $derived(
+    categories.find((item) => item.id === category)?.label ?? "Overview",
+  );
 
   /** Record a mode the server has confirmed, for every presentation at once. */
   function recordConfirmed(capability: string, mode: DecisionMode) {
@@ -415,28 +437,6 @@
     ).length,
   );
 
-  const filtered = $derived.by(() => {
-    const q = search.trim().toLowerCase();
-    return groupGates(governedGates.filter(gate => {
-      // Both headings are searchable whichever one is drawn, so "network" still
-      // finds what the technical view files under Network.
-      const text = `${gate.capability} ${capabilityLabel(gate.capability)} ${capabilityDescription(gate.capability)} ${capabilityDomain(gate.capability)} ${capabilityGroup(gate.capability, "task")}`.toLowerCase();
-      if (q && !text.includes(q)) return false;
-      if (domainFilter !== "all" && capabilityGroup(gate.capability, grouping) !== domainFilter) return false;
-      if (statusFilter === "on") return isAvailable(gate);
-      if (statusFilter === "off") return !isAvailable(gate);
-      if (statusFilter === "attention") return attention.some(item => item.capability === gate.capability);
-      if (statusFilter === "selected") return selectedCaps.has(gate.capability);
-      return true;
-    }), grouping);
-  });
-  const visibleCount = $derived(filtered.reduce((count, group) => count + group.gates.length, 0));
-
-  function clearFilters() {
-    search = "";
-    statusFilter = "all";
-    domainFilter = "all";
-  }
   function selectable(gates: CapabilityGate[]): string[] {
     return gates.filter(gate => gate.can_current_principal_change).map(gate => gate.capability);
   }
@@ -445,36 +445,9 @@
   // summary said nothing at all. Ranked by authority instead — see
   // `authorityMatrixGates`.
   const authorityGates = $derived(authorityMatrixGates(governedGates));
-  const domains = $derived(groupGates(governedGates, grouping).map(group => group.domain));
   const posture = $derived(permissionPosture(governedGates));
   const goals = $derived(goalSummaries(effective));
 
-  /**
-   * The status filters, as one control instead of two.
-   *
-   * These counts were four page-width tiles at the top of the page and a
-   * `<select>` two-thirds of the way down it, both setting `statusFilter`. One
-   * idiom, in one place, beside the sentence they are counts of. `Selected`
-   * appears only once there is a selection to filter to.
-   */
-  const statusFilters = $derived([
-    { id: "all", label: "All", count: governedGates.length },
-    { id: "on", label: "Available", count: posture.available },
-    { id: "off", label: "Unavailable", count: governedGates.length - posture.available },
-    { id: "attention", label: "Needs review", count: attention.length },
-    ...(selectedCaps.size > 0
-      ? [{ id: "selected", label: "Selected", count: selectedCaps.size }]
-      : []),
-  ]);
-
-  function toggleExpand(capability: string) {
-    expanded = expanded === capability ? null : capability;
-  }
-
-  /** The row's own control, so a shortcut can land keyboard focus on it. */
-  function rowToggleId(capability: string): string {
-    return `cap-row-${capability}`;
-  }
 
   /*
    * NEW-PERM-01 — the shortcut the two top sections were missing.
@@ -498,26 +471,24 @@
     const gate = governedGates.find((entry) => entry.capability === capability);
     if (gate === undefined) {
       // Never a dead action: a capability with no registry row says so instead
-      // of scrolling to nothing.
+      // of opening nothing.
       notice = {
         kind: "error",
         text: `${capabilityLabel(capability)} has no control in this build, so there is nothing to open.`,
       };
       return;
     }
-    clearFilters();
-    const domain = capabilityGroup(capability, grouping);
-    collapsedDomains = collapsedDomains.filter((entry) => entry !== domain);
-    expanded = capability;
+    bulkMode = false;
+    chooseCategory(categoryIdOf(capability));
+    selectedCapability = capability;
     await tick();
-    const control = document.getElementById(rowToggleId(capability));
-    if (control === null) return;
-    // Focus first, and never behind a scroll helper that a non-browser DOM does
-    // not implement: the keyboard landing on the control is the part of this
-    // that a screen-reader user depends on, and it must not be lost to an
-    // environment where scrolling is a no-op.
-    control.focus();
-    control.scrollIntoView?.({ block: "center" });
+    // Focus lands on the permission's own control in the detail pane, so the
+    // shortcut helps a keyboard user as much as a pointer one.
+    const control = document.querySelector<HTMLElement>(
+      `.category-pane article[aria-label="${CSS.escape(capabilityLabel(capability))}"] button`,
+    );
+    control?.focus();
+    control?.scrollIntoView?.({ block: "center" });
   }
 
   async function setMode(capability: string, mode: DecisionMode) {
@@ -670,11 +641,13 @@
   onMount(load);
 </script>
 
-<!-- One page title, and it is the one in the top bar that every other page
-     uses. This view carried a second `<h1>` reading "Permissions" directly
-     under it — the only view in the product that did. -->
+<!-- QUI-L06 — one line for the active profile, then categories beside the
+     permissions in them. The four-way choice is in the detail pane, one
+     control at a time. -->
 <header class="perm-head">
-  <p class="lede">Choose what Raiker can use, and when it should ask you.</p>
+  <p class="lede" data-testid="permission-profile">
+    {#if gates !== null}{posture.sentence}{:else}Choose what Raiker can use, and when it should ask you.{/if}
+  </p>
   <div class="head-actions">
     <button
       type="button"
@@ -687,6 +660,22 @@
       {refreshing ? "Refreshing…" : "Refresh"}
     </button>
     <GuideLink route="capabilities" />
+    <RowOverflow
+      label="permissions"
+      items={[
+        {
+          label: bulkMode ? "Stop selecting" : "Select several",
+          run: () => {
+            bulkMode = !bulkMode;
+            selectedCaps = new Set();
+          },
+        },
+        {
+          label: grouping === "task" ? "Group by technical area" : "Group by what it's for",
+          run: () => chooseGrouping(grouping === "task" ? "domain" : "task"),
+        },
+      ]}
+    />
   </div>
 </header>
 
@@ -699,326 +688,223 @@
 {:else if gates === null}
   <PageState state="loading" title="Loading capabilities…" />
 {:else}
-  <!-- One posture summary, with the counts as the page's single status filter
-       (REM-PERM-01). -->
-  <section class="panel posture" aria-label="Permission posture">
-    <p class="posture-line">{posture.sentence}</p>
-    <div class="chip-row" role="group" aria-label="Filter permissions by status">
-      {#each statusFilters as item (item.id)}
-        <button
-          type="button"
-          class="chip"
-          aria-pressed={statusFilter === item.id}
-          onclick={() => (statusFilter = item.id)}
-        >
-          <span class="chip-count">{item.count}</span>
-          {item.label}
-        </button>
-      {/each}
-    </div>
-    {#if integratedButOff > 0}
-      <!-- Why a fresh account shows most things off, at note weight. BUG-239 —
-           "most", with the exception named, because a new account's baseline
-           turns some on; saying "off" about a capability that is on is the
-           defect this page exists to prevent. -->
-      <p class="posture-note">
-        <Icon name="info" size="sm" />
-        <span>
-          Most capabilities with a real executor start <strong>off</strong> on this account until
-          you turn them on. A new account starts with a small set of local, reversible ones
-          available — and every one of them still asks. To stop all work instead, use
-          <a href="#/settings">Settings → Runtime configuration</a>.
-        </span>
-      </p>
-    {/if}
-  </section>
+  <div class="perm-layout">
+    <nav class="category-rail" aria-label="Permission categories">
+      <ul>
+        {#each categories as item (item.id)}
+          {#if item.id === ADVANCED_ID}<li class="rail-divider" aria-hidden="true"></li>{/if}
+          <li>
+            <button
+              type="button"
+              class="category"
+              aria-current={category === item.id ? "page" : undefined}
+              onclick={() => chooseCategory(item.id)}
+            >
+              <span>{item.label}</span>
+              {#if item.review > 0}
+                <span class="category-review">{item.review} to review</span>
+              {:else if item.count > 0}
+                <span class="category-count">{item.count}</span>
+              {/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </nav>
 
-  {#if !filtering && goals.some((goal) => goal.verdict !== "not_reported")}
-    <!-- UX-PERM-05 — the posture by goal, read-only. The owner's question is
-         "can Raiker edit my files?", not "what is file_write_execution set
-         to"; each line is derived from the same effective gates as the rows
-         below, and Change opens the row that decides it. -->
-    <section class="panel goals" aria-label="What Raiker can do for you">
-      <h2>What Raiker can do for you</h2>
-      <ul class="goal-list">
-        {#each goals.filter((goal) => goal.verdict !== "not_reported") as goal (goal.id)}
-          <li class="goal goal-{goal.verdict}">
-            <Icon name={goal.verdict === "never" ? "x" : goal.verdict === "unknown" ? "info" : "check"} size="sm" />
-            <span class="goal-sentence">{goal.sentence}</span>
-            {#if goal.firstCapability}
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                aria-label={`Change: ${goal.sentence}`}
-                onclick={() => void revealCapability(goal.firstCapability ?? "")}
-              >
-                Change
-              </button>
+    <div class="category-pane">
+      {#if category === OVERVIEW_ID}
+        {#if goals.some((goal) => goal.verdict !== "not_reported")}
+          <!-- UX-PERM-05 — the posture by goal, read-only, in seven plain
+               sentences; Change opens the permission that decides it. -->
+          <section class="panel goals" aria-label="What Raiker can do for you">
+            <h2>What Raiker can do for you</h2>
+            <ul class="goal-list">
+              {#each goals.filter((goal) => goal.verdict !== "not_reported") as goal (goal.id)}
+                <li class="goal goal-{goal.verdict}">
+                  <Icon name={goal.verdict === "never" ? "x" : goal.verdict === "unknown" ? "info" : "check"} size="sm" />
+                  <span class="goal-sentence">{goal.sentence}</span>
+                  {#if goal.firstCapability}
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      aria-label={`Change: ${goal.sentence}`}
+                      onclick={() => void revealCapability(goal.firstCapability ?? "")}
+                    >
+                      Change
+                    </button>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+
+        {#if !presetDone && presetPending.length > 0}
+          <!-- BUG-239 — the Build setup preset, shown before it is taken. -->
+          <section class="panel preset" aria-label="Set up for Build">
+            <div class="preset-head">
+              <div>
+                <h2>Set up for Build</h2>
+                <p class="preset-lede">
+                  Building needs {BUILD_PRESET.length} permissions. Raiker still asks
+                  before each change — this turns them on, not off.
+                </p>
+              </div>
+              <div class="preset-actions">
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  aria-expanded={presetOpen}
+                  onclick={() => (presetOpen = !presetOpen)}
+                >
+                  {presetOpen ? "Hide" : "What this turns on"}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={mutationBusy}
+                  onclick={() => void applyBuildPreset()}
+                >
+                  {presetBusy ? "Turning on…" : `Turn on ${presetPending.length}`}
+                </button>
+              </div>
+            </div>
+            {#if presetOpen}
+              <ul class="preset-list">
+                {#each BUILD_PRESET as row (row.capability)}
+                  <li>
+                    <span class="cap-label">{capabilityLabel(row.capability)}</span>
+                    <span class="preset-what">{row.what}</span>
+                    <span class="cap-summary">
+                      {presetPending.some((g) => g.capability === row.capability)
+                        ? "Off"
+                        : "Already on"}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
             {/if}
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  {#if !filtering && attention.length > 0}
-    <!-- What needs a decision comes before what is merely configured. Narrow on
-         purpose — a capability sitting at its default is not attention, and a
-         page that calls everything attention has said nothing. -->
-    <section class="panel panel-attention" aria-label="Needs your attention">
-      <h2>Needs your attention</h2>
-      <ul class="shortcuts">
-        {#each attention as item (item.capability)}
-          <li>
-            <span class="shortcut-text">
-              <span class="cap-label">{item.label}</span>
-              <span class="cap-summary">{item.reason}</span>
-            </span>
-            <!-- The section says a decision wants a second look, so it offers
-                 the place to make it (NEW-PERM-01). -->
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              onclick={() => void revealCapability(item.capability)}
-            >
-              Review
-              <span class="sr-only">{item.label}</span>
+          </section>
+        {/if}
+        {#if governedGates.length === 0}
+          <PageState state="empty" title="No permissions available" detail="Raiker has not reported any permission you can change." />
+        {/if}
+      {:else if bulkMode}
+        <!-- Select several: the category as a checklist, with the bulk bar. -->
+        <section class="panel bulk" aria-label="Select several permissions">
+          <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
+            <span class="bulk-count">{selectedCaps.size} selected</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => toggleSelectAllInGroup(selectable(categoryGates))} disabled={mutationBusy || selectable(categoryGates).length === 0}>
+              {allSelectedInGroup(selectable(categoryGates)) ? "Clear all" : "Select all"}
             </button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  {#if !filtering && !presetDone && presetPending.length > 0}
-    <!-- BUG-239 — the Build setup preset. One deliberate decision instead of
-         a handful of rows to find, and it shows them before it takes it: a preset
-         an owner cannot read before pressing is a permission change they did
-         not make. Hidden once every row in it is on, because at that point it
-         is a button that would do nothing. -->
-    <section class="panel preset" aria-label="Set up for Build">
-      <div class="preset-head">
-        <div>
-          <h2>Set up for Build</h2>
-          <p class="preset-lede">
-            Building needs {BUILD_PRESET.length} permissions. Raiker still asks
-            before each change — this turns them on, not off.
-          </p>
-        </div>
-        <div class="preset-actions">
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-expanded={presetOpen}
-            onclick={() => (presetOpen = !presetOpen)}
-          >
-            {presetOpen ? "Hide" : "What this turns on"}
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary btn-sm"
-            disabled={mutationBusy}
-            onclick={() => void applyBuildPreset()}
-          >
-            {presetBusy ? "Turning on…" : `Turn on ${presetPending.length}`}
-          </button>
-        </div>
-      </div>
-      {#if presetOpen}
-        <ul class="preset-list">
-          {#each BUILD_PRESET as row (row.capability)}
-            <li>
-              <span class="cap-label">{capabilityLabel(row.capability)}</span>
-              <span class="preset-what">{row.what}</span>
-              <span class="cap-summary">
-                {presetPending.some((g) => g.capability === row.capability)
-                  ? "Off"
-                  : "Already on"}
-              </span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </section>
-  {/if}
-
-  {#if !filtering && common.length > 0}
-    <!-- The handful people actually come to change, above the registry that
-         holds everything. Same gates, same controls: this is an ordering, not a
-         second copy of the page's state. -->
-    <section class="panel" aria-label="Common permissions">
-      <h2>Common permissions</h2>
-      <ul class="shortcuts">
-        {#each common as gate (gate.capability)}
-          <li>
-            <span class="shortcut-text">
+            <span class="bulk-label">Set all to:</span>
+            <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={mutationBusy || selectedCaps.size === 0}>{BEHAVIOUR_COPY.ask.label}</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={mutationBusy || selectedCaps.size === 0}>{BEHAVIOUR_COPY.deny.label}</button>
+          </div>
+          <ul class="bulk-list">
+            {#each categoryGates as gate (gate.capability)}
+              <li>
+                <label>
+                  <input
+                    type="checkbox"
+                    disabled={mutationBusy || !gate.can_current_principal_change}
+                    checked={selectedCaps.has(gate.capability)}
+                    onchange={() => toggleCapSelected(gate.capability)}
+                    aria-label={`Select ${capabilityLabel(gate.capability)}`}
+                  />
+                  <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+                  <span class="cap-summary">{rowSummary(gate, isAvailable(gate))}</span>
+                </label>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {:else}
+        <ListDetail
+          items={categoryGates}
+          key={(gate) => gate.capability}
+          label={`${categoryLabel} permissions`}
+          matches={(gate, query) =>
+            `${gate.capability} ${capabilityLabel(gate.capability)} ${capabilityDescription(gate.capability)}`
+              .toLowerCase()
+              .includes(query)}
+          searchLabel="Search permissions"
+          storageKey="permissions"
+          autoSelectFirst={true}
+          bind:selectedId={selectedCapability}
+        >
+          {#snippet row(gate)}
+            <span class="perm-row">
               <span class="cap-label">{capabilityLabel(gate.capability)}</span>
-              <span class="cap-summary">{rowSummary(gate, isAvailable(gate))}</span>
+              <span class="cap-summary">
+                {rowSummary(gate, isAvailable(gate))}{#if attention.some((item) => item.capability === gate.capability)} · Needs review{/if}
+              </span>
             </span>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              onclick={() => void revealCapability(gate.capability)}
-            >
-              Manage
-              <span class="sr-only">{capabilityLabel(gate.capability)}</span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
-
-  <!-- The registry: everything, grouped by domain. It keeps the full list an
-       owner may need to audit, and sits under the two sections that answer the
-       questions people actually arrive with. -->
-  <section class="panel registry" aria-label="All permissions">
-    <div class="registry-heading">
-      <div>
-        <h2>All permissions</h2>
-        <p aria-live="polite">Showing {visibleCount} of {governedGates.length} permissions</p>
-      </div>
-      <!-- One toolbar: find, narrow, fold, reset. The search sat in a band of
-           its own two sections above this heading, so the control and the list
-           it filtered were not on screen together. -->
-      <div class="registry-filters">
-        <div class="search">
-          <Icon name="search" size="sm" />
-          <label class="sr-only" for="cap-search">Search capabilities</label>
-          <input
-            id="cap-search"
-            class="search-input"
-            type="search"
-            placeholder="Search permissions, actions or groups…"
-            bind:value={search}
-          />
-        </div>
-        <label class="sr-only" for="cap-group">Permission group</label>
-        <select id="cap-group" bind:value={domainFilter}>
-          <option value="all">All groups</option>
-          {#each domains as domain}<option value={domain}>{domain}</option>{/each}
-        </select>
-        <button type="button" class="btn btn-ghost btn-sm" onclick={() => collapsedDomains = []}>Expand groups</button>
-        <button type="button" class="btn btn-ghost btn-sm" disabled={searching} onclick={() => collapsedDomains = [...domains]}>Collapse groups</button>
-        {#if filtering}<button type="button" class="btn btn-ghost btn-sm" onclick={clearFilters}>Clear filters</button>{/if}
-      </div>
-    </div>
-    <!-- UX-PERM-01 — what each permission is for leads; the technical areas
-         are the advanced view of the same registry. -->
-    <div class="chip-row grouping" role="group" aria-label="Group permissions by">
-      <span class="grouping-label">Group by</span>
-      <button type="button" class="chip" aria-pressed={grouping === "task"} onclick={() => chooseGrouping("task")}>What it's for</button>
-      <button type="button" class="chip" aria-pressed={grouping === "domain"} onclick={() => chooseGrouping("domain")}>Technical area (advanced)</button>
-    </div>
-
-    {#if selectedCaps.size > 0}
-      <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
-        <span class="bulk-count">{selectedCaps.size} selected</span>
-        <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={mutationBusy}>Clear</button>
-        <span class="bulk-label">Set all to:</span>
-        <!-- REM-PERM-02 — the same words the controls below use. These two said
-             "Ask" and "Deny" about the values every other control on the page
-             calls "Ask me" and "Never", so one policy had two names on one
-             screen. -->
-        <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={mutationBusy}>{BEHAVIOUR_COPY.ask.label}</button>
-        <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={mutationBusy}>{BEHAVIOUR_COPY.deny.label}</button>
-      </div>
-    {/if}
-
-    {#if visibleCount === 0}
-      <PageState state="empty" title={governedGates.length === 0 ? "No permissions available" : "No matching permissions"} detail={governedGates.length === 0 ? "This runtime has not reported any configurable tools." : "Try a different search, group or status filter."} />
-    {/if}
-
-    {#each filtered as group (group.domain)}
-      <div class="cap-list">
-        <div class="phase-head">
-          <label class="phase-select-all">
-            <input
-              type="checkbox"
-              disabled={mutationBusy || selectable(group.gates).length === 0}
-              indeterminate={selectable(group.gates).some(cap => selectedCaps.has(cap)) && !allSelectedInGroup(selectable(group.gates))}
-              checked={allSelectedInGroup(selectable(group.gates))}
-              onchange={() => toggleSelectAllInGroup(selectable(group.gates))}
-              aria-label={`Select all ${group.domain} capabilities`}
+          {/snippet}
+          {#snippet empty()}
+            <p class="note">Nothing in this category is reported by this build.</p>
+          {/snippet}
+          {#snippet detail(gate)}
+            <PermissionDetail
+              {gate}
+              review={attention.find((item) => item.capability === gate.capability)?.reason ?? null}
+              busy={mutationBusy}
+              modes={controlModes}
+              onDecision={(capability, mode) => void setMode(capability, mode)}
+              onEnable={startEnable}
+              onDisable={startDisable}
             />
-            {group.domain}
-          </label>
-          <button
-            type="button"
-            class="phase-fold"
-            aria-expanded={!isCollapsed(group.domain)}
-            onclick={() => toggleDomain(group.domain)}
-          >
-            <span class="phase-count">{group.gates.length}</span>
-            <Icon name={isCollapsed(group.domain) ? "chevron-right" : "chevron-down"} size="sm" />
-            <span class="sr-only">
-              {isCollapsed(group.domain) ? "Show" : "Hide"}
-              {group.domain} capabilities
+          {/snippet}
+        </ListDetail>
+      {/if}
+
+      {#if category === ADVANCED_ID && !bulkMode}
+        {#if integratedButOff > 0}
+          <!-- Why a fresh account shows most things off, at note weight. -->
+          <p class="posture-note">
+            <Icon name="info" size="sm" />
+            <span>
+              Most capabilities with a real executor start <strong>off</strong> on this account until
+              you turn them on. A new account starts with a small set of local, reversible ones
+              available — and every one of them still asks.
             </span>
-          </button>
-        </div>
-        {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
-          <PermissionRow
-            {gate}
-            open={expanded === gate.capability}
-            selected={selectedCaps.has(gate.capability)}
-            busy={mutationBusy}
-            modes={controlModes}
-            toggleId={rowToggleId(gate.capability)}
-            onToggleOpen={toggleExpand}
-            onToggleSelect={toggleCapSelected}
-            onDecision={(capability, mode) => void setMode(capability, mode)}
-            onEnable={startEnable}
-            onDisable={startDisable}
-          />
-        {/each}
-      </div>
-    {/each}
-  </section>
-
-  {#if notDecidedHere.length > 0}
-    <!--
-      GEP-04, second answer. These gates exist, and flipping them decides
-      nothing: either nothing in the product reaches the executor, or the work
-      runs under a different named control. They carry no mode buttons, so no
-      owner can set one and believe they closed something.
-
-      They are not hidden. Hiding a capability an owner can ask about is its own
-      dishonesty, and the note is the answer they actually need: what really
-      governs this, or why nothing runs.
-    -->
-    <details class="panel not-decided">
-      <summary>
-        Not decided here
-        <span class="not-decided-count">{notDecidedHere.length}</span>
-      </summary>
-      <p class="not-decided-lead">
-        Raiker reports a gate for each of these, and this page does not decide them: the work runs
-        under a different control, or nothing in Raiker reaches it yet. They are listed so the
-        answer is here rather than missing.
-      </p>
-      <ul class="not-decided-list">
-        {#each notDecidedHere as item (item.capability)}
-          <li>
-            <span class="not-decided-head">
-              <span class="cap-label">{item.label}</span>
-              <span class="cap-reality">{item.reality}</span>
-            </span>
-            <p>{item.note}</p>
-          </li>
-        {/each}
-      </ul>
-    </details>
-  {/if}
-
-  {#if authorityGates.length > 0}
-    <!-- REM-PERM-01 — evidence, not the owner's first task: reference for a
-         question an owner asks second, so it reads second, and closed. -->
-    <details class="panel authority-disclosure">
-      <summary>How your permissions apply</summary>
-      <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
-    </details>
-  {/if}
+          </p>
+        {/if}
+        {#if notDecidedHere.length > 0}
+          <!-- GEP-04 — gates that decide nothing here. Read-only, listed so
+               the answer is here rather than missing. -->
+          <details class="panel not-decided">
+            <summary>
+              Not decided here
+              <span class="not-decided-count">{notDecidedHere.length}</span>
+            </summary>
+            <p class="not-decided-lead">
+              Raiker reports a gate for each of these, and this page does not decide them: the work runs
+              under a different control, or nothing in Raiker reaches it yet.
+            </p>
+            <ul class="not-decided-list">
+              {#each notDecidedHere as item (item.capability)}
+                <li>
+                  <span class="not-decided-head">
+                    <span class="cap-label">{item.label}</span>
+                    <span class="cap-reality">{item.reality}</span>
+                  </span>
+                  <p>{item.note}</p>
+                </li>
+              {/each}
+            </ul>
+          </details>
+        {/if}
+        {#if authorityGates.length > 0}
+          <details class="panel authority-disclosure">
+            <summary>How your permissions apply</summary>
+            <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
+          </details>
+        {/if}
+      {/if}
+    </div>
+  </div>
 {/if}
 
 {#if pending !== null}
@@ -1041,6 +927,105 @@
 {/if}
 
 <style>
+  /* QUI-L06 — layout B with a category rail: categories on the left, the
+     category's permissions and the one open beside them on the right. */
+  .perm-layout {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: var(--space-5);
+    align-items: start;
+  }
+  .category-rail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  .category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: var(--nav-row-h);
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .category:hover {
+    background: var(--sunken);
+    color: var(--text-1);
+  }
+  .category[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--text-1);
+  }
+  .category-count {
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .category-review {
+    color: var(--warn-text);
+    font-size: var(--text-xs);
+    font-weight: 650;
+  }
+  .rail-divider {
+    height: 1px;
+    margin: var(--space-2) var(--space-3);
+    background: var(--border);
+  }
+  .category-pane {
+    min-width: 0;
+    display: grid;
+    gap: var(--space-3);
+  }
+  .perm-row {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .perm-row .cap-summary {
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .note {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .bulk-list {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+  .bulk-list label {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: 0 var(--space-2);
+    border-radius: var(--r-sm);
+  }
+  .bulk-list label:hover {
+    background: var(--sunken);
+  }
+  @media (max-width: 860px) {
+    .perm-layout {
+      grid-template-columns: 1fr;
+    }
+  }
   /* One column of panels, each with the same padding, radius and border, so the
      page reads as one surface rather than as seven bands that each invented
      their own. */
@@ -1105,10 +1090,7 @@
     color: var(--text-2);
     font-size: var(--text-sm);
   }
-  .posture-note a {
-    color: var(--accent);
-    font-weight: 600;
-  }
+
   /* The one panel that is about something unresolved keeps a marker, in text
      weight rather than in a fill: a page where a section shouts is a page where
      the shout stops meaning anything. */
@@ -1121,19 +1103,7 @@
     padding: 0;
     display: grid;
   }
-  .shortcuts li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .shortcuts li:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
-  }
+
   .shortcut-text {
     display: flex;
     align-items: baseline;
@@ -1204,9 +1174,7 @@
     gap: var(--space-3);
     margin-bottom: var(--space-3);
   }
-  .registry-heading h2 {
-    margin: 0;
-  }
+
   .registry-heading p {
     font-size: var(--text-sm);
     color: var(--text-3);
@@ -1218,16 +1186,7 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
-  .registry-filters select {
-    font: inherit;
-    font-size: var(--text-sm);
-    color: var(--text-1);
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-sm);
-    padding: var(--space-2);
-    max-width: 100%;
-  }
+
   .search {
     display: flex;
     align-items: center;
@@ -1326,9 +1285,7 @@
     color: var(--text-3);
     cursor: pointer;
   }
-  .phase-select-all input {
-    accent-color: var(--accent);
-  }
+
   /* The read-only list of gates this page does not decide. Drawn as reference —
      no control, no selection — because that is exactly what it is. */
   .not-decided summary,

@@ -5,10 +5,8 @@ import type { CapabilityGate } from "./apiTypes";
 import {
   BEHAVIOUR_COPY,
   CANNOT_CHANGE_HERE,
-  COMMON_PERMISSIONS,
   UNKNOWN_BEHAVIOUR,
   behaviourCopy,
-  commonGates,
   availabilityAnswer,
   permissionAttention,
   permissionPosture,
@@ -16,7 +14,6 @@ import {
 } from "./permissionLanguage";
 import {
   canDisable,
-  capabilityLabel,
   DECISION_MODES,
   isAvailable,
   unsetResolutionNote,
@@ -62,31 +59,6 @@ describe("the two questions Permissions asks (P1 — Permissions UX)", () => {
   it("says both facts on a row that is still closed", () => {
     expect(rowSummary(gate({ decision_mode: "ask" }), true)).toBe("On · Ask me");
     expect(rowSummary(gate({ decision_mode: "allow" }), false)).toBe("Off · Allow");
-  });
-
-  it("names capabilities the registry actually ships", () => {
-    // Found live: the first list used plausible-sounding names — `file_write`,
-    // `shell_exec`, `git_push` — and the registry calls them
-    // `file_write_execution`, `shell_execution`, `git_push_execution`. Nothing
-    // failed; the section simply rendered one row and looked finished.
-    for (const name of COMMON_PERMISSIONS) {
-      expect(capabilityLabel(name), `${name} is not in the capability registry`).not.toBe(name);
-    }
-  });
-
-  it("lists the common permissions that this build actually has", () => {
-    const installed = [
-      gate({ capability: "shell_execution" }),
-      gate({ capability: "file_write_execution" }),
-    ];
-    expect(commonGates(installed).map((entry) => entry.capability)).toEqual([
-      "file_write_execution",
-      "shell_execution",
-    ]);
-    // Order follows the list, not the registry's order …
-    expect(COMMON_PERMISSIONS.indexOf("web_fetch")).toBe(0);
-    // … and a capability this build does not ship is simply absent.
-    expect(commonGates([])).toEqual([]);
   });
 
   it("does not read an unrecognised mode as an answer it was never given", () => {

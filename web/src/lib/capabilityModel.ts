@@ -482,8 +482,9 @@ export function groupByDomain(gates: CapabilityGate[]): { domain: string; gates:
  * The domain groups above are an engineer's filing: *Workspace*, *Execution*,
  * *Network*, *Models*, *Automation*. Nobody arrives asking "what can Raiker do
  * in Automation"; they arrive asking whether it may touch their files, read the
- * web, send a message, remember something, or run things on this machine. Five
- * groups answer those five questions. The domain grouping is still one switch
+ * web, send a message, remember something, act on a schedule, or run things on
+ * this machine. Six groups answer those six questions; the last is Permissions'
+ * Advanced category (QUI-L06). The domain grouping is still one switch
  * away, as the advanced view, because an audit sometimes wants it — nothing
  * about enforcement or the registry changes, only the headings over it.
  */
@@ -492,6 +493,8 @@ export const CAPABILITY_TASK_GROUP_ORDER = [
   "Web and research",
   "Messages and services",
   "Memory",
+  // QUI-L06 — what runs on its own at a time the owner chose.
+  "Schedules",
   "System and runtimes",
 ] as const;
 
@@ -525,6 +528,8 @@ const TASK_GROUP_OVERRIDES: Record<string, TaskGroup> = {
   semantic_memory_runtime: "Memory",
   vector_embedding_runtime: "Memory",
   graph_indexing_runtime: "Memory",
+  scheduled_routines: "Schedules",
+  reminder_runtime: "Schedules",
   external_channel_runtime: "Messages and services",
   channel_approval_relay: "Messages and services",
   telemetry_export: "System and runtimes",

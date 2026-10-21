@@ -123,32 +123,6 @@ export function availabilityAnswer(gate: CapabilityGate, available: boolean): st
 }
 
 /**
- * The handful an owner actually comes to change, above the full registry.
- *
- * Sixty-six equally weighted cards is a registry, not a page: the capabilities
- * people arrive to adjust are a short list, and the rest is reference. Named by
- * backend capability so the section cannot drift from what it claims to
- * control; anything not installed in this build simply does not appear.
- */
-export const COMMON_PERMISSIONS = [
-  "web_fetch",
-  "file_write_execution",
-  "shell_execution",
-  // BUG-308 — beside shell, because it is shell's other half: the commands
-  // that run code, when they would run with this machine's network.
-  "host_network_code_execution",
-  "git_push_execution",
-  "external_channel_runtime",
-] as const;
-
-export function commonGates(gates: CapabilityGate[]): CapabilityGate[] {
-  const byName = new Map(gates.map((gate) => [gate.capability, gate]));
-  return COMMON_PERMISSIONS.map((name) => byName.get(name)).filter(
-    (gate): gate is CapabilityGate => gate !== undefined,
-  );
-}
-
-/**
  * Owner wording for the one refusal this page has to state often.
  *
  * "Not permitted for your principal" names an internal concept to explain a

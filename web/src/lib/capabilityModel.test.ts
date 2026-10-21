@@ -418,6 +418,8 @@ describe("task groups (UX-PERM-01)", () => {
     expect(capabilityTaskGroup("external_channel_runtime")).toBe("Messages and services");
     expect(capabilityTaskGroup("connector_slack_runtime")).toBe("Messages and services");
     expect(capabilityTaskGroup("memory_forget_execution")).toBe("Memory");
+    expect(capabilityTaskGroup("scheduled_routines")).toBe("Schedules");
+    expect(capabilityTaskGroup("reminder_runtime")).toBe("Schedules");
     expect(capabilityTaskGroup("shell_execution")).toBe("System and runtimes");
     expect(capabilityTaskGroup("something_new")).toBe("System and runtimes");
   });

@@ -24,6 +24,7 @@ export const ICON_SIZE = { sm: 14, md: 16, lg: 20, xl: 24 } as const;
 export type IconSize = keyof typeof ICON_SIZE;
 
 export type IconName =
+  | "help"
   | "chat"
   | "approvals"
   | "tasks"
@@ -205,6 +206,12 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   "fast-forward": ["M5 5.5 12 12 5 18.5V5.5Z", "M12 5.5 19 12l-7 6.5V5.5Z"],
   info: ["M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z", "M12 11v5", "M12 7.5v.5"],
+  // QUI-L05 — the help panel's "?".
+  help: [
+    "M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z",
+    "M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.9-1.1 1.6v.5",
+    "M12 16.6v.4",
+  ],
   spark: ["M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"],
   bell: ["M18 16H6c1.2-1.4 2-2.8 2-6a4 4 0 0 1 8 0c0 3.2.8 4.6 2 6Z", "M10.4 19a1.8 1.8 0 0 0 3.2 0"],
   user: ["M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z", "M4.5 20c1.6-3.2 4.3-5 7.5-5s5.9 1.8 7.5 5"],

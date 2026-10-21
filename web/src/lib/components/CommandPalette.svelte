@@ -17,6 +17,7 @@
    * * **Pages** — every destination in `NAV_ITEMS`, on the rail or not.
    * * **Settings** — each section of the settings rail, so "privacy" lands on
    *   Privacy rather than on Settings' front page.
+   * * **Help** — every help article (QUI-L05), which opens in the help panel.
    *
    * Threads, projects and tasks are deliberately not here yet: they need a
    * debounced server search, and a palette that stalls on every keystroke is
@@ -27,6 +28,7 @@
   import { NAV_ITEMS, HUB_TABS, SIDEBAR_ITEM_IDS } from "../nav";
   import { settingsSection } from "../settingsSections";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
+  import { api } from "../api";
 
   let {
     open = false,
@@ -41,7 +43,7 @@
   interface Entry {
     id: string;
     label: string;
-    group: "Commands" | "Pages" | "Settings";
+    group: "Commands" | "Pages" | "Settings" | "Help";
     hint: string;
     icon: IconName;
     href: string;
@@ -76,7 +78,30 @@
     href: `#/settings?tab=${section}`,
   }));
 
-  const ALL: Entry[] = [...COMMANDS, ...PAGES, ...SETTINGS];
+  // QUI-L05 — the help articles, read once the palette is first opened.
+  let HELP = $state<Entry[]>([]);
+  let helpRead = false;
+  $effect(() => {
+    if (!open || helpRead) return;
+    helpRead = true;
+    void api
+      .guide()
+      .then((index) => {
+        HELP = (index.sections ?? []).map((section) => ({
+          id: `help-${section.slug}`,
+          label: section.title,
+          group: "Help" as const,
+          hint: section.summary ?? "Help article",
+          icon: "help" as IconName,
+          href: `#/guide?section=${section.slug}`,
+        }));
+      })
+      .catch(() => {
+        // Help is one group among four; the others still answer.
+      });
+  });
+
+  const ALL: Entry[] = $derived([...COMMANDS, ...PAGES, ...SETTINGS, ...HELP]);
 
   let query = $state("");
   let active = $state(0);
@@ -97,7 +122,7 @@
   // Grouped for display, but `matches` stays the flat list the keyboard moves
   // through — two orders would let the highlight and Enter disagree.
   const grouped = $derived.by(() => {
-    const order: Entry["group"][] = ["Commands", "Pages", "Settings"];
+    const order: Entry["group"][] = ["Commands", "Pages", "Settings", "Help"];
     return order
       .map((group) => ({ group, entries: matches.filter((entry) => entry.group === group) }))
       .filter((section) => section.entries.length > 0);

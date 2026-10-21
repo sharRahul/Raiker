@@ -92,9 +92,6 @@ describe("visual rubric", () => {
       // Offering an action would invent work.
       "ApprovalsView.svelte",
       "ObserveView.svelte",
-      // A build that shipped without the guide is a genuine error, and the
-      // rubric allows diagnostic text where the absence really is one.
-      "GuideView.svelte",
       // Chat and Build open onto their own composer, which is directly below
       // the empty state and is the action.
       "ChatView.svelte",

@@ -10,7 +10,6 @@
     DEFAULT_ROUTE,
     navItem,
     routeFromHash,
-    sectionFromHash,
     tabFromHash,
   } from "./lib/nav";
   import { routeStateFromHash } from "./lib/routeState";
@@ -36,6 +35,8 @@
   import NotificationCenter from "./lib/components/NotificationCenter.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
+  import HelpPanel from "./lib/components/HelpPanel.svelte";
+  import { helpSlugFromHash, isHelpAddress, openHelp } from "./lib/help.svelte";
 
   let current = $state(
     typeof window === "undefined"
@@ -51,11 +52,6 @@
   // so a count on an overview can open the records it counted.
   let currentFilter = $state<string | null>(
     typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).filter,
-  );
-  // The guide page a deep link names, so "Learn more" from another surface can
-  // open the section it means rather than the guide's front page.
-  let currentSection = $state(
-    typeof window === "undefined" ? null : sectionFromHash(window.location.hash),
   );
   let chatVisited = $state(false);
   // Build keeps its transcript, its unsent draft, and its streaming turn alive
@@ -97,9 +93,7 @@
     // the room the shell gives it, with a composer on the floor of the page.
     current === "new-chat" || current === "build" || current === "design"
       ? "work-surface" as const
-      : current === "guide"
-        ? "reading" as const
-        : current === "models" || current === "connections" || current === "observe" ||
+      : current === "models" || current === "connections" || current === "observe" ||
             current === "home" || current === "work" ||
             current === "memory" || current === "approvals" ||
             current === "capabilities"
@@ -193,8 +187,19 @@
     // DEC-09 step 5 — the address the shell last showed, so a page that asks
     // to stay (unsaved work) can be stayed on: the address is put back without
     // a second hashchange and nothing below runs.
+    // QUI-L10 — a guide address opens the help panel over the page the owner
+    // is on; it is no longer a page of its own.
+    if (isHelpAddress(window.location.hash)) {
+      openHelp(helpSlugFromHash(window.location.hash));
+      history.replaceState(history.state, "", `#/${current}`);
+    }
     let shownHash = window.location.hash;
     const handler = () => {
+      if (isHelpAddress(window.location.hash)) {
+        openHelp(helpSlugFromHash(window.location.hash));
+        history.replaceState(history.state, "", shownHash || "#/");
+        return;
+      }
       if (window.location.hash !== shownHash && !mayLeave(window.location.hash)) {
         history.replaceState(history.state, "", shownHash || "#/");
         return;
@@ -208,7 +213,6 @@
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
       currentFilter = routeStateFromHash(window.location.hash).filter;
-      currentSection = sectionFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       anchoredTurnId = routeStateFromHash(window.location.hash).turnId;
       openTaskId = routeStateFromHash(window.location.hash).taskId;
@@ -367,6 +371,7 @@
         {compactNavigation}
         onNavigationToggle={toggleNavigation}
         onOpenAllPages={openAllPages}
+        onOpenHelp={() => openHelp(null)}
         onOpenPalette={() => {
           paletteTrigger = document.activeElement as HTMLElement | null;
           paletteOpen = true;
@@ -449,8 +454,6 @@
             />
           {:else if current === "design"}
             <LazyRoute route="design" props={{ projects }} />
-          {:else if current === "guide"}
-            <LazyRoute route="guide" props={{ section: currentSection }} />
           {:else if current === "state-gallery"}
             <LazyRoute route="state-gallery" />
           {:else if current === "observe"}
@@ -469,7 +472,6 @@
           {:else if
             current !== "new-chat" &&
             current !== "build" &&
-            current !== "guide" &&
             current !== "state-gallery" &&
             current !== "model-setup"}
             <LazyRoute
@@ -485,6 +487,7 @@
   <ApprovalPrompt />
   <NotificationCenter />
   <ModelOperationTray />
+  <HelpPanel {current} />
 {/if}
 
 <style>

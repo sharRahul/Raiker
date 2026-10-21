@@ -42,7 +42,6 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "observe", label: "Diagnostics", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
   { id: "support", label: "Support", collapsible: true, items: [
-    { id: "guide", label: "Guide", icon: "info", hint: "How Raiker works, in the product" },
     { id: "settings", label: "Settings", icon: "settings", hint: "Runtime, security posture, appearance" },
   ] },
 ];
@@ -169,7 +168,6 @@ export const PRODUCT_AREAS: Record<string, ProductArea> = {
   capabilities: "settings",
   settings: "settings",
   observe: "diagnostics",
-  guide: "diagnostics",
 };
 
 /** The More window's groups, in the order it draws them. */
@@ -178,7 +176,7 @@ export const MORE_AREAS: { id: ProductArea; label: string }[] = [
   { id: "review", label: "Review" },
   { id: "connect", label: "Connect" },
   { id: "settings", label: "Settings" },
-  { id: "diagnostics", label: "Diagnostics & help" },
+  { id: "diagnostics", label: "Diagnostics" },
 ];
 
 /**

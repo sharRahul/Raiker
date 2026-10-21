@@ -6,11 +6,12 @@ import { rememberPage } from "../recentPages";
 afterEach(() => window.localStorage.clear());
 
 describe("the More window", () => {
-  it("groups by what an owner comes to do, with diagnostics and help last", () => {
+  it("groups by what an owner comes to do, with diagnostics last", () => {
     render(AllPagesDialog, { open: true, current: "home" });
     const dialog = screen.getByRole("dialog", { name: /^more$/i });
     const headings = within(dialog).getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Review", "Connect", "Settings", "Diagnostics & help"]);
+    // QUI-L10 — help is the panel behind ?, not a page listed here.
+    expect(headings).toEqual(["Review", "Connect", "Settings", "Diagnostics"]);
     const connect = within(dialog).getByRole("heading", { name: "Connect" }).closest("section")!;
     for (const label of ["Models", "Connections"]) {
       expect(within(connect as HTMLElement).getByRole("link", { name: label })).toBeInTheDocument();

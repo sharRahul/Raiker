@@ -17,7 +17,7 @@
   // thing worth removing: nothing about a page told you which project it meant.
   let { title, hint, current = "", quietHeader = false, connecting = false,
     navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {},
-    onOpenAllPages = () => {}, onOpenPalette = () => {} }: {
+    onOpenAllPages = () => {}, onOpenPalette = () => {}, onOpenHelp = () => {} }: {
     title: string;
     hint: string;
     /** The active route id, so the Work-mode switch can mark itself. */
@@ -32,6 +32,8 @@
     onOpenAllPages?: (trigger: HTMLElement) => void;
     /** Opens the command palette. */
     onOpenPalette?: () => void;
+    /** QUI-L05 — opens the help panel on this page's article. */
+    onOpenHelp?: () => void;
   } = $props();
 
   // Approvals came off the rail. A decision waiting on you is not a
@@ -169,6 +171,13 @@
       onclick={onOpenPalette}
     ><Icon name="search" size="md" /><kbd class="palette-key" aria-hidden="true"
       >{shortcutLabel("mod", "K")}</kbd></button>
+    <button
+      type="button"
+      class="btn btn-ghost help-button"
+      aria-label="Help"
+      title="Help"
+      onclick={onOpenHelp}
+    ><Icon name="help" size="md" /></button>
     <a
       href="#/approvals"
       class="btn btn-ghost approvals-link"

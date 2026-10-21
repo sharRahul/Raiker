@@ -73,7 +73,7 @@ const SAFE_URL = /^(?:https?:\/\/|mailto:)\S+$/i;
  * BUG-301 — an address inside this app, accepted only when the caller opts in.
  *
  * The guide's chapters point at each other, and a caller that owns its own
- * content (`GuideView`, which resolves those references against the chapter
+ * content (`HelpPanel`, which resolves those references against the chapter
  * list the product shipped) may say so. Nothing else may: `renderMarkdown`
  * draws model-authored answers with the same code, and there a link is
  * untrusted input, so the default stays exactly what it was.

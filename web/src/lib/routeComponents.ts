@@ -34,7 +34,6 @@ export type LazyRouteId =
   | "design"
   | "observe"
   | "settings"
-  | "guide"
   | "model-setup"
   | "state-gallery";
 
@@ -47,7 +46,6 @@ type Loader = () => Promise<{ default: RouteComponent }>;
 
 const LOADERS: Record<LazyRouteId, Loader> = {
   work: () => import("./views/WorkView.svelte"),
-  guide: () => import("./views/GuideView.svelte"),
   memory: () => import("./views/MemoryView.svelte"),
   approvals: () => import("./views/ApprovalsView.svelte"),
   brain: () => import("./views/BrainView.svelte"),

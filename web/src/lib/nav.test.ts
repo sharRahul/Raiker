@@ -346,6 +346,8 @@ describe("hard-coded destinations", () => {
       for (const match of text.matchAll(/["'`]#\/([a-z][a-z-]*)/g)) {
         const route = match[1];
         if (route === DEFAULT_ROUTE) continue;
+        // QUI-L10 — a guide address opens the help panel, not a page.
+        if (route === "guide") continue;
         if (routeFromHash(`#/${route}`) === DEFAULT_ROUTE) unknown.push(`${file}: #/${route}`);
       }
     }

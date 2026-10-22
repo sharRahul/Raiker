@@ -123,7 +123,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
     "Use the write_file tool now to create approval-reload-live.txt containing exactly reload approval live.",
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByText("Waiting for your decision", { exact: true })).toBeVisible({ timeout: 180_000 });
   const login = await request.post(`${BASE}/api/auth/login`, { data: { username: OWNER_CREDENTIALS.user, password: PASSWORD } });
   expect(login.ok()).toBeTruthy();
   const token = (await login.json()).token as string;
@@ -133,13 +133,13 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   const parked = sessions.find((session) => session.title?.includes("Use the write_file tool")) ?? sessions[0];
   expect(parked?.session_id).toBeTruthy();
   await page.goto(`${BASE}/#/new-chat?session=${parked.session_id}`);
-  await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Waiting for your decision", { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.reload();
   await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-  await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("link", { name: "Review approval" })).toBeVisible();
+  await expect(page.getByText("Waiting for your decision", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("link", { name: "Change" })).toBeVisible();
   await expect(page.getByText("Loading conversation…")).toBeHidden({ timeout: 20_000 });
   await capture(page, join(SHOTS, "179-BUG-34-reloaded-approval-live.png"));
 });

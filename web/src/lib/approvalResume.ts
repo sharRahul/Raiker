@@ -34,6 +34,8 @@
 import { api } from "./api";
 
 export const RESUME_CHANNEL = "raiker:approvals";
+/** The same announcement, inside the tab that made the decision. */
+export const RESOLVED_HERE = "raiker:approval-resolved";
 
 /** The shape put on the wire. Ids only — never conversation content. */
 export interface ApprovalResolvedMessage {
@@ -77,6 +79,17 @@ function channel(): BroadcastChannel | null {
  * tabs learn from their next poll instead of immediately.
  */
 export function publishApprovalResolved(message: Omit<ApprovalResolvedMessage, "type">): void {
+  // QUI-P05 — a decision clears every place that shows it, this tab included:
+  // a BroadcastChannel never delivers to the context that posted, so the top
+  // bar's count and the floating card beside a Chat that just decided inline
+  // would otherwise keep offering it until their next read.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent<ApprovalResolvedMessage>(RESOLVED_HERE, {
+        detail: { type: "approval-resolved", ...message },
+      }),
+    );
+  }
   const bus = channel();
   if (bus === null) return;
   try {
@@ -97,16 +110,24 @@ export function publishApprovalResolved(message: Omit<ApprovalResolvedMessage, "
 export function subscribeApprovalResolved(
   onResolved: (message: ApprovalResolvedMessage) => void,
 ): () => void {
+  // Decisions made in this tab arrive as a window event; other tabs', on the
+  // channel. A listener hears both, so where a decision was made never changes
+  // what it clears.
+  const here = (event: Event) => {
+    const message = (event as CustomEvent<ApprovalResolvedMessage>).detail;
+    if (message && message.type === "approval-resolved") onResolved(message);
+  };
+  if (typeof window !== "undefined") window.addEventListener(RESOLVED_HERE, here);
   const bus = channel();
-  if (bus === null) return () => {};
   const listener = (event: MessageEvent) => {
     const message = event.data as ApprovalResolvedMessage | null;
     if (message && message.type === "approval-resolved") onResolved(message);
   };
-  bus.addEventListener("message", listener);
+  bus?.addEventListener("message", listener);
   return () => {
-    bus.removeEventListener("message", listener);
-    bus.close();
+    if (typeof window !== "undefined") window.removeEventListener(RESOLVED_HERE, here);
+    bus?.removeEventListener("message", listener);
+    bus?.close();
   };
 }
 

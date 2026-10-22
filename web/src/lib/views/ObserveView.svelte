@@ -160,7 +160,8 @@
       [diagnostics, readiness, approvals, tasks, events, notifications] = await Promise.all([
         api.diagnostics(),
         api.runtimeReadiness(),
-        api.approvals(),
+        // Waiting and lapsed together: this page counts the two separately.
+        Promise.all([api.approvals(), api.lapsedApprovals()]).then(([live, lapsed]) => [...live, ...lapsed]),
         api.tasks(),
         // Over-fetched because the digest filters: a page of routine
         // authorization lookups must not be able to empty it.

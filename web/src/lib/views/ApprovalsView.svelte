@@ -5,11 +5,16 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
+  import ListDetail from "../components/ListDetail.svelte";
   import PageState from "../components/PageState.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { consequenceFacts, destinationHost } from "../approvalConsequence";
   import { api, auth, getToken, setToken, ApiError } from "../api";
-  import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
+  import {
+    alreadyResumedElsewhere,
+    publishApprovalResolved,
+    subscribeApprovalResolved,
+  } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { elevatedRisk } from "../rowTokens";
@@ -19,16 +24,28 @@
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
 
-  // `executed` is the terminal status of an approval the execution relay
-  // actually carried out, so it needs its own tab — otherwise the file writes
-  // the owner approved would vanish from every filter.
-  const FILTERS = ["pending", "approved", "executed", "denied"] as const;
+  // QUI-P07 — two places: what waits on you, and what you decided. History
+  // keeps `executed` reachable (an approval the relay carried out) beside the
+  // ones only recorded, declined or left to expire.
+  const VIEWS = [
+    { id: "pending", label: "Pending" },
+    { id: "history", label: "History" },
+  ] as const;
+  type ViewId = (typeof VIEWS)[number]["id"];
+  const HISTORY_STATUSES = ["executed", "approved", "denied", "expired"] as const;
+  const HISTORY_FILTERS = [
+    { id: "all", label: "Every decision" },
+    { id: "executed", label: "Allowed and ran" },
+    { id: "approved", label: "Allowed (recorded only)" },
+    { id: "denied", label: "Declined" },
+    { id: "expired", label: "No decision in time" },
+  ] as const;
   const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
   // BUG-271 — a governed refusal of an edited patch, in the owner's language.
   // A bare reason code as the whole answer is the defect FIXED-01 removed from
   // Models; a review surface must not put one back.
   const EDIT_REFUSALS: Record<string, string> = {
-    replacement_patch_empty: "An empty diff is not a change. Write the version you want, or Deny.",
+    replacement_patch_empty: "An empty diff is not a change. Write the version you want, or Decline.",
     replacement_patch_unreadable:
       "That is not a unified diff Raiker can read. Each file needs its --- and +++ header.",
     replacement_unchanged: "That is the change as proposed. Approve it, or edit a line first.",
@@ -40,7 +57,10 @@
       "A critical action keeps the step-up lifecycle and cannot be replaced here.",
   };
 
-  let filter = $state<(typeof FILTERS)[number]>("pending");
+  let view = $state<ViewId>("pending");
+  let historyStatus = $state<(typeof HISTORY_FILTERS)[number]["id"]>("all");
+  let selectedId = $state<string | null>(null);
+  let pendingCount = $state(0);
   let sort = $state<"risk" | "newest">("risk");
   let approvals = $state<ApprovalView[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -94,12 +114,16 @@
 
   const orderedApprovals = $derived.by(() => {
     const requestedAt = (approval: ApprovalView) => Date.parse(approval.created_at) || 0;
-    const scoped = sessionId
-      ? (approvals ?? []).filter((approval) => approval.session_id === sessionId)
-      : (approvals ?? []);
+    const scoped = (approvals ?? []).filter(
+      (approval) =>
+        (!sessionId || approval.session_id === sessionId) &&
+        (view === "pending" || historyStatus === "all" || statusOf(approval) === historyStatus),
+    );
     return [...scoped].sort((left, right) => {
       const newestFirst = requestedAt(right) - requestedAt(left);
-      if (sort === "newest") return newestFirst || left.approval_id.localeCompare(right.approval_id);
+      if (view === "history" || sort === "newest") {
+        return newestFirst || left.approval_id.localeCompare(right.approval_id);
+      }
       return (
         (RISK_RANK[right.risk_level] ?? 0) - (RISK_RANK[left.risk_level] ?? 0) ||
         newestFirst ||
@@ -108,10 +132,82 @@
     });
   });
 
+  /** A pending approval past its time limit is, for every purpose here, expired. */
+  function statusOf(approval: ApprovalView): string {
+    return approval.is_expired ? "expired" : approval.status;
+  }
+
+  const STATUS_WORDS: Record<string, string> = {
+    pending: "Waiting",
+    executed: "Allowed · ran",
+    approved: "Allowed · recorded",
+    denied: "Declined",
+    expired: "No decision",
+    execution_failed: "Allowed · failed",
+  };
+  function statusWord(approval: ApprovalView): string {
+    return STATUS_WORDS[statusOf(approval)] ?? humanize(statusOf(approval));
+  }
+
+  /** QUI-P08 — the task a decision belongs to, by name. */
+  function requestedFrom(approval: ApprovalView): string {
+    if (approval.source_title) return `From “${approval.source_title}”`;
+    if (approval.session_id && approval.session_id !== "connector_store") return "From a conversation";
+    return "From Connections";
+  }
+  function conversationHref(id: string): string {
+    return `#/new-chat?session=${encodeURIComponent(id)}`;
+  }
+
+  // The decision shown is the selected row, or the first one until a row is
+  // picked: the same rule `ListDetail` applies, so the pane and the list agree.
+  const shownId = $derived(
+    orderedApprovals.some((approval) => approval.approval_id === selectedId)
+      ? selectedId
+      : (orderedApprovals[0]?.approval_id ?? null),
+  );
+  // Picking another row starts afresh; arriving on the next row after a
+  // decision keeps the sentence that says what that decision did.
+  $effect(() => {
+    void selectedId;
+    notice = null;
+  });
+  $effect(() => {
+    const id = shownId;
+    if (id === null) return;
+    if (selected?.approval.approval_id === id) return;
+    void openDetail(id);
+  });
+
+  // QUI-P07 — evidence sits beside the decision from 1,600 px and is a closed
+  // section below the decision under that.
+  let wide = $state(false);
+  $effect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(min-width: 1600px)");
+    const apply = () => (wide = query.matches);
+    apply();
+    query.addEventListener?.("change", apply);
+    return () => query.removeEventListener?.("change", apply);
+  });
+
   async function load() {
     loadError = null;
     try {
-      approvals = await api.approvals(filter);
+      if (view === "pending") {
+        // QUI-P06 — one past its time limit can no longer be decided, so it is
+        // History's ("No decision"), not the queue's (found live, RT-QUI-29).
+        approvals = (await api.approvals("pending")).filter((approval) => !approval.is_expired);
+        pendingCount = approvals.length;
+      } else {
+        const lists = await Promise.all(HISTORY_STATUSES.map((status) => api.approvals(status)));
+        // A pending approval past its time limit belongs to History too: it was
+        // never decided, and it can no longer be.
+        const lapsed = await api.lapsedApprovals();
+        // One row per approval, whichever list it came back in.
+        const byId = new Map([...lists.flat(), ...lapsed].map((approval) => [approval.approval_id, approval]));
+        approvals = [...byId.values()];
+      }
     } catch (e) {
       approvals = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -121,7 +217,6 @@
   async function openDetail(id: string) {
     detailError = null;
     decisionReason = "";
-    notice = null;
     // B14 — a narrowing belongs to the change it was made on. Carrying one
     // across to the next approval would apply hunk positions from one diff to a
     // completely different one.
@@ -421,12 +516,16 @@
     }
   }
 
-  function setFilter(value: (typeof FILTERS)[number]) {
-    filter = value;
+  function setView(next: ViewId) {
+    view = next;
     selected = null;
+    selectedId = null;
     void load();
   }
 
+  // A decision made in Chat, the floating card or another tab leaves this
+  // queue as soon as it is announced.
+  onMount(() => subscribeApprovalResolved(() => void load()));
   onMount(load);
 </script>
 
@@ -462,117 +561,122 @@
       <button type="button" class="btn btn-primary btn-sm" onclick={resumeTurn} disabled={resumeBusy}>
         {resumeBusy ? "Continuing…" : "Continue the turn"}
       </button>
-      <a class="btn btn-ghost btn-sm" href={`#/sessions?session=${encodeURIComponent(resumable.session_id)}`}>
-        Open the session
+      <a class="btn btn-ghost btn-sm" href={conversationHref(resumable.session_id)}>
+        Open the conversation
       </a>
     </span>
   </div>
 {/if}
 
 <div class="queue-controls">
-  <div class="filters" role="tablist" aria-label="Approval status filter">
-    {#each FILTERS as f (f)}
+  <div class="filters" role="tablist" aria-label="Approvals">
+    {#each VIEWS as v (v.id)}
       <button
         type="button"
         class="filter-btn"
-        class:active={filter === f}
+        class:active={view === v.id}
         role="tab"
-        aria-selected={filter === f}
-        onclick={() => setFilter(f)}
+        aria-selected={view === v.id}
+        onclick={() => setView(v.id)}
       >
-        {f}
+        {v.label}{#if v.id === "pending" && pendingCount > 0}<span class="tab-count">{pendingCount}</span>{/if}
       </button>
     {/each}
   </div>
-  <label class="sort-control">
-    <span class="sr-only">Sort approvals</span>
-    <select class="select" aria-label="Sort approvals" bind:value={sort}>
-      <option value="risk">Highest risk first</option>
-      <option value="newest">Newest first</option>
-    </select>
-  </label>
+  {#if view === "history"}
+    <label class="sort-control">
+      <span class="sr-only">Show</span>
+      <select class="select" aria-label="Show decisions" bind:value={historyStatus}>
+        {#each HISTORY_FILTERS as h (h.id)}
+          <option value={h.id}>{h.label}</option>
+        {/each}
+      </select>
+    </label>
+  {:else}
+    <label class="sort-control">
+      <span class="sr-only">Sort approvals</span>
+      <select class="select" aria-label="Sort approvals" bind:value={sort}>
+        <option value="risk">Highest risk first</option>
+        <option value="newest">Newest first</option>
+      </select>
+    </label>
+  {/if}
 </div>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load approvals" detail={loadError} />
 {:else if approvals === null}
   <PageState state="loading" title="Loading approvals…" />
-{:else if orderedApprovals.length === 0}
-  <div class="card">
-    <EmptyState
-      icon="approvals"
-      title={sessionId ? "No approvals for this session" : filter === "pending" ? "Nothing waiting on you" : `No ${filter} approvals`}
-      body={filter === "pending"
-        ? "When the agent proposes a gated action, it will appear here for your decision."
-        : undefined}
-    />
-  </div>
 {:else}
-  <div class="card list-card">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Action</th>
-          <th>Proposed by</th>
-          <th>Capability</th>
-          <th>Risk</th>
-          <th>Status</th>
-          <th>Requested</th>
-          <th><span class="sr-only">Open</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each orderedApprovals as a (a.approval_id)}
-          <tr>
-            <td>
-              {humanize(a.tool_name)}
-              {#if a.queue_total > 1}
-                <span class="queue-chip" title="This turn proposed {a.queue_total} tool calls; the rest are queued behind this decision.">
-                  Decision {a.queue_position} of {a.queue_total}
-                </span>
-              {/if}
-            </td>
-            <td><IdentityChip identity={a.proposed_by} /></td>
-            <td>{capabilityLabel(a.capability)}</td>
-            <!-- Only elevated risk is toned, so the one dangerous decision
-                 stands out from the routine ones. Routine risk is metadata;
-                 `elevatedRisk` decides. -->
-            <td>
-              {#if elevatedRisk(a.risk_level)}
-                <Badge variant="blocked" label={a.risk_level} />
-              {:else}
-                <span class="row-fact">{a.risk_level}</span>
-              {/if}
-            </td>
-            <td><Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={a.is_expired ? "expired" : a.status} /></td>
-            <td title={a.created_at}>{relativeTime(a.created_at)}</td>
-            <td>
-              <button type="button" class="btn btn-sm" onclick={() => openDetail(a.approval_id)}>
-                {a.tool_name === OWNER_QUESTION_TOOL ? "Answer" : "Review"}
-              </button>
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
-{/if}
-
-{#if detailError}
-  <p class="error" role="alert">{detailError}</p>
-{/if}
-
-{#if selected !== null}
-  <section class="card detail" aria-labelledby="approval-detail-h">
-    <div class="detail-head">
-      <h2 id="approval-detail-h">
-        {isQuestion ? "Answer a question" : `Review ${humanize(selected.approval.tool_name)}`}
-      </h2>
-      <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selected = null)}>
-        <Icon name="x" size="sm" />
-        Close
-      </button>
-    </div>
+  <!-- QUI-P07 — layout B: the queue, the selected decision with its actions,
+       and its evidence beside it on a wide screen (closed below 1,600 px). -->
+  <ListDetail
+    items={orderedApprovals}
+    key={(item: ApprovalView) => item.approval_id}
+    label={view === "pending" ? "Decisions waiting on you" : "Decisions you have made"}
+    storageKey="approvals"
+    autoSelectFirst
+    bind:selectedId
+    matches={(item: ApprovalView, query: string) =>
+      `${humanize(item.tool_name)} ${item.target} ${item.source_title} ${capabilityLabel(item.capability)}`
+        .toLowerCase()
+        .includes(query)}
+    searchLabel="Search decisions"
+  >
+    {#snippet row(a: ApprovalView)}
+      <div class="queue-row" data-testid="approval-row">
+        <span class="row-line">
+          <strong class="row-action">{humanize(a.tool_name)}</strong>
+          {#if elevatedRisk(a.risk_level)}
+            <Badge variant="blocked" label={`${a.risk_level} risk`} />
+          {:else}
+            <span class="row-fact">{a.risk_level} risk</span>
+          {/if}
+        </span>
+        <span class="row-line row-sub">
+          <span class="row-target">{a.target || capabilityLabel(a.capability)}</span>
+          <span class="row-fact" title={a.created_at}>{relativeTime(a.created_at)}</span>
+        </span>
+        <span class="row-line row-sub">
+          <span class="row-source">{requestedFrom(a)}</span>
+          {#if view === "history" || a.is_expired}
+            <Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={statusWord(a)} />
+          {:else if a.queue_total > 1}
+            <span class="queue-chip" title="This turn proposed {a.queue_total} tool calls; the rest are queued behind this decision.">
+              Decision {a.queue_position} of {a.queue_total}
+            </span>
+          {/if}
+        </span>
+      </div>
+    {/snippet}
+    {#snippet empty()}
+      <EmptyState
+        icon="approvals"
+        title={sessionId ? "No approvals for this conversation" : view === "pending" ? "Nothing waiting on you" : "No decisions yet"}
+        body={view === "pending"
+          ? "When Raiker needs your decision, it appears here and in the conversation that asked."
+          : undefined}
+      />
+    {/snippet}
+    {#snippet detail(item: ApprovalView)}
+      {#if detailError}
+        <p class="error" role="alert">{detailError}</p>
+      {:else if selected === null || selected.approval.approval_id !== item.approval_id}
+        <p class="loading-detail">Loading the decision…</p>
+      {:else}
+        <div class="decision-host">
+        <div class="decision-layout">
+          <section class="decision" aria-labelledby="approval-detail-h">
+    <h2 id="approval-detail-h" class="decision-title">
+      {isQuestion ? "Answer a question" : `Review ${humanize(selected.approval.tool_name)}`}
+    </h2>
+    <p class="decision-source">
+      {selected.approval.target ? `${selected.approval.target} · ` : ""}{requestedFrom(selected.approval)}
+      · {relativeTime(selected.approval.created_at)}
+      {#if selected.approval.session_id}
+        · <a href={conversationHref(selected.approval.session_id)}>Open the conversation</a>
+      {/if}
+    </p>
 
     <p class="notice">{selected.metadata_only_notice}</p>
 
@@ -679,54 +783,6 @@
       </details>
     {/if}
 
-    <!-- Kept, moved. None of this is wrong to record; it is wrong to read
-         first. -->
-    <details class="provenance">
-      <summary>Provenance and evidence</summary>
-    <dl class="meta">
-      <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
-      <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
-      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
-      <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
-      <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
-      {#if selected.approval.queue_total > 1}
-        <div>
-          <dt>Batch</dt>
-          <dd>
-            Decision {selected.approval.queue_position} of {selected.approval.queue_total} —
-            the calls after it are queued on this turn and each gets its own decision.
-          </dd>
-        </div>
-      {/if}
-      {#if selected.approval.expires_at}
-        <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
-      {/if}
-      {#if selected.approval.approved_by}
-        <div><dt>Authorized by</dt><dd><IdentityChip identity={selected.approval.approved_by} /></dd></div>
-      {/if}
-    </dl>
-    {#if Object.keys(selected.execution_evidence ?? {}).length > 0}
-      <h3>Execution evidence</h3>
-      <dl class="meta">
-        <div><dt>Principal</dt><dd class="mono">{selected.execution_evidence.principal_id ?? selected.approval.resolved_by ?? "unknown"}</dd></div>
-        <div><dt>Exit</dt><dd>{selected.execution_evidence.returncode ?? "n/a"}</dd></div>
-        <div><dt>Output</dt><dd>{selected.execution_evidence.stdout_bytes ?? 0} B stdout / {selected.execution_evidence.stderr_bytes ?? 0} B stderr</dd></div>
-      </dl>
-      {#if selected.execution_evidence.stdout}
-        <pre class="diff">{selected.execution_evidence.stdout}</pre>
-      {/if}
-      {#if selected.execution_evidence.stderr}
-        <pre class="diff">{selected.execution_evidence.stderr}</pre>
-      {/if}
-      {#if selected.execution_evidence.truncated}
-        <p class="notice">Output was truncated at the approved bound.</p>
-      {/if}
-      {#if selected.execution_evidence.output_redacted}
-        <p class="notice">Secret-like output was redacted before it entered history.</p>
-      {/if}
-    {/if}
-
-    </details>
 
     {#if isQuestion && selected.approval.status === "pending" && !selected.approval.is_expired}
       <div class="question-block">
@@ -797,7 +853,7 @@
         class="textarea"
         rows="2"
         bind:value={decisionReason}
-        placeholder="Why are you approving or denying this?"
+        placeholder="Why are you allowing or declining this?"
         disabled={busy}
       ></textarea>
       <!-- BUG-271 — a reviewer could narrow a change and could not correct one.
@@ -833,7 +889,7 @@
       {:else}
         <div class="decision-actions">
           <button type="button" class="btn btn-danger" onclick={() => resolve(false)} disabled={busy}>
-            Deny
+            Decline
           </button>
           {#if selected.preview_kind === "patch" && selected.diff}
             <button
@@ -851,8 +907,8 @@
                 ? "Executing…"
                 : "Recording…"
               : selected.executes_on_approval
-                ? "Approve and execute once"
-                : "Approve (record only)"}
+                ? "Allow once"
+                : "Allow once (record only)"}
           </button>
         </div>
       {/if}
@@ -860,10 +916,65 @@
       <p class="resolved-note">Expired before a decision was recorded.</p>
     {:else}
       <p class="resolved-note">
-        Already resolved: <Badge variant={approvalBadge(selected.approval.status)} label={selected.approval.status} />
+        Already decided: <Badge variant={approvalBadge(selected.approval.status)} label={statusWord(selected.approval)} />
       </p>
     {/if}
-  </section>
+          </section>
+          <aside class="evidence" aria-label="Evidence">
+    <!-- Kept, moved. None of this is wrong to record; it is wrong to read
+         first. -->
+    <details class="provenance" open={wide}>
+      <summary>Evidence</summary>
+    <dl class="meta">
+      <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
+      <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
+      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
+      <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
+      <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
+      {#if selected.approval.queue_total > 1}
+        <div>
+          <dt>Batch</dt>
+          <dd>
+            Decision {selected.approval.queue_position} of {selected.approval.queue_total} —
+            the calls after it are queued on this turn and each gets its own decision.
+          </dd>
+        </div>
+      {/if}
+      {#if selected.approval.expires_at}
+        <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
+      {/if}
+      {#if selected.approval.approved_by}
+        <div><dt>Authorized by</dt><dd><IdentityChip identity={selected.approval.approved_by} /></dd></div>
+      {/if}
+    </dl>
+    {#if Object.keys(selected.execution_evidence ?? {}).length > 0}
+      <h3>Execution evidence</h3>
+      <dl class="meta">
+        <div><dt>Principal</dt><dd class="mono">{selected.execution_evidence.principal_id ?? selected.approval.resolved_by ?? "unknown"}</dd></div>
+        <div><dt>Exit</dt><dd>{selected.execution_evidence.returncode ?? "n/a"}</dd></div>
+        <div><dt>Output</dt><dd>{selected.execution_evidence.stdout_bytes ?? 0} B stdout / {selected.execution_evidence.stderr_bytes ?? 0} B stderr</dd></div>
+      </dl>
+      {#if selected.execution_evidence.stdout}
+        <pre class="diff">{selected.execution_evidence.stdout}</pre>
+      {/if}
+      {#if selected.execution_evidence.stderr}
+        <pre class="diff">{selected.execution_evidence.stderr}</pre>
+      {/if}
+      {#if selected.execution_evidence.truncated}
+        <p class="notice">Output was truncated at the approved bound.</p>
+      {/if}
+      {#if selected.execution_evidence.output_redacted}
+        <p class="notice">Secret-like output was redacted before it entered history.</p>
+      {/if}
+    {/if}
+
+    </details>
+          </aside>
+        </div>
+        </div>
+      {/if}
+    {/snippet}
+  </ListDetail>
 {/if}
 
 {#if criticalDecision !== null}
@@ -1000,12 +1111,84 @@
     color: var(--accent);
     box-shadow: var(--shadow-1);
   }
-  .list-card {
-    padding: var(--space-2) var(--space-3);
-    overflow-x: auto;
+  .tab-count {
+    margin-left: 0.35rem;
+    padding: 0 0.4rem;
+    border-radius: var(--r-pill);
+    background: var(--warn-soft);
+    color: var(--warn-text, var(--warn));
+    font-size: var(--text-2xs);
   }
-  .detail {
-    margin-top: var(--space-4);
+  /* QUI-P07 — queue rows of one height: action and risk, target and time,
+     the task it came from and where it stands. */
+  .queue-row {
+    display: grid;
+    gap: 0.1rem;
+    min-height: 68px;
+    align-content: center;
+    min-width: 0;
+  }
+  .row-line {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+  .row-action {
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-sub {
+    justify-content: space-between;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .row-target,
+  .row-source {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  /* The evidence opens from 1,600 px (`wide`) and sits beside the decision
+     only where the pane has room for both at full width; otherwise it stays
+     below, so the decision is never squeezed to make room for it. */
+  .decision-host {
+    container-type: inline-size;
+  }
+  .decision-layout {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 720px;
+  }
+  @container (min-width: 1040px) {
+    .decision-layout {
+      grid-template-columns: minmax(0, 720px) 300px;
+      max-width: none;
+    }
+  }
+  .decision {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .decision-title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+  .decision-source {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
+  }
+  .evidence {
+    min-width: 0;
+  }
+  .loading-detail {
+    color: var(--text-3);
+    font-size: var(--text-sm);
   }
   .resume-row {
     display: flex;
@@ -1018,12 +1201,6 @@
     display: inline-flex;
     gap: var(--space-2);
     flex-shrink: 0;
-  }
-  .detail-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
   }
   .meta {
     display: grid;

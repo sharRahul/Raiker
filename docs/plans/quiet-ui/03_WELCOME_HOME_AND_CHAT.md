@@ -14,7 +14,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 
 | Item | State |
 |---|---|
-| QUI-H01 | **Done**, except the profile chip on Home's composer, which waits for QUI-P02. Greeting with one true fact, composer with Attach, one Continue card with its next step, one decision row, at most two in-progress rows, This week, and one 980 px column. |
+| QUI-H01 | **Done**, with the profile chip on Home's composer since 2026-10-22 ([FIXED-1130](../FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02)). Greeting with one true fact, composer with Attach, one Continue card with its next step, one decision row, at most two in-progress rows, This week, and one 980 px column. |
 | QUI-H02 | **Done**, without the companion: the companion's art does not exist yet ([08, QUI-V05](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v05--companion)). |
 | QUI-H03 | **Done.** Home is the default and Settings → General can choose Chat; the option now reads Home. |
 | QUI-H04 | **Done.** The line names the version; a count of changes needs release notes the host can read. |
@@ -22,7 +22,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
 | QUI-C03 | **Done**: the status line, Add instruction, Stop safely and the outcome line. Open: the task receipt on the outcome line ([06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md#qui-f16--task-receipt)). |
-| QUI-C04 | **Partly done.** Done: the placeholder and the data label. Open: the profile chip (QUI-P02) and *More* (schedule, research depth, answer style). |
+| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22). Open: *More* (schedule, research depth, answer style). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
 | QUI-C07 | **Done.** Tabs: Context (files in use), Plan, Sources, Activity. Memories in use are not listed yet: a turn's recall reports a count, not the records. |

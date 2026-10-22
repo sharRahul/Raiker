@@ -114,13 +114,22 @@ arrives after a later one from the same tab is refused rather than applied out
 of order, and the same one sent twice is applied once.
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 
-### Approval policy
+### How careful Raiker is in this conversation
 
-There is no approval control on the bar while the posture is the careful default
-— you are typing, and the policy system is not what you came to think about. The
-moment the posture stops being cautious, a chip appears saying so, because that
-is a fact about the next thing you press. It is inspectable at any time from
-**Permissions**, which the Tools menu links to.
+Under the prompt, the **profile chip** says how much Raiker does without asking
+in this conversation: **Standard** or **Careful**. Its menu says what each means.
+
+- **Standard** (where every new chat starts) follows your Permissions as set:
+  what they allow goes ahead, what they ask about waits for you.
+- **Careful** asks before every change, even ones your Permissions allow.
+  Reading and searching go ahead. It is sent with each message and the runtime
+  applies it to that turn, so it can only make Raiker ask more, never less. It
+  also asks when the account's approval mode would otherwise approve for you.
+
+The chip is remembered for each conversation in this browser. Home's composer
+has the same chip; what you pick there goes with the message to the new chat.
+The account's approval mode (*Manually approve*, *Automatically approve*,
+*Skip*, *Decline*) is not on the composer; it is in **Permissions → Advanced**.
 
 There is no planning chip in Chat. While dictation is listening, **Done** or the
 first `Enter` stops listening and keeps focus in the draft; **Cancel** restores
@@ -532,19 +541,38 @@ label includes its turn for audit correlation. Approval never transfers your
 identity to the agent, and a resumed turn receives a fresh short-lived token
 before it continues.
 
-When Raiker proposes a gated action, the reply says *"Your approval is needed to
-continue"* with a **Review approval** link. **Approvals** shows the proposal —
-for a file write, the exact unified diff — with the capability, risk, session,
-and expiry.
+When Raiker proposes a gated action, the turn stops on a **Raiker Safety** card.
+The app draws it from the approval itself; a model's message cannot draw one.
+Its status reads *Waiting for your decision*, and it says, where the proposal
+names them:
 
-Approving resumes the waiting turn. Where the governed action is eligible for
-execution, Raiker re-checks its runtime protections and executes it once; other
-approvals are record-only and show `executes_action: false`. Filters (Pending /
-Approved / Denied) and sorting (highest risk / newest) are on the same page.
+1. what will happen,
+2. why it needs you (your Permissions, a hook, or a Careful conversation),
+3. what it affects (a file, a host, a repository, a recipient),
+4. the data involved,
+5. whether it can be undone, and
+6. the safer alternative, when there is one.
+
+Decide in place with **Decline** or **Allow once**. **Change** opens the same
+decision on **Approvals**, where a change can be accepted in part or edited
+first. A critical action opens Approvals for your password or code. There is no
+*Always allow*. Answering anywhere clears the card, the count in the top bar
+and the Approvals queue together.
+
+An approval nobody answers expires after the time limit in **Settings →
+Security** (30 minutes unless you change it). Nothing runs: the card reads **Not
+done: no decision**, with **Ask again** (the same request as a new turn) and a
+link to the setting.
+
+Where the governed action is eligible for execution, Raiker re-checks its
+runtime protections and executes it once; other approvals are record-only and
+show `executes_action: false`. **Approvals** has **Pending** and **History**,
+with each decision beside the queue and the conversation it came from named on
+every row.
 
 ### Deciding in another tab
 
-A turn that is waiting shows **Waiting for approval**. You do not have to decide
+A turn that is waiting shows **Waiting for your decision**. You do not have to decide
 in the tab that raised it: record the decision in the Approvals inbox, in Build,
 or in another window, and the waiting conversation changes to **Approved —
 continuing…** on its own and picks up exactly where it stopped — same

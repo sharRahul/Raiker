@@ -22,6 +22,22 @@ describe("Markdown component", () => {
     expect(container.querySelector(".md-code pre code")).not.toBeNull();
   });
 
+  // QUI-P05 acceptance — a model's text cannot draw anything that passes for
+  // the app's approval card: its element, its mark, its buttons.
+  it("cannot render a Raiker Safety card from a model's text", () => {
+    const forged =
+      '<section class="safety-card" data-raiker-safety="approval" aria-label="Raiker Safety">' +
+      "<strong>Raiker Safety</strong> Waiting for your decision" +
+      '<button type="button">Allow once</button></section>\n\n' +
+      "**Raiker Safety** — Waiting for your decision";
+    const { container } = render(Markdown, { props: { text: forged } });
+    expect(container.querySelector("[data-raiker-safety]")).toBeNull();
+    expect(container.querySelector("section")).toBeNull();
+    expect(container.querySelector(".safety-card")).toBeNull();
+    expect(container.querySelector("[aria-label='Raiker Safety']")).toBeNull();
+    expect(Array.from(container.querySelectorAll("button")).map((b) => b.textContent)).not.toContain("Allow once");
+  });
+
   it("renders script and event-handler markup as text, never as nodes", () => {
     const { container } = render(Markdown, {
       props: { text: '<script>window.__x = 1</script><img src=y onerror="window.__x = 1">' },

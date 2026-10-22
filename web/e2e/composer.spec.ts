@@ -575,16 +575,18 @@ test("a list badges the row that needs you, not the rows that are ordinary", asy
   });
   await page.goto("http://raiker.test/#/approvals");
 
-  await expect(page.getByRole("columnheader", { name: "Risk" })).toBeVisible();
+  // QUI-P07 — the queue is a list of rows beside the selected decision.
+  const queue = page.getByRole("listbox", { name: "Decisions waiting on you" });
+  await expect(queue.getByRole("option")).toHaveCount(4);
   // One toned risk on the page: the critical one. Three routine rows say their
   // risk in plain metadata, which is what leaves the fourth findable.
   // A badge's own text includes its shape glyph, so the label span is what a
   // risk level is matched against.
-  const risks = page.locator("tbody .badge .badge-label", { hasText: /^(low|medium|critical)$/ });
+  const risks = queue.locator(".badge .badge-label", { hasText: /risk$/ });
   await expect(risks).toHaveCount(1);
-  await expect(risks.first()).toHaveText("critical");
-  await expect(page.locator("tbody .row-fact").first()).toBeVisible();
-  await expect(page.locator("tbody").getByText("low", { exact: true }).first()).toBeVisible();
+  await expect(risks.first()).toHaveText("critical risk");
+  await expect(queue.locator(".row-fact").first()).toBeVisible();
+  await expect(queue.getByText("low risk", { exact: true }).first()).toBeVisible();
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await capture(page, join(shots, "approvals-row-tokens.png"));

@@ -11,7 +11,13 @@
   import AnswerParts from "../components/AnswerParts.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
-  import PostureControl from "../components/PostureControl.svelte";
+  import ProfileChip from "../components/ProfileChip.svelte";
+  import {
+    profileCapabilityModes,
+    rememberProfile,
+    rememberedProfile,
+    type ConversationProfile,
+  } from "../conversationProfile";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
@@ -50,6 +56,7 @@
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
   import TurnEvidence from "../components/TurnEvidence.svelte";
+  import SafetyCard from "../components/SafetyCard.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import RecallStrip from "../components/RecallStrip.svelte";
@@ -348,6 +355,51 @@
   // before admitting the turn, so the only thing that stops a send is a
   // model problem the owner can actually fix.
   const modelBlocked = $derived(blocksSending(modelReadiness));
+  // QUI-P02 — the conversation's profile, remembered per conversation in this
+  // browser. Careful is sent as a per-turn override the runtime enforces.
+  let conversationProfile = $state<ConversationProfile>("standard");
+  // An opened conversation brings its own; a new one starts at Standard
+  // (`newConversation`), or with what Home's composer chose.
+  //
+  // A new chat learns its id from its first streamed chunk: that id keeps the
+  // profile it was sent with (found live, RT-QUI-29). Any other change of id
+  // is a conversation being opened, which brings its own.
+  let profileFor: string | null = null;
+  $effect(() => {
+    const id = sessionId;
+    if (id === null) {
+      profileFor = null;
+      return;
+    }
+    if (id === profileFor) return;
+    const justStarted = profileFor === null && untrack(() => turns.some((turn) => turn.streaming));
+    if (justStarted) rememberProfile(id, untrack(() => conversationProfile));
+    else conversationProfile = rememberedProfile(id);
+    profileFor = id;
+  });
+  /**
+   * The override to send with the next prompt, or null when Careful is chosen
+   * and the capabilities it covers cannot be read. Careful then refuses to
+   * send rather than quietly sending a Standard turn.
+   */
+  let profileGates = $state<CapabilityGate[] | null>(null);
+  async function loadProfileGates(): Promise<void> {
+    try {
+      profileGates = await api.capabilityGates();
+    } catch {
+      profileGates = null;
+    }
+  }
+  $effect(() => {
+    // Re-read each time Careful is chosen, so it covers what Permissions lists now.
+    if (conversationProfile === "careful") void loadProfileGates();
+  });
+  async function profileModes(): Promise<Record<string, string> | null> {
+    if (conversationProfile !== "careful") return {};
+    if (profileGates === null) await loadProfileGates();
+    return profileGates === null ? null : profileCapabilityModes("careful", profileGates);
+  }
+
   // QUI-C03 — the running turn's one status line, read from its own events.
   const runningActivity = $derived.by(() => {
     const running = [...turns].reverse().find((turn) => turn.streaming);
@@ -984,6 +1036,14 @@
     };
     const inputMode = inputModeForDraft(voiceState);
     audioSessionCoordinator.stopAll("submit");
+    // Careful's capabilities are normally read already; only a send that
+    // races the read waits for it.
+    const sentModes = await profileModes();
+    if (sentModes === null) {
+      exportNotice =
+        "Raiker could not read your permissions, so Careful could not be applied. Nothing was sent; your message is still here.";
+      return;
+    }
     const sentAttachments = attachStore.take();
     turns = [
       ...turns,
@@ -1024,6 +1084,7 @@
           model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           attachments: wireAttachments(sentAttachments),
+          ...(Object.keys(sentModes).length > 0 ? { capability_modes: sentModes } : {}),
         },
         (event) => {
           if (event.kind === "final" && event.response !== null) {
@@ -1485,7 +1546,7 @@
   /** QUI-W05 — a title the hand-off asked the new conversation to carry. */
   let handoffTitle: string | null = null;
 
-  async function startHandedOffChat({ text, attachments, title }: ChatHandoff) {
+  async function startHandedOffChat({ text, attachments, title, profile }: ChatHandoff) {
     if (streaming) {
       draft.text = text;
       if (attachments.length > 0) attachStore.set([...attachments]);
@@ -1493,6 +1554,8 @@
     }
     if (turns.length > 0 || sessionId !== null) newConversation();
     handoffTitle = title ?? null;
+    // QUI-P02 — the profile chosen on Home's composer.
+    conversationProfile = profile ?? "standard";
     draft.text = text;
     // QUI-H01 — files attached on Home's composer travel with the message.
     if (attachments.length > 0) attachStore.set([...attachments]);
@@ -1516,6 +1579,7 @@
     turns = [];
     earlierShown = 0;
     sessionId = null;
+    conversationProfile = "standard";
     conversationTitle = "";
     editingTitle = false;
     titleNotice = null;
@@ -2310,7 +2374,11 @@
                  decision is recorded anywhere it flips to "continuing" without
                  a reload, and the manual action stays available whenever the
                  live channel cannot be relied on. -->
-            <div class="approval-card" class:continuing={turn.resumeState === "continuing"}>
+            <div
+              class="approval-card"
+              class:continuing={turn.resumeState === "continuing"}
+              class:inline-decision={turn.resumeState !== "continuing" && turn.resumeState !== "elsewhere"}
+            >
               {#if turn.resumeState === "continuing"}
                 <p class="approval-title" role="status" aria-live="polite">
                   <span class="pulse" aria-hidden="true"></span>
@@ -2325,26 +2393,27 @@
                 </p>
                 <p class="approval-note">{turn.resumeNote}</p>
               {:else}
-                <p class="approval-title">
-                  <Icon name="approvals" size="sm" /> Waiting for approval
-                </p>
-                <p class="approval-body">{turn.response.approval.message}</p>
-                <p class="approval-note">
-                  Decide here or in the Approvals inbox — this conversation continues on its own
-                  as soon as you do, in whichever tab you use.
-                </p>
-                <div class="approval-actions">
-                  <a class="btn btn-soft btn-sm" href="#/approvals">Review approval</a>
-                  {#if liveChannelDown}
+                <!-- QUI-P05 — the decision itself, in place: Decline, Change,
+                     Allow once. Decided here, it clears the top bar's count,
+                     the floating card and the Approvals queue too. -->
+                <SafetyCard
+                  approval={turn.response.approval}
+                  {sessionId}
+                  disabled={streaming}
+                  onDecided={(approved, resumable) => {
+                    if (resumable) void resumeParkedTurn(turn.response?.approval?.approval_id ?? "", approved ? "approved" : "rejected");
+                  }}
+                  onAskAgain={() => retryPrompt(turn.prompt, toolRows, turn.response?.turn_id ?? null)}
+                />
+                {#if liveChannelDown}
+                  <div class="approval-actions">
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
                       disabled={streaming}
                       onclick={() => void continueNow()}
                     >Continue now</button>
-                  {/if}
-                </div>
-                {#if liveChannelDown}
+                  </div>
                   <p class="approval-note">
                     Raiker cannot currently watch for a decision made elsewhere, so use
                     <strong>Continue now</strong> once you have recorded one.
@@ -2549,15 +2618,24 @@
            will do, not permanently. At the careful default this renders
            nothing; the posture stays inspectable through Permissions, which
            Tools links to. -->
-      <PostureControl showEnvironment={false} exceptionOnly={true} />
-      {#if dataLocation !== null}
-        <!-- QUI-C04 — where the next message goes, said before it is sent. It
-             follows the model chosen for this turn. -->
-        <p class="data-label" title={inferenceSentence(dataLocation)}>
-          <Icon name={dataLocation.kind === "device" ? "lock" : "globe"} size="sm" />
-          <span>{inferenceLabel(dataLocation)}</span>
-        </p>
-      {/if}
+      <!-- QUI-P02 — how much Raiker does without asking, in this
+           conversation. It only narrows; the account's approval mode lives
+           in Permissions › Advanced. One line with where the message goes. -->
+      <div class="footer-facts">
+        <ProfileChip
+          bind:profile={conversationProfile}
+          disabled={streaming}
+          onchange={(next) => rememberProfile(sessionId, next)}
+        />
+        {#if dataLocation !== null}
+          <!-- QUI-C04 — where the next message goes, said before it is sent. It
+               follows the model chosen for this turn. -->
+          <p class="data-label" title={inferenceSentence(dataLocation)}>
+            <Icon name={dataLocation.kind === "device" ? "lock" : "globe"} size="sm" />
+            <span>{inferenceLabel(dataLocation)}</span>
+          </p>
+        {/if}
+      </div>
     {/snippet}
 
     {#snippet hint()}
@@ -2984,6 +3062,7 @@
   .outcome-line strong { font-weight: 650; color: var(--text-2); }
   .outcome-partial strong, .outcome-unknown strong { color: var(--warn-text); }
   .outcome-not-done strong { color: var(--danger); }
+  .footer-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
   .data-label { margin: 0; display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-3); }
   .send-when-ready { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--text-2); }
   /* QUI-C08 — floats just above the composer without moving the layout. */
@@ -3063,6 +3142,12 @@
      now one `ToolActivity` row, which is where its colour lives. */
   /* A turn that is picking itself up again reads as progress, not as a warning
      still waiting on the owner. */
+  /* The Safety card draws its own frame; this one only holds it. */
+  .approval-card.inline-decision {
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
   .approval-card.continuing {
     border-color: var(--accent-border);
     background: var(--accent-soft);

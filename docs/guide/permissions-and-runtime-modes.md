@@ -546,8 +546,12 @@ particular action. Change anything it shows in the list below it.
 
 ## Composer approval policy
 
-The **approval** pill in the Chat and Build composers is a per-account shared
-composer preference that persists across sessions and both surfaces. It decides
+The **approval mode** is set in **Permissions → Advanced** under *When
+something needs your decision* (Build's composer also shows it while it is not
+*Manually approve*). Chat's and Home's composers carry a per-conversation
+**profile chip** instead, **Careful** or **Standard**, which can only make
+Raiker ask more ([Working in Chat](working-in-chat.md#how-careful-raiker-is-in-this-conversation)).
+The approval mode is a per-account preference that persists across sessions. It decides
 how the agent presents actions that are already otherwise eligible to run. It is
 separate from the capability gate and the per-capability decision mode above:
 those controls decide whether an action may run at all; the composer policy
@@ -591,6 +595,12 @@ run anything while the agent runtime is disabled in
 Approving does one of two things, and the approval detail tells you which
 **before** you decide — it is computed by the server from your own capability
 gates, not assumed:
+
+The decision itself is **Allow once** or **Decline** on every surface: the
+Raiker Safety card in Chat, the floating card and Approvals. On Approvals a
+record-only decision reads **Allow once (record only)**. An unanswered approval
+expires after the time limit in **Settings → Security** (30 minutes by default)
+and never runs on its own.
 
 - **Approve and execute once.** A proposed file change (`write_file`,
   `edit_file`, `apply_patch`) is carried out, once, when both the
@@ -636,7 +646,7 @@ gates, not assumed:
 
 Disabling any of these capabilities in Permissions returns its approvals to
 record-only, and the detail view says so **before** you decide — the button reads
-**Approve (record only)** rather than **Approve and execute once**. A **critical**
+**Allow once (record only)** rather than **Allow once**. A **critical**
 approval never takes either path: it uses the human-only, step-up-verified
 critical lifecycle.
 

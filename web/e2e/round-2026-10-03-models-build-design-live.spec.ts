@@ -288,7 +288,7 @@ test("Build closes the loop: run the tests, read the failure, fix, re-run, green
     }
     const finished =
       !(await done.isVisible().catch(() => false)) &&
-      !(await page.getByText("Waiting for approval", { exact: true }).isVisible().catch(() => false));
+      !(await page.getByText("Waiting for your decision", { exact: true }).isVisible().catch(() => false));
     if (finished && approvals > 0) {
       const passed = (() => {
         try {

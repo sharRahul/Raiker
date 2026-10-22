@@ -14,6 +14,11 @@
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
   // governed backend directly; no fabricated state.
   import FormDialog from "../../components/FormDialog.svelte";
+  import {
+    APPROVAL_TIMEOUT_CHOICES,
+    APPROVAL_TIMEOUT_KEY,
+    approvalTimeoutMinutes,
+  } from "../../approvalTimeout";
 
   /*
    * QUI-L09 / QUI-L03 — Security as rows: a label, the current value and one
@@ -109,6 +114,30 @@
   let breachPassword = $state("");
   let breachOptIn = $state(false);
 
+  // QUI-P06 — how long an unanswered approval waits. The server reads the same
+  // key whenever it raises an approval, so this row shows what is in force.
+  let approvalTimeout = $state<number | null>(null);
+  let timeoutBusy = $state(false);
+  async function saveApprovalTimeout(minutes: number) {
+    const previous = approvalTimeout;
+    timeoutBusy = true;
+    notice = null;
+    approvalTimeout = minutes;
+    try {
+      const current = await api.settings();
+      await api.putSettings(
+        { ...current.settings, [APPROVAL_TIMEOUT_KEY]: minutes },
+        current.revision,
+        { [APPROVAL_TIMEOUT_KEY]: current.settings[APPROVAL_TIMEOUT_KEY] },
+      );
+    } catch {
+      approvalTimeout = previous;
+      notice = { kind: "error", text: "The approval time limit was not saved. Nothing changed." };
+    } finally {
+      timeoutBusy = false;
+    }
+  }
+
   // Scoped standing approval grants (ZT-5): user-owned, expiry-bound, revocable.
   let grants = $state<StandingGrant[]>([]);
   let grantActionType = $state("");
@@ -157,6 +186,7 @@
       requireMfaForVault = Boolean(
         (s.settings as Record<string, unknown>)["security.require_mfa_for_vault"],
       );
+      approvalTimeout = approvalTimeoutMinutes(s.settings as Record<string, unknown>);
     } catch {
       notice = { kind: "error", text: "Could not load security settings." };
     }
@@ -384,7 +414,22 @@
 </section>
 
 <section class="card" aria-labelledby="security-standing-h">
-  <h2 id="security-standing-h">Standing access</h2>
+  <h2 id="security-standing-h">Approvals and standing access</h2>
+  <div class="setting-row" data-testid="approval-time-limit">
+    <h3 id="approval-time-limit-h">Unanswered approvals expire after</h3>
+    <span class="setting-value">Nothing runs without a decision.</span>
+    <select
+      class="select"
+      aria-labelledby="approval-time-limit-h"
+      value={approvalTimeout ?? undefined}
+      disabled={approvalTimeout === null || timeoutBusy}
+      onchange={(event) => void saveApprovalTimeout(Number(event.currentTarget.value))}
+    >
+      {#each APPROVAL_TIMEOUT_CHOICES as choice (choice.minutes)}
+        <option value={choice.minutes}>{choice.label}</option>
+      {/each}
+    </select>
+  </div>
   <div class="setting-row">
     <h3>Standing approval grants</h3>
     <span class="setting-value">{grants.filter((grant) => !grant.revoked).length === 0 ? "None" : `${grants.filter((grant) => !grant.revoked).length} active`}</span>

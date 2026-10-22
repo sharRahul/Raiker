@@ -86,7 +86,7 @@ async function runGovernedProposal(marker: string, screenshotName: string): Prom
     `Use the write_file tool now to create add03-${marker.toLowerCase()}.txt containing exactly ${marker}. Do not answer without calling the tool.`,
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 240_000 });
+  await expect(page.getByText("Waiting for your decision", { exact: true })).toBeVisible({ timeout: 240_000 });
 
   await page.goto(`${BASE}/#/approvals`);
   await page.getByLabel("Sort approvals").selectOption({ label: "Newest first" });

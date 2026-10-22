@@ -3,6 +3,7 @@
   import type { Notification as RaikerNotification } from "../apiTypes";
   import { NOTICES_CHANGED, announceNoticesChanged } from "../noticeDestination";
   import { api } from "../api";
+  import { subscribeApprovalResolved } from "../approvalResume";
   import { relativeTime } from "../format";
   import Icon from "./Icon.svelte";
   import HostControl from "./HostControl.svelte";
@@ -39,10 +40,14 @@
   // Approvals came off the rail. A decision waiting on you is not a
   // place you navigate to, it is a thing that arrives, so it is a counted
   // button here: visible from every route rather than only when the sidebar is.
+  /** How often the count is re-read while the window is visible. */
+  const APPROVALS_POLL_MS = 15000;
   let pendingApprovals = $state(0);
   async function loadApprovals() {
     try {
-      pendingApprovals = (await api.approvals("pending")).length;
+      // QUI-P06 — an approval past its time limit can no longer be decided, so
+      // it is not "waiting on you": it is a turn marked not done.
+      pendingApprovals = (await api.approvals("pending")).filter((item) => !item.is_expired).length;
     } catch {
       // A failed read leaves the last known count. Never a broken shell.
     }
@@ -101,11 +106,23 @@
   onMount(() => {
     void loadNotifications();
     void loadApprovals();
+    // QUI-P05 — the count was read once, on mount, so a decision made in Chat,
+    // on Approvals or in another tab left it showing until a reload. It is
+    // re-read when a decision is announced and on the same cadence as the
+    // floating card's own read.
+    const stopResolved = subscribeApprovalResolved(() => void loadApprovals());
+    const approvalsTimer = setInterval(() => {
+      if (document.visibilityState === "visible") void loadApprovals();
+    }, APPROVALS_POLL_MS);
     // BUG-309 — the dock marks a notice read when the page shows its subject.
     // The count re-reads then, instead of disagreeing until the next poll.
     const reread = () => void loadNotifications();
     window.addEventListener(NOTICES_CHANGED, reread);
-    return () => window.removeEventListener(NOTICES_CHANGED, reread);
+    return () => {
+      window.removeEventListener(NOTICES_CHANGED, reread);
+      stopResolved();
+      clearInterval(approvalsTimer);
+    };
   });
 
   $effect(() => {

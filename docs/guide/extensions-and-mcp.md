@@ -47,6 +47,11 @@ Miss any one and the read fails closed with a named reason —
 `connector_egress_denied`. Fetched content is always framed as **untrusted
 data**, never as instructions.
 
+A connected service's detail lists **What Raiker may do with** it: each
+activity says, in words, whether it **Reads**, **Changes** something in the
+service, or **Can't be undone** (a delete), and *Asks first* where the runtime
+stops for your decision. The method and path stay underneath in small print.
+
 **Import manifest** adds a manifest-driven connector.
 
 ## MCP servers

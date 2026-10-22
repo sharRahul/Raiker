@@ -910,14 +910,50 @@ These parts of the same items are not done:
   they are run again (related to BUG-248).
 * **QUI-W02 and QUI-H02 — the companion.** Its pick in Hello and its picture on
   a first-day Home wait for the companion's art (QUI-V05).
-* **QUI-C04 and QUI-H01 — the profile chip** on both composers waits for
-  QUI-P02, and *More* (schedule, research depth, answer style) is not built.
-  **Run in background** sits in Tools until it is.
+* **QUI-C04 — *More*** (schedule, research depth, answer style) is not built.
+  **Run in background** sits in Tools until it is. The profile chip on both
+  composers shipped 2026-10-22 ([FIXED-1130](FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02)).
 * **Needs the owner's decision: QUI-W01** (the open-ring mark replacing the
-  eye-orb is recorded as a recommendation, not a decision) **and QUI-P02**
-  (what the profile chip on the composer means and changes).
+  eye-orb is recorded as a recommendation, not a decision). QUI-P02 was
+  decided 2026-10-22.
 * **BUG-357 is still open**: RT-QUI-10 shows Home's *No default model is
   chosen.* beside a Chat that answers with Haiku 4.5.
+
+## 2026-10-22 Quiet UI approvals round — what is still open
+
+The approvals round of [02](quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
+shipped [FIXED-1125](FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
+to [FIXED-1135](FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance).
+These parts of the same document are not done:
+
+* **QUI-P03 — Allow with limits.** Permissions offers *Ask me*, *Allow*,
+  *Automatic* and *Never*. A limited allow (account, recipients or domains,
+  attachments, volume, sensitive data still asks, scope, expiry) needs a rule
+  the runtime evaluates; Settings › Security's *Standing approval grants*
+  (action type, risk ceiling, scope, expiry) is the closest existing record and
+  the likely base. Until it exists, **Within limits** (QUI-P02), **Allow for
+  this task** (QUI-P05) and the suggestion in QUI-P09 are not offered.
+* **QUI-P04 — connection presets and accounts.** *Read only* (the default for a
+  new connection), *Ask before changes* and *Custom*, several named accounts per
+  service, and recent activity under the list need a per-connection policy and
+  account record. Today a connection is on or off for the session, and each
+  operation's `requires_confirmation` comes from its manifest.
+* **QUI-P08 — Approvals you've given** in Memory › Controls, with Undo, together
+  with *What Raiker has learned to do* (QUI-F09).
+* **The Careful profile is remembered in this browser only.** It is applied by
+  the runtime on every turn it is sent with, but it is chosen per browser. If
+  it should follow the owner to another device, it needs a field on the
+  session.
+* **The tool row above an expired approval still reads *waiting for your
+  decision*.** Found live in RT-QUI-31: the Safety card below it says *Not done:
+  no decision*, but the turn's tool row (`ToolActivity`) is built from the
+  turn's events, and nothing records the expiry as an event. It should read
+  *not done* too. Recording expiry as an event (with the sweep below) would let
+  the row follow.
+* **An expired approval stays `pending` in storage** until something tries to
+  decide it, and the read model reports `is_expired`. Every surface now treats
+  it as expired. A sweep that settles it to `expired` (and closes its parked
+  turn) would let the stored state say the same.
 
 ## 2026-10-21 verification follow-up — the Python CI job is at its 45-minute limit
 

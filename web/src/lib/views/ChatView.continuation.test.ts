@@ -93,7 +93,7 @@ async function parkATurn() {
   );
   await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Write notes" } });
   await fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await screen.findByText("Waiting for approval");
+  await screen.findByText("Waiting for your decision");
 }
 
 describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
@@ -115,15 +115,20 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
 
     render(ChatView, { props: { sessionId: "sess_1" } });
 
-    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Review approval" })).toBeInTheDocument();
+    expect(await screen.findByText("Waiting for your decision")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change" })).toBeInTheDocument();
   });
-  it("shows a parked turn as Waiting for approval", async () => {
+  it("shows a parked turn as Waiting for your decision", async () => {
     stubFetch(baseRoutes());
     render(ChatView, {});
     await parkATurn();
-    expect(screen.getByText("Raiker wants to write notes.md")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Review approval" })).toBeInTheDocument();
+    // QUI-P05 — the Raiker Safety card, decided in place.
+    const card = screen.getByRole("region", { name: "Raiker Safety" });
+    expect(card).toHaveTextContent("Write file: Writes one file in your workspace.");
+    expect(screen.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Allow once" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change" })).toHaveAttribute("href", "#/approvals?item=apv_1");
+    expect(card).not.toHaveTextContent(/always allow/i);
   });
 
   // ADD-02 — a turn that proposed a batch asks for more than one decision. The
@@ -153,7 +158,7 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Write three" } });
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(await screen.findByText(/decision 2 of 3 in this batch/i)).toBeInTheDocument();
+    expect(await screen.findByText("Decision 2 of 3")).toBeInTheDocument();
   });
 
   it("flips to Approved — continuing… and streams the resumption, without a reload", async () => {
@@ -225,7 +230,7 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
 
     await waitFor(() => expect(streamResumeMock).toHaveBeenCalled());
     expect(screen.queryByText(/could not continue/)).not.toBeInTheDocument();
-    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
+    expect(await screen.findByText("Waiting for your decision")).toBeInTheDocument();
   });
 
   it("still says so when the parked state genuinely cannot be read", async () => {

@@ -30,6 +30,7 @@ from raiker.hooks.factory import dispatcher_for_workspace
 from raiker.notify.delivery_policy import validate as validate_notification_settings
 from raiker.runtime.identity.presentation import resolve_presentation_identity
 from raiker.storage.sqlite import SQLiteStore
+from raiker.storage.stores.approvals import APPROVAL_TIMEOUT_CHOICES, APPROVAL_TIMEOUT_SETTING
 
 #: DEC-21 Personalisation — the appearance values a page can apply. Visual only:
 #: none of them reaches a prompt, an instruction or an authority decision.
@@ -205,6 +206,17 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="invalid_personalisation_value",
             )
+    # QUI-P06 — the approval time limit is read every time an approval is
+    # raised; a value outside the offered choices would be read as the default
+    # there while the page showed something else, so it is refused here.
+    timeout = body.settings.get(APPROVAL_TIMEOUT_SETTING)
+    if timeout is not None and (
+        isinstance(timeout, bool) or not isinstance(timeout, int) or timeout not in APPROVAL_TIMEOUT_CHOICES
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid_approval_timeout",
+        )
     # DEC-21a — quiet hours and interrupt preferences are policy the server
     # evaluates on every notice, so a value it cannot evaluate is refused here
     # rather than stored and silently read as the default.

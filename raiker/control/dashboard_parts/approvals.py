@@ -64,6 +64,53 @@ _GATE_LABELS = {
 }
 
 
+#: QUI-P07 — the argument keys that name what an action reaches, in the order
+#: a queue row should prefer them.
+_TARGET_KEYS = (
+    "path",
+    "file_path",
+    "target_path",
+    "repository",
+    "repo",
+    "url",
+    "endpoint_url",
+    "recipient",
+    "to",
+    "channel",
+    "connector_id",
+    "checkpoint_id",
+    "command",
+)
+_TARGET_MAX_CHARS = 120
+
+
+def _action_target(arguments_json: object) -> str:
+    """The one thing an action reaches, in a few words, or "" when it names none.
+
+    Read from the arguments the broker already stored redacted; never inferred.
+    A URL is reduced to its host, the part that says where it goes.
+    """
+    try:
+        arguments = json.loads(str(arguments_json or "{}"))
+    except (ValueError, TypeError):
+        return ""
+    if not isinstance(arguments, dict):
+        return ""
+    for key in _TARGET_KEYS:
+        value = arguments.get(key)
+        if isinstance(value, list):
+            value = " ".join(str(part) for part in value if isinstance(part, (str, int)))
+        if not isinstance(value, str) or not value.strip():
+            continue
+        text = redact_secret_like_text(value.strip())
+        if key in {"url", "endpoint_url"}:
+            from urllib.parse import urlparse
+
+            text = urlparse(text).netloc or text
+        return text if len(text) <= _TARGET_MAX_CHARS else f"{text[:_TARGET_MAX_CHARS]}…"
+    return ""
+
+
 def _gate_label(capability: str) -> str:
     return _GATE_LABELS.get(capability, capability.replace("_", " ").capitalize())
 
@@ -83,12 +130,31 @@ class ApprovalService:
         positions = self.store.suspended_turn_queue_positions(
             [str(row.get("approval_id", "")) for row in rows]
         )
+        titles = self._session_titles({str(row.get("session_id") or "") for row in rows})
         return [
             self._placed_approval_view(
-                row, self._approval_view(row, queue=positions), principal_id
+                row,
+                replace(
+                    self._approval_view(row, queue=positions),
+                    source_title=titles.get(str(row.get("session_id") or ""), ""),
+                ),
+                principal_id,
             )
             for row in rows
         ]
+
+    def _session_titles(self: DashboardService, session_ids: set[str]) -> dict[str, str]:
+        """Conversation titles by id, in one read, for the rows that name one."""
+        wanted = sorted(session_id for session_id in session_ids if session_id)
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self.store.connect() as connection:
+            found = connection.execute(
+                f"SELECT session_id, title FROM sessions WHERE session_id IN ({placeholders})",  # noqa: S608 - placeholders only
+                wanted,
+            ).fetchall()
+        return {str(row["session_id"]): str(row["title"] or "") for row in found}
 
     def _placed_approval_view(
         self: DashboardService,
@@ -207,6 +273,7 @@ class ApprovalService:
             resolved_by=(str(row["approved_by"]) if row.get("approved_by") else None),
             queue_position=queue_position,
             queue_total=queue_total,
+            target=_action_target(row.get("arguments_json")),
         )
 
     def _approval_detail(
@@ -217,8 +284,13 @@ class ApprovalService:
         approval_id = str(row["approval_id"])
         view = self._placed_approval_view(
             row,
-            self._approval_view(
-                row, queue=self.store.suspended_turn_queue_positions([approval_id])
+            replace(
+                self._approval_view(
+                    row, queue=self.store.suspended_turn_queue_positions([approval_id])
+                ),
+                source_title=self._session_titles({str(row.get("session_id") or "")}).get(
+                    str(row.get("session_id") or ""), ""
+                ),
             ),
             principal_id,
         )

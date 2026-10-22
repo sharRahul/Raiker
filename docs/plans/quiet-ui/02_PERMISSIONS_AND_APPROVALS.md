@@ -2,6 +2,27 @@
 
 Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
+## Status
+
+**Approvals round shipped 2026-10-22**
+([FIXED-1125](../FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
+to [FIXED-1135](../FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance);
+live cases RT-QUI-26 to RT-QUI-34 in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+
+| Item | State |
+|---|---|
+| QUI-P01 | **Unchanged.** The layers already hold in the runtime; no surface was added for them. |
+| QUI-P02 | **Done** for Careful and Standard on Chat's and Home's composers (decided 2026-10-22: per conversation, narrows only). **Within limits** waits for Allow-with-limits rules (QUI-P03). The account's approval mode moved to Permissions › Advanced. |
+| QUI-P03 | **Partly done** through QUI-L06. Open: **Allow with limits** and the limits it requires. |
+| QUI-P04 | **Partly done.** Done: *What Raiker may do with …* with each activity as *Reads*, *Changes* or *Can't be undone*. Open: the three presets, named accounts and recent activity under the list, which need a per-connection policy the runtime does not store yet. |
+| QUI-P05 | **Done**, except **Allow for this task**, which waits for limits the runtime can enforce. The card is in Chat; the floating card and Approvals use the same words. |
+| QUI-P06 | **Done.** 30 minutes by default, set in Settings › Security. *Ask again* asks the same request as a new turn. |
+| QUI-P07 | **Done.** |
+| QUI-P08 | **Partly done.** Done: History names and links the conversation each decision belongs to. Open: *Approvals you've given* with Undo in Memory › Controls (with QUI-F09). |
+| QUI-P09 | **Open.** Suggesting an Allow-with-limits rule needs QUI-P03. |
+| Acceptance | **Partly met.** No surface offers *Always allow*; a model's text cannot draw the card; History links each decision to its task. Open: a permission changed in one place shown elsewhere without reload is not checked across every surface. |
+
 This document changes how permissions are **presented**. The authority model,
 the policy store and the runtime's decisions do not change. A label never
 authorises an action.

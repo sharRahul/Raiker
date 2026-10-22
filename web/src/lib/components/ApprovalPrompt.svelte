@@ -86,7 +86,9 @@
   async function poll() {
     if (!hasToken()) return;
     try {
-      pending = await api.approvals("pending");
+      // QUI-P06 — one past its time limit cannot be decided; the turn it
+      // parked says "Not done: no decision" instead.
+      pending = (await api.approvals("pending")).filter((item) => !item.is_expired);
       announce(pending);
     } catch {
       // A read that fails changes nothing on screen: the inbox is still there,
@@ -278,9 +280,11 @@
       {#if failure}<p class="note" role="alert">{failure}</p>{/if}
       <div class="actions">
         <button type="button" class="primary" disabled={busy} onclick={() => void decide(true)}>
-          <Icon name="check" size="sm" /> Approve
+          <Icon name="check" size="sm" /> Allow once
         </button>
-        <button type="button" disabled={busy} onclick={() => void decide(false)}>Deny</button>
+        <!-- QUI-P05 — the same words on every surface that decides: Decline
+             and Allow once. There is no "Always allow". -->
+        <button type="button" disabled={busy} onclick={() => void decide(false)}>Decline</button>
         <button type="button" class="quiet" onclick={review}>Details</button>
       </div>
     {/if}

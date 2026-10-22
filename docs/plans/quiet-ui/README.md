@@ -7,7 +7,9 @@ so.** Shipped so far: the quick fixes and most quality checks in
 [07](07_QUICK_FIXES_AND_QUALITY.md), two rounds of
 [03](03_WELCOME_HOME_AND_CHAT.md#status) (2026-10-21), and the layouts and the
 Permissions, Connections, Models, Settings and help-panel plans in
-[01](01_LAYOUT_SYSTEM_AND_PAGES.md#status) (2026-10-21; L11 to L13 open). These documents record the UI/UX direction agreed in the October 2026
+[01](01_LAYOUT_SYSTEM_AND_PAGES.md#status) (2026-10-21; L11 to L13 open), and
+the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
+(2026-10-22; Allow with limits and its dependants open). These documents record the UI/UX direction agreed in the October 2026
 design review and turn it into numbered, testable work items. They extend
 [PERSONAL_AGENT_UX_SPEC.md](../PERSONAL_AGENT_UX_SPEC.md); where the two
 disagree on layout or presentation, this folder is the newer decision. Neither

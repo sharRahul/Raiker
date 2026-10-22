@@ -119,6 +119,27 @@ describe("Connections › Services (QUI-L07)", () => {
     expect(screen.getByText(/Blocked at/)).toHaveTextContent("Account connected");
   });
 
+  // QUI-P04 — each activity says what it does in words, not as an HTTP verb.
+  it("says what Raiker may do with the service: reads, changes, can't be undone", async () => {
+    const operations = [
+      { operation_id: "list_messages", method: "GET", path: "/messages", description: "List messages", requires_confirmation: false },
+      { operation_id: "send_message", method: "POST", path: "/messages/send", description: "Send a message", requires_confirmation: true },
+      { operation_id: "delete_message", method: "DELETE", path: "/messages/{id}", description: "Delete a message", requires_confirmation: true },
+    ] as StoreConnector["operations"];
+    stubFetch(routes([connector({ installed: true, operations })], [extension()]));
+    render(ConnectionsView);
+    await fireEvent.click(await screen.findByRole("option", { name: /gmail/i }));
+
+    expect(await screen.findByRole("heading", { name: "What Raiker may do with Gmail" })).toBeInTheDocument();
+    const rows = screen.getAllByRole("listitem").filter((item) => item.closest(".operations"));
+    expect(rows.map((row) => row.querySelector(".effect")?.textContent)).toEqual([
+      "Reads",
+      "Changes",
+      "Can't be undone",
+    ]);
+    expect(rows[1]).toHaveTextContent("Asks first");
+  });
+
   it("asks for the credential in a password field and never shows it", async () => {
     stubFetch(routes([connector({ installed: true })]));
     render(ConnectionsView);

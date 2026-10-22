@@ -1120,8 +1120,15 @@ export const api = {
   workInFlight: () => contract.workInFlight(),
   stopAll: () => contract.stopAll(),
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
-  approvals: (statusFilter = "pending") =>
-    contract.listApprovals({ status_filter: statusFilter }),
+  // QUI-P06 — "pending" means decidable: one past its time limit is left out
+  // here, once, for every surface that counts or offers decisions. History
+  // reads those through `lapsedApprovals`.
+  approvals: async (statusFilter = "pending") => {
+    const listed = await contract.listApprovals({ status_filter: statusFilter });
+    return statusFilter === "pending" ? listed.filter((approval) => !approval.is_expired) : listed;
+  },
+  lapsedApprovals: async () =>
+    (await contract.listApprovals({ status_filter: "pending" })).filter((approval) => approval.is_expired),
   // Which of a provider's models stay offered in every picker. The default
   // model is a different decision, made by `setModelSelection`.
   setAvailableModels: (profileId: string, models: string[]) =>

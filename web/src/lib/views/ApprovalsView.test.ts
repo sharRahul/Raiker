@@ -53,7 +53,14 @@ const CRITICAL = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.location.hash = "";
 });
+
+/** QUI-P07 — the queue is a list; its first row's decision opens beside it. */
+async function openFirst() {
+  const [first] = within(await screen.findByRole("listbox")).getAllByRole("option");
+  await fireEvent.click(first);
+}
 
 describe("ApprovalsView", () => {
   it("shows a route-level loading state while approvals are fetched", async () => {
@@ -80,7 +87,7 @@ describe("ApprovalsView", () => {
     });
     expect(screen.queryByText("write_file")).not.toBeInTheDocument();
     expect(screen.getByText("File writes")).toBeInTheDocument();
-    expect(screen.getByText("medium")).toBeInTheDocument();
+    expect(screen.getByText("medium risk")).toBeInTheDocument();
   });
 
   it("tones the dangerous decision, not every decision in the queue (the badge budget)", async () => {
@@ -90,9 +97,9 @@ describe("ApprovalsView", () => {
     stubFetch({ "GET /api/approvals": [PENDING, critical] });
     render(ApprovalsView);
 
-    await waitFor(() => expect(screen.getByText("critical")).toBeInTheDocument());
-    expect(screen.getByText("critical").closest(".badge")).not.toBeNull();
-    expect(screen.getByText("medium").closest(".badge")).toBeNull();
+    await waitFor(() => expect(screen.getByText("critical risk")).toBeInTheDocument());
+    expect(screen.getByText("critical risk").closest(".badge")).not.toBeNull();
+    expect(screen.getByText("medium risk").closest(".badge")).toBeNull();
   });
 
   it("names the machine proposer separately from the human authorizer", async () => {
@@ -126,7 +133,7 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     expect(screen.getAllByText("Raiker agent · turn_1").length).toBeGreaterThan(0);
     expect(screen.getByText("Owner")).toBeInTheDocument();
@@ -158,7 +165,7 @@ describe("ApprovalsView", () => {
     render(ApprovalsView);
 
     await screen.findByText("Shell exec");
-    const rows = screen.getAllByRole("row").slice(1);
+    const rows = within(screen.getByRole("listbox")).getAllByRole("option");
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("Shell exec"),
       expect.stringContaining("Read file"),
@@ -167,7 +174,7 @@ describe("ApprovalsView", () => {
     ]);
 
     await fireEvent.change(screen.getByLabelText("Sort approvals"), { target: { value: "newest" } });
-    expect(screen.getAllByRole("row").slice(1).map((row) => row.textContent)).toEqual([
+    expect(within(screen.getByRole("listbox")).getAllByRole("option").map((row) => row.textContent)).toEqual([
       expect.stringContaining("Read file"),
       expect.stringContaining("Http request"),
       expect.stringContaining("Write file"),
@@ -181,10 +188,7 @@ describe("ApprovalsView", () => {
       "GET /api/approvals/appr_1": DETAIL,
     });
     render(ApprovalsView);
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /review/i })).toBeInTheDocument();
-    });
-    await fireEvent.click(screen.getByRole("button", { name: /review/i }));
+    await openFirst();
     await waitFor(() => {
       expect(screen.getByText(/metadata-only/i)).toBeInTheDocument();
     });
@@ -194,7 +198,7 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("Added:")).toBeInTheDocument();
     expect(screen.getByText("notes.txt")).toBeInTheDocument();
     // Approve is explicit about not executing.
-    expect(screen.getByRole("button", { name: /approve \(record only\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /allow once \(record only\)/i })).toBeInTheDocument();
   });
 
   it("puts the proposed change above the provenance, not below it", async () => {
@@ -207,17 +211,17 @@ describe("ApprovalsView", () => {
       "GET /api/approvals/appr_1": DETAIL,
     });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     const heading = await screen.findByRole("heading", { name: /^Review / });
-    const panel = heading.closest("section");
+    const panel = heading.closest(".decision-layout");
     const order = panel?.textContent ?? "";
     expect(order.indexOf("notes.txt")).toBeGreaterThan(-1);
     // The change comes before the provenance disclosure.
-    expect(order.indexOf("notes.txt")).toBeLessThan(order.indexOf("Provenance and evidence"));
+    expect(order.indexOf("notes.txt")).toBeLessThan(order.indexOf("Evidence"));
 
     // Provenance is still there, and still complete — collapsed, not dropped.
-    const provenance = screen.getByText("Provenance and evidence");
+    const provenance = screen.getByText("Evidence");
     await fireEvent.click(provenance);
     // Scoped to the panel: the queue table also has a "Requested" column.
     const details = provenance.closest("details") as HTMLElement;
@@ -232,7 +236,7 @@ describe("ApprovalsView", () => {
       "GET /api/approvals/appr_1": DETAIL,
     });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     expect(
       await screen.findByText(/Approving records a decision; it does not run anything\./),
@@ -246,12 +250,16 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    // QUI-P06 — past its time limit it is not waiting on anyone: History has it.
+    expect(await screen.findByText(/nothing waiting on you/i)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("tab", { name: /history/i }));
+    await openFirst();
+    expect(screen.getAllByText("No decision").length).toBeGreaterThan(0);
 
     expect(await screen.findByText(/expired at/i)).toBeInTheDocument();
     expect(screen.getByText(/the server will not accept a decision/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /allow once/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
     expect(
       screen.queryByText((_, element) => element?.textContent?.includes("Already resolved: pending") ?? false),
     ).not.toBeInTheDocument();
@@ -280,11 +288,11 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
     expect(
       await screen.findByText(/approving this performs the change shown above/i),
     ).toBeInTheDocument();
-    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
 
     expect(await screen.findByText(/executed once — wrote notes\.txt/i)).toBeInTheDocument();
   });
@@ -315,8 +323,8 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
 
     const notice = await screen.findByText(/change completed — not reversible/i);
     expect(notice).toHaveTextContent(/checkpoint_snapshot_os_error/i);
@@ -338,8 +346,8 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
 
     expect(await screen.findByText(/was NOT executed \(metadata-only\)/i)).toBeInTheDocument();
   });
@@ -369,7 +377,7 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     expect(await screen.findByText("Execution evidence")).toBeInTheDocument();
     expect(screen.getAllByText("principal_owner").length).toBeGreaterThan(0);
@@ -402,8 +410,8 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
 
     await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
 
@@ -428,28 +436,53 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
 
     await screen.findByText(/was NOT executed/i);
     expect(screen.queryByRole("button", { name: /continue the turn/i })).not.toBeInTheDocument();
   });
 
-  it("keeps executed approvals reachable through their own filter tab", async () => {
-    // `executed` is the terminal status the relay writes, so without this tab
-    // every approval the owner actually carried out would vanish from the queue.
+  it("keeps executed approvals reachable in History", async () => {
+    // `executed` is the terminal status the relay writes, so without it every
+    // approval the owner actually carried out would vanish from the record.
     const executed = { ...PENDING, approval_id: "appr_done", status: "executed", requires_approval: false };
     const fetchMock = stubFetch({ "GET /api/approvals": [executed] });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("tab", { name: /executed/i }));
+    await fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some((call) => String(call[0]).includes("status_filter=executed")),
       ).toBe(true);
     });
-    expect(await screen.findByRole("button", { name: /review/i })).toBeInTheDocument();
+    expect((await screen.findAllByText("Allowed · ran")).length).toBeGreaterThan(0);
+  });
+
+  // QUI-P08 — every decision in History names the task it allowed and links to it.
+  it("links each decision in History to the conversation it belongs to", async () => {
+    const executed = {
+      ...PENDING,
+      approval_id: "appr_done",
+      status: "executed",
+      source_title: "Tidy the notes",
+      target: "notes.txt",
+    };
+    stubFetch({
+      "GET /api/approvals": [executed],
+      "GET /api/approvals/appr_done": { ...DETAIL, approval: executed },
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
+
+    const row = within(await screen.findByRole("listbox")).getAllByRole("option")[0];
+    expect(row).toHaveTextContent("From “Tidy the notes”");
+    expect(row).toHaveTextContent("notes.txt");
+    expect(await screen.findByRole("link", { name: "Open the conversation" })).toHaveAttribute(
+      "href",
+      `#/new-chat?session=${PENDING.session_id}`,
+    );
   });
 
   it("reports the connector-write exception after server-confirmed execution", async () => {
@@ -480,10 +513,25 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /^allow once$/i }));
 
     expect(await screen.findByText(/executed once: executed/i)).toBeInTheDocument();
+  });
+
+  // QUI-P05 — Change on the Raiker Safety card opens this decision here.
+  it("opens the decision a link names", async () => {
+    const second = { ...PENDING, approval_id: "appr_2", tool_name: "edit_file" };
+    window.location.hash = "#/approvals?item=appr_2";
+    const fetchMock = stubFetch({
+      "GET /api/approvals": [PENDING, second],
+      "GET /api/approvals/appr_1": DETAIL,
+      "GET /api/approvals/appr_2": { ...DETAIL, approval: second },
+    });
+    render(ApprovalsView);
+
+    expect(await screen.findByRole("heading", { name: "Review Edit file" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith("/api/approvals/appr_2"))).toBe(true);
   });
 
   it("shows a friendly empty state when nothing is pending", async () => {
@@ -502,9 +550,9 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView, { sessionId: PENDING.session_id });
 
-    await screen.findByText("Write file");
-    expect(screen.queryByText("appr_other")).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: /review/i }));
+    await screen.findAllByText("Write file");
+    expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(1);
+    await openFirst();
     expect(await screen.findByRole("link", { name: "View session" })).toHaveAttribute(
       "href",
       `#/sessions?session=${PENDING.session_id}`,
@@ -551,11 +599,11 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
     // Both the list row and the open detail pane place the decision inside its
     // batch, so the owner sees it whether or not they opened the review.
     expect(screen.getAllByText(/decision 2 of 3/i)).toHaveLength(2);
-    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
 
     expect(
       await screen.findByText(/1 more call from the same batch/i),
@@ -597,8 +645,8 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+    await openFirst();
+    await fireEvent.click(await screen.findByRole("button", { name: /allow once \(record only\)/i }));
     await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
 
     expect(await screen.findByText(/continued in another tab/i)).toBeInTheDocument();
@@ -620,7 +668,7 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
     await fireEvent.click(screen.getByRole("button", { name: "Begin critical denial" }));
     await fireEvent.input(screen.getByLabelText("Decision note"), { target: { value: "Risk is too high" } });
     await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "secret" } });
@@ -676,14 +724,14 @@ describe("ApprovalsView", () => {
     });
     render(ApprovalsView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+    await openFirst();
 
     expect(await screen.findByText(/Which database should the new service use\?/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Answer a question/i })).toBeTruthy();
     // The controls that must not exist here. An owner who can "approve" a
     // question has been shown a decision they were never asked to make.
-    expect(screen.queryByRole("button", { name: /^Approve/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Deny$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Allow once/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Decline$/ })).toBeNull();
     expect(screen.getByText(/grants nothing and\s+runs nothing/i)).toBeTruthy();
   });
 
@@ -693,7 +741,7 @@ describe("ApprovalsView", () => {
       "GET /api/approvals/appr_question": QUESTION_DETAIL,
     });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+    await openFirst();
 
     const send = await screen.findByRole("button", { name: "Send answer" });
     expect(send).toBeDisabled();
@@ -713,7 +761,7 @@ describe("ApprovalsView", () => {
       },
     });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+    await openFirst();
     await fireEvent.click(await screen.findByRole("radio", { name: /SQLite/ }));
     await fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
 
@@ -753,11 +801,11 @@ describe("ApprovalsView per-hunk acceptance", () => {
   it("sends only the hunks the reviewer kept", async () => {
     const fetchMock = stubFetch(routes());
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
     await fireEvent.click(screen.getAllByRole("checkbox")[0]);
-    await fireEvent.click(screen.getByRole("button", { name: /approve/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /allow once/i }));
 
     const post = await waitFor(() =>
       fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
@@ -773,10 +821,10 @@ describe("ApprovalsView per-hunk acceptance", () => {
     // saying so with an explicit list would record a scope on every approval.
     const fetchMock = stubFetch(routes());
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
-    await fireEvent.click(screen.getByRole("button", { name: /approve/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /allow once/i }));
 
     const post = await waitFor(() =>
       fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
@@ -790,7 +838,8 @@ describe("ApprovalsView per-hunk acceptance", () => {
       "GET /api/approvals/appr_1": { ...TWO_HUNKS, approval: EXPIRED },
     });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("tab", { name: /history/i }));
+    await openFirst();
 
     await screen.findByText(/expired at/i);
     expect(screen.queryByRole("checkbox")).toBeNull();
@@ -829,7 +878,7 @@ describe("ApprovalsView edit then propose", () => {
   it("sends the reviewer's own patch to the replace route, never to resolve", async () => {
     const fetchMock = stubFetch(routes());
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
     await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
     const editor = await screen.findByLabelText("Your version of this change");
@@ -853,7 +902,7 @@ describe("ApprovalsView edit then propose", () => {
   it("says the change was denied and nothing ran", async () => {
     stubFetch(routes());
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
     await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
     await fireEvent.input(await screen.findByLabelText("Your version of this change"), {
       target: { value: PATCH_DETAIL.diff.replace("+A", "+Aa") },
@@ -875,7 +924,7 @@ describe("ApprovalsView edit then propose", () => {
       }),
     );
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
     await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
     await fireEvent.input(await screen.findByLabelText("Your version of this change"), {
       target: { value: PATCH_DETAIL.diff.replace("+A", "+Aa") },
@@ -891,9 +940,9 @@ describe("ApprovalsView edit then propose", () => {
     // A control with nothing behind it is worse than no control.
     stubFetch({ "GET /api/approvals": [PENDING], "GET /api/approvals/appr_1": DETAIL });
     render(ApprovalsView);
-    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await openFirst();
 
-    await screen.findByRole("button", { name: /approve/i });
+    await screen.findByRole("button", { name: /allow once/i });
     expect(screen.queryByRole("button", { name: "Edit…" })).toBeNull();
   });
 });

@@ -188,6 +188,8 @@ export type ApprovalView = {
   resolved_by: string | null;
   queue_position: number;
   queue_total: number;
+  target: string;
+  source_title: string;
 };
 
 export type ApproveMcpToolsRequest = {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import { goalSummaries } from "../permissionGoals";
   import { onMount, tick } from "svelte";
   import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
@@ -821,6 +822,17 @@
           </ul>
         </section>
       {:else}
+        {#if category === ADVANCED_ID}
+          <!-- QUI-P02 — the account's approval mode is set here, not on a
+               composer: a composer's profile chip only ever asks more. -->
+          <section class="panel approval-mode-panel" aria-labelledby="approval-mode-h">
+            <h3 id="approval-mode-h">When something needs your decision</h3>
+            <p class="posture-note-text">
+              For every conversation on this account. A conversation set to Careful still asks.
+            </p>
+            <ApprovalModeControl />
+          </section>
+        {/if}
         <ListDetail
           items={categoryGates}
           key={(gate) => gate.capability}
@@ -1079,6 +1091,21 @@
     font-variant-numeric: tabular-nums;
     font-weight: 700;
     margin-right: 0.3rem;
+  }
+  .approval-mode-panel {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+    margin-bottom: var(--space-3);
+  }
+  .approval-mode-panel h3 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .posture-note-text {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-xs);
   }
   .posture-note {
     display: flex;

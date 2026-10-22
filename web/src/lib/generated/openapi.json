@@ -909,8 +909,18 @@
             "title": "Session Id",
             "type": "string"
           },
+          "source_title": {
+            "default": "",
+            "title": "Source Title",
+            "type": "string"
+          },
           "status": {
             "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "default": "",
+            "title": "Target",
             "type": "string"
           },
           "tool_name": {

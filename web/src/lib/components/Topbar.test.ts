@@ -111,3 +111,29 @@ describe("Topbar notifications", () => {
     expect(bell).toHaveFocus();
   });
 });
+
+// FIXED-1128 — the count leaves out what can no longer be decided, and follows
+// a decision made in this tab without a reload.
+describe("Topbar approvals count", () => {
+  it("counts only decidable approvals and re-reads when a decision is announced", async () => {
+    let pending = [
+      { approval_id: "a1", is_expired: false },
+      { approval_id: "a2", is_expired: true },
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes("/api/approvals") ? pending : [];
+        return { ok: true, status: 200, json: async () => body } as Response;
+      }),
+    );
+    render(Topbar, { title: "Chat", hint: "" });
+    expect(await screen.findByRole("link", { name: "Approvals (1 waiting on you)" })).toBeInTheDocument();
+
+    pending = [];
+    const { publishApprovalResolved } = await import("../approvalResume");
+    publishApprovalResolved({ approvalId: "a1", sessionId: null, turnId: null, approved: true });
+    await waitFor(() => expect(screen.getByRole("link", { name: "Approvals" })).toBeInTheDocument());
+  });
+});

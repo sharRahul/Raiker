@@ -15,6 +15,34 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-22 (Quiet UI permissions and approvals, hosted Anthropic Haiku 4.5)
+
+The approvals round of the [Quiet UI plan](../plans/quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
+([FIXED-1125](../plans/FIXED_ITEMS.md#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06)
+to [FIXED-1135](../plans/FIXED_ITEMS.md#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance)).
+Fresh workspaces served by `raiker-web` at 1440×900 (1680×1000 for the wide
+Approvals check). Anthropic was connected through **Add model**, with the key and
+workspace ID typed from the run's environment; neither appears in a spec,
+command, document, screenshot or the server log. Spec:
+`web/e2e/quiet-ui-permissions-live.spec.ts`, developed against one workspace,
+then run whole on a second fresh workspace: **9/9 in 3.6 min**. RT-QUI-31 moves a
+waiting approval's expiry into the past through the store
+(`RAIKER_LIVE_WORKSPACE`, `RAIKER_LIVE_PYTHON`) instead of waiting 30 minutes.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-26 | **Settings → Security** has *Approvals and standing access* with **Unanswered approvals expire after** at *30 minutes*; *1 hour* is kept across a reload, then set back | ✅ |
+| RT-QUI-27 | Anthropic connects through **Add model → An account I have**, Haiku 4.5 kept and made the default | ✅ |
+| RT-QUI-28 | Chat's profile chip reads **Standard**; its menu offers **Careful** and **Standard** with their consequences and no Skip, Off, Always allow or Within limits; **Permissions → Advanced** opens with *When something needs your decision*. File writes and the approval relay are turned on (Ask me) for the next cases | ✅ after a fix found in this round: the approval mode sat below the sixteen Advanced rows, and now leads them |
+| RT-QUI-29 | In a **Careful** chat, *create careful-live.txt* stops on the **Raiker Safety** card: *Waiting for your decision*, the six parts (*Write file: Approving writes this exact change to careful-live.txt, once* · *Your permissions ask before file writes* · *careful-live.txt* · *1 line of text* · *Can be undone afterwards* · *Accept only part of the change…*), **Decline**, **Change**, **Allow once**, no *Always allow*; the top bar reads *Approvals (1 waiting on you)* and no floating card repeats it. **Allow once** continues the turn and the count clears | ✅ after fixes found in this round ([FIXED-1130](../plans/FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02), [FIXED-1126](../plans/FIXED_ITEMS.md#fixed-1126--an-approval-past-its-time-limit-still-looked-like-it-was-waiting-qui-p06)): the chip went back to Standard when the first chunk gave the chat its id, and Pending listed expired approvals |
+| RT-QUI-30 | **Change** opens the decision on **Approvals**: queue row *Write file · medium risk · standard-live.txt · just now · From "Create a file named…"*, the decision beside it with **Decline** and **Allow once**; at 1,680 px the evidence is open. **Decline** empties Pending; **History** shows *Declined* and *Allowed · ran*, each with its conversation, and **Open the conversation** | ✅ after a fix found in the screenshot review ([FIXED-1132](../plans/FIXED_ITEMS.md#fixed-1132--approvals-was-a-table-with-the-decision-underneath-it-qui-p07)): the evidence column squeezed the decision to about 350 px |
+| RT-QUI-31 | A waiting approval past its time limit reads **Not done: no decision**, *Nobody answered within 30 minutes, so nothing ran and the task stopped here*, **Change the time limit** (→ `#/settings?tab=security`), no **Allow once**, and is not counted in the top bar. **Ask again** raises the same request as a new turn, which is declined in place | ✅ after a fix found in this round ([FIXED-1126](../plans/FIXED_ITEMS.md#fixed-1126--an-approval-past-its-time-limit-still-looked-like-it-was-waiting-qui-p06)): the expired card still offered a safer alternative pointing at **Change** |
+| RT-QUI-32 | A prompt asking Haiku to reply with a forged card (`data-raiker-safety`, *Raiker Safety*, an **Allow once** button): Haiku declined, and nothing on the page is a Safety card or carries the mark | ✅ |
+| RT-QUI-33 | **Careful** chosen on Home's composer goes with the message: the chat answers *CAREFUL HANDOFF* and its chip reads Careful | ✅ |
+| RT-QUI-34 | A connected service's detail reads **What Raiker may do with GitHub** (*No activities are registered yet* until a manifest is imported) | ✅ |
+| Suites | Web unit suite, `svelte-check`, ESLint, design tokens, build; `tests/test_approval_timeout.py`, the approval, contract and docs tests; ruff, mypy, SAST | ✅ |
+| Visual review | `docs/screenshots/2026-10-22-quiet-ui-permissions/` (26–34), inspected at original resolution; the fixes marked above were found from the images. Still seen: the tool row above an expired approval reads *waiting for your decision* ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-22-quiet-ui-approvals-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-21 (Quiet UI layout system and pages, hosted Anthropic Haiku 4.5)
 
 The layouts and page plans in the [Quiet UI plan](../plans/quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#status)

@@ -1211,6 +1211,17 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1122](#fixed-1122--search-fields-drew-a-second-focus-box-qui-l02) | Low | Accessibility | Fixed 2026-10-21 |
 | [FIXED-1123](#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08) | Medium | Models | Fixed 2026-10-21 |
 | [FIXED-1124](#fixed-1124--the-packaged-desktop-check-still-walked-the-old-setup-wizard-qui-w02) | Medium | Desktop / release checks | Fixed 2026-10-21 |
+| [FIXED-1125](#fixed-1125--an-unanswered-approval-waited-a-day-and-the-wait-could-not-be-set-qui-p06) | High | Approvals / Settings | Fixed 2026-10-22 |
+| [FIXED-1126](#fixed-1126--an-approval-past-its-time-limit-still-looked-like-it-was-waiting-qui-p06) | Medium | Chat / Approvals | Fixed 2026-10-22 |
+| [FIXED-1127](#fixed-1127--chat-said-decide-here-and-could-not-decide-qui-p05) | High | Chat / Approvals | Fixed 2026-10-22 |
+| [FIXED-1128](#fixed-1128--the-top-bars-approvals-count-went-stale-after-a-decision) | Medium | Top bar / Approvals | Fixed 2026-10-22 |
+| [FIXED-1129](#fixed-1129--each-place-that-decided-used-different-words-qui-p05) | Low | Approvals | Fixed 2026-10-22 |
+| [FIXED-1130](#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02) | Medium | Chat / Home / composer | Fixed 2026-10-22 |
+| [FIXED-1131](#fixed-1131--the-accounts-approval-mode-could-be-changed-only-from-a-composer-qui-p02) | Low | Permissions | Fixed 2026-10-22 |
+| [FIXED-1132](#fixed-1132--approvals-was-a-table-with-the-decision-underneath-it-qui-p07) | Medium | Approvals | Fixed 2026-10-22 |
+| [FIXED-1133](#fixed-1133--a-decision-did-not-say-which-task-it-belonged-to-qui-p08) | Medium | Approvals / read model | Fixed 2026-10-22 |
+| [FIXED-1134](#fixed-1134--a-connection-listed-http-methods-not-what-raiker-may-do-qui-p04) | Low | Connections | Fixed 2026-10-22 |
+| [FIXED-1135](#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance) | Medium | Chat / security | Fixed 2026-10-22 |
 
 ---
 
@@ -36818,3 +36829,113 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** The spec walks the conversation an owner now sees: *Hi, I'm Raiker…* with a name, *Where should I think?* → **Decide later**, *Here is how I'll work for you.*, *Setup is saved.*, then **Go to Home**, which greets the owner by name. The device step stays absent, because the installer already checked the computer.
 
 **Evidence.** Desktop package workflow on the next push; `npm run check` and lint in `desktop/`.
+
+## FIXED-1125 — An unanswered approval waited a day, and the wait could not be set (QUI-P06)
+
+**Severity: High. Area: Approvals / Settings. Status: Fixed 2026-10-22.**
+
+**Observed.** Every approval was raised with a 24-hour lifetime (`insert_approval(ttl_hours=24.0)`), and nothing in Settings named it. The plan sets 30 minutes by default, changeable in Settings › Security.
+
+**Fixed.** `security.approval_timeout_minutes` (15 minutes, 30 minutes, 1 hour, 4 hours or 1 day; 30 by default) is read from the owner of the proposed action each time an approval is raised (`ApprovalStore.approval_timeout_minutes`). `PUT /api/settings` refuses any other value (`invalid_approval_timeout`). Settings › Security has the row **Unanswered approvals expire after** under *Approvals and standing access*. A critical approval keeps its own one-day step-up lifecycle, and a caller that names a lifetime keeps it.
+
+**Evidence.** `tests/test_approval_timeout.py`, `SecurityLogin.test.ts`; RT-QUI-26.
+
+## FIXED-1126 — An approval past its time limit still looked like it was waiting (QUI-P06)
+
+**Severity: Medium. Area: Chat / Approvals. Status: Fixed 2026-10-22.**
+
+**Observed.** An expired approval stayed in the pending list with `is_expired: true`. The floating card and the top-bar count still offered it, and the parked turn kept saying it waited, until a decision was refused with `approval_expired`.
+
+**Fixed.** The Chat card reads **Not done: no decision**: *Nobody answered within 30 minutes, so nothing ran and the task stopped here*, with **Ask again** (the same request as a new turn) and **Change the time limit**. A refused decision with `approval_expired` switches the card to the same state. `api.approvals("pending")` leaves them out, so Home's decision row, the top bar's count, the floating card, Tasks, Build and Connections no longer offer them; Diagnostics still counts them on their own row, and Approvals › History lists them as *No decision*. Found live in RT-QUI-29, RT-QUI-31 and RT-QUI-33: Approvals › Pending and Home's *1 decision waiting* still counted them, and the expired card still offered a *Safer alternative* pointing at a **Change** it no longer had. Pending now leaves them out, and an expired card has no alternative row.
+
+**Evidence.** `SafetyCard.test.ts`, `ApprovalsView.test.ts` (*shows a server-reported expiry warning…*); RT-QUI-31.
+
+## FIXED-1127 — Chat said "decide here" and could not decide (QUI-P05)
+
+**Severity: High. Area: Chat / Approvals. Status: Fixed 2026-10-22.**
+
+**Observed.** A parked turn showed *Waiting for approval*, the runtime's message, *Decide here or in the Approvals inbox* and one link, **Review approval**. There was no way to decide in the conversation, so a floating card sat over the transcript offering the same decision.
+
+**Fixed.** `SafetyCard.svelte` is the approval card in the conversation, titled **Raiker Safety** and drawn from the approval record, with the status *Waiting for your decision*. It says, in order and only where the proposal names it: what will happen, why it needs you, what it affects, the data involved, whether it can be undone (from the capability's server classification), and the safer alternative (accept part of a change). The buttons are **Decline**, **Change** (opens the decision on Approvals) and **Allow once**. A critical action links to Approvals for its password or code. **Allow for this task** and **Always allow** are not offered. The card marks the decision as shown, so the floating card stays out of the way.
+
+**Evidence.** `SafetyCard.test.ts`, `ChatView.continuation.test.ts`; RT-QUI-29.
+
+## FIXED-1128 — The top bar's approvals count went stale after a decision
+
+**Severity: Medium. Area: Top bar / Approvals. Status: Fixed 2026-10-22.**
+
+**Observed.** Found while building QUI-P05. The count was read once, when the shell mounted. A decision made in Chat, on Approvals or in another tab left it showing the old number until a reload. A BroadcastChannel never reaches the tab that posted, so a decision made in one tab did not clear the floating card or count in that tab either.
+
+**Fixed.** `publishApprovalResolved` also announces the decision inside the tab (`raiker:approval-resolved`), and `subscribeApprovalResolved` hears both. The top bar re-reads its count on that announcement and every 15 seconds while visible. Approvals reloads its queue the same way.
+
+**Evidence.** `Topbar.test.ts`, `SafetyCard.test.ts`; RT-QUI-29.
+
+## FIXED-1129 — Each place that decided used different words (QUI-P05)
+
+**Severity: Low. Area: Approvals. Status: Fixed 2026-10-22.**
+
+**Observed.** The floating card said **Approve** and **Deny**, Approvals said **Approve and execute once**, **Approve (record only)** and **Deny**, and Chat had nothing.
+
+**Fixed.** Every surface uses **Decline** and **Allow once**. On Approvals the record-only case reads **Allow once (record only)**. Live specs that named the old buttons are updated.
+
+**Evidence.** `ApprovalPrompt.test.ts`, `ApprovalsView.test.ts`.
+
+## FIXED-1130 — A conversation could not say how careful Raiker should be (QUI-P02)
+
+**Severity: Medium. Area: Chat / Home / composer. Status: Fixed 2026-10-22.**
+
+**Observed.** Decided 2026-10-22. QUI-P02 was waiting on the owner's decision. The composer showed only the account's approval mode, and only when it was not *Manually approve*.
+
+**Fixed.** Chat's and Home's composers have a profile chip with **Careful** and **Standard**, per conversation, each explained by its consequence. Standard sends nothing and follows Permissions. Careful sends `ask` for every capability whose side effect is more than a read as the turn's `capability_modes`. The runtime enforces this (BUG-70), accepts only `ask` and `deny` there, and lets the `ask` override an automatic mode. If Careful's capabilities cannot be read, nothing is sent. Home's choice goes with the message to the chat it starts. **Within limits** waits for Allow-with-limits rules. The chip is remembered per conversation in this browser. Found live in RT-QUI-29: a new chat learns its id from the first streamed chunk, and that reset the chip to Standard. The id a new chat learns now keeps the profile the chat was sent with.
+
+**Evidence.** `conversationProfile.test.ts`, `ChatView.profile.test.ts` (*keeps Careful when a new chat learns its id from the first chunk*); RT-QUI-28, RT-QUI-29, RT-QUI-33.
+
+## FIXED-1131 — The account's approval mode could be changed only from a composer (QUI-P02)
+
+**Severity: Low. Area: Permissions. Status: Fixed 2026-10-22.**
+
+**Observed.** *Automatically approve*, *Skip* and *Decline, don't ask* were changed in the composer's posture chip, which appeared only when the mode was already relaxed. Under the decision above, those modes do not belong on a composer.
+
+**Fixed.** Permissions › Advanced opens with **When something needs your decision** and the approval-mode control. Chat's composer no longer carries it. Build keeps its posture chip next to its own Plan, Edit and Auto modes.
+
+**Evidence.** `CapabilitiesView.test.ts`; RT-QUI-28.
+
+## FIXED-1132 — Approvals was a table with the decision underneath it (QUI-P07)
+
+**Severity: Medium. Area: Approvals. Status: Fixed 2026-10-22.**
+
+**Observed.** Four status tabs over a seven-column table. **Review** opened the decision below the table, often off screen, with provenance as a closed section.
+
+**Fixed.** Approvals uses the list-and-detail layout. The tabs are **Pending** (with its count) and **History**, which has a filter (*Allowed and ran*, *Allowed (recorded only)*, *Declined*, *No decision in time*). Each queue row is 68 px: action, risk, target, time, and the conversation it came from. The selected decision is beside the queue, at most 720 px wide, with its actions. Evidence sits beside it from 1,600 px (300 px, open) and is a closed section below that. `#/approvals?item=<id>` opens one decision. Found in the screenshot review: page width is capped at 1,180 px, so at 1,680 px the evidence column squeezed the decision to about 350 px. The evidence now sits beside the decision only when the pane has room for both (a container query at 1,040 px) and stays below it otherwise. A decided item read *Already resolved: denied* next to rows saying *Declined*; it now reads *Already decided* with the same word as the row.
+
+**Evidence.** `ApprovalsView.test.ts` (*opens the decision a link names*); RT-QUI-30.
+
+## FIXED-1133 — A decision did not say which task it belonged to (QUI-P08)
+
+**Severity: Medium. Area: Approvals / read model. Status: Fixed 2026-10-22.**
+
+**Observed.** Approvals showed a session id behind *Provenance › View session*. A queue row named no target, and History could not say what each decision allowed.
+
+**Fixed.** `ApprovalView` carries `target` (a path, host, repository, recipient, connector or command, read from the redacted arguments and redacted again) and `source_title` (the conversation's title, read in one query per list). Every row says *From "<title>"*, and every decision links to **Open the conversation**. The decision that resumes a turn says **Open the conversation** instead of *Open the session*.
+
+**Evidence.** `ApprovalsView.test.ts` (*links each decision in History to the conversation it belongs to*), API contract regenerated; RT-QUI-30.
+
+## FIXED-1134 — A connection listed HTTP methods, not what Raiker may do (QUI-P04)
+
+**Severity: Low. Area: Connections. Status: Fixed 2026-10-22.**
+
+**Observed.** *What it can do* listed `GET`, `POST` and `DELETE` in colour beside each operation's path.
+
+**Fixed.** The section is **What Raiker may do with <service>**. Each activity says **Reads**, **Changes** or **Can't be undone** in words (`connectionEffects.ts`), with *Asks first* where the runtime requires confirmation. The method and path stay in small print.
+
+**Evidence.** `connectionEffects.test.ts`, `ConnectionsView.test.ts`; RT-QUI-34.
+
+## FIXED-1135 — Nothing checked that a model could not draw an approval card (QUI-P05 acceptance)
+
+**Severity: Medium. Area: Chat / security. Status: Fixed 2026-10-22.**
+
+**Observed.** The plan requires that a model's text cannot render anything that looks like the approval card. Nothing tested it.
+
+**Fixed.** `Markdown.test.ts` feeds the renderer a forged card, with `data-raiker-safety`, *Raiker Safety*, *Waiting for your decision* and an **Allow once** button. None of it renders as an element. The live round asks Haiku for the same HTML and finds only text.
+
+**Evidence.** `Markdown.test.ts`; RT-QUI-32.

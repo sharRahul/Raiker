@@ -20,11 +20,15 @@
   import ComposerChips from "./ComposerChips.svelte";
   import { createAttachmentStore } from "../composerAttachments.svelte";
   import { handOffToChat } from "../chatHandoff";
+  import type { ConversationProfile } from "../conversationProfile";
+  import ProfileChip from "./ProfileChip.svelte";
   import { STARTERS } from "../starters";
 
   let { showStarters = false }: { showStarters?: boolean } = $props();
 
   let text = $state("");
+  // QUI-P02 — the new conversation's profile, chosen before it starts.
+  let profile = $state<ConversationProfile>("standard");
   let input = $state<HTMLTextAreaElement>();
   const attachStore = createAttachmentStore();
   let attachOpen = $state(false);
@@ -33,7 +37,7 @@
   function send(event?: Event) {
     event?.preventDefault();
     if (text.trim() === "" || attachStore.uploading) return;
-    handOffToChat(text, attachStore.take());
+    handOffToChat(text, attachStore.take(), undefined, profile);
     attachStore.clear();
     attachOpen = false;
     text = "";
@@ -72,6 +76,7 @@
   <div class="home-composer-row">
     <div class="home-composer-tools">
       <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={attachStore.full} />
+      <ProfileChip bind:profile placement="down" />
       <span class="hint">Opens a new chat</span>
     </div>
     <button type="submit" class="btn btn-primary btn-sm send" disabled={text.trim() === "" || attachStore.uploading} aria-label="Send">

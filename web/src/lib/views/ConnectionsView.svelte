@@ -23,7 +23,8 @@
   import GitHubConnection from "./settings/GitHubConnection.svelte";
   import { api, ApiError } from "../api";
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
-  import { relativeTime } from "../format";
+  import { humanize, relativeTime } from "../format";
+  import { operationEffect } from "../connectionEffects";
   import { itemFromHash } from "../listDetail";
   import {
     connectionBlockedCopy,
@@ -355,22 +356,27 @@
           </section>
 
           <section>
-            <h3>What it can do</h3>
+            <!-- QUI-P04 — what Raiker may do with this service, in words: each
+                 activity says whether it reads, changes or can't be undone,
+                 and whether it asks first. The HTTP detail stays one click
+                 away for whoever needs it. -->
+            <h3>What Raiker may do with {connector.display_name}</h3>
             {#if connector.operations.length > 0}
               <ul class="operations">
                 {#each connector.operations as operation (operation.operation_id)}
+                  {@const effect = operationEffect(operation.method)}
                   <li>
-                    <span class:write={operation.requires_confirmation} class="method">{operation.method}</span>
+                    <span class="effect" data-effect={effect.id}>{effect.label}</span>
                     <span class="operation-copy">
-                      <strong>{operation.description || operation.operation_id}</strong>
-                      <small>{operation.path}</small>
+                      <strong>{operation.description || humanize(operation.operation_id)}</strong>
+                      <small title={`${operation.method} ${operation.path}`}>{operation.method} {operation.path}</small>
                     </span>
                     {#if operation.requires_confirmation}<span class="pill">Asks first</span>{/if}
                   </li>
                 {/each}
               </ul>
             {:else}
-              <p>No operations are registered yet. Import its manifest to add them.</p>
+              <p>No activities are registered yet. Import its manifest to add them.</p>
             {/if}
           </section>
 
@@ -640,13 +646,18 @@
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
   }
-  .method {
-    min-width: 3rem;
-    color: var(--ok);
-    font: 700 var(--text-2xs) var(--font-mono);
+  /* Said in words, never by colour alone (Quiet UI principle 6). */
+  .effect {
+    min-width: 6.5rem;
+    color: var(--text-2);
+    font-size: var(--text-2xs);
+    font-weight: 650;
   }
-  .method.write {
-    color: var(--warn);
+  .effect[data-effect="changes"] {
+    color: var(--warn-text, var(--warn));
+  }
+  .effect[data-effect="permanent"] {
+    color: var(--danger);
   }
   .operation-copy strong,
   .operation-copy small {

@@ -21,6 +21,18 @@ from raiker.contracts.models import ApprovalRelayRecord, ToolAction
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
+#: QUI-P06 — how long an unanswered approval waits before it expires, in
+#: minutes, and the choices Settings › Security offers. Thirty minutes by
+#: default: an approval nobody answers never proceeds on its own, so a short
+#: wait costs a re-ask, while a long one leaves a stale decision open.
+APPROVAL_TIMEOUT_SETTING = "security.approval_timeout_minutes"
+DEFAULT_APPROVAL_TIMEOUT_MINUTES = 30
+APPROVAL_TIMEOUT_CHOICES = frozenset({15, 30, 60, 240, 1440})
+
+#: Stands in for "the owner's own time limit" as ``insert_approval``'s default,
+#: so a caller that names a lifetime (tests, the critical lifecycle) keeps it.
+OWNER_TIMEOUT: float = -1.0
+
 
 class ApprovalStore:
 
@@ -211,9 +223,13 @@ class ApprovalStore:
         action: ToolAction | str,
         status: str = "pending",
         *,
-        ttl_hours: float | None = 24.0,
+        ttl_hours: float | None = OWNER_TIMEOUT,
         critical: bool = False,
     ) -> None:
+        if ttl_hours == OWNER_TIMEOUT:
+            # A critical approval keeps its step-up lifecycle's own day: it is
+            # answered with a password or code in the inbox, not in passing.
+            ttl_hours = 24.0 if critical else self._owner_approval_ttl_hours(action)
         if isinstance(action, ToolAction):
             action_id = action.action_id
             payload_hash = self.tool_action_payload_sha256(
@@ -257,6 +273,33 @@ class ApprovalStore:
                 1 if critical else 0,
             ),
         )
+
+    def approval_timeout_minutes(self: SQLiteStore, principal_id: str) -> int:
+        """The owner's approval time limit (QUI-P06), or the default."""
+        row = self.get_user_settings(principal_id) if principal_id else None
+        if row is None:
+            return DEFAULT_APPROVAL_TIMEOUT_MINUTES
+        try:
+            settings = json.loads(str(row["settings_json"]))
+        except (ValueError, TypeError):
+            return DEFAULT_APPROVAL_TIMEOUT_MINUTES
+        value = settings.get(APPROVAL_TIMEOUT_SETTING) if isinstance(settings, dict) else None
+        if isinstance(value, bool) or not isinstance(value, int) or value not in APPROVAL_TIMEOUT_CHOICES:
+            return DEFAULT_APPROVAL_TIMEOUT_MINUTES
+        return value
+
+    def _owner_approval_ttl_hours(self: SQLiteStore, action: ToolAction | str) -> float:
+        """The time limit of whoever owns the proposed action."""
+        if isinstance(action, ToolAction):
+            row = self.load_tool_action(action.action_id)
+            fallback = action.proposed_by or ""
+        else:
+            row = self.load_tool_action(action)
+            fallback = ""
+        owner = ""
+        if row is not None:
+            owner = str(row.get("owner_principal_id") or row.get("proposed_by") or "")
+        return self.approval_timeout_minutes(owner or fallback) / 60.0
 
     def expire_approval(self: SQLiteStore, approval_id: str) -> bool:
         """Resolve a still-pending approval to ``expired``.

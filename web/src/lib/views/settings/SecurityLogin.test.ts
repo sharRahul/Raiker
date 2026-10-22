@@ -40,6 +40,30 @@ async function openRow(label: string, action: string | RegExp) {
 }
 
 describe("Security settings", () => {
+  // QUI-P06 — how long an unanswered approval waits, in force and changeable.
+  it("shows the approval time limit, 30 minutes by default, and saves a new one", async () => {
+    let saved: Record<string, unknown> | null = null;
+    stub({
+      "GET /api/settings": () => ({
+        settings: {},
+        revision: "r1",
+        status: { vault: "ok", mfa_enrolled: false, username: "alice" },
+      }),
+      "PUT /api/settings": (init) => {
+        saved = JSON.parse(String(init?.body ?? "{}"));
+        return { settings: {}, revision: "r2", merged_keys: [] };
+      },
+    });
+    render(SecurityLogin);
+    const select = await screen.findByRole("combobox", { name: "Unanswered approvals expire after" });
+    await waitFor(() => expect(select).toHaveValue("30"));
+    await fireEvent.change(select, { target: { value: "60" } });
+    await waitFor(() => expect(saved).not.toBeNull());
+    expect((saved as unknown as { settings: Record<string, unknown> }).settings).toMatchObject({
+      "security.approval_timeout_minutes": 60,
+    });
+  });
+
   it("is a list of rows, each with its value and one action", async () => {
     stub({
       "GET /api/settings": () => ({ settings: {}, status: { vault: "missing", mfa_enrolled: false, username: "alice" } }),

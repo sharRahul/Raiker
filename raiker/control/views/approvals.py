@@ -39,6 +39,12 @@ class ApprovalView(View):
     # owner two more decisions are queued behind this one on the same turn.
     queue_position: int = 1
     queue_total: int = 1
+    # QUI-P07 — what the action reaches (a path, a host, a repository or a
+    # recipient), read off its redacted arguments; empty when it names none.
+    target: str = ""
+    # QUI-P07 / QUI-P08 — the conversation that raised it, by its title, so a
+    # queue row and a History entry name the task they belong to.
+    source_title: str = ""
 
 
 #: How an approval card renders what it is asking about.

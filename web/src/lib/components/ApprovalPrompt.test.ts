@@ -32,6 +32,8 @@ function approval(partial: Partial<ApprovalView> = {}): ApprovalView {
     requires_approval: true,
     expires_at: null,
     is_expired: false,
+    target: "",
+    source_title: "",
     proposed_by: {
       principal_id: "prin_agent",
       principal_type: "ai_agent",
@@ -67,7 +69,7 @@ it("announces a pending decision on whatever page is open and resolves it there"
   expect(await screen.findByText("Approval needed")).toBeInTheDocument();
   expect(screen.getByText("Write file")).toBeInTheDocument();
 
-  await fireEvent.click(screen.getByRole("button", { name: /Approve/ }));
+  await fireEvent.click(screen.getByRole("button", { name: /Allow once/ }));
   await waitFor(() =>
     expect(resolve).toHaveBeenCalledWith("ap_1", {
       approve: true,
@@ -81,7 +83,7 @@ it("sends a critical decision to the inbox instead of answering it here", async 
   render(ApprovalPrompt);
 
   expect(await screen.findByText(/needs your password/)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Allow once/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Review" })).toBeInTheDocument();
 });
 

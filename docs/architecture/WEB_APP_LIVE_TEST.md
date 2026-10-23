@@ -15,6 +15,34 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-23 (Quiet UI visual answers, hosted Anthropic Haiku 4.5)
+
+The visual answers of the [Quiet UI plan](../plans/quiet-ui/04_VISUAL_ANSWERS.md#status)
+([FIXED-1136](../plans/FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04)
+to [FIXED-1149](../plans/FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review)).
+Fresh workspaces served by `raiker-web` at 1440×900. Anthropic was connected
+through **Add model**, with the key and workspace ID typed from the run's
+environment; neither appears in a spec, command, document, screenshot or the
+server log. Spec: `web/e2e/quiet-ui-visual-answers-live.spec.ts`, developed
+against two workspaces, then run whole on a third fresh workspace: **9/9 in
+3.6 min**. Most cases ask the model to send back blocks the spec wrote, so they
+check Raiker's validation and drawing rather than what a model chooses;
+RT-QUI-37 and RT-QUI-43 let the model choose.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-35 | Anthropic connects through **Add model → An account I have**, Haiku 4.5 kept and made the default | ✅ |
+| RT-QUI-36 | **Settings → General → Answers**: *Answer style* reads *Auto*; *Visual where it helps* is kept across a reload | ✅ |
+| RT-QUI-37 | Asked to compare three laptops from figures given in the prompt, Haiku answers with key figures, a comparison and a verdict callout; Raiker marks *Best* on 18 h, 1.09 kg and £999 — three marks, none chosen by the model. Above three blocks the answer offers **Create document** | ✅ after fixes found in this round ([FIXED-1148](../plans/FIXED_ITEMS.md#fixed-1148--a-block-whose-json-opened-on-the-fence-line-was-drawn-as-code-qui-a-rules), FIXED-1136, FIXED-1144): blocks with their JSON on the fence line were drawn as code, then refused as one invalid block; prices read *999 £*; the comparison came without a source and was shown as text until the instructions said how to cite figures the user gave; key figures came as three blocks until they said *all in one block* |
+| RT-QUI-38 | Key figures (*≈ estimate*, *Source: …*), a measure (*31 of 40*, a `<meter>` named *Checks passed: 31 of 40*), a warning callout, pros and cons (*Pros*, *Cons*) and three steps on the path line | ✅ |
+| RT-QUI-39 | Horizontal bars, 100% stacked bars and a scatter draw; **Table** shows the stacked shares (*60%*) and **Chart** brings the drawing back; **CSV** downloads `battery-life.csv` with *ThinkPad X1 Carbon,15*; **PNG** downloads a real PNG; **Show as text** reads *MacBook Air 13 · 18*; **Copy** says *Copied* and the clipboard holds the rows | ✅ after a fix found in the screenshot review ([FIXED-1149](../plans/FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review)): charts rendered at about 6 px text and the legend had no colours |
+| RT-QUI-40 | Figures with no source read *Longest battery: 18 h (MacBook Air 13)* with *No source was given for these numbers, so Raiker shows them as text*; a figure with no unit is **Not rendered** with *figures_unit_missing*; the prose either side survives | ✅ |
+| RT-QUI-41 | Four blocks: *This answer has 4 blocks* with **Create document**, which puts *…into a document I can keep* in the composer without sending it | ✅ |
+| RT-QUI-42 | **Export conversation → Markdown** carries the comparison as a table with *18 — Best*, and no `raiker:compare` fence in Raiker's section | ✅ |
+| RT-QUI-43 | On *Mostly text*, a question with three comparable weights is answered in prose with no block | ✅ after a fix found in this round (FIXED-1145): Haiku drew a comparison until the style sentence said it overrides the general guidance |
+| Suites | Python suite (3 workers), `tests/test_visual_answers.py`; web unit suite, `svelte-check`, ESLint, design tokens, build; ruff, mypy | ✅ |
+| Visual review | `docs/screenshots/2026-10-23-quiet-ui-visual-answers/` (36–43), inspected at original resolution; FIXED-1149 was found from the images. Still seen: the Plan card covers the *Completed · N steps* line ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-23-quiet-ui-visual-answers-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-22 (Quiet UI permissions and approvals, hosted Anthropic Haiku 4.5)
 
 The approvals round of the [Quiet UI plan](../plans/quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)

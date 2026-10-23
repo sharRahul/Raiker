@@ -1377,6 +1377,16 @@
   }
 
   /**
+   * Quiet UI 04 — an answer of more than three blocks offers *Create
+   * document*. It puts the request in the composer rather than sending it: the
+   * document is written by the governed `create_document` tool on a turn the
+   * owner chose to send, never by the offer itself.
+   */
+  function documentFromAnswer() {
+    editPrompt("Put your last answer, with its figures, comparisons and charts, into a document I can keep.");
+  }
+
+  /**
    * Send the same prompt again, unchanged, as a new turn.
    *
    * BUG-306 — **Retry** looked identical whether the first attempt had done
@@ -2243,6 +2253,7 @@
                 parts={turn.response?.content_parts ?? []}
                 citations={renderableCitations(turnSourceList)}
                 oncite={(sourceId) => inspector.openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
+                ondocument={turn.streaming ? undefined : documentFromAnswer}
               />
             </div>
             {#if !turn.streaming}
@@ -3021,6 +3032,14 @@
     color: var(--text-1);
     border: 1px solid var(--border);
     border-bottom-left-radius: 0.35rem;
+  }
+  /* Quiet UI 04 — a chart is drawn to a 640-unit box and scaled to fit. In a
+     bubble that shrinks to its content it was scaled down until its labels
+     could not be read, so a bubble holding a chart, comparison or key figures
+     and its group take the group's full width (still capped at 48rem). */
+  .message-group-raiker:has(:global(.answer-block:is([data-block="chart"], [data-block="compare"], [data-block="figures"]))),
+  .message-bubble-raiker:has(:global(.answer-block:is([data-block="chart"], [data-block="compare"], [data-block="figures"]))) {
+    align-self: stretch;
   }
   .streaming-label {
     display: flex;

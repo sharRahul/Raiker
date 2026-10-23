@@ -225,32 +225,54 @@ Raiker. Nothing is fetched to colour a keyword, and a code block can never
 execute — the renderer escapes every character of model output before it emits
 any markup.
 
-### Tables and charts
+### Tables, charts and other answer blocks
 
-Some of a reply is not prose. When part of an answer is genuinely a table or a
-series to plot, Raiker asks the model to **declare** it rather than describe it,
-and renders what comes back as the thing it says it is.
+Some of a reply is not prose. When part of an answer is genuinely a table, a
+series to plot or a set of numbers to compare, Raiker asks the model to
+**declare** it rather than describe it, and renders what comes back as the thing
+it says it is. The model sends numbers; Raiker draws them.
 
-A declared table is a real table. It has a caption, states its row count, and
-**sorts by any column** — click a heading once for ascending, twice for
-descending, and a third time to get the model's own order back. A screen reader
-announces it as a table and reads the sort direction with it, which a paragraph
-that merely looks like a table cannot do.
+| Block | Used for |
+|---|---|
+| **Table** | Several items by several attributes. Sorts by any column — once ascending, twice descending, a third time back to the model's order. |
+| **Chart** | Bar, line or area; **horizontal bars** for rankings with long names; **100% stacked bars** for parts of a whole (there is no pie); **scatter** for two measures at once. Every bar starts at zero. |
+| **Key figures** | Up to four headline numbers, each with its unit and what it is of. |
+| **Comparison** | Items side by side, one row per criterion. Where a row says whether higher or lower is better, **Raiker** marks the best value with the word *Best* — the model never picks the winner. |
+| **Measure** | One value on a known scale, such as *31 of 40* checks. |
+| **Callout** | One *Verdict*, *Warning* or *Next step*. |
+| **Pros and cons** | Two short lists per option. |
+| **Steps** | An ordered or dated sequence, on a thin path line. |
 
-A declared chart is drawn as a bar, line or area chart on your machine — no
-library is fetched and nothing leaves — and **the numbers are always underneath
-it**, one fold down, as an ordinary table. Colour and geometry are not a channel
-everyone has, so the chart is never the only way to read the answer. The vertical
-axis always includes zero, so a difference cannot be exaggerated by the choice of
-scale.
+**Every number has a unit, and numbers need a source.** A guess says *≈
+estimate* beside it. Key figures, measures and comparisons that give no source
+for their numbers are shown as plain text, with a line saying so, rather than
+drawn as figures that look checked.
+
+**Every block has a toolbar**, quiet until you point at it: **Chart · Table**
+switches a chart to the numbers behind it, **Show as text** turns any block into
+sentences, **Copy** copies that text, **CSV** downloads a table, chart, figures
+or comparison, and **PNG** saves a chart as an image. All of it happens on your
+machine; nothing is fetched and nothing leaves. A screen reader always reaches
+every number, because a chart keeps its table in the page.
+
+**At most three blocks** in an answer, unless you asked for a report. When an
+answer has more, it offers **Create document**, which puts that request in the
+composer for you to send — the document is written by the ordinary, governed
+document tool, never by the offer.
+
+**Answer style** in **Settings → General → Answers** sets how often blocks are
+used: *Auto*, *Mostly text* (blocks only when you ask for one) or *Visual where
+it helps*. It changes how answers are presented and nothing Raiker may do.
 
 Raiker checks a declared block before it draws it, on the same terms as anything
 else a model proposes: bounded in size, every row the width of its columns, every
-series the length of its labels, every plotted value a real number. A block that
-does not meet that is **shown as refused**, with the reason, rather than quietly
-repaired or dropped — a row is never padded with a cell nobody wrote, and a
-section of an answer never disappears because the model made a formatting
-mistake.
+series the length of its labels, every plotted value a real number, every value
+on its own scale. A block that does not meet that is **shown as refused**, with
+the reason, rather than quietly repaired or dropped — a row is never padded with
+a cell nobody wrote, and a section of an answer never disappears because the
+model made a formatting mistake. A model running on your computer is asked once
+to correct a refused block before the answer stands; a hosted model is not asked
+again, because that would be a second paid call you did not choose.
 
 An ordinary Markdown table in a reply is still an ordinary Markdown table.
 Raiker does not promote one to a sortable table, because that would be guessing,
@@ -386,7 +408,10 @@ renders it as the thing it is: a real table in the HTML page, a Markdown table
 you can paste anywhere, and a page-width table in the PDF. A chart is exported as
 the numbers behind it, with its kind and caption stated — the series is what you
 need when you file a transcript or send it on, and a second drawing of it could
-disagree with the one you were looking at.
+disagree with the one you were looking at. Key figures and comparisons are
+exported as tables too, with *Best* in the cell Raiker marked; a callout, pros
+and cons, steps and a measure are exported as the same text **Show as text**
+gives.
 
 **Print / Save as PDF** uses your browser's own print dialog against a dedicated
 print layout: the sidebar, topbar, composer, and controls are dropped, and a turn

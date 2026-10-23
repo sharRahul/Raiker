@@ -15,7 +15,7 @@ from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal, require_human
 from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.redaction import redact_response_body
-from raiker.api.routes_settings import load_composer_approval_mode
+from raiker.api.routes_settings import load_answer_style, load_composer_approval_mode
 from raiker.api.schemas import InterruptRequest, PromptRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.sessions import (
@@ -176,6 +176,11 @@ def _build_envelope(
             body.max_tool_calls if body.max_tool_calls is not None else DEFAULT_MAX_TOOL_CALLS
         ),
         capability_modes=body.capability_modes or {},
+        answer_style=(
+            body.answer_style
+            if body.answer_style is not None
+            else load_answer_style(workspace, principal_id) if workspace is not None else "auto"
+        ),
     )
     client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)
     metadata: dict[str, Any] = {

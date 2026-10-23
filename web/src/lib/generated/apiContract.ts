@@ -1552,7 +1552,7 @@ export type ContainmentCapability = {
 
 /** One declared piece of a turn's answer. */
 export type ContentPart = {
-  type: "text" | "table" | "chart" | "refused";
+  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps";
   text: string;
   data: Record<string, unknown>;
   reason_code: string;
@@ -1560,7 +1560,7 @@ export type ContentPart = {
 
 /** One declared piece of a turn's answer, as ``raiker.runtime.typed_parts`` serialises it. */
 export type ContentPartView = {
-  type: "text" | "table" | "chart" | "refused";
+  type: "text" | "table" | "chart" | "refused" | "figures" | "compare" | "measure" | "callout" | "proscons" | "steps";
   text: string;
   data: Record<string, unknown>;
   reason_code: string;
@@ -4929,6 +4929,7 @@ export type PromptRequest = {
   reasoning_effort?: string | null;
   max_tool_calls?: number | null;
   capability_modes?: Record<string, string> | null;
+  answer_style?: string | null;
   attachments?: Record<string, unknown>[] | null;
   client_type?: string | null;
 };

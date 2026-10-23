@@ -217,11 +217,32 @@ _SYSTEM_PROMPT = (
     "When part of your answer is genuinely tabular or a series to plot, declare it rather than "
     "describing it: a ```raiker:table fence containing "
     '{"caption": …, "columns": [...], "rows": [[...], ...]}, or a ```raiker:chart fence '
-    'containing {"kind": "bar"|"line"|"area", "caption": …, "y_label": …, "labels": [...], '
-    '"series": [{"name": …, "values": [...]}]}. Rows must be the width of the columns and every '
-    "series must be the length of the labels. Raiker renders these as a real table or chart; "
-    "anything malformed is shown to the user as refused, so send the shape only when you have the "
-    "data for it, and write ordinary prose the rest of the time. "
+    'containing {"kind": "bar"|"hbar"|"line"|"area"|"stacked"|"scatter", "caption": …, '
+    '"y_label": …, "labels": [...], "series": [{"name": …, "values": [...]}]}. Rows must be the '
+    "width of the columns and every series must be the length of the labels. Use hbar for "
+    "rankings with long names, stacked for parts of a whole (never a pie), and scatter for two "
+    "measures at once (exactly two series: x first, then y; labels name the points). "
+    # QUI-A04 to A07 — the rest of the vocabulary, with the two rules that keep
+    # numbers honest: every figure has a unit, and numbers need a source.
+    "Other blocks: ```raiker:figures "
+    '{"items": [{"label": …, "value": 18, "unit": "h", "of": …, "estimate": false}], '
+    '"source": …} for up to four headline numbers, all in one block; ```raiker:compare '
+    '{"caption": …, "items": [...], "rows": [{"label": …, "unit": …, "better": "higher"|"lower", '
+    '"values": [...]}], "source": …} to compare items (Raiker marks the best value itself from '
+    '`better`; never claim a winner yourself); ```raiker:measure {"label": …, "value": …, '
+    '"max": …, "unit": …, "source": …} for one value on a known scale; ```raiker:callout '
+    '{"tone": "verdict"|"warning"|"action", "text": …} for one verdict, warning or next step; '
+    '```raiker:proscons {"options": [{"name": …, "pros": [...], "cons": [...]}]}; and '
+    '```raiker:steps {"steps": [{"label": …, "when": …, "text": …}]} for an ordered or dated '
+    "sequence. Every figure needs a unit; mark guesses with \"estimate\": true; always say where "
+    "numbers came from in \"source\" on figures, compare and measure blocks (\"Figures you "
+    "gave in this conversation\" when the user supplied them, a site and the date checked, or "
+    "this workspace's own records), because numbers without a source are shown as plain text. Do not visualise fewer than "
+    "three values, values that cannot be compared, or opinions and explanations: write prose, "
+    "with a callout at most. Use at most three blocks in one answer unless the user asked for a "
+    "report. Raiker renders these itself; anything malformed is shown to the user as refused, so "
+    "send a block only when you have the data for it, and write ordinary prose the rest of the "
+    "time. "
     # Tell the model which question it is answering: a table or chart asked for
     # in the answer is a typed part, not a file written with `create_document`.
     "These blocks are how you answer *in the conversation*. Use `create_document` only when the "
@@ -316,18 +337,43 @@ _DESIGN_RESEARCH_PROMPT = (
 )
 
 
-def _system_messages(surface: str) -> list[str]:
+#: QUI-A rules — the owner's Answer style, as the one sentence that changes.
+#: "auto" adds nothing: the standing guidance above already says when to draw.
+_ANSWER_STYLE_PROMPTS = {
+    "text": (
+        "Answer style: mostly text. The user chose this, and it overrides the guidance above on "
+        "when to declare blocks: answer in prose, and send no raiker: block unless this message "
+        "asks by name for a table, chart, figures or comparison."
+    ),
+    "visual": (
+        "Answer style: visual where it helps. When your answer compares items or reports "
+        "three or more comparable numbers, prefer the raiker: blocks over prose for that part, "
+        "still at most three blocks, and never two blocks that show the same numbers."
+    ),
+}
+
+
+#: Providers that run on the owner's computer: the small models that get one
+#: corrected-block retry (04, Rules). Hosted providers do not.
+LOCAL_ANSWER_PROVIDERS = frozenset(
+    {"ollama", "lm-studio", "lm_studio", "llama.cpp", "mlx", "vllm", "local_gguf"}
+)
+
+
+def _system_messages(surface: str, answer_style: str = "auto") -> list[str]:
     """The standing instructions for one turn, chosen by composer surface.
 
     Chat, Build and Design share the same runtime, the same tools and the same
     governance. What differs is the expected working method, so that - and only
-    that - is what the surface selects.
+    that - is what the surface selects. The answer style adds one sentence about
+    presentation, never about authority.
     """
+    style = [_ANSWER_STYLE_PROMPTS[answer_style]] if answer_style in _ANSWER_STYLE_PROMPTS else []
     if surface == "build":
-        return [_SYSTEM_PROMPT, _BUILD_PROCESS_PROMPT]
+        return [_SYSTEM_PROMPT, _BUILD_PROCESS_PROMPT, *style]
     if surface == "design":
-        return [_SYSTEM_PROMPT, _DESIGN_RESEARCH_PROMPT]
-    return [_SYSTEM_PROMPT]
+        return [_SYSTEM_PROMPT, _DESIGN_RESEARCH_PROMPT, *style]
+    return [_SYSTEM_PROMPT, *style]
 
 
 def _queued_call_message(proposal: ToolCallProposal) -> ModelMessage:
@@ -755,6 +801,7 @@ class RuntimeOrchestrator:
                     # parked in Plan mode resumes in Plan mode rather than
                     # picking up whatever the standing modes say hours later.
                     "capability_modes": dict(envelope.options.capability_modes),
+                    "answer_style": envelope.options.answer_style,
                 }),
                 "client_json": json.dumps({
                     "type": envelope.client.type,
@@ -1706,6 +1753,36 @@ class RuntimeOrchestrator:
         self._event(envelope, "verification_completed", result.event_payload())
         return result
 
+    def _block_retry_prompt(self, envelope: PromptEnvelope, text: str) -> str | None:
+        """The one correction a small local model is asked for, or ``None``.
+
+        Small local models are the ones that most often send a ``raiker:``
+        block the runtime refuses (04, Rules). They are asked once, with the
+        reasons, for the same answer with the block corrected or written as
+        prose; whatever comes back is the answer, refusals still visible. A
+        hosted model is not asked again: its refusals are rare, and a second
+        paid call to fix one is not the owner's choice to have made.
+        """
+        from raiker.runtime.typed_parts import PART_REFUSED, content_parts
+
+        reasons = [
+            part.reason_code
+            for part in content_parts(text)
+            if part.type == PART_REFUSED and part.reason_code != "too_many_parts"
+        ]
+        if not reasons:
+            return None
+        provider = self._turn_provider(envelope)[0]
+        if provider not in LOCAL_ANSWER_PROVIDERS:
+            return None
+        self._event(envelope, "typed_block_retry", {"reasons": reasons[:12], "provider": provider})
+        return (
+            "Raiker could not draw a raiker: block in your last answer ("
+            + ", ".join(sorted(set(reasons)))
+            + "). Send the whole answer again with that block corrected to the documented "
+            "shape, or write that part as ordinary prose instead. Do not mention this request."
+        )
+
     def _turn_provider(self, envelope: PromptEnvelope) -> tuple[str, str]:
         requested = envelope.options.model_profile
         requested_model = envelope.options.model or None
@@ -2469,7 +2546,8 @@ class RuntimeOrchestrator:
             *(
                 ModelMessage(role="system", content=text)
                 for text in _system_messages(
-                    str(envelope.prompt.metadata.get("surface", "chat"))
+                    str(envelope.prompt.metadata.get("surface", "chat")),
+                    envelope.options.answer_style,
                 )
             ),
             # RR-IDENTITY-01 — who this turn is for. Ahead of the workspace
@@ -2909,6 +2987,9 @@ class RuntimeOrchestrator:
         # message and Markdown's paragraph boundary is what separates two of
         # them. Empty rounds contribute nothing.
         answer_segments: list[str] = []
+        # QUI-A rules — a local model gets one chance to correct a block the
+        # runtime refused, and then the answer stands as it is.
+        block_retry_used = False
 
         def answer_so_far() -> str:
             return "\n\n".join(part for part in (text.strip() for text in answer_segments) if part)
@@ -3161,6 +3242,12 @@ class RuntimeOrchestrator:
                 )
                 break
             if not response.tool_calls:
+                retry = None if block_retry_used else self._block_retry_prompt(envelope, response.text)
+                if retry is not None:
+                    block_retry_used = True
+                    messages.append(ModelMessage(role="assistant", content=response.text))
+                    messages.append(ModelMessage(role="user", content=retry))
+                    continue
                 answer_segments.append(response.text)
                 final_text = answer_so_far()
                 break

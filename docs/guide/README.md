@@ -34,6 +34,7 @@ If this is your first time using Raiker, read these pages in order:
 | Goal | Guide |
 |---|---|
 | Have conversations, attach files, use memory, and review approvals | [Working in Chat](working-in-chat.md) |
+| Read answers drawn as figures, comparisons and charts, and choose how often | [Answer blocks](working-in-chat.md#tables-charts-and-other-answer-blocks) |
 | Understand capture, approval, recall, retention, correction, forget, and purge | [How Raiker memory works](memory.md) |
 | Plan and change code, run commands, commit, and push | [Working in Build](working-in-build.md) |
 | Use personal context, outcome requests and current background workflows | [Personal-agent workflow](tasks-and-projects.md#using-raiker-as-a-personal-agent) |

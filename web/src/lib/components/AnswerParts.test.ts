@@ -140,3 +140,138 @@ describe("a block Raiker would not accept", () => {
     expect(screen.getByText("After.")).toBeInTheDocument();
   });
 });
+
+// ── Quiet UI 04: the visual answer vocabulary ──────────────────────────────
+
+const FIGURES: ContentPart = part({
+  type: "figures",
+  data: {
+    caption: "",
+    items: [
+      { label: "Longest battery", value: 18, unit: "h", of: "MacBook Air", estimate: false },
+      { label: "Lightest", value: 1.09, unit: "kg", of: "X1 Carbon", estimate: true },
+    ],
+    source: "Spec pages, checked 23 Oct 2026",
+    estimate: false,
+  },
+});
+
+const COMPARE: ContentPart = part({
+  type: "compare",
+  data: {
+    caption: "Laptops",
+    items: ["Air", "XPS", "X1"],
+    rows: [
+      { label: "Battery", unit: "h", better: "higher", values: [18, 13, 15], best: [0] },
+      { label: "Ports", unit: "", better: "", values: ["USB-C", "USB-C", "HDMI"], best: [] },
+    ],
+    source: "Spec pages",
+    estimate: false,
+  },
+});
+
+describe("key figures (QUI-A04)", () => {
+  it("reads each label with its value, unit, owner and source", () => {
+    render(AnswerParts, { text: "", parts: [FIGURES] });
+    expect(screen.getByText("Longest battery").tagName).toBe("DT");
+    expect(screen.getByText("18")).toBeInTheDocument();
+    expect(screen.getByText("MacBook Air")).toBeInTheDocument();
+    expect(screen.getByText("≈ estimate")).toBeInTheDocument();
+    expect(screen.getByText(/Source: Spec pages/)).toBeInTheDocument();
+  });
+});
+
+describe("a comparison (QUI-A05)", () => {
+  it("marks the runtime's best in words, and only where the runtime said", () => {
+    render(AnswerParts, { text: "", parts: [COMPARE] });
+    const best = screen.getAllByText("Best");
+    expect(best).toHaveLength(1);
+    expect(best[0].closest("td")?.textContent).toContain("18");
+    expect(screen.getByText("higher is better")).toBeInTheDocument();
+    expect(screen.getByRole("rowheader", { name: /Ports/ })).toBeInTheDocument();
+  });
+});
+
+describe("measure, callout, pros and cons, steps (QUI-A06, A07)", () => {
+  it("draws each with its meaning in words", () => {
+    render(AnswerParts, {
+      text: "",
+      parts: [
+        part({ type: "measure", data: { label: "Checks passed", value: 31, min: 0, max: 40, unit: "", source: "This run", estimate: false } }),
+        part({ type: "callout", data: { tone: "warning", text: "Battery figures are manufacturer claims." } }),
+        part({ type: "proscons", data: { caption: "", options: [{ name: "Air", pros: ["Battery"], cons: ["Ports"] }] } }),
+        part({ type: "steps", data: { caption: "", steps: [{ label: "Order", when: "Mon", text: "" }, { label: "Set up", when: "", text: "" }] } }),
+      ],
+    });
+    expect(screen.getByText("31 of 40")).toBeInTheDocument();
+    expect(screen.getByRole("meter")).toHaveAttribute("aria-label", "Checks passed: 31 of 40");
+    expect(screen.getByText("Warning.")).toBeInTheDocument();
+    expect(screen.getByText("Pros")).toBeInTheDocument();
+    expect(screen.getByText("Cons")).toBeInTheDocument();
+    expect(screen.getByText("Mon")).toHaveClass("when");
+  });
+});
+
+describe("the new chart kinds (QUI-A01 to A03)", () => {
+  it("keeps every number in a table for a screen reader", () => {
+    render(AnswerParts, {
+      text: "",
+      parts: [
+        part({
+          type: "chart",
+          data: { kind: "stacked", caption: "Spend mix", y_label: "", labels: ["Oct"], series: [{ name: "Chat", values: [3] }, { name: "Build", values: [1] }] },
+        }),
+      ],
+    });
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("75%")).toBeInTheDocument();
+    expect(within(table).getByText("25%")).toBeInTheDocument();
+  });
+});
+
+describe("the block toolbar", () => {
+  it("switches a chart to its table and back", async () => {
+    render(AnswerParts, { text: "", parts: [CHART] });
+    await fireEvent.click(screen.getByRole("button", { name: "Table" }));
+    expect(screen.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.querySelector("figure.data-chart svg")).toBeNull();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Chart" }));
+    expect(document.querySelector("figure.data-chart svg")).not.toBeNull();
+  });
+
+  it("shows any block as text, in the runtime's words", async () => {
+    render(AnswerParts, { text: "", parts: [COMPARE] });
+    await fireEvent.click(screen.getByRole("button", { name: "Show as text" }));
+    expect(screen.getByText(/Battery: Air 18 h \(best\); XPS 13 h; X1 15 h/)).toBeInTheDocument();
+    expect(screen.queryByText("higher is better")).toBeNull();
+  });
+
+  it("offers CSV only for blocks that are grids", () => {
+    render(AnswerParts, {
+      text: "",
+      parts: [COMPARE, part({ type: "callout", data: { tone: "verdict", text: "Pick the Air." } })],
+    });
+    expect(screen.getAllByRole("button", { name: "CSV" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Show as text" })).toHaveLength(2);
+  });
+});
+
+describe("more than three blocks", () => {
+  it("offers a document, and only when the surface can make one", async () => {
+    const blocks = [FIGURES, COMPARE, TABLE, CHART];
+    const { unmount } = render(AnswerParts, { text: "", parts: blocks });
+    expect(screen.queryByRole("button", { name: "Create document" })).toBeNull();
+    unmount();
+    let asked = 0;
+    render(AnswerParts, { text: "", parts: blocks, ondocument: () => (asked += 1) });
+    expect(screen.getByText(/This answer has 4 blocks/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Create document" }));
+    expect(asked).toBe(1);
+  });
+
+  it("does not offer one for three", () => {
+    render(AnswerParts, { text: "", parts: [FIGURES, COMPARE, TABLE], ondocument: () => {} });
+    expect(screen.queryByRole("button", { name: "Create document" })).toBeNull();
+  });
+});

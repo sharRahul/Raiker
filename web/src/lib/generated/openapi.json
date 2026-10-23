@@ -7751,7 +7751,13 @@
               "text",
               "table",
               "chart",
-              "refused"
+              "refused",
+              "figures",
+              "compare",
+              "measure",
+              "callout",
+              "proscons",
+              "steps"
             ],
             "title": "Type",
             "type": "string"
@@ -7784,7 +7790,13 @@
               "text",
               "table",
               "chart",
-              "refused"
+              "refused",
+              "figures",
+              "compare",
+              "measure",
+              "callout",
+              "proscons",
+              "steps"
             ],
             "title": "Type",
             "type": "string"
@@ -25601,6 +25613,17 @@
       },
       "PromptRequest": {
         "properties": {
+          "answer_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Style"
+          },
           "approval_mode": {
             "anyOf": [
               {

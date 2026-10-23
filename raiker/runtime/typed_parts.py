@@ -44,7 +44,7 @@ import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 
 from typing_extensions import TypedDict
 
@@ -60,9 +60,29 @@ PART_TABLE: Final = "table"
 PART_CHART: Final = "chart"
 #: A declared block the runtime would not accept, with the reason it refused.
 PART_REFUSED: Final = "refused"
+#: QUI-A04 — up to four headline numbers, each with its unit and what it is of.
+PART_FIGURES: Final = "figures"
+#: QUI-A05 — items side by side, with the best value per row computed here.
+PART_COMPARE: Final = "compare"
+#: QUI-A06 — one value on a known scale.
+PART_MEASURE: Final = "measure"
+#: QUI-A07 — one verdict, warning or recommended action.
+PART_CALLOUT: Final = "callout"
+#: QUI-A07 — two short lists per option.
+PART_PROSCONS: Final = "proscons"
+#: QUI-A07 — an ordered or dated sequence.
+PART_STEPS: Final = "steps"
 
-PART_TYPES = frozenset({PART_TEXT, PART_TABLE, PART_CHART, PART_REFUSED})
-PartType = Literal["text", "table", "chart", "refused"]
+#: Every declared block an owner sees as something other than prose.
+BLOCK_TYPES = frozenset({
+    PART_TABLE, PART_CHART, PART_FIGURES, PART_COMPARE, PART_MEASURE,
+    PART_CALLOUT, PART_PROSCONS, PART_STEPS,
+})
+PART_TYPES = frozenset({PART_TEXT, PART_REFUSED, *BLOCK_TYPES})
+PartType = Literal[
+    "text", "table", "chart", "refused", "figures", "compare", "measure",
+    "callout", "proscons", "steps",
+]
 
 
 class ContentPartView(TypedDict):
@@ -73,9 +93,12 @@ class ContentPartView(TypedDict):
     data: dict[str, Any]
     reason_code: str
 
-#: The chart shapes Raiker draws. Deliberately three: each is a different claim
-#: about the data, and a shape nobody can read is not a fourth feature.
-CHART_KINDS = ("bar", "line", "area")
+#: The chart shapes Raiker draws. Each is a different claim about the data:
+#: one measure across items (bar, and hbar when the names are long), change over
+#: time (line), a total over time (area), parts of a whole (stacked, drawn as
+#: 100% bars instead of a pie) and two measures at once (scatter). A shape
+#: nobody can read is not a feature, which is why there is no pie.
+CHART_KINDS = ("bar", "hbar", "line", "area", "stacked", "scatter")
 
 # ── Bounds ──────────────────────────────────────────────────────────────────
 #
@@ -90,9 +113,25 @@ MAX_CAPTION_CHARS = 200
 MAX_SERIES = 8
 MAX_POINTS = 500
 MAX_LABEL_CHARS = 80
+MAX_FIGURES = 4
+MAX_COMPARE_ITEMS = 6
+MAX_COMPARE_ROWS = 20
+MAX_UNIT_CHARS = 24
+MAX_SOURCE_CHARS = 200
+MAX_TEXT_CHARS = 500
+MAX_OPTIONS = 4
+MAX_LIST_ITEMS = 8
+MAX_STEPS = 12
 
+#: A model sometimes opens the JSON on the fence line itself
+#: (```` ```raiker:figures { ````), or writes all of it there; ``head`` keeps
+#: that part so the block is still the block it declared rather than a code
+#: sample of it. The body is optional and lazy, so a fence whose JSON is all on
+#: its first line closes on the next line instead of running into the block
+#: after it.
 _FENCE = re.compile(
-    r"^[ \t]*```[ \t]*raiker:(?P<kind>[a-z_]+)[ \t]*\n(?P<body>.*?)\n[ \t]*```[ \t]*$",
+    r"^[ \t]*```[ \t]*raiker:(?P<kind>[a-z_]+)[ \t]*(?P<head>[{\[][^\n]*)?"
+    r"(?:\n(?P<body>.*?))??\n[ \t]*```[ \t]*$",
     re.S | re.M,
 )
 
@@ -220,6 +259,18 @@ def _validate_chart(payload: Any) -> tuple[dict[str, Any] | None, str]:
                 return None, "chart_value_not_a_number"
             numbers.append(float(value))
         clean_series.append({"name": name, "values": numbers})
+    if kind == "scatter" and len(clean_series) != 2:
+        # A scatter plots one measure against another, so it is exactly two
+        # series: the first is the horizontal axis, the second the vertical.
+        return None, "chart_scatter_needs_two_series"
+    if kind == "stacked":
+        # Parts of a whole: a negative part is not a share of anything, and a
+        # label whose parts sum to nothing has no whole to divide.
+        if any(value < 0 for entry in clean_series for value in entry["values"]):
+            return None, "chart_stacked_negative"
+        for index in range(len(clean_labels)):
+            if sum(entry["values"][index] for entry in clean_series) <= 0:
+                return None, "chart_stacked_empty"
     caption = payload.get("caption", "")
     if not isinstance(caption, str) or len(caption) > MAX_CAPTION_CHARS:
         return None, "chart_caption_invalid"
@@ -235,7 +286,365 @@ def _validate_chart(payload: Any) -> tuple[dict[str, Any] | None, str]:
     }, ""
 
 
-_VALIDATORS = {PART_TABLE: _validate_table, PART_CHART: _validate_chart}
+def _short(value: Any, limit: int, *, required: bool = False) -> str | None:
+    """A bounded string, ``""`` when absent and allowed, or ``None`` when unusable."""
+    if value is None and not required:
+        return ""
+    if not isinstance(value, str) or len(value) > limit:
+        return None
+    if required and not value.strip():
+        return None
+    return value
+
+
+def _number_value(value: Any) -> float | None:
+    """A real number, or ``None``. ``True`` is not one, whatever Python thinks."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    number = float(value)
+    return number if number == number and abs(number) != float("inf") else None
+
+
+def _provenance(payload: dict[str, Any], kind: str) -> tuple[dict[str, Any] | None, str]:
+    """The block's ``source`` and ``estimate``: where its numbers came from.
+
+    Both are what the owner reads beside the numbers, so both are bounded and
+    typed like everything else. Whether a missing source turns the block into
+    text is :func:`content_parts`'s decision, not this one's.
+    """
+    source = _short(payload.get("source"), MAX_SOURCE_CHARS)
+    if source is None:
+        return None, f"{kind}_source_invalid"
+    estimate = payload.get("estimate", False)
+    if not isinstance(estimate, bool):
+        return None, f"{kind}_estimate_invalid"
+    return {"source": source.strip(), "estimate": estimate}, ""
+
+
+def _validate_figures(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A04. Up to four headline numbers, each with a unit and a label.
+
+    The unit is required: "18" is not a figure an owner can act on, "18 h" is.
+    """
+    if not isinstance(payload, dict):
+        return None, "figures_not_an_object"
+    items = payload.get("items")
+    if not isinstance(items, list) or not items:
+        return None, "figures_items_missing"
+    if len(items) > MAX_FIGURES:
+        return None, "figures_too_many"
+    clean: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            return None, "figures_item_not_an_object"
+        label = _short(item.get("label"), MAX_LABEL_CHARS, required=True)
+        if label is None:
+            return None, "figures_label_invalid"
+        value = _number_value(item.get("value"))
+        if value is None:
+            return None, "figures_value_not_a_number"
+        unit = _short(item.get("unit"), MAX_UNIT_CHARS, required=True)
+        if unit is None:
+            return None, "figures_unit_missing"
+        owner = _short(item.get("of"), MAX_LABEL_CHARS)
+        if owner is None:
+            return None, "figures_of_invalid"
+        estimate = item.get("estimate", False)
+        if not isinstance(estimate, bool):
+            return None, "figures_estimate_invalid"
+        clean.append(
+            {"label": label, "value": value, "unit": unit, "of": owner, "estimate": estimate}
+        )
+    caption = _short(payload.get("caption"), MAX_CAPTION_CHARS)
+    if caption is None:
+        return None, "figures_caption_invalid"
+    provenance, reason = _provenance(payload, "figures")
+    if provenance is None:
+        return None, reason
+    return {"caption": caption, "items": clean, **provenance}, ""
+
+
+def _best(values: list[Any], better: str) -> list[int]:
+    """The indexes holding the best value in a row; every index on a tie."""
+    numbers = [value for value in values if isinstance(value, float)]
+    if not numbers or better not in ("higher", "lower"):
+        return []
+    target = max(numbers) if better == "higher" else min(numbers)
+    best = [index for index, value in enumerate(values) if value == target]
+    # A row where every item ties has no best, and saying "Best" on all of
+    # them would mark a difference that is not there.
+    return [] if len(best) == len(values) else best
+
+
+def _validate_compare(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A05. Items as columns, criteria as rows, the best per row computed here.
+
+    The model states the rule (``better``: higher or lower) and the values; the
+    runtime picks the winner. A ``best`` the model sent is never read, because
+    a model choosing which item to crown is a model choosing the answer.
+    """
+    if not isinstance(payload, dict):
+        return None, "compare_not_an_object"
+    items = payload.get("items")
+    if not isinstance(items, list) or len(items) < 2:
+        return None, "compare_items_missing"
+    if len(items) > MAX_COMPARE_ITEMS:
+        return None, "compare_too_many_items"
+    names: list[str] = []
+    for item in items:
+        name = _short(item, MAX_LABEL_CHARS, required=True)
+        if name is None:
+            return None, "compare_item_invalid"
+        names.append(name)
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return None, "compare_rows_missing"
+    if len(rows) > MAX_COMPARE_ROWS:
+        return None, "compare_too_many_rows"
+    clean: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            return None, "compare_row_not_an_object"
+        label = _short(row.get("label"), MAX_LABEL_CHARS, required=True)
+        if label is None:
+            return None, "compare_row_label_invalid"
+        unit = _short(row.get("unit"), MAX_UNIT_CHARS)
+        if unit is None:
+            return None, "compare_unit_invalid"
+        better = row.get("better", "")
+        if better not in ("", "higher", "lower"):
+            return None, "compare_better_invalid"
+        values = row.get("values")
+        if not isinstance(values, list) or len(values) != len(names):
+            return None, "compare_row_width_mismatch"
+        cells: list[Any] = []
+        for value in values:
+            number = _number_value(value)
+            if number is not None:
+                cells.append(number)
+                continue
+            cell = _cell(value)
+            if cell is None or (isinstance(value, int | float) and not isinstance(value, bool)):
+                return None, "compare_value_invalid"
+            cells.append(cell)
+        if better and not all(isinstance(cell, float) for cell in cells):
+            # "Lower is better" over text has no answer, and guessing one is
+            # exactly the mark this block exists to keep honest.
+            return None, "compare_better_needs_numbers"
+        clean.append({
+            "label": label, "unit": unit, "better": better, "values": cells,
+            "best": _best(cells, better),
+        })
+    caption = _short(payload.get("caption"), MAX_CAPTION_CHARS)
+    if caption is None:
+        return None, "compare_caption_invalid"
+    provenance, reason = _provenance(payload, "compare")
+    if provenance is None:
+        return None, reason
+    return {"caption": caption, "items": names, "rows": clean, **provenance}, ""
+
+
+def _validate_measure(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A06. One value on a known scale: 4.2 of 5, 31 of 40 checks."""
+    if not isinstance(payload, dict):
+        return None, "measure_not_an_object"
+    label = _short(payload.get("label"), MAX_LABEL_CHARS, required=True)
+    if label is None:
+        return None, "measure_label_invalid"
+    value = _number_value(payload.get("value"))
+    if value is None:
+        return None, "measure_value_not_a_number"
+    raw_min = payload.get("min", 0)
+    low = _number_value(raw_min)
+    high = _number_value(payload.get("max"))
+    if low is None or high is None or high <= low:
+        return None, "measure_scale_invalid"
+    if not low <= value <= high:
+        # Off the scale is a different claim from "full", and drawing it as a
+        # full bar would hide that.
+        return None, "measure_value_off_scale"
+    unit = _short(payload.get("unit"), MAX_UNIT_CHARS)
+    if unit is None:
+        return None, "measure_unit_invalid"
+    provenance, reason = _provenance(payload, "measure")
+    if provenance is None:
+        return None, reason
+    return {"label": label, "value": value, "min": low, "max": high, "unit": unit, **provenance}, ""
+
+
+CALLOUT_TONES = ("verdict", "warning", "action")
+
+
+def _validate_callout(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A07. One verdict, warning or recommended action, in a sentence or two."""
+    if not isinstance(payload, dict):
+        return None, "callout_not_an_object"
+    tone = payload.get("tone", "verdict")
+    if tone not in CALLOUT_TONES:
+        return None, "callout_tone_invalid"
+    text = _short(payload.get("text"), MAX_TEXT_CHARS, required=True)
+    if text is None:
+        return None, "callout_text_invalid"
+    return {"tone": tone, "text": text}, ""
+
+
+def _short_list(value: Any) -> list[str] | None:
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS:
+        return None
+    out: list[str] = []
+    for entry in value:
+        text = _short(entry, MAX_CELL_CHARS, required=True)
+        if text is None:
+            return None
+        out.append(text)
+    return out
+
+
+def _validate_proscons(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A07. Two short lists per option."""
+    if not isinstance(payload, dict):
+        return None, "proscons_not_an_object"
+    options = payload.get("options")
+    if not isinstance(options, list) or not options:
+        return None, "proscons_options_missing"
+    if len(options) > MAX_OPTIONS:
+        return None, "proscons_too_many_options"
+    clean: list[dict[str, Any]] = []
+    for option in options:
+        if not isinstance(option, dict):
+            return None, "proscons_option_not_an_object"
+        name = _short(option.get("name"), MAX_LABEL_CHARS, required=True)
+        if name is None:
+            return None, "proscons_name_invalid"
+        pros = _short_list(option.get("pros"))
+        cons = _short_list(option.get("cons"))
+        if pros is None or cons is None:
+            return None, "proscons_list_invalid"
+        if not pros and not cons:
+            return None, "proscons_option_empty"
+        clean.append({"name": name, "pros": pros, "cons": cons})
+    caption = _short(payload.get("caption"), MAX_CAPTION_CHARS)
+    if caption is None:
+        return None, "proscons_caption_invalid"
+    return {"caption": caption, "options": clean}, ""
+
+
+def _validate_steps(payload: Any) -> tuple[dict[str, Any] | None, str]:
+    """QUI-A07. An ordered or dated sequence, in the order given."""
+    if not isinstance(payload, dict):
+        return None, "steps_not_an_object"
+    steps = payload.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return None, "steps_missing"
+    if len(steps) > MAX_STEPS:
+        return None, "steps_too_many"
+    clean: list[dict[str, Any]] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            return None, "steps_step_not_an_object"
+        label = _short(step.get("label"), MAX_CAPTION_CHARS, required=True)
+        if label is None:
+            return None, "steps_label_invalid"
+        when = _short(step.get("when"), MAX_LABEL_CHARS)
+        text = _short(step.get("text"), MAX_TEXT_CHARS)
+        if when is None or text is None:
+            return None, "steps_detail_invalid"
+        clean.append({"label": label, "when": when, "text": text})
+    caption = _short(payload.get("caption"), MAX_CAPTION_CHARS)
+    if caption is None:
+        return None, "steps_caption_invalid"
+    return {"caption": caption, "steps": clean}, ""
+
+
+_VALIDATORS = {
+    PART_TABLE: _validate_table,
+    PART_CHART: _validate_chart,
+    PART_FIGURES: _validate_figures,
+    PART_COMPARE: _validate_compare,
+    PART_MEASURE: _validate_measure,
+    PART_CALLOUT: _validate_callout,
+    PART_PROSCONS: _validate_proscons,
+    PART_STEPS: _validate_steps,
+}
+
+#: Blocks whose numbers are claims about the world. Without a stated source
+#: Raiker shows them as text rather than as a figure an owner may trust.
+SOURCED_TYPES = frozenset({PART_FIGURES, PART_COMPARE, PART_MEASURE})
+
+
+def _has_numbers(kind: str, data: dict[str, Any]) -> bool:
+    if kind == PART_COMPARE:
+        return any(isinstance(v, float) for row in data["rows"] for v in row["values"])
+    return True
+
+
+#: Units written before the number, the way a price is read: £999, not 999 £.
+PREFIX_UNITS = frozenset({"£", "$", "€", "¥", "₹", "US$", "A$", "C$"})
+
+
+def _figure(value: float, unit: str = "") -> str:
+    text = str(int(value)) if value.is_integer() else f"{value:g}"
+    if unit in PREFIX_UNITS:
+        return f"-{unit}{text[1:]}" if text.startswith("-") else f"{unit}{text}"
+    return f"{text} {unit}".strip() if unit else text
+
+
+def as_text(part: ContentPart) -> str:
+    """A block as the Markdown an owner would read if it were not drawn.
+
+    The one text form every surface shares: an unsourced block becomes it, an
+    export can print it, and *Show as text* in the browser says the same thing.
+    """
+    data = part.data
+    estimate = " (≈ estimate)" if data.get("estimate") else ""
+    if part.type == PART_FIGURES:
+        lines = [f"**{data['caption']}**", ""] if data.get("caption") else []
+        for item in data["items"]:
+            owner = f" ({item['of']})" if item.get("of") else ""
+            mark = " (≈ estimate)" if item.get("estimate") or data.get("estimate") else ""
+            lines.append(f"- {item['label']}: {_figure(item['value'], item['unit'])}{owner}{mark}")
+        return "\n".join(lines)
+    if part.type == PART_COMPARE:
+        lines = [f"**{data['caption']}**{estimate}", ""] if data.get("caption") else []
+        for row in data["rows"]:
+            cells = []
+            for index, (name, value) in enumerate(zip(data["items"], row["values"], strict=True)):
+                shown = _figure(value, row["unit"]) if isinstance(value, float) else str(value)
+                best = " (best)" if index in row["best"] else ""
+                cells.append(f"{name} {shown}{best}")
+            lines.append(f"- {row['label']}: " + "; ".join(cells))
+        return "\n".join(lines)
+    if part.type == PART_MEASURE:
+        low = "" if data["min"] == 0 else f"{_figure(data['min'])}–"
+        return (
+            f"**{data['label']}**: {_figure(data['value'], data['unit'])} "
+            f"of {low}{_figure(data['max'], data['unit'])}{estimate}"
+        )
+    if part.type == PART_CALLOUT:
+        lead = {"verdict": "Verdict", "warning": "Warning", "action": "Next step"}[data["tone"]]
+        return f"> **{lead}:** {data['text']}"
+    if part.type == PART_PROSCONS:
+        lines = [f"**{data['caption']}**", ""] if data.get("caption") else []
+        for option in data["options"]:
+            lines.append(f"**{option['name']}**")
+            lines += [f"- Pro: {entry}" for entry in option["pros"]]
+            lines += [f"- Con: {entry}" for entry in option["cons"]]
+            lines.append("")
+        return "\n".join(lines).rstrip()
+    if part.type == PART_STEPS:
+        lines = [f"**{data['caption']}**", ""] if data.get("caption") else []
+        for number, step in enumerate(data["steps"], start=1):
+            when = f" ({step['when']})" if step.get("when") else ""
+            detail = f" — {step['text']}" if step.get("text") else ""
+            lines.append(f"{number}. {step['label']}{when}{detail}")
+        return "\n".join(lines)
+    return part.text
+
+
+#: Said under an unsourced block shown as text, so the owner knows why.
+UNSOURCED_NOTE = "_No source was given for these numbers, so Raiker shows them as text._"
 
 
 def content_parts(message: str) -> list[ContentPart]:
@@ -271,7 +680,7 @@ def content_parts(message: str) -> list[ContentPart]:
             parts.append(ContentPart(PART_REFUSED, reason_code="too_many_parts"))
             continue
         try:
-            payload = json.loads(match.group("body"))
+            payload = json.loads((match.group("head") or "") + "\n" + (match.group("body") or ""))
         except json.JSONDecodeError:
             parts.append(ContentPart(PART_REFUSED, reason_code=f"{kind}_not_json"))
             continue
@@ -279,7 +688,13 @@ def content_parts(message: str) -> list[ContentPart]:
         if data is None:
             parts.append(ContentPart(PART_REFUSED, reason_code=reason))
             continue
-        parts.append(ContentPart(PART_TABLE if kind == PART_TABLE else PART_CHART, data=data))
+        part = ContentPart(cast(PartType, kind), data=data)
+        if kind in SOURCED_TYPES and not data["source"] and _has_numbers(kind, data):
+            # Units and sources (04, Rules): numbers with no stated source are
+            # shown, but as text — never drawn as figures that look checked.
+            parts.append(ContentPart(PART_TEXT, text=f"{as_text(part)}\n\n{UNSOURCED_NOTE}"))
+            continue
+        parts.append(part)
 
     tail = _text(message[cursor:])
     if tail is not None:

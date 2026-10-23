@@ -1222,6 +1222,20 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1133](#fixed-1133--a-decision-did-not-say-which-task-it-belonged-to-qui-p08) | Medium | Approvals / read model | Fixed 2026-10-22 |
 | [FIXED-1134](#fixed-1134--a-connection-listed-http-methods-not-what-raiker-may-do-qui-p04) | Low | Connections | Fixed 2026-10-22 |
 | [FIXED-1135](#fixed-1135--nothing-checked-that-a-model-could-not-draw-an-approval-card-qui-p05-acceptance) | Medium | Chat / security | Fixed 2026-10-22 |
+| [FIXED-1136](#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04) | Medium | Chat / typed answers | Fixed 2026-10-23 |
+| [FIXED-1137](#fixed-1137--a-comparisons-winner-was-whatever-the-model-said-qui-a05) | Medium | Chat / typed answers | Fixed 2026-10-23 |
+| [FIXED-1138](#fixed-1138--rankings-with-long-names-had-to-be-vertical-bars-qui-a01) | Low | Chat / charts | Fixed 2026-10-23 |
+| [FIXED-1139](#fixed-1139--parts-of-a-whole-had-no-honest-chart-qui-a02) | Low | Chat / charts | Fixed 2026-10-23 |
+| [FIXED-1140](#fixed-1140--two-measures-at-once-had-no-chart-qui-a03) | Low | Chat / charts | Fixed 2026-10-23 |
+| [FIXED-1141](#fixed-1141--one-value-on-a-scale-a-verdict-pros-and-cons-and-a-sequence-were-all-prose-qui-a06-qui-a07) | Low | Chat / typed answers | Fixed 2026-10-23 |
+| [FIXED-1142](#fixed-1142--numbers-with-no-source-were-drawn-as-if-checked-04-rules) | Medium | Chat / typed answers | Fixed 2026-10-23 |
+| [FIXED-1143](#fixed-1143--a-block-could-only-be-looked-at-04-block-toolbar) | Medium | Chat | Fixed 2026-10-23 |
+| [FIXED-1144](#fixed-1144--the-model-was-told-about-two-block-types-and-no-rules-04-rules) | Medium | Runtime / model instructions | Fixed 2026-10-23 |
+| [FIXED-1145](#fixed-1145--there-was-no-way-to-ask-for-fewer-or-more-visuals-04-answer-style) | Low | Settings / runtime | Fixed 2026-10-23 |
+| [FIXED-1146](#fixed-1146--an-export-dropped-the-new-blocks-meaning-04-exports) | Low | Conversation export | Fixed 2026-10-23 |
+| [FIXED-1147](#fixed-1147--a-local-models-malformed-block-was-final-qui-a-rules) | Low | Runtime | Fixed 2026-10-23 |
+| [FIXED-1148](#fixed-1148--a-block-whose-json-opened-on-the-fence-line-was-drawn-as-code-qui-a-rules) | Medium | Runtime / typed answers | Fixed 2026-10-23 |
+| [FIXED-1149](#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review) | Medium | Chat / charts | Fixed 2026-10-23 |
 
 ---
 
@@ -36939,3 +36953,144 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** `Markdown.test.ts` feeds the renderer a forged card, with `data-raiker-safety`, *Raiker Safety*, *Waiting for your decision* and an **Allow once** button. None of it renders as an element. The live round asks Haiku for the same HTML and finds only text.
 
 **Evidence.** `Markdown.test.ts`; RT-QUI-32.
+
+## FIXED-1136 — A turn could not say "these are the headline numbers" (QUI-A04)
+
+**Severity: Medium. Area: Chat / typed answers. Status: Fixed 2026-10-23.**
+
+**Observed.** The typed answer channel had tables and charts only. Headline numbers were sentences or bold text, and nothing required a unit beside them.
+
+**Fixed.** `raiker:figures` carries up to four items, each with `label`, `value` (a real number), `unit` (required, non-blank), `of` and `estimate`, plus the block's `source` and `estimate`. `typed_parts.py` refuses a figure without a unit (`figures_unit_missing`) and five other shapes. `KeyFigures.svelte` draws them as a description list, with *≈ estimate* in words. Found live: a price read *999 £*; currency units (£, $, €, ¥, ₹) now go before the number everywhere a figure is written.
+
+**Evidence.** `tests/test_visual_answers.py` (key figures cases), `AnswerParts.test.ts` (*reads each label with its value*); RT-QUI-38.
+
+## FIXED-1137 — A comparison's winner was whatever the model said (QUI-A05)
+
+**Severity: Medium. Area: Chat / typed answers. Status: Fixed 2026-10-23.**
+
+**Observed.** A comparison could only be a table, with "best" written by the model in a cell or in bold.
+
+**Fixed.** `raiker:compare` takes items, rows with `label`, `unit`, `better` (higher or lower) and values. The runtime computes `best` per row; a `best` in the payload is never read. A tie marks every tied item, a row where all tie has no mark, and `better` over text is refused (`compare_better_needs_numbers`). `Comparison.svelte` writes *Best* in the cell beside a tick, with the row's rule (*higher is better*) under its label.
+
+**Evidence.** `tests/test_visual_answers.py` (*a model cannot crown a winner itself*, *a row where every item ties has no best*); RT-QUI-37, where Haiku compared three laptops and Raiker marked 18 h, 1.09 kg and £999.
+
+## FIXED-1138 — Rankings with long names had to be vertical bars (QUI-A01)
+
+**Severity: Low. Area: Chat / charts. Status: Fixed 2026-10-23.**
+
+**Observed.** A bar chart of long names cut or crowded its labels under the bars.
+
+**Fixed.** Chart kind `hbar`: labels on the left (the margin grows with the longest label, to 180 units), bars from zero. `DataChart.svelte` sizes its height by row.
+
+**Evidence.** `tests/test_visual_answers.py` (*the new chart kinds are accepted*); RT-QUI-39.
+
+## FIXED-1139 — Parts of a whole had no honest chart (QUI-A02)
+
+**Severity: Low. Area: Chat / charts. Status: Fixed 2026-10-23.**
+
+**Observed.** Shares could only be a bar chart of raw values; the plan rules out a pie.
+
+**Fixed.** Chart kind `stacked`: one 100% bar per label, each series a part, its share printed on the part when it fits, and the table lists each value with its share. Negative parts (`chart_stacked_negative`) and labels whose parts sum to nothing (`chart_stacked_empty`) are refused.
+
+**Evidence.** `tests/test_visual_answers.py`, `AnswerParts.test.ts` (*keeps every number in a table*); RT-QUI-39 (*60%* in the table view).
+
+## FIXED-1140 — Two measures at once had no chart (QUI-A03)
+
+**Severity: Low. Area: Chat / charts. Status: Fixed 2026-10-23.**
+
+**Observed.** Price against battery could only be two separate charts.
+
+**Fixed.** Chart kind `scatter`: exactly two series, the first across and the second up (`chart_scatter_needs_two_series` otherwise); labels name the points, and the caption line says which measure is on which axis. Axes fit the points, because a scatter shows positions, not lengths.
+
+**Evidence.** `tests/test_visual_answers.py`; RT-QUI-39.
+
+## FIXED-1141 — One value on a scale, a verdict, pros and cons and a sequence were all prose (QUI-A06, QUI-A07)
+
+**Severity: Low. Area: Chat / typed answers. Status: Fixed 2026-10-23.**
+
+**Observed.** *31 of 40 checks*, *Pick the Air*, two lists per option and a dated plan had no block of their own.
+
+**Fixed.** `raiker:measure` (refused off its scale), `raiker:callout` (*Verdict*, *Warning*, *Next step*, each with an icon and a word as well as a tint), `raiker:proscons` (headed *Pros* and *Cons*, marked + and −) and `raiker:steps` (an ordered list on the path line). Each has a validator with reasons and a component (`MeasureBlock`, `Callout`, `ProsCons`, `StepsBlock`); the measure is a `<meter>` for assistive technology.
+
+**Evidence.** `tests/test_visual_answers.py`, `AnswerParts.test.ts` (*draws each with its meaning in words*); RT-QUI-38.
+
+## FIXED-1142 — Numbers with no source were drawn as if checked (04, Rules)
+
+**Severity: Medium. Area: Chat / typed answers. Status: Fixed 2026-10-23.**
+
+**Observed.** A figure, measure or comparison would have looked equally authoritative with or without a source.
+
+**Fixed.** Those three blocks take a `source`. One that contains numbers and gives none becomes a text part: the same sentences **Show as text** gives (`as_text` in `typed_parts.py`, `blockText` in `answerBlocks.ts`), followed by *No source was given for these numbers, so Raiker shows them as text.* A comparison of text values only needs no source. Tables and charts are unchanged.
+
+**Evidence.** `tests/test_visual_answers.py` (*numbers with no source are shown as text*); RT-QUI-40.
+
+## FIXED-1143 — A block could only be looked at (04, Block toolbar)
+
+**Severity: Medium. Area: Chat. Status: Fixed 2026-10-23.**
+
+**Observed.** A chart's numbers were one fold down under *The numbers behind this chart*; nothing could copy, download or save a block, and nothing showed a block as text.
+
+**Fixed.** `AnswerBlock.svelte` frames every block with a quiet toolbar: **Chart · Table** on charts (the table replaces the drawing; in chart view the table stays in the page for screen readers), **Show as text**, **Copy** (says *Copied*, or why it could not), **CSV** for tables, charts, figures, comparisons and measures (RFC 4180 quoting), and **PNG** for a drawn chart (`chartImage.ts` inlines the computed paint and rasterises at 2× on the page's surface colour). Nothing is fetched.
+
+**Evidence.** `AnswerParts.test.ts` (*the block toolbar*), `answerBlocks.test.ts`; RT-QUI-39 (CSV contents, PNG signature, clipboard).
+
+## FIXED-1144 — The model was told about two block types and no rules (04, Rules)
+
+**Severity: Medium. Area: Runtime / model instructions. Status: Fixed 2026-10-23.**
+
+**Observed.** The standing instructions named `raiker:table` and `raiker:chart` with three kinds, and nothing about units, sources, when not to visualise or how many blocks an answer should have.
+
+**Fixed.** The instructions list every block and chart kind with its shape, say that Raiker marks *Best*, that every figure needs a unit and a source, not to visualise fewer than three values or opinions, and to use at most three blocks unless asked for a report. `AnswerParts` offers **Create document** above three blocks; in Chat it puts the request in the composer.
+
+**Evidence.** `tests/test_visual_answers.py` (*the model is told the whole vocabulary*), `AnswerParts.test.ts` (*more than three blocks*); RT-QUI-37, RT-QUI-41.
+
+## FIXED-1145 — There was no way to ask for fewer or more visuals (04, Answer style)
+
+**Severity: Low. Area: Settings / runtime. Status: Fixed 2026-10-23.**
+
+**Observed.** How often an answer used blocks was entirely the model's call.
+
+**Fixed.** **Settings → General → Answers → Answer style**: *Auto*, *Mostly text*, *Visual where it helps*, stored as `chat.answer_style` (any other value is refused with `invalid_answer_style`). `PromptOptions.answer_style` carries it; the prompt route reads the setting when a request does not name one, an approval resume keeps it, and `_system_messages` adds one sentence for the two non-default styles. Presentation only: it grants nothing.
+
+**Evidence.** `tests/test_visual_answers.py` (*answer style adds one sentence*, *the settings route keeps only an offered answer style*), `General.test.ts`; RT-QUI-36, RT-QUI-43.
+
+## FIXED-1146 — An export dropped the new blocks' meaning (04, exports)
+
+**Severity: Low. Area: Conversation export. Status: Fixed 2026-10-23.**
+
+**Observed.** Exports knew tables and charts only.
+
+**Fixed.** `transcript.py` exports key figures and comparisons as tables (Markdown, HTML and the PDF's fixed-width table), with *Best* in the marked cell and the source in the title; callouts, pros and cons, steps and measures as their text form. The new chart kinds are named (*Stacked bar chart*, *Scatter chart*).
+
+**Evidence.** `tests/test_visual_answers.py` (*an export keeps figures and comparisons as tables*, *markdown export renders new blocks*); RT-QUI-42.
+
+## FIXED-1147 — A local model's malformed block was final (QUI-A rules)
+
+**Severity: Low. Area: Runtime. Status: Fixed 2026-10-23.**
+
+**Observed.** Small local models send malformed blocks more often than hosted ones, and the refusal was the answer.
+
+**Fixed.** When a turn on a local provider (Ollama, LM Studio, llama.cpp, MLX, vLLM, local GGUF) ends with a refused block, the runtime asks once, with the reason codes, for the same answer with the block corrected or written as prose, and records `typed_block_retry`. Whatever comes back is the answer, refusals still visible. Hosted models are not asked again.
+
+**Evidence.** `tests/test_visual_answers.py` (*a local model is asked once*, *the correction is asked only once*, *a hosted model is not asked again*).
+
+## FIXED-1148 — A block whose JSON opened on the fence line was drawn as code (QUI-A rules)
+
+**Severity: Medium. Area: Runtime / typed answers. Status: Fixed 2026-10-23.**
+
+**Observed.** Found live in RT-QUI-37. Haiku wrote ```` ```raiker:figures { ```` with the opening brace on the fence line. The fence pattern required a line break straight after the type, so the runtime did not see a block, and the answer showed three code samples of JSON instead of key figures, a comparison and a callout.
+
+**Fixed.** The fence pattern in `typed_parts.py` accepts JSON that opens on the fence line and joins it to the body before parsing. Found in the second round: when all of a block's JSON was on the fence line and the closing fence followed at once, the match ran into the next block and the whole answer was refused as invalid JSON; the body is now optional and matched lazily, so each block closes on its own fence. A fence line with anything else after the type is still not a block.
+
+**Evidence.** `tests/test_visual_answers.py` (*a block whose JSON opens on the fence line is still the block*, *blocks written entirely on their fence lines stay separate*); RT-QUI-37.
+
+## FIXED-1149 — A chart in a transcript bubble was too small to read, and its legend had no colours (04, screenshot review)
+
+**Severity: Medium. Area: Chat / charts. Status: Fixed 2026-10-23.**
+
+**Observed.** Found in the RT-QUI-39 screenshots. A Raiker bubble is as wide as its content, so a chart drawn in a 640-unit box was scaled into a bubble about 370 px wide and its labels rendered at about 6 px. A multi-series chart's legend showed names with no colour beside them: `.swatch` read `--c`, and only the bars and lines set it.
+
+**Fixed.** A message group and bubble that hold a chart, comparison or key figures take the group's full width (capped at 48rem as before); chart labels are 12 units, so they render at about 13 px. The legend swatches take the series colours. A scatter point on the right half is labelled on its left, so its label stays inside the frame.
+
+**Evidence.** RT-QUI-39 screenshots before and after (local evidence).
+

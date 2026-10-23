@@ -1112,6 +1112,11 @@ class AgentGateway:
                     if isinstance(options_raw.get("capability_modes"), dict)
                     else {}
                 ),
+                answer_style=(
+                    str(options_raw["answer_style"])
+                    if options_raw.get("answer_style") in ("auto", "text", "visual")
+                    else "auto"
+                ),
             ),
         )
         # ADD-02 — the rest of the batch this decision unblocked, in the order the

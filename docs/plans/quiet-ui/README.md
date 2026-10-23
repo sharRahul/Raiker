@@ -9,7 +9,9 @@ so.** Shipped so far: the quick fixes and most quality checks in
 Permissions, Connections, Models, Settings and help-panel plans in
 [01](01_LAYOUT_SYSTEM_AND_PAGES.md#status) (2026-10-21; L11 to L13 open), and
 the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
-(2026-10-22; Allow with limits and its dependants open). These documents record the UI/UX direction agreed in the October 2026
+(2026-10-22; Allow with limits and its dependants open), and the visual answers
+of [04](04_VISUAL_ANSWERS.md#status) (2026-10-23; diagrams and Pin to project
+open). These documents record the UI/UX direction agreed in the October 2026
 design review and turn it into numbered, testable work items. They extend
 [PERSONAL_AGENT_UX_SPEC.md](../PERSONAL_AGENT_UX_SPEC.md); where the two
 disagree on layout or presentation, this folder is the newer decision. Neither
@@ -84,7 +86,7 @@ modes and "Off" approval mode, Muse's feed, up-front data requests and
 4. Guide to help panel; Observability to Diagnostics and Recovery (01).
 5. Size budgets in CI (07, QUI-G01).
 6. Welcome, Home and Chat; the approval card; clarifying-question cards (03, 02).
-7. Visual answers: key figures, comparison, horizontal bar, callout first (04).
+7. Visual answers: key figures, comparison, horizontal bar, callout first (04). Shipped 2026-10-23.
 8. Live work line, Quick Entry, goals noticed in conversation (06).
 9. Task receipt, data label in the composer, Library, Make this repeatable (06).
 10. Brand: tokens, mark, companion (08). Token and eye-orb work may start earlier

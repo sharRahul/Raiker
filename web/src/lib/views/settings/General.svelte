@@ -51,6 +51,16 @@
   const language = $derived((settings["general.language"] as string) ?? "");
   const answerLanguage = $derived((settings["general.answer_language"] as string) ?? "");
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
+  /**
+   * QUI-A rules — how much of an answer Raiker draws. The runtime reads this
+   * for every turn; a stored value this build does not offer reads as Auto,
+   * which is also what the runtime does with it.
+   */
+  const answerStyle = $derived(
+    ["auto", "text", "visual"].includes(settings["chat.answer_style"] as string)
+      ? (settings["chat.answer_style"] as string)
+      : "auto",
+  );
 
   // QUI-W06 — reopen first-run setup on its model step.
   let setupBusy = $state(false);
@@ -249,6 +259,25 @@
       {#if setupError}<span class="setup-error" role="alert">{setupError}</span>{/if}
     </div>
   </div>
+</section>
+
+<section class="settings-card" aria-labelledby="answer-style">
+  <div class="card-heading">
+    <h3 id="answer-style">Answers</h3>
+    <p>How often Raiker shows figures, comparisons and charts instead of prose.</p>
+  </div>
+  <label>
+    <span>Answer style</span>
+    <select
+      aria-label="Answer style"
+      value={answerStyle}
+      onchange={(e) => save({ "chat.answer_style": e.currentTarget.value })}
+    >
+      <option value="auto">Auto</option>
+      <option value="text">Mostly text</option>
+      <option value="visual">Visual where it helps</option>
+    </select>
+  </label>
 </section>
 
 <style>

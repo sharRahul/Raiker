@@ -65,11 +65,15 @@ from typing import Any
 from raiker.approval_previews import redact_secret_like_text
 from raiker.contracts.views import View
 from raiker.runtime.typed_parts import (
+    BLOCK_TYPES,
     PART_CHART,
+    PART_COMPARE,
+    PART_FIGURES,
     PART_REFUSED,
     PART_TABLE,
     PART_TEXT,
     ContentPart,
+    as_text,
     content_parts,
     renders_as_parts,
 )
@@ -123,8 +127,8 @@ class TranscriptMessage(View):
 
     @property
     def typed_part_count(self) -> int:
-        """Declared tables and charts. Refusals are not counted as content."""
-        return sum(1 for part in self.parts if part.type in (PART_TABLE, PART_CHART))
+        """Declared blocks. Refusals are not counted as content."""
+        return sum(1 for part in self.parts if part.type in BLOCK_TYPES)
 
 
 @dataclass(frozen=True)
@@ -318,7 +322,10 @@ _REFUSAL_SENTENCE = (
     "Raiker did not accept one declared part of this answer, so it was not rendered."
 )
 
-_CHART_KIND_LABELS = {"bar": "Bar chart", "line": "Line chart", "area": "Area chart"}
+_CHART_KIND_LABELS = {
+    "bar": "Bar chart", "hbar": "Bar chart", "line": "Line chart", "area": "Area chart",
+    "stacked": "Stacked bar chart", "scatter": "Scatter chart",
+}
 
 
 def _blocks(message: TranscriptMessage) -> list[ContentPart]:
@@ -355,6 +362,42 @@ def _chart_table(data: dict[str, Any]) -> tuple[str, list[str], list[list[str]]]
             row.append(_number(values[index]) if index < len(values) else "")
         rows.append(row)
     return title, columns, rows
+
+
+def _block_table(part: ContentPart) -> tuple[str, list[str], list[list[str]]] | None:
+    """A key-figures or comparison block as a table, or ``None`` for prose blocks.
+
+    Both are grids of numbers, so an export keeps them one; callouts, pros and
+    cons and steps read as the text :func:`as_text` gives every surface.
+    """
+    data = part.data
+    estimate = " (≈ estimate)" if data.get("estimate") else ""
+    source = f" — source: {data['source']}" if data.get("source") else ""
+    if part.type == PART_FIGURES:
+        rows = [
+            [
+                str(item["label"]),
+                f"{_number(item['value'])} {item['unit']}".strip()
+                + (" (≈ estimate)" if item.get("estimate") else ""),
+                str(item.get("of", "")),
+            ]
+            for item in data.get("items", [])
+        ]
+        title = (str(data.get("caption", "")) or "Key figures") + estimate + source
+        return title, ["Figure", "Value", "Of"], rows
+    if part.type == PART_COMPARE:
+        columns = ["", *[str(item) for item in data.get("items", [])]]
+        rows = []
+        for row in data.get("rows", []):
+            unit = str(row.get("unit", ""))
+            cells = [f"{row['label']} ({unit})" if unit else str(row["label"])]
+            for index, value in enumerate(row.get("values", [])):
+                cell = _number(value) if isinstance(value, float) else str(value)
+                cells.append(f"{cell} — Best" if index in row.get("best", []) else cell)
+            rows.append(cells)
+        title = (str(data.get("caption", "")) or "Comparison") + estimate + source
+        return title, columns, rows
+    return None
 
 
 def _number(value: Any) -> str:
@@ -425,6 +468,12 @@ def _markdown_block(part: ContentPart) -> list[str]:
         return [f"**{_markdown_inline(title)}**", "", *_markdown_table(columns, rows)]
     if part.type == PART_REFUSED:
         return [f"> {_REFUSAL_SENTENCE}", ""]
+    grid = _block_table(part)
+    if grid is not None:
+        title, columns, rows = grid
+        return [f"**{_markdown_inline(title)}**", "", *_markdown_table(columns, rows)]
+    if part.type != PART_TEXT:
+        return [as_text(part), ""]
     return [part.text.strip("\n"), ""]
 
 
@@ -584,6 +633,11 @@ def _html_block(part: ContentPart) -> str:
         return _html_table(title, columns, rows)
     if part.type == PART_REFUSED:
         return f'<p class="refused" role="note">{_escape(_REFUSAL_SENTENCE)}</p>'
+    grid = _block_table(part)
+    if grid is not None:
+        return _html_table(*grid)
+    if part.type != PART_TEXT:
+        return f'<div class="body">{_escape(as_text(part))}</div>'
     return f'<div class="body">{_escape(part.text.strip(chr(10)))}</div>'
 
 
@@ -689,6 +743,11 @@ def _pdf_block(part: ContentPart) -> list[tuple[str, str]]:
         return _pdf_table(title, columns, rows)
     if part.type == PART_REFUSED:
         return [("meta", _REFUSAL_SENTENCE)]
+    grid = _block_table(part)
+    if grid is not None:
+        return _pdf_table(*grid)
+    if part.type != PART_TEXT:
+        return [("body", as_text(part))]
     return [("body", part.text.strip("\n"))]
 
 

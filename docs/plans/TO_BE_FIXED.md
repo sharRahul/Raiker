@@ -955,6 +955,40 @@ These parts of the same document are not done:
   it as expired. A sweep that settles it to `expired` (and closes its parked
   turn) would let the stored state say the same.
 
+## 2026-10-23 Quiet UI visual answers round — what is still open
+
+The visual answers of [04](quiet-ui/04_VISUAL_ANSWERS.md#status) shipped
+[FIXED-1136](FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04)
+to [FIXED-1149](FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review).
+These parts of the same document are not done:
+
+* **QUI-A08 — diagrams.** Planned as *Later*. Mermaid would be the first
+  diagram library in the bundle, and the built UI makes no external requests,
+  so it has to ship inside the app.
+* **Pin to project** in the block toolbar needs the Library
+  ([06, QUI-F15](quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#qui-f15--library)) and
+  a place in a project's Files & links for a saved block.
+* **The three-block limit and the answer style are guidance to the model.**
+  Found live: on *Visual where it helps*, Haiku 4.5 once split key figures into
+  three blocks (five blocks in one answer) before the instruction said to keep
+  them in one, and on *Mostly text* once drew a comparison until the instruction
+  said it overrides the general guidance. Above three blocks the answer offers
+  **Create document**. Nothing enforces either rule in the runtime, because the
+  runtime cannot tell whether the owner asked for a report or for a table.
+* **Streaming shows the raw fence until the turn finishes.** The typed parts
+  arrive with the final response, so while a turn streams its `raiker:` block is
+  visible as JSON in a code sample, and is replaced by the drawn block at the
+  end. A renderer that holds back an open `raiker:` fence while streaming would
+  remove the flash.
+* **The Plan card covers the line under it.** Seen in the RT-QUI-37
+  screenshot: when a turn has a plan, the sticky Plan card at the top of the
+  transcript sits over the turn's *Completed · N steps* line, so only its lower
+  edge shows. Not caused by this round; seen in Chat with any planned turn.
+* **A corrected-block retry streams twice.** On a local model, the first answer
+  streams, then the corrected one streams after it, and the final response
+  replaces both. Not seen live (this round used a hosted model, which is not
+  retried).
+
 ## 2026-10-21 verification follow-up — the Python CI job is at its 45-minute limit
 
 On `main`, CI run 39606078093 spent 40 min 42 s in `pytest` alone, and the next

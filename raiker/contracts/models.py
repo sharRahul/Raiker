@@ -38,6 +38,8 @@ CLIENT_TYPES = {
     "test_harness",
 }
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
+#: QUI-A rules — Auto · Mostly text · Visual where it helps.
+ANSWER_STYLES = {"auto", "text", "visual"}
 #: ``dont_ask`` (BUG-219) is the unattended posture: anything not already
 #: permitted by a standing rule is **denied** rather than queued, because a
 #: scheduled routine at 06:00 cannot answer a prompt and parking is not the same
@@ -469,6 +471,9 @@ EVENT_TYPES = {
     "turn_cost_limit_reached",
     "turn_spend_limit_reached",
     "turn_steered",
+    # QUI-A rules — a local model was asked once to correct a raiker: block
+    # the runtime refused. Reason codes only.
+    "typed_block_retry",
     "checkpoint_restore_planned",
     "checkpoint_fork_planned",
     "phase3.workspace.inspection.requested",
@@ -799,9 +804,14 @@ class PromptOptions:
     # does not name. A turn can therefore never grant itself authority the owner
     # has not already given it, which is why this needs no ceremony of its own.
     capability_modes: dict[str, str] = field(default_factory=dict)
+    # QUI-A rules — how much of an answer to draw: "auto", "text" (mostly
+    # text) or "visual" (visual where it helps). Presentation only; it changes
+    # one standing instruction and grants nothing.
+    answer_style: str = "auto"
 
     def __post_init__(self) -> None:
         _one_of(self.planning_mode, PLANNING_MODES, "planning_mode")
+        _one_of(self.answer_style, ANSWER_STYLES, "answer_style")
         object.__setattr__(self, "approval_mode", normalize_approval_mode(self.approval_mode))
         object.__setattr__(
             self, "capability_modes", validated_turn_capability_modes(self.capability_modes)

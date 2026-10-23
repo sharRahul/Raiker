@@ -22,7 +22,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
 | QUI-C03 | **Done**: the status line, Add instruction, Stop safely and the outcome line. Open: the task receipt on the outcome line ([06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md#qui-f16--task-receipt)). |
-| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22). Open: *More* (schedule, research depth, answer style). |
+| QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists ([04](04_VISUAL_ANSWERS.md#status), 2026-10-23). Open: *More* (schedule, research depth). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
 | QUI-C07 | **Done.** Tabs: Context (files in use), Plan, Sources, Activity. Memories in use are not listed yet: a turn's recall reports a count, not the records. |

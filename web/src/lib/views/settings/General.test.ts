@@ -75,3 +75,16 @@ it("reopens first-run setup on its model step, keeping what was chosen", async (
   // The startup page is called Home, as the sidebar calls it.
   expect(screen.getByRole("option", { name: "Home" })).toBeInTheDocument();
 });
+
+// Quiet UI 04 — Answer style, read by the runtime for every turn.
+it("offers the three answer styles and reads an unknown one as Auto", async () => {
+  const save = vi.fn();
+  render(General, { settings: { "chat.answer_style": "loud" }, save });
+  const select = screen.getByLabelText("Answer style");
+  expect(select).toHaveValue("auto");
+  expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
+    "Auto", "Mostly text", "Visual where it helps",
+  ]);
+  await fireEvent.change(select, { target: { value: "visual" } });
+  expect(save).toHaveBeenCalledWith({ "chat.answer_style": "visual" });
+});

@@ -302,9 +302,10 @@ test("a real turn answers with a table Raiker knows is a table", async ({ page }
 
   // And the chart, with its own numbers under it — colour and geometry are not
   // a channel everyone has.
-  const chart = page.locator("figure.data-chart").first();
+  // The block toolbar's Table replaced the fold (Quiet UI 04).
+  const chart = page.locator('.answer-block[data-block="chart"]').first();
   await expect(chart).toBeVisible({ timeout: 60_000 });
-  await chart.getByText("The numbers behind this chart").click();
+  await chart.getByRole("button", { name: "Table" }).click();
   await expect(chart.getByRole("table")).toBeVisible();
 
   await capture(page, `${SHOTS}/chat-typed-table-and-chart.png`);

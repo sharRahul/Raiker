@@ -39,6 +39,11 @@ PERSONALISATION_VALUES: dict[str, frozenset[str]] = {
     "personalisation.font": frozenset({"sans", "system", "mono"}),
 }
 
+#: QUI-A rules — Answer style: how much of an answer Raiker draws. It changes
+#: one sentence of presentation guidance and nothing a turn may do.
+ANSWER_STYLE_SETTING = "chat.answer_style"
+ANSWER_STYLE_VALUES = frozenset({"auto", "text", "visual"})
+
 router = APIRouter()
 
 SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk"}
@@ -86,6 +91,12 @@ def load_composer_approval_mode(ws: str | Path, principal_id: str) -> str:
         return normalize_approval_mode(approval_mode)
     except ContractValidationError:
         return "manual"
+
+
+def load_answer_style(ws: str | Path, principal_id: str) -> str:
+    """The owner's Answer style, or ``auto`` when unset or unreadable."""
+    value = _load(ws, principal_id).get(ANSWER_STYLE_SETTING)
+    return value if isinstance(value, str) and value in ANSWER_STYLE_VALUES else "auto"
 
 
 def _leaf_keys(value: Any, prefix: str = "") -> set[str]:
@@ -206,6 +217,12 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="invalid_personalisation_value",
             )
+    answer_style = body.settings.get(ANSWER_STYLE_SETTING)
+    if answer_style is not None and answer_style not in ANSWER_STYLE_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid_answer_style",
+        )
     # QUI-P06 — the approval time limit is read every time an approval is
     # raised; a value outside the offered choices would be read as the default
     # there while the page showed something else, so it is refused here.

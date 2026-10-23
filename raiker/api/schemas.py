@@ -852,6 +852,9 @@ class PromptRequest:
     # never grant itself authority; the owner's standing decision modes are not
     # touched. Validated in PromptOptions, which is where an invalid value fails.
     capability_modes: dict[str, str] | None = None
+    # QUI-A rules — "auto", "text" or "visual". Changes how the answer is
+    # presented and nothing it may do; validated in PromptOptions.
+    answer_style: str | None = None
     # Optional attachments for this prompt:
     #   {"type": "path", "path": "<workspace-relative path>"} — resolved through
     #     the workspace-scoped filesystem layer (outside the workspace fails

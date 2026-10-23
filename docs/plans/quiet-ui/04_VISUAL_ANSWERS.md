@@ -2,6 +2,29 @@
 
 Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
+## Status
+
+**Shipped 2026-10-23**
+([FIXED-1136](../FIXED_ITEMS.md#fixed-1136--a-turn-could-not-say-these-are-the-headline-numbers-qui-a04)
+to [FIXED-1149](../FIXED_ITEMS.md#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review);
+live cases RT-QUI-35 to RT-QUI-43 in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+
+| Item | State |
+|---|---|
+| QUI-A01 | **Done.** Chart kind `hbar`, axis from zero, labels on the left. |
+| QUI-A02 | **Done.** Chart kind `stacked`: 100% horizontal bars, shares printed on each part; negative or empty parts are refused. |
+| QUI-A03 | **Done.** Chart kind `scatter`: exactly two series (across, then up); labels name the points. |
+| QUI-A04 | **Done.** `raiker:figures`, up to four, unit required, *≈ estimate* in words. |
+| QUI-A05 | **Done.** `raiker:compare`; the runtime computes `best` from `better`, and a `best` the model sends is ignored. A tie marks every tied item; a row where all tie has no mark. |
+| QUI-A06 | **Done.** `raiker:measure`; a value off its scale is refused. |
+| QUI-A07 | **Done.** `raiker:proscons`, `raiker:steps` (on the path line) and `raiker:callout` (*Verdict*, *Warning*, *Next step*). |
+| QUI-A08 | **Later**, as planned. Mermaid would be the UI's first bundled diagram library. |
+| Rules | **Done.** Units required on figures. Figures, measures and comparisons that contain numbers but give no `source` are shown as text, with a line saying why; tables and charts keep their earlier behaviour (deviation: the rule names "a block", and applying it to charts would have changed every existing chart answer). At most three blocks is guidance to the model; more than three offers **Create document**, which puts the request in the composer rather than sending it. Small local models get one corrected-block retry (Ollama, LM Studio, llama.cpp, MLX, vLLM, local GGUF); hosted models do not, because a second paid call is not the owner's choice. |
+| Answer style | **Done** in **Settings › General › Answers** (*Auto · Mostly text · Visual where it helps*), read by the runtime for every turn. Deviation: *More* does not exist yet ([03, QUI-C04](03_WELCOME_HOME_AND_CHAT.md#status)), so it is an account setting rather than a composer choice. |
+| Block toolbar | **Done**: **Chart · Table** on charts, **Show as text** on every block, **Copy**, **CSV** for grids, **PNG** for charts. Open: **Pin to project**, which needs the Library ([06, QUI-F15](06_FEATURES_AND_IMPROVEMENTS.md#qui-f15--library)). |
+| Acceptance | **Met.** Each block has a validator with refusal reasons, a component and a table or text fallback; every number reaches a screen reader (charts keep their table in the page; the measure is a `<meter>`); a malformed block leaves its prose and a visible refusal. Exports keep figures and comparisons as tables and the rest as text. |
+
 ## What exists
 
 The typed answer channel already ships (BUG-288):

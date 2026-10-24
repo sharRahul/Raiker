@@ -21,7 +21,7 @@
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.0",
     "@types/node": "22.20.1",
-    "electron": "44.5.1",
+    "electron": "44.9.3",
     "eslint": "10.8.0",
     "globals": "17.8.0",
     "typescript": "5.9.3",

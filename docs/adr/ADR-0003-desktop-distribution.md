@@ -60,7 +60,7 @@ acceptance criteria, and references.
   Playwright driver for the real window. *Native per OS* — three UIs.
   *Browser only* — no native window, menu, notifications or installer
   integration. *Electron (keep)*.
-- **Choice.** Keep Electron 44.5.1 in `desktop/`, unchanged in architecture.
+- **Choice.** Keep Electron 44 (44.9.3 since 2026-10-24) in `desktop/`, unchanged in architecture.
 - **Justification.** It meets every requirement here; migration would replace
   working, tested code to save download size, which the owner did not ask for.
 - **Security.** Unchanged: context isolation, Chromium sandbox, no Node in the

@@ -14,32 +14,32 @@
 
   let { sessionId, turnId, text }: { sessionId: string; turnId: string; text: string } = $props();
 
-  let state = $state<"offer" | "saving" | "saved" | "dismissed">("offer");
+  let phase = $state<"offer" | "saving" | "saved" | "dismissed">("offer");
   let problem = $state<string | null>(null);
 
   async function save(): Promise<void> {
-    state = "saving";
+    phase = "saving";
     problem = null;
     try {
       const proposed = await api.proposeCorrectionMemory({ text, session_id: sessionId, turn_id: turnId });
       await api.decideMemoryProposal(proposed.candidate_id, { decision: "approved", expected_decision: "deferred" });
-      state = "saved";
+      phase = "saved";
     } catch (error) {
-      state = "offer";
+      phase = "offer";
       problem = failure("It was not remembered", "Nothing was saved.", "Try again, or add it in Memory.", error);
     }
   }
 </script>
 
-{#if state === "saved"}
+{#if phase === "saved"}
   <p class="correction" role="status">Remembered. <a href="#/memory?tab=memories">Open Memory</a></p>
-{:else if state !== "dismissed"}
+{:else if phase !== "dismissed"}
   <div class="correction" role="group" aria-label="Remember this correction">
     <span>Remember: <strong>{rememberQuestion(text)}</strong></span>
-    <button type="button" class="btn btn-soft btn-sm" disabled={state === "saving"} onclick={() => void save()}
-      >{state === "saving" ? "Saving…" : "Save"}</button
+    <button type="button" class="btn btn-soft btn-sm" disabled={phase === "saving"} onclick={() => void save()}
+      >{phase === "saving" ? "Saving…" : "Save"}</button
     >
-    <button type="button" class="btn btn-ghost btn-sm" disabled={state === "saving"} onclick={() => (state = "dismissed")}>Dismiss</button>
+    <button type="button" class="btn btn-ghost btn-sm" disabled={phase === "saving"} onclick={() => (phase = "dismissed")}>Dismiss</button>
     {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
   </div>
 {/if}

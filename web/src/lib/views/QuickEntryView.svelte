@@ -17,13 +17,13 @@
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../api";
-  import type { SessionView } from "../apiTypes";
+  import type { SessionSummary } from "../apiTypes";
   import { desktopBridge } from "../desktopShell";
   import { newIdempotencyKey } from "../idempotency";
 
   let text = $state("");
   let target = $state("new");
-  let recent = $state<SessionView[]>([]);
+  let recent = $state<SessionSummary[]>([]);
   let problem = $state<string | null>(null);
   let sending = $state(false);
   let input = $state<HTMLInputElement>();

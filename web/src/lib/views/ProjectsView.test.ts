@@ -1347,3 +1347,25 @@ describe("ProjectsView selection races", () => {
     expect(screen.queryByText(/Could not load project/)).toBeNull();
   });
 });
+
+describe("QUI-F13 a project in its own window", () => {
+  afterEach(() => {
+    delete (window as { raikerDesktop?: unknown }).raikerDesktop;
+  });
+
+  it("offers Open in new window only in the desktop window, and asks the shell for the project", async () => {
+    stubFetch({
+      "GET /api/projects": { projects: [project({ project_id: "proj_1" })], active_project_id: null },
+      "GET /api/projects/tree": [],
+    });
+    const openWindow = vi.fn();
+    (window as { raikerDesktop?: unknown }).raikerDesktop = {
+      bridgeVersion: 1, platform: "linux", onCommand: () => () => {}, setTitleBarColours: () => {}, focusWindow: () => {}, openWindow,
+    };
+    render(ProjectsView);
+    await screen.findByRole("button", { name: /^New chat$/ });
+    await openLifecycleMenu();
+    await fireEvent.click(screen.getByRole("menuitem", { name: "Open in new window" }));
+    expect(openWindow).toHaveBeenCalledWith("#/projects?project=proj_1");
+  });
+});

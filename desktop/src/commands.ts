@@ -33,6 +33,12 @@ export const CHANNELS = {
   titleBar: "raiker:title-bar",
   focus: "raiker:focus",
   quitForUpdate: "raiker:quit-for-update",
+  // Quiet UI 06 — the tray's attention dot and preference (QUI-F11), a place
+  // in its own window (QUI-F13), and closing Quick Entry (QUI-F01).
+  attention: "raiker:attention",
+  trayPreference: "raiker:tray-preference",
+  openWindow: "raiker:open-window",
+  closeWindow: "raiker:close-window",
 } as const;
 
 /** A `#rrggbb` colour; the only form the title-bar overlay accepts from the page. */

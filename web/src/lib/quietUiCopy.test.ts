@@ -110,3 +110,25 @@ describe("quiet UI word list (QUI-G02)", () => {
     }
   });
 });
+
+/*
+ * QUI-F10 — one confirmation, one loading style.
+ *
+ * Every "Are you sure" goes through `askConfirm` and the shell's one dialog.
+ * The Settings leave guard is the exception: a navigation guard answers the
+ * hash change synchronously, so it cannot wait for a dialog. And no surface
+ * says a bare "Loading…": it says what it is reading.
+ */
+describe("QUI-F10 one confirmation, one loading style", () => {
+  const files = svelteFiles(SRC).filter((path) => !path.endsWith("SettingsView.svelte"));
+
+  it("asks through the one dialog, never the browser's own", () => {
+    const offenders = files.filter((path) => /window\.confirm\(|[^.\w]confirm\(`|!confirm\(/.test(readFileSync(path, "utf8")));
+    expect(offenders.map((path) => relative(SRC, path))).toEqual([]);
+  });
+
+  it("never says a bare Loading…", () => {
+    const offenders = svelteFiles(SRC).filter((path) => shownText(readFileSync(path, "utf8")).some((text) => /^Loading(…|\.\.\.)$/.test(text)) || /["']Loading(…|\.\.\.)["']/.test(readFileSync(path, "utf8")));
+    expect(offenders.map((path) => relative(SRC, path))).toEqual([]);
+  });
+});

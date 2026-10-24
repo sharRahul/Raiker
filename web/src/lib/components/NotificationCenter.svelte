@@ -261,6 +261,9 @@
     for (const item of unread) {
       if (mirrored.has(item.notification_id)) continue;
       mirrored.add(item.notification_id);
+      // QUI-F05 — only while Raiker is in the background: a notice about
+      // something on screen is the corner card's job, not the desktop's.
+      if (!raikerIsHidden()) continue;
       // DEC-21a — the desktop channel has its own stored decision: a critical
       // exception can be on for one channel and off for the other.
       if (!interrupts(item.desktop_presentation)) continue;

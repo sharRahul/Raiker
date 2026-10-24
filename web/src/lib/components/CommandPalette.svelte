@@ -19,9 +19,10 @@
    *   Privacy rather than on Settings' front page.
    * * **Help** — every help article (QUI-L05), which opens in the help panel.
    *
-   * Threads, projects and tasks are deliberately not here yet: they need a
-   * debounced server search, and a palette that stalls on every keystroke is
-   * worse than one that only knows the product. The grouping leaves room.
+   * QUI-F22 — and the owner's own things: **Chats** (the server's chat
+   * search, debounced, so a keystroke never waits on it), **Tasks** and
+   * **Memories** (read once when the palette opens, matched as you type). A
+   * row of type filters narrows the list to one kind.
    */
   import Icon from "./Icon.svelte";
   import type { IconName } from "../icons";
@@ -29,6 +30,7 @@
   import { settingsSection } from "../settingsSections";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
   import { api } from "../api";
+  import { humanize, relativeTime } from "../format";
 
   let {
     open = false,
@@ -40,13 +42,28 @@
     onClose?: () => void;
   } = $props();
 
+  type Group = "Commands" | "Pages" | "Chats" | "Tasks" | "Memories" | "Settings" | "Help";
+  const GROUPS: Group[] = ["Commands", "Pages", "Chats", "Tasks", "Memories", "Settings", "Help"];
+  /** QUI-F22 — the type filters, in the order the results are grouped. */
+  const FILTERS: { id: "all" | Group; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "Chats", label: "Chats" },
+    { id: "Tasks", label: "Tasks" },
+    { id: "Memories", label: "Memories" },
+    { id: "Settings", label: "Settings" },
+    { id: "Help", label: "Help" },
+  ];
+  let filter = $state<"all" | Group>("all");
+
   interface Entry {
     id: string;
     label: string;
-    group: "Commands" | "Pages" | "Settings" | "Help";
+    group: Group;
     hint: string;
     icon: IconName;
     href: string;
+    /** What is matched besides the label and hint, when the row shows less. */
+    search?: string;
   }
 
 
@@ -101,7 +118,73 @@
       });
   });
 
-  const ALL: Entry[] = $derived([...COMMANDS, ...PAGES, ...SETTINGS, ...HELP]);
+  // QUI-F22 — tasks and memories, read once per opening; chats searched as typed.
+  let TASKS = $state<Entry[]>([]);
+  let MEMORIES = $state<Entry[]>([]);
+  let CHATS = $state<Entry[]>([]);
+  $effect(() => {
+    if (!open) return;
+    void api
+      .tasks()
+      .then((tasks) => {
+        TASKS = tasks.map((task) => ({
+          id: `task-${task.task_id}`,
+          label: task.title || "Untitled task",
+          group: "Tasks" as const,
+          hint: (task.objective ?? "").slice(0, 120) || humanize(task.status),
+          icon: "tasks" as IconName,
+          href: `#/tasks?task=${encodeURIComponent(task.task_id)}`,
+        }));
+      })
+      .catch(() => (TASKS = []));
+    void api
+      .memories()
+      .then((records) => {
+        MEMORIES = records.map((record) => ({
+          id: `memory-${record.memory_id}`,
+          label: record.text.length > 80 ? `${record.text.slice(0, 79)}…` : record.text,
+          group: "Memories" as const,
+          hint: `Memory · ${relativeTime(record.created_at)}`,
+          search: record.text,
+          icon: "memory" as IconName,
+          href: `#/memory?tab=memories&record=${encodeURIComponent(record.memory_id)}`,
+        }));
+      })
+      .catch(() => (MEMORIES = []));
+  });
+  $effect(() => {
+    const needle = query.trim();
+    if (!open || needle.length < 2) {
+      CHATS = [];
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void api
+        .searchChats(needle)
+        .then((sessions) => {
+          if (cancelled) return;
+          CHATS = sessions.slice(0, 8).map((session) => ({
+            id: `chat-${session.session_id}`,
+            label: session.title || "Untitled conversation",
+            group: "Chats" as const,
+            // The server already matched it: its snippet says where.
+            hint: (session.match_snippet ?? "").trim() || needle,
+            icon: "chat" as IconName,
+            href: `#/new-chat?session=${encodeURIComponent(session.session_id)}${session.match_turn_id ? `&turn=${encodeURIComponent(session.match_turn_id)}` : ""}`,
+          }));
+        })
+        .catch(() => {
+          if (!cancelled) CHATS = [];
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  });
+
+  const ALL: Entry[] = $derived([...COMMANDS, ...PAGES, ...CHATS, ...TASKS, ...MEMORIES, ...SETTINGS, ...HELP]);
 
   let query = $state("");
   let active = $state(0);
@@ -111,19 +194,27 @@
 
   const matches = $derived.by(() => {
     const needle = query.trim().toLowerCase();
-    if (needle === "") return ALL.slice(0, 12);
-    return ALL.filter(
-      (entry) =>
-        entry.label.toLowerCase().includes(needle) ||
-        entry.hint.toLowerCase().includes(needle),
-    ).slice(0, 24);
+    const pool = filter === "all" ? ALL : ALL.filter((entry) => entry.group === filter);
+    if (needle === "") {
+      // Unfiltered, an empty query shows the product's own places; a filter
+      // shows what it holds.
+      return filter === "all" ? pool.filter((entry) => entry.group !== "Tasks" && entry.group !== "Memories").slice(0, 12) : pool.slice(0, 24);
+    }
+    return pool
+      .filter(
+        (entry) =>
+          entry.group === "Chats" ||
+          entry.label.toLowerCase().includes(needle) ||
+          entry.hint.toLowerCase().includes(needle) ||
+          (entry.search ?? "").toLowerCase().includes(needle),
+      )
+      .slice(0, 30);
   });
 
   // Grouped for display, but `matches` stays the flat list the keyboard moves
   // through — two orders would let the highlight and Enter disagree.
   const grouped = $derived.by(() => {
-    const order: Entry["group"][] = ["Commands", "Pages", "Settings", "Help"];
-    return order
+    return GROUPS
       .map((group) => ({ group, entries: matches.filter((entry) => entry.group === group) }))
       .filter((section) => section.entries.length > 0);
   });
@@ -139,6 +230,7 @@
     deactivate?.(restoreFocus);
     deactivate = null;
     query = "";
+    filter = "all";
     onClose();
   }
 
@@ -194,12 +286,25 @@
           bind:this={input}
           bind:value={query}
           onkeydown={onKeydown}
-          placeholder="Search pages, settings and commands"
-          aria-label="Search pages, settings and commands"
+          placeholder="Search chats, tasks, memories, settings and help"
+          aria-label="Search everything"
           aria-controls="palette-results"
           autocomplete="off"
         />
         <kbd>Esc</kbd>
+      </div>
+      <div class="filters" role="group" aria-label="Show only">
+        {#each FILTERS as item (item.id)}
+          <button
+            type="button"
+            class="filter"
+            aria-pressed={filter === item.id}
+            onclick={() => {
+              filter = item.id;
+              input?.focus();
+            }}>{item.label}</button
+          >
+        {/each}
       </div>
       <div class="results" id="palette-results" role="listbox" aria-label="Results">
         {#if matches.length === 0}
@@ -275,6 +380,27 @@
     border: 1px solid var(--border);
     border-radius: var(--r-xs);
     padding: 0.05rem 0.3rem;
+  }
+  .filters {
+    display: flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+    padding: var(--space-2) var(--space-4) 0;
+  }
+  .filter {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .filter[aria-pressed="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   .results {
     overflow-y: auto;

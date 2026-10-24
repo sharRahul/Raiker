@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../../confirm.svelte";
   import { onDestroy } from "svelte";
   import { api, ApiError } from "../../api";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
@@ -289,9 +290,10 @@
   async function convert() {
     if (!selected || !conversionPreview) return;
     if (
-      !window.confirm(
-        `Convert this immutable snapshot to ${quantization} in the isolated worker?`,
-      )
+      !(await askConfirm({
+        title: `Convert this immutable snapshot to ${quantization} in the isolated worker?`,
+        confirmLabel: "Convert",
+      }))
     )
       return;
     try {

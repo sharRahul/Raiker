@@ -50,6 +50,11 @@ why it was proposed. You can:
   recall; or
 - **Reject** it so the proposal does not become memory.
 
+A correction you make in Chat arrives here too: when a message starts *That's
+wrong*, *No,* or *Actually*, Chat offers *Remember: …?* under the answer, and
+**Save** files your own words as a proposal and approves it in one step, under
+the same rules.
+
 Relationship review is separate. **Scan approved memories** can prepare
 candidate links, but only **Approve relationship** makes a link eligible for
 relationship retrieval. Rejection does not delete the underlying memories.
@@ -254,6 +259,17 @@ memory reaches a prompt and preserves provenance labels. Post-Stage-J work will
 add a shared `RetrievalBudget`, deterministic graph ranking/truncation, and a
 versioned graph-to-prompt serialization format; these are plans, not current
 product claims.
+
+## Undoing what Raiker learned
+
+**Memory → Controls** puts two lists in one place, each with **Undo**:
+
+- **What Raiker has learned to do** — skills built in this workspace that are
+  in use. Undo turns one off; it stays installed, and **Connections → Skills**
+  turns it on again.
+- **Approvals you've given** — standing approvals still in force, with what
+  they cover, how often they were used and when they end. Undo revokes one
+  after asking once: the next matching action asks you again.
 
 ## Correcting and controlling an approved memory
 

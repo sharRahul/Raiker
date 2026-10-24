@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../../confirm.svelte";
   /**
    * Runtime configuration.
    *
@@ -156,7 +157,7 @@
     const question = recreate
       ? "Discard this session's environment and its cached files? The next command starts from the approved image."
       : "Discard this session's environment? The next command starts from the approved image; cached files are kept.";
-    if (!window.confirm(question)) return;
+    if (!(await askConfirm({ title: question, confirmLabel: "Discard", danger: true }))) return;
     resetting = profileId; notice = null;
     try {
       await api.resetExecutionEnvironment(profileId, "settings", recreate);
@@ -198,7 +199,7 @@
   async function setEnvironmentEnabled(profileId: string, name: string, enabled: boolean) {
     // DEC-11 step 6 — off stops new work and asks every command running there
     // to stop; its runs, receipts and settings are kept.
-    if (!enabled && !window.confirm(`Turn off ${name}? Nothing new will run there, and commands running there now are stopped. Its settings are kept.`)) return;
+    if (!enabled && !(await askConfirm({ title: `Turn off ${name}?`, body: "Nothing new will run there, and commands running there now are stopped. Its settings are kept.", confirmLabel: "Turn off" }))) return;
     switching = profileId;
     notice = null;
     try {
@@ -245,7 +246,7 @@
     const question = instead
       ? `Remove ${name}? Work runs here by default, so from now on it runs on ${instead.name}. Commands that ran here stay in the record.`
       : `Remove ${name}? Its settings go; commands that ran here stay in the record.`;
-    if (!window.confirm(question)) return;
+    if (!(await askConfirm({ title: question, confirmLabel: "Remove", danger: true }))) return;
     switching = profileId;
     notice = null;
     try {
@@ -316,7 +317,7 @@
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if mode === null}
-    <p class="description" role="status">Loading…</p>
+    <p class="description" role="status">Reading where work runs…</p>
   {:else}
     <p class="description">
       {running

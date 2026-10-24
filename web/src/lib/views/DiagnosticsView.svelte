@@ -230,7 +230,7 @@
       {#if healthError}
         <p class="error" role="alert">{healthError}</p>
       {:else if health === null}
-        <p class="sub">Loading…</p>
+        <p class="sub" role="status">Reading self-monitoring…</p>
       {:else if health.length === 0}
         <p class="sub">No health transitions recorded.</p>
       {:else}
@@ -255,7 +255,7 @@
       {#if integrityError}
         <p class="error" role="alert">{integrityError}</p>
       {:else if integrity === null}
-        <p class="sub">Loading…</p>
+        <p class="sub" role="status">Checking memory integrity…</p>
       {:else}
         <p class="big-status">
           <Badge

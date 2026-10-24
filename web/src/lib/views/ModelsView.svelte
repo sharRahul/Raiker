@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { onDestroy, onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -541,9 +542,12 @@
     const id = profile.profile_id;
     const name = providerName(profile.provider);
     if (
-      !window.confirm(
-        `Disconnect ${name}? The encrypted credential and custom endpoint stored for this provider will be removed from this Raiker instance.`,
-      )
+      !(await askConfirm({
+        title: `Disconnect ${name}?`,
+        body: "The encrypted credential and custom endpoint stored for this provider will be removed from this Raiker instance.",
+        confirmLabel: "Disconnect",
+        danger: true,
+      }))
     )
       return;
     disconnecting = { ...disconnecting, [id]: true };

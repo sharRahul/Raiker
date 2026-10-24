@@ -853,6 +853,9 @@ export const api = {
       expected_decision: string;
     },
   ) => contract.decideMemoryProposal(id, body),
+  // QUI-F20 — the owner's correction, filed as a memory proposal.
+  proposeCorrectionMemory: (body: { text: string; session_id: string; turn_id?: string | null }) =>
+    contract.proposeMemoryFromCorrection(body),
   memoryHistory: (id: string) => contract.getMemoryHistory(id),
   changeMemoryScope: (
     id: string,
@@ -1035,6 +1038,8 @@ export const api = {
   // one saved elsewhere since is refused 409 `project_conflict`.
   // BR-D01 — whether a Build turn's change was verified by the project's checks.
   getBuildTurnOutcome: (sessionId: string, turnId: string) => contract.getBuildTurnOutcome(sessionId, turnId),
+  // QUI-F16 — what one turn used, read, changed and sent, from its own records.
+  turnReceipt: (sessionId: string, turnId: string) => contract.getTurnReceipt(sessionId, turnId),
   saveProjectContext: (id: string, context: ProjectContext) =>
     contract.saveProjectContext(id, {
       instructions: context.instructions,

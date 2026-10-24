@@ -37,6 +37,8 @@ from raiker.storage.stores.approvals import APPROVAL_TIMEOUT_CHOICES, APPROVAL_T
 PERSONALISATION_VALUES: dict[str, frozenset[str]] = {
     "personalisation.spacing": frozenset({"compact", "comfortable", "spacious"}),
     "personalisation.font": frozenset({"sans", "system", "mono"}),
+    # QUI-F12 — the size of conversation text, apart from the interface's.
+    "personalisation.chat_text_size": frozenset({"100", "110", "125", "140"}),
 }
 
 #: QUI-A rules — Answer style: how much of an answer Raiker draws. It changes

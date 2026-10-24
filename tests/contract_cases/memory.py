@@ -14,7 +14,7 @@ from raiker.memory.candidates import create_deferred_candidate
 from raiker.memory.eidetic import propose_gist, record_observation
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
-from tests.contract_cases.base import Call, Cases, Seed, patched, plain
+from tests.contract_cases.base import Call, Cases, Seed, first, patched, plain, with_turn
 
 OWNER = "principal_owner"
 
@@ -69,6 +69,13 @@ def _candidate(ws: Path) -> str:
 def _proposals(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
     _candidate(ws)
     return "/api/memory/proposals"
+
+
+def _correction(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-F20 — the owner's correction in a conversation they own."""
+    with_turn("")(ws, client, h)
+    session_id = first(client, h, "/api/sessions", "session_id")
+    return "/api/memory/proposals", {"text": "Anna prefers short replies.", "session_id": session_id}
 
 
 def _proposal_decision(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
@@ -269,6 +276,7 @@ def _revoke_knowledge_source(ws: Path, client: TestClient, h: dict[str, str]) ->
 
 CASES: Cases = {
     ("GET", "/api/memory/proposals"): _proposals,
+    ("POST", "/api/memory/proposals"): _correction,
     ("POST", "/api/memory/proposals/{candidate_id}/decision"): _proposal_decision,
     ("GET", "/api/memory/relationship-proposals"): _relationships("relationship-proposals"),
     ("GET", "/api/memory/entity-proposals"): _relationships("entity-proposals"),

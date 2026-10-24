@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   /**
    * BUG-305 — what Raiker can read, in one list.
    *
@@ -52,7 +53,7 @@
   }
 
   async function revoke(source: KnowledgeSource): Promise<void> {
-    if (!window.confirm(consequence(source))) return;
+    if (!(await askConfirm({ title: consequence(source), confirmLabel: "Stop reading", danger: true }))) return;
     busy = source.source_id;
     actionError = null;
     try {

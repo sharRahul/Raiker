@@ -32,6 +32,11 @@ OS_NOTIFY_ENV = "RAIKER_OS_NOTIFY_CMD"
 # Notification kind for the dashboard notification center.
 APPROVAL_PENDING_KIND = "approval_pending"
 
+# QUI-F05 — a turn parked on a question it cannot go on without. It travels
+# the approval transport but it is not an approval, so it is its own kind: the
+# owner switches *Input needed* and *Approval needed* separately.
+QUESTION_PENDING_KIND = "question_pending"
+
 # A parked critical action (Workstream F / F7). Its own kind so the dashboard can
 # surface it distinctly — critical approvals resolve *only* by a live human's
 # manual decision, so the owner should never miss one.
@@ -154,15 +159,21 @@ def notify_approval_pending(
     owner_principal_id = resolve_owner_principal_id(store, acting_principal_id)
     if owner_principal_id is None:
         return None
+    from raiker.contracts.models import OWNER_QUESTION_TOOL
+
+    question = tool_name == OWNER_QUESTION_TOOL
+    kind = QUESTION_PENDING_KIND if question else APPROVAL_PENDING_KIND
     risk_suffix = f" ({risk_level} risk)" if risk_level else ""
-    title = "Approval needed"
+    title = "Input needed" if question else "Approval needed"
     body = (
-        f"Raiker is waiting for your approval to run '{tool_name}'{risk_suffix}. "
+        "Raiker has a question and is waiting for your answer to continue."
+        if question
+        else f"Raiker is waiting for your approval to run '{tool_name}'{risk_suffix}. "
         "Review it in the approvals queue."
     )
     notification_id = store.insert_notification(
         principal_id=owner_principal_id,
-        kind=APPROVAL_PENDING_KIND,
+        kind=kind,
         title=title,
         body=body,
         subject_id=approval_id,
@@ -173,7 +184,7 @@ def notify_approval_pending(
     dispatch_notification_hook(
         store,
         owner_principal_id=owner_principal_id,
-        kind=APPROVAL_PENDING_KIND,
+        kind=kind,
         notification_id=notification_id,
         subject_id=approval_id,
     )

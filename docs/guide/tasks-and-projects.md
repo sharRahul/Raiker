@@ -20,6 +20,23 @@ to run**, and — only where there is a choice — **how it runs**.
 A background agent starts now, so **How it runs** is asked under **Now** and
 nowhere else — there is no scheduled variant of it to compose.
 
+**Start from a template.** While the instruction is empty, three templates sit
+above it: **Morning brief** (every morning: today's calendar, what waits on you,
+what is due), **Weekly inbox tidy** (every Monday: what needs a reply and what
+could be archived; it sends, archives and deletes nothing) and **Watch this
+page** (every day: what changed on a page — add its address where the cursor
+waits). A template only fills the form; nothing is saved until you press
+**Create routine**. Chat's **Save as routine** fills the same form from a turn
+that went well. Every run's result appears on Home and in the task's own
+conversation, where a reply steers the next run.
+
+**Quick Entry** (desktop window): **Ctrl+Shift+Space** (**Cmd+Shift+Space** on
+a Mac) opens a small box from anywhere on your computer. Type, choose **Send
+to** — **New task** or one of your five most recent conversations — and press
+Enter. It hides at once and Raiker's main window stays where it is; a new task
+starts now, and the top bar's live work line shows it. Esc closes the box. If
+sending fails, the box comes back with your message and the reason.
+
 **Repeat** offers every cadence the scheduler honours: **Keep going** (a cycle
 roughly every 20 minutes), **Hourly**, **Daily**, **Weekdays** (Monday to
 Friday) and **Weekly**. A routine is
@@ -245,7 +262,8 @@ leave the workspace.
 (`projects/<slug>`), how many chats it holds and when it was last worked in.
 **New chat** and **Start in Build** are on the card; **Archive**, **Move** and
 **Delete** are in its `⋯` menu, because deleting a managed project deletes its
-folder and that is not a neighbour for a button you press all day. A folder tree
+folder and that is not a neighbour for a button you press all day. In the
+desktop window the same menu has **Open in new window**. A folder tree
 shows nesting.
 
 **Current project** is the one project new work starts in — the same one every
@@ -423,10 +441,15 @@ through*, inside Raiker, outside it, or both. Both start off. It covers security
 findings and containment — a capability or server Raiker has stopped — and
 nothing else; what a model writes in a notice can never make it urgent.
 
-**What interrupts you** lets you stop a kind of notice from appearing in the
-corner and on the desktop at any time of day — background work, security
-findings and containment, or extensions and MCP servers. It is still recorded and
-counted. Decisions have no such switch: work is waiting on them.
+**What interrupts you** has a switch for each event: **Approval needed**,
+**Input needed** (Raiker asked you a question), **Response ready** (an answer
+arrived while Raiker was in the background), **Task failed**, **Background task
+finished**, security findings and containment, and extensions and MCP servers.
+A notice you turn off is still recorded and counted. **Approval needed** and
+**Input needed** turn off only the desktop alert: inside Raiker they always
+show, because work is waiting on them, and an approval for a critical action
+has no switch at all. Desktop alerts appear only while Raiker is not the window
+you are looking at.
 
 **Send a test notice** sends one through exactly the path a real notice takes,
 using what is saved, and says what happened to it — shown now, or held until
@@ -435,7 +458,8 @@ quiet hours end. The desktop notification command you may have configured
 
 **Only work you were not watching notifies.** An ordinary Chat turn is a task
 too, and a banner behind an answer you are reading is noise, so those are
-silent. The notice carries the task's title and whether it finished; what the
+silent — unless you have moved to another window while it ran, which is what
+**Response ready** is for. The notice carries the task's title and whether it finished; what the
 run actually produced stays in its thread, because a notification can end up on
 a lock screen and the thread is one click away.
 

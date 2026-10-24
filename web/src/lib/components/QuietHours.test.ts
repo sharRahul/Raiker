@@ -51,7 +51,7 @@ function policy(partial: Partial<NotificationDelivery> = {}): NotificationDelive
     },
     decisions_interrupt: true,
     categories: [
-      { category: "work", label: "Background work finished or paused", interrupts: true },
+      { category: "work", label: "Background task finished", interrupts: true },
       { category: "security", label: "Security findings and containment", interrupts: true },
       { category: "extensions", label: "Extensions and MCP servers", interrupts: true },
     ],
@@ -253,11 +253,13 @@ describe("Settings → Notifications, quiet hours", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("cannot start and end at the same time");
   });
 
-  it("offers interrupt switches for every category but decisions", async () => {
+  it("offers the event switches, and says approvals still show inside Raiker (QUI-F05)", async () => {
     const save = vi.fn();
     render(Notification, { settings: {}, save });
-    expect(screen.getByLabelText("Background work finished or paused")).toBeChecked();
-    expect(screen.queryByLabelText(/approval/i)).not.toBeInTheDocument();
+    for (const label of ["Approval needed", "Input needed", "Response ready", "Task failed", "Background task finished"]) {
+      expect(screen.getByLabelText(label)).toBeChecked();
+    }
+    expect(screen.getByText(/inside Raiker they always show/)).toBeInTheDocument();
     await fireEvent.click(screen.getByLabelText("Extensions and MCP servers"));
     expect(save).toHaveBeenCalledWith({ "notification.interrupt.extensions": false });
   });

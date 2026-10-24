@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   /**
    * Backlog #18 — the governed record, on a wire.
    *
@@ -167,7 +168,7 @@
   }
 
   async function remove(destination: TelemetryDestination) {
-    if (!confirm(`Remove “${destination.name}”? Nothing already delivered is affected.`)) return;
+    if (!(await askConfirm({ title: `Remove “${destination.name}”?`, body: "Nothing already delivered is affected.", confirmLabel: "Remove", danger: true }))) return;
     busy = destination.destination_id;
     error = null;
     try {

@@ -26,7 +26,9 @@ Under the bar, one quiet line says **where the next message goes**: *Stays on
 this computer* for a model that runs on this device, *Sent to Anthropic* (or the
 provider's name) for a hosted one, and *Where it runs is not confirmed* when the
 runtime has not said. It follows the model chosen for the turn, and its tooltip
-gives the full sentence.
+gives the full sentence. With files attached it says they go too (*Sent to
+Anthropic, with 2 files*). Home's composer shows the same line for the model
+Chat will send on.
 
 ### Starting a conversation
 
@@ -205,11 +207,34 @@ through, *Outcome unknown* when a step never reported how it ended, or *Not
 done*. A plain answer has no such line, and a stopped or parked turn says so in
 its own words.
 
+**Every settled turn ends with its receipt**, one line you can open: the
+model, roughly what it cost, what it read, what it changed or sent (with the
+time you approved each change) and what left this computer — for example
+*Haiku 4.5 · ≈ $0.0128 · 1 file read · nothing else left this computer*.
+Raiker builds it from the turn's own audit records, never from what the model
+says it did, and a step that failed or was refused is not on it. A local model
+reads *no charge*; a paid model Raiker has no price for reads *cost not known*,
+never free.
+
 A completed reply also has **Read aloud**. It is manual: Raiker never starts
 speaking because a response arrived. **Stop speaking** interrupts playback, and
 starting dictation anywhere stops it. The spoken form keeps readable prose but
 omits fenced-code bodies, Markdown/citation syntax and raw URL text. Streaming
 or incomplete replies cannot be read aloud.
+
+When a turn with no failed step went well, **Save as routine** (beside Copy)
+opens **Work → Tasks** with your request as a daily routine's instruction, the
+steps this turn took, and the conversation's title. Nothing is saved until you
+review it and press **Create**; each step still asks for approval where it would.
+
+**When you correct Raiker** — a message that starts *That's wrong*, *No,* or
+*Actually* — the answer is followed by *Remember: Anna prefers short replies?*
+with **Save** and **Dismiss**. Save keeps your own words as a memory, through
+the same review Memory's Suggestions use (secret-like text is never kept);
+Dismiss keeps nothing.
+
+Conversation text has its own size, apart from the rest of Raiker: **Settings →
+Personalisation → Chat text size** (110% unless you choose 100%, 125% or 140%).
 
 Every code block in a reply carries:
 
@@ -595,6 +620,17 @@ show `executes_action: false`. **Approvals** has **Pending** and **History**,
 with each decision beside the queue and the conversation it came from named on
 every row.
 
+### When Raiker asks you a question
+
+Sometimes a task cannot go on without your choice — which account, which day.
+Raiker then stops on a question card, not an approval card: *Waiting for your
+answer*, one question at a time (*1 of 2*), where you pick one option, pick
+several, or type your own answer, with **Skip** and **Confirm and continue**.
+Your answer goes back exactly as you gave it and the task continues in the same
+conversation. A question never grants anything, so it never offers **Allow
+once**; it is answered in Chat, in Build, from the floating *Question for you*
+card, from Home's *Answer a question* row, or on Approvals.
+
 ### Deciding in another tab
 
 A turn that is waiting shows **Waiting for your decision**. You do not have to decide
@@ -609,6 +645,11 @@ exactly once even if several tabs react at the same moment; a tab that loses tha
 race says **Continued in another tab** rather than reporting an error.
 
 ## Background work
+
+Whatever page you are on, the top bar shows **one line while something runs**:
+the turn being written or the task running, with its real current step (*New
+chat · Writing the answer*), or *2 tasks running* with a menu of each. Click it
+to open the work. It is not there when nothing runs.
 
 Chat shows the same inline **Background Work** panel as Build, behind the
 **Background** toggle in the header — whose label already says how much is

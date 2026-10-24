@@ -53,6 +53,12 @@
       ? (settings["personalisation.font"] as string)
       : "sans",
   );
+  // QUI-F12 — chat text has its own size, apart from the interface's.
+  const chatTextSize = $derived(
+    ["100", "110", "125", "140"].includes(settings["personalisation.chat_text_size"] as string)
+      ? (settings["personalisation.chat_text_size"] as string)
+      : "110",
+  );
   const weatherLocation = $derived((settings[WEATHER_LOCATION_KEY] as string) ?? "");
   /** Open when the owner has tuned either of them, so a non-default is never hidden. */
   const tuned = $derived(spacing !== "comfortable" || font !== "sans");
@@ -104,6 +110,24 @@
       </button>
     {/each}
   </div>
+</section>
+
+<section class="settings-card">
+  <div class="card-heading"><h3>Conversation text</h3><p>The size of messages in Chat, separate from the rest of Raiker.</p></div>
+  <label>
+    <span>Chat text size</span>
+    <select
+      class="settings-select"
+      aria-label="Chat text size"
+      value={chatTextSize}
+      onchange={(e) => save({ "personalisation.chat_text_size": e.currentTarget.value })}
+    >
+      <option value="100">100%</option>
+      <option value="110">110% (default)</option>
+      <option value="125">125%</option>
+      <option value="140">140%</option>
+    </select>
+  </label>
 </section>
 
 <section class="settings-card">

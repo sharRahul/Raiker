@@ -36,6 +36,7 @@
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
   import HelpPanel from "./lib/components/HelpPanel.svelte";
+  import ConfirmDialog from "./lib/components/ConfirmDialog.svelte";
   import { helpSlugFromHash, isHelpAddress, openHelp } from "./lib/help.svelte";
   import { movedSettingsAddress } from "./lib/settingsSections";
 
@@ -53,6 +54,10 @@
   // so a count on an overview can open the records it counted.
   let currentFilter = $state<string | null>(
     typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).filter,
+  );
+  // QUI-F22 — one memory a link names (`#/memory?tab=memories&record=…`).
+  let currentRecord = $state<string | null>(
+    typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).recordId,
   );
   let chatVisited = $state(false);
   // Build keeps its transcript, its unsent draft, and its streaming turn alive
@@ -223,6 +228,7 @@
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
       currentFilter = routeStateFromHash(window.location.hash).filter;
+      currentRecord = routeStateFromHash(window.location.hash).recordId;
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       anchoredTurnId = routeStateFromHash(window.location.hash).turnId;
       openTaskId = routeStateFromHash(window.location.hash).taskId;
@@ -349,6 +355,12 @@
     <div class="desktop-drag-strip" aria-hidden="true"></div>
   {/if}
   <LoginView {onAuthenticated} runtimeState={authState} />
+{:else if current === "quick-entry"}
+  <!-- QUI-F01 — Quick Entry: the small window the desktop opens from anywhere
+       on the computer. One input and a "send to" picker; no shell around it. -->
+  <main id="main" class="quick-entry-focus" tabindex="-1">
+    <LazyRoute route="quick-entry" />
+  </main>
 {:else if current === "model-setup"}
   <!-- First-run setup is a focused sheet: no navigation, top bar or palette
        around it, the way the desktop Setup window before sign-in has none.
@@ -442,7 +454,7 @@
               }}
             />
           {:else if current === "memory"}
-            <LazyRoute route="memory" props={{ tab: currentTab ?? "overview", filter: currentFilter }} />
+            <LazyRoute route="memory" props={{ tab: currentTab ?? "overview", filter: currentFilter, record: currentRecord }} />
           {:else if current === "approvals"}
             <LazyRoute
               route="approvals"
@@ -483,6 +495,7 @@
             current !== "new-chat" &&
             current !== "build" &&
             current !== "state-gallery" &&
+            current !== "quick-entry" &&
             current !== "model-setup"}
             <LazyRoute
               route="settings"
@@ -498,6 +511,7 @@
   <NotificationCenter />
   <ModelOperationTray />
   <HelpPanel {current} />
+  <ConfirmDialog />
 {/if}
 
 <style>
@@ -546,6 +560,11 @@
     background:
       radial-gradient(50% 40% at 100% 0%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
       var(--bg);
+  }
+  .quick-entry-focus {
+    height: 100vh;
+    overflow: hidden;
+    background: var(--surface);
   }
   .setup-focus:focus-visible {
     outline: none;

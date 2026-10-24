@@ -15,6 +15,38 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-24 (Quiet UI features and improvements, hosted Anthropic Haiku 4.5)
+
+Fifteen features of the [Quiet UI plan, 06](../plans/quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#status)
+([FIXED-1150](../plans/FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04)
+to [FIXED-1167](../plans/FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round)).
+Fresh workspaces served by `raiker-web` at 1440×900. Anthropic was connected
+through **Add model**, with the key and workspace ID typed from the run's
+environment; neither appears in a spec, command, document, screenshot or the
+server log. Spec: `web/e2e/quiet-ui-features-live.spec.ts`, developed against
+two workspaces, then run on a third fresh workspace: RT-QUI-44 to 50 in one
+run, and RT-QUI-51 to 56 after a fix to the spec's own reload — **13/13**. The
+desktop-only parts (the tray, a project in its own window, Quick Entry's global
+shortcut) are proved by `desktop/e2e/shell.spec.ts` under Xvfb: **12/12**.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-44 | Anthropic connects through **Add model → An account I have**, Haiku 4.5 kept and made the default | ✅ |
+| RT-QUI-45 | Home's composer reads *Sent to Anthropic*, and *Sent to Anthropic, with 1 file* once a document is attached | ✅ |
+| RT-QUI-46 | While a turn runs the top bar reads *New chat · Writing the answer*, and the line is gone when it ends; the turn ends with *Haiku 4.5 · ≈ $0.0128 · 1 file read · nothing else left this computer*, which opens to *Model*, *Cost*, *Read*, *Changed or sent* and *Left this computer: The conversation, to Anthropic* | ✅ after fixes found in this round: the provider read *anthropic* in lower case |
+| RT-QUI-47 | Haiku calls `ask_owner_question`: a card reads *Waiting for your answer* and *1 of 2*, the row *waiting for your answer*, and there is no **Allow once**; Hi, then Tue and Wed, **Confirm and continue**, and the answer reads *Hi! I'm available to help you on Tuesday and Wednesday* under *Completed · 1 step* | ✅ after fixes found in this round ([FIXED-1152](../plans/FIXED_ITEMS.md#fixed-1152--an-answered-question-read-as-a-failed-step-qui-f02-found-live)): the answered question read *failed* and the turn *Partially completed*; the parked turn also said *Waiting for your decision* |
+| RT-QUI-48 | *That's wrong — Anna prefers short replies. Reply with one short sentence…* is answered and followed by *Remember: Anna prefers short replies?*; **Save** puts it in Memory › Memories | ✅ after a fix found in this round ([FIXED-1162](../plans/FIXED_ITEMS.md#fixed-1162--a-correction-was-forgotten-as-soon-as-it-was-made-qui-f20)): the offer took the follow-up instruction too and read *replies.?* |
+| RT-QUI-49 | Ctrl+K, *Anna*: **Chats** and **Memories** groups; the **Memories** filter hides the chats; choosing the memory opens Memory › Memories with its details open | ✅ |
+| RT-QUI-50 | **Save as routine** opens Work › Tasks with the request and *Last time this took these steps: …*, on **Repeating**; **Morning brief** fills the instruction, *Daily* and *Results appear on Home and in this task's own conversation*; nothing is created | ✅ |
+| RT-QUI-51 | Memory › Controls: an active built skill under *What Raiker has learned to do*, *Approvals you've given* empty; **Undo** turns the skill off | ✅ |
+| RT-QUI-52 | Settings › Personalisation › **Chat text size** reads 110%; 140% sets `--chat-text-scale` to 1.4 | ✅ |
+| RT-QUI-53 | Settings › Notifications lists *Approval needed*, *Input needed*, *Response ready*, *Task failed* and *Background task finished*, all on; *Input needed* off is kept across a reload | ✅ |
+| RT-QUI-54 | Work › Threads › Organise › **Archive** asks in the one dialog (**Cancel** / **Archive**); Esc closes it with nothing archived | ✅ |
+| RT-QUI-55 | `#/quick-entry` at 560×120: the input has focus, *Send to* is **New task**; Enter files the task and the top bar shows *Write a three-line haiku…* | ✅ after a fix found in this round: the long title pushed the stop switch off the top bar |
+| RT-QUI-56 | In a browser, Settings › General has no *Desktop window* section | ✅ |
+| Suites | Python suite; web unit suite, `svelte-check`, ESLint, design tokens, build; desktop unit tests, lint, type-check and shell end-to-end; ruff, mypy | ✅ |
+| Visual review | `docs/screenshots/2026-10-24-quiet-ui-features/` (45–55), inspected at original resolution: the live line overflow, Memory › Controls' spacing, the lower-case provider and the doubled *Ask owner question* on the floating card were found from the images and fixed. Still seen: a question's notice stays after it is answered ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-24-quiet-ui-features-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-23 (Quiet UI visual answers, hosted Anthropic Haiku 4.5)
 
 The visual answers of the [Quiet UI plan](../plans/quiet-ui/04_VISUAL_ANSWERS.md#status)

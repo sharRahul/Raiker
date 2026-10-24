@@ -224,6 +224,11 @@ describe("workingLine", () => {
     expect(workingLine([row("running"), row("waiting", "Send email", "anna@studio.com")])).toBe("Waiting for your decision");
   });
 
+  it("says a question waits for an answer, not a decision (QUI-F02)", () => {
+    const asked = { ...row("waiting", "Ask you a question", ""), toolName: "ask_owner_question" };
+    expect(workingLine([asked])).toBe("Waiting for your answer");
+  });
+
   it("names the call in flight, and otherwise says nothing", () => {
     expect(workingLine([row("success"), row("running", "Search the web", "flights to Lisbon")])).toBe("Search the web · flights to Lisbon");
     expect(workingLine([row("running", "Read file", "")])).toBe("Read file");

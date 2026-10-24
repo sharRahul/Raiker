@@ -266,7 +266,14 @@ when it is missing.
 - Closing the window leaves Raiker working in the background (scheduled work,
   reminders, approvals); the first time, a notification says so. Quit from
   **Host** in the top bar or the tray.
-- Notifications for things that need you, which bring the window forward.
+- **Quick Entry**: Ctrl+Shift+Space (Cmd+Shift+Space on a Mac) opens a small
+  box from anywhere on your computer to start a task or add to a recent
+  conversation, without bringing Raiker forward.
+- Optionally keep Raiker in the tray when its window closes, with a dot while a
+  decision waits; open a project in a second window.
+- Notifications for things that need you, chosen by event (approval needed,
+  input needed, response ready, task failed, task finished), which bring the
+  window forward.
 - Light and dark themes following your system.
 - Visible background work and agent status, with **Stop** controls.
 

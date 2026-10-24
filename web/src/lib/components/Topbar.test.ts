@@ -137,3 +137,34 @@ describe("Topbar approvals count", () => {
     await waitFor(() => expect(screen.getByRole("link", { name: "Approvals" })).toBeInTheDocument());
   });
 });
+
+describe("Topbar live work line (QUI-F04)", () => {
+  const task = (task_id: string, status: string, title: string, current_step: string | null) => ({
+    task_id, status, title, current_step, updated_at: "2026-10-24T00:00:00Z", completed_at: null,
+  });
+
+  it("is absent while nothing runs", async () => {
+    stubFetch({ "GET /api/notifications": [], "GET /api/tasks": [task("t0", "completed", "Done", null)] });
+    render(Topbar, { title: "Home", hint: "" });
+    await screen.findByRole("button", { name: "Notifications" });
+    expect(screen.queryByTestId("live-work-line")).not.toBeInTheDocument();
+  });
+
+  it("links the one running task with its real step", async () => {
+    stubFetch({ "GET /api/notifications": [], "GET /api/tasks": [task("t1", "running", "Morning brief", "Reading calendar")] });
+    render(Topbar, { title: "Home", hint: "" });
+    const line = await screen.findByRole("link", { name: "Morning brief · Reading calendar" });
+    expect(line).toHaveAttribute("href", "#/tasks?task=t1");
+  });
+
+  it("opens a menu listing each when several run", async () => {
+    stubFetch({
+      "GET /api/notifications": [],
+      "GET /api/tasks": [task("t1", "running", "Morning brief", null), task("t2", "waiting_for_approval", "Send reply", null)],
+    });
+    render(Topbar, { title: "Home", hint: "" });
+    const button = await screen.findByRole("button", { name: "2 tasks running · 1 waiting for you" });
+    await fireEvent.click(button);
+    expect(screen.getByRole("link", { name: /Send reply\s*waiting for you/ })).toHaveAttribute("href", "#/tasks?task=t2");
+  });
+});

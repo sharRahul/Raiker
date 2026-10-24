@@ -153,7 +153,7 @@
     </header>
     <button type="button" class="find" onclick={search}>
       <Icon name="search" size="sm" />
-      <span>Search pages, settings and commands</span>
+      <span>Search everything</span>
       <kbd>{shortcut}</kbd>
     </button>
     <div class="groups">

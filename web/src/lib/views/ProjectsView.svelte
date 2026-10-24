@@ -13,6 +13,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import ProjectDeleteDialog from "../components/ProjectDeleteDialog.svelte";
   import ProjectMoveDialog from "../components/ProjectMoveDialog.svelte";
+  import { desktopBridge } from "../desktopShell";
   import { setWorkProject, startInBuild, workProject } from "../workProject.svelte";
   import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
@@ -513,6 +514,11 @@
     }
   }
 
+  /** QUI-F13 — this project, in a window of its own (desktop only). */
+  function openProjectWindow(projectId: string) {
+    desktopBridge()?.openWindow?.(`#/projects?project=${encodeURIComponent(projectId)}`);
+  }
+
   async function onMoved() {
     moveTarget = null;
     await load();
@@ -798,6 +804,11 @@
                     run: () => void archiveProject(p),
                   },
                   { label: "Move…", run: () => (moveTarget = p) },
+                  // QUI-F13 — the desktop window can show a project in a
+                  // second window beside the first.
+                  ...(desktopBridge()?.openWindow
+                    ? [{ label: "Open in new window", run: () => openProjectWindow(p.project_id) }]
+                    : []),
                   { label: "Delete…", run: () => (deleteTarget = p) },
                 ]}
               />

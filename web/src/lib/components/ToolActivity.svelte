@@ -71,7 +71,10 @@
             <!-- Nothing is running: the turn stopped on the owner's decision,
                  and the approval card below it is where that decision is
                  made. -->
-            <span class="tool-waiting">{STATE_LABEL.waiting}</span>
+            <!-- QUI-F02 — a question waits for an answer, not a decision. -->
+            <span class="tool-waiting"
+              >{row.toolName === "ask_owner_question" ? "waiting for your answer" : STATE_LABEL.waiting}</span
+            >
           {/if}
         </span>
         {#if !SPOKEN_STATES.has(row.state)}

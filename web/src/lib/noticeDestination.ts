@@ -30,7 +30,10 @@ export const NOTICE_RECORD = "#/observe?tab=notifications";
 const DESTINATIONS: Record<string, string> = {
   approval_pending: "#/approvals",
   critical_approval_pending: "#/approvals",
+  // QUI-F05 — a question is answered where it was asked, or on Approvals.
+  question_pending: "#/approvals",
   task_finished: "#/tasks",
+  task_failed: "#/tasks",
   // BUG-322 — the notice about a damaged index opens its repair.
   search_index_damaged: "#/observe?tab=overview&repair=indexes",
 };

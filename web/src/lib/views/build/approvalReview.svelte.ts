@@ -151,6 +151,12 @@ export class ApprovalReview {
     }
   };
 
+  /** QUI-F02 — a question was answered on its card; the parked turn continues. */
+  continueAfterAnswer = async (approvalId: string) => {
+    await this.load();
+    await this.resumeTurn(approvalId, "answered");
+  };
+
   resolve = async (approval: ApprovalView, approve: boolean) => {
     this.busy = approval.approval_id;
     this.notice = null;

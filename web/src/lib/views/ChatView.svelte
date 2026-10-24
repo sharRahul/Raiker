@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
   import { NOT_ANSWERING } from "../errorCopy";
   import { pickableProjects } from "../projectLifecycle";
@@ -57,6 +58,11 @@
   import ToolActivity from "../components/ToolActivity.svelte";
   import TurnEvidence from "../components/TurnEvidence.svelte";
   import SafetyCard from "../components/SafetyCard.svelte";
+  import ClarifyCard from "../components/ClarifyCard.svelte";
+  import TurnReceipt from "../components/TurnReceipt.svelte";
+  import CorrectionMemory from "../components/CorrectionMemory.svelte";
+  import { correctionToRemember } from "../corrections";
+  import { ownerQuestions } from "../clarify";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import RecallStrip from "../components/RecallStrip.svelte";
@@ -111,7 +117,11 @@
   import { filesInUse } from "../contextPanel";
   import ChatContextPanel from "../components/ChatContextPanel.svelte";
   import { STARTERS } from "../starters";
-  import { inferenceLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
+  import { composerDataLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
+  import { reportForegroundWork } from "../liveWork.svelte";
+  import { requestTaskDraft, routineFromTurn, routineSteps } from "../taskDrafts";
+  import { announceResponseReady } from "../desktopNotice";
+  import { delivery } from "../deliveryPolicy.svelte";
   import {
     activeComposerProfile,
     blocksSending,
@@ -405,6 +415,34 @@
     const running = [...turns].reverse().find((turn) => turn.streaming);
     if (!running) return "";
     return workingLine(toolActivity(running.events));
+  });
+  // QUI-F04 — the turn being written here shows in the top bar's live work
+  // line from every page, with the same step the status line says.
+  $effect(() => {
+    if (!streaming) {
+      reportForegroundWork("chat", null);
+      return;
+    }
+    reportForegroundWork("chat", {
+      label: conversationTitle || "New chat",
+      step: runningActivity || "Writing the answer",
+      href: sessionId === null ? "#/new-chat" : `#/new-chat?session=${encodeURIComponent(sessionId)}`,
+      waiting: runningActivity.startsWith("Waiting for your"),
+    });
+  });
+  $effect(() => () => reportForegroundWork("chat", null));
+  // QUI-F05 — *Response ready*: the turn this page ran has its answer while
+  // Raiker is in the background. A parked turn is announced by its own notice.
+  let wasStreaming = false;
+  $effect(() => {
+    const now = streaming;
+    if (wasStreaming && !now) {
+      const last = turns[turns.length - 1];
+      if (last?.response && last.response.status !== "needs_approval") {
+        announceResponseReady(conversationTitle, `#/new-chat?session=${encodeURIComponent(last.response.session_id)}`, `response-${last.response.turn_id}`, delivery.current?.quiet_hours.active ?? false);
+      }
+    }
+    wasStreaming = now;
   });
   // QUI-C05 — the message Send kept while no model was usable. It goes the
   // moment one is, through the same `submit()`, and is dropped if the owner
@@ -1382,6 +1420,12 @@
    * document is written by the governed `create_document` tool on a turn the
    * owner chose to send, never by the offer itself.
    */
+  /** QUI-F18 — the request that worked, with its recorded steps, as a draft routine. */
+  function saveAsRoutine(prompt: string, rows: ToolCallRow[]) {
+    requestTaskDraft(routineFromTurn(prompt, conversationTitle, routineSteps(rows)));
+    window.location.hash = "#/tasks";
+  }
+
   function documentFromAnswer() {
     editPrompt("Put your last answer, with its figures, comparisons and charts, into a document I can keep.");
   }
@@ -1395,10 +1439,10 @@
    * that is the owner's decision, so it is put to them, with what would be
    * repeated named rather than implied.
    */
-  function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
+  async function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
     if (streaming || text.trim() === "") return;
     const consequence = retryConsequence(rows);
-    if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
+    if (consequence.repeats && !(await askConfirm({ title: retryConfirmation(consequence), confirmLabel: "Ask again" }))) return;
     draft.text = text;
     // DEC-22 step 3 — the new turn names the one it asks again, so the record
     // says these are one request tried twice rather than two requests.
@@ -1761,7 +1805,11 @@
     if (turn === undefined || turn.streaming) return;
     turn.resumeState = "continuing";
     turn.resumeNote =
-      outcomeStatus === "rejected" ? "Rejected — telling Raiker…" : "Approved — continuing…";
+      outcomeStatus === "rejected"
+        ? "Rejected — telling Raiker…"
+        : outcomeStatus === "answered"
+          ? "Answered — continuing…"
+          : "Approved — continuing…";
     turn.streaming = true;
     turn.error = null;
     streaming = true;
@@ -2241,7 +2289,10 @@
             </p>
           {/if}
 
-          {#if answer !== ""}
+          {#if answer !== "" && !(turn.response?.status === "needs_approval" && ownerQuestions(turn.response.approval) !== null)}
+            <!-- QUI-F02 — a turn parked on a question shows its card below;
+                 the parked notice ("Waiting for your decision") is not said
+                 a second time, and not in the wrong words. -->
             <div class="message-bubble message-bubble-raiker">
               <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has an
                    s1. A marker the model invented stays the characters it is. -->
@@ -2273,6 +2324,18 @@
                 aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
               ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
+              {#if turn.response?.status === "completed" && !toolRows.some((row) => row.state === "failed" || row.state === "denied" || row.state === "refused")}
+                <!-- QUI-F18 — after a task goes well: make it repeatable. It
+                     opens a filled task form in Work › Tasks; nothing is saved
+                     or scheduled until the owner presses Create there. -->
+                <button
+                  type="button"
+                  class="copy-message"
+                  onclick={() => saveAsRoutine(turn.prompt, toolRows)}
+                  aria-label="Save as routine"
+                  title="Save as routine"
+                ><Icon name="refresh" size="sm" /></button>
+              {/if}
               </div>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
@@ -2298,6 +2361,16 @@
               openSourceId={inspector.openSourceTurnId === turn.response?.turn_id ? inspector.openSourceId : null}
               onopen={(source) => void inspector.openSource(source, sentenceAround(answer, source.source_id))}
             />
+          {/if}
+          {#if !turn.streaming && sessionId !== null && turn.response?.turn_id && turn.response.status !== "needs_approval"}
+            <!-- QUI-F16 — the receipt at the end of the task: model, cost, what
+                 was read, changed or sent, and what left this computer. -->
+            <TurnReceipt {sessionId} turnId={turn.response.turn_id} />
+            {@const correction = turn.response.status === "completed" ? correctionToRemember(turn.prompt) : null}
+            {#if correction !== null}
+              <!-- QUI-F20 — the owner corrected Raiker: offer to remember it. -->
+              <CorrectionMemory {sessionId} turnId={turn.response.turn_id} text={correction} />
+            {/if}
           {/if}
 
           <!-- C17 — the memories this turn was given, correctable here. Recall
@@ -2407,6 +2480,20 @@
                 <!-- QUI-P05 — the decision itself, in place: Decline, Change,
                      Allow once. Decided here, it clears the top bar's count,
                      the floating card and the Approvals queue too. -->
+                {@const asked = ownerQuestions(turn.response.approval)}
+                {#if asked !== null && asked.length > 0}
+                <!-- QUI-F02 — a question is answered, not allowed: its own
+                     card and its own route, never Decline / Allow once. -->
+                <ClarifyCard
+                  approvalId={turn.response.approval.approval_id}
+                  questions={asked}
+                  {sessionId}
+                  disabled={streaming}
+                  onAnswered={(resumable) => {
+                    if (resumable) void resumeParkedTurn(turn.response?.approval?.approval_id ?? "", "answered");
+                  }}
+                />
+                {:else}
                 <SafetyCard
                   approval={turn.response.approval}
                   {sessionId}
@@ -2416,6 +2503,7 @@
                   }}
                   onAskAgain={() => retryPrompt(turn.prompt, toolRows, turn.response?.turn_id ?? null)}
                 />
+                {/if}
                 {#if liveChannelDown}
                   <div class="approval-actions">
                     <button
@@ -2643,7 +2731,7 @@
                follows the model chosen for this turn. -->
           <p class="data-label" title={inferenceSentence(dataLocation)}>
             <Icon name={dataLocation.kind === "device" ? "lock" : "globe"} size="sm" />
-            <span>{inferenceLabel(dataLocation)}</span>
+            <span>{composerDataLabel(dataLocation, attachStore.items.length)}</span>
           </p>
         {/if}
       </div>
@@ -3018,6 +3106,9 @@
   }
   .message-bubble {
     position: relative;
+    /* QUI-F12 — conversation text follows its own size (Settings ›
+       Personalisation), 110% of the interface's unless the owner chose. */
+    font-size: calc(var(--text-base) * var(--chat-text-scale, 1.1));
     border-radius: 1.25rem;
     padding: 0.72rem 0.95rem;
     box-shadow: var(--shadow-1);

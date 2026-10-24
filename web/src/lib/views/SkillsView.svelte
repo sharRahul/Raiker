@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   /**
    * Extensions → Skills.
    *
@@ -306,7 +307,7 @@
   }
 
   async function remove(skill: SkillView) {
-    if (!confirm(`Delete “${skill.name}”? Its document is removed from this workspace.`)) return;
+    if (!(await askConfirm({ title: `Delete “${skill.name}”?`, body: "Its document is removed from this workspace.", confirmLabel: "Delete", danger: true }))) return;
     busy = skill.skill_id;
     error = null;
     notice = null;

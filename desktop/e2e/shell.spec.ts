@@ -101,7 +101,10 @@ test("the window shows the Raiker origin with one frozen bridge and no Node", as
     bridge: "object",
     version: 1,
     frozen: true,
-    keys: ["bridgeVersion", "focusWindow", "onCommand", "platform", "quitForUpdate", "setTitleBarColours"],
+    keys: [
+      "bridgeVersion", "closeWindow", "focusWindow", "onCommand", "openWindow", "platform",
+      "quitForUpdate", "setAttention", "setMinimizeToTray", "setTitleBarColours",
+    ],
     require: "undefined",
     process: "undefined",
   });
@@ -231,4 +234,45 @@ test("a second launch brings the first window forward instead of opening another
   expect(second.status).toBe(0);
   expect(first.app.windows()).toHaveLength(1);
   await first.app.close();
+});
+
+// Quiet UI 06 — the desktop's own features: a place in a second window
+// (QUI-F13), the tray and its decision dot (QUI-F11), and Quick Entry's
+// global shortcut (QUI-F01).
+
+test("a project opens in a window of its own on the same origin, and a URL is refused", async () => {
+  const { app, page } = await launch(["--raiker-url", base]);
+  await waitForFixture(page);
+  await page.evaluate(() => {
+    const bridge = (window as unknown as { raikerDesktop: { openWindow(hash: string): void } }).raikerDesktop;
+    bridge.openWindow("https://example.com/");
+    bridge.openWindow("#/projects?project=proj_1");
+  });
+  await expect.poll(() => app.windows().length).toBe(2);
+  const second = app.windows().find((window) => window !== page);
+  await expect.poll(() => second?.url()).toBe(`${base}#/projects?project=proj_1`);
+  await app.close();
+});
+
+test("kept in the tray, closing the window hides it, and the dot follows waiting decisions", async () => {
+  const { app, page } = await launch(["--raiker-url", base]);
+  await waitForFixture(page);
+  await page.evaluate(() => {
+    const bridge = (window as unknown as { raikerDesktop: { setMinimizeToTray(on: boolean): void; setAttention(count: number): void } }).raikerDesktop;
+    bridge.setMinimizeToTray(true);
+    bridge.setAttention(2);
+  });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
+  await expect
+    .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((window) => window.isVisible())))
+    .toEqual([false]);
+  await app.evaluate(({ app: electronApp }) => electronApp.quit());
+});
+
+test("Quick Entry's shortcut is registered once Raiker is open", async () => {
+  const { app, page } = await launch(["--raiker-url", base]);
+  await waitForFixture(page);
+  const registered = await app.evaluate(({ globalShortcut }) => globalShortcut.isRegistered("CommandOrControl+Shift+Space"));
+  expect(registered).toBe(true);
+  await app.close();
 });

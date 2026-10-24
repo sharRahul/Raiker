@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { workDraft } from "../workDraft.svelte";
   import { pickableProjects } from "../projectLifecycle";
   /**
@@ -627,10 +628,13 @@
       const usage = await contract.readDesignAssetUsage(generationId);
       if (
         usage.documents.length > 0 &&
-        !window.confirm(
-          `This picture is placed in ${usage.documents.map((doc) => `“${doc.title}”`).join(", ")}. ` +
-            "Those designs keep the layer and show it as missing until you restore the picture. Put it in Recently deleted anyway?",
-        )
+        !(await askConfirm({
+          title: "Put it in Recently deleted anyway?",
+          body:
+            `This picture is placed in ${usage.documents.map((doc) => `“${doc.title}”`).join(", ")}. ` +
+            "Those designs keep the layer and show it as missing until you restore the picture.",
+          confirmLabel: "Put in Recently deleted",
+        }))
       )
         return;
     } catch {

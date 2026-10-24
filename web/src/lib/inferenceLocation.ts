@@ -67,3 +67,17 @@ export function remoteDestinations(
   const hosts = Object.values(profile.model_locations ?? {}).filter((where) => where !== "device");
   return [...new Set(hosts)];
 }
+
+/**
+ * QUI-F17 — the composer's label, said for what is about to be sent.
+ *
+ * Attached files go wherever the message goes, so a remote model with files
+ * attached says that the files leave too; a local one says they stay.
+ */
+export function composerDataLabel(location: InferenceLocation, attachments: number): string {
+  if (attachments <= 0) return inferenceLabel(location);
+  const files = `${attachments} ${attachments === 1 ? "file" : "files"}`;
+  if (location.kind === "device") return `Stays on this computer, with ${files}`;
+  if (location.kind === "remote") return `Sent to ${location.destination}, with ${files}`;
+  return `Where it runs is not confirmed, with ${files}`;
+}

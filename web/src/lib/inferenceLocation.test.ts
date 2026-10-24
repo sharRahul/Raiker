@@ -1,6 +1,6 @@
 // BUG-340 — a model is described by where it runs, not by where its runtime runs.
 import { describe, expect, it } from "vitest";
-import { inferenceLocation, inferenceSentence, remoteDestinations } from "./inferenceLocation";
+import { composerDataLabel, inferenceLocation, inferenceSentence, remoteDestinations } from "./inferenceLocation";
 
 const ollama = {
   provider: "ollama",
@@ -49,5 +49,14 @@ describe("where a model's requests are processed", () => {
     expect(remoteDestinations(ollama)).toEqual(["ollama.com"]);
     expect(remoteDestinations({ model_locations: { a: "device" } })).toEqual([]);
     expect(remoteDestinations({})).toEqual([]);
+  });
+});
+
+describe("QUI-F17 composer data label with attachments", () => {
+  it("says the files go where the message goes", () => {
+    expect(composerDataLabel({ kind: "remote", destination: "Anthropic" }, 0)).toBe("Sent to Anthropic");
+    expect(composerDataLabel({ kind: "remote", destination: "Anthropic" }, 2)).toBe("Sent to Anthropic, with 2 files");
+    expect(composerDataLabel({ kind: "device" }, 1)).toBe("Stays on this computer, with 1 file");
+    expect(composerDataLabel({ kind: "unknown" }, 1)).toBe("Where it runs is not confirmed, with 1 file");
   });
 });

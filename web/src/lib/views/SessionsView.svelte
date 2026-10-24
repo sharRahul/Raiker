@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import AnswerParts from "../components/AnswerParts.svelte";
   import Badge from "../components/Badge.svelte";
   import { rowTokens, sessionCandidates } from "../rowTokens";
@@ -101,7 +102,7 @@
   // audit record itself.
 
   async function deleteOne(id: string) {
-    if (!window.confirm("Delete this conversation permanently? Its turns and governed events will be removed.")) return;
+    if (!(await askConfirm({ title: "Delete this conversation permanently?", body: "Its turns and governed events will be removed.", confirmLabel: "Delete", danger: true }))) return;
     actionError = null;
     deleting = true;
     try {
@@ -120,9 +121,12 @@
   async function deleteSelected() {
     if (selected.size === 0) return;
     if (
-      !window.confirm(
-        `Delete ${selected.size} conversation${selected.size === 1 ? "" : "s"} permanently? Their turns and governed events will be removed.`,
-      )
+      !(await askConfirm({
+        title: `Delete ${selected.size} conversation${selected.size === 1 ? "" : "s"} permanently?`,
+        body: "Their turns and governed events will be removed.",
+        confirmLabel: "Delete",
+        danger: true,
+      }))
     )
       return;
     actionError = null;

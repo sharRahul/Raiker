@@ -1615,7 +1615,9 @@ describe("ChatView long transcripts (QUI-G04)", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Show 100 earlier messages" }));
     expect(document.querySelectorAll(".turn")).toHaveLength(200);
     expect(screen.getByText("answer 899")).toBeInTheDocument();
-  });
+    // Rendering two hundred turns takes about four seconds in jsdom, close to
+    // the default five; under a loaded machine it tipped over (found 2026-10-24).
+  }, 20_000);
 
   it("widens the window when search finds an earlier turn", async () => {
     stubFetch({ ...MODELS_ROUTE, "GET /api/sessions/sess_long": longHistory(250) });
@@ -1625,5 +1627,5 @@ describe("ChatView long transcripts (QUI-G04)", () => {
     await fireEvent.input(screen.getByRole("searchbox", { name: "Search in conversation" }), { target: { value: "needle" } });
     expect(await screen.findByText("the needle question")).toBeInTheDocument();
     expect(document.querySelector(".turn.search-hit")?.getAttribute("data-turn-index")).toBe("3");
-  });
+  }, 20_000);
 });

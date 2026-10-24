@@ -75,3 +75,23 @@ describe("Settings → Personalisation", () => {
     expect(screen.getByText(/never its instructions, its personality or what it may do/)).toBeInTheDocument();
   });
 });
+
+describe("QUI-F12 chat text size", () => {
+  it("reads 110% by default and saves a chosen size", async () => {
+    const save = vi.fn();
+    render(Personalisation, { settings: {}, save, theme: "system", chooseTheme: vi.fn() });
+    const select = screen.getByRole("combobox", { name: "Chat text size" }) as HTMLSelectElement;
+    expect(select.value).toBe("110");
+    await fireEvent.change(select, { target: { value: "125" } });
+    expect(save).toHaveBeenCalledWith({ "personalisation.chat_text_size": "125" });
+  });
+
+  it("applies the size as its own scale, apart from the interface", async () => {
+    const { applyAppearance, chatTextScale } = await import("../../prefs.svelte");
+    expect(chatTextScale({})).toBe(1.1);
+    expect(chatTextScale({ "personalisation.chat_text_size": "140" })).toBe(1.4);
+    expect(chatTextScale({ "personalisation.chat_text_size": "999" })).toBe(1.1);
+    applyAppearance({ "personalisation.chat_text_size": "125" });
+    expect(document.documentElement.style.getPropertyValue("--chat-text-scale")).toBe("1.25");
+  });
+});

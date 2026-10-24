@@ -35,6 +35,7 @@ export type LazyRouteId =
   | "observe"
   | "settings"
   | "model-setup"
+  | "quick-entry"
   | "state-gallery";
 
 // The props each route takes differ, so the map is typed at the loosest shape
@@ -58,6 +59,7 @@ const LOADERS: Record<LazyRouteId, Loader> = {
   observe: () => import("./views/ObserveView.svelte"),
   settings: () => import("./views/SettingsView.svelte"),
   "model-setup": () => import("./views/ModelSetupView.svelte"),
+  "quick-entry": () => import("./views/QuickEntryView.svelte"),
   // QUI-G03 — development builds only; `routeFromHash` refuses it otherwise.
   "state-gallery": () => import("./views/StateGalleryView.svelte"),
 };

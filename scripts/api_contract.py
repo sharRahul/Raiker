@@ -284,6 +284,8 @@ VERIFIED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/api/sessions"),
         ("GET", "/api/sessions/{session_id}"),
         ("GET", "/api/sessions/{session_id}/turns/{turn_id}/outcome"),
+        ("GET", "/api/sessions/{session_id}/turns/{turn_id}/receipt"),
+        ("POST", "/api/memory/proposals"),
         ("GET", "/api/sessions/{session_id}/attachments"),
         ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/preview"),
         ("GET", "/api/sessions/{session_id}/attachments/{attachment_id}/provenance"),

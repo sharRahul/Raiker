@@ -287,7 +287,7 @@
   {/if}
 
   {#if loading && files.length === 0}
-    <p class="library-empty">Loading…</p>
+    <p class="library-empty" role="status">Reading files…</p>
   {:else if ready && files.length === 0}
     <p class="library-empty">No files yet.</p>
   {:else if files.length > 0}

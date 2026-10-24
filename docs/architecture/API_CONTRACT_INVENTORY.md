@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**466 operations: 452 verified, 0 eligible, 0 deferred, 14 special.**
+**468 operations: 454 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -288,6 +288,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/memory/observations` |  | ObservationsView | verified | declared by cast |
 | POST | `/api/memory/observations/delete` | dict | ObservationsDeleted | verified | declared by cast |
 | GET | `/api/memory/proposals` |  | MemoryProposal[] | verified | declared MemoryProposal[] |
+| POST | `/api/memory/proposals` | CorrectionMemoryRequest | CorrectionProposed | verified | declared by cast |
 | POST | `/api/memory/proposals/{candidate_id}/decision` | dict | ProposalDecided | verified | declared by cast |
 | PUT | `/api/memory/recall-mode` | dict | RecallModeSet | verified | declared by cast |
 | POST | `/api/memory/reconcile` |  | MemoryReconciled | verified | declared by cast |
@@ -427,6 +428,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/sessions/{session_id}/sources` |  | TurnSources | verified | declared TurnSources |
 | PUT | `/api/sessions/{session_id}/tags` | SetSessionTagsRequest | SessionTagsSet | verified | declared SessionTagsSet |
 | GET | `/api/sessions/{session_id}/turns/{turn_id}/outcome` |  | BuildTurnOutcome | verified | declared BuildTurnOutcome |
+| GET | `/api/sessions/{session_id}/turns/{turn_id}/receipt` |  | TurnReceipt | verified | declared TurnReceipt |
 | GET | `/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt` |  | TurnSourceExcerpt | verified | declared TurnSourceExcerpt |
 | PUT | `/api/sessions/{session_id}/unarchive` |  | SessionArchived | verified | declared SessionArchived |
 | GET | `/api/settings` |  | SettingsView | verified | declared SettingsView |

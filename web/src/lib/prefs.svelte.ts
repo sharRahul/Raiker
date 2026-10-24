@@ -2,10 +2,11 @@
 // presentation choices only — nothing here grants or changes authority.
 import { setDisplayLocale } from "./format";
 import { NAV_ITEMS } from "./nav";
+import { desktopBridge } from "./desktopShell";
 
 // Notification preferences read by NotificationCenter. Defaults match the
 // settings defaults: in-app popups on, desktop alerts off.
-export const uiPrefs = $state({ inApp: true, desktop: false });
+export const uiPrefs = $state({ inApp: true, desktop: false, responses: true });
 
 /**
  * Apply density and typeface to the shell — nothing else.
@@ -24,6 +25,16 @@ export function applyAppearance(settings: Record<string, unknown>): void {
   const font = settings["personalisation.font"];
   if (font === "mono" || font === "system") root.dataset.font = String(font);
   else delete root.dataset.font;
+  // QUI-F12 — conversation text has its own size, 110% unless chosen.
+  root.style.setProperty("--chat-text-scale", String(chatTextScale(settings)));
+}
+
+/** QUI-F12 — the chat text size as a multiplier; 1.1 when nothing valid is stored. */
+export const CHAT_TEXT_SIZES = ["100", "110", "125", "140"] as const;
+export function chatTextScale(settings: Record<string, unknown>): number {
+  const stored = settings["personalisation.chat_text_size"];
+  const size = (CHAT_TEXT_SIZES as readonly unknown[]).includes(stored) ? Number(stored) : 110;
+  return size / 100;
 }
 
 /** Apply spacing/font and the date format to the shell, and refresh notification preferences. */
@@ -33,6 +44,10 @@ export function applyUiPrefs(settings: Record<string, unknown>): void {
   setDisplayLocale(settings["general.language"]);
   uiPrefs.inApp = settings["notification.in_app"] !== false;
   uiPrefs.desktop = Boolean(settings["notification.desktop"]);
+  // QUI-F05 — *Response ready*: on unless the owner turned it off.
+  uiPrefs.responses = settings["notification.interrupt.responses"] !== false;
+  // QUI-F11 — the desktop window keeps the account's tray choice.
+  desktopBridge()?.setMinimizeToTray?.(settings["desktop.minimize_to_tray"] === true);
 }
 
 /** The saved startup route, if it names a real route. */

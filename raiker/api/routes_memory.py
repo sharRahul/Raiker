@@ -18,10 +18,11 @@ from fastapi import APIRouter, Depends, Header, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
-from raiker.api.schemas import serialize_dto
+from raiker.api.schemas import CorrectionMemoryRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.memory import (
     ConversationIndexRebuilt,
+    CorrectionProposed,
     DamagedVectorsRemoved,
     EmbeddingBackendSet,
     EmbeddingIndexBuilt,
@@ -101,6 +102,31 @@ async def list_memory_proposals(
         memory_proposal(row)
         for row in _service(request).list_memory_proposals(auth_data[0].principal_id)
     ]
+    return serialize_dto(answer)
+
+
+@router.post("/api/memory/proposals")
+async def propose_memory_from_correction(
+    body: CorrectionMemoryRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F20 — offer the owner's correction as a memory proposal, nothing more."""
+    result = _service(request).propose_memory_from_correction(
+        body.text,
+        session_id=body.session_id,
+        turn_id=body.turn_id,
+        acting_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        code = result.reason_code or "memory_proposal_refused"
+        raise refusal(
+            status.HTTP_404_NOT_FOUND if code == "session_not_found"
+            else status.HTTP_422_UNPROCESSABLE_CONTENT if code in {"empty_memory_text", "memory_text_too_long"}
+            else status.HTTP_403_FORBIDDEN,
+            code,
+        )
+    answer = cast(CorrectionProposed, {"ok": True, **result.data})
     return serialize_dto(answer)
 
 

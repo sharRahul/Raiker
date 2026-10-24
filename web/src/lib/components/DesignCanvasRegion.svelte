@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   /*
    * Design's canvas. A request can name a prior generation as its subject and
    * ask for several pictures, and the store records what each was made from
@@ -97,11 +98,13 @@
   }
 
   /** The irreversible step says what it removes, and is never the first one. */
-  function purge(item: ImageGeneration) {
-    const ok = window.confirm(
-      `Remove "${item.prompt}" for good? The picture and its bytes are deleted from ` +
-        "this workspace and cannot be restored.",
-    );
+  async function purge(item: ImageGeneration) {
+    const ok = await askConfirm({
+      title: `Remove "${item.prompt}" for good?`,
+      body: "The picture and its bytes are deleted from this workspace and cannot be restored.",
+      confirmLabel: "Remove for good",
+      danger: true,
+    });
     if (ok) void lifecycle(onpurge, item.generation_id);
   }
 

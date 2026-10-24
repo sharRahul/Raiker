@@ -71,3 +71,18 @@ export function raiseDesktopNotice(notice: DesktopNotice): boolean {
     return false;
   }
 }
+
+/**
+ * QUI-F05 — *Response ready*: a turn this page ran has an answer while Raiker
+ * is in the background. No notice is written for it; the page that ran it
+ * says so on the desktop, when the owner's switch and quiet hours allow.
+ */
+export function announceResponseReady(conversation: string, route: string, tag: string, quiet: boolean): boolean {
+  if (!uiPrefs.responses || quiet || !raikerIsHidden()) return false;
+  return raiseDesktopNotice({
+    title: "Response ready",
+    body: conversation.trim() ? `Raiker answered in “${conversation.trim()}”.` : "Raiker has answered.",
+    tag,
+    route,
+  });
+}

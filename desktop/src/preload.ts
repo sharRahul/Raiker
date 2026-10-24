@@ -30,6 +30,10 @@ const COMMAND_CHANNEL = "raiker:command";
 const TITLE_BAR_CHANNEL = "raiker:title-bar";
 const FOCUS_CHANNEL = "raiker:focus";
 const QUIT_FOR_UPDATE_CHANNEL = "raiker:quit-for-update";
+const ATTENTION_CHANNEL = "raiker:attention";
+const TRAY_PREFERENCE_CHANNEL = "raiker:tray-preference";
+const OPEN_WINDOW_CHANNEL = "raiker:open-window";
+const CLOSE_WINDOW_CHANNEL = "raiker:close-window";
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const bridge = Object.freeze({
@@ -61,6 +65,22 @@ const bridge = Object.freeze({
    */
   quitForUpdate(): void {
     ipcRenderer.send(QUIT_FOR_UPDATE_CHANNEL);
+  },
+  /** QUI-F11 — how many decisions wait, for the tray's dot. A count, nothing else. */
+  setAttention(count: number): void {
+    if (Number.isInteger(count) && count >= 0) ipcRenderer.send(ATTENTION_CHANNEL, count);
+  },
+  /** QUI-F11 — keep running in the tray when the window is closed. */
+  setMinimizeToTray(enabled: boolean): void {
+    ipcRenderer.send(TRAY_PREFERENCE_CHANNEL, enabled === true);
+  },
+  /** QUI-F13 — open one of Raiker's own places (a route hash) in a new window. */
+  openWindow(hash: string): void {
+    if (typeof hash === "string" && hash.startsWith("#/")) ipcRenderer.send(OPEN_WINDOW_CHANNEL, hash);
+  },
+  /** QUI-F01 — close this window (Quick Entry's Esc and Send). */
+  closeWindow(): void {
+    ipcRenderer.send(CLOSE_WINDOW_CHANNEL);
   },
 });
 

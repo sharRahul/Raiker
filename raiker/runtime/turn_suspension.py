@@ -340,7 +340,10 @@ def resumed_call_row_status(outcome: dict[str, Any]) -> str:
     row can render, so the two never disagree.
     """
     status = str(outcome.get("status", ""))
-    if status == "success":
+    # QUI-F02 — an answered question did what it was for: the owner answered.
+    # Reading it as "failed" turned every answered question into a partially
+    # completed turn.
+    if status in ("success", "answered"):
         return "success"
     if status == "rejected":
         return "denied"

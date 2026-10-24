@@ -346,7 +346,7 @@
   {#if loadError}
     <PageState state="error" title="Couldn't load the GitHub connection" detail={loadError} />
   {:else if !connection}
-    <PageState state="loading" title="Loading…" />
+    <PageState state="loading" title="Reading the GitHub connection…" />
   {:else}
     {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 

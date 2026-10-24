@@ -832,6 +832,74 @@ class ModelService:
             )
         return resolved
 
+    def turn_receipt(
+        self: DashboardService,
+        session_id: str,
+        turn_id: str,
+        *,
+        user_id: str | None,
+        owner_principal_id: str,
+    ) -> dict[str, Any] | None:
+        """QUI-F16 — one turn's receipt, or ``None`` when it is not this owner's.
+
+        Read from the turn's audit events. The cost is priced at the rate of the
+        model that served the turn, through the same resolution the context
+        meter uses, and stays ``None`` for a local model (free) or a billable
+        one with no known rate (said as unknown, never as free).
+        """
+        from raiker.control.turn_receipt import build_turn_receipt
+        from raiker.events.query import EventViewer
+        from raiker.runtime.model_usage import ModelUsageLedger, UsageTotals
+        from raiker.runtime.orchestrator import LOCAL_ANSWER_PROVIDERS
+
+        session = self.store.load_session(session_id)
+        if session is None:
+            return None
+        owner = session.get("user_id")
+        if user_id is not None and owner is not None and str(owner) != user_id:
+            return None
+        turn = self.store.load_turn(turn_id)
+        if turn is None or str(turn.get("session_id")) != session_id:
+            return None
+        viewer = EventViewer(self.store)
+        index = sorted(
+            self.store.list_event_index(turn_id=turn_id, limit=2000),
+            key=lambda row: (str(row.get("timestamp") or ""), str(row.get("event_id") or "")),
+        )
+        events = [
+            payload
+            for row in index
+            if (payload := viewer.read_event_payload(str(row["event_id"]))) is not None
+        ]
+        receipt = build_turn_receipt(turn_id, events, local_providers=LOCAL_ANSWER_PROVIDERS)
+        usage = receipt.pop("_usage")
+        model = receipt["model"]
+
+        profile = None
+        if model:
+            rows = ModelUsageLedger(self.store).session_usage(owner_principal_id, session_id)
+            profile_id = next((row.profile_id for row in reversed(rows) if row.model == model), None)
+            if profile_id:
+                try:
+                    profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+                except Exception:  # noqa: BLE001 — an unknown profile is simply unpriced
+                    profile = None
+        if profile is not None:
+            receipt["local"] = bool(getattr(profile, "local_only", False)) and not self._profile_is_billable(profile)
+        cost: float | None = None
+        basis = "free" if receipt["local"] else "unknown"
+        if profile is not None and model and self._profile_is_billable(profile):
+            priced = UsageTotals(**usage).cost(self._resolve_facts(profile, model, owner_principal_id))
+            if priced is not None:
+                cost = float(priced)
+                basis = "priced"
+        elif profile is not None and not receipt["local"]:
+            # Off the machine with no key (a free endpoint): nothing to price.
+            basis = "free"
+        receipt["cost_usd"] = cost
+        receipt["cost_basis"] = basis
+        return receipt
+
     def get_context_usage(
         self: DashboardService, session_id: str, acting_principal_id: str | None = None
     ) -> ContextUsageView:

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "../../api";
+  import { inDesktopShell } from "../../desktopShell";
   import { DISPLAY_LOCALES } from "../../format";
   import {
     TIMEZONE_KEY,
@@ -261,6 +262,25 @@
   </div>
 </section>
 
+{#if inDesktopShell()}
+  <!-- QUI-F11 — the desktop window only: closing it can keep Raiker in the
+       tray, where a dot shows while a decision waits. -->
+  <section class="settings-card" aria-labelledby="desktop-window">
+    <div class="card-heading">
+      <h3 id="desktop-window">Desktop window</h3>
+      <p>Raiker keeps working while its window is hidden; approvals still wait for you.</p>
+    </div>
+    <label class="tray-toggle">
+      <input
+        type="checkbox"
+        checked={settings["desktop.minimize_to_tray"] === true}
+        onchange={(e) => save({ "desktop.minimize_to_tray": e.currentTarget.checked })}
+      />
+      <span>Keep Raiker in the tray when you close its window</span>
+    </label>
+  </section>
+{/if}
+
 <section class="settings-card" aria-labelledby="answer-style">
   <div class="card-heading">
     <h3 id="answer-style">Answers</h3>
@@ -282,6 +302,7 @@
 
 <style>
   .section-heading { margin-bottom: var(--space-4); }
+  .tray-toggle { display: flex; align-items: center; gap: var(--space-2); flex-direction: row; }
   .section-heading h2, .card-heading h3 { margin: 0; }
   .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }

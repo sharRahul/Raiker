@@ -23,6 +23,11 @@
   import type { ConversationProfile } from "../conversationProfile";
   import ProfileChip from "./ProfileChip.svelte";
   import { STARTERS } from "../starters";
+  import { onMount } from "svelte";
+  import { allProfiles, chatProfiles, refreshModels } from "../models.svelte";
+  import { activeComposerProfile } from "../modelReadiness.svelte";
+  import { surfaceModel } from "../surfaceModel.svelte";
+  import { composerDataLabel, inferenceLocation, inferenceSentence } from "../inferenceLocation";
 
   let { showStarters = false }: { showStarters?: boolean } = $props();
 
@@ -33,6 +38,23 @@
   const attachStore = createAttachmentStore();
   let attachOpen = $state(false);
   let attachControl = $state<ComposerAttach | undefined>();
+
+  // QUI-F17 — where the message will go, said here too. The message is sent
+  // by Chat, on the model Chat was last set to (or the default), so that is
+  // the model this label describes.
+  let chatChoice = $state<{ profileId: string; model: string } | null>(null);
+  onMount(() => {
+    void refreshModels();
+    void surfaceModel("chat")
+      .then((remembered) => (chatChoice = remembered))
+      .catch(() => {});
+  });
+  const chatProfile = $derived(
+    activeComposerProfile(chatProfiles(), chatChoice?.profileId ?? "", chatChoice?.model ?? "", allProfiles()),
+  );
+  const dataLocation = $derived(
+    chatProfile === null ? null : inferenceLocation(chatProfile, chatChoice?.model || chatProfile.model),
+  );
 
   function send(event?: Event) {
     event?.preventDefault();
@@ -77,6 +99,12 @@
     <div class="home-composer-tools">
       <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={attachStore.full} />
       <ProfileChip bind:profile placement="down" />
+      {#if dataLocation !== null}
+        <span class="hint data-label" title={inferenceSentence(dataLocation)}>
+          <Icon name={dataLocation.kind === "device" ? "lock" : "globe"} size="sm" />
+          {composerDataLabel(dataLocation, attachStore.items.length)}
+        </span>
+      {/if}
       <span class="hint">Opens a new chat</span>
     </div>
     <button type="submit" class="btn btn-primary btn-sm send" disabled={text.trim() === "" || attachStore.uploading} aria-label="Send">
@@ -130,6 +158,7 @@
   .home-composer-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
   .home-composer-tools { display: flex; align-items: center; gap: var(--space-2); }
   .hint { font-size: var(--text-xs); color: var(--text-3); }
+  .data-label { display: inline-flex; align-items: center; gap: var(--space-1); }
   .send { width: 2.5rem; height: 2.5rem; padding: 0; display: inline-grid; place-items: center; border-radius: var(--r-md); }
   .starters {
     list-style: none;

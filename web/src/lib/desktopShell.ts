@@ -39,6 +39,14 @@ export interface DesktopBridge {
   focusWindow(): void;
   /** DIST-10 — absent from shells built before it; check before calling. */
   quitForUpdate?(): void;
+  /** QUI-F11 — the tray's attention dot; absent from older shells. */
+  setAttention?(count: number): void;
+  /** QUI-F11 — keep running in the tray when the window closes. */
+  setMinimizeToTray?(enabled: boolean): void;
+  /** QUI-F13 — open one of Raiker's own places in a new window. */
+  openWindow?(hash: string): void;
+  /** QUI-F01 — close this window (Quick Entry). */
+  closeWindow?(): void;
 }
 
 declare global {

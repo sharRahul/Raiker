@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { onMount } from "svelte";
   import { api } from "../api";
   import type { CredentialDeltaView } from "../apiTypes";
@@ -16,7 +17,7 @@
   }
 
   async function discard() {
-    if (!window.confirm("Discard every file change from this credentialed worker?")) return;
+    if (!(await askConfirm({ title: "Discard every file change from this credentialed worker?", confirmLabel: "Discard changes", danger: true }))) return;
     busy = true; message = null;
     try {
       await api.discardCredentialDelta(runId, crypto.randomUUID());

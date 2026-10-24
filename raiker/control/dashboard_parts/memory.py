@@ -277,6 +277,53 @@ class MemoryService:
             data={"relationship_id": relationship_id, "active": False},
         )
 
+    def propose_memory_from_correction(
+        self: DashboardService,
+        text: str,
+        *,
+        session_id: str,
+        turn_id: str | None,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """QUI-F20 — the owner corrected Raiker; offer the correction as a memory.
+
+        Only a proposal: it waits in Memory › Suggestions exactly like one the
+        runtime extracted, and becomes a memory only through the same
+        human-only decision (which also refuses secret-like text). The text is
+        the owner's own words from the conversation; nothing is inferred.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        clean = " ".join(text.split())
+        if not clean:
+            return ControlResult(ok=False, reason_code="empty_memory_text")
+        if len(clean) > 500:
+            return ControlResult(ok=False, reason_code="memory_text_too_long")
+        session = self.store.load_session(session_id)
+        user_id = self.store.principal_user_id(acting_principal_id or "")
+        if session is None or (session.get("user_id") is not None and str(session["user_id"]) != user_id):
+            return ControlResult(ok=False, reason_code="session_not_found")
+        from raiker.memory.candidates import MemoryCandidate
+        from raiker.memory.policy import classify_memory_sensitivity
+
+        candidate = MemoryCandidate(
+            candidate_id=new_id("memcand_"),
+            source_event_id=new_id("evt_"),
+            memory_type="project",
+            scope="project",
+            text=clean,
+            sensitivity=classify_memory_sensitivity(clean).value,
+            confidence=1.0,
+            decision="deferred",
+            created_at=utc_now(),
+            source_session_id=session_id,
+            source_turn_id=turn_id,
+            source_role="owner_correction",
+            extractor_version="correction-v1",
+        )
+        self.store.insert_memory_candidate(candidate, owner_principal_id=acting_principal_id)
+        return ControlResult(ok=True, data={"candidate_id": candidate.candidate_id, "text": clean})
+
     def decide_memory_proposal(
         self: DashboardService,
         candidate_id: str,

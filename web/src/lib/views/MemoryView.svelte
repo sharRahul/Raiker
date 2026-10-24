@@ -1,4 +1,6 @@
 <script lang="ts">
+  import MemoryControls from "../components/MemoryControls.svelte";
+  import { askConfirm } from "../confirm.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
@@ -174,7 +176,7 @@
     catch { actionError = "Could not edit this memory."; }
   }
   async function forget(m: MemoryControlView) {
-    if (!window.confirm(`Forget this memory? ${LIFECYCLE_VERBS.forget.consequence} To stop recalling it and keep it, archive it instead.`)) return;
+    if (!(await askConfirm({ title: "Forget this memory?", body: `${LIFECYCLE_VERBS.forget.consequence} To stop recalling it and keep it, archive it instead.`, confirmLabel: "Forget", danger: true }))) return;
     try { await api.forgetMemory(m.memory_id); await load(); }
     catch { actionError = "Could not forget this memory."; }
   }
@@ -282,7 +284,7 @@
     duplicate_in_file: "Repeated in this file",
   };
   async function undoImport(batch: MemoryImportBatch) {
-    if (!window.confirm(`Undo the import of ${batch.imported} record${batch.imported === 1 ? "" : "s"}${batch.file_name ? ` from ${batch.file_name}` : ""}? Each one is forgotten, except any you have changed since.`)) return;
+    if (!(await askConfirm({ title: `Undo the import of ${batch.imported} record${batch.imported === 1 ? "" : "s"}${batch.file_name ? ` from ${batch.file_name}` : ""}?`, body: "Each one is forgotten, except any you have changed since.", confirmLabel: "Undo import", danger: true }))) return;
     try {
       const result = await api.undoMemoryImport(batch.batch_id);
       const kept = result.kept_changed > 0 ? ` Kept ${result.kept_changed} you changed since.` : "";
@@ -365,7 +367,7 @@
   let sweepResult = $state<string | null>(null);
   async function sweepExpired() {
     if (busy || !dueForExpiry.length) return;
-    if (!window.confirm(`Remove ${dueForExpiry.length} observation records whose retention has run out? Raiker keeps no copy of the material they describe.`)) return;
+    if (!(await askConfirm({ title: `Remove ${dueForExpiry.length} observation records whose retention has run out?`, body: "Raiker keeps no copy of the material they describe.", confirmLabel: "Remove", danger: true }))) return;
     busy = true; actionError = null; sweepResult = null;
     try {
       const result = await api.cleanupExpiredObservations(dueForExpiry);
@@ -376,7 +378,7 @@
     } finally { busy = false; }
   }
   async function deleteObservation(observationId: string) {
-    if (!window.confirm("Delete this observation? Raiker keeps no copy of the material it describes, so this removes the record that it was seen.")) return;
+    if (!(await askConfirm({ title: "Delete this observation?", body: "Raiker keeps no copy of the material it describes, so this removes the record that it was seen.", confirmLabel: "Delete", danger: true }))) return;
     try { await api.deleteObservations([observationId]); await load(); }
     catch { actionError = "Could not delete this observation."; }
   }
@@ -411,7 +413,16 @@
     return m.approval_state === "approved" || m.approval_state === "policy_allowed";
   }
 
-  let { tab = "overview", filter = null }: { tab?: string; filter?: string | null } = $props();
+  let { tab = "overview", filter = null, record = null }: { tab?: string; filter?: string | null; record?: string | null } = $props();
+  // QUI-F22 — a search result names one memory: open it and bring it into view.
+  let openedRecord: string | null = null;
+  $effect(() => {
+    if (record === null || record === openedRecord || memories === null) return;
+    if (!memories.some((m) => m.memory_id === record)) return;
+    openedRecord = record;
+    drawerId = record;
+    queueMicrotask(() => document.getElementById(`memory-${record}`)?.scrollIntoView({ block: "center" }));
+  });
   $effect(() => {
     if (isMemoryFilter(filter)) statusFilter = filter;
   });
@@ -596,7 +607,7 @@
          already said. -->
     {#if records.length === 0}<div class="empty"><Icon name="spark" size="xl" /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
-    {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
+    {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" id={`memory-${m.memory_id}`} class:pinned={m.pinned}>
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size="sm" /> Pinned</span>{/if}</div>
       <!-- UX-MEM-04 — who put it there, in words; UX-MEM-02 — its state, when
            it is anything but current. -->
@@ -731,6 +742,10 @@
       {/if}
     {/if}
   </section>
+  </div>
+{:else if tab === "controls"}
+  <div id="panel-controls" role="tabpanel" aria-labelledby="tab-controls">
+    <MemoryControls />
   </div>
 {:else if tab === "sources"}
   <div id="panel-sources" role="tabpanel" aria-labelledby="tab-sources">

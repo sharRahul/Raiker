@@ -191,7 +191,7 @@ test("More groups by purpose, remembers where you were, and hands search to the 
   expect(headings).toEqual(["Recent", "Review", "Connect", "Settings", "Diagnostics & help"]);
   await expect(more.getByRole("heading", { name: "Recent" }).locator("..").getByRole("link", { name: "Models" })).toBeVisible();
   await capture(page, join(SHOTS, "07-more-by-purpose.png"), more);
-  await more.getByRole("button", { name: /Search pages, settings and commands/ }).click();
+  await more.getByRole("button", { name: /Search everything/ }).click();
   await expect(more).toBeHidden();
   const palette = page.getByRole("dialog").filter({ has: page.getByRole("combobox").or(page.getByRole("textbox")) });
   await expect(palette.first()).toBeVisible();

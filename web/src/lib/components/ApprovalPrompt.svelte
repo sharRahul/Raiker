@@ -29,6 +29,7 @@
   import { raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
   import { decisionsInterrupt, watchDelivery } from "../deliveryPolicy.svelte";
   import { inlineDecisions, shownInlineNow } from "../inlineDecisions.svelte";
+  import { OWNER_QUESTION_TOOL } from "../clarify";
   import { humanize } from "../format";
   import { watchLayout } from "../layoutWatch";
   import Icon from "./Icon.svelte";
@@ -191,6 +192,16 @@
     window.location.hash = "#/approvals";
   }
 
+  // QUI-F02 — a mid-task question parks through the same transport, but it is
+  // answered, never allowed: it opens where it can be answered.
+  const isQuestion = $derived(current?.tool_name === OWNER_QUESTION_TOOL);
+  function answer() {
+    if (current === null) return;
+    window.location.hash = current.session_id
+      ? `#/new-chat?session=${encodeURIComponent(current.session_id)}`
+      : "#/approvals";
+  }
+
   /**
    * How far the card rises so it never covers a composer (FIXED-621).
    *
@@ -263,17 +274,22 @@
   >
     <header>
       <Icon name="shield" size="sm" />
-      <strong>Approval needed</strong>
+      <strong>{isQuestion ? "Question for you" : "Approval needed"}</strong>
       {#if queue.length > 1}<span class="more">{queue.length - 1} more</span>{/if}
       <button type="button" class="dismiss" aria-label="Decide later" onclick={later}>
         <Icon name="x" size="sm" />
       </button>
     </header>
-    <p class="what">
-      <strong>{humanize(current.tool_name)}</strong>
-      <span>{capabilityLabel(current.capability)}</span>
-    </p>
-    {#if current.critical}
+    {#if !isQuestion}
+      <p class="what">
+        <strong>{humanize(current.tool_name)}</strong>
+        <span>{capabilityLabel(current.capability)}</span>
+      </p>
+    {/if}
+    {#if isQuestion}
+      <p class="note">Raiker has a question and is waiting for your answer.</p>
+      <div class="actions"><button type="button" class="primary" onclick={answer}>Answer</button></div>
+    {:else if current.critical}
       <p class="note">This one needs your password or a code.</p>
       <div class="actions"><button type="button" class="primary" onclick={review}>Review</button></div>
     {:else}

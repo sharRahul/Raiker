@@ -43,7 +43,9 @@ If this is your first time using Raiker, read these pages in order:
 | Connect services, or add MCP servers, skills, hooks, or plugins | [Extensions and MCP](extensions-and-mcp.md) |
 | Reach Raiker from Telegram or another channel | [Messaging](messaging.md) |
 | Generate images, import your own, and compose editable designs to export or hand to Build | [Design](design.md) |
-| Use Raiker's desktop window, its menu and shortcuts | [The desktop window](managing-the-host.md#the-desktop-window) |
+| Use Raiker's desktop window, its menu and shortcuts, Quick Entry and the tray | [The desktop window](managing-the-host.md#the-desktop-window) |
+| Answer a question Raiker asks mid-task, and read a turn's receipt | [When Raiker asks you a question](working-in-chat.md#when-raiker-asks-you-a-question) and [Reading a reply](working-in-chat.md#reading-a-reply) |
+| Undo a skill Raiker learned or an approval you gave | [Undoing what Raiker learned](memory.md#undoing-what-raiker-learned) |
 | Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
 | Build installers, or publish a signed release (maintainers) | [Releasing](releasing.md) |
 | Understand accounts, credentials, audit records, and privacy choices | [Security and privacy](security-and-privacy.md) |

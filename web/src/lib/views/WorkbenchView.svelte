@@ -463,9 +463,14 @@
           <div class="decision-row" data-testid="home-decision">
             <div class="row-main">
               <strong>{first.tool_name === "ask_owner_question" ? "Answer a question" : `Review ${humanize(first.tool_name).toLowerCase()}`}</strong>
-              <span>{capabilityLabel(first.capability)}{first.age_seconds !== null ? ` · waiting ${relativeTime(first.created_at)}` : ""}</span>
+              <!-- QUI-F02 — a question is answered where it was asked. -->
+              <span>{first.tool_name === "ask_owner_question" ? "Raiker is waiting for your answer" : capabilityLabel(first.capability)}{first.age_seconds !== null ? ` · waiting ${relativeTime(first.created_at)}` : ""}</span>
             </div>
-            <a class="btn btn-soft btn-sm" href="#/approvals">Decide</a>
+            {#if first.tool_name === "ask_owner_question" && first.session_id}
+              <a class="btn btn-soft btn-sm" href={`#/new-chat?session=${encodeURIComponent(first.session_id)}`}>Answer</a>
+            {:else}
+              <a class="btn btn-soft btn-sm" href="#/approvals">Decide</a>
+            {/if}
           </div>
           {#if approvals.length > 1}
             <a class="view-all" href="#/approvals">View all {approvals.length} decisions</a>

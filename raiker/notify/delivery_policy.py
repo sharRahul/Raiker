@@ -27,7 +27,10 @@ Three rules the owner accepted on 2026-10-05 (DEC-21a), and where they hold:
   writes "URGENT" into a task title changes nothing here.
 * **Muting a category is not approving.** Decisions (approvals) cannot be
   muted outside quiet hours: they hold work up, and the switch that would hide
-  them is the switch that makes work stall unseen.
+  them is the switch that makes work stall unseen. QUI-F05 (2026-10-24) adds
+  *Approval needed* and *Input needed* switches, and they reach the desktop
+  alert only (:data:`DESKTOP_ONLY_CATEGORIES`): inside Raiker the card and the
+  notice still interrupt. A critical approval has no switch at all.
 """
 
 from __future__ import annotations
@@ -74,10 +77,15 @@ CRITICAL_KINDS: frozenset[str] = frozenset(
 #: mute has an entry in :data:`MUTABLE_CATEGORIES`; an unknown kind is
 #: ``other``, which interrupts outside quiet hours and is never critical.
 CATEGORIES: dict[str, str] = {
-    "approval_pending": "decisions",
+    # QUI-F05 — an ordinary approval and a question have switches of their own.
+    # A critical approval stays in ``decisions``, which no switch mutes: it
+    # resolves only by a live owner's decision, so it is never silenced.
+    "approval_pending": "approvals",
+    "question_pending": "input",
     "critical_approval_pending": "decisions",
     "task_finished": "work",
-    "task_paused": "work",
+    "task_failed": "failed",
+    "task_paused": "failed",
     "telemetry_delivery": "work",
     "security_alert": "security",
     "security_recovered": "security",
@@ -95,7 +103,15 @@ CATEGORIES: dict[str, str] = {
 #: ``decisions`` (see the module docstring) and not ``test`` — a test notice
 #: that a preference silently swallowed would test nothing.
 MUTABLE_CATEGORIES: dict[str, str] = {
-    "work": "Background work finished or paused",
+    # QUI-F05 — notifications by event. Muting one is never approving: what it
+    # announces still waits, is counted by the bell and is in the record.
+    "approvals": "Approval needed",
+    "input": "Input needed",
+    # No notice is written for an answer; the page that ran the turn raises it
+    # on the desktop when Raiker is in the background, and reads this switch.
+    "responses": "Response ready",
+    "failed": "Task failed",
+    "work": "Background task finished",
     "security": "Security findings and containment",
     "extensions": "Extensions and MCP servers",
 }
@@ -104,6 +120,12 @@ MUTABLE_CATEGORIES: dict[str, str] = {
 def instant(moment: datetime) -> str:
     """``moment`` in the store's timestamp shape, so stored instants compare as text."""
     return moment.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+#: QUI-F05 — categories whose switch reaches the desktop alert only. Their
+#: notices hold work up, so inside Raiker they always interrupt (DEC-21a);
+#: what the owner may turn off is being reached outside it.
+DESKTOP_ONLY_CATEGORIES: frozenset[str] = frozenset({"approvals", "input"})
 
 
 def category_key(category: str) -> str:
@@ -291,11 +313,15 @@ def decide(
 ) -> PresentationDecision:
     """The one delivery policy. Test notices and real ones both come through here."""
     category = category_of(kind)
-    if not interrupts_enabled(settings, category):
+    muted = not interrupts_enabled(settings, category)
+    if muted and category not in DESKTOP_ONLY_CATEGORIES:
         return PresentationDecision("muted", "muted", None)
+    # QUI-F05 — *Approval needed* and *Input needed* switch the desktop alert
+    # only; inside Raiker they still interrupt (the rule above, DEC-21a).
+    desktop_muted: Presentation | None = "muted" if muted else None
     quiet = QuietHours.from_settings(settings, fallback_zone)
     if not quiet.active(now):
-        return PresentationDecision("interrupt", "interrupt", None)
+        return PresentationDecision("interrupt", desktop_muted or "interrupt", None)
     critical = kind in CRITICAL_KINDS
     in_app: Presentation = (
         "critical_exception" if critical and quiet.critical_in_app else "quiet_hours"
@@ -303,6 +329,8 @@ def decide(
     desktop: Presentation = (
         "critical_exception" if critical and quiet.critical_desktop else "quiet_hours"
     )
+    if desktop_muted is not None:
+        desktop = desktop_muted
     ends = quiet.ends_at(now)
     held = "quiet_hours" in (in_app, desktop)
     return PresentationDecision(

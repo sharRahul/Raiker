@@ -109,7 +109,7 @@
   {#if loadError}
     <PageState state="error" title="Couldn't load the git credential" detail={loadError} />
   {:else if !status}
-    <PageState state="loading" title="Loading…" />
+    <PageState state="loading" title="Reading the Git credential…" />
   {:else}
     <!-- Step one, and the reason this card is above the field rather than below
          it: what the credential is for is a decision, and a decision made after

@@ -26,7 +26,7 @@ describe("the More window", () => {
     const onClose = vi.fn();
     render(AllPagesDialog, { open: true, current: "home", onOpenPalette, onClose });
     expect(screen.queryByRole("textbox")).toBeNull();
-    await fireEvent.click(screen.getByRole("button", { name: /search pages, settings and commands/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /search everything/i }));
     expect(onClose).toHaveBeenCalled();
     expect(onOpenPalette).toHaveBeenCalled();
   });

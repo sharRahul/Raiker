@@ -8478,6 +8478,61 @@
         "title": "ConversionPreview",
         "type": "object"
       },
+      "CorrectionMemoryRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F20 — the owner's correction, offered as a memory proposal.",
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "required": [
+          "text",
+          "session_id"
+        ],
+        "title": "CorrectionMemoryRequest",
+        "type": "object"
+      },
+      "CorrectionProposed": {
+        "description": "QUI-F20 — a correction waiting in Suggestions until the owner decides it.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "candidate_id",
+          "text"
+        ],
+        "title": "CorrectionProposed",
+        "type": "object"
+      },
       "CostEvent": {
         "properties": {
           "action_id": {
@@ -32039,6 +32094,121 @@
         "title": "TurnMemoryDisclosure",
         "type": "object"
       },
+      "TurnReceipt": {
+        "description": "QUI-F16 — what one turn used, read, changed and sent, from its own records.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TurnReceiptLine"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "cost_basis": {
+            "enum": [
+              "priced",
+              "free",
+              "unknown"
+            ],
+            "title": "Cost Basis",
+            "type": "string"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "left_computer": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Left Computer",
+            "type": "array"
+          },
+          "local": {
+            "title": "Local",
+            "type": "boolean"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "reads": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reads",
+            "type": "object"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "model",
+          "provider",
+          "local",
+          "cost_usd",
+          "cost_basis",
+          "reads",
+          "changes",
+          "left_computer"
+        ],
+        "title": "TurnReceipt",
+        "type": "object"
+      },
+      "TurnReceiptLine": {
+        "description": "QUI-F16 — one thing a turn changed or sent, with when it was approved.",
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "approved_at"
+        ],
+        "title": "TurnReceiptLine",
+        "type": "object"
+      },
       "TurnSourceExcerpt": {
         "description": "One cited source, opened at the passage the turn used (C4).",
         "properties": {
@@ -44239,6 +44409,43 @@
           }
         },
         "summary": "List Memory Proposals"
+      },
+      "post": {
+        "description": "QUI-F20 — offer the owner's correction as a memory proposal, nothing more.",
+        "operationId": "propose_memory_from_correction_api_memory_proposals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionMemoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrectionProposed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Memory From Correction"
       }
     },
     "/api/memory/proposals/{candidate_id}/decision": {
@@ -49504,6 +49711,55 @@
           }
         },
         "summary": "Get Build Turn Outcome"
+      }
+    },
+    "/api/sessions/{session_id}/turns/{turn_id}/receipt": {
+      "get": {
+        "description": "QUI-F16 — what one turn used, read, changed and sent, from its own records.",
+        "operationId": "get_turn_receipt_api_sessions__session_id__turns__turn_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Turn Receipt"
       }
     },
     "/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt": {

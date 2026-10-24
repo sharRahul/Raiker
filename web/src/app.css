@@ -128,6 +128,9 @@
   --text-sm: 0.82rem;
   --text-md: 0.9rem;
   --text-base: 1rem;
+  /* QUI-F12 — conversation text's own size, 110% unless Settings › Personalisation
+     says otherwise (applied by `applyAppearance`). */
+  --chat-text-scale: 1.1;
   --text-lg: 1.12rem;
   --text-xl: 1.32rem;
   --text-2xl: 1.6rem;

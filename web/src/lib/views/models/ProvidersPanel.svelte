@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../../confirm.svelte";
   import { onDestroy } from "svelte";
   import { api } from "../../api";
   import { openRuntimeInstaller } from "../../runtimeInstall";
@@ -90,9 +91,11 @@
   async function pull() {
     if (!model.trim()) return;
     if (
-      !window.confirm(
-        `Pull ${model.trim()} from Ollama? The model may use substantial disk space.`,
-      )
+      !(await askConfirm({
+        title: `Pull ${model.trim()} from Ollama?`,
+        body: "The model may use substantial disk space.",
+        confirmLabel: "Pull",
+      }))
     )
       return;
     busy = "pull";

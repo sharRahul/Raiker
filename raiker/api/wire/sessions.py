@@ -12,6 +12,34 @@ from raiker.contracts.views import View
 from raiker.control.views.sessions import SessionView, TurnView
 
 
+class TurnReceiptLine(TypedDict):
+    """QUI-F16 — one thing a turn changed or sent, with when it was approved."""
+
+    label: str
+    #: When the owner approved it, or ``None`` when it needed no approval.
+    approved_at: str | None
+
+
+class TurnReceipt(TypedDict):
+    """QUI-F16 — what one turn used, read, changed and sent, from its own records."""
+
+    turn_id: str
+    #: The model that answered last, as the provider names it.
+    model: str | None
+    provider: str | None
+    #: True when that provider runs on this computer.
+    local: bool
+    #: Approximate cost in US dollars; ``None`` when no price is known or it is free.
+    cost_usd: float | None
+    #: ``priced``, ``free`` (a local model), or ``unknown`` (billable, no rate).
+    cost_basis: Literal["priced", "free", "unknown"]
+    #: Successful reads, by what was read: ``{"file": 2, "web page": 1}``.
+    reads: dict[str, int]
+    changes: list[TurnReceiptLine]
+    #: Where anything beyond the model request went: service names, deduplicated.
+    left_computer: list[str]
+
+
 class BuildCheckRow(TypedDict):
     """BR-D01 — one declared check, and what the turn's command record says of it."""
 

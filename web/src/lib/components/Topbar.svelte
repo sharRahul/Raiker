@@ -8,8 +8,10 @@
   import Icon from "./Icon.svelte";
   import HostControl from "./HostControl.svelte";
   import StopSwitch from "./StopSwitch.svelte";
+  import LiveWorkLine from "./LiveWorkLine.svelte";
   import { WORK_MODES } from "../nav";
   import { shortcutLabel, shortcutSpoken } from "../shortcutLabel";
+  import { desktopBridge } from "../desktopShell";
 
   // The top bar carries the shell's own controls only. The project selector
   // moved into Build, where the execution boundary it sets is visible for the
@@ -48,6 +50,8 @@
       // QUI-P06 — an approval past its time limit can no longer be decided, so
       // it is not "waiting on you": it is a turn marked not done.
       pendingApprovals = (await api.approvals("pending")).filter((item) => !item.is_expired).length;
+      // QUI-F11 — the desktop tray shows a dot while a decision waits.
+      desktopBridge()?.setAttention?.(pendingApprovals);
     } catch {
       // A failed read leaves the last known count. Never a broken shell.
     }
@@ -178,6 +182,8 @@
   </nav>
   <div class="status" role="status" aria-live="polite">
     {#if connecting}<span class="pill">Connecting…</span>{/if}
+    <!-- QUI-F04 — what is running, from every page; absent when nothing is. -->
+    <LiveWorkLine />
   </div>
   <div class="controls">
     <button
@@ -285,7 +291,7 @@
   /* Visually hidden, not removed: the page keeps exactly one h1 and the
      document outline is unchanged. */
   .page-id.quiet{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
-  .page-title{font-size:var(--text-base);margin:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .page-title{font-size:var(--text-base);margin:0;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto;min-width:0;flex-shrink:1}.controls{flex-shrink:0}.pill{font-size:var(--text-xs);font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   /* Navigation and attention on one side of the rule, where the
      workspace runs and how it is stopped on the other. */
   .cluster-rule{width:1px;height:1.35rem;background:var(--border);margin:0 .1rem;flex-shrink:0}

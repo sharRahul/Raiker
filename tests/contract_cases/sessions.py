@@ -135,9 +135,17 @@ def _turn_outcome(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return f"/api/sessions/{session_id}/turns/{turn_id}/outcome"
 
 
+def _turn_receipt(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-F16 — the receipt of the conversation's one turn."""
+    session_id = _session(client, h)
+    turn_id = client.get(f"/api/sessions/{session_id}", headers=h).json()["turns"][0]["turn_id"]
+    return f"/api/sessions/{session_id}/turns/{turn_id}/receipt"
+
+
 CASES: Cases = {
     ("GET", "/api/sessions/{session_id}"): _on_session(""),
     ("GET", "/api/sessions/{session_id}/turns/{turn_id}/outcome"): _turn_outcome,
+    ("GET", "/api/sessions/{session_id}/turns/{turn_id}/receipt"): _turn_receipt,
     ("GET", "/api/sessions/{session_id}/export/manifest"): _on_session("/export/manifest"),
     ("PUT", "/api/sessions/{session_id}/pin"): _on_session("/pin", {"pinned": True}),
     ("PUT", "/api/sessions/{session_id}/rename"): _on_session("/rename", {"title": "Renamed"}),

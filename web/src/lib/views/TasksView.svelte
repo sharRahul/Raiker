@@ -46,6 +46,7 @@
   import { taskActionLabel, taskActions, taskPhase, taskPhaseLabel, type TaskAction } from "../taskPhase";
   import { forgetSurfaceModel, rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
+  import { SCHEDULE_TEMPLATES, firstRunValue, takeTaskDraft, type TaskDraft } from "../taskDrafts";
   import type {
     ApprovalView,
     CapabilityGate,
@@ -543,6 +544,25 @@
 
 
 
+  /** QUI-F06 — fill the form from a template or a handed-over draft. Saves nothing. */
+  function applyDraft(draft: TaskDraft) {
+    objective = draft.objective;
+    titleOverride = draft.title;
+    timing = draft.timing;
+    runMode = "single";
+    if (draft.timing === "repeating") {
+      routineEvery = draft.every;
+      scheduledAt = firstRunValue(draft);
+    }
+    detailsOpen = true;
+    queueMicrotask(() => {
+      instructionEl?.focus();
+      // "Watch this page" leaves the address for the owner: the cursor waits there.
+      const gap = draft.objective.indexOf("https:// ");
+      if (gap >= 0) instructionEl?.setSelectionRange(gap + 8, gap + 8);
+    });
+  }
+
   // §13.2 item 6 — this draft's key, kept until the server accepts it.
   let draftKey = newIdempotencyKey();
 
@@ -666,6 +686,10 @@
   onMount(() => {
     // Chat's `/schedule` asks this surface to open on **Schedule once**. It
     // arranges the form and stops: nothing is created and nothing is scheduled.
+    // QUI-F06 / QUI-F18 — a draft handed over by Save as routine opens in the
+    // form, for the owner to read and Create; nothing is saved by arriving.
+    const handed = takeTaskDraft();
+    if (handed !== null) applyDraft(handed);
     if (takeScheduleRequest()) {
       // Asked for by the shape the runtime knows, and translated by the one
       // function that owns that translation.
@@ -752,6 +776,17 @@
     onsubmit={() => void createTask()}
   >
     {#snippet above()}
+      <!-- QUI-F06 — start from a template: it fills the form, the owner reads
+           it and presses Create. Shown while the instruction is empty. -->
+      {#if objective.trim() === ""}
+        <div class="cadence chip-row templates" role="group" aria-label="Start from a template">
+          {#each SCHEDULE_TEMPLATES as template (template.id)}
+            <button type="button" class="chip" title={template.detail} onclick={() => applyDraft(template)}
+              >{template.label}</button
+            >
+          {/each}
+        </div>
+      {/if}
       <!-- REM-TASK-01 — when it runs, then how it runs. The second question is
            only asked where the runtime has an answer for it: a background agent
            starts now, so it is not offered beside a start time. -->
@@ -884,6 +919,11 @@
               {/if}
             </fieldset>
           {/if}
+          <!-- QUI-F06 — where the results go, said as it is: every run's
+               result is on Home and in the task's own conversation. -->
+          <p class="results-go" role="note">
+            Results appear on Home and in this task's own conversation, where you can reply to steer the next run.
+          </p>
           <fieldset class="detail-group" aria-label="Organisation">
             <legend>Organisation</legend>
             <label>
@@ -1249,4 +1289,5 @@
   .delegated{display:flex;align-items:center;gap:var(--space-2);margin-top:.6rem}
   .delegated .progress{flex:1 1 auto;margin-top:0}
   .project-choice select{min-width:12rem}@media(max-width:42rem){.tasks header{flex-direction:column}.task{margin-left:0;max-width:none}.history-row{flex-wrap:wrap}.history-main{flex:1 1 100%}.history-row span:last-of-type,.history-row button{white-space:nowrap}}
+  .results-go { margin: 0; font-size: var(--text-xs); color: var(--text-3); }
 </style>

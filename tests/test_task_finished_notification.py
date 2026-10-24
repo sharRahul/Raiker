@@ -22,7 +22,7 @@ import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.events.writer import EventLogWriter
-from raiker.notify.task_notifier import TASK_FINISHED_KIND
+from raiker.notify.task_notifier import TASK_FAILED_KIND, TASK_FINISHED_KIND
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 
@@ -54,7 +54,8 @@ def _notices(store: SQLiteStore) -> list[dict[str, object]]:
     return [
         item
         for item in store.list_notifications("principal_owner")
-        if item["kind"] == TASK_FINISHED_KIND
+        # QUI-F05 — a run that did not complete is its own kind, switched apart.
+        if item["kind"] in (TASK_FINISHED_KIND, TASK_FAILED_KIND)
     ]
 
 
@@ -141,6 +142,7 @@ class TestWhatTheNoticeSays:
         notices = _notices(store)
         assert len(notices) == 1
         assert notices[0]["title"] == "Background task did not finish"
+        assert notices[0]["kind"] == TASK_FAILED_KIND
 
     def test_the_run_s_own_words_stay_in_the_thread(
         self, manager: TaskManager, store: SQLiteStore, session_id: str

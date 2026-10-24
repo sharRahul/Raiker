@@ -425,9 +425,11 @@ something, change a setting — with diagnostics last. Help is not a page: the
 **?** in the top bar opens a panel beside whatever you are on, starting on the
 article for that page, with search over every article; **Escape** closes it and
 the page underneath stays where it was. Old `#/guide` links open the panel. It has no search
-box of its own: **Search pages, settings and commands** at its top opens the
+box of its own: **Search everything** at its top opens the
 command palette (`Ctrl K`, `⌘K` on a Mac), which finds every page and every
-Settings section by name. On a phone More is a full-height sheet with **Back**,
+Settings section by name, and also your chats, tasks and memories — with
+filters (*All · Chats · Tasks · Memories · Settings · Help*) to narrow it to
+one kind. On a phone More is a full-height sheet with **Back**,
 and it says which page you are on.
 
 **More was a gear**, and it opened a window that could not take you to Settings:

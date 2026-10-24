@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../../confirm.svelte";
   /**
    * REM-MEM-03 — the recall engine's controls, out of the personal review.
    *
@@ -71,7 +72,7 @@
       `${waiting === 1 ? "memory" : "memories"} and ${waitingFiles} managed document ` +
       `${waitingFiles === 1 ? "passage" : "passages"} ${where} to be embedded as ` +
       `${indexTarget.model}? Secret-like or credential-like content is never embedded.`;
-    if (!window.confirm(question)) return;
+    if (!(await askConfirm({ title: question, confirmLabel: indexTarget.local_only ? "Process" : "Send" }))) return;
     busy = true;
     actionError = null;
     indexResult = null;
@@ -102,7 +103,7 @@
   {#if loadError}
     <PageState state="error" title="Couldn't load the memory engine" detail={loadError} />
   {:else if !settings}
-    <PageState state="loading" title="Loading…" />
+    <PageState state="loading" title="Reading the memory engine…" />
   {:else}
     {#if actionError}<p class="notice notice-danger" role="alert">{actionError}</p>{/if}
 

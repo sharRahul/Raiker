@@ -1236,6 +1236,24 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1147](#fixed-1147--a-local-models-malformed-block-was-final-qui-a-rules) | Low | Runtime | Fixed 2026-10-23 |
 | [FIXED-1148](#fixed-1148--a-block-whose-json-opened-on-the-fence-line-was-drawn-as-code-qui-a-rules) | Medium | Runtime / typed answers | Fixed 2026-10-23 |
 | [FIXED-1149](#fixed-1149--a-chart-in-a-transcript-bubble-was-too-small-to-read-and-its-legend-had-no-colours-04-screenshot-review) | Medium | Chat / charts | Fixed 2026-10-23 |
+| [FIXED-1150](#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04) | Medium | Shell / top bar | Fixed 2026-10-24 |
+| [FIXED-1151](#fixed-1151--a-question-asked-mid-task-was-offered-as-an-approval-in-chat-build-and-the-floating-card-qui-f02) | High | Chat / Build / approvals | Fixed 2026-10-24 |
+| [FIXED-1152](#fixed-1152--an-answered-question-read-as-a-failed-step-qui-f02-found-live) | Medium | Runtime / transcript | Fixed 2026-10-24 |
+| [FIXED-1153](#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16) | Medium | Chat / audit | Fixed 2026-10-24 |
+| [FIXED-1154](#fixed-1154--homes-composer-did-not-say-where-a-message-would-go-qui-f17) | Low | Home / composer | Fixed 2026-10-24 |
+| [FIXED-1155](#fixed-1155--notifications-could-not-be-chosen-by-event-and-desktop-alerts-fired-while-raiker-was-on-screen-qui-f05) | Medium | Notifications | Fixed 2026-10-24 |
+| [FIXED-1156](#fixed-1156--scheduled-work-started-from-an-empty-form-qui-f06) | Low | Work › Tasks | Fixed 2026-10-24 |
+| [FIXED-1157](#fixed-1157--a-task-that-went-well-could-not-be-made-repeatable-qui-f18) | Low | Chat / Tasks | Fixed 2026-10-24 |
+| [FIXED-1158](#fixed-1158--what-raiker-learned-and-the-approvals-given-could-not-be-undone-in-one-place-qui-f09) | Low | Memory | Fixed 2026-10-24 |
+| [FIXED-1159](#fixed-1159--confirmations-were-the-browsers-own-box-worded-as-ok-qui-f10) | Medium | Every surface | Fixed 2026-10-24 |
+| [FIXED-1160](#fixed-1160--nine-surfaces-said-a-bare-loading-qui-f10) | Low | Settings, Diagnostics, Design, libraries | Fixed 2026-10-24 |
+| [FIXED-1161](#fixed-1161--chat-text-could-only-be-resized-with-the-whole-interface-qui-f12) | Low | Settings › Personalisation / Chat | Fixed 2026-10-24 |
+| [FIXED-1162](#fixed-1162--a-correction-was-forgotten-as-soon-as-it-was-made-qui-f20) | Low | Chat / Memory | Fixed 2026-10-24 |
+| [FIXED-1163](#fixed-1163--ctrlcmdk-could-not-find-a-chat-a-task-or-a-memory-qui-f22) | Medium | Command palette | Fixed 2026-10-24 |
+| [FIXED-1164](#fixed-1164--the-desktop-window-could-not-stay-in-the-tray-qui-f11) | Low | Desktop shell | Fixed 2026-10-24 |
+| [FIXED-1165](#fixed-1165--a-project-could-not-be-opened-in-a-second-window-qui-f13) | Low | Desktop shell / Projects | Fixed 2026-10-24 |
+| [FIXED-1166](#fixed-1166--there-was-no-way-to-ask-raiker-something-without-switching-to-it-qui-f01) | Medium | Desktop shell | Fixed 2026-10-24 |
+| [FIXED-1167](#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round) | Low | Web tests | Fixed 2026-10-24 |
 
 ---
 
@@ -37094,3 +37112,179 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Evidence.** RT-QUI-39 screenshots before and after (local evidence).
 
+
+## FIXED-1150 — Nothing outside Chat said that work was running (QUI-F04)
+
+**Severity: Medium. Area: Shell / top bar. Status: Fixed 2026-10-24.**
+
+**Observed.** A running task or a turn being written was visible only on the page that ran it (Chat's status line, Background work, Home's In progress). From any other page the only signal was the stop switch's count.
+
+**Fixed.** The top bar carries one live work line while something runs (`LiveWorkLine.svelte`, `liveWork.svelte.ts`). One item is a link to it with its real step (*New chat · Writing the answer*, a task's own `current_step`, or *waiting for you*); several read *2 tasks running · 1 waiting for you* and open a menu of each. Chat and Build report the turn they are streaming; tasks come from the same `GET /api/tasks` read every surface counts with. Nothing running, nothing drawn. A long task title is cut with an ellipsis, so it never pushes the stop switch off screen (found live, RT-QUI-55).
+
+**Evidence.** `liveWork.test.ts`, `Topbar.test.ts` (*live work line*); RT-QUI-46 and RT-QUI-55.
+
+## FIXED-1151 — A question asked mid-task was offered as an approval in Chat, Build and the floating card (QUI-F02)
+
+**Severity: High. Area: Chat / Build / approvals. Status: Fixed 2026-10-24.**
+
+**Observed.** `ask_owner_question` parks a turn through the approval transport without being an approval. Approvals keeps a separate branch for it, but Chat drew it with the Raiker Safety card (**Decline**, **Allow once**), Build listed it under *Waiting on you* with **Accept** and **Reject**, and the floating card offered **Allow once** — the exact blur that teaches an owner to click through approvals.
+
+**Fixed.** `ClarifyCard.svelte` draws the question where the turn parked: one question at a time (*1 of 2*), pick one, pick several or type an answer, **Skip** and **Confirm and continue**, headed *Waiting for your answer*. It answers through the question's own route (`POST /api/approvals/{id}/answer`), which refuses a label it did not offer; picks go back as picks, and anything typed or skipped goes back as the owner's own words, one line per question. The turn then continues (*Answered — continuing…*). Build uses the same card; the floating card says *Question for you* with **Answer**, which opens the conversation; Home's row reads *Raiker is waiting for your answer* with **Answer**.
+
+**Evidence.** `ClarifyCard.test.ts`, `chatPresentation.test.ts` (*a question waits for an answer*); RT-QUI-47.
+
+## FIXED-1152 — An answered question read as a failed step (QUI-F02, found live)
+
+**Severity: Medium. Area: Runtime / transcript. Status: Fixed 2026-10-24.**
+
+**Observed.** Found in the first live run of the question card: after the owner answered, the question's row read *failed* and the turn *Partially completed · 1 of 1 step did not go through*, although the model received the answer and used it. `resumed_call_row_status` mapped every outcome other than `success` and `rejected` to `failed`, and an answer's outcome is `answered`.
+
+**Fixed.** `answered` settles the row as done (`raiker/runtime/turn_suspension.py`). The parked turn no longer repeats *Waiting for your decision. Nothing has run yet.* in a bubble above its question card, and the row says *waiting for your answer* rather than *waiting for your decision*.
+
+**Evidence.** `tests/test_owner_question.py` (*an answered question reads as done*); RT-QUI-47.
+
+## FIXED-1153 — A task's end did not say what it used, read, changed or sent (QUI-F16)
+
+**Severity: Medium. Area: Chat / audit. Status: Fixed 2026-10-24.**
+
+**Observed.** The governed promise — which model, what it cost, what was read, what changed with whose approval, what left the computer — was in the audit log and nowhere on the turn.
+
+**Fixed.** `GET /api/sessions/{session_id}/turns/{turn_id}/receipt` builds a receipt from the turn's own audit events (`raiker/control/turn_receipt.py`): the model that answered, the cost of the provider-reported tokens at that model's resolved rate (*no charge* for a local model, *cost not known* for a billable one with no rate, never free), successful reads by kind, each change with the time its approval was recorded, and any service reached beyond the model. A call that failed or was refused is not on it. Chat shows it as one expandable line at the end of each turn: *Haiku 4.5 · ≈ $0.0128 · 1 file read · nothing else left this computer*.
+
+**Evidence.** `tests/test_turn_receipt.py`, `turnReceipt.test.ts`, the contract case; RT-QUI-46.
+
+## FIXED-1154 — Home's composer did not say where a message would go (QUI-F17)
+
+**Severity: Low. Area: Home / composer. Status: Fixed 2026-10-24.**
+
+**Observed.** Chat's composer said *Sent to Anthropic* or *Stays on this computer* (QUI-C04); Home's, which hands its message to Chat, said nothing, and neither said that attached files go too.
+
+**Fixed.** Home's composer shows the label for the model Chat will send on, and both say *Sent to Anthropic, with 1 file* (or *Stays on this computer, with 2 files*) once something is attached (`composerDataLabel`).
+
+**Evidence.** `inferenceLocation.test.ts`; RT-QUI-45.
+
+## FIXED-1155 — Notifications could not be chosen by event, and desktop alerts fired while Raiker was on screen (QUI-F05)
+
+**Severity: Medium. Area: Notifications. Status: Fixed 2026-10-24.**
+
+**Observed.** Settings › Notifications had three category switches (*Background work finished or paused*, security, extensions). A question parked as an approval was announced as *Approval needed*; a failed background task and a finished one were one switch. `desktopNotice.ts` promised alerts only when Raiker is not visible, but the notice centre mirrored every unread notice to the desktop whatever was on screen.
+
+**Fixed.** Five event switches: **Approval needed**, **Input needed**, **Response ready**, **Task failed** and **Background task finished** (`MUTABLE_CATEGORIES`). A question is its own kind (`question_pending`, *Input needed*); a background task that did not complete is `task_failed`, and a routine paused by its own failures counts as failed. *Approval needed* and *Input needed* reach the desktop alert only (`DESKTOP_ONLY_CATEGORIES`): inside Raiker they always show, because DEC-21a keeps decisions from being muted; a critical approval has no switch at all. Desktop alerts are raised only while Raiker is in the background, and *Response ready* is raised by the page that ran a turn when its answer arrives while hidden.
+
+**Evidence.** `tests/test_notifications_by_event.py`, `desktopNotice.test.ts`, `QuietHours.test.ts`; RT-QUI-53.
+
+## FIXED-1156 — Scheduled work started from an empty form (QUI-F06)
+
+**Severity: Low. Area: Work › Tasks. Status: Fixed 2026-10-24.**
+
+**Observed.** Every repeating task was written from nothing, and the form never said where a run's result would appear.
+
+**Fixed.** *Start from a template* — **Morning brief**, **Weekly inbox tidy** (which sends, archives and deletes nothing) and **Watch this page** — fills the instruction, the cadence and the next first run (`taskDrafts.ts`); nothing is saved until **Create**. The schedule details say *Results appear on Home and in this task's own conversation*. Delivering results to a connected channel is open ([TO_BE_FIXED](TO_BE_FIXED.md#2026-10-24-quiet-ui-features-round--what-is-still-open)).
+
+**Evidence.** `taskDrafts.test.ts`, `TasksView.test.ts` (*fills the form from Morning brief*); RT-QUI-50.
+
+## FIXED-1157 — A task that went well could not be made repeatable (QUI-F18)
+
+**Severity: Low. Area: Chat / Tasks. Status: Fixed 2026-10-24.**
+
+**Observed.** Repeating something that worked meant copying the request into Tasks by hand.
+
+**Fixed.** A completed turn with no failed or refused step offers **Save as routine** beside Copy. It opens Work › Tasks with the request as the instruction, the steps the turn's record says it took (*Last time this took these steps: List folder (the workspace root)*), daily at 09:00 and the conversation's title. The owner reviews and presses **Create**; nothing is saved without it, and every step still asks for approval where it would.
+
+**Evidence.** `taskDrafts.test.ts` (*save as routine*, *the steps a routine repeats*), `TasksView.test.ts`; RT-QUI-50.
+
+## FIXED-1158 — What Raiker learned and the approvals given could not be undone in one place (QUI-F09)
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-24.**
+
+**Observed.** Skills Raiker built were on Connections › Skills and standing approvals in Settings › Security; neither was where an owner looks for what Raiker has learned.
+
+**Fixed.** Memory › **Controls** lists *What Raiker has learned to do* (active skills built in this workspace; **Undo** turns one off, and it can be turned on again) and *Approvals you've given* (standing approvals in force; **Undo** revokes after the one confirmation dialog). This also closes the open part of QUI-P08.
+
+**Evidence.** `MemoryControls.test.ts`; RT-QUI-51.
+
+## FIXED-1159 — Confirmations were the browser's own box, worded as "OK" (QUI-F10)
+
+**Severity: Medium. Area: Every surface. Status: Fixed 2026-10-24.**
+
+**Observed.** Twenty-five confirmations used `window.confirm`: a system box that names the site, says *OK*, and looks different in every browser.
+
+**Fixed.** One dialog (`ConfirmDialog.svelte`, asked through `askConfirm`): the question, what it affects, **Cancel** and the action on its own button (*Delete*, *Revoke*, *Archive*), red when it destroys something. Enter confirms; Esc and the backdrop cancel. The Settings leave guard stays native because a navigation guard must answer synchronously. A component rendered without the shell asks the browser in the same words. `quietUiCopy.test.ts` now fails on a new `window.confirm`.
+
+**Evidence.** `ConfirmDialog.test.ts`, `quietUiCopy.test.ts` (*QUI-F10*); RT-QUI-54.
+
+## FIXED-1160 — Nine surfaces said a bare "Loading…" (QUI-F10)
+
+**Severity: Low. Area: Settings, Diagnostics, Design, libraries. Status: Fixed 2026-10-24.**
+
+**Observed.** *Loading…* said nothing about what was being read.
+
+**Fixed.** Each says what it reads: *Reading where work runs…*, *Checking memory integrity…*, *Reading this design's history…* and so on, as a status. `quietUiCopy.test.ts` fails on a new bare *Loading…*.
+
+**Evidence.** `quietUiCopy.test.ts`.
+
+## FIXED-1161 — Chat text could only be resized with the whole interface (QUI-F12)
+
+**Severity: Low. Area: Settings › Personalisation / Chat. Status: Fixed 2026-10-24.**
+
+**Observed.** Density and typeface reached everything; there was no way to make conversation text larger alone.
+
+**Fixed.** Settings › Personalisation › *Conversation text*: **Chat text size** 100%, 110% (default), 125% or 140%, previewed at once and kept on Save. Chat's message bubbles follow `--chat-text-scale`; the server refuses any other value.
+
+**Evidence.** `Personalisation.test.ts`, `tests/test_routes_settings.py`; RT-QUI-52.
+
+## FIXED-1162 — A correction was forgotten as soon as it was made (QUI-F20)
+
+**Severity: Low. Area: Chat / Memory. Status: Fixed 2026-10-24.**
+
+**Observed.** *That's wrong — Anna prefers short replies* corrected one answer and nothing after it.
+
+**Fixed.** A message that opens as a correction (*That's wrong*, *No,*, *Actually*) is followed, under the answer, by *Remember: Anna prefers short replies?* **Save** · **Dismiss**. Save files the owner's own words as a memory proposal (`POST /api/memory/proposals`) and approves it through Suggestions' own decision, which refuses secret-like text; Dismiss keeps nothing. Found live (RT-QUI-48): the offer took the rest of the message, follow-up instruction included, and read *replies.?*; it now takes the first sentence of the correction and asks it as a question.
+
+**Evidence.** `tests/test_correction_memory.py`, `corrections.test.ts`, `CorrectionMemory.test.ts`; RT-QUI-48.
+
+## FIXED-1163 — Ctrl/Cmd+K could not find a chat, a task or a memory (QUI-F22)
+
+**Severity: Medium. Area: Command palette. Status: Fixed 2026-10-24.**
+
+**Observed.** The palette knew the product (commands, pages, settings, help) and none of the owner's things.
+
+**Fixed.** It also searches **Chats** (the server's chat search, debounced), **Tasks** and **Memories**, with type filters (*All · Chats · Tasks · Memories · Settings · Help*). A chat result opens at the matching turn; a memory result opens Memory › Memories with that record's details open (`#/memory?tab=memories&record=…`). Slash commands already show a one-line description each.
+
+**Evidence.** `CommandPalette.test.ts` (*one search for everything*); RT-QUI-49.
+
+## FIXED-1164 — The desktop window could not stay in the tray (QUI-F11)
+
+**Severity: Low. Area: Desktop shell. Status: Fixed 2026-10-24.**
+
+**Observed.** Closing the desktop window closed the shell; nothing on the desktop showed that a decision was waiting.
+
+**Fixed.** Settings › General › *Desktop window* (desktop only): **Keep Raiker in the tray when you close its window**. The tray offers *Open Raiker*, *Quick Entry* and *Quit*; a closed window hides and keeps working, and the tray icon carries a dot and a tooltip (*2 decisions are waiting for you*) while approvals wait, from the top bar's own count.
+
+**Evidence.** `desktop/test/companion.test.ts`, `desktop/e2e/shell.spec.ts` (*kept in the tray*).
+
+## FIXED-1165 — A project could not be opened in a second window (QUI-F13)
+
+**Severity: Low. Area: Desktop shell / Projects. Status: Fixed 2026-10-24.**
+
+**Fixed.** In the desktop window a project's **⋯** menu offers **Open in new window**. The shell opens only an in-app route of its own origin (`isAppHash`); a URL is refused.
+
+**Evidence.** `ProjectsView.test.ts` (*a project in its own window*), `desktop/e2e/shell.spec.ts`.
+
+## FIXED-1166 — There was no way to ask Raiker something without switching to it (QUI-F01)
+
+**Severity: Medium. Area: Desktop shell. Status: Fixed 2026-10-24.**
+
+**Fixed.** **Ctrl/Cmd+Shift+Space** opens Quick Entry from anywhere on the computer: a 560×120 window with one input and *Send to* (**New task**, or one of the five most recent conversations). Enter sends and hides it without bringing the main window forward; Esc hides it. A new task starts now through the same `POST /api/tasks` as *Run in background*, so the top bar's live work line shows it; a conversation gets the message as its next turn. If sending fails the window comes back with the message kept and the reason said. The tray also opens it.
+
+**Evidence.** `QuickEntryView.test.ts`, `desktop/e2e/shell.spec.ts` (*Quick Entry's shortcut is registered*); RT-QUI-55.
+
+## FIXED-1167 — Two long-transcript tests ran at their time limit (quality, found this round)
+
+**Severity: Low. Area: Web tests. Status: Fixed 2026-10-24.**
+
+**Observed.** The two QUI-G04 tests that render a thousand-turn conversation took 3.7–4.5 s against vitest's 5 s default, before and after this round's changes; one tipped over in a loaded full run.
+
+**Fixed.** Both state a 20 s limit, with the reason beside it. The shared model store also tolerates an `/api/models` answer without `profiles`, which a Home test fixture sends and which now reaches Home's composer.
+
+**Evidence.** `ChatView.test.ts`, `WorkbenchView.test.ts`.

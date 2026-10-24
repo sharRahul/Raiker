@@ -217,7 +217,7 @@ export const HUB_TABS: Record<string, string[]> = {
   // reading all of it. Overview leads for the same reason it does on Extensions
   // and Models: the question people arrive with is "is anything waiting on me,
   // and what does Raiker remember", not "show me the observations category".
-  memory: ["overview", "memories", "suggestions", "sources", "recall", "map"],
+  memory: ["overview", "memories", "suggestions", "sources", "recall", "controls", "map"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
@@ -323,6 +323,8 @@ function rawRoute(hash: string): string {
 export function routeFromHash(hash: string): string {
   const raw = rawRoute(hash);
   if (raw === "model-setup") return raw;
+  // QUI-F01 — the desktop's Quick Entry window: a page with no shell around it.
+  if (raw === "quick-entry") return raw;
   // QUI-G03 — the state gallery exists in development builds only.
   if (raw === "state-gallery" && import.meta.env.DEV) return raw;
   if (NAV_ITEMS.some((item) => item.id === raw)) return raw;

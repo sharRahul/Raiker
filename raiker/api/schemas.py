@@ -173,6 +173,14 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+class CorrectionMemoryRequest(StrictRequest):
+    """QUI-F20 — the owner's correction, offered as a memory proposal."""
+
+    text: str
+    session_id: str
+    turn_id: str | None = None
+
+
 class RegisterRequest(StrictRequest):
     username: str
     password: str

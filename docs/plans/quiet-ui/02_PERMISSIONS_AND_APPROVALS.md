@@ -19,7 +19,7 @@ live cases RT-QUI-26 to RT-QUI-34 in
 | QUI-P05 | **Done**, except **Allow for this task**, which waits for limits the runtime can enforce. The card is in Chat; the floating card and Approvals use the same words. |
 | QUI-P06 | **Done.** 30 minutes by default, set in Settings › Security. *Ask again* asks the same request as a new turn. |
 | QUI-P07 | **Done.** |
-| QUI-P08 | **Partly done.** Done: History names and links the conversation each decision belongs to. Open: *Approvals you've given* with Undo in Memory › Controls (with QUI-F09). |
+| QUI-P08 | **Done.** History names and links the conversation each decision belongs to; *Approvals you've given* with Undo is in Memory › Controls (2026-10-24, [FIXED-1158](../FIXED_ITEMS.md#fixed-1158--what-raiker-learned-and-the-approvals-given-could-not-be-undone-in-one-place-qui-f09)). |
 | QUI-P09 | **Open.** Suggesting an Allow-with-limits rule needs QUI-P03. |
 | Acceptance | **Partly met.** No surface offers *Always allow*; a model's text cannot draw the card; History links each decision to its task. Open: a permission changed in one place shown elsewhere without reload is not checked across every surface. |
 

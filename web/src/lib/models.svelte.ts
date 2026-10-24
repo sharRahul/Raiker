@@ -21,7 +21,7 @@ const store = $state<{ data: ModelsView | null }>({ data: null });
 export function chatProfiles(): ModelProfile[] {
   return (
     store.data?.chat_profiles ??
-    (store.data ? store.data.profiles.filter((profile) => profile.configured) : [])
+    (store.data ? (store.data.profiles ?? []).filter((profile) => profile.configured) : [])
   );
 }
 
@@ -50,7 +50,7 @@ export function modelsKnown(): boolean {
 
 // Workbench's model summary covers every profile, configured or not.
 export function allProfiles(): ModelProfile[] {
-  return store.data ? store.data.profiles : [];
+  return store.data?.profiles ?? [];
 }
 
 /** Exact profiles currently proven reachable; unknown is deliberately not ready. */

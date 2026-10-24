@@ -145,6 +145,7 @@ from raiker.api.wire.sessions import (
     SessionRenamed,
     SessionsDeleted,
     SessionTagsSet,
+    TurnReceipt,
 )
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import DashboardService
@@ -1044,6 +1045,25 @@ async def get_build_turn_outcome(
     if data is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "turn_not_found")
     answer: BuildTurnOutcome = cast(BuildTurnOutcome, data)
+    return serialize_dto(answer)
+
+
+@router.get("/api/sessions/{session_id}/turns/{turn_id}/receipt")
+async def get_turn_receipt(
+    session_id: str,
+    turn_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F16 — what one turn used, read, changed and sent, from its own records."""
+    data = _service(request).turn_receipt(
+        session_id, turn_id,
+        user_id=auth_data[1].delegated_by_user_id,
+        owner_principal_id=auth_data[0].principal_id,
+    )
+    if data is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "turn_not_found")
+    answer: TurnReceipt = cast(TurnReceipt, data)
     return serialize_dto(answer)
 
 

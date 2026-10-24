@@ -955,6 +955,50 @@ These parts of the same document are not done:
   it as expired. A sweep that settles it to `expired` (and closes its parked
   turn) would let the stored state say the same.
 
+## 2026-10-24 Quiet UI features round — what is still open
+
+Fifteen features of [06](quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#status)
+shipped
+[FIXED-1150](FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04)
+to [FIXED-1167](FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round).
+These parts of the same document are not done:
+
+* **QUI-F03 — goals noticed in conversation** waits for goal intake from Chat
+  ([BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
+* **QUI-F07 — named accounts per service.** The connector store holds one
+  account per service, so "Work Gmail" and "Personal Gmail" need a second
+  credential slot per connector and an account name on every approval card.
+* **QUI-F15 — the Library**, and with it 04's **Pin to project**. Needs one
+  owner-scoped read over drafts, documents, generated images, pinned answer
+  blocks and downloads, each linked to the conversation it came from.
+* **QUI-F19 — undo windows.** Holding an email or a message for ten seconds
+  needs a delayed-send stage in the connector write path, between the approval
+  and the send, that a Stop can still reach.
+* **QUI-F21 — projects hold everything.** A project's own permission limits
+  ("may push to this one repository only") need a per-project policy the
+  runtime does not store yet.
+* **QUI-F06 — results to a connected channel.** A routine's result is on Home
+  and in its own conversation. Sending it to Telegram or Slack would be an
+  unattended outbound send, which needs its own consent at the moment the
+  routine is created and the channel executor's existing gates.
+* **QUI-F20 — corrections made by editing.** A correction typed as *That's
+  wrong*, *No,* or *Actually* is offered; one made by editing Raiker's draft is
+  not, because an edit carries no statement of what was wrong.
+* **Quick Entry before sign-in.** The Quick Entry window shares the main
+  window's session; with no signed-in session it shows the lock screen in a
+  560×120 window. It should say *Sign in to Raiker first* and offer to open the
+  main window.
+* **Older live specs answer native confirms.** Eight earlier live specs wait
+  for the browser's `dialog` event; the in-app dialog (QUI-F10) needs them to
+  press its button instead. The mocked suite and this round's live spec do.
+* **A notice outlives the decision it announced.** Seen in the RT-QUI-51 and
+  RT-QUI-55 screenshots: *Input needed* stayed in the corner after the question
+  was answered in Chat. Approval notices behave the same way — a decision does
+  not mark its notice read; only opening the notice or its page does. The
+  answer and decision routes could mark the notice for that approval read.
+* **The receipt is per turn, not per task.** A background task's receipt would
+  sum the turns of its run; Tasks does not show one yet.
+
 ## 2026-10-23 Quiet UI visual answers round — what is still open
 
 The visual answers of [04](quiet-ui/04_VISUAL_ANSWERS.md#status) shipped

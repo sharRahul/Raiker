@@ -19,18 +19,30 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync, mkdirSync } fr
 import {
   app,
   BrowserWindow,
+  globalShortcut,
   ipcMain,
   Menu,
+  nativeImage,
   nativeTheme,
   Notification,
   screen,
   session,
   shell,
+  Tray,
   type BrowserWindowConstructorOptions,
+  type NativeImage,
   type WebContents,
 } from "electron";
 
 import { parseShellArgs } from "./args";
+import {
+  attentionCount,
+  isAppHash,
+  QUICK_ENTRY_SHORTCUT,
+  quickEntryBounds,
+  trayTooltip,
+  withDot,
+} from "./companion";
 import { CHANNELS, isHexColour, type ShellCommand } from "./commands";
 import { resolveHostCommand, startHost } from "./host";
 import { menuTemplate } from "./menu";
@@ -73,6 +85,14 @@ let hostUrl: string | null = null;
 let setupWindow: BrowserWindow | null = null;
 let setupCommand: string[] | null = null;
 let setupRunning = false;
+/** QUI-F11 — the tray, while the owner keeps Raiker there. */
+let tray: Tray | null = null;
+let trayIcons: { plain: NativeImage; waiting: NativeImage } | null = null;
+let waitingDecisions = 0;
+/** Set once the owner really quits, so a tray-kept window may close. */
+let quitting = false;
+/** QUI-F01 — the Quick Entry window, made once and shown on the shortcut. */
+let quickEntry: BrowserWindow | null = null;
 
 app.setName("Raiker");
 // A separate profile for a second copy of the shell — tests, or an owner who
@@ -211,8 +231,15 @@ function createWindow(main: boolean): BrowserWindow {
     showStatus(window, "error", `Raiker did not answer at ${failedUrl} (${description}). Is the host still running?`);
   });
   if (main) {
-    window.on("close", () => {
+    window.on("close", (event) => {
       saveState(stateFile(), { bounds: window.getNormalBounds(), maximized: window.isMaximized() });
+      // QUI-F11 — kept in the tray: the window hides and keeps working (its
+      // page still reads approvals and runs the dot), until the owner quits.
+      if (tray !== null && !quitting) {
+        event.preventDefault();
+        window.hide();
+        return;
+      }
       announceBackground();
     });
     window.on("closed", () => {
@@ -315,9 +342,32 @@ function installIpc(): void {
     else if (action === "quit") app.quit();
     else if (action === "open" && hostUrl !== null) {
       mainWindow = openWindow(hostUrl, true);
+      installQuickEntry();
       const finished = setupWindow;
       mainWindow.once("ready-to-show", () => finished.close());
     }
+  });
+  ipcMain.on(CHANNELS.attention, (event, count: unknown) => {
+    if (originOf(event.sender) === null) return;
+    waitingDecisions = attentionCount(count);
+    refreshTray();
+  });
+  ipcMain.on(CHANNELS.trayPreference, (event, enabled: unknown) => {
+    if (originOf(event.sender) === null) return;
+    setTrayEnabled(enabled === true);
+  });
+  ipcMain.on(CHANNELS.openWindow, (event, hash: unknown) => {
+    const origin = originOf(event.sender);
+    if (origin === null || !isAppHash(hash)) return;
+    openWindow(`${origin}/${hash}`, false);
+  });
+  ipcMain.on(CHANNELS.closeWindow, (event) => {
+    if (originOf(event.sender) === null) return;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window === null || window === mainWindow) return;
+    // Quick Entry hides, ready for the next shortcut; another window closes.
+    if (window === quickEntry) window.hide();
+    else window.close();
   });
   ipcMain.on(CHANNELS.focus, (event) => {
     if (originOf(event.sender) === null) return;
@@ -327,6 +377,100 @@ function installIpc(): void {
     window.show();
     window.focus();
   });
+}
+
+/** QUI-F11 — the tray icon with and without the attention dot, made once. */
+function makeTrayIcons(): { plain: NativeImage; waiting: NativeImage } | null {
+  const path = iconPath();
+  if (path === undefined) return null;
+  const plain = nativeImage.createFromPath(path).resize({ width: 32, height: 32 });
+  if (plain.isEmpty()) return null;
+  const { width, height } = plain.getSize();
+  const waiting = nativeImage.createFromBitmap(Buffer.from(withDot(plain.toBitmap(), width, height)), { width, height });
+  return { plain, waiting };
+}
+
+function refreshTray(): void {
+  if (tray === null) return;
+  tray.setToolTip(trayTooltip(waitingDecisions));
+  if (trayIcons !== null) tray.setImage(waitingDecisions > 0 ? trayIcons.waiting : trayIcons.plain);
+  // macOS reads a title beside the icon; the count is said in words too.
+  if (process.platform === "darwin") tray.setTitle(waitingDecisions > 0 ? ` ${waitingDecisions}` : "");
+}
+
+function setTrayEnabled(enabled: boolean): void {
+  writeShellState({ minimizeToTray: enabled });
+  if (!enabled) {
+    tray?.destroy();
+    tray = null;
+    return;
+  }
+  if (tray !== null) return;
+  trayIcons ??= makeTrayIcons();
+  if (trayIcons === null) return;
+  tray = new Tray(trayIcons.plain);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Open Raiker", click: () => showMainWindow() },
+      { label: "Quick Entry", accelerator: QUICK_ENTRY_SHORTCUT, click: () => toggleQuickEntry() },
+      { type: "separator" },
+      { label: "Quit Raiker window", click: () => { quitting = true; app.quit(); } },
+    ]),
+  );
+  tray.on("click", () => showMainWindow());
+  refreshTray();
+}
+
+/**
+ * QUI-F01 — Quick Entry: one input and a "send to" picker, over whatever the
+ * owner is doing. It is a page of the same origin (`#/quick-entry`), so it
+ * sends through the same governed routes; sending never raises the main window.
+ */
+function toggleQuickEntry(): void {
+  if (hostUrl === null) return;
+  if (quickEntry !== null && !quickEntry.isDestroyed()) {
+    if (quickEntry.isVisible()) {
+      quickEntry.hide();
+      return;
+    }
+  } else {
+    const origin = loopbackOrigin(hostUrl);
+    if (origin === null) return;
+    quickEntry = new BrowserWindow({
+      ...quickEntryBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea),
+      show: false,
+      frame: false,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      title: "Raiker Quick Entry",
+      backgroundColor: palette().window,
+      webPreferences: windowOptions(false).webPreferences,
+    });
+    const entry = quickEntry;
+    origins.set(entry.webContents.id, origin);
+    entry.on("blur", () => entry.hide());
+    entry.on("closed", () => {
+      if (quickEntry === entry) quickEntry = null;
+    });
+    void entry.loadURL(`${origin}/#/quick-entry`);
+  }
+  const entry = quickEntry;
+  if (entry === null) return;
+  entry.setBounds(quickEntryBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea));
+  if (entry.webContents.isLoading()) entry.once("ready-to-show", () => entry.show());
+  else entry.show();
+  entry.focus();
+}
+
+function installQuickEntry(): void {
+  if (globalShortcut.isRegistered(QUICK_ENTRY_SHORTCUT)) return;
+  // Another program may own the shortcut; Quick Entry is then reachable from
+  // the tray, and nothing else changes.
+  globalShortcut.register(QUICK_ENTRY_SHORTCUT, () => toggleQuickEntry());
 }
 
 /** The Setup window: a fixed-size page packaged with the shell, with its own bridge. */
@@ -457,9 +601,11 @@ async function start(): Promise<void> {
     showStatus(mainWindow, "error", `${args.rejectedUrl} is not a Raiker address on this computer, so the window will not open it.`);
     return;
   }
+  if (readShellState().minimizeToTray === true) setTrayEnabled(true);
   if (args.url !== null) {
     hostUrl = args.url;
     mainWindow = openWindow(args.url, true);
+    installQuickEntry();
     return;
   }
 
@@ -489,6 +635,7 @@ async function start(): Promise<void> {
     // The same window goes from "Starting Raiker" to Raiker, without a flash.
     if (mainWindow !== null) showRaiker(mainWindow, ready.url);
     else mainWindow = openWindow(ready.url, true);
+    installQuickEntry();
   } catch (error) {
     // A later start that fails becomes a repair: the Setup window checks the
     // computer and the installation again and offers Retry and the logs,
@@ -500,6 +647,14 @@ async function start(): Promise<void> {
 }
 
 app.on("activate", () => showMainWindow());
+
+app.on("before-quit", () => {
+  quitting = true;
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+});
 
 app.on("window-all-closed", () => {
   // The host keeps running either way. On macOS the app stays in the Dock, as

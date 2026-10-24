@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import WorkMeta from "../components/WorkMeta.svelte";
   /**
    * GAP-CHAT C18 — the cross-chat surface.
@@ -205,7 +206,7 @@
    */
   async function archiveOrRestore(thread: WorkThread): Promise<void> {
     const id: CommandId = thread.archived ? "restore" : "archive";
-    if (command(id).confirms && !window.confirm(archiveConfirmation(thread.title))) return;
+    if (command(id).confirms && !(await askConfirm({ title: archiveConfirmation(thread.title), confirmLabel: "Archive" }))) return;
     await organise(thread.session_id, id, () =>
       thread.archived
         ? api.unarchiveSession(thread.session_id)
@@ -581,7 +582,7 @@
         disabled={loadingMore}
         onclick={() => void read(page?.next_cursor ?? null)}
       >
-        {loadingMore ? "Loading…" : "Load more"}
+        {loadingMore ? "Reading more conversations…" : "Load more"}
       </button>
     {/if}
   {/if}

@@ -1744,7 +1744,7 @@
           <section class="panel" aria-label="History">
             <h3>History</h3>
             {#if versions === null}
-              <p class="muted">Loading…</p>
+              <p class="muted" role="status">Reading this design's history…</p>
             {:else}
               <ol class="history">
                 {#each versions.versions as item (item.version)}

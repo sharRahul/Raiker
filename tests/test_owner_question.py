@@ -36,7 +36,11 @@ from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import ToolCallRejected, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
-from raiker.runtime.turn_suspension import approval_outcome, owner_answer_outcome
+from raiker.runtime.turn_suspension import (
+    approval_outcome,
+    owner_answer_outcome,
+    resumed_call_row_status,
+)
 from raiker.storage.sqlite import SQLiteStore
 from tests.factories import tool_action
 
@@ -132,6 +136,17 @@ def test_the_outcome_handed_back_is_shaped_nothing_like_an_approval() -> None:
     assert "permission" in answered["note"]
     assert approved["status"] == "success"
     assert answered["status"] != approved["status"]
+
+
+def test_an_answered_question_reads_as_done_not_failed() -> None:
+    """QUI-F02 — the row of an answered question settles as done.
+
+    Found live: the resumed row read *failed* and the turn *Partially
+    completed* after a question the owner had answered.
+    """
+    assert resumed_call_row_status(owner_answer_outcome(answers={"Q?": "A"})) == "success"
+    assert resumed_call_row_status(owner_answer_outcome(answers={}, response="mine")) == "success"
+    assert resumed_call_row_status(approval_outcome(approved=False, executed=False)) == "denied"
 
 
 def test_free_text_is_carried_verbatim_and_says_so() -> None:

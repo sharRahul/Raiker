@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TasksView from "./TasksView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { requestSchedule, takeScheduleRequest } from "../scheduleHandoff";
+import { requestTaskDraft, routineFromTurn } from "../taskDrafts";
 
 afterEach(() => { vi.unstubAllGlobals(); resetModels(); takeScheduleRequest(); });
 
@@ -897,5 +898,38 @@ describe("TasksView — a completed run whose notice did not arrive", () => {
     render(TasksView);
     expect(await screen.findByText("Done.")).toBeInTheDocument();
     expect(screen.queryByTestId("task-delivery-failed")).toBeNull();
+  });
+});
+
+describe("QUI-F06 templates and QUI-F18 a handed-over routine", () => {
+  it("fills the form from Morning brief and creates nothing until Create", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+    const group = await screen.findByRole("group", { name: "Start from a template" });
+    await fireEvent.click(within(group).getByRole("button", { name: "Morning brief" }));
+    expect((screen.getByLabelText("What should Raiker do?") as HTMLTextAreaElement).value).toContain("brief for today");
+    expect(screen.getByRole("button", { name: "Repeating" })).toHaveAttribute("aria-pressed", "true");
+    expect((screen.getByLabelText("Repeat") as HTMLSelectElement).value).toBe("daily");
+    expect(screen.getByText(/Results appear on Home and in this task's own conversation/)).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Start from a template" })).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([url, init]) => String(url).includes("/api/tasks") && (init as RequestInit | undefined)?.method === "POST"),
+    ).toHaveLength(0);
+  });
+
+  it("opens a routine Chat handed over, for the owner to sign off", async () => {
+    stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    requestTaskDraft(routineFromTurn("Summarise my unread email", "Inbox summary"));
+    render(TasksView);
+    await waitFor(() =>
+      expect((screen.getByLabelText("What should Raiker do?") as HTMLTextAreaElement).value).toBe("Summarise my unread email"),
+    );
+    expect((screen.getByLabelText("Task title") as HTMLInputElement).value).toBe("Inbox summary");
   });
 });

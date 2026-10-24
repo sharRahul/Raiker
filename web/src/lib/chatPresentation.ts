@@ -173,7 +173,9 @@ export function collectReasoning(events: StreamEvent[]): string {
  * on screen as it arrives. No percentages and no "thinking".
  */
 export function workingLine(rows: readonly ToolCallRow[]): string {
-  if (rows.some((row) => row.state === "waiting")) return "Waiting for your decision";
+  const waiting = rows.find((row) => row.state === "waiting");
+  // QUI-F02 — a question is not a decision: the turn waits for an answer.
+  if (waiting) return waiting.toolName === "ask_owner_question" ? "Waiting for your answer" : "Waiting for your decision";
   const inFlight = [...rows].reverse().find((row) => row.state === "running");
   if (inFlight) return inFlight.action ? `${inFlight.label} · ${inFlight.action}` : inFlight.label;
   return "";

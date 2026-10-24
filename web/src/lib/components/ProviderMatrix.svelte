@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   /**
    * One row per model provider — the whole model-connection question on a single
    * screen.
@@ -560,9 +561,12 @@
 
   async function forget(row: Row) {
     if (
-      !window.confirm(
-        `Remove the stored ${row.label} credential from this Raiker instance? Nothing at ${row.label} is changed.`,
-      )
+      !(await askConfirm({
+        title: `Remove the stored ${row.label} credential from this Raiker instance?`,
+        body: `Nothing at ${row.label} is changed.`,
+        confirmLabel: "Remove credential",
+        danger: true,
+      }))
     )
       return;
     busy = set(busy, row.profileId, "saving");

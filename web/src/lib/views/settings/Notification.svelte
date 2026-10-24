@@ -74,7 +74,11 @@
 
   /** Interrupt switches the server offers, with what each covers. Decisions are not among them. */
   const CATEGORY_FALLBACK = [
-    { category: "work", label: "Background work finished or paused" },
+    { category: "approvals", label: "Approval needed" },
+    { category: "input", label: "Input needed" },
+    { category: "responses", label: "Response ready" },
+    { category: "failed", label: "Task failed" },
+    { category: "work", label: "Background task finished" },
     { category: "security", label: "Security findings and containment" },
     { category: "extensions", label: "Extensions and MCP servers" },
   ];
@@ -255,9 +259,10 @@
 <section class="card" aria-labelledby="interrupt-heading">
   <h3 id="interrupt-heading">What interrupts you</h3>
   <p class="sub">
-    Any time of day. A notice you turn off here is still recorded and counted by the bell; it
-    just does not appear in the corner or on the desktop. Decisions always interrupt outside
-    quiet hours, because work is waiting on them.
+    Desktop alerts appear only while Raiker is in the background. A notice you turn off here is
+    still recorded and counted by the bell. <strong>Approval needed</strong> and
+    <strong>Input needed</strong> turn off only the desktop alert: inside Raiker they always show,
+    because work is waiting on them.
   </p>
   {#each categories as item (item.category)}
     <label class="toggle">

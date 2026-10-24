@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { formatTimestamp } from "../format";
   import { onMount } from "svelte";
   import GuideLink from "../components/GuideLink.svelte";
@@ -344,7 +345,7 @@
   }
 
   async function remove(server: McpServer) {
-    if (!confirm(`Delete “${server.name}”? This removes its profile and generated server file.`))
+    if (!(await askConfirm({ title: `Delete “${server.name}”?`, body: "This removes its profile and generated server file.", confirmLabel: "Delete", danger: true })))
       return;
     busy = server.server_id;
     error = null;
@@ -401,7 +402,7 @@
   }
 
   async function takeSecret(server: McpServer, name: string) {
-    if (!confirm(`Take ${name} away from “${server.name}”? Its next start goes without it.`)) return;
+    if (!(await askConfirm({ title: `Take ${name} away from “${server.name}”?`, body: "Its next start goes without it.", confirmLabel: "Remove", danger: true }))) return;
     busy = server.server_id;
     error = null;
     notice = null;

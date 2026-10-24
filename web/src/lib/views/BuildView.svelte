@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { askConfirm } from "../confirm.svelte";
   import { shownInline } from "../inlineDecisions.svelte";
   import { NOT_ANSWERING } from "../errorCopy";
   import { LARGE_PASTE_CHARS } from "../composerAttachments.svelte";
@@ -145,7 +146,12 @@
   import { composerMenu } from "../composerCapabilities";
   import { readReadiness, refreshReadCapabilities } from "../readCapabilities.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { collectReasoning, hasRunningTool, toolActivity, type ToolCallRow } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity, workingLine, type ToolCallRow } from "../chatPresentation";
+  import { reportForegroundWork } from "../liveWork.svelte";
+  import { announceResponseReady } from "../desktopNotice";
+  import { delivery } from "../deliveryPolicy.svelte";
+  import ClarifyCard from "../components/ClarifyCard.svelte";
+  import { OWNER_QUESTION_TOOL } from "../clarify";
   import {
     citedSourceIds,
     renderableCitations,
@@ -665,6 +671,35 @@
     projects?.projects.find((project) => project.project_id === projectId) ?? null,
   );
   const projectReady = $derived(projectId !== "" && selectedProject !== null);
+  // QUI-F04 — a Build turn being written shows in the top bar's live work line.
+  $effect(() => {
+    if (!streaming) {
+      reportForegroundWork("build", null);
+      return;
+    }
+    const running = [...turns].reverse().find((turn) => turn.streaming);
+    const step = running ? workingLine(toolActivity(running.events)) : "";
+    reportForegroundWork("build", {
+      label: selectedProject ? `Build · ${selectedProject.name}` : "Build",
+      step: step || "Writing the answer",
+      href: sessionId === null ? "#/build" : `#/build?session=${encodeURIComponent(sessionId)}`,
+      waiting: step.startsWith("Waiting for your"),
+    });
+  });
+  $effect(() => () => reportForegroundWork("build", null));
+  // QUI-F05 — *Response ready*: the turn this page ran has its answer while
+  // Raiker is in the background. A parked turn is announced by its own notice.
+  let wasStreaming = false;
+  $effect(() => {
+    const now = streaming;
+    if (wasStreaming && !now) {
+      const last = turns[turns.length - 1];
+      if (last?.response && last.response.status !== "needs_approval") {
+        announceResponseReady((selectedProject ? `Build · ${selectedProject.name}` : "Build"), `#/build?session=${encodeURIComponent(last.response.session_id)}`, `response-${last.response.turn_id}`, delivery.current?.quiet_hours.active ?? false);
+      }
+    }
+    wasStreaming = now;
+  });
 
   /**
    * COMPOSER-02/03/04/08 — Build's two entry points.
@@ -1324,10 +1359,10 @@
    * files, run commands and push, so a Retry offered as though the first
    * attempt had done nothing is the most expensive version of that mistake.
    */
-  function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
+  async function retryPrompt(text: string, rows: ToolCallRow[] = [], sourceTurnId: string | null = null) {
     if (streaming || text.trim() === "") return;
     const consequence = retryConsequence(rows);
-    if (consequence.repeats && !window.confirm(retryConfirmation(consequence))) return;
+    if (consequence.repeats && !(await askConfirm({ title: retryConfirmation(consequence), confirmLabel: "Ask again" }))) return;
     draft.text = text;
     // DEC-22 step 3 — linked to the turn it asks again, as in Chat.
     void submit(sourceTurnId);
@@ -1608,7 +1643,11 @@
     turn.error = null;
     turn.resumeState = "continuing";
     turn.resumeNote =
-      outcomeStatus === "rejected" ? "Rejected — telling Raiker…" : "Approved — continuing…";
+      outcomeStatus === "rejected"
+        ? "Rejected — telling Raiker…"
+        : outcomeStatus === "answered"
+          ? "Answered — continuing…"
+          : "Approved — continuing…";
     streaming = true;
     void scrollToEnd();
     try {
@@ -2312,6 +2351,18 @@
               <p class="decision-meta">
                 {humanize(approval.capability)} · raised {relativeTime(approval.created_at)}
               </p>
+              {#if approval.tool_name === OWNER_QUESTION_TOOL}
+                <!-- QUI-F02 — a question is answered, never accepted. -->
+                <ClarifyCard
+                  approvalId={approval.approval_id}
+                  {sessionId}
+                  disabled={streaming}
+                  onAnswered={(resumable) => {
+                    if (resumable) void review.continueAfterAnswer(approval.approval_id);
+                    else void review.load();
+                  }}
+                />
+              {:else}
               {#if review.recordOnly[approval.approval_id]}
                 <!-- BUG-346 — said before Accept, not discovered after it: an
                      owner switch means accepting records the decision only. -->
@@ -2404,6 +2455,7 @@
                   {/if}
                   <a class="btn btn-ghost btn-sm" href="#/approvals">Open in Approvals</a>
                 </div>
+              {/if}
               {/if}
             </div>
           {/each}

@@ -27,12 +27,24 @@ behaviour, and nothing in it can act on your workspace.
 | Ctrl/⌘ + K | Command palette |
 | Ctrl/⌘ + \ | Show or collapse the navigation |
 | F1 | This guide |
+| Ctrl/⌘ + Shift + Space, from anywhere on the computer | Quick Entry |
 
 - **Closing the window does not stop Raiker.** Scheduled work, reminders and
   approvals carry on, and the first time you close it Raiker says so. Open it
   again from your applications menu or the tray; stop the host from **Host** or
   with `raiker-app quit`.
-- **One window.** Opening Raiker again brings the existing window forward.
+- **Keep it in the tray.** **Settings → General → Desktop window → Keep Raiker
+  in the tray when you close its window**: closing the window then hides it and
+  it keeps working. The tray icon opens Raiker or Quick Entry, quits the window,
+  and shows a dot — with *2 decisions are waiting for you* as its tooltip —
+  while approvals wait.
+- **Quick Entry.** Ctrl/⌘ + Shift + Space opens a small box over whatever you
+  are doing: type, choose **Send to** (a new task or a recent conversation),
+  press Enter. It never brings the main window forward. Another program that
+  already owns the shortcut keeps it; Quick Entry is then on the tray menu.
+- **A project in its own window.** A project's `⋯` menu offers **Open in new
+  window**, beside the main one. Only Raiker's own pages open this way.
+- **One main window.** Opening Raiker again brings the existing window forward.
 - **It remembers where it was** — size, position and whether it was maximised —
   and reopens on a visible screen if a monitor has gone.
 - **Links stay safe.** Web links open in your own browser; another Raiker

@@ -1687,6 +1687,20 @@ export type ConversionPreview = {
   isolation: ConversionIsolation;
 };
 
+/** QUI-F20 — the owner's correction, offered as a memory proposal. */
+export type CorrectionMemoryRequest = {
+  text: string;
+  session_id: string;
+  turn_id?: string | null;
+};
+
+/** QUI-F20 — a correction waiting in Suggestions until the owner decides it. */
+export type CorrectionProposed = {
+  ok: boolean;
+  candidate_id: string;
+  text: string;
+};
+
 export type CostEvent = {
   event_id: string;
   action_id: string;
@@ -6196,6 +6210,25 @@ export type TurnMemoryDisclosure = {
   recall_count: number;
 };
 
+/** QUI-F16 — what one turn used, read, changed and sent, from its own records. */
+export type TurnReceipt = {
+  turn_id: string;
+  model: string | null;
+  provider: string | null;
+  local: boolean;
+  cost_usd: number | null;
+  cost_basis: "priced" | "free" | "unknown";
+  reads: Record<string, number>;
+  changes: TurnReceiptLine[];
+  left_computer: string[];
+};
+
+/** QUI-F16 — one thing a turn changed or sent, with when it was approved. */
+export type TurnReceiptLine = {
+  label: string;
+  approved_at: string | null;
+};
+
 /** One cited source, opened at the passage the turn used (C4). */
 export type TurnSourceExcerpt = {
   source_id: string;
@@ -7015,6 +7048,8 @@ export const contract = {
     call<ObservationsDeleted>("POST", "/api/memory/observations/delete", { body }),
   listMemoryProposals: () =>
     request<MemoryProposal[]>("/api/memory/proposals"),
+  proposeMemoryFromCorrection: (body: CorrectionMemoryRequest) =>
+    call<CorrectionProposed>("POST", "/api/memory/proposals", { body }),
   decideMemoryProposal: (candidateId: string, body: Record<string, unknown>) =>
     call<ProposalDecided>("POST", `/api/memory/proposals/${encodeURIComponent(candidateId)}/decision`, { body }),
   setMemoryRecallMode: (body: Record<string, unknown>) =>
@@ -7281,6 +7316,8 @@ export const contract = {
     call<SessionTagsSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/tags`, { body }),
   getBuildTurnOutcome: (sessionId: string, turnId: string) =>
     request<BuildTurnOutcome>(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/outcome`),
+  getTurnReceipt: (sessionId: string, turnId: string) =>
+    request<TurnReceipt>(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/receipt`),
   getTurnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, query: { quote?: string } = {}) =>
     request<TurnSourceExcerpt>(withQuery(`/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}/sources/${encodeURIComponent(sourceId)}/excerpt`, query)),
   unarchiveSession: (sessionId: string) =>

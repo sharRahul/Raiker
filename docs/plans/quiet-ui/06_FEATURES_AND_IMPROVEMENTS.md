@@ -2,6 +2,40 @@
 
 Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 
+## Status
+
+**Shipped 2026-10-24**
+([FIXED-1150](../FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04)
+to [FIXED-1167](../FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round);
+live cases RT-QUI-44 to RT-QUI-56 in
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+
+| Item | State |
+|---|---|
+| QUI-F01 | **Done.** Ctrl/Cmd+Shift+Space opens a 560×120 window from anywhere: one input, *Send to* (New task or one of five recent conversations), Esc hides. Also on the tray menu. A new task starts now through `POST /api/tasks`. |
+| QUI-F02 | **Done** on the existing `ask_owner_question`, which parks a turn without being an approval: the card replaces the approval card that Chat, Build and the floating card drew for it. Picks go back as picks; typed or skipped answers go back in the owner's words. |
+| QUI-F03 | **Open.** Depends on goal intake from Chat ([BUG-355](../TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)). |
+| QUI-F04 | **Done.** A task's own `current_step`, or the turn's status line; several open a menu. |
+| QUI-F05 | **Done.** Deviation: *Approval needed* and *Input needed* switch the desktop alert only, because DEC-21a keeps decisions from being muted inside Raiker; a critical approval has no switch. |
+| QUI-F06 | **Done** for the three templates. Results go to Home and the task's own conversation, which the form now says; delivering them to a connected channel is open. |
+| QUI-F07 | **Open.** Needs more than one account per service in the connector store. |
+| QUI-F08 | **Done** earlier, as [02, QUI-P06](02_PERMISSIONS_AND_APPROVALS.md#status). |
+| QUI-F09 | **Done** in Memory › Controls: active skills Raiker built (Undo turns one off) and standing approvals (Undo revokes). |
+| QUI-F10 | **Done.** One dialog for 25 confirmations; nine bare *Loading…* say what they read. The Settings leave guard stays native (it must answer synchronously). |
+| QUI-F11 | **Done** (desktop): Settings › General › *Desktop window*; the tray dot follows waiting decisions. |
+| QUI-F12 | **Done.** 100 / 110 (default) / 125 / 140%, in Settings › Personalisation. |
+| QUI-F13 | **Done** (desktop): a project's **⋯** › **Open in new window**. |
+| QUI-F14 | **Later**, as planned. |
+| QUI-F15 | **Open.** The Library needs one server read over drafts, documents, images, pinned blocks and downloads; with it, 04's **Pin to project**. |
+| QUI-F16 | **Done.** Built from the turn's audit events; shown on every settled turn in Chat. |
+| QUI-F17 | **Done.** Home's composer has the label too, and both say when attached files leave. |
+| QUI-F18 | **Done.** **Save as routine** on a completed turn opens a filled task form; nothing is saved without **Create**. |
+| QUI-F19 | **Open.** Holding a send for an undo window needs a delayed-send stage in the connector write path. |
+| QUI-F20 | **Done** for corrections in words (*That's wrong*, *No,*, *Actually*). Open: offering one when the owner edits a draft. |
+| QUI-F21 | **Open.** Project permission limits need a per-project policy the runtime does not store yet. |
+| QUI-F22 | **Done.** Chats, tasks, memories, settings and help, with type filters. Slash commands already described themselves. |
+| QUI-F23 | **Done** earlier, as [03, QUI-H04](03_WELCOME_HOME_AND_CHAT.md#status). |
+
 Features taken from the reference products (F01–F14), then product gaps found in
 the review (F15–F23). Each adds behaviour without adding a page.
 

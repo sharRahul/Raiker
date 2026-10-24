@@ -45,6 +45,9 @@ if TYPE_CHECKING:
 #: Background work reached a terminal state. Its own kind so the centre can
 #: group it and an owner can tell it from an approval, which needs a decision.
 TASK_FINISHED_KIND = "task_finished"
+#: QUI-F05 — background work that ended without completing. Its own kind so
+#: *Task failed* and *Background task finished* are switched separately.
+TASK_FAILED_KIND = "task_failed"
 
 #: The longest task title a notice will carry. A title is owner-authored or
 #: model-authored text; bounding it keeps a notice readable and keeps a very
@@ -97,6 +100,7 @@ def notify_task_finished(
     if not owner:
         return None
     finished = outcome == "completed"
+    kind = TASK_FINISHED_KIND if finished else TASK_FAILED_KIND
     title = "Background task finished" if finished else "Background task did not finish"
     body = (
         f"“{_title(task)}” {'completed' if finished else 'ended as ' + outcome}."
@@ -105,7 +109,7 @@ def notify_task_finished(
     try:
         notification_id = store.insert_notification(
             principal_id=owner,
-            kind=TASK_FINISHED_KIND,
+            kind=kind,
             title=title,
             body=body,
             subject_id=task.task_id,
@@ -131,7 +135,7 @@ def notify_task_finished(
     dispatch_notification_hook(
         store,
         owner_principal_id=owner,
-        kind=TASK_FINISHED_KIND,
+        kind=kind,
         notification_id=notification_id,
         subject_id=task.task_id,
     )

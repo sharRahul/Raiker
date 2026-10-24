@@ -52,6 +52,14 @@ class ProposalDecided(TypedDict):
     relationship_proposals: NotRequired[int]
 
 
+class CorrectionProposed(TypedDict):
+    """QUI-F20 — a correction waiting in Suggestions until the owner decides it."""
+
+    ok: bool
+    candidate_id: str
+    text: str
+
+
 class RelationshipScan(TypedDict):
     ok: bool
     scanned: int

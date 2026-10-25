@@ -182,7 +182,7 @@ describe("rewind from a turn", () => {
           (init as RequestInit | undefined)?.method === "POST",
       ),
     ).toBe(false);
-    expect(screen.getByRole("button", { name: /request this rewind/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /ask to restore/i })).toBeDisabled();
   });
 
   it("raises a governed approval and says nothing has changed yet", async () => {
@@ -209,7 +209,7 @@ describe("rewind from a turn", () => {
 
     await screen.findByText("db/schema.sql");
     await fireEvent.click(screen.getByLabelText(/i have read what this would change/i));
-    await fireEvent.click(screen.getByRole("button", { name: /request this rewind/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ask to restore/i }));
 
     expect(await screen.findByText(/nothing has changed yet/i)).toBeInTheDocument();
     expect(

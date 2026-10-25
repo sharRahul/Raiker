@@ -772,3 +772,26 @@ describe("Design compares versions and goes back without rewriting history", () 
     expect(screen.queryByLabelText("Compare with an earlier version")).toBeNull();
   });
 });
+
+describe("the revision strip (QUI-L13)", () => {
+  it("shows nothing until a picture exists", async () => {
+    stubFetch(routes({ "GET /api/images": { sizes: ["1024x1024"], generations: [] } }));
+    render(DesignView);
+    await waitFor(() => expect(screen.queryByRole("list", { name: "Latest pictures" })).toBeNull());
+  });
+
+  it("puts at most three of the newest pictures above the composer, and selects one when pressed", async () => {
+    const many = ["a", "b", "c", "d"].map((id, index) =>
+      generation({ generation_id: `img_${id}`, prompt: `leaf ${id}`, created_at: `2026-09-13T10:0${index}:00Z` }),
+    );
+    stubFetch(routes({ "GET /api/images": { sizes: ["1024x1024"], generations: many } }));
+    render(DesignView);
+    const strip = await screen.findByRole("list", { name: "Latest pictures" });
+    const buttons = strip.querySelectorAll("button");
+    expect(buttons).toHaveLength(3);
+    expect(buttons[0]).toHaveAccessibleName("Latest picture: leaf d");
+    await fireEvent.click(buttons[1]);
+    expect(buttons[1]).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText(/Enter edits/)).toBeInTheDocument();
+  });
+});

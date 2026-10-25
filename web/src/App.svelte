@@ -26,7 +26,7 @@
   import LazyRoute from "./lib/components/LazyRoute.svelte";
   import { prefetchRoutes } from "./lib/routeComponents";
   import { mayLeave } from "./lib/leaveGuard";
-  import { DESKTOP_COMMAND_EVENT, inDesktopShell } from "./lib/desktopShell";
+  import { DESKTOP_COMMAND_EVENT, desktopBridge, inDesktopShell } from "./lib/desktopShell";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
   // REM-SET-NOTIFY — unread notices belong wherever the owner is. The strip was
@@ -344,11 +344,24 @@
     }
   }
 
+  /** Quick Entry before sign-in: the main window holds the lock screen. */
+  function openMainToSignIn(): void {
+    const bridge = desktopBridge();
+    if (bridge?.showMainWindow) bridge.showMainWindow();
+    else window.location.hash = "#/home";
+  }
 </script>
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-{#if authState !== "ready"}
+{#if authState !== "ready" && current === "quick-entry"}
+  <!-- Quick Entry before sign-in: the 560×120 window cannot hold the lock
+       screen, so it says what is needed and opens the main window for it. -->
+  <main id="main" class="quick-entry-focus quick-entry-locked" tabindex="-1">
+    <p><strong>Sign in to Raiker first.</strong> Quick Entry works once Raiker is unlocked.</p>
+    <button type="button" class="btn btn-primary btn-sm" onclick={openMainToSignIn}>Open Raiker</button>
+  </main>
+{:else if authState !== "ready"}
   {#if inDesktopShell()}
     <!-- The desktop window has no native title bar. Before sign-in there is no
          top bar to drag it by, so this strip is that handle. -->
@@ -565,6 +578,21 @@
     height: 100vh;
     overflow: hidden;
     background: var(--surface);
+  }
+  .quick-entry-locked {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: 0 var(--space-5);
+  }
+  .quick-entry-locked p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+  .quick-entry-locked strong {
+    color: var(--text-1);
   }
   .setup-focus:focus-visible {
     outline: none;

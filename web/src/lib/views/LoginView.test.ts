@@ -26,9 +26,9 @@ describe("LoginView", () => {
     render(LoginView, { props: { onAuthenticated } });
     expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeInTheDocument();
-    // The large Raiker core and the top-left mark are the production rendered
-    // icon, exposed as labelled images (theme-swapped via CSS background).
-    expect(screen.getAllByRole("img", { name: "Raiker" }).length).toBeGreaterThanOrEqual(2);
+    // QUI-V04 — the large open ring is the one labelled image; the small mark
+    // beside the visible wordmark is decorative.
+    expect(screen.getAllByRole("img", { name: "Raiker" })).toHaveLength(1);
     await waitFor(() => expect(screen.getByText("I am ready when you are.")).toBeInTheDocument());
     // The greeting and the idle statement are never shown together.
     expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();

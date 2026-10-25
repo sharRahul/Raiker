@@ -6,7 +6,7 @@ import { KNOWN_GAPS, readinessGaps } from "./readinessGaps";
 describe("readinessGaps", () => {
   it("names a missing default model plainly and links to Models", () => {
     expect(readinessGaps(["No model profile is selected."], true)).toEqual([
-      { id: "gap-0", title: "No default model is chosen.", action: { label: "Choose a model", href: "#/models" } },
+      { id: "gap-0", title: "No default model is chosen.", action: { label: "Choose a model", href: "#/models" }, kind: "default-model" },
     ]);
   });
 

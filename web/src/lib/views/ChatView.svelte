@@ -15,8 +15,7 @@
   import ProfileChip from "../components/ProfileChip.svelte";
   import {
     profileCapabilityModes,
-    rememberProfile,
-    rememberedProfile,
+    profileFromSession,
     type ConversationProfile,
   } from "../conversationProfile";
   import ModelPicker from "../components/ModelPicker.svelte";
@@ -365,8 +364,9 @@
   // before admitting the turn, so the only thing that stops a send is a
   // model problem the owner can actually fix.
   const modelBlocked = $derived(blocksSending(modelReadiness));
-  // QUI-P02 — the conversation's profile, remembered per conversation in this
-  // browser. Careful is sent as a per-turn override the runtime enforces.
+  // QUI-P02 — the conversation's profile, kept on the conversation itself
+  // (decided 2026-10-25), so every device opens it the same way. Careful is
+  // sent as a per-turn override the runtime enforces.
   let conversationProfile = $state<ConversationProfile>("standard");
   // An opened conversation brings its own; a new one starts at Standard
   // (`newConversation`), or with what Home's composer chose.
@@ -374,6 +374,11 @@
   // A new chat learns its id from its first streamed chunk: that id keeps the
   // profile it was sent with (found live, RT-QUI-29). Any other change of id
   // is a conversation being opened, which brings its own.
+  /** Keep the conversation's profile on its record; a failed save keeps the choice for this page. */
+  function saveProfile(id: string | null, profile: ConversationProfile): void {
+    if (id === null) return;
+    void api.setSessionProfile(id, profile).catch(() => {});
+  }
   let profileFor: string | null = null;
   $effect(() => {
     const id = sessionId;
@@ -383,8 +388,9 @@
     }
     if (id === profileFor) return;
     const justStarted = profileFor === null && untrack(() => turns.some((turn) => turn.streaming));
-    if (justStarted) rememberProfile(id, untrack(() => conversationProfile));
-    else conversationProfile = rememberedProfile(id);
+    // A conversation that is opened takes its profile from its own record, read
+    // with its transcript (`loadHistory`).
+    if (justStarted) saveProfile(id, untrack(() => conversationProfile));
     profileFor = id;
   });
   /**
@@ -909,6 +915,7 @@
     try {
       const detail = await api.session(id);
       conversationTitle = detail.session?.title ?? "";
+      conversationProfile = profileFromSession(id, detail.session?.conversation_profile, saveProfile);
       const parked = parkedByTurn(detail);
       earlierShown = 0;
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
@@ -964,6 +971,13 @@
   let contextPanelOpen = $state(false);
   const contextFiles = $derived(filesInUse(turns.map((turn) => turn.attachments)));
   const contextActivity = $derived(turns.flatMap((turn) => toolActivity(turn.events)));
+  // The calls whose approval expired with no decision: their tool row says
+  // *not done* beside the Safety card's *Not done: no decision*.
+  let expiredActions = $state<ReadonlySet<string>>(new Set());
+  function markExpired(actionId: string | undefined): void {
+    if (!actionId || expiredActions.has(actionId)) return;
+    expiredActions = new Set([...expiredActions, actionId]);
+  }
 
   // QUI-C01 — search in conversation: the turns on screen that mention the
   // words typed, stepped through in order. Search finds across conversations.
@@ -2258,7 +2272,7 @@
           <!-- BUG-206 slice D. Every call this turn made, in call order, one
                line each: what ran, what it acted on, and — when it did not run —
                why. Above the answer because it happened before it. -->
-          <ToolActivity rows={toolRows} />
+          <ToolActivity rows={toolRows} {expiredActions} />
 
           {#if turn.streaming && answer === "" && reasoning === "" && toolRows.length === 0}
             <p class="streaming-label" role="status">
@@ -2305,6 +2319,7 @@
                 citations={renderableCitations(turnSourceList)}
                 oncite={(sourceId) => inspector.openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
                 ondocument={turn.streaming ? undefined : documentFromAnswer}
+                streaming={turn.streaming}
               />
             </div>
             {#if !turn.streaming}
@@ -2502,6 +2517,7 @@
                     if (resumable) void resumeParkedTurn(turn.response?.approval?.approval_id ?? "", approved ? "approved" : "rejected");
                   }}
                   onAskAgain={() => retryPrompt(turn.prompt, toolRows, turn.response?.turn_id ?? null)}
+                  onExpired={(actionId) => markExpired(actionId)}
                 />
                 {/if}
                 {#if liveChannelDown}
@@ -2724,7 +2740,7 @@
         <ProfileChip
           bind:profile={conversationProfile}
           disabled={streaming}
-          onchange={(next) => rememberProfile(sessionId, next)}
+          onchange={(next) => saveProfile(sessionId, next)}
         />
         {#if dataLocation !== null}
           <!-- QUI-C04 — where the next message goes, said before it is sent. It
@@ -2901,7 +2917,7 @@
   /* UX-CHAT-05 — three named groups in the conversation menu. */
   .grouped-menu { min-width: 16rem; }
   .grouped-menu [role="group"] + [role="group"] { border-top: 1px solid var(--border); margin-top: 0.25rem; padding-top: 0.25rem; }
-  .menu-group { margin: 0.2rem 0.6rem 0.15rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .menu-group { margin: 0.2rem 0.6rem 0.15rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 700; }
   .grouped-menu [role="group"] { display: grid; gap: var(--space-1); }
   .conversation-menu .menu a[role="menuitem"] {
     display: block; text-decoration: none; color: var(--text-1); font-size: var(--text-sm);

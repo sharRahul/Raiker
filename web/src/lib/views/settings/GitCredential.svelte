@@ -300,7 +300,7 @@
      a colour stops carrying information. Exceptions keep their tone. */
   .state.ok { color: var(--text-1); }
   .scope { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.35rem var(--space-4); margin: 0; }
-  .scope dt { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+  .scope dt { color: var(--text-3); font-size: var(--text-xs); }
   .scope dd { margin: 0; font-size: var(--text-sm); color: var(--text-1); display: flex; flex-wrap: wrap; gap: var(--space-2); }
   .operations { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
   .methods { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }

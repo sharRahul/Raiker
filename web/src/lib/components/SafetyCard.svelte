@@ -38,6 +38,7 @@
     disabled = false,
     onDecided,
     onAskAgain,
+    onExpired,
   }: {
     approval: ApprovalInfo;
     sessionId?: string | null;
@@ -47,6 +48,12 @@
     onDecided?: (approved: boolean, resumable: boolean) => void;
     /** Ask the same request again, as a new turn. */
     onAskAgain?: () => void;
+    /**
+     * The approval expired with no decision, so the call it parked will not
+     * run. Given the call's action id from the approval's own record, because a
+     * reopened conversation's parked approval does not carry one.
+     */
+    onExpired?: (actionId: string) => void;
   } = $props();
 
   let detail = $state<ApprovalDetailView | null>(null);
@@ -99,7 +106,10 @@
         return;
       }
       expired = detail.approval.is_expired || detail.approval.status === "expired";
-      if (expired) void readTimeLimit();
+      if (expired) {
+        void readTimeLimit();
+        onExpired?.(detail.approval.action_id || approval.action_id);
+      }
       try {
         sideEffect = (await api.capabilityGate(detail.approval.capability)).side_effect || null;
       } catch {
@@ -128,6 +138,7 @@
       if (error instanceof ApiError && error.reasonCode === "approval_expired") {
         expired = true;
         void readTimeLimit();
+        onExpired?.(detail?.approval.action_id || approval.action_id);
       } else if (error instanceof ApiError && error.reasonCode === "approval_already_resolved") {
         failure = "This was already decided somewhere else. The conversation continues from that decision.";
       } else {
@@ -215,14 +226,13 @@
     display: grid;
     gap: 0.55rem;
     border: 1px solid var(--warn-border);
-    border-left: 4px solid var(--warn);
     border-radius: var(--r-sm);
     background: var(--surface);
     padding: 0.7rem 0.9rem 0.8rem;
     max-width: 680px;
   }
   .safety-card.expired {
-    border-left-color: var(--text-3);
+    border-color: var(--border-strong);
     border-color: var(--neutral-border, var(--border));
   }
   header {

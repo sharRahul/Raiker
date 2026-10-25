@@ -36,6 +36,7 @@
     BLOCK_TYPES,
     BLOCKS_PER_ANSWER,
     blockCount,
+    holdBackBlocks,
     type CompareRow,
     type Figure,
     type ProsConsOption,
@@ -49,6 +50,7 @@
     citations,
     oncite,
     ondocument,
+    streaming = false,
   }: {
     /** The whole answer. Rendered as-is when the runtime declared no parts. */
     text: string;
@@ -61,6 +63,8 @@
      * handler the offer is not shown.
      */
     ondocument?: () => void;
+    /** The turn is still streaming: `raiker:` fences are held back until it ends. */
+    streaming?: boolean;
   } = $props();
 
   const blocks = $derived(blockCount(parts));
@@ -126,7 +130,7 @@
 </script>
 
 {#if !typed}
-  <Markdown {text} {citations} {oncite} />
+  <Markdown text={streaming ? holdBackBlocks(text) : text} {citations} {oncite} />
 {:else}
   {#each parts as part, index (index)}
     {#if part.type === "text"}

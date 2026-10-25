@@ -1833,7 +1833,7 @@ describe("ModelsView — one page, Add model and Settings › Advanced (QUI-L08)
     render(ModelsView);
     expect(await screen.findByRole("heading", { name: "My models" })).toBeInTheDocument();
     expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.getByText("Model in use")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No default model is chosen" })).toBeInTheDocument();
     // Serving, fallback and pricing moved to Settings › Advanced.
     expect(screen.queryByText("Model fallback sequence")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Pricing" })).toBeNull();

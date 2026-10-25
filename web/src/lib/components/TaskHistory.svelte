@@ -174,7 +174,7 @@
   .head-actions { align-items: center; display: flex; gap: .4rem; flex-wrap: wrap; }
   .facts { display: grid; gap: var(--space-2); margin: var(--space-4) 0 0; }
   .facts div { display: grid; gap: .15rem; }
-  dt { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; }
+  dt { color: var(--text-3); font-size: var(--text-xs); }
   dd { color: var(--text-1); font-size: var(--text-sm); margin: 0; overflow-wrap: anywhere; }
   .blocked, .truncated { align-items: center; border-radius: var(--r-sm); display: flex; flex-wrap: wrap; font-size: var(--text-sm); gap: .4rem; margin: var(--space-3) 0 0; padding: .4rem .6rem; }
   .blocked { background: var(--warn-soft); border: 1px solid var(--warn-border); color: var(--text-1); }

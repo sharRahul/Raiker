@@ -564,7 +564,7 @@
     gap: var(--space-4);
   }
   .detail-col :global(.card) {
-    border-left: 3px solid var(--accent);
+    border: 1px solid var(--accent-border);
     box-shadow: var(--shadow-0);
   }
   .session-links {

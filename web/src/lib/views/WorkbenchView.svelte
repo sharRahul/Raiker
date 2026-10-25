@@ -38,6 +38,9 @@
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { readinessGaps } from "../readinessGaps";
+  import { surfaceModel, type SurfaceModel } from "../surfaceModel.svelte";
+  import { modelName } from "../modelPresentation";
+  import { failure } from "../errorCopy";
   import { humanize, relativeFuture, relativeTime } from "../format";
   import { capabilityLabel } from "../capabilityModel";
   import { cadenceLabel } from "../agentCadence";
@@ -149,6 +152,25 @@
     return readinessGaps(diagnostics.missing_config, diagnostics.production_ready_local_single_user_runtime);
   });
   const healthIsCurrent = $derived(isCurrent(health));
+  // BUG-357 — a Chat choice is remembered per surface and never sets the
+  // default, so the default-model gap stayed beside a Chat that answered. The
+  // gap offers that model as the default; it is never set without the press.
+  let chatModel = $state<SurfaceModel | null>(null);
+  let defaultBusy = $state(false);
+  let defaultError = $state<string | null>(null);
+  async function useChatModelAsDefault() {
+    if (chatModel === null || defaultBusy) return;
+    defaultBusy = true;
+    defaultError = null;
+    try {
+      await api.selectModel(chatModel.profileId, chatModel.model);
+      await load();
+    } catch (error) {
+      defaultError = failure("The default model was not set", "Nothing changed.", "Choose one on the Models page.", error);
+    } finally {
+      defaultBusy = false;
+    }
+  }
   // QUI-H01 — the owner's chosen name, as Chat greets them (RR-IDENTITY-01).
   let ownerName = $state("");
   const greeting = $derived(homeGreeting(ownerName, tasks !== null && !hasActivity, new Date().getHours()));
@@ -336,6 +358,7 @@
     void api.settings()
       .then((view) => (ownerName = view.status.display_name || view.status.username || ""))
       .catch(() => {});
+    void surfaceModel("chat").then((found) => (chatModel = found));
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(timer);
@@ -380,14 +403,6 @@
        the four starters sit under it, and nothing else does. -->
   <HomeComposer showStarters={tasks !== null && !hasActivity} />
 
-  <div class="refresh-state">
-    <GuideLink route="home" />
-    <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}
-      title={updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}>
-      <Icon name="refresh" size="sm" />
-    </button>
-  </div>
-
   {#if notice}<p class="notice" role="status">
       {notice}
       {#if noticeHref}<a href={noticeHref}>Open its history</a>{/if}
@@ -414,7 +429,18 @@
     {/if}
 
     <aside class="side-column" aria-label="Needs your attention">
-      <h3 class="attention-title">Needs your attention</h3>
+      <!-- Help and refresh sit with the heading they belong to; on a row of
+           their own they read as two stray icons in the middle of Home. -->
+      <div class="attention-head">
+        <h3 class="attention-title">Needs your attention</h3>
+        <div class="refresh-state">
+          <GuideLink route="home" />
+          <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}
+            title={updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}>
+            <Icon name="refresh" size="sm" />
+          </button>
+        </div>
+      </div>
       {#if unavailable}
         <PageState
           state="error"
@@ -497,7 +523,17 @@
           {#each gaps as gap (gap.id)}
             <li class="feed-item feed-blocking">
               <strong>{gap.title}</strong>
-              <a href={gap.action.href}>{gap.action.label}</a>
+              {#if gap.kind === "default-model" && chatModel !== null}
+                <span class="gap-actions">
+                  <button type="button" class="btn btn-sm" disabled={defaultBusy} onclick={() => void useChatModelAsDefault()}>
+                    {defaultBusy ? "Setting…" : `Use ${modelName(chatModel.model)}, as in Chat`}
+                  </button>
+                  <a href={gap.action.href}>{gap.action.label}</a>
+                </span>
+                {#if defaultError}<span class="gap-error" role="alert">{defaultError}</span>{/if}
+              {:else}
+                <a href={gap.action.href}>{gap.action.label}</a>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -732,6 +768,8 @@
 </section>
 
 <style>
+  .gap-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .gap-error { color: var(--danger); font-size: var(--text-sm); }
   .goal-group { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--text-2); }
   .workbench { display: grid; gap: var(--space-5); max-width: 61.25rem; }
   .intro { display: grid; gap: var(--space-2); }
@@ -743,7 +781,9 @@
   .all-clear { color: var(--text-3); font-size: var(--text-sm); margin: 0; }
   /* Below the start row now: freshness and a guide link are true and are not
      what anybody opened Home for. */
-  .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; margin-top: var(--space-3); }
+  .refresh-state { display: flex; align-items: center; gap: var(--space-1); color: var(--text-3); font-size: var(--text-sm); }
+  .attention-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+  .attention-head .attention-title { margin: 0; }
   /* QUI-H01 — one 980 px column, in the order an owner reads it: continue,
      what needs you, what is in progress, this week, what is coming. */
   .columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }

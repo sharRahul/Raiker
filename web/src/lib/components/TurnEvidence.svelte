@@ -214,10 +214,9 @@
     border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken);
     display: grid; gap: var(--space-2);
   }
-  h4 { margin: var(--space-2) 0 0; color: var(--text-3); font-size: var(--text-xs);
-    text-transform: uppercase; letter-spacing: 0.04em; font-weight: 650; }
+  h4 { margin: var(--space-2) 0 0; color: var(--text-3); font-size: var(--text-xs); font-weight: 650; }
   .coordinate { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-  .key { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+  .key { color: var(--text-3); font-size: var(--text-xs); }
   code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-2); overflow-wrap: anywhere; }
   .full-record { margin-left: auto; font-size: var(--text-sm); }
   .calls, .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }

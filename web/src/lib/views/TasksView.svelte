@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ShowMore from "../components/ShowMore.svelte";
+  import { PAGE_SIZE, page } from "../pagination";
   import WorkMeta from "../components/WorkMeta.svelte";
   import { failure } from "../errorCopy";
   import { pickableProjects } from "../projectLifecycle";
@@ -303,6 +305,7 @@
    */
   let expanded = $state<string[]>([]);
   const rows = $derived(flatten(active, expanded, tasks ?? []));
+  let shownRows = $state(PAGE_SIZE);
 
   /** A parent's delegated work: how much there is, and how much has settled. */
   function delegated(task: TaskView): { total: number; settled: number } {
@@ -1082,7 +1085,7 @@
     {:else}
       <section class="work-list" aria-labelledby="open-work">
         <h3 id="open-work">Open work</h3>
-        {#each rows as row (row.task.task_id)}
+        {#each page(rows, shownRows) as row (row.task.task_id)}
           {@const task = row.task}
           {@const pending = blockedBy(task)}
           {@const children = delegated(task)}
@@ -1255,6 +1258,7 @@
             </footer>
           </article>
         {/each}
+        <ShowMore total={rows.length} shown={Math.min(shownRows, rows.length)} noun="tasks" onmore={() => (shownRows += PAGE_SIZE)} />
       </section>
     {/if}
     {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span>{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
@@ -1269,15 +1273,15 @@
   /* UX-TASK-03 — Schedule and Organisation are two groups, each a grid of its
      own short fields, so four of them do not become four full-width rows. */
   .detail-group{display:grid;gap:var(--space-3);grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));margin:0;padding:var(--space-3);border:1px solid var(--border);border-radius:var(--r-sm);min-width:0}
-  .detail-group legend{padding:0 .35rem;color:var(--text-3);font-size:var(--text-xs);font-weight:650;letter-spacing:.06em;text-transform:uppercase}
+  .detail-group legend{padding:0 .35rem;color:var(--text-3);font-size:var(--text-xs);font-weight:650;}
   .task-details label{color:var(--text-2);display:grid;font-size:var(--text-sm);gap:.35rem}
   .parent-toggle,.method{align-self:end;justify-self:start}
   .preview-empty{grid-column:1/-1;margin:0;color:var(--warn,var(--text-2));font-size:var(--text-sm)}
   .zone{color:var(--text-3);font-size:var(--text-xs)}
   /* The preview spans the details grid: three timestamps read as a list, not as
      a fourth field squeezed beside Parent work. */
-  .preview{grid-column:1/-1;display:grid;gap:.25rem;padding:var(--space-3);border-left:3px solid var(--accent);background:var(--sunken);border-radius:var(--r-sm)}
-  .preview-heading{color:var(--text-3);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em}
+  .preview{grid-column:1/-1;display:grid;gap:.25rem;padding:var(--space-3);border: 1px solid var(--accent-border);background:var(--sunken);border-radius:var(--r-sm)}
+  .preview-heading{color:var(--text-3);font-size:var(--text-xs);}
   .preview ol{margin:0;padding-left:1.1rem;display:grid;gap:.1rem;color:var(--text-1);font-size:var(--text-sm)}
   .preview small{color:var(--text-2);font-size:var(--text-xs)}
   /* The one control planning work needs that asking a question does not. It

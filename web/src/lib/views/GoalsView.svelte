@@ -10,6 +10,8 @@
    * profile is shown read-only with a route to Settings — the only place it
    * can be changed.
    */
+  import ShowMore from "../components/ShowMore.svelte";
+  import { PAGE_SIZE, page } from "../pagination";
   import { onDestroy, onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
@@ -40,6 +42,7 @@
   interface StepDraft { title: string; instruction: string; surface: string; depends_on: number[]; criteria: number[] }
 
   let list = $state<GoalList | null>(null);
+  let shownGoals = $state(PAGE_SIZE);
   let loadError = $state<string | null>(null);
   let selected = $state<GoalView | null>(null);
   let busy = $state(false);
@@ -360,8 +363,9 @@
     </div>
   {:else}
     <div class="layout">
+      <div class="goal-column">
       <ul class="goal-list" aria-label="Goals">
-        {#each list.goals as goal (goal.goal_id)}
+        {#each page(list.goals, shownGoals) as goal (goal.goal_id)}
           {@const badge = goalBadge(goal.status)}
           <li>
             <button type="button" class="card card-interactive goal-card" class:selected={selected?.goal_id === goal.goal_id} onclick={() => open(goal.goal_id)} aria-current={selected?.goal_id === goal.goal_id}>
@@ -372,6 +376,8 @@
           </li>
         {/each}
       </ul>
+      <ShowMore total={list.goals.length} shown={Math.min(shownGoals, list.goals.length)} noun="goals" onmore={() => (shownGoals += PAGE_SIZE)} />
+      </div>
 
       {#if selected}
         {@const badge = goalBadge(selected.status)}
@@ -488,7 +494,8 @@
   .layout { display: grid; grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
   @media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } }
   .goal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
-  .goal-card { width: 100%; text-align: left; display: grid; gap: 0.3rem; justify-items: start; }
+  /* QUI-L12 — list rows are at least 64 px, the same height across Work. */
+  .goal-card { width: 100%; min-height: 64px; text-align: left; display: grid; gap: 0.3rem; justify-items: start; align-content: center; }
   .goal-card.selected { outline: 2px solid var(--accent); }
   .goal-title { font-weight: 600; overflow-wrap: anywhere; }
   .detail { display: grid; gap: 0.6rem; min-width: 0; }

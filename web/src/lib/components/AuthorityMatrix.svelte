@@ -171,7 +171,7 @@
     .matrix-cards li:last-child { border-bottom:0; }
     .matrix-cards dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.15rem var(--space-3); margin:0; }
     .matrix-cards dl > div { display:contents; }
-    .matrix-cards dt { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.05em; text-transform:uppercase; align-self:baseline; }
+    .matrix-cards dt { color:var(--text-2); font-size:var(--text-2xs); align-self:baseline; }
     .matrix-cards dd { margin:0; font-size:var(--text-sm); }
   }
 </style>

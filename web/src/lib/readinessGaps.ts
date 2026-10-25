@@ -24,7 +24,15 @@ export interface ReadinessGap {
   readonly id: string;
   readonly title: string;
   readonly action: GapAction;
+  /**
+   * BUG-357 — the default-model gap can be settled from the model Chat
+   * already uses, so Home needs to tell it from the others.
+   */
+  readonly kind: "default-model" | "other";
 }
+
+/** The runtime's sentence for "no default model is chosen". */
+export const DEFAULT_MODEL_GAP = "No model profile is selected.";
 
 const DIAGNOSTICS: GapAction = { label: "Open diagnostics", href: "#/observe?tab=diagnostics" };
 
@@ -58,10 +66,11 @@ export function readinessGaps(missing: readonly string[], ready: boolean): Readi
       id: `gap-${index}`,
       title: known?.title ?? sentence,
       action: known?.action ?? DIAGNOSTICS,
+      kind: sentence === DEFAULT_MODEL_GAP ? "default-model" : "other",
     };
   });
   if (rows.length === 0 && !ready) {
-    rows.push({ id: "gap-not-ready", title: "Raiker is not ready to run work.", action: DIAGNOSTICS });
+    rows.push({ id: "gap-not-ready", title: "Raiker is not ready to run work.", action: DIAGNOSTICS, kind: "other" });
   }
   return rows;
 }

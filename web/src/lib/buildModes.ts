@@ -74,14 +74,16 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
   },
   {
     id: "edit",
-    label: "Edit",
+    // QUI-L13 — the postures are named by what they promise: Plan · Suggest
+    // changes · Run within limits. The ids stay, so stored choices still read.
+    label: "Suggest changes",
     summary: "Propose each change and wait for you.",
     turnMode: "ask",
     planningMode: null,
   },
   {
     id: "auto",
-    label: "Auto",
+    label: "Run within limits",
     summary: "Follow your standing permissions.",
     turnMode: null,
     planningMode: null,

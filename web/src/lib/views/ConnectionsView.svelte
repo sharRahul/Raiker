@@ -262,9 +262,13 @@
         <Icon name="file" size="sm" /> Import manifest
       </button>
     {/if}
-    <button type="button" class="btn btn-primary" onclick={() => (adding = true)}>
-      <Icon name="plus" size="sm" /> Add connection
-    </button>
+    <!-- One obvious next action: with nothing connected the empty list
+         carries Add connection, so the header does not repeat it. -->
+    {#if services.length > 0}
+      <button type="button" class="btn btn-primary" onclick={() => (adding = true)}>
+        <Icon name="plus" size="sm" /> Add connection
+      </button>
+    {/if}
   </div>
 </div>
 

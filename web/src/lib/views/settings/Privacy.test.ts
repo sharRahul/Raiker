@@ -17,28 +17,28 @@ const NAME = /Keep the model's working with the turn/;
 describe("Settings → Privacy", () => {
   it("is off until the owner turns it on", () => {
     render(Privacy, { settings: {}, save: vi.fn() });
-    expect(screen.getByRole("checkbox", { name: NAME })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: NAME })).not.toBeChecked();
   });
 
   it("reports the owner's choice with the exact setting key", async () => {
     const save = vi.fn();
     render(Privacy, { settings: {}, save });
 
-    await fireEvent.click(screen.getByRole("checkbox", { name: NAME }));
+    await fireEvent.click(screen.getByRole("switch", { name: NAME }));
 
     expect(save).toHaveBeenCalledWith({ "privacy.retain_reasoning": true });
   });
 
   it("stays on once the setting says it is on", () => {
     render(Privacy, { settings: { "privacy.retain_reasoning": true }, save: vi.fn() });
-    expect(screen.getByRole("checkbox", { name: NAME })).toBeChecked();
+    expect(screen.getByRole("switch", { name: NAME })).toBeChecked();
   });
 
   it("turns retention back off, rather than only ever on", async () => {
     const save = vi.fn();
     render(Privacy, { settings: { "privacy.retain_reasoning": true }, save });
 
-    await fireEvent.click(screen.getByRole("checkbox", { name: NAME }));
+    await fireEvent.click(screen.getByRole("switch", { name: NAME }));
 
     expect(save).toHaveBeenCalledWith({ "privacy.retain_reasoning": false });
   });

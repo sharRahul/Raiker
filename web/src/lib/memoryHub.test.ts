@@ -56,6 +56,6 @@ describe("what the Memory hub says it holds", () => {
     expect(tabFor("proposal")).toBe("suggestions");
     expect(tabFor("observation")).toBe("suggestions");
     expect(tabFor("document")).toBe("sources");
-    expect(tabFor("setting")).toBe("recall");
+    expect(tabFor("setting")).toBe("controls");
   });
 });

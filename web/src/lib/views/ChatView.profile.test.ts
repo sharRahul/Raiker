@@ -55,7 +55,7 @@ describe("ChatView — profile chip (QUI-P02)", () => {
   // Found live (RT-QUI-29): the first streamed chunk gave the new chat its id,
   // and the chip went back to Standard.
   it("keeps Careful when a new chat learns its id from the first chunk", async () => {
-    stubFetch(routes());
+    const fetch = stubFetch({ ...routes(), "PUT /api/sessions/sess_new/profile": { ok: true, session_id: "sess_new", profile: "careful" } });
     streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: unknown) => void) => {
       onEvent({ kind: "token", text: "Hi", event_type: "", payload: {}, session_id: "sess_new" });
     });
@@ -67,7 +67,17 @@ describe("ChatView — profile chip (QUI-P02)", () => {
       await send("Hello");
       expect(streamPromptMock).toHaveBeenCalled();
     });
-    await waitFor(() => expect(localStorage.getItem("raiker.conversation-profile.sess_new")).toBe("careful"));
+    // Kept on the conversation (decided 2026-10-25), not in this browser.
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([input, init]) =>
+            String(input).includes("/api/sessions/sess_new/profile") &&
+            (init as RequestInit | undefined)?.method === "PUT" &&
+            JSON.parse(String((init as RequestInit).body)).profile === "careful",
+        ),
+      ).toBe(true),
+    );
     expect(screen.getByRole("button", { name: /without asking: Careful/ })).toBeInTheDocument();
   });
 

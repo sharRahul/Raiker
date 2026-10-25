@@ -709,7 +709,7 @@
   .notice { font-size: var(--text-sm); color: var(--text-1); margin: 0 0 var(--space-3); }
   .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-2); margin: 0; }
   .state-row { border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--row-y) var(--row-x); }
-  .state-row dt { font-size: var(--text-xs); color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .state-row dt { font-size: var(--text-xs); color: var(--text-3); }
   .state-row dd { margin: 0.15rem 0 0; font-size: var(--text-sm); color: var(--text-2); }
   .state-row.on dd { color: var(--text-1); }
   .selected { font-size: var(--text-sm); margin: var(--space-3) 0 0; }
@@ -732,7 +732,7 @@
   .pair .field-label { margin: 0; }
   .risks { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
   .risks th, .risks td { text-align: left; padding: 0.3rem var(--space-2); border-bottom: 1px solid var(--border); }
-  .risks th { color: var(--text-3); font-weight: 500; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+  .risks th { color: var(--text-3); font-weight: 500; font-size: var(--text-xs); }
   .advanced summary { cursor: pointer; font-weight: 600; }
   .advanced[open] summary { margin-bottom: var(--space-3); }
   @media (max-width: 40rem) {

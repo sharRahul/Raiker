@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   CONVERSATION_PROFILES,
   profileCapabilityModes,
-  rememberProfile,
-  rememberedProfile,
+  profileFromSession,
 } from "./conversationProfile";
+import { vi } from "vitest";
 import { handOffToChat, takeChatHandoff } from "./chatHandoff";
 
 afterEach(() => localStorage.clear());
@@ -39,11 +39,21 @@ describe("conversation profile (QUI-P02)", () => {
     expect(new Set(Object.values(modes))).toEqual(new Set(["ask"]));
   });
 
-  it("is remembered per conversation, and Standard needs no record", () => {
-    rememberProfile("sess_a", "careful");
-    expect(rememberedProfile("sess_a")).toBe("careful");
-    expect(rememberedProfile("sess_b")).toBe("standard");
-    rememberProfile("sess_a", "standard");
+  // Decided 2026-10-25: the profile is kept on the conversation, so every
+  // device opens it the same way.
+  it("takes the conversation's own record", () => {
+    const save = vi.fn();
+    expect(profileFromSession("sess_a", "careful", save)).toBe("careful");
+    expect(profileFromSession("sess_b", "standard", save)).toBe("standard");
+    expect(profileFromSession("sess_c", undefined, save)).toBe("standard");
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("carries a Careful choice this browser kept before over to the conversation, once", () => {
+    localStorage.setItem("raiker.conversation-profile.sess_a", "careful");
+    const save = vi.fn();
+    expect(profileFromSession("sess_a", "standard", save)).toBe("careful");
+    expect(save).toHaveBeenCalledWith("sess_a", "careful");
     expect(localStorage.length).toBe(0);
   });
 

@@ -50,6 +50,7 @@ from raiker.api.schemas import (
     SetModelFallbackRequest,
     SetModelSelectionRequest,
     SetSessionPinnedRequest,
+    SetSessionProfileRequest,
     SetSessionProjectRequest,
     SetSessionTagsRequest,
     SetSideTaskModelsRequest,
@@ -141,6 +142,7 @@ from raiker.api.wire.sessions import (
     SessionDeleted,
     SessionDetail,
     SessionPinned,
+    SessionProfileSet,
     SessionProjectSet,
     SessionRenamed,
     SessionsDeleted,
@@ -1187,6 +1189,32 @@ async def set_session_pinned(
         "ok": True,
         "session_id": result.data["session_id"],
         "pinned": result.data["pinned"],
+    }
+    return serialize_dto(answer)
+
+
+@router.put("/api/sessions/{session_id}/profile")
+async def set_session_profile(
+    session_id: str,
+    body: SetSessionProfileRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-P02 — remember a conversation's profile (Careful or Standard).
+
+    The profile is sent with every turn as a narrowing override the runtime
+    enforces; storing it on the conversation lets every device open it the same
+    way. It grants nothing. Human-only; an account cannot set another account's.
+    """
+    result = _service(request).set_session_profile(
+        session_id, body.profile, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise refusal(status.HTTP_403_FORBIDDEN, result.reason_code)
+    answer: SessionProfileSet = {
+        "ok": True,
+        "session_id": result.data["session_id"],
+        "profile": result.data["profile"],
     }
     return serialize_dto(answer)
 

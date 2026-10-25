@@ -397,7 +397,7 @@
   .table-wrap { overflow-x: auto; }
   table { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
   th, td { border-bottom: 1px solid var(--border); padding: .45rem .6rem; text-align: left; vertical-align: top; }
-  thead th { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; }
+  thead th { color: var(--text-3); font-size: var(--text-xs); }
   tbody th { font-weight: 600; }
   tbody th code { display: block; overflow-wrap: anywhere; }
   .provider { color: var(--text-3); font-size: var(--text-xs); }

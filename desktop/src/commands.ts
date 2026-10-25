@@ -39,6 +39,8 @@ export const CHANNELS = {
   trayPreference: "raiker:tray-preference",
   openWindow: "raiker:open-window",
   closeWindow: "raiker:close-window",
+  // Quick Entry before sign-in: bring the main window forward to sign in there.
+  showMain: "raiker:show-main",
 } as const;
 
 /** A `#rrggbb` colour; the only form the title-bar overlay accepts from the page. */

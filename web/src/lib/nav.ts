@@ -217,7 +217,10 @@ export const HUB_TABS: Record<string, string[]> = {
   // reading all of it. Overview leads for the same reason it does on Extensions
   // and Models: the question people arrive with is "is anything waiting on me,
   // and what does Raiker remember", not "show me the observations category".
-  memory: ["overview", "memories", "suggestions", "sources", "recall", "controls", "map"],
+  // QUI-L12 — Recall folded into Controls (its old address forwards there), and
+  // the Knowledge Map stays addressable but is not drawn as a tab: it opens
+  // from a memory search, and `#/brain` still lands on it.
+  memory: ["overview", "memories", "suggestions", "sources", "controls", "map"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
@@ -278,6 +281,9 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
   // is a section of Overview now.
   observe: {
     diagnostics: "overview",
+  },
+  memory: {
+    recall: "controls",
   },
   // QUI-L07 — the seven Extensions tabs, on the three Connections tabs. The
   // four technical kinds land on Advanced with their segment selected

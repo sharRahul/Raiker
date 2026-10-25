@@ -46,6 +46,10 @@ class SessionView(View):
     # only — it grants nothing and hides nothing; a task session stays fully
     # readable here and from Tasks.
     origin: str = "chat"
+    # QUI-P02 — the conversation's profile (Careful or Standard), remembered on
+    # the conversation so every device opens it the same way. A narrowing label
+    # the composer sends with each turn; it grants nothing.
+    conversation_profile: str = "standard"
 
 
 def _stored_content_parts(summary: Any) -> tuple[ContentPartView, ...]:

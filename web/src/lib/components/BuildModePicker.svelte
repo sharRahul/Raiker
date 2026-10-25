@@ -60,7 +60,7 @@
     aria-label={`How much Raiker may do this turn: ${spec.label}`}
     aria-haspopup="menu"
     aria-expanded={open}
-    title="Shift+Tab cycles Plan → Edit → Auto"
+    title="Shift+Tab cycles Plan → Suggest changes → Run within limits"
     {disabled}
     onclick={() => (open = !open)}
     onkeydown={closeOnEscape}
@@ -158,8 +158,6 @@
     color: var(--text-3);
     font-size: var(--text-2xs);
     font-weight: 750;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
   .mode-choice {
     width: 100%;

@@ -1064,6 +1064,9 @@ export const api = {
   unarchiveSession: (id: string) => contract.unarchiveSession(id),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
   setSessionPinned: (id: string, pinned: boolean) => contract.setSessionPinned(id, { pinned }),
+  // QUI-P02 — the conversation's profile, kept on the conversation. A label
+  // the composer sends as a narrowing override; it grants nothing.
+  setSessionProfile: (id: string, profile: "careful" | "standard") => contract.setSessionProfile(id, { profile }),
   // Permanently delete one session and its cascaded rows. Requires the explicit
   // confirmation header (mirrors project deletion). Human-only; an account
   // cannot delete another account's session.

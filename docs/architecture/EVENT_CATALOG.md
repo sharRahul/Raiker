@@ -24,6 +24,7 @@ human authorizer, runtime authority, or other literal actor.
 | `policy_decision` | Policy classified the requested action |
 | `approval_requested` | A human decision is required |
 | `approval_denied` | A human or policy denied the action |
+| `approval_expired` | An approval's time limit ran out with no decision; the host sweep settled it to `expired` and nothing ran (approval id, action id and tool name only) |
 | `turn_suspended_for_approval` | A turn parked its working state against an approval so resolving it resumes the same turn (approval id, tool name, and counts only — the parked conversation stays in the encrypted store) |
 | `turn_suspension_failed` | The working state could not be parked, so the turn is not resumable; the approval itself is unaffected |
 | `turn_resumed_after_approval` | A parked turn picked up again with the resolved tool result appended (approval id and counts only) |

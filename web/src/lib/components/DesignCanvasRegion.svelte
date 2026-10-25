@@ -727,8 +727,6 @@
     margin: 0 0 var(--space-2);
     color: var(--text-3);
     font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     font-weight: 650;
   }
   .rail-head span { color: var(--text-2); }
@@ -818,8 +816,6 @@
     margin: 0;
     font-size: var(--text-2xs);
     font-weight: 750;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     color: var(--text-3);
   }
   .strip {

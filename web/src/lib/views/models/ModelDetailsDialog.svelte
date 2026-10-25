@@ -313,8 +313,6 @@
     color: var(--text-3);
     font-size: var(--text-xs);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
   .details-grid dd {
     color: var(--text-2);

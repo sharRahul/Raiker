@@ -221,11 +221,11 @@
   .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:var(--text-xs); }
   .tool-budget { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; margin:.35rem 0 0; color:var(--text-3); font-size:var(--text-xs); }
   .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:var(--text-2xs); color:var(--text-2); cursor:help; }
-  .compaction { display:grid; grid-template-columns:1fr auto; gap:.2rem .9rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:.5rem; background:var(--sunken); }
+  .compaction { display:grid; grid-template-columns:1fr auto; gap:.2rem .9rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid var(--border); border: 1px solid var(--accent-border); border-radius:.5rem; background:var(--sunken); }
   .compaction strong { color:var(--text-1); font-size:var(--text-sm); }
   .compaction > span { color:var(--text-2); font-size:var(--text-xs); font-variant-numeric:tabular-nums; }
   .compaction p { grid-column:1 / -1; margin:.05rem 0 0; font-size:var(--text-xs); }
-  .compaction.failed { border-left-color:var(--warning); }
+  .compaction.failed { border-color:var(--warn-border); }
   .compaction.failed > span { grid-column:1 / -1; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }
   .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:var(--text-sm); color:var(--text-1); }

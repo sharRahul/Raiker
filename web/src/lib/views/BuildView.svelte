@@ -2251,6 +2251,7 @@
                   parts={turn.response?.content_parts ?? []}
                   citations={renderableCitations(turnSourceList)}
                   oncite={(sourceId) => sources.showById(turn.response?.turn_id ?? "", sourceId, answer)}
+                  streaming={turn.streaming}
                 />
               </div>
               {#if !turn.streaming}
@@ -3099,8 +3100,6 @@
     display: inline-block;
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     opacity: 0.85;
     margin-bottom: 0.25rem;
   }
@@ -3188,7 +3187,7 @@
   .decision-record-only {
     margin: 0.2rem 0 0.5rem;
     padding: 0.4rem 0.6rem;
-    border-left: 3px solid var(--warning, var(--accent));
+    border: 1px solid var(--warn-border);
     font-size: var(--text-sm);
     color: var(--text-2);
   }

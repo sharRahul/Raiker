@@ -213,3 +213,47 @@ export function blockCount(parts: readonly ContentPart[]): number {
 
 /** QUI-A rules: more than this, and the answer is offered as a document. */
 export const BLOCKS_PER_ANSWER = 3;
+
+const BLOCK_NAMES: Record<BlockType, string> = {
+  table: "a table",
+  chart: "a chart",
+  figures: "key figures",
+  compare: "a comparison",
+  measure: "a measure",
+  callout: "a callout",
+  proscons: "pros and cons",
+  steps: "the steps",
+};
+
+/**
+ * Quiet UI 04 — what a streaming answer shows of its `raiker:` blocks.
+ *
+ * The typed parts arrive with the final response, so while a turn streams its
+ * block was visible as raw JSON in a code sample and then replaced by the drawn
+ * block at the end. While streaming, each `raiker:` fence — finished or still
+ * open — is held back and replaced by one line naming what is being prepared.
+ * The fence type is the model's own declaration, so the line says no more than
+ * the answer already does. Prose either side is untouched.
+ */
+export function holdBackBlocks(text: string): string {
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let inBlock = false;
+  for (const line of lines) {
+    if (!inBlock) {
+      const open = /^\s*(`{3,}|~{3,})\s*raiker:([a-z]+)/i.exec(line);
+      if (open) {
+        inBlock = true;
+        const kind = open[2].toLowerCase() as BlockType;
+        out.push(`*Preparing ${BLOCK_NAMES[kind] ?? "a block"}…*`);
+        // A fence whose JSON closes on its own line closes the block too.
+        if (/(`{3,}|~{3,})\s*$/.test(line.slice(open.index + open[0].length))) inBlock = false;
+        continue;
+      }
+      out.push(line);
+      continue;
+    }
+    if (/^\s*(`{3,}|~{3,})\s*$/.test(line)) inBlock = false;
+  }
+  return out.join("\n");
+}

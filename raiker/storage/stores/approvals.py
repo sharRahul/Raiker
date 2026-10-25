@@ -316,7 +316,33 @@ class ApprovalStore:
         )
         if changed == 1:
             self._settle_proposed_tool_action(approval_id, "expired")
+            self._settle_approval_notices(approval_id)
         return changed == 1
+
+    def expire_due_approvals(self: SQLiteStore, *, now: str | None = None, limit: int = 200) -> list[dict[str, Any]]:
+        """Settle every pending approval whose time limit has passed.
+
+        Until this sweep, an expired approval stayed ``pending`` in storage
+        until something tried to decide it, and only the read model's
+        ``is_expired`` said otherwise. Each row is moved through
+        :meth:`expire_approval`, so a decision made in the same instant wins and
+        the proposing call's row and its notice settle with it. Returns the
+        approvals this call expired, with the ids the audit event names.
+        """
+        moment = now or utc_now()
+        rows = self._rows(
+            """SELECT a.approval_id, a.action_id, t.tool_name, t.session_id, t.turn_id
+               FROM approvals a LEFT JOIN tool_actions t ON t.action_id = a.action_id
+               WHERE a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at != ''
+                 AND a.expires_at < ?
+               ORDER BY a.expires_at LIMIT ?""",
+            (moment, int(limit)),
+        )
+        expired: list[dict[str, Any]] = []
+        for row in rows:
+            if self.expire_approval(str(row["approval_id"])):
+                expired.append(dict(row))
+        return expired
 
     def claim_approval_for_execution(self: SQLiteStore, approval_id: str) -> bool:
         """Atomically claim a pending approval for execution (pending → executing).
@@ -331,6 +357,8 @@ class ApprovalStore:
             "WHERE approval_id = ? AND status = 'pending'",
             (approval_id,),
         )
+        if changed == 1:
+            self._settle_approval_notices(approval_id)
         return changed == 1
 
     def finalize_approval_execution(
@@ -382,6 +410,29 @@ class ApprovalStore:
             "WHERE status = 'approval_required' AND action_id = "
             "(SELECT action_id FROM approvals WHERE approval_id = ?)",
             (settled, utc_now(), approval_id),
+        )
+
+    #: The notice kinds that announce a decision waiting on the owner
+    #: (``raiker.notify.approval_notifier``: approval, question, critical).
+    #: Kept here as literals so the store does not import the notifier;
+    #: ``tests/test_approval_notice_settles.py`` pins the two lists together.
+    _DECISION_NOTICE_KINDS = ("approval_pending", "question_pending", "critical_approval_pending")
+
+    def _settle_approval_notices(self: SQLiteStore, approval_id: str) -> None:
+        """Mark the notice that announced this approval read once it is decided.
+
+        Found in the Quiet UI features round: *Input needed* stayed in the
+        corner after the question was answered in Chat, and an approval's notice
+        stayed unread after its decision, because only opening the notice or
+        its page marked it read. A decision is the owner having seen it, so the
+        notice that asked for it is settled with it, on every path that decides
+        (approve, deny, answer, expire).
+        """
+        placeholders = ", ".join("?" for _ in self._DECISION_NOTICE_KINDS)
+        self._execute(
+            f"UPDATE notifications SET read = 1 WHERE subject_id = ? AND read = 0 "  # noqa: S608 - placeholders only
+            f"AND kind IN ({placeholders})",
+            (approval_id, *self._DECISION_NOTICE_KINDS),
         )
 
     def release_approval_claim(self: SQLiteStore, approval_id: str) -> bool:
@@ -645,6 +696,7 @@ class ApprovalStore:
         )
         if changed == 1:
             self._settle_proposed_tool_action(approval_id, status)
+            self._settle_approval_notices(approval_id)
 
     def answer_owner_question(
         self: SQLiteStore, approval_id: str, *, answers_json: str, answered_by: str, answered_at: str
@@ -663,7 +715,10 @@ class ApprovalStore:
                 "resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
                 (answers_json, answered_by, answered_at, approval_id),
             )
-            return cursor.rowcount > 0
+            answered = cursor.rowcount > 0
+        if answered:
+            self._settle_approval_notices(approval_id)
+        return answered
 
     def insert_approval_relay(self: SQLiteStore, relay: ApprovalRelayRecord) -> None:
         self._execute(

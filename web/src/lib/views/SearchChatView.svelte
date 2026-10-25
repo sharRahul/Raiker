@@ -435,8 +435,8 @@
                    pin: the owner cannot tell a pinned thread from the newest
                    one. It says so on the row, with the mark Sessions has always
                    used for the same state. -->
-              {#if thread.pinned}<span class="pin-mark" title="Pinned" aria-label="Pinned"
-                  >★</span
+              {#if thread.pinned}<span class="pin-mark" title="Pinned" role="img" aria-label="Pinned"
+                  ><Icon name="spark" size="sm" /></span
                 >{/if}
               {thread.title}
             </span>
@@ -462,7 +462,7 @@
                     class="tag-remove"
                     aria-label={`Remove tag ${tag} from ${thread.title}`}
                     disabled={busy === thread.session_id}
-                    onclick={() => void removeTag(thread, tag)}>×</button
+                    onclick={() => void removeTag(thread, tag)}><Icon name="x" size="sm" /></button
                   >
                 </li>
               {/each}
@@ -679,9 +679,12 @@
   li {
     border-bottom: 1px solid var(--border);
   }
+  /* QUI-L12 — 64 px rows, the height every Work list shares. */
   li a {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-content: center;
+    min-height: 64px;
     gap: 0.2rem var(--space-4);
     padding: var(--space-3) var(--space-2);
     border-radius: var(--r-sm);
@@ -781,6 +784,8 @@
     padding: 0.05rem 0.45rem;
   }
   .tag-remove {
+    display: inline-flex;
+    align-items: center;
     background: none;
     border: 0;
     color: var(--text-3);
@@ -804,6 +809,7 @@
     font-size: var(--text-sm);
   }
   .pin-mark {
+    display: inline-flex;
     color: var(--accent);
     margin-right: 0.2rem;
   }

@@ -17,12 +17,12 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
-  import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import TelemetryExport from "../components/TelemetryExport.svelte";
   import { api, ApiError } from "../api";
   import { digestEvents } from "../auditDigest";
-  import { allClearSentence, attentionItems, RUNTIME_HEALTH_CHANGED } from "../observeAttention";
+  import { allClearSentence, attentionItems, RUNTIME_HEALTH_CHANGED, type AttentionTone } from "../observeAttention";
+  import type { IconName } from "../icons";
   import { presentationPhrase, repeatPhrase } from "../noticePresentation";
   import { delivery, localClock } from "../deliveryPolicy.svelte";
   import { isDeferred, isInherent } from "../capabilityModel";
@@ -58,6 +58,23 @@
   let security = $state<SecurityHealth[] | null>(null);
   let loadError = $state<string | null>(null);
   let offline = $state(false);
+  /** When the reads behind this page last came back: the cards' "last checked". */
+  let checkedAt = $state<string | null>(null);
+
+  // QUI-L11 — what kind of problem a card is, in words as well as an icon,
+  // because status never relies on colour alone.
+  const TONE_LABEL: Record<AttentionTone, string> = {
+    containment: "Security",
+    blocking: "Stops work",
+    waiting: "Waiting on you",
+    unknown: "Not known",
+  };
+  const TONE_ICON: Record<AttentionTone, IconName> = {
+    containment: "shield",
+    blocking: "warning",
+    waiting: "hand",
+    unknown: "help",
+  };
 
   // Support bundle. It is only ever what the server sends back — the browser
   // assembles nothing and claims nothing about the runtime on its own.
@@ -73,7 +90,8 @@
         overview: "Overview",
         sessions: "Sessions",
         activity: "Audit log",
-        checkpoints: "Checkpoints",
+        // QUI-L11 — the record of points to go back to is Recovery.
+        checkpoints: "Recovery",
         diagnostics: "Diagnostics",
         work: "Work in action",
         notifications: "Notifications",
@@ -88,7 +106,6 @@
   const activeTasks = $derived(
     (tasks ?? []).filter((task) => isActiveTask(task.status)),
   );
-  const expiredApprovals = $derived((approvals ?? []).filter((a) => a.is_expired));
   // BUG-239 — a gate the enforcing path would run is not a closed gate. Counting
   // `!runtime_enabled` alone made this tile say "66 closed" on a workspace where
   // `web_fetch` would have fetched, which is the same defect Permissions had.
@@ -124,6 +141,44 @@
       notifications === null ? null : notifications.filter((n) => !n.read).length,
   });
   const attention = $derived(attentionItems(attentionInputs));
+
+  /** The resting state of a working install, folded under "What is working". */
+  const healthyRows = $derived.by(() => {
+    if (diagnostics === null) return [];
+    const unread = (notifications ?? []).filter((n) => !n.read).length;
+    const live = (approvals ?? []).filter((a) => !a.is_expired).length;
+    return [
+      {
+        label: "Raiker",
+        value: `${ready ? "Ready" : "Not ready"} · ${humanize(diagnostics.runtime_mode)} mode`,
+        href: null,
+        linkLabel: "",
+      },
+      {
+        label: "Permissions",
+        value:
+          openableGates.length === 0
+            ? "Every capability you can turn on is on"
+            : `${openableGates.length} turned off${gatesWithNoExecutor > 0 ? ` · ${gatesWithNoExecutor} with no executor` : ""}`,
+        href: "#/capabilities",
+        linkLabel: "Permissions",
+      },
+      {
+        label: "Required settings",
+        value: diagnostics.missing_config.length === 0 ? "All set" : `${diagnostics.missing_config.length} unset`,
+        href: null,
+        linkLabel: "",
+      },
+      { label: "Decisions", value: live === 0 ? "None waiting" : `${live} waiting`, href: "#/approvals", linkLabel: "Approvals" },
+      {
+        label: "Background work",
+        value: activeTasks.length === 0 ? "Nothing running" : `${activeTasks.length} running or waiting`,
+        href: "#/observe?tab=work",
+        linkLabel: "Live board",
+      },
+      { label: "Notifications", value: unread === 0 ? "All read" : `${unread} unread`, href: "#/observe?tab=notifications", linkLabel: "History" },
+    ];
+  });
 
   // BUG-322 — a link to a damaged index's repair (the attention item, the
   // notice) opens the detail it lives in and brings the repair into view,
@@ -169,6 +224,7 @@
         api.notifications(),
       ]);
       offline = false;
+      checkedAt = new Date().toISOString();
       // Read separately and allowed to fail on its own: a build without the
       // security-health route must not take the whole overview down, and a
       // failure here becomes an explicit *unknown* in the attention list
@@ -230,12 +286,6 @@
 
 {#if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="overview">
-    <div class="head">
-      <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-        <Icon name="refresh" size="sm" /> Refresh
-      </button>
-    </div>
-
     {#if loadError}
       <PageState
         state="error"
@@ -245,117 +295,74 @@
     {:else if diagnostics === null}
       <PageState state="loading" title="Reading status…" />
     {:else}
-      <!-- REM-OBSERVE — exceptions first: what is wrong and what changed lead,
-           and the resting state reads below, so the one tile that matters is
-           not as easy to miss as six that read "0". -->
+      <!-- QUI-L11 — Diagnostics: what needs attention, one card per issue
+           (the problem, what it affects, when it was checked, the safe fix, and
+           the runtime's own words under Technical details). Healthy systems,
+           recent changes and sharing are folded below it, so a healthy install
+           is one line and a sick one leads with the problem. -->
       <section aria-labelledby="attention-h" class="attention">
-        <h2 id="attention-h" class="section-h">Needs your attention</h2>
+        <div class="attention-head">
+          <h2 id="attention-h" class="section-h">What needs attention</h2>
+          <span class="checked">
+            {#if checkedAt}Checked <time datetime={checkedAt}>{relativeTime(checkedAt)}</time>{/if}
+          </span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
+            <Icon name="refresh" size="sm" /> Check again
+          </button>
+        </div>
         {#if attention.length === 0}
           <!-- NEW-HOME-01's rule, stated in the sentence itself: an all-clear
                names what it covers, so a read that failed cannot hide inside
                the word "nothing". -->
           <p class="quiet" role="status">{allClearSentence(attentionInputs)}</p>
         {:else}
-          <ul class="attention-list">
+          <ul class="issues">
             {#each attention as item (item.id)}
-              <li data-tone={item.tone}>
-                <div>
-                  <p class="attention-title">{item.title}</p>
-                  <p class="attention-detail">{item.detail}</p>
+              <li class="issue" data-tone={item.tone}>
+                <div class="issue-main">
+                  <h3 class="issue-title">{item.title}</h3>
+                  <p class="issue-detail">{item.detail}</p>
+                  <p class="issue-meta">
+                    <Icon name={TONE_ICON[item.tone]} size="sm" />
+                    <span>{TONE_LABEL[item.tone]}</span>
+                    {#if checkedAt}<span aria-hidden="true">·</span><span>last checked {relativeTime(checkedAt)}</span>{/if}
+                  </p>
+                  {#if item.technical}
+                    <details class="technical">
+                      <summary>Technical details</summary>
+                      <code>{item.technical}</code>
+                    </details>
+                  {/if}
                 </div>
-                <a class="btn btn-ghost btn-sm" href={item.href}>{item.linkLabel}</a>
+                <a class="btn btn-sm issue-fix" href={item.href}>{item.linkLabel}</a>
               </li>
             {/each}
           </ul>
         {/if}
       </section>
 
-      <section aria-labelledby="ready-h" class="folded">
-        <h2 id="ready-h" class="section-h">Is Raiker ready?</h2>
-        <div class="tiles">
-          <!-- The healthy half of this pair is the resting state of a
-               working install, so it is plain metadata. The colour is spent on
-               the half that needs a person, which is what makes it mean
-               anything the one time it appears. -->
-          <StatTile
-            label="Raiker"
-            value={ready ? "Ready" : "Not ready"}
-            detail={ready
-              ? `Running in ${humanize(diagnostics.runtime_mode)} mode with its readiness checks met.`
-              : `Running in ${humanize(diagnostics.runtime_mode)} mode with unmet readiness checks.`}
-            tone={ready ? "neutral" : "warn"}
-          />
-          <StatTile
-            label="Closed capability gates"
-            value={openableGates.length}
-            detail={openableGates.length === 0
-              ? "Every capability you can open is open."
-              : `Requests needing these fail closed until you open them.${
-                  gatesWithNoExecutor > 0
-                    ? ` ${gatesWithNoExecutor} more have no executor and stay closed.`
-                    : ""
-                }`}
-            tone="neutral"
-            href="#/capabilities"
-            linkLabel="Review capabilities"
-          />
-          <StatTile
-            label="Missing configuration"
-            value={diagnostics.missing_config.length}
-            detail={diagnostics.missing_config.length === 0
-              ? "Nothing required is unset."
-              : diagnostics.missing_config.join(", ")}
-            tone={diagnostics.missing_config.length === 0 ? "neutral" : "warn"}
-            href="#/settings"
-            linkLabel="Open settings"
-          />
-        </div>
-      </section>
+      <details class="fold" aria-labelledby="healthy-h">
+        <summary>
+          <span id="healthy-h" class="fold-title">What is working</span>
+          <span class="fold-meta">{healthyRows.length} check{healthyRows.length === 1 ? "" : "s"}</span>
+          <Icon name="chevron-down" size="sm" />
+        </summary>
+        <dl class="healthy-rows">
+          {#each healthyRows as row (row.label)}
+            <div>
+              <dt>{row.label}</dt>
+              <dd>{row.value}{#if row.href}<a href={row.href}>{row.linkLabel}</a>{/if}</dd>
+            </div>
+          {/each}
+        </dl>
+      </details>
 
-      <section aria-labelledby="waiting-h" class="folded">
-        <h2 id="waiting-h" class="section-h">Is anything waiting for me?</h2>
-        <div class="tiles">
-          <StatTile
-            label="Pending approvals"
-            value={(approvals ?? []).length}
-            detail={(approvals ?? []).length === 0
-              ? "No decision needs your review."
-              : "Each one blocks a governed action until you decide."}
-            tone={(approvals ?? []).length > 0 ? "accent" : "neutral"}
-            href="#/approvals"
-            linkLabel="Open the decision queue"
-          />
-          <StatTile
-            label="Expired approvals"
-            value={expiredApprovals.length}
-            detail={expiredApprovals.length === 0
-              ? "Nothing has aged out."
-              : "These can no longer be approved; the action must be requested again."}
-            tone={expiredApprovals.length > 0 ? "warn" : "neutral"}
-            href="#/approvals"
-            linkLabel="Review expiries"
-          />
-          <StatTile
-            label="Open work"
-            value={activeTasks.length}
-            detail={activeTasks.length === 0
-              ? "No task is queued, running, paused, or waiting for approval."
-              : "You can stop any of these at a safe boundary."}
-            href="#/observe?tab=work"
-            linkLabel="Open the live board"
-          />
-          <StatTile
-            label="Unread notifications"
-            value={(notifications ?? []).filter((n) => !n.read).length}
-            detail="The same record the bell in the context bar reads from."
-            href="#/observe?tab=notifications"
-            linkLabel="Open notification history"
-          />
-        </div>
-      </section>
-
-      <section aria-labelledby="changed-h">
-        <h2 id="changed-h" class="section-h">What changed?</h2>
+      <details class="fold">
+        <summary>
+          <span class="fold-title">What changed</span>
+          <span class="fold-meta">{changes.length === 0 ? "Nothing yet" : `${changes.length} recent`}</span>
+          <Icon name="chevron-down" size="sm" />
+        </summary>
         {#if changes.length === 0}
           <p class="quiet">Nothing has changed yet.</p>
         {:else}
@@ -390,13 +397,17 @@
                together into one unreadable sentence at a phone width. -->
           <p class="more-row">
             <a class="more" href="#/observe?tab=activity">Open the full audit log</a>
-            <a class="more" href="#/observe?tab=checkpoints">See the rewind timeline</a>
+            <a class="more" href="#/observe?tab=checkpoints">Open Recovery</a>
           </p>
         {/if}
-      </section>
+      </details>
 
-      <section aria-labelledby="support-h" class="support folded">
-        <h2 id="support-h" class="section-h">Can I safely share this?</h2>
+      <details class="fold support">
+        <summary>
+          <span class="fold-title">Share or export</span>
+          <span class="fold-meta">Support bundle and telemetry</span>
+          <Icon name="chevron-down" size="sm" />
+        </summary>
         <p>
           The support bundle is built by the server and redacted with the same rules every API
           response uses. It carries readiness facts and gate state — no credential, prompt, file
@@ -420,7 +431,10 @@
         {#if bundle !== null}
           <pre class="bundle" aria-label="Redacted support bundle">{JSON.stringify(bundle, null, 2)}</pre>
         {/if}
-      </section>
+        <!-- Backlog #18 — the record Raiker keeps can leave the machine on a
+             wire, to a collector the owner adds. -->
+        <TelemetryExport />
+      </details>
 
       <!--
         Diagnostics was a seventh tab on this hub reading the *same* `diagnostics`
@@ -440,23 +454,17 @@
            a healthy install does not have to scroll past them. What its
            failures mean for the owner is already in the attention list above,
            read from the same records. -->
-      <details class="specialist" open={repairOpen} id="runtime-health-detail">
+      <details class="fold specialist" open={repairOpen} id="runtime-health-detail">
         <summary>
-          <span>
-            <strong>Health, in detail</strong>
-            <small>Failed readiness checks, health transitions, memory integrity and what a restart does to each kind of work.</small>
-          </span>
-          <Icon name="chevron-down" size="md" />
+          <span class="fold-title">Health, in detail</span>
+          <span class="fold-meta">Readiness checks, memory integrity, restarts</span>
+          <Icon name="chevron-down" size="sm" />
         </summary>
         <div class="specialist-body">
           <DiagnosticsView />
         </div>
       </details>
 
-      <!-- Backlog #18 — the record Raiker keeps is more than any compared
-           product exports, and until now it could not leave the machine on a
-           wire. This is the fifth question the overview answers. -->
-      <TelemetryExport />
     {/if}
   </div>
 {:else if tab === "sessions"}
@@ -519,21 +527,10 @@
 {/if}
 
 <style>
-  .overview { display: grid; gap: var(--space-5); }
-  .head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
+  .overview { display: grid; gap: var(--space-3); max-width: 52rem; }
   .section-h {
     font-size: var(--text-md);
     margin: 0 0 var(--space-3);
-  }
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    gap: var(--space-3);
   }
   .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
   .timeline li {
@@ -571,39 +568,55 @@
   .more-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0 0; }
   .quiet { color: var(--text-3); }
 
-  /* REM-OBSERVE — the exception list leads the page, and the resting state
-     that follows it is quieter than it was so the order is legible without
-     reading the headings. */
-  .attention-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-  .attention-list li {
+  /* QUI-L11 — one flat card per issue. The kind of problem is a word and an
+     icon in the meta line, never a coloured stripe: status never relies on
+     colour alone, and a side stripe was decoration doing a label's job. */
+  .attention { margin-bottom: var(--space-3); }
+  .attention-head { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-3); }
+  .attention-head .section-h { margin: 0; font-size: var(--text-lg); }
+  .checked { color: var(--text-3); font-size: var(--text-sm); margin-right: auto; }
+  .issues { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .issue {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-4);
-    padding: var(--space-3);
+    padding: var(--space-4);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--border-strong);
     border-radius: var(--r-md);
     background: var(--surface);
   }
-  /* Containment is the one row that carries the danger colour, because it is
-     the one row that must not be read as an ordinary queue item. */
-  .attention-list li[data-tone="containment"] { border-left-color: var(--danger); }
-  .attention-list li[data-tone="blocking"] { border-left-color: var(--warn); }
-  .attention-list li[data-tone="waiting"] { border-left-color: var(--accent); }
-  .attention-list li[data-tone="unknown"] { border-left-color: var(--text-3); }
-  .attention-title { margin: 0; font-weight: 650; }
-  .attention-detail { margin: 0.15rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
-  .folded .section-h { color: var(--text-2); }
-  .specialist summary {
+  .issue[data-tone="containment"] { border-color: var(--danger-border); }
+  .issue[data-tone="blocking"] { border-color: var(--warn-border); }
+  .issue-main { display: grid; gap: var(--space-1); min-width: 0; }
+  .issue-title { margin: 0; font-size: var(--text-base); font-weight: 650; }
+  .issue-detail { margin: 0; color: var(--text-2); font-size: var(--text-sm); max-width: 62ch; }
+  .issue-meta { display: flex; align-items: center; gap: 0.35rem; margin: var(--space-1) 0 0; color: var(--text-3); font-size: var(--text-xs); }
+  .issue[data-tone="containment"] .issue-meta { color: var(--danger); }
+  .issue[data-tone="blocking"] .issue-meta { color: var(--warn); }
+  .issue-fix { flex: none; }
+  .technical summary { cursor: pointer; color: var(--text-3); font-size: var(--text-xs); width: fit-content; }
+  .technical code { display: block; margin-top: var(--space-1); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-2); overflow-wrap: anywhere; }
+  .fold { border-top: 1px solid var(--border); padding: var(--space-3) 0 0; }
+  .fold > summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
     cursor: pointer;
+    list-style: none;
+    min-height: var(--control-normal);
   }
-  .specialist summary small { display: block; color: var(--text-2); font-size: var(--text-sm); }
-  .specialist-body { margin-top: var(--space-4); }
+  .fold > summary::-webkit-details-marker { display: none; }
+  .fold > summary :global(svg) { transition: transform var(--motion-fast) var(--ease); }
+  .fold[open] > summary :global(svg) { transform: rotate(180deg); }
+  .fold-title { font-weight: 650; }
+  .fold-meta { color: var(--text-3); font-size: var(--text-sm); margin-right: auto; }
+  .fold[open] > :not(summary) { margin-top: var(--space-3); }
+  .healthy-rows { margin: 0; display: grid; gap: 0; }
+  .healthy-rows div { display: grid; grid-template-columns: 12rem 1fr; gap: var(--space-3); padding: var(--space-2) 0; }
+  .healthy-rows dt { color: var(--text-2); font-size: var(--text-sm); }
+  .healthy-rows dd { margin: 0; font-size: var(--text-sm); display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .healthy-rows a { font-weight: 600; }
   .support p { color: var(--text-2); max-width: 68ch; }
   .support-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .copy-note { color: var(--ok); font-size: var(--text-sm); font-weight: 600; }
@@ -624,11 +637,9 @@
   .notifications { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
   .notifications li {
     border: 1px solid var(--border);
-    border-left: 3px solid var(--border-strong);
     border-radius: var(--r-md);
     background: var(--surface);
     padding: var(--space-3) var(--space-4);
   }
-  .notifications li.unread { border-left-color: var(--accent); }
-  @media (max-width: 720px) { .head { flex-direction: column; } }
+  .notifications li.unread { border-color: var(--accent-border); background: var(--accent-soft); }
 </style>

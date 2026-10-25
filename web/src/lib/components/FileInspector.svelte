@@ -376,8 +376,6 @@
     color: var(--accent);
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
   .resolution-badge { color:var(--text-3); font-size:var(--text-2xs); font-weight:650; }
   /* A persistent normal state is neutral. Success colour is spent on

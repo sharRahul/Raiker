@@ -66,26 +66,37 @@ export function profileLabel(profile: ConversationProfile): string {
   return CONVERSATION_PROFILES.find((item) => item.id === profile)?.label ?? "Standard";
 }
 
-const KEY = "raiker.conversation-profile.";
+/**
+ * Where an earlier build kept the choice: this browser's storage, per
+ * conversation. Read once, so a choice made before the profile moved to the
+ * conversation is carried over rather than lost (`profileFromSession`).
+ */
+const LEGACY_KEY = "raiker.conversation-profile.";
 
-/** The profile remembered for a conversation in this browser, or the default. */
-export function rememberedProfile(sessionId: string | null): ConversationProfile {
-  if (sessionId === null) return DEFAULT_PROFILE;
+/**
+ * The profile a conversation carries, from its session record.
+ *
+ * Decided 2026-10-25: the profile belongs to the conversation, so another
+ * device opening it sees the same choice. A Careful choice still sitting in
+ * this browser from before is written to the conversation once, then forgotten
+ * here; the server's answer wins in every other case.
+ */
+export function profileFromSession(
+  sessionId: string,
+  stored: string | null | undefined,
+  save: (sessionId: string, profile: ConversationProfile) => void,
+): ConversationProfile {
+  const server: ConversationProfile = stored === "careful" ? "careful" : DEFAULT_PROFILE;
+  let legacy: string | null;
   try {
-    const stored = localStorage.getItem(`${KEY}${sessionId}`);
-    return stored === "careful" || stored === "standard" ? stored : DEFAULT_PROFILE;
+    legacy = localStorage.getItem(`${LEGACY_KEY}${sessionId}`);
+    localStorage.removeItem(`${LEGACY_KEY}${sessionId}`);
   } catch {
-    return DEFAULT_PROFILE;
+    legacy = null;
   }
-}
-
-export function rememberProfile(sessionId: string | null, profile: ConversationProfile): void {
-  if (sessionId === null) return;
-  try {
-    if (profile === DEFAULT_PROFILE) localStorage.removeItem(`${KEY}${sessionId}`);
-    else localStorage.setItem(`${KEY}${sessionId}`, profile);
-  } catch {
-    // Not remembered in this browser; the choice still applies while the
-    // conversation is open.
+  if (server === DEFAULT_PROFILE && legacy === "careful") {
+    save(sessionId, "careful");
+    return "careful";
   }
+  return server;
 }

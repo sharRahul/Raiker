@@ -181,7 +181,7 @@
     <span>Font</span>
     <small>Choose the typeface used across the interface.</small>
     <select class="settings-select" aria-label="Font" value={font} onchange={(e) => save({ "personalisation.font": e.currentTarget.value })}>
-      <option value="sans">Manrope (default)</option>
+      <option value="sans">Inter (default)</option>
       <option value="system">System</option>
       <option value="mono">Monospace</option>
     </select>

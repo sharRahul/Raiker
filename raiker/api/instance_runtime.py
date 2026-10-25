@@ -128,6 +128,10 @@ class InstanceRuntime:
             # service (Ollama) is re-checked on every tick, so Ready follows
             # the service rather than the last time somebody pressed Check.
             await self._contained("local_model_watch", self._watch_local_models())
+            # An approval whose time limit ran out is settled to `expired` in
+            # storage, with its event, rather than waiting for somebody to try
+            # to decide it.
+            await self._contained("approval_expiry", asyncio.to_thread(self._expire_approvals))
             with suppress(TimeoutError):
                 await asyncio.wait_for(self._stop.wait(), timeout=TICK_SECONDS)
 
@@ -156,6 +160,30 @@ class InstanceRuntime:
         store = SQLiteStore(self.workspace_root)
         for damaged in store.check_search_indexes():
             notify_search_index_damaged(store, damaged["index_name"], int(damaged["damaged_count"]))
+
+    def _expire_approvals(self) -> None:
+        from raiker.events.types import make_event
+        from raiker.events.writer import EventLogWriter
+
+        store = SQLiteStore(self.workspace_root)
+        expired = store.expire_due_approvals()
+        if not expired:
+            return
+        writer = EventLogWriter(store)
+        for row in expired:
+            writer.append(
+                make_event(
+                    session_id=str(row.get("session_id") or "approvals"),
+                    turn_id=row.get("turn_id"),
+                    event_type="approval_expired",
+                    actor="host",
+                    payload={
+                        "approval_id": row["approval_id"],
+                        "action_id": row["action_id"],
+                        "tool_name": row.get("tool_name") or "",
+                    },
+                )
+            )
 
     async def _watch_local_models(self) -> None:
         from raiker.models.local_watch import recheck_local_selections

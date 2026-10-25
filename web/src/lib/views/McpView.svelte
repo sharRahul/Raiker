@@ -889,21 +889,21 @@
   .actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
   .meta { display: flex; flex-wrap: wrap; gap: var(--space-4); margin: var(--space-3) 0 0; }
   .meta div { display: flex; flex-direction: column; gap: 0.15rem; }
-  .meta dt { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); }
+  .meta dt { font-size: var(--text-2xs); color: var(--text-3); }
   .meta dd { margin: 0; font-size: var(--text-sm); color: var(--text-2); }
   .meta code { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-1); background: var(--sunken); padding: 0.1rem 0.4rem; border-radius: 4px; }
   .tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor-banner { margin: var(--space-3) 0 0; }
   .finding { font-size: var(--text-xs); font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
-  .held { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: var(--r-sm); background: var(--warn-soft, var(--sunken)); display: grid; gap: var(--space-2); justify-items: start; }
+  .held { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border: 1px solid var(--warn-border); border-radius: var(--r-sm); background: var(--warn-soft, var(--sunken)); display: grid; gap: var(--space-2); justify-items: start; }
   .held-lead { margin: 0; display: flex; gap: 0.5rem; align-items: flex-start; font-size: var(--text-sm); color: var(--text-2); }
   .held-lead :global(svg) { color: var(--warn); flex: none; margin-top: 0.15rem; }
   .held ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); width: 100%; }
   .held li { display: flex; gap: var(--space-3); align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
   .held-copy { display: grid; gap: 0.15rem; min-width: 0; flex: 1 1 16rem; }
   .held-name { display: inline-flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-  .held-change { font-size: var(--text-xs); font-weight: 600; color: var(--warn); text-transform: uppercase; letter-spacing: 0.04em; }
+  .held-change { font-size: var(--text-xs); font-weight: 600; color: var(--warn); }
   .held-says { font-size: var(--text-xs); color: var(--text-3); overflow-wrap: anywhere; }
   .unsupported { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
   .unsupported li { font-size: var(--text-xs); color: var(--text-3); }
@@ -912,7 +912,7 @@
   .declared div { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: var(--text-sm); }
   .declared dt { font-family: var(--font-mono, monospace); color: var(--text-2); }
   .declared dd { margin: 0; color: var(--text-3); }
-  .tools-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .tools-label { font-size: var(--text-xs); font-weight: 600; color: var(--text-3); }
   .chip { font-size: var(--text-xs); font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
   .muted { color: var(--text-3); font-size: var(--text-sm); }
   .reach { font-size: var(--text-xs); font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--warn-soft, var(--sunken)); color: var(--warn); border: 1px solid var(--border); }

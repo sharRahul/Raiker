@@ -4820,6 +4820,15 @@ CREATE INDEX IF NOT EXISTS idx_design_handoffs_document
 # reads it the way it reads Incognito.
 GOALS_AND_EXECUTION_PROFILES_MIGRATION_ID = "RAIKER-2121-goals-and-execution-profiles"
 
+# QUI-P02 — the conversation's profile (Careful or Standard) belongs to the
+# conversation, not to the browser it was chosen in, so another device opening
+# the same conversation sees the same choice (owner's decision, 2026-10-25). A
+# label the composer sends as a narrowing override; it grants nothing.
+SESSION_PROFILE_MIGRATION_ID = "RAIKER-2122-session-conversation-profile"
+SESSION_PROFILE_SQL = """
+ALTER TABLE sessions ADD COLUMN conversation_profile TEXT NOT NULL DEFAULT 'standard';
+"""
+
 GOALS_AND_EXECUTION_PROFILES_SQL = """
 CREATE TABLE IF NOT EXISTS execution_profiles (
   profile_id TEXT NOT NULL,
@@ -5191,6 +5200,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     RunnerStep("_backfill_memory_fts"),
     RunnerStep("_backfill_conversation_fts"),
     RunnerStep("_add_session_and_task_columns"),
+    Migration(SESSION_PROFILE_MIGRATION_ID, SESSION_PROFILE_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

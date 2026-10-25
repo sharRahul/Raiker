@@ -108,8 +108,6 @@
     font-size: var(--text-2xs);
     font-weight: 650;
     color: var(--text-3);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
     background: var(--sunken);
   }
   tbody tr:last-child th,

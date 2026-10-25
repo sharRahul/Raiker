@@ -103,7 +103,21 @@ describe("attentionItems", () => {
     });
     const titles = items.map((item) => item.title);
     expect(titles).toContain("Readiness checks are unmet");
-    expect(titles).toContain("2 required settings are unset");
+    // QUI-L11 — one card per unset setting, each keeping the runtime's words.
+    expect(titles).toContain("RAIKER_VAULT_KEY");
+    expect(titles).toContain("RAIKER_OWNER_TOKEN");
+  });
+
+  it("words a known gap the way Home does, with its fix and the runtime's sentence", () => {
+    const items = attentionItems({
+      ...EVERYTHING_FINE,
+      diagnostics: { ...HEALTHY_DIAGNOSTICS, missing_config: ["No model profile is selected."] },
+    });
+    const gap = items.find((item) => item.id === "missing-config:0");
+    expect(gap?.title).toBe("No default model is chosen");
+    expect(gap?.linkLabel).toBe("Choose a model");
+    expect(gap?.href).toBe("#/models");
+    expect(gap?.technical).toBe("No model profile is selected.");
   });
 
   // BUG-322 — a damaged index was named only inside Diagnostics' fold.

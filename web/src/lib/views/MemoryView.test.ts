@@ -199,7 +199,7 @@ describe("MemoryView", () => {
         vector_search_exact_limit: 128,
       },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     expect(await screen.findByText(/ranks 128 vectors exactly/i)).toBeInTheDocument();
   });
@@ -209,7 +209,7 @@ describe("MemoryView", () => {
       "GET /api/memory": [],
       "GET /api/memory/settings": { incognito: false, vector_search_strategy: "exact" },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     await screen.findByRole("heading", { name: /recall backend/i });
     expect(screen.queryByText(/vectors exactly/i)).toBeNull();
@@ -303,7 +303,7 @@ describe("MemoryView", () => {
       "GET /api/memory/settings": { incognito: false },
       "PUT /api/memory/incognito": { ok: true, incognito: true },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     await waitFor(() => expect(screen.getByRole("switch", { name: /incognito session/i })).toHaveAttribute("aria-checked", "false"));
     await fireEvent.click(screen.getByRole("switch", { name: /incognito session/i }));
@@ -325,7 +325,7 @@ describe("MemoryView", () => {
       "GET /api/memory/settings": { incognito: true, recall_mode: "search_when_relevant" },
       "PUT /api/memory/recall-mode": { ok: true, recall_mode: "brief" },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     const group = await screen.findByRole("radiogroup", { name: /recall mode/i });
     expect(within(group).getByRole("radio", { name: /search when relevant/i })).toHaveAttribute("aria-checked", "true");
@@ -436,17 +436,17 @@ describe("MemoryView", () => {
     );
 
     // Import and export are administration, not content: they sit under
-    // Recall & indexing now rather than beside the records they would rewrite.
+    // Controls now rather than beside the records they would rewrite.
     expect(screen.queryByText(/advanced memory management/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/memory export json/i)).not.toBeInTheDocument();
   });
 
-  it("keeps import and export under Recall & indexing", async () => {
+  it("keeps import and export under Controls", async () => {
     stubFetch({
       "GET /api/memory": [],
       "GET /api/memory/settings": { incognito: false },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     await waitFor(() =>
       expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument(),
@@ -504,7 +504,7 @@ describe("MemoryView import review (BUG-244)", () => {
         ],
       },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "a" }, { text: "already" }, { text: "c" }, { text: "a" }]);
@@ -542,7 +542,7 @@ describe("MemoryView import review (BUG-244)", () => {
         ],
       },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "a" }, { text: "b" }]);
@@ -606,7 +606,7 @@ describe("MemoryView import review (BUG-244)", () => {
       },
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
     await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
 
     await chooseFile([{ text: "keep" }, { text: "leave out" }, { text: "stored" }]);
@@ -832,7 +832,7 @@ describe("MemoryView observations (MEM-04)", () => {
         unindexed_memories: 4,
       },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     await waitFor(() =>
       expect(screen.getByText(/matches words, not meaning/i)).toBeInTheDocument(),
@@ -868,7 +868,7 @@ describe("MemoryView observations (MEM-04)", () => {
         unindexed_memories: 0,
       },
     });
-    render(MemoryView, { props: { tab: "recall" } });
+    render(MemoryView, { props: { tab: "controls" } });
 
     await waitFor(() =>
       expect(screen.getByText(/recall still matches words/i)).toBeInTheDocument(),

@@ -167,7 +167,7 @@
 {/if}
 
 <section class="settings-card">
-  <div class="card-heading"><h3>Profile</h3><p>Signed in as <strong>{status.username}</strong>. The username is fixed; the display name can change.</p></div>
+  <div class="card-heading"><h3>Profile</h3><p>Signed in as <strong>{status.username}</strong>; the username is fixed.</p></div>
   <label>
     <span>Display name</span>
     <small>Shown in greetings and account surfaces.</small>
@@ -196,18 +196,19 @@
       <p class="sub">The account ID could not be read just now.</p>
     {/if}
   </details>
+  <!-- QUI-L03 — one row of the account it removes; the confirmation opens in
+       a dialog. A card of its own drew a red box around a choice an owner
+       makes once. -->
+  <div class="delete-row">
+    <div>
+      <h3>Delete account</h3>
+      <small>Permanently removes this account and everything Raiker keeps for it.</small>
+    </div>
+    <button type="button" class="btn btn-danger btn-sm" onclick={beginDelete}>Delete my account</button>
+  </div>
 </section>
 
 <BackupsCard />
-
-<!-- QUI-L03 — one row; the confirmation opens in a dialog. -->
-<section class="settings-card delete-row">
-  <div class="card-heading">
-    <h3>Delete account</h3>
-    <p>Permanently removes this account and everything Raiker keeps for it.</p>
-  </div>
-  <button type="button" class="btn btn-danger" onclick={beginDelete}>Delete my account</button>
-</section>
 
 {#if confirmingDelete}
   <FormDialog title="Delete account" onclose={() => { if (!busy) confirmingDelete = false; }}>
@@ -272,7 +273,7 @@
 {/if}
 
 <style>
-  .section-heading { margin:var(--space-5) 0 var(--space-3); }
+  .section-heading { margin:var(--space-4) 0 var(--space-2); }
   .section-heading h2,.card-heading h3 { margin:0; }
   .card-heading p { color:var(--text-2); margin:.3rem 0 0; }
   .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--space-4) var(--card-pad-x); margin-bottom:var(--space-3); }
@@ -296,8 +297,12 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    border-color: var(--danger-border);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
   }
+  .delete-row h3 { margin: 0; font-size: var(--text-base); }
+  .delete-row small { color: var(--text-2); font-size: var(--text-sm); }
   /* QUI-L03 — a field is a row: its name and help on the left, the control on
      the right. */
   .settings-card label {

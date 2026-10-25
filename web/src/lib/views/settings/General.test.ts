@@ -46,7 +46,7 @@ it("says which language setting reaches a model", async () => {
   render(General, { settings: {}, save });
   const answer = screen.getByLabelText("Answer in");
   expect(answer).toHaveValue("");
-  expect(screen.getByText(/Every model turn is told this/)).toBeInTheDocument();
+  expect(screen.getByText(/Every turn is told this/)).toBeInTheDocument();
   await fireEvent.change(answer, { target: { value: "fr" } });
   expect(save).toHaveBeenCalledWith({ "general.answer_language": "fr" });
 });

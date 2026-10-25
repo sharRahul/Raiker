@@ -396,7 +396,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   await expect(mode).toBeVisible();
   await mode.click();
   await expect(page.getByRole("menu", { name: "Mode" })).toBeVisible();
-  for (const option of ["Plan", "Edit", "Auto"]) {
+  for (const option of ["Plan", "Suggest changes", "Run within limits"]) {
     await expect(page.getByRole("menuitemradio", { name: new RegExp(`^${option}`) })).toBeVisible();
   }
   await capture(page, join(SHOTS, "r0816b-08-build-composer-mode.png"));

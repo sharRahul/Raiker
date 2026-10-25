@@ -737,8 +737,6 @@
   .finding-severity {
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
     border: 1px solid var(--border);
     border-radius: var(--r-sm);
     padding: 0.02rem 0.3rem;

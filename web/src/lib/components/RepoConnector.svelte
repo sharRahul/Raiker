@@ -617,8 +617,6 @@
   .active-chip {
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
     color: var(--accent);
   }
   .code-map {

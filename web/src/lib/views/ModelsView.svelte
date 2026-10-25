@@ -1214,9 +1214,11 @@
       {#if inForce !== null}
         <ProviderLogo provider={inForce.provider} size={36} />
         <div class="profile-copy">
-          <p class="eyebrow">Model in use</p>
+          <!-- The heading names the model; what it is for is the first fact
+               under it rather than an eyebrow above it. -->
           <h2 id="profile-card-title">{modelName(inForce.model)}</h2>
           <p class="profile-facts">
+            <span>Model in use</span>
             <span>{providerName(inForce.provider)}</span>
             <span>{isChoosableModel(inForce) ? (readinessLabel(inForce.readiness_state) ?? "Set up") : "Not ready"}</span>
             <span>{inForce.off_machine ? `Sent to ${providerName(inForce.provider)}` : "Stays on this computer"}</span>
@@ -1244,7 +1246,6 @@
         </div>
       {:else}
         <div class="profile-copy">
-          <p class="eyebrow">Model in use</p>
           <h2 id="profile-card-title">No default model is chosen</h2>
           <p class="profile-tradeoff">
             Chat and Build need a model before they can answer. Add one that runs on this computer
@@ -2821,8 +2822,6 @@
   .gates dt {
     font-size: var(--text-xs);
     font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-3);
   }
   .gates dd {

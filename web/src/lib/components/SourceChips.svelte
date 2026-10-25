@@ -109,8 +109,6 @@
     margin: 0 0 0.3rem;
     font-size: var(--text-2xs);
     font-weight: 600;
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
     color: var(--text-3);
   }
   ul {

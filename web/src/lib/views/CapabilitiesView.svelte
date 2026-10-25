@@ -1307,8 +1307,6 @@
     gap: 0.4rem;
     font-size: var(--text-xs);
     font-weight: 650;
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
     color: var(--text-3);
     cursor: pointer;
   }
@@ -1363,8 +1361,6 @@
   .cap-reality {
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
     color: var(--text-3);
     border: 1px solid var(--border);
     border-radius: var(--r-sm);

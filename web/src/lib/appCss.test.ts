@@ -29,17 +29,24 @@ describe("subtle semantic palette", () => {
   it("pins the supplied roles and the accessible dark muted-text alias", () => {
     const light = themeTokens(":root[data-theme=\"light\"]");
     const dark = themeTokens(":root[data-theme=\"dark\"]");
-    expect(light).toMatchObject({ "--bg": "#F8FAFC", "--surface": "#FFFFFF", "--border": "#E2E8F0", "--text-1": "#0F172A", "--text-2": "#475569", "--ok": "#137333", "--ok-soft": "#E6F4EA", "--danger": "#C5221F", "--danger-soft": "#FCE8E6" });
-    expect(dark).toMatchObject({ "--bg": "#0B0D10", "--surface": "#12161F", "--border": "#1F242F", "--text-1": "#E2E8F0", "--palette-secondary": "#64748B", "--text-2": "#94A3B8", "--ok": "#A7F3D0", "--ok-soft": "#142E24", "--danger": "#FFEDD5", "--danger-soft": "#3E1F11" });
+        // QUI-V01 — the Quiet UI palette (08_BRAND_AND_VISUAL_SYSTEM.md).
+    expect(light).toMatchObject({ "--bg": "#F7F6F2", "--surface": "#FFFFFF", "--text-1": "#1C1C1A", "--text-2": "#686761", "--accent": "#2F6F8F", "--warn": "#8A6411", "--brand": "#B8871B", "--ok": "#2F7D5C", "--danger": "#B5453C" });
+    expect(dark).toMatchObject({ "--bg": "#121212", "--surface": "#1B1B1B", "--text-1": "#F4F1EA", "--text-2": "#B7B4AC", "--accent": "#78B7D5", "--warn": "#E0B64A", "--ok": "#62B68D", "--danger": "#E47B70" });
   });
 
   it("keeps normal muted and semantic state text at AA contrast", () => {
     for (const tokens of [themeTokens(":root[data-theme=\"light\"]"), themeTokens(":root[data-theme=\"dark\"]")]) {
-      for (const [foreground, background] of [["--text-2", "--surface"], ["--ok", "--ok-soft"], ["--danger", "--danger-soft"]] as const) {
+      for (const [foreground, background] of [["--text-2", "--surface"], ["--text-2", "--bg"], ["--text-2", "--sunken"], ["--accent", "--bg"], ["--ok", "--surface"], ["--ok", "--ok-soft"], ["--danger", "--danger-soft"]] as const) {
         expect(contrast(tokens[foreground], tokens[background])).toBeGreaterThanOrEqual(4.5);
       }
     }
-    expect(contrast("#64748B", "#12161F")).toBeLessThan(4.5);
+    // Dark soft fills are translucent; in light they are solid and checked.
+    const light = themeTokens(":root[data-theme=\"light\"]");
+    for (const [foreground, background] of [["--accent", "--accent-soft"], ["--warn", "--warn-soft"]] as const) {
+      expect(contrast(light[foreground], light[background])).toBeGreaterThanOrEqual(4.5);
+    }
+    // The light attention fill fails as text (2.98:1); it is for fills only.
+    expect(contrast("#B8871B", "#F7F6F2")).toBeLessThan(3);
   });
 });
 
@@ -158,7 +165,7 @@ describe("type scale", () => {
     expect(display / h1).toBeGreaterThan(1.15);
   });
 
-  it("uses Manrope for display type and does not retain a serif font policy", () => {
+  it("uses Inter for display type and does not retain a serif font policy", () => {
     const rule = /\.display,\s*h1\.display,\s*h2\.display\s*\{[^}]*font-family: var\(--font-sans\)/s;
     expect(stylesheet).toMatch(rule);
     expect(stylesheet).not.toContain("Source Serif");

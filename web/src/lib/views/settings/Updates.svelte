@@ -104,7 +104,7 @@
 
 <header class="section-heading"><h2>Updates</h2></header>
 <section class="settings-card" aria-label="Raiker updates">
-  <div class="card-heading"><span class="eyebrow">Application</span><h3>Signed updates</h3></div>
+  <div class="card-heading"><h3>Signed updates</h3></div>
   {#if update === null}
     <p class="description">Loading update status…</p>
   {:else}

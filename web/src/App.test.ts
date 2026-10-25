@@ -300,6 +300,32 @@ describe("App shell", () => {
     });
   });
 
+  // Quick Entry before sign-in — the small window says what is needed and
+  // opens the main window, rather than squeezing the lock screen into it.
+  it("asks Quick Entry to sign in first and opens the main window for it", async () => {
+    window.location.hash = "#/quick-entry";
+    const showMainWindow = vi.fn();
+    (window as unknown as { raikerDesktop: unknown }).raikerDesktop = {
+      bridgeVersion: 1,
+      platform: "linux",
+      onCommand: () => () => {},
+      setTitleBarColours: () => {},
+      focusWindow: () => {},
+      showMainWindow,
+    };
+    stubFetch({});
+    try {
+      render(App);
+      expect(await screen.findByText("Sign in to Raiker first.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Unlock Raiker" })).toBeNull();
+      await fireEvent.click(screen.getByRole("button", { name: "Open Raiker" }));
+      expect(showMainWindow).toHaveBeenCalledOnce();
+    } finally {
+      delete (window as unknown as { raikerDesktop?: unknown }).raikerDesktop;
+      window.location.hash = "";
+    }
+  });
+
   it("keeps the workspace locked when bootstrap fails after sign-in", async () => {
     stubFetch({ "POST /api/auth/login": BOOTSTRAP_ROUTES["POST /api/auth/login"] });
     render(App);

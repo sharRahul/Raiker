@@ -64,9 +64,9 @@ describe("ObserveView", () => {
       }),
     );
     render(ObserveView, { props: { tab: "overview" } });
-    const tile = (await screen.findByText("Closed capability gates")).closest("article.tile");
-    expect(tile).not.toBeNull();
-    expect(tile?.querySelector(".value")).toHaveTextContent("1");
+    // QUI-L11 — the count is a row under "What is working" now.
+    const row = (await screen.findByText("Permissions", { selector: "dt" })).closest("div");
+    expect(row).toHaveTextContent("1 turned off");
   });
 
   // The tile links to Permissions, and Permissions lists only capabilities that
@@ -86,9 +86,8 @@ describe("ObserveView", () => {
       }),
     );
     render(ObserveView, { props: { tab: "overview" } });
-    const tile = (await screen.findByText("Closed capability gates")).closest("article.tile");
-    expect(tile?.querySelector(".value")).toHaveTextContent("1");
-    expect(tile).toHaveTextContent("2 more have no executor and stay closed.");
+    const row = (await screen.findByText("Permissions", { selector: "dt" })).closest("div");
+    expect(row).toHaveTextContent("1 turned off · 2 with no executor");
   });
 
   it("shows a loading state while the runtime status is read", async () => {
@@ -114,23 +113,22 @@ describe("ObserveView", () => {
     // state. The page used to open with seven tiles reading Ready and 0 on any
     // working install, which made the one that mattered exactly as easy to
     // miss as the six that did not.
-    await waitFor(() => expect(screen.getByText("Needs your attention")).toBeInTheDocument());
+    // QUI-L11 — "What needs attention" leads; healthy systems, changes and
+    // sharing are folded below it.
+    await waitFor(() => expect(screen.getByText("What needs attention")).toBeInTheDocument());
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(headings[0]).toBe("Needs your attention");
+    expect(headings[0]).toBe("What needs attention");
 
-    expect(screen.getByText("Is Raiker ready?")).toBeInTheDocument();
-    expect(screen.getByText("Is anything waiting for me?")).toBeInTheDocument();
-    expect(screen.getByText("What changed?")).toBeInTheDocument();
-    expect(screen.getByText("Can I safely share this?")).toBeInTheDocument();
+    expect(screen.getByText("What is working")).toBeInTheDocument();
+    expect(screen.getByText("What changed")).toBeInTheDocument();
+    expect(screen.getByText("Share or export")).toBeInTheDocument();
     // Diagnostics was a seventh tab reading this same object and restating four
     // of its six cards from it. Its unique half is on this page — as a
     // disclosure now, because on a healthy install it has nothing to say and
     // what it does have is already named in the attention list above.
     expect(screen.getByText("Health, in detail")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /open diagnostics/i })).toBeNull();
-    expect(screen.getByRole("link", { name: /open the decision queue/i }).getAttribute("href")).toBe(
-      "#/approvals",
-    );
+    expect(screen.getByRole("link", { name: "Approvals" }).getAttribute("href")).toBe("#/approvals");
   });
 
   it("counts pending and expired approvals separately", async () => {
@@ -144,12 +142,10 @@ describe("ObserveView", () => {
     );
     render(ObserveView, { props: { tab: "overview" } });
 
-    await waitFor(() => expect(screen.getByText("Pending approvals")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("1 approval expired")).toBeInTheDocument());
     // REM-OBSERVE — an expired approval is a different job from a live one, so
-    // it is its own row in the attention list as well as its own tile. Both
-    // carry the same sentence, which is why this asserts on the list rather
-    // than on the page.
-    const attention = screen.getByRole("list", { name: undefined }).closest("section");
+    // it is its own card in the attention list.
+    const attention = screen.getByText("1 approval expired").closest("section");
     expect(attention?.textContent).toContain("1 approval expired");
     expect(attention?.textContent).toContain("1 decision waiting on you");
     expect(screen.getAllByText(/these can no longer be approved/i).length).toBeGreaterThan(0);
@@ -347,7 +343,7 @@ describe("ObserveView", () => {
   it("hosts the rewind timeline as a tab rather than a separate destination", async () => {
     stubFetch({ ...routes(), "GET /api/checkpoints": [] });
     render(ObserveView, { props: { tab: "checkpoints" } });
-    expect(await screen.findByRole("tab", { name: "Checkpoints" })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: "Recovery" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

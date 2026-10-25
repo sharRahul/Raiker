@@ -3,6 +3,7 @@
   import { auth, createInstance, health, ApiError } from "../api";
   import type { RecoveryRestored } from "../generated/apiContract";
   import Icon from "../components/Icon.svelte";
+  import Logo from "../components/Logo.svelte";
   import ThemeToggle from "../components/ThemeToggle.svelte";
   import LockScreenRecovery from "../components/LockScreenRecovery.svelte";
 
@@ -291,28 +292,22 @@
 <div class="lock-screen">
   <header class="lock-header">
     <span class="brand">
-      <span class="brand-mark" role="img" aria-label="Raiker"></span>
-      <span>RAIKER</span>
+      <Logo size={28} label="" />
+      <span>raiker</span>
     </span>
     <ThemeToggle />
   </header>
 
   <main id="main" class="lock-layout" aria-busy={isVerifying} tabindex="-1">
     <section class="hero">
-      <!-- The Raiker governed core: the production rendered icon. Light theme
-           shows the floating orb framed by decorative orbit rings; dark theme
-           shows the light-tiled icon (self-contained, so the rings are hidden).
-           The Γ_ prompt eye is part of the render. -->
+      <!-- QUI-V03 / QUI-V04 — the open ring, drawn at size. The eye-orb render
+           and the orbit rings around it are gone: the mark stands on its own. -->
       <div class="core">
-        <span class="orbit orbit-1" aria-hidden="true"></span>
-        <span class="orbit orbit-2" aria-hidden="true"></span>
-        <span class="orbit orbit-3" aria-hidden="true"></span>
-        <span class="core-img" role="img" aria-label="Raiker"></span>
+        <Logo size={168} />
       </div>
       <div class="hero-message" aria-live="polite">
         {#if hero}
           <h2 class="hero-title">{hero.title}</h2>
-          <span class="hero-divider" aria-hidden="true"></span>
           <p class="hero-sub">{hero.sub}</p>
         {/if}
       </div>
@@ -569,9 +564,9 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background:
-      radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 30rem),
-      linear-gradient(135deg, var(--surface), var(--bg));
+    /* Flat canvas: the open ring is the one figure on this screen, and a glow
+       behind it was decoration (QUI-V03). */
+    background: var(--bg);
     color: var(--text-1);
     padding: clamp(1rem, 3vw, 2rem);
   }
@@ -584,24 +579,9 @@
     display: inline-flex;
     align-items: center;
     gap: 0.85rem;
-    font-weight: 800;
-    letter-spacing: 0.45em;
-  }
-  .brand-mark {
-    width: 44px;
-    height: 44px;
-    background: center / contain no-repeat url("/raiker-mark.png?v=20260714");
-  }
-  :global(:root[data-theme="dark"]) .brand-mark {
-    background-image: url("/raiker-mark-dark.png?v=20260714");
-  }
-  :global(:root[data-theme="light"]) .brand-mark {
-    background-image: url("/raiker-mark.png?v=20260714");
-  }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme])) .brand-mark {
-      background-image: url("/raiker-mark-dark.png?v=20260714");
-    }
+    font-weight: 650;
+    font-size: var(--text-lg);
+    letter-spacing: -0.01em;
   }
   .lock-layout {
     flex: 1;
@@ -618,57 +598,9 @@
     text-align: center;
   }
   .core {
-    position: relative;
-    width: min(26rem, 66vw);
-    aspect-ratio: 1;
-    margin: 0 auto var(--space-5);
     display: grid;
     place-items: center;
-  }
-  .core-img {
-    position: relative;
-    z-index: 1;
-    width: 86%;
-    aspect-ratio: 1;
-    display: block;
-    background: center / contain no-repeat url("/raiker-hero.png?v=20260714");
-    filter: drop-shadow(0 1.4rem 2rem rgb(6 14 26 / 0.28));
-  }
-  /* Dark theme: the chrome/silver render, which pops on a dark surface. */
-  :global(:root[data-theme="dark"]) .core-img {
-    background-image: url("/raiker-hero-dark.png?v=20260714");
-    filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
-  }
-  :global(:root[data-theme="light"]) .core-img {
-    background-image: url("/raiker-hero.png?v=20260714");
-  }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme])) .core-img {
-      background-image: url("/raiker-hero-dark.png?v=20260714");
-      filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
-    }
-  }
-  /* Decorative concentric orbit rings behind the core (mockup styling). */
-  .orbit {
-    position: absolute;
-    border-radius: 50%;
-    border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
-    opacity: 0.5;
-  }
-  .orbit-1 {
-    width: 100%;
-    height: 100%;
-  }
-  .orbit-2 {
-    width: 78%;
-    height: 78%;
-    border-style: dashed;
-    opacity: 0.35;
-  }
-  .orbit-3 {
-    width: 122%;
-    height: 122%;
-    opacity: 0.28;
+    margin: 0 auto var(--space-6);
   }
   .hero-message {
     min-height: 5.5rem;
@@ -678,44 +610,22 @@
     font-weight: 800;
     margin: 0;
   }
-  .hero-divider {
-    display: block;
-    width: 3.5rem;
-    height: 3px;
-    border-radius: 999px;
-    background: var(--accent);
-    margin: var(--space-3) auto;
-  }
   .hero-sub {
     color: var(--text-2);
     font-size: clamp(1.05rem, 2vw, 1.3rem);
     margin: 0;
   }
   .panel {
-    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 1.5rem;
+    border-radius: var(--r-lg);
     padding: clamp(1.25rem, 4vw, 2.4rem);
     box-shadow: var(--shadow-2);
-    backdrop-filter: blur(18px);
   }
   .panel h1 {
     text-align: center;
     font-size: clamp(1.7rem, 4vw, 2.1rem);
     margin: 0 0 var(--space-3);
-    position: relative;
-    padding-bottom: var(--space-3);
-  }
-  .panel h1::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 0;
-    transform: translateX(-50%);
-    width: 3rem;
-    height: 3px;
-    border-radius: 999px;
-    background: var(--accent);
   }
   .intro {
     color: var(--text-2);
@@ -913,8 +823,6 @@
   }
   .status-label {
     font-size: var(--text-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--text-3);
   }
   .status-value {

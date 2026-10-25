@@ -29,6 +29,7 @@
 
 import type { ApprovalView, Diagnostics, SecurityHealth } from "./apiTypes";
 import { formatBytes } from "./projectLifecycle";
+import { KNOWN_GAPS } from "./readinessGaps";
 
 /** Raised on `window` when a repair on the Overview changed what it reports. */
 export const RUNTIME_HEALTH_CHANGED = "raiker:runtime-health-changed";
@@ -51,6 +52,11 @@ export interface AttentionItem {
   detail: string;
   href: string;
   linkLabel: string;
+  /**
+   * QUI-L11 — what the runtime itself reported, for the card's *Technical
+   * details*. Absent when the title already is the runtime's own words.
+   */
+  technical?: string;
 }
 
 /** Read first to last. Containment before anything, unknown before nothing. */
@@ -91,6 +97,7 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
       detail: `${signal.source} raised this for ${signal.subject_id} and it has not recovered.`,
       href: "#/settings?tab=security",
       linkLabel: "Review security",
+      technical: `${signal.source} · ${signal.code} · ${signal.subject_id}`,
     });
   }
   if (inputs.security === null) {
@@ -140,6 +147,7 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
           : "Searches through it fail until it is rebuilt. Rebuilding recomputes it from your conversations, memories and files, which are untouched.",
         href: SEARCH_INDEX_REPAIR,
         linkLabel: vectors ? "Remove damaged vectors" : "Rebuild it",
+        technical: `${index.index_name}: ${index.state}${index.damaged_count ? ` (${index.damaged_count} damaged)` : ""}`,
       });
     }
     // DEC-24 step 1 — the scheduler's queue. A running host claims due work
@@ -203,18 +211,23 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         linkLabel: "See runtime health",
       });
     }
-    if (inputs.diagnostics.missing_config.length > 0) {
+    // QUI-L11 — one card per unset setting, in the words Home uses and with
+    // the fix that settles it; the runtime's own sentence stays in the card's
+    // technical details.
+    inputs.diagnostics.missing_config.forEach((sentence, index) => {
+      const known = KNOWN_GAPS[sentence];
       items.push({
-        id: "missing-config",
+        id: `missing-config:${index}`,
         tone: "blocking",
-        title: `${inputs.diagnostics.missing_config.length} required setting${
-          inputs.diagnostics.missing_config.length === 1 ? " is" : "s are"
-        } unset`,
-        detail: inputs.diagnostics.missing_config.join(", "),
-        href: "#/settings",
-        linkLabel: "Open settings",
+        title: known?.title.replace(/\.$/, "") ?? sentence,
+        detail: known
+          ? "Tasks, goals and conversations that have no model of their own cannot run until it is set."
+          : "Work that needs this setting fails closed until it is set.",
+        href: known?.action.href ?? "#/settings",
+        linkLabel: known?.action.label ?? "Open settings",
+        technical: sentence,
       });
-    }
+    });
   }
 
   // 3. Decisions the owner owes. Expired first: an expired request cannot be

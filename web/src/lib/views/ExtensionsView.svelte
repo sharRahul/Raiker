@@ -636,8 +636,6 @@
   .hook-scope {
     font-size: var(--text-2xs);
     font-weight: 750;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
     color: var(--text-3);
   }
   /* A plugin rule carries the plugin's name where the other rules carry a scope

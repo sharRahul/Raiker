@@ -27,7 +27,28 @@
   import { familyIcon, type ToolCallRow } from "../chatPresentation";
   import { navItem } from "../nav";
 
-  let { rows }: { rows: ToolCallRow[] } = $props();
+  let {
+    rows,
+    expiredActions = new Set<string>(),
+  }: {
+    rows: ToolCallRow[];
+    /**
+     * Calls whose approval expired with no decision. Their row stops reading
+     * "waiting for your decision" the moment the Safety card below it says
+     * *Not done: no decision* (found live, RT-QUI-31).
+     */
+    expiredActions?: ReadonlySet<string>;
+  } = $props();
+  const shown = $derived(
+    rows.map((row) =>
+      // Waiting in a live tab, or already settled as failed on a reopened
+      // conversation (the host's sweep settles the call's row): either way
+      // the reason is that nobody decided.
+      (row.state === "waiting" || row.state === "failed") && expiredActions.has(row.actionId)
+        ? { ...row, state: "failed" as const, reasons: ["no decision"], expired: true }
+        : { ...row, expired: false },
+    ),
+  );
 
   const STATE_LABEL: Record<ToolCallRow["state"], string> = {
     running: "running",
@@ -50,7 +71,7 @@
 
 {#if rows.length > 0}
   <ul class="tool-activity" aria-label="What Raiker did in this turn">
-    {#each rows as row (row.actionId)}
+    {#each shown as row (row.actionId)}
       <li class="tool-row" data-state={row.state} data-family={row.family}>
         <span class="tool-glyph" aria-hidden="true">
           {#if row.state === "running"}
@@ -86,7 +107,7 @@
         {/if}
         {#if row.state === "failed" || row.state === "denied" || row.state === "refused"}
           <span class="tool-reason">
-            {row.state === "refused" ? "refused" : row.state === "denied" ? "not permitted" : "failed"}{row
+            {row.expired ? "not done" : row.state === "refused" ? "refused" : row.state === "denied" ? "not permitted" : "failed"}{row
               .reasons.length > 0
               ? ` — ${row.reasons.join(", ")}`
               : ""}

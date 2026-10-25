@@ -324,7 +324,7 @@
   .state-pill.tone-danger { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
   .detail, .quiet, .foot { margin: 0; color: var(--text-2); font-size: var(--text-sm); }
   .foot { color: var(--text-3); font-size: var(--text-xs); }
-  .work h4, .build h4 { margin: 0 0 0.35rem; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+  .work h4, .build h4 { margin: 0 0 0.35rem; font-size: var(--text-xs); color: var(--text-3); }
   .build { display: grid; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: var(--space-3); }
   .build dd { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
   .build-version { font-size: var(--text-xs); color: var(--text-2); }

@@ -388,7 +388,7 @@ describe("Build composer modes", () => {
     await renderBuildWithProject();
 
     expect(await screen.findByRole("button", {
-      name: "How much Raiker may do this turn: Auto",
+      name: "How much Raiker may do this turn: Run within limits",
     })).toBeInTheDocument();
 
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
@@ -503,9 +503,9 @@ describe("Build composer modes", () => {
     const fetchMock = stubFetch(baseRoutes());
     await renderBuildWithProject();
 
-    await pickMode("Auto");
+    await pickMode("Run within limits");
 
-    expect(modeTrigger()).toHaveAccessibleName("How much Raiker may do this turn: Auto");
+    expect(modeTrigger()).toHaveAccessibleName("How much Raiker may do this turn: Run within limits");
     expect(
       fetchMock.mock.calls.map(([url]) => String(url)).filter((u) => u.includes("/api/capability-modes/")),
     ).toEqual([]);
@@ -517,7 +517,7 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes({ "GET /api/capability-gates": gates("ask") }));
     await renderBuildWithProject();
 
-    await pickMode("Auto");
+    await pickMode("Run within limits");
 
     expect(await screen.findByText(/still be proposed/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /change in permissions/i })).toBeInTheDocument();
@@ -527,7 +527,7 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes({ "GET /api/capability-gates": undefined }));
     await renderBuildWithProject();
 
-    await pickMode("Auto");
+    await pickMode("Run within limits");
 
     expect(await screen.findByText(/could not read your standing permissions/i)).toBeInTheDocument();
   });
@@ -572,7 +572,7 @@ describe("Build composer modes", () => {
     respondWith("Done.");
     await renderBuildWithProject();
 
-    await pickMode("Auto");
+    await pickMode("Run within limits");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });

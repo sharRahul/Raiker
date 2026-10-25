@@ -174,7 +174,7 @@ describe("CheckpointsView restore preflight", () => {
     expect(await screen.findByText("notes/brief.md")).toBeInTheDocument();
     expect(screen.getByText(/puts every workspace file changed after this point back as it was/i)).toBeInTheDocument();
     expect(screen.getByText(/computed from stored metadata and changed nothing/i)).toBeInTheDocument();
-    expect(screen.getByText(/this panel never performs a rewind/i)).toBeInTheDocument();
+    expect(screen.getByText(/this panel never performs a restore/i)).toBeInTheDocument();
   });
 
   it("names a cross-principal escalation before anything is requested", async () => {
@@ -205,7 +205,7 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
 
     expect(await screen.findByText(/confirm you have read the impact/i)).toBeInTheDocument();
-    const request = screen.getByRole("button", { name: /request this rewind/i });
+    const request = screen.getByRole("button", { name: /ask to restore/i });
     expect(request).toBeDisabled();
     await fireEvent.click(screen.getByRole("checkbox"));
     expect(request).toBeEnabled();
@@ -235,7 +235,7 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
     await screen.findByText(/confirm you have read the impact/i);
     await fireEvent.click(screen.getByRole("checkbox"));
-    await fireEvent.click(screen.getByRole("button", { name: /request this rewind/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /ask to restore/i }));
 
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/raised as approval/i);
@@ -273,8 +273,8 @@ describe("CheckpointsView restore preflight", () => {
     );
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
 
-    expect(await screen.findByText(/a rewind would change nothing/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /request this rewind/i })).toBeNull();
+    expect(await screen.findByText(/a restore would change nothing/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ask to restore/i })).toBeNull();
     expect(screen.queryByText(/before you ask for this/i)).toBeNull();
   });
 });

@@ -116,8 +116,6 @@
     font: inherit;
     font-size: var(--text-sm);
     font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
     cursor: pointer;
     padding: 0;
   }

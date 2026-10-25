@@ -168,6 +168,10 @@ EVENT_TYPES = {
     "owner_question_answered",
     "approval_received",
     "approval_denied",
+    # An ordinary approval's time limit ran out with no decision, and the host
+    # sweep settled it to `expired` (ids and the tool name only). Its critical
+    # counterpart is `critical_approval_expired`.
+    "approval_expired",
     # BUG-271 — the reviewer corrected the proposed change rather than taking it
     # or refusing it. Two records, not one: the original is `approval_denied`
     # like any other refusal, and this says what took its place, so a reader of

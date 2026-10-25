@@ -776,8 +776,6 @@
     color: var(--text-2);
     font-family: var(--font-mono, monospace);
     font-size: var(--text-xs);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
   .posture-detail { margin-bottom: 0; }
   @media (max-width: 560px) {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ShowMore from "../components/ShowMore.svelte";
+  import { PAGE_SIZE, page } from "../pagination";
   import WorkMeta from "../components/WorkMeta.svelte";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
@@ -145,6 +147,7 @@
   const activeProjects = $derived((list?.projects ?? []).filter((p) => !p.is_archived));
   const archivedProjects = $derived((list?.projects ?? []).filter((p) => p.is_archived));
   const shownProjects = $derived(listView === "active" ? activeProjects : archivedProjects);
+  let shownCount = $state(PAGE_SIZE);
   const currentProject = $derived(
     activeProjects.find((p) => p.project_id === currentProjectId) ?? null,
   );
@@ -708,7 +711,7 @@
       </div>
     {/if}
     <div class="card-grid project-grid">
-      {#each shownProjects as p (p.project_id)}
+      {#each page(shownProjects, shownCount) as p (p.project_id)}
         <article
           class="card card-interactive project"
           class:current={p.project_id === currentProjectId && !p.is_archived}
@@ -820,6 +823,7 @@
         </article>
       {/each}
     </div>
+    <ShowMore total={shownProjects.length} shown={Math.min(shownCount, shownProjects.length)} noun="projects" onmore={() => (shownCount += PAGE_SIZE)} />
 
     {#if dropError}
       <p class="error" role="alert">{dropError}</p>
@@ -1336,7 +1340,7 @@
     border-top: 1px solid var(--border);
   }
   .section-counts div { display: grid; gap: 0.1rem; }
-  .section-counts dt { color: var(--text-3); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+  .section-counts dt { color: var(--text-3); font-size: var(--text-xs); }
   .section-counts dd { margin: 0; color: var(--text-1); font-size: var(--text-lg); }
   .unsaved { margin-top: var(--space-3); }
   .detail-head {
@@ -1435,7 +1439,7 @@
     gap: var(--space-2);
   }
   .provenance li {
-    border-left: 2px solid var(--accent-border);
+    border: 1px solid var(--accent-border);
     padding-left: 0.55rem;
   }
   .prov-head {

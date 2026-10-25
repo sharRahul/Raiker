@@ -5,11 +5,11 @@
  * already Raiker, and its fonts, so nothing is fetched to draw it.
  */
 @font-face {
-  font-family: "Manrope";
+  font-family: "Inter";
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: block;
-  src: url("fonts/manrope-latin.woff2") format("woff2");
+  src: url("fonts/inter-latin.woff2") format("woff2");
 }
 @font-face {
   font-family: "JetBrains Mono";
@@ -20,49 +20,49 @@
 }
 :root {
   color-scheme: light;
-  --bg: #f8fafc;
+  --bg: #f7f6f2;
   --surface: #ffffff;
-  --surface-2: #f1f5f9;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --text-1: #0f172a;
-  --text-2: #475569;
-  --text-3: #64748b;
-  --accent: #365f7d;
-  --accent-strong: #294a63;
-  --accent-soft: #e8f0f5;
-  --brand: #ecd06f;
-  --brand-strong: #c9a63d;
-  --ok: #1a7f4b;
-  --warn: #a15c07;
-  --danger: #b42318;
+  --surface-2: #efeee9;
+  --border: #e4e2da;
+  --border-strong: #cfccc2;
+  --text-1: #1c1c1a;
+  --text-2: #686761;
+  --text-3: #686761;
+  --accent: #2f6f8f;
+  --accent-strong: #245a75;
+  --accent-soft: #e8f1f5;
+  --brand: #b8871b;
+  --brand-strong: #8a6411;
+  --ok: #2f7d5c;
+  --warn: #8a6411;
+  --danger: #b5453c;
   --danger-soft: #fef3f2;
-  --glow-a: rgba(236, 208, 111, 0.28);
-  --glow-b: rgba(54, 95, 125, 0.16);
+  --glow-a: transparent;
+  --glow-b: transparent;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
-  --font: Manrope, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #0b0d10;
-    --surface: #12161f;
-    --surface-2: #171c27;
-    --border: #1f242f;
-    --border-strong: #2c3443;
-    --text-1: #e2e8f0;
-    --text-2: #94a3b8;
-    --text-3: #7c8aa0;
-    --accent: #91b4cd;
-    --accent-strong: #b5cfe1;
-    --accent-soft: #16222d;
-    --ok: #4fc58a;
-    --warn: #f0b955;
-    --danger: #f97066;
+    --bg: #121212;
+    --surface: #1b1b1b;
+    --surface-2: #222222;
+    --border: #2a2a2a;
+    --border-strong: #3b3b3b;
+    --text-1: #f4f1ea;
+    --text-2: #b7b4ac;
+    --text-3: #b7b4ac;
+    --accent: #78b7d5;
+    --accent-strong: #a3cfe4;
+    --accent-soft: #1c2a31;
+    --ok: #62b68d;
+    --warn: #e0b64a;
+    --danger: #e47b70;
     --danger-soft: #2a1414;
-    --glow-a: rgba(236, 208, 111, 0.12);
-    --glow-b: rgba(145, 180, 205, 0.1);
+    --glow-a: transparent;
+    --glow-b: transparent;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.35);
   }
 }

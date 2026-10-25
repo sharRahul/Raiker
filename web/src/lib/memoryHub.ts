@@ -13,7 +13,7 @@
  * the counts on the Overview and the counts on each tab cannot disagree.
  */
 
-export const MEMORY_TABS = ["overview", "memories", "suggestions", "sources", "recall", "controls", "map"] as const;
+export const MEMORY_TABS = ["overview", "memories", "suggestions", "sources", "controls", "map"] as const;
 export type MemoryTab = (typeof MEMORY_TABS)[number];
 
 export const MEMORY_TAB_LABELS: Record<MemoryTab, string> = {
@@ -21,8 +21,8 @@ export const MEMORY_TAB_LABELS: Record<MemoryTab, string> = {
   memories: "Memories",
   suggestions: "Suggestions",
   sources: "Sources",
-  recall: "Recall & indexing",
-  // QUI-F09 — what Raiker learned to do and the approvals given, each with Undo.
+  // QUI-F09 — what Raiker learned to do and the approvals given, each with Undo;
+  // QUI-L12 — and recall and indexing, which were a tab of their own.
   controls: "Controls",
   // The Knowledge Map, which was its own page (Quiet UI).
   map: "Map",
@@ -103,7 +103,7 @@ export function tabFor(kind: "memory" | "proposal" | "observation" | "document" 
     case "document":
       return "sources";
     case "setting":
-      return "recall";
+      return "controls";
     default:
       return "memories";
   }

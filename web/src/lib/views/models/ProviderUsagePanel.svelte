@@ -349,7 +349,7 @@
   .usage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-3); }
   .usage-heading h2 { margin: .15rem 0 .35rem; font-size: var(--text-base); }
   .usage-heading p { margin: 0; color: var(--text-2); max-width: 68ch; font-size: var(--text-sm); }
-  .eyebrow { color: var(--accent) !important; font-size: var(--text-2xs) !important; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+  .eyebrow { color: var(--accent) !important; font-size: var(--text-2xs) !important; font-weight: 750; }
   .usage-list { display: grid; gap: var(--space-3); }
   .usage-row { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
   .usage-row > header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--border); }
@@ -359,7 +359,7 @@
   .source-pair { display: grid; grid-template-columns: 1fr 1fr; }
   .source { padding: var(--space-3); min-width: 0; }
   .source + .source { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--sunken) 55%, transparent); }
-  .source-label { margin: 0 0 .45rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+  .source-label { margin: 0 0 .45rem; color: var(--text-3); font-size: var(--text-2xs); font-weight: 750; }
   .source > strong { font-size: var(--text-xl); letter-spacing: -.02em; }
   .source > p:not(.source-label) { margin: .25rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
   .cost { color: var(--text-1) !important; font-weight: 650; }

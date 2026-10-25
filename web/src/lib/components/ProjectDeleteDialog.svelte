@@ -314,7 +314,7 @@
   .irreversible {
     margin: 0;
     padding-left: 0.6rem;
-    border-left: 3px solid var(--danger);
+    border: 1px solid var(--danger-border);
     color: var(--text-2);
     font-size: var(--text-sm);
   }

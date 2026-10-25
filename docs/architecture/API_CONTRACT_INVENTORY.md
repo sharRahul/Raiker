@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**468 operations: 454 verified, 0 eligible, 0 deferred, 14 special.**
+**469 operations: 455 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -422,6 +422,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/sessions/{session_id}/export/manifest` |  | TranscriptManifest | verified | declared TranscriptManifest |
 | PUT | `/api/sessions/{session_id}/pin` | SetSessionPinnedRequest | SessionPinned | verified | declared SessionPinned |
 | GET | `/api/sessions/{session_id}/plan` |  | AgentPlan | verified | declared AgentPlan |
+| PUT | `/api/sessions/{session_id}/profile` | SetSessionProfileRequest | SessionProfileSet | verified | declared SessionProfileSet |
 | PUT | `/api/sessions/{session_id}/project` | SetSessionProjectRequest | SessionProjectSet | verified | declared SessionProjectSet |
 | GET | `/api/sessions/{session_id}/recall` |  | SessionRecall | verified | declared SessionRecall |
 | PUT | `/api/sessions/{session_id}/rename` | RenameSessionRequest | SessionRenamed | verified | declared SessionRenamed |

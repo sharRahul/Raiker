@@ -167,8 +167,6 @@
     color: var(--text-3);
     font-size: var(--text-2xs);
     font-weight: 750;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
   .search {
     min-height: 30px;

@@ -297,7 +297,7 @@
   .card { margin-bottom: var(--space-4); }
   .card h3 { margin: 0 0 0.3rem; font-size: var(--text-lg); }
   .lead, .empty { color: var(--text-2); font-size: var(--text-sm); margin: 0 0 var(--space-3); }
-  .guard { border-left: 3px solid var(--accent); }
+  .guard { border: 1px solid var(--accent-border); }
   .guard strong { display: block; margin-bottom: 0.25rem; }
   .guard p { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
   .guard-grant { margin-top: 0.35rem !important; color: var(--text-3) !important; }
@@ -308,8 +308,7 @@
     cursor: pointer; font-size: var(--text-lg); font-weight: 600;
   }
   .fixed-card[open] summary { margin-bottom: var(--space-3); }
-  .read-only { color: var(--text-3); font-size: var(--text-xs); font-weight: 400;
-    text-transform: uppercase; letter-spacing: 0.04em; }
+  .read-only { color: var(--text-3); font-size: var(--text-xs); font-weight: 400; }
   .remedy { color: var(--text-2); font-size: var(--text-sm); margin: 0.2rem 0 0; }
   /* FIXED-416 — a wrapping flex row, not a `1fr 1fr auto` grid: a `1fr` track
      will not shrink below its content's minimum, and an `<input>` defaults to
@@ -333,7 +332,7 @@
   .probe.blocked > p:first-child { color: var(--danger); }
   .probe .why { color: var(--text-2); }
   .addresses { color: var(--text-2); font-family: var(--font-mono); font-size: var(--text-xs); }
-  .source { color: var(--text-3); font-size: var(--text-xs); margin: var(--space-3) 0 0; text-transform: uppercase; letter-spacing: 0.04em; }
+  .source { color: var(--text-3); font-size: var(--text-xs); margin: var(--space-3) 0 0; }
   .fixed li { color: var(--text-2); font-size: var(--text-sm); }
   @media (max-width: 40rem) { .add-row { grid-template-columns: 1fr; } }
 </style>

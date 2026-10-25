@@ -3,7 +3,7 @@
  * text, Copy and CSV all use. The wording matches the runtime's `as_text`.
  */
 import { describe, expect, it } from "vitest";
-import { blockCount, blockFilename, blockGrid, blockText, figure, toCsv } from "./answerBlocks";
+import { blockCount, blockFilename, blockGrid, blockText, figure, holdBackBlocks, toCsv } from "./answerBlocks";
 import { part } from "./test-helpers";
 
 describe("figure", () => {
@@ -58,5 +58,25 @@ describe("currency units", () => {
     expect(figure(999, "£")).toBe("£999");
     expect(figure(-5, "$")).toBe("-$5");
     expect(figure(18, "h")).toBe("18 h");
+  });
+});
+
+describe("holdBackBlocks — a streaming answer's raiker: fences", () => {
+  it("replaces a finished block with the line naming it, and keeps the prose", () => {
+    const text = 'Here are the numbers.\n```raiker:figures\n{"items": []}\n```\nThat is all.';
+    expect(holdBackBlocks(text)).toBe("Here are the numbers.\n*Preparing key figures…*\nThat is all.");
+  });
+
+  it("holds back a fence that is still open", () => {
+    expect(holdBackBlocks('Compare:\n```raiker:compare\n{"items": [')).toBe("Compare:\n*Preparing a comparison…*");
+  });
+
+  it("closes a block whose JSON ends on the fence line", () => {
+    expect(holdBackBlocks('```raiker:chart {"kind":"bar"}```\nAfter.')).toBe("*Preparing a chart…*\nAfter.");
+  });
+
+  it("leaves an ordinary code sample alone", () => {
+    const text = "```python\nprint(1)\n```";
+    expect(holdBackBlocks(text)).toBe(text);
   });
 });

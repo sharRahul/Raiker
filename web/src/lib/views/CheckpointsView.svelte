@@ -109,7 +109,7 @@
   <PageState state="loading" title="Loading checkpoints…" />
 {:else if groups.length === 0}
   <div class="card">
-    <EmptyState icon="checkpoints" title="No checkpoints" body="Raiker records a point you can rewind to each time it changes a file.">
+    <EmptyState icon="checkpoints" title="Nothing to recover" body="Raiker records a point you can restore to each time it changes a file.">
       {#snippet action()}
         <a class="btn btn-primary" href="#/build">Open Build</a>
       {/snippet}
@@ -152,9 +152,9 @@
                 type="button"
                 class="btn btn-sm preflight-btn"
                 onclick={() => (planFor = cp)}
-                aria-label={`Preview what rewinding to checkpoint ${shortId(cp.checkpoint_id)} would change`}
+                aria-label={`Preview what restoring checkpoint ${shortId(cp.checkpoint_id)} would change`}
               >
-                Preview rewind
+                Preview restore
               </button>
             </div>
           </li>
@@ -167,6 +167,7 @@
 <RewindPanel
   checkpointId={planFor?.checkpoint_id ?? null}
   subtitle={planFor ? `Checkpoint ${shortId(planFor.checkpoint_id)}` : null}
+  source={planFor ? `${humanize(planFor.checkpoint_type)} · ${relativeTime(planFor.created_at)}` : null}
   onclose={() => (planFor = null)}
   scrollIntoViewOnOpen
 />
@@ -269,8 +270,6 @@
   .context dt {
     font-size: var(--text-2xs);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-3);
   }
   .context dd {

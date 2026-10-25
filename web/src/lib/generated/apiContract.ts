@@ -5473,6 +5473,12 @@ export type SessionPinned = {
   pinned: boolean;
 };
 
+export type SessionProfileSet = {
+  ok: boolean;
+  session_id: string;
+  profile: string;
+};
+
 export type SessionProjectSet = {
   ok: boolean;
   session_id: string;
@@ -5520,6 +5526,7 @@ export type SessionView = {
   archived: boolean;
   archived_at: string | null;
   origin: string;
+  conversation_profile: string;
 };
 
 export type SessionsDeleted = {
@@ -5556,6 +5563,10 @@ export type SetModelSelectionRequest = {
 
 export type SetSessionPinnedRequest = {
   pinned: boolean;
+};
+
+export type SetSessionProfileRequest = {
+  profile: "careful" | "standard";
 };
 
 export type SetSessionProjectRequest = {
@@ -7304,6 +7315,8 @@ export const contract = {
     call<SessionPinned>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/pin`, { body }),
   getSessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
+  setSessionProfile: (sessionId: string, body: SetSessionProfileRequest) =>
+    call<SessionProfileSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/profile`, { body }),
   setSessionProject: (sessionId: string, body: SetSessionProjectRequest) =>
     call<SessionProjectSet>("PUT", `/api/sessions/${encodeURIComponent(sessionId)}/project`, { body }),
   listSessionRecall: (sessionId: string, query: { turn_id?: string } = {}) =>

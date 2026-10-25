@@ -38,12 +38,15 @@
   let {
     checkpointId = null,
     subtitle = null,
+    source = null,
     scrollIntoViewOnOpen = false,
     onclose,
   }: {
     /** The checkpoint to rewind to, or null when the panel is closed. */
     checkpointId?: string | null;
     subtitle?: string | null;
+    /** QUI-L11 — what made the checkpoint and when, e.g. "File edit · 2 hours ago". */
+    source?: string | null;
     scrollIntoViewOnOpen?: boolean;
     onclose: () => void;
   } = $props();
@@ -123,7 +126,7 @@
 
 <SidePanel
   open={checkpointId !== null}
-  title="Rewind preflight"
+  title="Before you restore"
   subtitle={subtitle ?? (checkpointId ? `Checkpoint ${shortId(checkpointId)}` : null)}
   {onclose}
   {scrollIntoViewOnOpen}
@@ -133,8 +136,12 @@
   {:else if planError}
     <PageState state="error" title="Preflight unavailable" detail={planError} />
   {:else if plan}
+    <!-- QUI-L11 — Recovery shows, before a restore: where the checkpoint came
+         from and when, what will be undone, what stays as it is, the safety
+         checkpoint, and then Restore — never the dominant button. -->
+    {#if source}<p class="source"><Icon name="checkpoints" size="sm" /> {source}</p>{/if}
     <p class="preflight-lead">
-      Rewinding puts every workspace file changed after this point back as it was. This preview is
+      Restoring puts every workspace file changed after this point back as it was. This preview is
       computed from stored metadata and changed nothing.
     </p>
     <div class="impact">
@@ -149,14 +156,15 @@
          made; when there is none, none of them is worth reading. -->
     {#if nothingToRestore}
       <p class="quiet">
-        No captured file changes after this point, so a rewind would change nothing.
+        No captured file changes after this point, so a restore would change nothing.
       </p>
     {:else}
+      <h3 class="part">What will be undone</h3>
       <ul class="affected">
         {#each plan.files as file (file.workspace_path)}
           <li class:changed={file.changed}>
             <span class="path mono">{file.workspace_path}</span>
-            <span class="op">{opLabel(file.op)}</span>
+            <span class="op">{opLabel(file.op)}{#if file.changed} · changed since this point{/if}</span>
             {#if file.changed_by_other_principal}
               <span class="escalation">Last changed by a different principal</span>
             {/if}
@@ -175,10 +183,14 @@
       {/if}
 
       <div class="undo-facts">
-        <h3>Before you ask for this</h3>
+        <h3 class="part">What stays as it is</h3>
         <ul>
-          <li>The rewind itself is captured, so it can be rewound the same way.</li>
           <li>Skipped files are left as they are — they were never captured.</li>
+          <li>Anything that left this computer — a message, an email, a push — is not undone.</li>
+        </ul>
+        <h3 class="part">Safety checkpoint</h3>
+        <ul>
+          <li>The current state is captured first, so this restore can itself be undone the same way.</li>
           <li>
             Every step is written to the append-only record.
             <a href={`#/observe?tab=activity&session=${encodeURIComponent(plan.session_id)}`}
@@ -209,28 +221,48 @@
           <input type="checkbox" bind:checked={acknowledged} />
           I have read what this would change.
         </label>
-        <button
-          type="button"
-          class="btn btn-primary"
-          onclick={requestRestore}
-          disabled={!acknowledged || requestBusy}
-        >
-          {requestBusy ? "Raising approval…" : "Request this rewind"}
-        </button>
+        <div class="restore-actions">
+          <button type="button" class="btn btn-ghost" onclick={onclose}>Keep things as they are</button>
+          <button
+            type="button"
+            class="btn"
+            onclick={requestRestore}
+            disabled={!acknowledged || requestBusy}
+          >
+            {requestBusy ? "Raising approval…" : "Ask to restore"}
+          </button>
+        </div>
         <p class="handoff" class:ready={acknowledged}>
           {acknowledged
-            ? "This raises a governed approval. The rewind runs only once you approve it, and it re-passes its capability gate, policy review and posture check then."
-            : "Confirm you have read the impact above before requesting the rewind."}
+            ? "This raises a governed approval. The restore runs only once you approve it, and it re-passes its capability gate, policy review and posture check then."
+            : "Confirm you have read the impact above before asking to restore."}
         </p>
       {/if}
     {/if}
     {#if !nothingToRestore}
-      <p class="quiet">This panel never performs a rewind. It asks for one; a human decision runs it.</p>
+      <p class="quiet">This panel never performs a restore. It asks for one; a human decision runs it.</p>
     {/if}
   {/if}
 </SidePanel>
 
 <style>
+  .source {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-weight: 600;
+  }
+  .part {
+    margin: var(--space-3) 0 var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 650;
+  }
+  .restore-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
   .preflight-lead {
     margin: 0;
     color: var(--text-2);
@@ -261,8 +293,9 @@
     border-left: 2px solid var(--border);
     padding: 0.2rem 0 0.2rem 0.55rem;
   }
+  /* Said in words in the row as well; the rule's colour only repeats it. */
   .affected li.changed {
-    border-left-color: var(--warn);
+    border-left-color: var(--warn-border);
   }
   .path {
     overflow-wrap: anywhere;

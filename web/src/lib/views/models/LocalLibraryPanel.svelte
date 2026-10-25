@@ -239,7 +239,7 @@
     justify-content: space-between;
     gap: 24px;
     padding: 24px;
-    border-left: 4px solid var(--accent);
+    border: 1px solid var(--accent-border);
   }
   .library-intro h2,
   .section-title h3 {

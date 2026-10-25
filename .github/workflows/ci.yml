@@ -13,7 +13,7 @@ jobs:
   python:
     name: Python 3.11
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -84,16 +84,12 @@ jobs:
                   + result.reason_code
               )
           PY
-      - name: Run tests
+      # The suite itself runs in `python-tests`, three shards in parallel. One
+      # job reached its 45-minute limit on a slow runner (CI run 39612791351);
+      # every test file must still land in exactly one shard.
+      - name: Every test file is in exactly one shard
         run: |
-          python -m pytest -vv --durations=25
-        # The real platform probe above proves Linux page locking separately.
-        # Running thousands of isolated stores with locking enabled makes the
-        # suite roughly seven times slower and can exhaust the runner's memlock
-        # allowance, which hides test progress instead of adding coverage. The
-        # BUG-46 tests exercise enabled and fail-closed behavior directly.
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+          python scripts/test_shard.py --check 3
       # BUG-205 — the job-wide variable above is what stopped CI from ever seeing
       # a failure that landed on every contributor running the suite the
       # documented way. `cipher_memory_security` is process-global and latches
@@ -131,6 +127,39 @@ jobs:
       - name: Compile sources
         run: |
           python -m compileall -q raiker apps tests
+
+  # The Python suite, split three ways by measured running time
+  # (`scripts/test_shard.py`, weights in `tests/test_durations.json`). Each
+  # shard runs serially exactly as the single job did; together they finish in
+  # about a third of the time, well inside the limit the single job reached.
+  python-tests:
+    name: Python tests (shard ${{ matrix.shard }} of 3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Run tests
+        run: |
+          python -m pytest -vv --durations=25 $(python scripts/test_shard.py ${{ matrix.shard }} 3)
+        # The real platform probe in the Python 3.11 job proves Linux page
+        # locking separately. Running thousands of isolated stores with locking
+        # enabled makes the suite roughly seven times slower and can exhaust the
+        # runner's memlock allowance, which hides test progress instead of
+        # adding coverage. The BUG-46 tests exercise enabled and fail-closed
+        # behavior directly.
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
 
   # Wave 0 of the codebase optimisation review: a baseline taken the same way on
   # every run, so a simplification reports what it removed instead of estimating

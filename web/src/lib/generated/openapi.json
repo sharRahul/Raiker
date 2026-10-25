@@ -28280,6 +28280,29 @@
         "title": "SessionPinned",
         "type": "object"
       },
+      "SessionProfileSet": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "session_id",
+          "profile"
+        ],
+        "title": "SessionProfileSet",
+        "type": "object"
+      },
       "SessionProjectSet": {
         "properties": {
           "ok": {
@@ -28456,6 +28479,11 @@
             ],
             "default": null,
             "title": "Archived At"
+          },
+          "conversation_profile": {
+            "default": "standard",
+            "title": "Conversation Profile",
+            "type": "string"
           },
           "created_at": {
             "title": "Created At",
@@ -28717,6 +28745,24 @@
           "pinned"
         ],
         "title": "SetSessionPinnedRequest",
+        "type": "object"
+      },
+      "SetSessionProfileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "enum": [
+              "careful",
+              "standard"
+            ],
+            "title": "Profile",
+            "type": "string"
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "title": "SetSessionProfileRequest",
         "type": "object"
       },
       "SetSessionProjectRequest": {
@@ -49412,6 +49458,56 @@
           }
         },
         "summary": "Get Session Plan"
+      }
+    },
+    "/api/sessions/{session_id}/profile": {
+      "put": {
+        "description": "QUI-P02 — remember a conversation's profile (Careful or Standard).\n\nThe profile is sent with every turn as a narrowing override the runtime\nenforces; storing it on the conversation lets every device open it the same\nway. It grants nothing. Human-only; an account cannot set another account's.",
+        "operationId": "set_session_profile_api_sessions__session_id__profile_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSessionProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionProfileSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Session Profile"
       }
     },
     "/api/sessions/{session_id}/project": {

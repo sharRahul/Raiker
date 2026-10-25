@@ -85,7 +85,7 @@
   aria-label="All navigation" aria-hidden={compact && !drawerOpen ? "true" : undefined}
   inert={compact && !drawerOpen} bind:this={navigationElement}>
   <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
-  <a class="brand" href="#/home"><Logo size={30} /><span class="brand-text"><span class="brand-name">Raiker</span></span></a>
+  <a class="brand" href="#/home"><Logo size={26} label="" /><span class="brand-text"><span class="brand-name">raiker</span></span></a>
 
   <div class="navigation-sections">
     {#each SIDEBAR_GROUPS as group (group.id)}
@@ -140,7 +140,8 @@
   /* The brand should not rest on a letter-spaced wordmark. .45em was
      spacing the name out until it read as a logotype by force; the mark beside
      it is the identity. */
-  .brand-name { font-weight:800; font-size:var(--text-sm); letter-spacing:.14em; text-transform:uppercase; color:var(--text-1); }
+  /* QUI-V04 — the wordmark is lowercase "raiker" in Inter at a tuned weight. */
+  .brand-name { font-weight:650; font-size:var(--text-lg); letter-spacing:-.01em; color:var(--text-1); }
   .navigation-sections { display:grid; gap:var(--space-2); }
   .group { position:relative; }
   /* A navigation group label in caps at 2xs with .09em tracking is

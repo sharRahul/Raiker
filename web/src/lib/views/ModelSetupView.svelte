@@ -795,7 +795,7 @@
   .recommended { display: grid; gap: .25rem; padding: var(--space-4); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--accent-soft); }
   .optional { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }
-  .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
+  .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--sunken); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: var(--text-2xs); } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; text-decoration: none; }
   .quiet { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-2); } .primary { border: 1px solid var(--accent-border); background: var(--accent); color: white; } .error { color: var(--danger); }
   /* DIST-05/06 — check rows say their state in words, with colour as a second
@@ -808,7 +808,7 @@
   .check::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--success); align-self: center; grid-row: 1; }
   .check.warn::before { background: var(--warning); } .check.fail::before { background: var(--danger); } .check.info::before { background: var(--neutral-border); }
   .check > strong { grid-column: 2; grid-row: 1; font-size: var(--text-sm); }
-  .check-state { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; color: var(--text-3); }
+  .check-state { grid-column: 3; grid-row: 1; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-3); }
   .check.warn .check-state { color: var(--warning); } .check.fail .check-state { color: var(--danger); }
   .check-detail, .check-remedy { grid-column: 2 / 4; color: var(--text-3); }
   .check-remedy { color: var(--text-1); font-weight: 600; }

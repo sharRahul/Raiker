@@ -238,7 +238,7 @@
   .find span { flex:1 1 auto; min-width:0; }
   .find kbd { font-family:var(--font-mono, monospace); font-size:var(--text-2xs); color:var(--text-3); border:1px solid var(--border); border-radius:var(--r-xs, 4px); padding:0 .3rem; }
   .groups { overflow-y:auto; overscroll-behavior:contain; display:grid; gap:var(--space-4); }
-  h3 { margin:0 0 var(--space-2); color:var(--text-3); font-size:var(--text-2xs); font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  h3 { margin:0 0 var(--space-2); color:var(--text-3); font-size:var(--text-2xs); font-weight:700; }
   ul { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(13rem, 100%), 1fr)); gap:2px; }
   a { display:flex; align-items:center; gap:.6rem; min-height:2.35rem; padding:.42rem .55rem; border-radius:var(--r-sm); color:var(--text-2); font-size:var(--text-sm); text-decoration:none; }
   a:hover { background:var(--sunken); color:var(--text-1); text-decoration:none; }

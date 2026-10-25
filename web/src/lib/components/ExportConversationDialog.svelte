@@ -231,7 +231,7 @@
   .file-meta { color: var(--text-2); }
   .policy {
     margin: 0.7rem 0 0; padding-left: 0.6rem;
-    border-left: 3px solid var(--accent-border);
+    border: 1px solid var(--accent-border);
     color: var(--text-2); font-size: var(--text-sm); line-height: 1.45;
   }
   .formats { display: grid; gap: 0.4rem; border: 0; padding: 0; margin: 0; }

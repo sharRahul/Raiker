@@ -922,8 +922,8 @@
   .notice-ok { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
   .card + .card { margin-top: var(--space-4); }
   .env { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-2); }
-  .env li { display: grid; gap: 0.2rem; padding: var(--space-2); border-left: 2px solid var(--border); }
-  .env li.env-missing { border-left-color: var(--warn); }
+  .env li { display: grid; gap: 0.2rem; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--r-sm); }
+  .env li.env-missing { border-color: var(--warn-border); }
   /* The first step, for a channel that is not paired yet. */
   .next-step { margin: 0.2rem 0 0; color: var(--text-2); font-size: var(--text-sm); }
   /* UX-MSG-03 — the setup checklist. */
@@ -933,7 +933,7 @@
   .step-done .step-mark { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
   .step-current .step-mark { border-color: var(--accent); background: var(--accent-soft); }
   .step-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.5rem; min-width: 0; }
-  .step-state { font-size: var(--text-2xs); font-weight: 650; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .step-state { font-size: var(--text-2xs); font-weight: 650; color: var(--text-3); }
   .step-current .step-state { color: var(--accent); }
   .step-detail { flex-basis: 100%; color: var(--text-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
   .step-todo .step-detail, .step-not_needed .step-detail { color: var(--text-3); }

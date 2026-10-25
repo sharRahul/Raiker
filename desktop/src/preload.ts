@@ -34,6 +34,7 @@ const ATTENTION_CHANNEL = "raiker:attention";
 const TRAY_PREFERENCE_CHANNEL = "raiker:tray-preference";
 const OPEN_WINDOW_CHANNEL = "raiker:open-window";
 const CLOSE_WINDOW_CHANNEL = "raiker:close-window";
+const SHOW_MAIN_CHANNEL = "raiker:show-main";
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const bridge = Object.freeze({
@@ -81,6 +82,10 @@ const bridge = Object.freeze({
   /** QUI-F01 — close this window (Quick Entry's Esc and Send). */
   closeWindow(): void {
     ipcRenderer.send(CLOSE_WINDOW_CHANNEL);
+  },
+  /** Quick Entry before sign-in — open the main window, where signing in happens. */
+  showMainWindow(): void {
+    ipcRenderer.send(SHOW_MAIN_CHANNEL);
   },
 });
 

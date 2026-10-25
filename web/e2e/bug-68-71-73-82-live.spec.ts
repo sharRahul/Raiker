@@ -204,7 +204,7 @@ function modeTrigger(target: Page) {
 
 async function pickMode(
   target: Page,
-  label: "Plan" | "Edit" | "Auto",
+  label: "Plan" | "Suggest changes" | "Run within limits",
   options: { keepMenuOpen?: boolean } = {},
 ) {
   await modeTrigger(target).click();
@@ -234,7 +234,7 @@ test("BUG-70 — a Build mode chip changes nothing standing and says so", async 
   // the assertion is that arriving in it wrote nothing — and the composer says
   // what the owner's standing permissions actually amount to.
   await expect(modeTrigger(page)).toHaveAccessibleName(
-    "How much Raiker may do this turn: Auto",
+    "How much Raiker may do this turn: Run within limits",
   );
   await expect(page.getByText(/Change in Permissions/)).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "r0810-bug70-build-auto-changes-nothing-standing.png") });

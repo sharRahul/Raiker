@@ -427,7 +427,8 @@
     if (isMemoryFilter(filter)) statusFilter = filter;
   });
 
-  const tabs = HUB_TABS.memory.map((id) => ({
+  // QUI-L12 — the map is reached from a search, not drawn as a tab.
+  const tabs = HUB_TABS.memory.filter((id) => id !== "map").map((id) => ({
     id,
     label: MEMORY_TAB_LABELS[id as MemoryTab] ?? id,
   }));
@@ -475,7 +476,7 @@
   $effect(() => { void load(); });
 </script>
 
-<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
+{#if tab !== "map"}<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>{/if}
 
 <!-- Memory carried approved records, proposals, observations, a document
      library, two recall controls and an import/export drawer at one visual
@@ -484,14 +485,15 @@
      above it. It is a hub now, and Overview leads for the same reason it does
      on Extensions and Models: people arrive asking whether anything is waiting
      on them and what Raiker can recall, not to look at a category. -->
-<TabStrip {tabs} selected={tab} onselect={selectTab} label="Memory sections" />
-
 {#if tab === "map"}
-  <!-- Quiet UI — the Knowledge Map is a tab of Memory, not a page of its own. -->
-  <div id="panel-map" role="tabpanel" aria-labelledby="tab-map">
+  <!-- QUI-L12 — the Knowledge Map opens from a memory search, so it carries
+       its way back rather than a tab strip it is not on. -->
+  <a class="back-link" href="#/memory?tab=memories"><Icon name="chevron-left" size="sm" /> Memory</a>
+  <div id="panel-map">
     <LazyRoute route="brain" />
   </div>
 {:else}
+<TabStrip {tabs} selected={tab} onselect={selectTab} label="Memory sections" />
 
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
   <Icon name={posture.kind === "proposes" ? "check" : "info"} size="md" />
@@ -598,6 +600,7 @@
     <select bind:value={sensitivityFilter} aria-label="Memory sensitivity"><option value="all">All sensitivities</option>{#each sensitivities as sensitivity}<option value={sensitivity}>{sensitivity}</option>{/each}</select>
     <select bind:value={sort} aria-label="Sort memories"><option value="recently-approved">Recently approved</option><option value="review-date">Review date</option><option value="review-priority">Worth reviewing first</option></select>
     <label class="pinned-filter"><input type="checkbox" bind:checked={pinnedOnly} /> Pinned only</label>
+    <a class="btn btn-ghost btn-sm map-link" href="#/memory?tab=map"><Icon name="map" size="sm" /> See on the map</a>
   </section>
 
   <section class="memory-section"><div class="section-head"><h3>{statusFilter === "active" ? "Approved memories" : MEMORY_FILTER_LABELS[statusFilter]}</h3><span>{filtered.length}</span></div>
@@ -743,10 +746,6 @@
     {/if}
   </section>
   </div>
-{:else if tab === "controls"}
-  <div id="panel-controls" role="tabpanel" aria-labelledby="tab-controls">
-    <MemoryControls />
-  </div>
 {:else if tab === "sources"}
   <div id="panel-sources" role="tabpanel" aria-labelledby="tab-sources">
     <!-- The document library was always kept apart from the atomic records and
@@ -779,7 +778,10 @@
   </section>
   </div>
 {:else}
-  <div id="panel-recall" role="tabpanel" aria-labelledby="tab-recall">
+  <!-- QUI-L12 — Controls holds recall and indexing as well as what Raiker has
+       learned and the approvals given. -->
+  <div id="panel-controls" role="tabpanel" aria-labelledby="tab-controls">
+  <MemoryControls />
 {#if settings}
   <section class="control-card">
     <div><h3>Incognito session</h3><p>Do not use approved memories in new conversations and tasks. Stored memories are not deleted.</p></div>
@@ -948,6 +950,8 @@
 {/if}
 
 <style>
+  .back-link { display:inline-flex; align-items:center; gap:.3rem; margin-bottom:var(--space-3); font-size:var(--text-sm); font-weight:600; }
+  .map-link { margin-left:auto; }
   .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
   .control-card + .control-card { margin-top:var(--space-3); }

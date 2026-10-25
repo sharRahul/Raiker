@@ -1788,14 +1788,14 @@
   .version { font-size: var(--text-xs); color: var(--text-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px 6px; }
   .workspace { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) minmax(0, 20rem); gap: var(--space-4); align-items: start; }
   .left, .right { display: grid; gap: var(--space-2); align-content: start; min-width: 0; }
-  h3 { margin: 0; font-size: var(--text-2xs); font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+  h3 { margin: 0; font-size: var(--text-2xs); font-weight: 750; color: var(--text-3); }
   .row { display: grid; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 6px; font: inherit; font-size: var(--text-sm); color: var(--text-1); cursor: pointer; }
   .row.current { border-color: var(--accent); background: var(--accent-soft); }
   .row:focus-visible, .icon-btn:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
   .layers li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 2px; padding-left: calc(var(--depth) * 0.75rem); }
   .layer-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-1); align-items: center; }
   .layer-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .kind { font-size: var(--text-2xs); color: var(--text-3); text-transform: uppercase; }
+  .kind { font-size: var(--text-2xs); color: var(--text-3); }
   .badge { font-size: var(--text-2xs); color: var(--accent); border: 1px solid var(--accent-border); border-radius: var(--r-sm); padding: 0 4px; }
   .icon-btn { background: none; border: 0; padding: 2px; color: var(--text-2); cursor: pointer; border-radius: var(--r-sm); }
   .add-row, .row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }

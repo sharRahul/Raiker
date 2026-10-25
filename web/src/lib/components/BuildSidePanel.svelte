@@ -531,8 +531,6 @@
     font-size: var(--text-xs);
     font-weight: 650;
     color: var(--text-3);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
   }
   .recent li {
     display: flex;

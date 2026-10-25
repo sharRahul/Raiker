@@ -295,7 +295,5 @@
     color: var(--text-3);
     font-size: var(--text-2xs);
     font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
   }
 </style>

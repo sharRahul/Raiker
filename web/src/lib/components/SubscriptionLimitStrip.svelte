@@ -69,8 +69,6 @@
     margin: 0;
     color: var(--text-3);
     font-size: var(--text-2xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
   }
   .limit { margin: 0; display: grid; gap: 0.2rem; }
   .limit-head { display: flex; justify-content: space-between; gap: 0.5rem; font-size: var(--text-xs); }

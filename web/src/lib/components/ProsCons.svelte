@@ -39,7 +39,7 @@
   .options { display: grid; grid-template-columns: repeat(var(--count), minmax(0, 1fr)); gap: var(--space-3); }
   .option { min-width: 0; }
   h4 { margin: 0 0 var(--space-1); font-size: var(--text-md); color: var(--text-1); }
-  .list-head { margin: var(--space-2) 0 var(--space-1); font-size: var(--text-xs); font-weight: 650; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .list-head { margin: var(--space-2) 0 var(--space-1); font-size: var(--text-xs); font-weight: 650; color: var(--text-2); }
   ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
   li { display: flex; gap: 0.4rem; color: var(--text-1); font-size: var(--text-sm); }
   .mark { font-weight: 700; width: 0.8rem; flex: none; }

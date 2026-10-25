@@ -132,6 +132,12 @@ class SessionPinned(TypedDict):
     pinned: bool
 
 
+class SessionProfileSet(TypedDict):
+    ok: bool
+    session_id: str
+    profile: str
+
+
 class SessionRenamed(TypedDict):
     ok: bool
     session_id: str

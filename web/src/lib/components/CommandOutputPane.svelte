@@ -257,7 +257,7 @@
   .chevron { color: var(--text-3); font-size: var(--text-base); }
   .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
   .pane-body { padding: .15rem .8rem .8rem; border-top: 1px solid var(--border); }
-  .receipt-rail { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr auto; align-items: center; gap: .35rem; padding: .72rem 0; color: var(--text-3); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em; }
+  .receipt-rail { display: grid; grid-template-columns: auto 1fr auto 1fr auto 1fr auto; align-items: center; gap: .35rem; padding: .72rem 0; color: var(--text-3); font-size: var(--text-2xs); }
   .receipt-rail span { display: flex; align-items: center; gap: .32rem; white-space: nowrap; }
   .receipt-rail i { width: 7px; height: 7px; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); }
   .receipt-rail span.ready { color: var(--text-2); }
@@ -280,7 +280,7 @@
   .receipt-card summary { cursor: pointer; }
   .receipt-card code { color: var(--text-3); }
   dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin: .55rem 0 0; }
-  dl div { min-width: 0; } dt { color: var(--text-3); font-size: var(--text-2xs); text-transform: uppercase; } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
+  dl div { min-width: 0; } dt { color: var(--text-3); font-size: var(--text-2xs); } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
   .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: var(--text-2xs); }
   .run-picker { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .35rem; color: var(--text-3); font-size: var(--text-2xs); }
   .run-picker select { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-2xs); }

@@ -339,8 +339,6 @@
     margin: 5px 0;
   }
   .kind {
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
     font-size: var(--text-2xs);
     font-weight: 750;
   }

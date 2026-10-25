@@ -455,6 +455,12 @@
       ? all
       : all.filter((generation) => generation.project_id === arrivedWith.projectId),
   );
+  /**
+   * QUI-L13 — once output exists, the three newest pictures sit above the
+   * composer as 56 px thumbnails, so the revision just made and the two before
+   * it are one click from the canvas without opening the gallery.
+   */
+  const revisions = $derived(turns.filter((generation) => generation.has_image).slice(0, 3));
   const COUNTS = Array.from({ length: MAX_DESIGN_VARIATIONS }, (_, index) => index + 1);
   const primaryAction = $derived(designPrimaryAction(selectedId, variations));
 
@@ -859,6 +865,26 @@
     </section>
   {/if}
 
+  {#if revisions.length > 0}
+    <ul class="revision-strip" aria-label="Latest pictures">
+      {#each revisions as generation, index (generation.generation_id)}
+        <li>
+          <button
+            type="button"
+            class="revision"
+            class:selected={selectedId === generation.generation_id}
+            aria-pressed={selectedId === generation.generation_id}
+            aria-label={index === 0 ? `Latest picture: ${generation.prompt}` : `Earlier picture: ${generation.prompt}`}
+            title={generation.prompt}
+            onclick={() => (selectedId = generation.generation_id)}
+          >
+            <img src={api.imageBytesUrl(generation.generation_id)} alt="" loading="lazy" width="56" height="56" />
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
   <Composer
     ariaLabel="Image composer"
     inputId="design-prompt"
@@ -1060,6 +1086,11 @@
 </div>
 
 <style>
+  .revision-strip { display: flex; gap: var(--space-2); list-style: none; margin: 0 auto var(--space-2); padding: 0; width: min(100%, 45rem); }
+  .revision { display: block; width: 56px; height: 56px; padding: 0; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; background: var(--sunken); cursor: pointer; }
+  .revision img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .revision:hover { border-color: var(--border-strong); }
+  .revision.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .mode-switch { margin: 0 0 var(--space-3); }
   /* NEW-PROJ-02 — the canvas saying which project it is scoped to. */
   .scope-chip {

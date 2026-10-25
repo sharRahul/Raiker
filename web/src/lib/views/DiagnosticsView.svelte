@@ -483,8 +483,6 @@
   .kv dt {
     font-size: var(--text-2xs);
     font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-3);
   }
   .kv dd {

@@ -52,12 +52,26 @@ def test_every_action_reference_is_pinned_or_local() -> None:
 def test_ci_probes_memory_locking_without_running_the_whole_suite_locked() -> None:
     job = _workflow()["jobs"]["python"]
     steps = {step["name"]: step for step in job["steps"]}
-
     assert "Verify SQLCipher memory-security probe" in steps
-    test_step = steps["Run tests"]
+    assert "scripts/test_shard.py --check 3" in steps["Every test file is in exactly one shard"]["run"]
+
+    # The suite runs in three shards, each serially and unlocked, each inside
+    # the limit the single job used to reach.
+    tests = _workflow()["jobs"]["python-tests"]
+    assert tests["strategy"]["matrix"]["shard"] == ["1", "2", "3"]
+    test_step = {step["name"]: step for step in tests["steps"]}["Run tests"]
     assert test_step["env"]["RAIKER_SQLCIPHER_MEMORY_SECURITY"] == "off"
     assert "-vv" in test_step["run"]
-    assert job["timeout-minutes"] == "45"
+    assert "scripts/test_shard.py ${{ matrix.shard }} 3" in test_step["run"]
+    assert tests["timeout-minutes"] == "45"
+
+
+def test_every_test_file_lands_in_exactly_one_shard() -> None:
+    from scripts.test_shard import shards, test_files
+
+    dealt = [name for bucket in shards(3) for name in bucket]
+    assert sorted(dealt) == test_files()
+    assert all(bucket for bucket in shards(3))
 
 
 def test_a_dependency_with_a_known_vulnerability_fails_ci() -> None:

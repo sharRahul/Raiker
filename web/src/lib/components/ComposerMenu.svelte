@@ -104,8 +104,6 @@
     border-bottom: 1px solid var(--border);
     color: var(--text-3);
     font-size: var(--text-2xs);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
   ul {
     list-style: none;

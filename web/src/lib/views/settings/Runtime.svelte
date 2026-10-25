@@ -308,7 +308,6 @@
 
 <section class="settings-card">
   <div class="card-heading">
-    <span class="eyebrow">Agent runtime</span>
     <h3>
       Raiker runtime
       {#if mode}<span class="status" class:stopped={!running}>· {running ? "Accepting work" : "Disabled"}</span>{/if}
@@ -337,15 +336,26 @@
 </section>
 
 <section class="settings-card environment-settings">
-  <div class="card-heading"><span class="eyebrow">Execution targets</span><h3>Local, remote, and cloud environments</h3></div>
+  <div class="card-heading"><h3>Local, remote, and cloud environments</h3></div>
   {#if environments}
     <div class="environment-grid">
       {#each environments.environments as environment}
         <article class:selected={environment.selected}>
           <div>
             <strong>{environment.name}</strong>
+            <!-- QUI-L03 — one line per environment, its detail on request:
+                 three environments with every measurement open made this page
+                 four screens long. -->
             {#if environment.kind === "native" || environment.kind === "local"}
               <span class="container-runtime">{boundaryLabel(environment)}</span>
+            {:else if environment.kind === "container"}
+              <span class="container-runtime">{runtimeName(environment.runtime)} · {environment.image ?? "No approved image"}</span>
+            {:else}
+              <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
+            {/if}
+            <details class="env-details">
+            <summary>Details</summary>
+            {#if environment.kind === "native" || environment.kind === "local"}
               <ul class="observations">
                 {#each observationRows(environment.probe_observations) as observation}
                   <li class={observation.verdict}>
@@ -381,7 +391,6 @@
               </button>
               <small class="plain">Re-measuring opens one connection to this host's default gateway on a closed port.</small>
             {:else if environment.kind === "container"}
-              <span class="container-runtime">{runtimeName(environment.runtime)} · {environment.image ?? "No approved image"}</span>
               <span class="boundary">Read-only repository → writable output</span>
               <small>{environment.assigned_tool_count ?? 0} tools</small>
               {#if containerReason(environment.availability_reason)}<small class="remediation">{containerReason(environment.availability_reason)}</small>{/if}
@@ -393,7 +402,6 @@
                 </section>
               {/if}
             {:else}
-              <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
               <span class="boundary">Foreground command execution</span>
               <small class="plain">PTY, background execution, persistence, restart recovery, filtered egress, and command credential delivery are unavailable.</small>
               {#if environment.availability_reason && environment.enabled}<small class="remediation">{environment.availability_reason.replaceAll("_", " ")}</small>{/if}
@@ -416,6 +424,7 @@
               </div>
               <small class="plain">Resetting discards what commands left behind. The next command starts from the approved image.</small>
             {/if}
+            </details>
           </div>
           <div class="environment-actions">
             <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
@@ -531,6 +540,8 @@
 {/if}
 
 <style>
+  .env-details summary { cursor:pointer; color:var(--text-2); font-size:var(--text-xs); font-weight:600; width:fit-content; }
+  .env-details[open] { display:grid; gap:.2rem; margin-top:.2rem; }
   .environment-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
   .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .description, .danger-zone p { color: var(--text-2); }
   /* The readiness window is the one editable field in this section, so it needs
@@ -541,7 +552,7 @@
   .settings-card label > small { color: var(--text-2); }
   .settings-card label > input { min-height: 40px; padding: 0 .65rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); color: var(--text-1); font: inherit; }
   .settings-card, .danger-zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); }
-  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border-left:2px solid var(--accent); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; }
+  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border: 1px solid var(--accent-border); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:var(--text-xs); text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; }
   .observations { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
   .observations li { display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; font-size:var(--text-xs); }
   /* The card capitalises its short labels. These are sentences —
@@ -563,20 +574,20 @@
   .capabilities { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
   .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:var(--text-xs); text-transform:none; }
   .capabilities li :global(svg) { flex:none; color:var(--text-3); }
-  .egress-status { display:grid; gap:.2rem; margin-top:.45rem; padding:.65rem .75rem; border-left:3px solid var(--warn); background:var(--sunken); }
+  .egress-status { display:grid; gap:.2rem; margin-top:.45rem; padding:.65rem .75rem; border: 1px solid var(--warn-border); background:var(--sunken); }
   .egress-status strong { color:var(--warn); font-size:var(--text-xs); }
   .egress-status span { color:var(--text-1); font-family:var(--font-mono); font-size:var(--text-xs); text-transform:none; overflow-wrap:anywhere; }
   .egress-status small { color:var(--text-2); text-transform:none; }
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
-  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` is only half of it: a grid item's automatic minimum is its content, and a <select> is as wide as its longest option, which overflows a narrow track at 390px (FIXED-416). */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
+  details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; min-width:0; color:var(--text-2); font-size:var(--text-sm); } /* `minmax(0,1fr)` is only half of it: a grid item's automatic minimum is its content, and a <select> is as wide as its longest option, which overflows a narrow track at 390px (FIXED-416). */ .environment-form input,.environment-form select { min-width:0; max-width:100%; background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:var(--text-sm); } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border: 1px solid var(--accent-border); background:var(--sunken); color:var(--text-3); font-size:var(--text-xs); } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
   .advanced { margin-top: var(--space-5); }
   .advanced summary { color: var(--text-2); }
   .advanced label { margin-top: var(--space-3); }
   .form-advanced { grid-column: 1 / -1; margin-top: 0; }
   .form-advanced label { max-width: none; }
   .status { color: var(--ok); font-size: var(--text-sm); } .status.stopped { color: var(--warn); }
-  .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: var(--text-xs); font-weight: 700; }
+  .eyebrow { color: var(--accent); font-size: var(--text-xs); font-weight: 700; }
   dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: var(--text-xs); } dd { margin: 0; }
   .actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); }
   .danger-zone { margin-top: var(--space-5); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); } .danger-zone h4 { margin-top: var(--space-4); } .error { color: var(--danger); }

@@ -343,6 +343,38 @@ class ConversationStore:
             )
         return True
 
+    #: QUI-P02 — the profiles a conversation can carry. Careful narrows a turn;
+    #: Standard sends no override. Anything else is refused, not stored.
+    CONVERSATION_PROFILES = ("careful", "standard")
+
+    def set_session_profile(
+        self: SQLiteStore, session_id: str, profile: str, user_id: str | None = None
+    ) -> bool:
+        """Remember a conversation's profile. Returns False for an unknown
+        session, one owned by another account, or a profile that is not one of
+        :attr:`CONVERSATION_PROFILES` (user isolation mirrors set_session_pinned)."""
+        if profile not in self.CONVERSATION_PROFILES:
+            return False
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if user_id is not None and owner is not None and str(owner) != user_id:
+                return False
+            connection.execute(
+                "UPDATE sessions SET conversation_profile = ? WHERE session_id = ?",
+                (profile, session_id),
+            )
+        return True
+
+    def session_profile(self: SQLiteStore, session_id: str) -> str:
+        """The conversation's profile; Standard when it has none of its own."""
+        row = self._row("SELECT conversation_profile FROM sessions WHERE session_id = ?", (session_id,))
+        if row is None:
+            return "standard"
+        value = str(row["conversation_profile"] or "standard")
+        return value if value in self.CONVERSATION_PROFILES else "standard"
+
     # A tag is an organizing label only (like the `pinned` flag and the
     # `projects` table) — it grants nothing and changes no gate, policy, or
     # authority. Many-to-many: a session carries an ordered set of tags; the

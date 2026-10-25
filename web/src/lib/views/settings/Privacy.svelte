@@ -190,41 +190,38 @@
   <p>What Raiker keeps on this machine, what leaves it, and who decides.</p>
 </header>
 
+<!-- QUI-L03 — Privacy as rows: a label, what it holds or carries, and where it
+     is governed. The explanations an owner reads once sit under "How this
+     works" in each section instead of between the rows. -->
 <section class="settings-card" aria-labelledby="retained-inventory">
   <div class="card-heading">
     <h3 id="retained-inventory">Kept on this machine</h3>
-    <p>
-      All of it is written to the encrypted store in your workspace. Each one is governed by its
-      own page, which is also where it is reviewed, exported or forgotten.
-    </p>
+    <p>Written to the encrypted store in your workspace; each is reviewed, exported or forgotten on its own page.</p>
   </div>
-  <dl class="inventory">
+  <ul class="rows">
     {#each RETAINED as row (row.what)}
-      <div>
-        <dt>{row.what}</dt>
-        <dd>
-          {row.detail}
-          <a href={row.where}>{row.whereLabel}</a>
-        </dd>
-      </div>
+      <li>
+        <span class="row-label">{row.what}</span>
+        <span class="row-value">{row.detail}</span>
+        <a class="row-action" href={row.where}>{row.whereLabel}</a>
+      </li>
     {/each}
-  </dl>
-  <p class="note">
+  </ul>
+  <details class="how">
+    <summary>Forgetting and backups</summary>
     <!-- The limit an owner has to know before they rely on deletion. -->
-    Forgetting a record removes it from the workspace, not from a backup already written: a backup
-    is a copy of the store as it was when it was made. For a deletion you need to be permanent,
-    remove the backups made before it in <a href="#/settings?tab=general">General › Backups</a>.
-  </p>
+    <p>
+      Forgetting a record removes it from the workspace, not from a backup already written: a backup
+      is a copy of the store as it was when it was made. For a deletion you need to be permanent,
+      remove the backups made before it in <a href="#/settings?tab=general">General › Backups</a>.
+    </p>
+  </details>
 </section>
 
 <section class="settings-card" aria-labelledby="outbound-inventory">
   <div class="card-heading">
     <h3 id="outbound-inventory">What can leave this machine</h3>
-    <p>
-      Each row is a capability, what it would carry, and where it would go. Whether it can happen
-      at all is read from your permissions, in the same words
-      <a href="#/capabilities">Permissions</a> uses.
-    </p>
+    <p>What each capability would carry, read from your <a href="#/capabilities">Permissions</a>.</p>
   </div>
   {#if gatesError}
     <p class="notice" role="status">
@@ -232,116 +229,101 @@
       right now. Nothing below is a claim that it is off.
     </p>
   {/if}
-  <ul class="egress">
+  <ul class="rows egress">
     {#each egress as row (row.capability)}
       <li class:possible={row.possible === true}>
-        <div class="egress-head">
-          <strong>{row.label}</strong>
-          <span class="egress-state">{row.state}</span>
-        </div>
-        <p class="egress-carries">{row.carries}</p>
-        <p class="egress-destination">
-          {row.destination}
-          <a href={row.where}>{row.whereLabel}</a>
-        </p>
+        <span class="row-label">{row.label}</span>
+        <span class="row-value" title={row.destination}>{row.carries}</span>
+        <span class="egress-state">{row.state}</span>
+        <a class="row-action" href={row.where}>{row.whereLabel}</a>
       </li>
     {/each}
   </ul>
-  <p class="note">
-    Nothing leaves for a capability that is off, and nothing leaves without the decision its
-    permission asks for. A model request also goes only to a provider you connected on the Models
-    page, and only to that connection's own address — no tool, plugin or model can add or change one.
-  </p>
+  <details class="how">
+    <summary>Where each one goes</summary>
+    <dl class="destinations">
+      {#each egress as row (row.capability)}
+        <div><dt>{row.label}</dt><dd>{row.destination}</dd></div>
+      {/each}
+    </dl>
+    <p>
+      Nothing leaves for a capability that is off, and nothing leaves without the decision its
+      permission asks for. A model request also goes only to a provider you connected on the Models
+      page, and only to that connection's own address — no tool, plugin or model can add or change one.
+    </p>
+  </details>
 </section>
 
 <section class="settings-card" aria-labelledby="retained-working">
-  <div class="card-heading">
-    <h3 id="retained-working">Retained working</h3>
-    <p>
-      With Thinking on, Raiker shows the model's own working above its answer while
-      the turn runs. This decides whether that working is written to the encrypted
-      store so a re-opened conversation still shows it.
-    </p>
-  </div>
-
-  <label class="toggle">
+  <div class="setting-row">
+    <div>
+      <h3 id="retained-working">Keep the model's working with the turn</h3>
+      <p>
+        With Thinking on, the model's working shows while a turn runs. On keeps it, encrypted, so a
+        re-opened conversation still shows it. Off by default.
+      </p>
+    </div>
     <input
+      class="switch-input"
       type="checkbox"
+      role="switch"
+      aria-labelledby="retained-working"
       checked={retainReasoning}
       onchange={(e) => save({ "privacy.retain_reasoning": e.currentTarget.checked })}
     />
-    <span>
-      <strong>Keep the model's working with the turn</strong>
-      <small>
-        Off by default. The working can restate anything your prompt contained, so
-        it is kept only if you ask. It is stored under the same encryption as the
-        rest of the conversation, is never added to chat search, and is never
-        included in an exported transcript.
-      </small>
-    </span>
-  </label>
-
-  <p class="note">
-    Turning this off does not erase working already kept, and it does not hide that
-    there was any: a turn whose working was not kept says so in the transcript,
-    rather than reading as a turn that never thought.
-  </p>
+  </div>
+  <details class="how">
+    <summary>What is kept, and what is not</summary>
+    <p>
+      The working can restate anything your prompt contained, so it is kept only if you ask. It is
+      stored under the same encryption as the rest of the conversation, is never added to chat
+      search, and is never included in an exported transcript. Turning this off does not erase
+      working already kept, and it does not hide that there was any: a turn whose working was not
+      kept says so in the transcript.
+    </p>
+  </details>
 </section>
 
 <style>
   .section-heading { margin-bottom: var(--space-4); }
   .section-heading h2, .card-heading h3 { margin: 0; }
-  .section-heading p, .card-heading p { color: var(--text-2); margin: .3rem 0 0; max-width: var(--prose-measure); }
+  .section-heading p, .card-heading p, .setting-row p { color: var(--text-2); margin: .3rem 0 0; max-width: var(--prose-measure); font-size: var(--text-sm); }
   .settings-card {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--card-edge);
     border-radius: var(--r-lg);
     padding: var(--card-pad-y) var(--card-pad-x);
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
   }
-  .inventory {
+  .rows { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+  .rows li {
     display: grid;
-    grid-template-columns: minmax(10rem, auto) minmax(0, 1fr);
-    gap: var(--space-2) var(--space-4);
-    margin: var(--space-4) 0 0;
-  }
-  .inventory > div { display: contents; }
-  .inventory dt { color: var(--text-1); font-weight: 600; font-size: var(--text-sm); }
-  .inventory dd { margin: 0; color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; }
-  .inventory a, .egress-destination a { color: var(--accent); font-weight: 600; margin-left: .35rem; }
-  .egress { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-3); }
-  .egress li {
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    background: var(--sunken);
-  }
-  /* A row that can happen right now is marked, in a border rather than a fill:
-     this is a list to read, not a status board. */
-  .egress li.possible { border-color: var(--accent-border); }
-  .egress-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-  .egress-head strong { color: var(--text-1); }
-  .egress-state { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
-  .egress-carries, .egress-destination { margin: .3rem 0 0; color: var(--text-2); font-size: var(--text-sm); line-height: 1.5; }
-  .egress-destination { color: var(--text-3); }
-  .toggle {
-    display: flex;
-    align-items: flex-start;
-    gap: .6rem;
-    max-width: 40rem;
-    margin-top: var(--space-5);
-  }
-  .toggle span { display: grid; gap: .2rem; }
-  .toggle small { color: var(--text-2); line-height: 1.5; }
-  .note {
-    max-width: var(--prose-measure);
-    margin: var(--space-4) 0 0;
-    color: var(--text-3);
+    grid-template-columns: 13rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border);
     font-size: var(--text-sm);
-    line-height: 1.55;
   }
-  @media (max-width: 600px) {
-    .inventory { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
-    .inventory > div { display: block; margin-bottom: var(--space-3); }
+  .rows.egress li { grid-template-columns: 11rem minmax(0, 1fr) 7rem 7rem; }
+  .row-label { font-weight: 600; color: var(--text-1); }
+  .row-value { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-action { color: var(--accent); font-weight: 600; justify-self: end; white-space: nowrap; }
+  .egress-state { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }
+  /* A capability that can happen right now says so in words and weight. */
+  .egress li.possible .egress-state { color: var(--text-1); font-weight: 600; }
+  .how { margin-top: var(--space-2); font-size: var(--text-sm); }
+  .how summary { cursor: pointer; color: var(--text-2); width: fit-content; min-height: var(--control-compact); display: flex; align-items: center; }
+  .how p { color: var(--text-2); max-width: var(--prose-measure); margin: var(--space-2) 0 0; line-height: 1.55; }
+  .destinations { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: var(--space-2) 0 0; }
+  .destinations div { display: contents; }
+  .destinations dt { font-weight: 600; }
+  .destinations dd { margin: 0; color: var(--text-2); }
+  .setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+  .setting-row h3 { margin: 0; font-size: var(--text-base); }
+  .switch-input { flex: none; margin-top: .3rem; }
+  @media (max-width: 760px) {
+    .rows li, .rows.egress li { grid-template-columns: minmax(0, 1fr) auto; }
+    .row-value { grid-column: 1 / -1; white-space: normal; }
   }
 </style>

@@ -290,6 +290,30 @@ class SessionService:
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id, "pinned": pinned})
 
+    def set_session_profile(
+        self: DashboardService,
+        session_id: str,
+        profile: str,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """QUI-P02 — remember a conversation's profile, for every device.
+
+        Careful is sent with each turn as a narrowing override the runtime
+        enforces; storing it here grants nothing and widens nothing. Human-only,
+        with the same visibility boundary as pinning.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if profile not in self.store.CONVERSATION_PROFILES:
+            return ControlResult(ok=False, reason_code="invalid_profile")
+        user_id = principal.delegated_by_user_id
+        if not self.store.set_session_profile(session_id, profile, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        return ControlResult(ok=True, data={"session_id": session_id, "profile": profile})
+
     # Renaming and archiving are organizing actions only — they grant nothing
     # and change no gate, policy, or authority. Both are human-only and respect
     # the same user/session visibility boundary as set_session_pinned: an
@@ -884,6 +908,11 @@ class SessionService:
             archived=bool(row.get("archived", 0)),
             archived_at=row.get("archived_at"),
             origin=str(row.get("origin") or "chat"),
+            conversation_profile=(
+                str(row.get("conversation_profile") or "standard")
+                if str(row.get("conversation_profile") or "standard") in self.store.CONVERSATION_PROFILES
+                else "standard"
+            ),
             match_snippet=str(row.get("match_snippet") or ""),
             match_turn_id=str(row.get("match_turn_id") or ""),
         )

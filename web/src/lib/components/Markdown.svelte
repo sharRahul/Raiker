@@ -243,8 +243,6 @@
     color: var(--text-3);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
   .markdown :global(.md-copy) {
     display: inline-flex;

@@ -148,6 +148,7 @@ CASES: Cases = {
     ("GET", "/api/sessions/{session_id}/turns/{turn_id}/receipt"): _turn_receipt,
     ("GET", "/api/sessions/{session_id}/export/manifest"): _on_session("/export/manifest"),
     ("PUT", "/api/sessions/{session_id}/pin"): _on_session("/pin", {"pinned": True}),
+    ("PUT", "/api/sessions/{session_id}/profile"): _on_session("/profile", {"profile": "careful"}),
     ("PUT", "/api/sessions/{session_id}/rename"): _on_session("/rename", {"title": "Renamed"}),
     ("PUT", "/api/sessions/{session_id}/archive"): _on_session("/archive"),
     ("PUT", "/api/sessions/{session_id}/unarchive"): _on_session("/unarchive"),

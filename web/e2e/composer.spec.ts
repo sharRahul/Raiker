@@ -406,7 +406,7 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await expect(mode).toBeVisible();
   await mode.click();
   await expect(page.getByRole("menu", { name: "Mode" })).toBeVisible();
-  for (const option of ["Plan", "Edit", "Auto"]) {
+  for (const option of ["Plan", "Suggest changes", "Run within limits"]) {
     await expect(page.getByRole("menuitemradio", { name: new RegExp(`^${option}`) })).toBeVisible();
   }
   await page.keyboard.press("Escape");
@@ -606,7 +606,8 @@ test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page })
   await expect(page.getByRole("dialog", { name: /^more$/i })).toBeVisible();
   await page.mouse.move(400, 500);
   const scrim = page.locator(".scrim");
-  await expect(scrim).toHaveCSS("background-color", "rgba(15, 23, 42, 0.48)");
+  // The light theme overlay, `--overlay` (QUI-V01 main text at 48%).
+  await expect(scrim).toHaveCSS("background-color", "rgba(28, 28, 26, 0.48)");
 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /Notifications/ }).first().click();
@@ -688,7 +689,7 @@ test("Models names providers in plain language and offers a real model list", as
 test("Models is one page: the model in use, then My models (QUI-L08)", async ({ page }) => {
   await page.goto("http://raiker.test/#/models");
   await expect(page.getByRole("tablist")).toHaveCount(0);
-  await expect(page.getByText("Model in use")).toBeVisible();
+  await expect(page.locator("#profile-card-title")).toBeVisible();
   await expect(page.getByRole("heading", { name: "My models" })).toBeVisible();
   await capture(page, join(shots, "models-one-page.png"));
 

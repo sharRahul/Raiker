@@ -11,20 +11,20 @@
 
 /* ── Bundled fonts (variable weight, latin + latin-ext) ── */
 @font-face {
-  font-family: "Manrope";
+  font-family: "Inter";
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("./assets/fonts/manrope-latin.woff2") format("woff2");
+  src: url("./assets/fonts/inter-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
     U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Manrope";
+  font-family: "Inter";
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url("./assets/fonts/manrope-latin-ext.woff2") format("woff2");
+  src: url("./assets/fonts/inter-latin-ext.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
     U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
     U+2C60-2C7F, U+A720-A7FF;
@@ -50,7 +50,7 @@
 }
 :root {
   --font-sans:
-    "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
@@ -196,8 +196,8 @@
    governed action, not decoration. They are the only hues outside the three,
    and they are mixed toward the palette so they read as part of it. */
 :root {
-  --brand-gold: #ecd06f;
-  --brand-blue: #2779a7;
+  --brand-gold: #B8871B;
+  --brand-blue: #2F6F8F;
   --brand-grey: #9c9c9c;
   --brand-black: #000000;
   --brand-white: #ffffff;
@@ -225,56 +225,56 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #F8FAFC;
+  --bg: #F7F6F2;
   --surface: #FFFFFF;
-  --sunken: #F1F5F9;
+  --sunken: #EFEEE9;
   --raised: #FFFFFF;
-  --border: #E2E8F0;
-  --border-strong: #CBD5E1;
+  --border: #E4E2DA;
+  --border-strong: #CFCCC2;
   /* Light has almost no luminance to spend — a white card on a near-white
      ground — so the outline stays and is the only separator. */
   --card-edge: var(--border);
 
-  --text-1: #0F172A;
-  --palette-secondary: #475569;
-  --text-2: #475569;
+  --text-1: #1C1C1A;
+  --palette-secondary: #686761;
+  --text-2: #686761;
   /* Small secondary labels must remain AA-readable on both white and the
      composer's slightly sunken surface. */
-  --text-3: #475569;
+  --text-3: #686761;
   --text-inverse: #FFFFFF;
 
   /* Steel blue — the one accent; primary action and active state */
-  --accent: #365F7D;
-  --accent-strong: #294A63;
-  --accent-soft: #E8F0F5;
-  --accent-border: #B7CAD7;
+  --accent: #2F6F8F;
+  --accent-strong: #245A75;
+  --accent-soft: #E8F1F5;
+  --accent-border: #B3CDDA;
 
   /* Gold — the brand mark, and the pending/ask state it also carries */
-  --brand: #ecd06f;
-  --brand-strong: #c9a63d;
-  --brand-soft: #fdf6e2;
-  --brand-border: #ecd06f;
+  --brand: #B8871B;
+  --brand-strong: #8A6411;
+  --brand-soft: #F8F0DC;
+  --brand-border: #DCC07A;
 
   /* Green — success / enabled / allow */
-  --ok: #137333;
-  --ok-soft: #E6F4EA;
-  --ok-border: #B7D8C0;
+  --ok: #2F7D5C;
+  --ok-soft: #F0F7F3;
+  --ok-border: #B4D6C4;
 
   /* Gold — warning / ask / pending */
-  --warn: #866412;
-  --warn-soft: #fdf6e2;
-  --warn-border: #ecd06f;
+  --warn: #8A6411;
+  --warn-soft: #F8F0DC;
+  --warn-border: #DCC07A;
 
   /* Red — danger / deny / critical risk */
-  --danger: #C5221F;
-  --danger-strong: #9F1C1A;
-  --danger-soft: #FCE8E6;
-  --danger-border: #E8B9B5;
+  --danger: #B5453C;
+  --danger-strong: #943830;
+  --danger-soft: #FBEEEC;
+  --danger-border: #E5B9B3;
 
   /* Blue — info / read-only / authenticated trust; the accent's quieter half */
-  --info: #2779a7;
-  --info-soft: #e7f1f7;
-  --info-border: #a9cde1;
+  --info: #2F6F8F;
+  --info-soft: #E8F1F5;
+  --info-border: #B3CDDA;
 
   --neutral-soft: #efefef;
   --neutral-border: #d3d3d4;
@@ -315,8 +315,8 @@
      rather than over a page region — the command palette and full-screen
      pickers. Nothing below a modal may use it. */
   --shadow-3: 0 4px 8px -2px rgba(27, 28, 30, 0.08), 0 24px 56px -12px rgba(27, 28, 30, 0.24);
-  --overlay: rgba(15, 23, 42, 0.48);
-  --focus-ring: #365F7D;
+  --overlay: rgba(28, 28, 26, 0.48);
+  --focus-ring: #2F6F8F;
 
   /* The two themes are composed separately, without redesigning the
      palette. On a light ground a shadow is a real cue and a border is cheap, so
@@ -324,7 +324,7 @@
      is the hairline that keeps an image's boundary obvious *without* putting the
      picture in a card: the asset is the object, the card was chrome around it. */
   --elevation-edge: var(--border);
-  --canvas-edge: rgba(15, 23, 42, 0.14);
+  --canvas-edge: rgba(28, 28, 26, 0.14);
   --canvas-lift: var(--shadow-1);
 
   /* The overlay vocabulary, as a stacking ladder.
@@ -376,50 +376,50 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0B0D10;
-  --surface: #12161F;
-  --sunken: #0F131A;
-  --raised: #171C26;
-  --border: #1F242F;
-  --border-strong: #303847;
+  --bg: #121212;
+  --surface: #1B1B1B;
+  --sunken: #161616;
+  --raised: #222222;
+  --border: #2A2A2A;
+  --border-strong: #3B3B3B;
   /* Dark separates a card from the ground by luminance: the ground
      is #0B0D10 and the card #12161F. An outline on top of that step is a
      second edge doing a job the step already did, and it is what made a page
      of cards read as a grid of boxes rather than as raised paper. */
   --card-edge: transparent;
 
-  --text-1: #E2E8F0;
-  --palette-secondary: #64748B;
-  --text-2: #94A3B8;
-  --text-3: #94A3B8;
-  --text-inverse: #0B0D10;
+  --text-1: #F4F1EA;
+  --palette-secondary: #8C8A84;
+  --text-2: #B7B4AC;
+  --text-3: #B7B4AC;
+  --text-inverse: #121212;
 
-  --accent: #91B4CD;
-  --accent-strong: #B8D0E0;
-  --accent-soft: rgba(145, 180, 205, 0.13);
-  --accent-border: rgba(145, 180, 205, 0.38);
+  --accent: #78B7D5;
+  --accent-strong: #A3CFE4;
+  --accent-soft: rgba(120, 183, 213, 0.13);
+  --accent-border: rgba(120, 183, 213, 0.38);
 
-  --brand: #ecd06f;
-  --brand-strong: #f4e2a4;
-  --brand-soft: rgba(236, 208, 111, 0.14);
-  --brand-border: rgba(236, 208, 111, 0.42);
+  --brand: #E0B64A;
+  --brand-strong: #ECCB78;
+  --brand-soft: rgba(224, 182, 74, 0.14);
+  --brand-border: rgba(224, 182, 74, 0.42);
 
-  --ok: #A7F3D0;
-  --ok-soft: #142E24;
-  --ok-border: #28513F;
+  --ok: #62B68D;
+  --ok-soft: #16291F;
+  --ok-border: #2B5441;
 
-  --warn: #ecd06f;
-  --warn-soft: rgba(236, 208, 111, 0.13);
-  --warn-border: rgba(236, 208, 111, 0.36);
+  --warn: #E0B64A;
+  --warn-soft: rgba(224, 182, 74, 0.13);
+  --warn-border: rgba(224, 182, 74, 0.36);
 
-  --danger: #FFEDD5;
-  --danger-strong: #FFF7ED;
-  --danger-soft: #3E1F11;
-  --danger-border: #704127;
+  --danger: #E47B70;
+  --danger-strong: #F0A39A;
+  --danger-soft: #3A1E1B;
+  --danger-border: #6E3530;
 
-  --info: #7ab6d8;
-  --info-soft: rgba(122, 182, 216, 0.13);
-  --info-border: rgba(122, 182, 216, 0.36);
+  --info: #78B7D5;
+  --info-soft: rgba(120, 183, 213, 0.13);
+  --info-border: rgba(120, 183, 213, 0.36);
 
   --neutral-soft: rgba(156, 156, 156, 0.11);
   --neutral-border: rgba(156, 156, 156, 0.3);
@@ -442,7 +442,7 @@
      #0B0D10 a dark edge disappears, and the boundary of an image is exactly
      what must not. */
   --elevation-edge: var(--border-strong);
-  --canvas-edge: rgba(226, 232, 240, 0.24);
+  --canvas-edge: rgba(244, 241, 234, 0.24);
   --canvas-lift: none;
   --warning: var(--warn);
   --ok-text: var(--ok);
@@ -455,7 +455,7 @@
   --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
   --shadow-3: 0 4px 8px -2px rgba(0, 0, 0, 0.65), 0 28px 64px -12px rgba(0, 0, 0, 0.9);
   --overlay: rgba(3, 5, 8, 0.72);
-  --focus-ring: #91B4CD;
+  --focus-ring: #78B7D5;
 }
 
 /* System preference drives the default when the user hasn't chosen. */
@@ -469,46 +469,46 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #0B0D10;
-    --surface: #12161F;
-    --sunken: #0F131A;
-    --raised: #171C26;
-    --border: #1F242F;
-    --border-strong: #303847;
+    --bg: #121212;
+    --surface: #1B1B1B;
+    --sunken: #161616;
+    --raised: #222222;
+    --border: #2A2A2A;
+    --border-strong: #3B3B3B;
     --card-edge: transparent;
 
-    --text-1: #E2E8F0;
-    --palette-secondary: #64748B;
-    --text-2: #94A3B8;
-    --text-3: #94A3B8;
-    --text-inverse: #0B0D10;
+    --text-1: #F4F1EA;
+    --palette-secondary: #8C8A84;
+    --text-2: #B7B4AC;
+    --text-3: #B7B4AC;
+    --text-inverse: #121212;
 
-    --accent: #91B4CD;
-    --accent-strong: #B8D0E0;
-    --accent-soft: rgba(145, 180, 205, 0.13);
-    --accent-border: rgba(145, 180, 205, 0.38);
+    --accent: #78B7D5;
+    --accent-strong: #A3CFE4;
+    --accent-soft: rgba(120, 183, 213, 0.13);
+    --accent-border: rgba(120, 183, 213, 0.38);
 
-    --brand: #ecd06f;
-    --brand-strong: #f4e2a4;
-    --brand-soft: rgba(236, 208, 111, 0.14);
-    --brand-border: rgba(236, 208, 111, 0.42);
+    --brand: #E0B64A;
+    --brand-strong: #ECCB78;
+    --brand-soft: rgba(224, 182, 74, 0.14);
+    --brand-border: rgba(224, 182, 74, 0.42);
 
-    --ok: #A7F3D0;
-    --ok-soft: #142E24;
-    --ok-border: #28513F;
+    --ok: #62B68D;
+    --ok-soft: #16291F;
+    --ok-border: #2B5441;
 
-    --warn: #ecd06f;
-    --warn-soft: rgba(236, 208, 111, 0.13);
-    --warn-border: rgba(236, 208, 111, 0.36);
+    --warn: #E0B64A;
+    --warn-soft: rgba(224, 182, 74, 0.13);
+    --warn-border: rgba(224, 182, 74, 0.36);
 
-    --danger: #FFEDD5;
-    --danger-strong: #FFF7ED;
-    --danger-soft: #3E1F11;
-    --danger-border: #704127;
+    --danger: #E47B70;
+    --danger-strong: #F0A39A;
+    --danger-soft: #3A1E1B;
+    --danger-border: #6E3530;
 
-    --info: #7ab6d8;
-    --info-soft: rgba(122, 182, 216, 0.13);
-    --info-border: rgba(122, 182, 216, 0.36);
+    --info: #78B7D5;
+    --info-soft: rgba(120, 183, 213, 0.13);
+    --info-border: rgba(120, 183, 213, 0.36);
 
     --neutral-soft: rgba(156, 156, 156, 0.11);
     --neutral-border: rgba(156, 156, 156, 0.3);
@@ -531,7 +531,7 @@
        #0B0D10 a dark edge disappears, and the boundary of an image is exactly
        what must not. */
     --elevation-edge: var(--border-strong);
-    --canvas-edge: rgba(226, 232, 240, 0.24);
+    --canvas-edge: rgba(244, 241, 234, 0.24);
     --canvas-lift: none;
     --warning: var(--warn);
     --ok-text: var(--ok);
@@ -544,13 +544,13 @@
     --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
   --shadow-3: 0 4px 8px -2px rgba(0, 0, 0, 0.65), 0 28px 64px -12px rgba(0, 0, 0, 0.9);
     --overlay: rgba(3, 5, 8, 0.72);
-    --focus-ring: #91B4CD;
+    --focus-ring: #78B7D5;
   }
 }
 
 /* ── UI preferences (Settings → Personalisation) ──
    Applied as data attributes on <html> by lib/prefs.svelte.ts. Presentation
-   only; the defaults (no attribute) are the comfortable Manrope layout.
+   only; the defaults (no attribute) are the comfortable Inter layout.
 
    Density is a real mode rather than a gap adjustment. This workspace is dense
    by nature and its two readers want opposite things: someone following a long
@@ -717,6 +717,21 @@ code,
 ::selection {
   background: var(--accent-soft);
   color: var(--text-1);
+}
+
+/* The parts the browser draws carry the palette too: the caret in the accent,
+   and figures in tables and meters set in tabular numerals so a column of
+   numbers lines up (impeccable's craft floor, "browser surfaces"). */
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: var(--accent);
+}
+td,
+th,
+meter,
+time {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Motion, as three named intents ──
@@ -1211,7 +1226,7 @@ code,
   background: var(--sunken);
 }
 /* A column of numbers is compared vertically, so its digits have to line up.
-   Manrope's proportional figures do not, which is why a spend column read as
+   Inter's proportional figures do not, which is why a spend column read as
    ragged however carefully it was aligned. Marking the cell — not the table —
    keeps the label columns in the reading face. */
 .table th.numeric,
@@ -1225,14 +1240,13 @@ code,
   text-align: right;
 }
 
-/* A kicker is the one thing the uppercase rule leaves in uppercase: tiny metadata sitting
-   above a heading, where the caps *are* the hierarchy. The tracking comes down,
-   because 0.09em at this size is decoration rather than legibility. */
+/* A kicker is small metadata above a heading. Since 2026-10-25 it is sentence case
+   with no tracking: an uppercase, letter-spaced label above a heading is decoration
+   doing the heading's job (impeccable's craft floor), and the heading below it
+   carries its own weight. Size, weight and colour are what set it apart. */
 .kicker {
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--text-3);
   margin: 0 0 var(--space-1);
 }
@@ -1245,10 +1259,8 @@ code,
    0.08, 0.09, 0.12em). None of them disagreed on purpose; they were written
    separately, which is all it takes (the surface archetypes, the uppercase rule). */
 .eyebrow {
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--accent);
   margin: 0 0 var(--space-1);
 }
@@ -1267,6 +1279,15 @@ code,
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
+}
+/* A page's help link sits with the page's own actions, at the end of the row,
+   rather than alone at its start: on its own it read as a stray icon above the
+   page (seen on Models, Memory and Checkpoints, 2026-10-25). When it is the
+   only thing in the row, the row ends with it. */
+:is(.head-row, .page-intro, .services-head) > .guide-link:first-child {
+  order: 1;
+  margin-left: auto;
+  align-self: center;
 }
 /* 720px, which is the width all eight private copies already used. */
 @media (max-width: 720px) {

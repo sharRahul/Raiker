@@ -47,6 +47,8 @@ export interface DesktopBridge {
   openWindow?(hash: string): void;
   /** QUI-F01 — close this window (Quick Entry). */
   closeWindow?(): void;
+  /** Quick Entry before sign-in — bring the main window forward; absent from older shells. */
+  showMainWindow?(): void;
 }
 
 declare global {

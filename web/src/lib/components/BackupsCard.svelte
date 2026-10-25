@@ -114,7 +114,7 @@
   <div class="backups-head">
     <div class="card-heading">
       <h3 id="backups-heading">Backups</h3>
-      <p>A checked copy of this workspace. Raiker also takes one before an update and keeps the last three.</p>
+      <p>A checked copy of this workspace; one is also taken before each update, and the last three are kept.{#if !loadError && view && view.backups.length === 0} <span>No backups yet.</span>{/if}</p>
     </div>
     <button type="button" class="btn btn-primary btn-sm" disabled={busy !== null} onclick={backUp}>
       {busy === "create" ? "Backing up…" : "Back up now"}
@@ -147,9 +147,7 @@
   {/if}
   {#if loadError}
     <p class="sub" data-testid="backups-unreadable">{loadError}</p>
-  {:else if view && view.backups.length === 0}
-    <p class="sub">No backups yet.</p>
-  {:else if view}
+  {:else if view && view.backups.length > 0}
     <ul class="backups">
       {#each view.backups as backup (backup.backup_id)}
         <li data-state={backup.state}>
@@ -172,6 +170,7 @@
 
 <style>
   /* The Account page's card, which its scoped styles do not reach in here. */
+  .backups-head > .btn { flex: none; white-space: nowrap; }
   .backups-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
   .holds summary { cursor: pointer; color: var(--text-2); font-size: var(--text-sm); margin-top: var(--space-2); }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--space-4) var(--card-pad-x); margin-bottom: var(--space-3); }

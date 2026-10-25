@@ -369,6 +369,15 @@ function installIpc(): void {
     if (window === quickEntry) window.hide();
     else window.close();
   });
+  ipcMain.on(CHANNELS.showMain, (event) => {
+    if (originOf(event.sender) === null) return;
+    // Asked from Quick Entry when nobody is signed in: the small window steps
+    // aside and the main window, where the lock screen is, comes forward.
+    if (quickEntry !== null && !quickEntry.isDestroyed() && BrowserWindow.fromWebContents(event.sender) === quickEntry) {
+      quickEntry.hide();
+    }
+    showMainWindow();
+  });
   ipcMain.on(CHANNELS.focus, (event) => {
     if (originOf(event.sender) === null) return;
     const window = BrowserWindow.fromWebContents(event.sender);

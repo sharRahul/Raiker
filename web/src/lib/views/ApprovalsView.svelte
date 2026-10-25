@@ -592,7 +592,8 @@
         {/each}
       </select>
     </label>
-  {:else}
+  {:else if (approvals ?? []).length > 0}
+    <!-- An empty queue hides its sort, as an empty list hides its search. -->
     <label class="sort-control">
       <span class="sr-only">Sort approvals</span>
       <select class="select" aria-label="Sort approvals" bind:value={sort}>
@@ -1218,8 +1219,6 @@
   .meta dt {
     font-size: var(--text-xs);
     font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-3);
   }
   .meta dd {

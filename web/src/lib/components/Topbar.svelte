@@ -318,8 +318,8 @@
   .panel-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2)}
   .panel-empty{color:var(--text-3);font-size:var(--text-sm);margin:0}
   .panel ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem;max-height:19rem;overflow:auto}
-  .panel li{display:grid;gap:.1rem;font-size:var(--text-sm);border-left:2px solid transparent;padding-left:.5rem}
-  .panel li.unread{border-left-color:var(--accent)}
+  .panel li{display:grid;gap:.1rem;font-size:var(--text-sm);padding:.25rem .5rem;border-radius:var(--r-sm)}
+  .panel li.unread{background:var(--accent-soft)}
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:var(--text-xs)}
   @media(max-width:1100px){.palette-key{display:none}}

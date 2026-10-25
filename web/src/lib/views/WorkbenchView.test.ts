@@ -584,6 +584,37 @@ describe("WorkbenchView", () => {
     );
   });
 
+  // BUG-357 — the default-model gap offers the model Chat already uses, and
+  // sets it only when pressed.
+  it("offers Chat's model as the default and sets it only when asked", async () => {
+    const fetch = stubFetch(
+      routes({
+        "GET /api/diagnostics": { missing_config: ["No model profile is selected."], production_ready_local_single_user_runtime: true },
+        "GET /api/surface-models": { surfaces: { chat: { profile_id: "prof_anthropic", model: "claude-haiku-4-5-20251001" } } },
+        "PUT /api/model-selection": { profile_id: "prof_anthropic", model: "claude-haiku-4-5-20251001" },
+      }),
+    );
+    render(WorkbenchView);
+    const offer = await screen.findByRole("button", { name: "Use Haiku 4.5, as in Chat" });
+    expect(fetch.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(false);
+    await fireEvent.click(offer);
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([input, init]) => String(input).includes("/api/model-selection") && (init as RequestInit | undefined)?.method === "PUT",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("keeps only the link to Models when Chat has no model of its own", async () => {
+    stubFetch(routes({ "GET /api/diagnostics": { missing_config: ["No model profile is selected."], production_ready_local_single_user_runtime: true } }));
+    render(WorkbenchView);
+    const list = await screen.findByRole("list", { name: "Setup Raiker still needs" });
+    expect(within(list).queryByRole("button")).toBeNull();
+    expect(within(list).getByRole("link", { name: "Choose a model" })).toBeInTheDocument();
+  });
+
   it("shows a loading state for live status before it is known", async () => {
     stubFetchPending();
     render(WorkbenchView);

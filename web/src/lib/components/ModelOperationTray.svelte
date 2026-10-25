@@ -107,9 +107,7 @@
     background: var(--surface-raised);
   }
   .tray-body strong {
-    text-transform: uppercase;
     font-size: var(--text-2xs);
-    letter-spacing: 0.08em;
   }
   .tray-body small {
     color: var(--text-muted);

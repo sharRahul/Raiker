@@ -37,6 +37,6 @@
   .machine .identity-mark { color:var(--accent); }
   .identity-copy { display:flex; align-items:baseline; gap:.38rem; min-width:0; }
   strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--text-xs); font-weight:650; }
-  small { color:var(--text-2); font-size:var(--text-2xs); letter-spacing:.02em; text-transform:uppercase; white-space:nowrap; }
+  small { color:var(--text-2); font-size:var(--text-2xs); white-space:nowrap; }
   @media (max-width:520px) { .identity-copy { align-items:flex-start; flex-direction:column; gap:0; } }
 </style>

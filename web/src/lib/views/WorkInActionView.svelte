@@ -375,7 +375,7 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
   .desk-label { text-align:center; }
   .desk-label h3 { margin:0; font-size:var(--text-sm); }
   .desk-label p { margin:3px 0 0; color:var(--text-2); font-size:var(--text-sm); }
-  .mood-tag { display:inline-block; margin-top:5px; font-size:var(--text-2xs); font-weight:700; text-transform:uppercase; letter-spacing:0.06em; padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--border); color:var(--text-2); }
+  .mood-tag { display:inline-block; margin-top:5px; font-size:var(--text-2xs); font-weight:700; padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--border); color:var(--text-2); }
   .mood-tag[data-mood="working"] { color:var(--accent); border-color:var(--accent-border); background:var(--accent-soft); }
   .mood-tag[data-mood="idle"] { color:var(--text-3); }
   .mood-tag[data-mood="queued"] { color:var(--warn); border-color:var(--warn-border); background:var(--warn-soft); }

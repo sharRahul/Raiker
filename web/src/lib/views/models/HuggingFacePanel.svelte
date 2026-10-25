@@ -889,7 +889,7 @@
     justify-content: space-between;
     gap: 18px;
     padding: 16px 18px;
-    border-left: 3px solid var(--accent);
+    border: 1px solid var(--accent-border);
   }
   .curated-embedding p {
     margin: 3px 0 0;

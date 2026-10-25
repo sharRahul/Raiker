@@ -702,6 +702,13 @@ class MoveProjectRequest(StrictRequest):
     expected_revision: str | None = None
 
 
+class SetSessionProfileRequest(StrictRequest):
+    # QUI-P02 — a conversation's profile. Careful narrows each turn; Standard
+    # sends no override. A label only: it grants nothing.
+
+    profile: Literal["careful", "standard"]
+
+
 class SetSessionPinnedRequest(StrictRequest):
     # Pin (or unpin) a session. Pinning is an organizing label only — it grants
     # nothing. The strict base rejects unknown fields.

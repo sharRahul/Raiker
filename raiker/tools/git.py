@@ -718,6 +718,60 @@ def _commit_lines(root: Path, selection: list[str]) -> list[str]:
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
+#: TOOL-30 — how many outgoing commits the push preview scans for credentials,
+#: and how many findings it names.
+_MAX_SCANNED_COMMITS = 200
+_MAX_SECRET_FINDINGS = 20
+_HUNK_START = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def outgoing_secret_findings(root: Path, selection: list[str]) -> list[dict[str, Any]]:
+    """Credential-shaped values the outgoing commits *add*, by path and line.
+
+    TOOL-30. Reads the added lines of every commit a push would send (lines a
+    later commit removes still count: the remote keeps history), matches them
+    against the shapes CI fails on, and drops what the repository excuses in
+    its own ``.github/secret-scan-exceptions.json``. A value is reported as a
+    fingerprint, never as itself.
+    """
+    from raiker.security.secret_shapes import excused, matches, skipped
+
+    proc = _git(
+        root,
+        ["log", "-p", "--no-color", "--no-ext-diff", "--format=", "--unified=0",
+         f"-n{_MAX_SCANNED_COMMITS}", *selection],
+        timeout=30,
+    )
+    if proc.returncode != 0:
+        return []
+    allowed = excused(root)
+    findings: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    path = ""
+    line_number = 0
+    for raw in proc.stdout.splitlines():
+        if raw.startswith("+++ "):
+            target = raw[4:].strip()
+            path = target[2:] if target.startswith("b/") else ""
+            continue
+        hunk = _HUNK_START.match(raw)
+        if hunk:
+            line_number = int(hunk.group(1))
+            continue
+        if not raw.startswith("+") or not path or skipped(path):
+            continue
+        for rule, label in matches(raw[1:]):
+            key = (path, label)
+            if key in seen or key in allowed:
+                continue
+            seen.add(key)
+            findings.append({"path": path, "line": line_number, "rule": rule, "fingerprint": label})
+            if len(findings) >= _MAX_SECRET_FINDINGS:
+                return findings
+        line_number += 1
+    return findings
+
+
 def _outgoing(remote: str, branch: str, tracking: str) -> list[str]:
     """The commits a push would send, as rev-list arguments.
 
@@ -862,6 +916,20 @@ def proposed_push_snapshot(
     if tracking and ahead == 0:
         return _failed("nothing_to_push", remote=remote_name, branch=branch_name)
     commits = _commit_lines(root, selection)
+    # TOOL-30 — a pushed credential cannot be taken back, so a push whose
+    # commits add one is refused here, before the owner is asked to approve it.
+    secrets = outgoing_secret_findings(root, selection)
+    if secrets:
+        return _failed(
+            "outgoing_commits_contain_credentials",
+            remote=remote_name,
+            branch=branch_name,
+            findings=secrets,
+            next_step=(
+                "Remove the credential from the commits (rewrite them), rotate it if it was real, "
+                "or record a deliberate test fixture in .github/secret-scan-exceptions.json."
+            ),
+        )
     return {
         "status": "success",
         "remote": remote_name,

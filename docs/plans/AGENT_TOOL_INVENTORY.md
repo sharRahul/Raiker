@@ -1,7 +1,13 @@
 # Agent tool inventory — tools to bring into Raiker
 
-**Proposed, 2026-10-25. Nothing in this document has shipped.** It is the
-input to the planned refactor of Raiker's tools and capabilities. It records
+**Proposed, 2026-10-25.** It is the
+input to the planned refactor of Raiker's tools and capabilities. **First
+round shipped 2026-10-25** ([FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02) to
+[FIXED-1204](FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live); live cases RT-TOOL-01 to RT-TOOL-10 in
+[WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md)): the owner chose
+this document for the round and that the *Proposed Raiker capability* column
+is the decision for the items taken. Everything not named in the status table
+below is still a backlog idea. It records
 the tools of three agents, so the refactor can see the whole field before it
 reshapes Raiker's own set:
 
@@ -15,8 +21,8 @@ reshapes Raiker's own set:
   sibling Muse Code (TOOL-140 – TOOL-153).
 
 The [capability matrix](#capability-matrix) puts the three side by side with
-Raiker today. Each item is a backlog idea, not a decision: it still needs its
-own design, threat model and approval in the usual way
+Raiker today. Each item not taken in a round is a backlog idea, not a
+decision: it still needs its own design, threat model and approval in the usual way
 ([THREAT_MODEL.md](../architecture/THREAT_MODEL.md),
 [TOOLS_AND_PERMISSIONS_SPEC.md](../architecture/TOOLS_AND_PERMISSIONS_SPEC.md)).
 
@@ -43,15 +49,20 @@ These come from the existing posture and do not change per item:
 
 | Item | State |
 |---|---|
-| TOOL-01 – TOOL-12 (agent loop) | **Open** |
-| TOOL-20 – TOOL-31 (GitHub) | **Open** |
-| TOOL-40 – TOOL-47 (sessions, schedules, notifications) | **Open** |
-| TOOL-60 – TOOL-66 (artifacts, documents, design) | **Open** |
-| TOOL-70 – TOOL-75 (skills, plugins, connectors) | **Open** |
-| TOOL-80 – TOOL-83 (third-party connector families) | **Open** |
-| TOOL-90 – TOOL-109 (Claude API tools and Claude app features) | **Open** |
-| TOOL-110 – TOOL-131 (Hermes Agent) | **Open** |
-| TOOL-140 – TOOL-153 (Muse) | **Open** |
+| TOOL-02 | **Partly done.** `grep` takes `regex`, `ignore_case`, `context`, `path`, `include` and `max_results` ([FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)); `edit_file` takes `replace_all` ([FIXED-1190](FIXED_ITEMS.md#fixed-1190--edit_file-could-replace-exactly-one-occurrence-tool-02)); `read_file` reads a line range and a PDF's pages ([FIXED-1192](FIXED_ITEMS.md#fixed-1192--read_file-read-the-first-200-kb-of-a-text-file-and-nothing-else-tool-02)). Open: images in `read_file`. |
+| TOOL-04 | **Partly done.** Plan steps carry `blocked_by` ([FIXED-1202](FIXED_ITEMS.md#fixed-1202--plan-steps-could-not-say-what-they-waited-on-tool-04)). Open: an owner per item and stopping a running item. |
+| TOOL-08 | **Done.** A recommended option and a preview per option ([FIXED-1193](FIXED_ITEMS.md#fixed-1193--a-question-could-not-say-which-option-raiker-would-choose-tool-08)). |
+| TOOL-20, TOOL-22 | **Partly done.** `github_read` `checks`, `workflow_runs` and `run_jobs`, with failure annotations and failed steps ([FIXED-1197](FIXED_ITEMS.md#fixed-1197--build-could-not-read-its-own-ci-tool-20-tool-22)). Open: raw job logs, served from a host outside the connector egress rule. |
+| TOOL-23, TOOL-24 | **Partly done.** `github_read` `commits` and `file` at a ref ([FIXED-1198](FIXED_ITEMS.md#fixed-1198--a-remote-file-or-the-repositorys-history-needed-a-clone-tool-23-tool-24)). Open: branches, tags, releases and code search. |
+| TOOL-26 | **Partly done.** `github_write` `update_pull_request`, title and body only ([FIXED-1199](FIXED_ITEMS.md#fixed-1199--a-pull-request-raiker-opened-could-not-be-corrected-tool-26)). Open: bringing a pull request's branch up to date. Merging stays the owner's. |
+| TOOL-30 | **Done.** A push whose outgoing commits add a credential is refused before the owner is asked ([FIXED-1196](FIXED_ITEMS.md#fixed-1196--a-push-could-publish-a-committed-credential-tool-30)). |
+| TOOL-46 | **Done** for `read_documentation`: `help_read` reads Raiker's own help articles ([FIXED-1200](FIXED_ITEMS.md#fixed-1200--a-how-do-i-question-about-raiker-was-answered-from-memory-tool-46)). The rest of TOOL-46 is about the cloud session and does not apply. |
+| TOOL-90 | **Partly done.** `allowed_domains` and `blocked_domains` on `web_search`, filtered before the turn ([FIXED-1194](FIXED_ITEMS.md#fixed-1194--web_search-could-not-be-kept-to-sources-the-turn-trusted-tool-90)). |
+| TOOL-91 | **Partly done.** `max_chars` on `web_fetch` ([FIXED-1195](FIXED_ITEMS.md#fixed-1195--every-web_fetch-cost-up-to-20000-characters-of-context-tool-91)). Open: the provenance rule (a URL from the owner or an earlier result) and PDF pages. |
+| TOOL-99 | **Partly done.** `insert_line` on `edit_file` ([FIXED-1191](FIXED_ITEMS.md#fixed-1191--edit_file-could-not-insert-at-a-line-tool-99)). Open: merging the editor tools into one, which waits for the refactor. |
+| TOOL-124 | **Done.** A task's prompt is scanned for injected instructions when it is saved ([FIXED-1201](FIXED_ITEMS.md#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124)). |
+| TOOL-131 | **Partly done.** `/compress` and `/insights` in Chat ([FIXED-1203](FIXED_ITEMS.md#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131)). Open: Build's composer. |
+| Every other item | **Open** |
 | Capability matrix | **Input to the tools refactor** |
 
 ## The agent loop

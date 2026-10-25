@@ -45,6 +45,8 @@ ACTIVE_STATUS = "in_progress"
 MAX_PLAN_STEPS = 20
 MAX_TITLE_CHARS = 200
 MAX_NOTE_CHARS = 280
+#: TOOL-04 — how many other steps one step may wait on.
+MAX_BLOCKED_BY = 5
 
 
 class PlanValidationError(ValueError):
@@ -62,11 +64,15 @@ class PlanStep:
     title: str
     status: str
     note: str = ""
+    #: TOOL-04 — the 1-based numbers of the steps this one waits on.
+    blocked_by: tuple[int, ...] = ()
 
-    def to_dict(self) -> dict[str, str]:
-        payload = {"title": self.title, "status": self.status}
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"title": self.title, "status": self.status}
         if self.note:
             payload["note"] = self.note
+        if self.blocked_by:
+            payload["blocked_by"] = list(self.blocked_by)
         return payload
 
 
@@ -97,11 +103,65 @@ def normalize_steps(raw: object) -> list[PlanStep]:
         note = str(entry.get("note", "")).strip()
         if len(note) > MAX_NOTE_CHARS:
             raise PlanValidationError(f"plan_step_note_too_long:{index}")
-        steps.append(PlanStep(title=title, status=status, note=note))
+        steps.append(
+            PlanStep(
+                title=title,
+                status=status,
+                note=note,
+                blocked_by=_blocked_by(entry.get("blocked_by"), index, len(raw)),
+            )
+        )
     active = [step for step in steps if step.status == ACTIVE_STATUS]
     if len(active) > 1:
         raise PlanValidationError(f"plan_multiple_steps_in_progress:{len(active)}")
+    _check_dependencies(steps)
     return steps
+
+
+def _blocked_by(raw: object, index: int, count: int) -> tuple[int, ...]:
+    """A step's dependencies: other steps' numbers, 1-based, bounded."""
+    if raw is None or raw == []:
+        return ()
+    if not isinstance(raw, list) or len(raw) > MAX_BLOCKED_BY:
+        raise PlanValidationError(f"plan_step_blocked_by_invalid:{index}")
+    numbers: list[int] = []
+    for value in raw:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise PlanValidationError(f"plan_step_blocked_by_invalid:{index}")
+        if not 1 <= value <= count or value == index + 1:
+            raise PlanValidationError(f"plan_step_blocked_by_unknown_step:{index}:{value}")
+        numbers.append(value)
+    return tuple(sorted(set(numbers)))
+
+
+def _check_dependencies(steps: list[PlanStep]) -> None:
+    """No cycle, and nothing started or finished ahead of what it waits on.
+
+    A plan whose step 3 is *in progress* while the step it waits on is still
+    pending says something untrue about the work, so it is refused with a
+    reason the model can correct rather than drawn.
+    """
+    for index, step in enumerate(steps):
+        if step.status in (ACTIVE_STATUS, "completed"):
+            for number in step.blocked_by:
+                if steps[number - 1].status != "completed":
+                    raise PlanValidationError(f"plan_step_ahead_of_dependency:{index}:{number}")
+    visiting: set[int] = set()
+    done: set[int] = set()
+
+    def visit(number: int) -> None:
+        if number in done:
+            return
+        if number in visiting:
+            raise PlanValidationError(f"plan_dependency_cycle:{number}")
+        visiting.add(number)
+        for other in steps[number - 1].blocked_by:
+            visit(other)
+        visiting.discard(number)
+        done.add(number)
+
+    for number in range(1, len(steps) + 1):
+        visit(number)
 
 
 def plan_summary(steps: list[PlanStep]) -> dict[str, Any]:
@@ -186,6 +246,7 @@ def plan_context_message(plan: dict[str, Any]) -> str:
     """
     lines = [
         f"{index + 1}. {_STATUS_MARK.get(str(step.get('status')), '[ ]')} {step.get('title')}"
+        + (f" (after step {', '.join(str(n) for n in step['blocked_by'])})" if step.get("blocked_by") else "")
         + (f" — {step['note']}" if step.get("note") else "")
         for index, step in enumerate(plan.get("steps", []))
     ]

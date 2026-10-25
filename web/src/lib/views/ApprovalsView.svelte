@@ -16,6 +16,7 @@
     subscribeApprovalResolved,
   } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
+  import { ownerQuestions, previewFor } from "../clarify";
   import { approvalBadge } from "../statusMaps";
   import { elevatedRisk } from "../rowTokens";
   import { capabilityLabel } from "../capabilityModel";
@@ -241,10 +242,10 @@
   // the server refuses any label it did not offer.
   const OWNER_QUESTION_TOOL = "ask_owner_question";
   const isQuestion = $derived(selected?.approval.tool_name === OWNER_QUESTION_TOOL);
+  // Read through the same parser as Chat's card, so a recommendation and a
+  // preview mean the same thing on both surfaces (TOOL-08).
   const questions = $derived<OwnerQuestion[]>(
-    isQuestion && Array.isArray((selected?.arguments as Record<string, unknown>)?.questions)
-      ? (((selected?.arguments as Record<string, unknown>).questions as OwnerQuestion[]) ?? [])
-      : [],
+    isQuestion && selected ? (ownerQuestions({ tool_name: selected.approval.tool_name, arguments: selected.arguments }) ?? []) : [],
   );
   let picked = $state<Record<string, string[]>>({});
   let ownWords = $state("");
@@ -804,9 +805,13 @@
                   onchange={() => toggle(question, option.label)}
                   disabled={busy}
                 />
-                <span><strong>{option.label}</strong> — {option.description}</span>
+                <span
+                  ><strong>{option.label}</strong>{#if option.recommended}<span class="recommended">Recommended</span>{/if} — {option.description}</span
+                >
               </label>
             {/each}
+            {#if previewFor(question, picked[question.question] ?? [])}<pre class="preview" aria-label="Preview of your choice"
+                >{previewFor(question, picked[question.question] ?? [])}</pre>{/if}
           </fieldset>
         {/each}
         <label class="field-label" for="own-words">Or answer in your own words</label>
@@ -1294,4 +1299,6 @@
      not change shape when the editor opens. */
   .edit-block { display: grid; gap: var(--space-2); }
   .edit-block .textarea { font-family: var(--font-mono, ui-monospace, monospace); }
+  .recommended{margin-left:var(--space-2);padding:0 .35rem;border:1px solid var(--accent);border-radius:var(--r-sm);font-size:var(--text-xs);font-weight:600;color:var(--accent)}
+  .preview{margin:var(--space-2) 0 0;padding:var(--space-2);max-height:14rem;overflow:auto;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-xs);white-space:pre-wrap}
 </style>

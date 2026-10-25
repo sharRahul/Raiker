@@ -169,6 +169,8 @@ class TestSourceDerivation:
                 {"count": 1, "results": [{"title": "Keys", "created_at": "2026-03-12T00:00:00Z", "text": "monthly"}]},
             ),
             "skill_load": ({"name": "brief"}, {"content": "steps"}),
+            # TOOL-46 — one help article, cited by its title and slug.
+            "help_read": ({"slug": "memory"}, {"slug": "memory", "title": "Memory", "text": "how it works"}),
             "github_read": ({"repo": "o/r", "number": "1"}, {"title": "Issue", "content": "body"}),
             "gmail_read": ({}, {"subject": "Renewal", "message_id": "m1", "content": "text"}),
             "gcal_read": ({}, {"title": "Standup", "event_id": "e1", "content": "text"}),

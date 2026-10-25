@@ -48,7 +48,11 @@ class WebFetchExecutor:
         service = WebAccessService(
             self._workspace_root, self._store, principal_id=principal.principal_id
         )
-        result = service.fetch(url, authority=current_routed_authority(action.action_id))
+        raw_cap = action.arguments.get("max_chars")
+        cap = raw_cap if isinstance(raw_cap, int) and not isinstance(raw_cap, bool) else None
+        result = service.fetch(
+            url, authority=current_routed_authority(action.action_id), max_chars=cap
+        )
         if result.get("status") != "success":
             error = result.get("error") or {}
             reason = str(error.get("type") or "web_fetch_failed")

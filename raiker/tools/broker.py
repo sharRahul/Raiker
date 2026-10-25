@@ -61,6 +61,7 @@ from raiker.tools.conversation_tools import conversation_search
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
+    edit_options,
     list_directory,
     proposed_edit_snapshot,
     proposed_patch_snapshot,
@@ -78,6 +79,7 @@ from raiker.tools.git import (
     selected_repository_subpath,
 )
 from raiker.tools.graph_tools import knowledge_graph
+from raiker.tools.help_tools import help_read
 from raiker.tools.language_tools import diagnostics, document_symbols, find_definition
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_call, mcp_tool_specs
 from raiker.tools.memory_tools import (
@@ -151,6 +153,17 @@ def _drops_result_content(tool_name: str) -> bool:
     return tool_name in _CONTENT_RESULT_TOOLS or is_mcp_tool(tool_name)
 
 
+def _bounded_int(value: Any, default: int, low: int, high: int) -> int:
+    """A model-supplied count, clamped; anything that is not a number is the default."""
+    if isinstance(value, bool):
+        return default
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(number, high))
+
+
 class ToolBroker:
     def __init__(
         self,
@@ -195,7 +208,12 @@ class ToolBroker:
         )
         self.executors: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "read_file": lambda args: read_file(
-                self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
+                self.workspace_root,
+                str(args.get("path", ".")),
+                offset=_bounded_int(args.get("offset"), 0, 0, 10_000_000) or None,
+                limit=_bounded_int(args.get("limit"), 0, 0, 100_000) or None,
+                pages=str(args["pages"]) if args.get("pages") else None,
+                authority=self.path_authority,
             ),
             "list_directory": lambda args: list_directory(
                 self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
@@ -209,8 +227,11 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("query", "")),
                 str(args.get("path", ".")),
-                include=str(args.get("include", "*")),
-                max_results=int(args.get("max_results", 100)),
+                include=str(args.get("include", "*") or "*"),
+                max_results=_bounded_int(args.get("max_results"), 100, 1, 500),
+                regex=args.get("regex") is True,
+                ignore_case=args.get("ignore_case") is True,
+                context=_bounded_int(args.get("context"), 0, 0, 5),
             ),
             "stat_path": lambda args: stat_path(
                 self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
@@ -224,6 +245,10 @@ class ToolBroker:
                 # from the same discovery the projection uses so a search can
                 # never return a tool the turn could not have been offered.
                 mcp_specs=mcp_tool_specs(self.workspace_root, self.store, self.principal_id),
+            ),
+            # TOOL-46 — the guide this install ships, static and local.
+            "help_read": lambda args: help_read(
+                str(args.get("slug", "") or ""), str(args.get("query", "") or "")
             ),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
@@ -246,6 +271,7 @@ class ToolBroker:
                 str(args.get("path", ".")),
                 str(args.get("old_text", "")),
                 str(args.get("new_text", "")),
+                **edit_options(args),
                 authority=self.path_authority,
             ),
             "apply_patch": lambda args: proposed_patch_snapshot(
@@ -304,6 +330,8 @@ class ToolBroker:
                 str(args.get("resource", "")),
                 str(args.get("repo", "")),
                 args.get("number", ""),
+                ref=str(args["ref"]) if args.get("ref") else None,
+                path=str(args["path"]) if args.get("path") else None,
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -332,6 +360,7 @@ class ToolBroker:
             "web_fetch": lambda args: web_fetch(
                 self.workspace_root,
                 str(args.get("url", "")),
+                args.get("max_chars"),
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -339,6 +368,8 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("query", "")),
                 args.get("max_results", 5),
+                args.get("allowed_domains") or (),
+                args.get("blocked_domains") or (),
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -1200,6 +1231,7 @@ class ToolBroker:
                     str(action.arguments.get("path", ".")),
                     str(action.arguments.get("old_text", "")),
                     str(action.arguments.get("new_text", "")),
+                    **edit_options(action.arguments),
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
@@ -1336,9 +1368,23 @@ class ToolBroker:
                 # one as a write to "the proposed path" was how this sentence
                 # would have started lying the moment they became executable.
                 if action.tool_name == "create_task":
+                    from raiker.security.injection_scan import scan_untrusted_text
+
+                    # TOOL-124 — the owner reads a task's instructions before it
+                    # can ever run unattended; say so when they look injected.
+                    signals = scan_untrusted_text(
+                        f"{action.arguments.get('title', '')}\n{action.arguments.get('description', '')}"
+                    )
+                    warning = (
+                        " Its instructions contain text shaped like a prompt injection ("
+                        + ", ".join(sorted({signal.rule for signal in signals}))
+                        + "): read them before approving."
+                        if signals
+                        else ""
+                    )
                     return (
                         "Creates one task in Tasks. It will wait until you run or "
-                        "schedule it."
+                        "schedule it." + warning
                     )
                 if action.tool_name == "assign_session_project":
                     return "Approving moves this conversation into the named project, once."
@@ -1387,6 +1433,8 @@ class ToolBroker:
                     noun = (
                         "pull request"
                         if operation == "create_pull_request"
+                        else "pull request change"
+                        if operation == "update_pull_request"
                         else "comment" if operation == "create_comment" else "write"
                     )
                     return (

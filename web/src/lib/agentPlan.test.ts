@@ -66,3 +66,21 @@ describe("reading a plan out of a live turn", () => {
     expect(hasSteps({ session_id: "s", steps: [{ title: "A", status: "pending" }] })).toBe(true);
   });
 });
+
+describe("TOOL-04 plan dependencies", () => {
+  it("keeps valid step numbers and words them", async () => {
+    const { planFromPayload, waitsOn } = await import("./agentPlan");
+    const plan = planFromPayload({
+      session_id: "s",
+      steps: [
+        { title: "A", status: "completed" },
+        { title: "B", status: "pending" },
+        { title: "C", status: "pending", blocked_by: [1, 2, "x", -1] },
+      ],
+    })!;
+    expect(plan.steps[2].blocked_by).toEqual([1, 2]);
+    expect(waitsOn(plan.steps[2])).toBe("Waits on steps 1 and 2");
+    expect(waitsOn({ title: "D", status: "pending", blocked_by: [3] })).toBe("Waits on step 3");
+    expect(waitsOn(plan.steps[0])).toBeNull();
+  });
+});

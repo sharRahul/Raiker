@@ -56,9 +56,31 @@ export function ownerQuestions(approval: { tool_name: string; arguments?: unknow
       options: Array.isArray(entry.options)
         ? entry.options
             .filter((option): option is Record<string, unknown> => typeof option === "object" && option !== null)
-            .map((option) => ({ label: String(option.label ?? ""), description: String(option.description ?? "") }))
+            .map((option) => ({
+              label: String(option.label ?? ""),
+              description: String(option.description ?? ""),
+              ...(option.recommended === true ? { recommended: true } : {}),
+              ...(typeof option.preview === "string" && option.preview.trim() !== "" ? { preview: option.preview } : {}),
+            }))
             .filter((option) => option.label !== "")
         : [],
     }))
-    .filter((question) => question.question !== "");
+    .filter((question) => question.question !== "")
+    .map((question) => {
+      // A recommendation is one option's tag. More than one is not a
+      // recommendation, so the tags are dropped rather than one being guessed.
+      const marked = question.options.filter((option) => option.recommended).length;
+      return marked > 1
+        ? { ...question, options: question.options.map((option) => ({ label: option.label, description: option.description, ...(option.preview ? { preview: option.preview } : {}) })) }
+        : question;
+    });
+}
+
+/** The option whose preview the card shows: the last one picked, else none. */
+export function previewFor(question: OwnerQuestion, picked: readonly string[]): string | null {
+  for (let index = picked.length - 1; index >= 0; index -= 1) {
+    const option = question.options.find((entry) => entry.label === picked[index]);
+    if (option?.preview) return option.preview;
+  }
+  return null;
 }

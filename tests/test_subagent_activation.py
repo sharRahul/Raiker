@@ -196,7 +196,9 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
         # only by how quickly it can find it.
         ["code_map_references", "code_map_search", "conversation_search",
          "diagnostics", "diff_files", "document_symbols", "find_definition",
-         "git_diff", "git_log", "git_status", "glob", "grep", "knowledge_graph",
+         # TOOL-46 — `help_read` reads the guide this install ships: local,
+         # read-only, no store and no network, the same rule as the rest.
+         "git_diff", "git_log", "git_status", "glob", "grep", "help_read", "knowledge_graph",
          "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
          "skill_load", "stat_path", "vector_get"]
     )

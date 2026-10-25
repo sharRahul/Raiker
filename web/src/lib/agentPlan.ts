@@ -23,7 +23,16 @@ function toStep(raw: unknown): AgentPlanStep | null {
   if (title === "") return null;
   const status = STATUSES.find((candidate) => candidate === entry.status) ?? "pending";
   const note = typeof entry.note === "string" ? entry.note : undefined;
-  return note ? { title, status, note } : { title, status };
+  // TOOL-04 — the steps this one waits on, as 1-based numbers.
+  const blockedBy = Array.isArray(entry.blocked_by)
+    ? entry.blocked_by.filter((value): value is number => Number.isInteger(value) && (value as number) > 0)
+    : [];
+  return {
+    title,
+    status,
+    ...(note ? { note } : {}),
+    ...(blockedBy.length > 0 ? { blocked_by: blockedBy } : {}),
+  };
 }
 
 /** A validated plan, or null when the payload carries no usable steps. */
@@ -48,4 +57,12 @@ export function planFromEvent(event: StreamEvent): AgentPlan | null {
 /** True when a fetched plan has anything worth showing. */
 export function hasSteps(plan: AgentPlan | null): plan is AgentPlan {
   return plan !== null && Array.isArray(plan.steps) && plan.steps.length > 0;
+}
+
+/** "Waits on step 2" / "Waits on steps 2 and 3", for a step with dependencies (TOOL-04). */
+export function waitsOn(step: AgentPlanStep): string | null {
+  const numbers = step.blocked_by ?? [];
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return `Waits on step ${numbers[0]}`;
+  return `Waits on steps ${numbers.slice(0, -1).join(", ")} and ${numbers[numbers.length - 1]}`;
 }

@@ -17,5 +17,17 @@ def grep(
     *,
     include: str = "*",
     max_results: int = 100,
+    regex: bool = False,
+    ignore_case: bool = False,
+    context: int = 0,
 ) -> dict[str, Any]:
-    return grep_files(workspace_root, query, path, include=include, max_results=max_results)
+    return grep_files(
+        workspace_root,
+        query,
+        path,
+        include=include,
+        max_results=max_results,
+        regex=regex,
+        ignore_case=ignore_case,
+        context=context,
+    )

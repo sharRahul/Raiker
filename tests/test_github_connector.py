@@ -445,3 +445,108 @@ class TestGithubConnectorWrite:
             )
         assert outcome["status"] == "success"
         assert outcome["comment_id"] == "42"
+
+
+# ── TOOL-20/22/23/24 — CI, history and files, and TOOL-26 ────────────────────
+
+
+def _routes(responses: dict[str, object]):  # type: ignore[no-untyped-def]
+    seen: list[str] = []
+
+    def fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+        assert url.startswith("https://api.github.com/repos/acme/demo/")
+        seen.append(url)
+        for fragment, payload in responses.items():
+            if fragment in url:
+                text = json.dumps(payload)
+                return {"status": 200, "body_bytes": len(text), "body_text": text, "truncated": False}
+        raise AssertionError(f"unexpected url {url}")
+
+    return fetch, seen
+
+
+def test_checks_for_a_pull_request_name_the_failures_and_their_annotations(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    fetch, seen = _routes({
+        "/pulls/7": {"head": {"sha": "abc123def456"}},
+        "/check-runs/11/annotations": [
+            {"path": "tests/test_a.py", "start_line": 4, "annotation_level": "failure", "message": "assert 1 == 2"}
+        ],
+        "/commits/abc123def456/check-runs": {"check_runs": [
+            {"id": 10, "name": "lint", "status": "completed", "conclusion": "success"},
+            {"id": 11, "name": "tests", "status": "completed", "conclusion": "failure",
+             "output": {"summary": "1 failed"}},
+        ]},
+    })
+    service = GithubConnectorService(workspace, store, fetch_fn=fetch)
+    outcome = service.read("checks", "acme/demo", 7)
+    assert outcome["status"] == "success", outcome
+    assert outcome["failing"] == 1
+    assert outcome["check_counts"] == {"success": 1, "failure": 1}
+    assert "tests/test_a.py:4: failure assert 1 == 2" in outcome["content"]
+    assert outcome["content"].startswith("GitHub content (untrusted data")
+    assert any("/check-runs/11/annotations" in url for url in seen)
+
+
+def test_runs_jobs_commits_and_files_read_without_a_clone(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import base64
+
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    fetch, seen = _routes({
+        "/actions/runs/55/jobs": {"jobs": [{"id": 1, "name": "build", "conclusion": "failure",
+                                           "steps": [{"number": 3, "name": "Run tests", "conclusion": "failure"}]}]},
+        "/actions/runs": {"workflow_runs": [{"id": 55, "name": "CI", "run_number": 9, "head_branch": "main",
+                                             "head_sha": "abc", "conclusion": "failure"}]},
+        "/commits?": [{"sha": "abcdef1234567", "commit": {"message": "Fix it\n\nbody",
+                                                         "author": {"name": "Ann", "date": "2026-10-25T00:00:00Z"}}}],
+        "/contents/src/app.py": {"type": "file", "encoding": "base64",
+                                 "content": base64.b64encode(b"print('hi')\n").decode()},
+    })
+    service = GithubConnectorService(workspace, store, fetch_fn=fetch)
+    runs = service.read("workflow_runs", "acme/demo", ref="main")
+    assert "CI #9 on main" in runs["content"] and "branch=main" in seen[-1]
+    jobs = service.read("run_jobs", "acme/demo", 55)
+    assert jobs["failed_jobs"] == 1 and "failed step 3: Run tests" in jobs["content"]
+    commits = service.read("commits", "acme/demo")
+    assert "abcdef123456 2026-10-25T00:00:00Z Ann: Fix it" in commits["content"]
+    file = service.read("file", "acme/demo", path="src/app.py", ref="v1")
+    assert "print('hi')" in file["content"] and file["size_bytes"] == 12 and "ref=v1" in seen[-1]
+    assert service.read("file", "acme/demo", path="../etc")["error"]["type"] == "invalid_path"
+    assert service.read("checks", "acme/demo")["error"]["type"] == "missing_argument:ref"
+    assert service.read("run_jobs", "acme/demo")["error"]["type"] == "missing_argument:number"
+
+
+def test_new_reads_are_governed_like_the_old_ones(workspace: Path, store: SQLiteStore) -> None:
+    outcome = GithubConnectorService(workspace, store).read("commits", "acme/demo")
+    assert outcome["status"] == "denied"
+    assert outcome["error"]["type"] == "connector_gate_disabled"
+
+
+def test_update_pull_request_changes_only_title_and_body(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    sent: list[dict[str, object]] = []
+
+    def fake_post(url: str, payload: dict[str, object], **kwargs: object) -> dict[str, object]:
+        assert kwargs["method"] == "PATCH" and url.endswith("/repos/acme/demo/pulls/7")
+        sent.append(payload)
+        text = json.dumps({"number": 7, "html_url": "https://github.com/acme/demo/pull/7"})
+        return {"status": 200, "body_text": text, "truncated": False}
+
+    monkeypatch.setattr("raiker.runtime.connectors.post_json_url", fake_post)
+    service = GithubConnectorService(workspace, store)
+    outcome = service.update_pull_request("acme/demo", 7, "New title", None)
+    assert outcome["status"] == "success" and outcome["updated"] == ["title"]
+    assert sent == [{"title": "New title"}]
+    assert service.update_pull_request("acme/demo", 7, "", "  ")["error"]["type"] == "nothing_to_update"
+    specs = {spec.name: spec for spec in default_tool_specs()}
+    assert "update_pull_request" in specs["github_write"].parameters["properties"]["operation"]["enum"]
+    assert specs["github_read"].parameters["required"] == ["resource", "repo"]

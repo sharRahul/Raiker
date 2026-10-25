@@ -15,6 +15,36 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-25 (Agent tool inventory, first round, hosted Anthropic Haiku 4.5)
+
+The first round of the [agent tool inventory](../plans/AGENT_TOOL_INVENTORY.md#status)
+([FIXED-1189](../plans/FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)
+to [FIXED-1204](../plans/FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live)).
+Fresh workspaces served by `raiker-web` at 1440×900, each holding
+`src/shapes.py` and `src/palette.py`. Anthropic was connected through **Add
+model**, with the identity-linked key and its workspace ID typed from the run's
+environment; neither appears in a spec, command, document, screenshot or the
+server log. Spec: `web/e2e/tool-inventory-live.spec.ts`, developed against one
+workspace, then run on a second fresh workspace: **10/10**. The GitHub reads
+and write, the push secret scan, web search domains and the fetch cap need a
+GitHub credential, a remote or a search provider this host does not have; the
+unit suite proves them.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-TOOL-01 | Anthropic connects through **Add model** and becomes the default | ✅ |
+| RT-TOOL-02 | `grep` with `regex: true`, `path` and `context` finds `area_square` and `area_circle` and not the class method; the row reads *Search files “^def area_\w+”* | ✅ |
+| RT-TOOL-03 | `read_file` with `offset 5, limit 2` returns `def area_circle(radius)` and not the first function | ✅ |
+| RT-TOOL-04 | One `edit_file` with `replace_all: true` waits on the Raiker Safety card; **Allow once** renames `colour` to `shade` on all three lines of the file | ✅ after a spec fix (the file is polled: the approved edit runs as the turn resumes) |
+| RT-TOOL-05 | A question card tags *For loop* **Recommended** without selecting it, shows no preview until a pick, and shows *Comprehension*'s preview once it is picked | ✅ |
+| RT-TOOL-06 | A how-do-I question reads Raiker's help: rows *Read Raiker help “connect a model”* and *connecting-a-model*, sources *Help search* and *Help: Connecting a model*, and a receipt that counts no files read | ✅ after a fix found in this round ([FIXED-1200](../plans/FIXED_ITEMS.md#fixed-1200--a-how-do-i-question-about-raiker-was-answered-from-memory-tool-46)): the receipt said *2 files read* and the rows named nothing |
+| RT-TOOL-07 | A plan whose third step has `blocked_by [1, 2]` reads *Waits on steps 1 and 2* under it | ✅ |
+| RT-TOOL-08 | `/insights` after one tool-using turn: *Turns 1 · 2 model calls*, the model, tokens in and out, *$0.0143*, *Tool calls 1*, *Most used: List folder ×1* | ✅ after a fix found in this round ([FIXED-1203](../plans/FIXED_ITEMS.md#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131)): model calls were counted as turns and the cost was unformatted |
+| RT-TOOL-09 | `/compress` after two exchanges says *Summarised … for the model*; the transcript is unchanged | ✅ |
+| RT-TOOL-10 | Two routines saved through `POST /api/tasks`: the ordinary one raises nothing; the one whose instructions carry an override raises *A task's instructions look injected* naming *Weekly report* and the rules, shown in Notifications | ✅ after two fixes found in this round ([FIXED-1201](../plans/FIXED_ITEMS.md#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124), [FIXED-1204](../plans/FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live)): the notice said the text *was used as data*, and the top bar read *2 tasks running* for routines due in 2030 |
+| Suites | Python suite in three shards, ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
+| Visual review | Every capture inspected at original resolution: the help rows, the receipt, the insights sheet's numbers and spacing, the notice wording and the top bar's count were found from the images and fixed. Still seen: the Safety card for an edit does not show the change itself ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-25-agent-tool-inventory-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-25 (Quiet UI brand, Diagnostics and open items, hosted Anthropic Haiku 4.5)
 
 The round of 2026-10-25 across the [Quiet UI plan](../plans/quiet-ui/README.md):

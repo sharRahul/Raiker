@@ -46,6 +46,7 @@
     memory: "spark",
     skill: "code",
     subagent: "eye",
+    help: "help",
   };
 
   const KIND_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@
     memory: "Memory",
     skill: "Skill",
     subagent: "Subagent",
+    help: "Raiker help",
   };
 
   function icon(kind: string): IconName {

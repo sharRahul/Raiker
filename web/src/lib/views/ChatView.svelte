@@ -76,6 +76,8 @@
   import ReadAloudButton from "../components/ReadAloudButton.svelte";
   import { requestSchedule } from "../scheduleHandoff";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
+  import InsightsSheet from "../components/InsightsSheet.svelte";
+  import { latestSettledTurnId, threadInsights } from "../threadInsights";
   import {
     applyMention,
     autoGrow,
@@ -1278,6 +1280,7 @@
   // commands, one controller shared with the other composer.
   const lookups = new ComposerLookups({ href: "#/build", label: "Build" });
   let shortcutsOpen = $state(false);
+  let insightsOpen = $state(false);
 
   const slashItems = $derived.by<MenuItem[]>(() => {
     const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
@@ -1407,6 +1410,15 @@
       // which is the honest outcome rather than a message about it.
       case "stop": if (streaming) void stopRunningTurn(); break;
       case "shortcuts": shortcutsOpen = true; break;
+      // TOOL-131 — through the latest settled turn, exactly as the turn menu's
+      // Summarise does; with nothing settled yet there is nothing to summarise.
+      case "compress": {
+        const through = latestSettledTurnId(turns);
+        if (through === null) projectNotice = "There is nothing to summarise yet.";
+        else void continuity.compactThroughTurn(through);
+        break;
+      }
+      case "insights": insightsOpen = true; void refreshContextUsage(); break;
     }
   }
 
@@ -2593,6 +2605,9 @@
 
       {#if shortcutsOpen}
         <ShortcutSheet surface="chat" onclose={() => (shortcutsOpen = false)} />
+      {/if}
+      {#if insightsOpen}
+        <InsightsSheet insights={threadInsights(turns, contextUsage)} onclose={() => (insightsOpen = false)} />
       {/if}
       {#if menuKind !== "none"}
         <ComposerMenu

@@ -30,6 +30,7 @@ from raiker.execution.code_placement import (
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
+    edit_options,
     proposed_edit_snapshot,
     proposed_patch_snapshot,
     proposed_write_snapshot,
@@ -637,6 +638,7 @@ class ApprovalService:
                     str(args.get("path", ".")),
                     str(args.get("old_text", "")),
                     str(args.get("new_text", "")),
+                    **edit_options(args),
                 )
             except FilesystemSafetyError:
                 return None, str(args.get("path", "")), "arguments"

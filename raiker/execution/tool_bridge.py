@@ -50,8 +50,11 @@ def _grep(root: Path, arguments: dict[str, Any]) -> dict[str, Any]:
         root,
         str(arguments.get("query", "")),
         str(arguments.get("path", ".")),
-        include=str(arguments.get("include", "*")),
+        include=str(arguments.get("include", "*") or "*"),
         max_results=min(int(arguments.get("max_results", 100)), 100),
+        regex=arguments.get("regex") is True,
+        ignore_case=arguments.get("ignore_case") is True,
+        context=max(0, min(int(arguments.get("context", 0) or 0), 5)),
     )
 
 

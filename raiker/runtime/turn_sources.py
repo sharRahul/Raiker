@@ -466,11 +466,22 @@ def source_from_tool_result(
         )
     if tool_name == "github_read":
         repo, number = _text(args.get("repo"), 200), _text(args.get("number"), 20)
+        resource = _text(args.get("resource"), 40)
+        # TOOL-20/22/23/24 — a read with no number names its resource instead.
+        place = f"{repo}#{number}" if number else f"{repo} {resource.replace('_', ' ')}".strip()
         return SourceDraft(
             kind=kind,
-            title=_text(output.get("title")) or f"{repo}#{number}",
-            locator=f"{repo}#{number}" if repo else "",
+            title=_text(output.get("title")) or place,
+            locator=place if repo else "",
             tool_name=tool_name, passage=passage,
+        )
+    if tool_name == "help_read":
+        title = _text(output.get("title"), 200)
+        query = _text(args.get("query"), 200)
+        return SourceDraft(
+            kind=kind,
+            title=f"Help: {title}" if title else (f"Help search: {query}" if query else "Help articles"),
+            locator=_text(output.get("slug"), 80), tool_name=tool_name, passage=passage,
         )
     if tool_name == "gmail_read":
         return SourceDraft(

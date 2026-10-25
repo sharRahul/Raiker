@@ -15,6 +15,7 @@
   import Icon from "./Icon.svelte";
   import type { IconName } from "../icons";
   import type { AgentPlan, AgentPlanStep } from "../apiTypes";
+  import { waitsOn } from "../agentPlan";
 
   let {
     plan,
@@ -77,6 +78,7 @@
             <span class="body">
               <span class="title">{step.title}</span>
               {#if step.note}<span class="note">{step.note}</span>{/if}
+              {#if waitsOn(step) && step.status !== "completed"}<span class="waits">{waitsOn(step)}</span>{/if}
             </span>
             <span class="sr-only">{step.status.replace("_", " ")}</span>
           </li>
@@ -177,6 +179,7 @@
     font-weight: 650;
   }
   .note { font-size: var(--text-xs); color: var(--text-3); }
+  .waits { font-size: var(--text-xs); color: var(--text-3); font-style: italic; }
   .collapsed-line,
   .blocked-line {
     margin: 0;

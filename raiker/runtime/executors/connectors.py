@@ -47,6 +47,10 @@ class GithubConnectorExecutor:
         if operation == "create_pull_request":
             head = str(action.arguments.get("head", "")).strip()
             return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": head or None}
+        if operation == "update_pull_request":
+            # TOOL-26 — editing words on an existing pull request names no branch,
+            # so a branch-scoped delegation cannot cover it: it always asks.
+            return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": None}
         if operation == "read":
             return None
         # A comment, or anything else that writes: never covered by a delegation.
@@ -125,6 +129,34 @@ class GithubConnectorExecutor:
                     } if receipt else None,
                 },
             )
+        if operation == "update_pull_request":
+            raw_body = action.arguments.get("body")
+            outcome = service.update_pull_request(
+                str(action.arguments.get("repo", "")),
+                action.arguments.get("number"),
+                str(action.arguments.get("title", "") or ""),
+                str(raw_body) if isinstance(raw_body, str) else None,
+                authority=current_routed_authority(action.action_id),
+            )
+            if outcome.get("status") != "success":
+                error = outcome.get("error", {})
+                return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary=(
+                    f"GitHub pull request #{outcome.get('number')} updated "
+                    f"({', '.join(outcome.get('updated') or [])}); content withheld from artifacts."
+                ),
+                artifacts={
+                    "repo": outcome.get("repo"),
+                    "number": outcome.get("number"),
+                    "html_url": outcome.get("html_url"),
+                    "updated": outcome.get("updated"),
+                    "content_redacted": True,
+                },
+            )
         if operation != "read":
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
         outcome = service.read(
@@ -132,6 +164,8 @@ class GithubConnectorExecutor:
             str(action.arguments.get("repo", "")),
             action.arguments.get("number"),
             authority=current_routed_authority(action.action_id),
+            ref=str(action.arguments.get("ref") or "") or None,
+            path=str(action.arguments.get("path") or "") or None,
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})

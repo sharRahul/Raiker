@@ -235,6 +235,13 @@
       },
       "AgentPlanStep": {
         "properties": {
+          "blocked_by": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Blocked By",
+            "type": "array"
+          },
           "note": {
             "title": "Note",
             "type": "string"

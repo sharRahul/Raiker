@@ -667,6 +667,7 @@ def post_json_url(
     headers: dict[str, str] | None = None,
     max_bytes: int = 200_000,
     timeout: float = 15.0,
+    method: str = "POST",
 ) -> dict:
     """POST JSON ``payload`` to ``url`` only if its host matches ``egress_allowlist``.
 
@@ -695,8 +696,10 @@ def post_json_url(
     body_bytes = _json.dumps(payload).encode("utf-8")
     merged = dict(headers or {})
     merged.setdefault("Content-Type", "application/json")
+    if method not in ("POST", "PATCH"):
+        raise SandboxError(f"method_not_allowed:{method}")
     request = urllib.request.Request(  # noqa: S310 - scheme checked above
-        url, data=body_bytes, method="POST", headers=merged,
+        url, data=body_bytes, method=method, headers=merged,
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310

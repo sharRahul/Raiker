@@ -205,8 +205,17 @@ class InjectionScanner:
         title: str = "",
         session_id: str = "",
         turn_id: str | None = None,
+        summary: str | None = None,
+        notice_title: str | None = None,
     ) -> SecurityFinding | None:
-        """Scan one untrusted source; return the finding raised, if any."""
+        """Scan one untrusted source; return the finding raised, if any.
+
+        ``summary`` and ``notice_title`` replace the wording for a source that
+        is not material a turn read — a scheduled prompt (TOOL-124) *is*
+        instructions, so "it was used as data" would be untrue of it. A
+        summary may name ``{rules}``, which is filled with the rules that
+        matched.
+        """
         signals = scan_untrusted_text(text)
         if not signals:
             return None
@@ -221,7 +230,9 @@ class InjectionScanner:
             "scanned_chars": min(len(text), _SCAN_WINDOW_CHARS),
         }
         summary = (
-            f"Content from '{name}' contains text shaped like a prompt-injection attempt "
+            summary.replace("{rules}", ", ".join(rules))
+            if summary is not None
+            else f"Content from '{name}' contains text shaped like a prompt-injection attempt "
             f"({', '.join(rules)}). It was used as data, never as instructions."
         )
         finding_id = self._store.insert_security_finding(
@@ -250,7 +261,7 @@ class InjectionScanner:
             self._store.insert_notification(
                 principal_id=principal_id,
                 kind="anomaly",
-                title="Suspicious content in a source this turn read",
+                title=notice_title or "Suspicious content in a source this turn read",
                 body=summary,
                 finding_id=finding_id,
                 subject_id=locator[:500] or source_kind,

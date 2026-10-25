@@ -171,8 +171,8 @@ composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
 ### Slash commands
 
 Typing `/` at the **start** of the prompt opens the command menu. Every entry is
-a control you already have; none of them sends anything to the model, and none
-grants anything:
+a control you already have, and none grants anything. Only `/compress` asks a
+model for something — the same summary a turn's **Summarise** makes:
 
 | Command | What it does |
 |---|---|
@@ -185,6 +185,8 @@ grants anything:
 | `/schedule` | Open **Tasks**, where a one-off schedule, a daily routine or a background agent is created |
 | `/tasks` | Open **Tasks** to see schedules and runs already under way |
 | `/export` | Export this conversation |
+| `/compress` | Summarise the conversation so far for the model, through the latest finished turn. The transcript keeps every word; later turns read the summary instead of the full history |
+| `/insights` | Show what this conversation used: turns and model calls, the model, tokens in and out, the cost (*Not priced* when the price is unknown), tool calls and the tools used most |
 | `/stop` | Stop the running turn at its next safe boundary |
 | `/shortcuts` | Show the keyboard map |
 
@@ -621,12 +623,23 @@ show `executes_action: false`. **Approvals** has **Pending** and **History**,
 with each decision beside the queue and the conversation it came from named on
 every row.
 
+### Asking how Raiker works
+
+Ask Raiker how to do something in Raiker — *how do I connect Gmail?* — and it
+reads this guide (the `help_read` tool) rather than answering from memory. The
+rows say which article or search it read, and the answer cites **Raiker help**
+under *Sources*. It reads only the guide this install ships; nothing leaves the
+computer for it.
+
 ### When Raiker asks you a question
 
 Sometimes a task cannot go on without your choice — which account, which day.
 Raiker then stops on a question card, not an approval card: *Waiting for your
 answer*, one question at a time (*1 of 2*), where you pick one option, pick
 several, or type your own answer, with **Skip** and **Confirm and continue**.
+When Raiker has a view, one option carries a **Recommended** tag; it is never
+chosen for you. An option may also show a short preview — a code snippet or a
+draft line — once you pick it.
 Your answer goes back exactly as you gave it and the task continues in the same
 conversation. A question never grants anything, so it never offers **Allow
 once**; it is answered in Chat, in Build, from the floating *Question for you*

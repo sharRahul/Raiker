@@ -29,7 +29,8 @@ _READ_NOUNS: dict[str, str] = {
 }
 
 #: Read-shaped tools that are bookkeeping rather than reading the owner's things.
-_NOT_COUNTED: frozenset[str] = frozenset({"tool_search", "update_plan", "skill_load"})
+#: `help_read` (TOOL-46) reads the help this install ships, not the owner's files.
+_NOT_COUNTED: frozenset[str] = frozenset({"tool_search", "update_plan", "skill_load", "help_read"})
 
 #: Families whose successful calls reach a service off this computer.
 _SERVICE_BY_FAMILY: dict[str, str] = {"web": "the web"}

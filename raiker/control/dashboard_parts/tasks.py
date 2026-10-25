@@ -310,6 +310,8 @@ class TaskService:
         if max_run_minutes is not None:
             self.store.set_task_run_limit(task.task_id, max_run_minutes)
             task = replace(task, max_run_minutes=max_run_minutes)
+        # Every task's prompt runs in the background, on a schedule or queued.
+        self._scan_scheduled_prompt(task.task_id, title, objective, principal_id, inbox_session_id)
         if surface == "build":
             # BR-02 / BR-D03 — the repository this task is for is the one Build
             # is pointed at now. Its cycles run there or not at all.
@@ -334,6 +336,43 @@ class TaskService:
                     ),
                 )
         return self._task_view(task)
+
+    def _scan_scheduled_prompt(
+        self: DashboardService,
+        task_id: str,
+        title: str,
+        objective: str,
+        principal_id: str,
+        session_id: str,
+    ) -> None:
+        """TOOL-124 — a prompt saved to run later is scanned for injected instructions.
+
+        A scheduled prompt runs when nobody is watching, often pasted from an
+        email or a page. The scan is the deterministic one untrusted context
+        already gets (:mod:`raiker.security.injection_scan`): a match raises a
+        redacted finding and a notice naming the task, so the owner reads the
+        prompt before it runs. It never blocks the save — the tool gate is still
+        what refuses an action.
+        """
+        import contextlib
+
+        from raiker.security.injection_scan import InjectionScanner
+
+        with contextlib.suppress(Exception):
+            InjectionScanner(self.store).scan(
+                principal_id,
+                text=f"{title}\n{objective}",
+                source_kind="scheduled_task",
+                locator=task_id,
+                title=f"the task '{title[:80]}'",
+                session_id=session_id,
+                notice_title="A task's instructions look injected",
+                summary=(
+                    f"The instructions of the task '{title[:80]}' contain text shaped like a "
+                    "prompt injection ({rules}). They run without you watching: read them in "
+                    "Tasks, and change or delete the task if you did not write that."
+                ),
+            )
 
     def set_task_run_limit(
         self: DashboardService,

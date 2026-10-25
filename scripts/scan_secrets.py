@@ -22,9 +22,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import hashlib
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -33,27 +31,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXCEPTIONS = ROOT / ".github" / "secret-scan-exceptions.json"
 
-#: High-precision shapes only. Each is a published credential format, so a
-#: match is a key or a deliberate fixture — never a hash or an identifier.
-RULES: dict[str, re.Pattern[str]] = {
-    "anthropic_key": re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}"),
-    "openai_key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{32,}\b"),
-    "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"),
-    # The stateless installation-token form GitHub began issuing 2026-04-27:
-    # `ghs_`, the App id, an underscore and a JWT.
-    "github_installation_jwt": re.compile(r"\bghs_[0-9]+_[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
-    "github_pat": re.compile(r"\bgithub_pat_[A-Za-z0-9_]{60,}\b"),
-    "huggingface_token": re.compile(r"\bhf_[A-Za-z0-9]{34}\b"),
-    "aws_access_key": re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
-    "slack_token": re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"),
-    "google_api_key": re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"),
-    "stripe_live_key": re.compile(r"\b(?:sk|rk)_live_[0-9A-Za-z]{24,}\b"),
-    "private_key_block": re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----"),
-}
+# The shapes and the fingerprint live in the package, so the push preview
+# (TOOL-30) refuses exactly what this check fails.
+from raiker.security.secret_shapes import (  # noqa: E402
+    RULES,
+    SKIP_NAMES,
+    SKIP_SUFFIXES,
+    fingerprint,
+)
 
-#: Files that cannot hold text a person committed by hand.
-SKIP_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".woff", ".woff2", ".pdf", ".zip")
-SKIP_NAMES = ("package-lock.json", "uv.lock")
+__all__ = ["RULES", "SKIP_NAMES", "SKIP_SUFFIXES", "fingerprint"]
 
 
 @dataclass(frozen=True)
@@ -65,11 +52,6 @@ class Finding:
 
     def describe(self) -> str:
         return f"{self.path}:{self.line}: {self.rule} (fingerprint {self.fingerprint})"
-
-
-def fingerprint(value: str) -> str:
-    """A one-way label for a match, stable across lines moving."""
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
 def tracked_files(root: Path) -> list[str]:

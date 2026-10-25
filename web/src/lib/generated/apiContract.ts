@@ -62,6 +62,7 @@ export type AgentPlanStep = {
   title: string;
   status: "pending" | "in_progress" | "completed" | "blocked";
   note?: string;
+  blocked_by?: number[];
 };
 
 export type AgentResponse = {

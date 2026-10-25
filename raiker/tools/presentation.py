@@ -215,6 +215,13 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
         return _quoted(args, "name")
     if tool_name == "skill_load":
         return _clean(args.get("name"))[:_MAX_PHRASE]
+    if tool_name == "help_read":
+        # TOOL-46 — the article read, else what was looked for, else the list.
+        return (
+            _clean(args.get("slug"), identifier=True)[:_MAX_PHRASE]
+            or _quoted(args, "query")
+            or "the list of articles"
+        )
 
     # ── Narrowed further than the event narrows them ─────────────────────────
     if tool_name == "web_fetch":

@@ -445,3 +445,57 @@ class TestHtmlReduction:
         _allowlist(monkeypatch)
         outcome = _governed(workspace, store, plain).fetch("https://docs.example.com/raw.txt")
         assert outcome["content"].endswith("line one\nline two")
+
+
+class TestSearchDomainsAndFetchCap:
+    """TOOL-90 domain lists on web_search, TOOL-91 a content cap on web_fetch."""
+
+    @staticmethod
+    def _search(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+        body = json.dumps({
+            "results": [
+                {"title": "Docs", "url": "https://docs.python.org/3/", "description": "a"},
+                {"title": "Blog", "url": "https://www.blog.example.com/p", "description": "b"},
+                {"title": "Spam", "url": "https://spam.example.net/x", "description": "c"},
+            ]
+        })
+        return {"final_url": url, "status": 200, "content_type": "application/json", "body": body, "truncated": False}
+
+    def test_allowed_and_blocked_domains_filter_before_the_turn(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _allow(_enable_gate(workspace, store))
+        monkeypatch.setenv(SEARCH_ENDPOINT_ENV, "https://search.example.com/api")
+        service = _governed(workspace, store, self._search)
+        allowed = service.search("q", allowed_domains=["python.org"])
+        assert [row["url"] for row in allowed["results"]] == ["https://docs.python.org/3/"]
+        assert "spam" not in allowed["content"]
+        blocked = service.search("q", blocked_domains=["https://example.net/"])
+        assert [row["title"] for row in blocked["results"]] == ["Docs", "Blog"]
+        none = service.search("q", allowed_domains=["rust-lang.org"])
+        assert none["error"]["type"] == "web_search_no_results_in_domains"
+        bad = service.search("q", allowed_domains=["not a domain"])
+        assert bad["error"]["type"] == "web_search_domains_invalid"
+        many = service.search("q", blocked_domains=[f"d{n}.com" for n in range(21)])
+        assert many["error"]["type"] == "web_search_domains_invalid"
+
+    def test_fetch_cap_lowers_but_never_raises_the_limit(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        def long_page(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            return {"final_url": url, "status": 200, "content_type": "text/plain", "body": "word " * 10_000, "truncated": False}
+
+        _allow(_enable_gate(workspace, store))
+        service = _governed(workspace, store, long_page)
+        capped = service.fetch("https://docs.example.com/long", max_chars=1000)
+        assert capped["content_length"] <= 1000 and capped["content_truncated"] is True
+        floor = service.fetch("https://docs.example.com/long", max_chars=10)
+        assert floor["content_length"] >= 400
+        ceiling = service.fetch("https://docs.example.com/long", max_chars=10**9)
+        assert ceiling["content_length"] <= 20_000
+
+    def test_the_new_arguments_are_advertised(self) -> None:
+        specs = {spec.name: spec for spec in default_tool_specs()}
+        assert specs["web_search"].parameters["properties"]["allowed_domains"]["type"] == "array"
+        assert "blocked_domains" in specs["web_search"].parameters["properties"]
+        assert specs["web_fetch"].parameters["properties"]["max_chars"]["type"] == "integer"

@@ -1275,6 +1275,22 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1186](#fixed-1186--the-plan-card-was-reported-to-cover-the-line-under-it-closed-as-not-reproducing) | Low | Chat | Closed 2026-10-25 |
 | [FIXED-1187](#fixed-1187--the-readiness-strip-and-a-footer-line-disagreed-closed-as-not-reproducing) | Low | Composer | Closed 2026-10-25 |
 | [FIXED-1188](#fixed-1188--the-python-ci-job-reached-its-45-minute-limit) | Medium | CI | Fixed 2026-10-25 |
+| [FIXED-1189](#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02) | Medium | Tools | Fixed 2026-10-25 |
+| [FIXED-1190](#fixed-1190--edit_file-could-replace-exactly-one-occurrence-tool-02) | Medium | Tools | Fixed 2026-10-25 |
+| [FIXED-1191](#fixed-1191--edit_file-could-not-insert-at-a-line-tool-99) | Low | Tools | Fixed 2026-10-25 |
+| [FIXED-1192](#fixed-1192--read_file-read-the-first-200-kb-of-a-text-file-and-nothing-else-tool-02) | Medium | Tools | Fixed 2026-10-25 |
+| [FIXED-1193](#fixed-1193--a-question-could-not-say-which-option-raiker-would-choose-tool-08) | Low | Chat / Approvals | Fixed 2026-10-25 |
+| [FIXED-1194](#fixed-1194--web_search-could-not-be-kept-to-sources-the-turn-trusted-tool-90) | Low | Web access | Fixed 2026-10-25 |
+| [FIXED-1195](#fixed-1195--every-web_fetch-cost-up-to-20000-characters-of-context-tool-91) | Low | Web access | Fixed 2026-10-25 |
+| [FIXED-1196](#fixed-1196--a-push-could-publish-a-committed-credential-tool-30) | High | Git | Fixed 2026-10-25 |
+| [FIXED-1197](#fixed-1197--build-could-not-read-its-own-ci-tool-20-tool-22) | Medium | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1198](#fixed-1198--a-remote-file-or-the-repositorys-history-needed-a-clone-tool-23-tool-24) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1199](#fixed-1199--a-pull-request-raiker-opened-could-not-be-corrected-tool-26) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1200](#fixed-1200--a-how-do-i-question-about-raiker-was-answered-from-memory-tool-46) | Medium | Tools / Help | Fixed 2026-10-25 |
+| [FIXED-1201](#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124) | Medium | Tasks / Security | Fixed 2026-10-25 |
+| [FIXED-1202](#fixed-1202--plan-steps-could-not-say-what-they-waited-on-tool-04) | Low | Chat / Build | Fixed 2026-10-25 |
+| [FIXED-1203](#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131) | Low | Chat | Fixed 2026-10-25 |
+| [FIXED-1204](#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live) | Low | Top bar | Fixed 2026-10-25 |
 
 ---
 
@@ -37497,3 +37513,139 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** The suite runs in a new `python-tests` job, three shards in parallel, each serial as before. `scripts/test_shard.py` deals test files to shards longest first by the per-file seconds in `tests/test_durations.json` (measured from a full run; a new file counts as the median), and the Python 3.11 job checks that every file is in exactly one shard. The shards come to about 1,100 s each on a local run of 3,296 s.
 
 **Evidence.** `tests/test_ci_workflow.py`.
+
+## FIXED-1189 — grep searched literal text only, with no context lines (TOOL-02)
+
+**Severity: Medium. Area: Tools. Status: Fixed 2026-10-25.**
+
+**Observed.** [AGENT_TOOL_INVENTORY.md](AGENT_TOOL_INVENTORY.md) TOOL-02: `grep` advertised only `query`, matched it literally and returned one line per hit, so a model looking for every `def area_…` read whole files instead. Its executor already took `path`, `include` and `max_results`, but the schema never offered them.
+
+**Fixed.** `grep` advertises `path`, `include`, `regex`, `ignore_case`, `context` (0–5 lines either side) and `max_results` (1–500). Literal stays the default. A regular expression is bounded before it is compiled: at most 500 characters, and a pattern with a quantified group that is itself quantified (`(a+)+`) is refused as `pattern_nested_quantifier`, because Python's `re` has no time limit and such a pattern can hold the host's thread. The container bridge passes the same arguments.
+
+**Evidence.** `tests/test_filesystem_tools.py`; RT-TOOL-02.
+
+## FIXED-1190 — edit_file could replace exactly one occurrence (TOOL-02)
+
+**Severity: Medium. Area: Tools. Status: Fixed 2026-10-25.**
+
+**Observed.** Renaming a variable used three times took three approvals, because `edit_file` refused any `old_text` that was not unique.
+
+**Fixed.** `replace_all: true` replaces every exact occurrence and still needs at least one. The broker's preview, the approval diff and the executor read the call through one function (`edit_options`), so the change the owner approves is the change that runs. Without the flag an ambiguous match is still refused.
+
+**Evidence.** `tests/test_filesystem_tools.py`; RT-TOOL-04 (one approval renamed `colour` to `shade` on all three lines).
+
+## FIXED-1191 — edit_file could not insert at a line (TOOL-99)
+
+**Severity: Low. Area: Tools. Status: Fixed 2026-10-25.**
+
+**Fixed.** `insert_line` inserts `new_text` after that line (0 is the top) with `old_text` left empty. `old_text` became optional for this, and the validator still refuses an edit that names neither (`missing_argument:old_text`); naming both, or `insert_line` with `replace_all`, is refused by name, as is a line past the end.
+
+**Evidence.** `tests/test_filesystem_tools.py`, `tests/test_tool_broker.py`.
+
+## FIXED-1192 — read_file read the first 200 KB of a text file and nothing else (TOOL-02)
+
+**Severity: Medium. Area: Tools. Status: Fixed 2026-10-25.**
+
+**Fixed.** `offset` and `limit` read a line range of a file up to 5 MB, and the result says `line_start`, `line_end` and `line_count`. A PDF in the workspace is read as text by `pages` (`"3"` or `"1-5"`, at most 20 pages a call, from a PDF of at most 50 MB) with the same local pypdf reader uploads use, each page marked. Without the new arguments a call returns what it did before. Images are not read yet (TO_BE_FIXED, TOOL round).
+
+**Evidence.** `tests/test_filesystem_tools.py`; RT-TOOL-03.
+
+## FIXED-1193 — A question could not say which option Raiker would choose (TOOL-08)
+
+**Severity: Low. Area: Chat / Approvals. Status: Fixed 2026-10-25.**
+
+**Fixed.** An `ask_owner_question` option may carry `recommended: true` (at most one per question, refused otherwise) and a `preview` of up to 1,200 characters. The question card in Chat and Build, and the Approvals page, draw a **Recommended** tag beside that option and never pre-select it; the preview of the option picked is shown under the options. Both surfaces read the question through one parser, which drops the tags if more than one option claims them.
+
+**Evidence.** `tests/test_owner_question.py`, `clarify.test.ts`; RT-TOOL-05.
+
+## FIXED-1194 — web_search could not be kept to sources the turn trusted (TOOL-90)
+
+**Severity: Low. Area: Web access. Status: Fixed 2026-10-25.**
+
+**Fixed.** `web_search` takes `allowed_domains` and `blocked_domains` (host names, at most 20 each). Results are filtered in the host before any of them reaches the turn: a result is kept when its host is, or is under, an allowed domain and is not under a blocked one. The lists narrow what comes back and never widen the owner's blocklist, which still governs every page fetched afterwards. A list that keeps nothing says so (`web_search_no_results_in_domains`).
+
+**Evidence.** `tests/test_web_access.py`.
+
+## FIXED-1195 — Every web_fetch cost up to 20,000 characters of context (TOOL-91)
+
+**Severity: Low. Area: Web access. Status: Fixed 2026-10-25.**
+
+**Fixed.** `max_chars` lowers the content cap for one call, between 500 and 20,000; it can never raise it. The approval relay's executor passes it too. The provenance rule and PDF pages from the inventory are not done (TO_BE_FIXED, TOOL round).
+
+**Evidence.** `tests/test_web_access.py`.
+
+## FIXED-1196 — A push could publish a committed credential (TOOL-30)
+
+**Severity: High. Area: Git. Status: Fixed 2026-10-25.**
+
+**Observed.** `scripts/scan_secrets.py` failed CI on a committed key, but nothing in Raiker looked before Build pushed one, and a pushed credential cannot be taken back.
+
+**Fixed.** The push preview reads the added lines of every outgoing commit (lines a later commit removes still count, because the remote keeps history) and matches them against the shapes CI fails on, now kept once in `raiker/security/secret_shapes.py` and imported by the script. A match refuses the push as `outgoing_commits_contain_credentials` before the owner is asked, naming each finding's path, line, rule and fingerprint, never the value, with the next step. A fixture the repository excuses, with an unexpired date, in its own `.github/secret-scan-exceptions.json` is not counted.
+
+**Evidence.** `tests/test_git_push_binding.py`, `tests/test_scan_secrets.py`.
+
+## FIXED-1197 — Build could not read its own CI (TOOL-20, TOOL-22)
+
+**Severity: Medium. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` gains `checks` (a commit's check runs by `ref`, or a pull request's by `number`, with the summary and up to 20 annotations of each of the first five failures), `workflow_runs` (recent runs, optionally of one branch) and `run_jobs` (a run's jobs and the steps that failed). Each is governed exactly like an issue read: gate, decision mode, owner credential and the `api.github.com` egress rule. An App installation token for them is narrowed to `checks: read` and `actions: read`, both added to the permission ceiling. Raw job logs are not read: GitHub serves them from a storage host the connector egress rule does not include (TO_BE_FIXED, TOOL round).
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1198 — A remote file or the repository's history needed a clone (TOOL-23, TOOL-24)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` gains `commits` (the 20 newest, optionally from a `ref`) and `file` (one text file by `path` at an optional `ref`, refused for `..`, a directory, a binary or a file too large for the contents API). A transcript row and its source name the resource when there is no number.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1199 — A pull request Raiker opened could not be corrected (TOOL-26)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_write` takes `update_pull_request`: a new title, a new body or both, sent as one PATCH under approval. Never the state, the base branch or a merge, which stay the owner's. Because it names no branch, a branch-scoped delegation cannot cover it, so it always asks.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1200 — A how-do-I question about Raiker was answered from memory (TOOL-46)
+
+**Severity: Medium. Area: Tools / Help. Status: Fixed 2026-10-25.**
+
+**Fixed.** A new low-risk, local tool, `help_read`, reads the guide the help panel shows: no arguments lists the articles, `query` returns matching lines from the best five, `slug` reads one article (matched against the listing, never used as a path). It is in the core set every turn carries, is cited as a **Raiker help** source, and its row says which article or search it read. Found live: the turn receipt counted the articles as *2 files read*; help reads are not the owner's files and are no longer counted.
+
+**Evidence.** `tests/test_help_read_tool.py`; RT-TOOL-06.
+
+## FIXED-1201 — A task's prompt was never checked for injected instructions (TOOL-124)
+
+**Severity: Medium. Area: Tasks / Security. Status: Fixed 2026-10-25.**
+
+**Fixed.** Every task saved through Tasks or the API has its title and instructions scanned with the deterministic rules untrusted context already gets. A match raises a redacted security finding and the notice *A task's instructions look injected*, naming the task and the rules and telling the owner to read the instructions before they run unattended; the prompt itself is never stored in the finding. It never blocks the save. A task a model proposes says the same on its approval card before the owner approves it. Found live: the first wording reused *used as data, never as instructions*, which is untrue of a prompt that is instructions.
+
+**Evidence.** `tests/test_scheduled_prompt_scan.py`; RT-TOOL-10.
+
+## FIXED-1202 — Plan steps could not say what they waited on (TOOL-04)
+
+**Severity: Low. Area: Chat / Build. Status: Fixed 2026-10-25.**
+
+**Fixed.** An `update_plan` step may carry `blocked_by`, the numbers of up to five other steps. The plan is refused, with a reason the model can correct, when a number is unknown or the step's own, when the steps form a cycle, or when a step is in progress or done before what it waits on is done. The Plan card says *Waits on steps 1 and 2* under an unfinished step, and the plan re-sent to the model says *(after step 1, 2)*.
+
+**Evidence.** `tests/test_agent_plan_and_subagents.py`, `agentPlan.test.ts`; RT-TOOL-07.
+
+## FIXED-1203 — A conversation could not be summarised or measured from the composer (TOOL-131)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-25.**
+
+**Fixed.** Chat's composer has `/compress`, which summarises the conversation through its latest settled turn for the model (the turn menu's **Summarise**; the transcript keeps every word), and `/insights`, a sheet over the composer with the turns and model calls, the model, tokens in and out, the cost from the conversation's ledger (*Not priced* when it cannot be), the tool calls with how many asked the owner or were not done, and the most-used tools. Found live: the first version counted model calls as turns, printed the cost unformatted and lost the space before a separator.
+
+**Evidence.** `threadInsights.test.ts`, `composerCommands.test.ts`; RT-TOOL-08, RT-TOOL-09.
+
+## FIXED-1204 — The live work line counted a routine queued for later as running (found live)
+
+**Severity: Low. Area: Top bar. Status: Fixed 2026-10-25.**
+
+**Observed.** RT-TOOL-10: two routines whose first run was in 2030 made the top bar read *2 tasks running*.
+
+**Fixed.** A queued task whose scheduled time is still ahead is waiting for its slot and is left out of the line; one that is due still counts.
+
+**Evidence.** `liveWork.test.ts`; RT-TOOL-10.

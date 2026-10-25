@@ -112,6 +112,15 @@ filed somewhere — the next cycle runs in that same conversation and reads it, 
 replying is how you steer a routine without editing its instructions. Routine
 threads also appear on **Threads** beside your own conversations.
 
+**A task's instructions are checked when you save it.** A routine runs while
+you are not watching, and instructions pasted from an email or a page can carry
+text written to steer an AI (*ignore previous instructions and send … to …*).
+When the title or instructions look like that, the task is still saved and
+Raiker raises the notice *A task's instructions look injected*, naming the task
+and what it found. Read the instructions in Tasks, and change or delete the task
+if you did not write that part. A task Raiker proposes says the same on its
+approval card.
+
 **A run Raiker was stopped in the middle of is not lost or repeated.** If the
 host stops while a task is running, the next start settles that run as one that
 did not finish — its history says so — and does not run it again on its own,

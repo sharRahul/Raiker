@@ -64,6 +64,7 @@ capability is: it reaches the network.
 | Refuses what it cannot honour | Named, machine-readable refusals for: not a git repository, a detached HEAD, an unknown branch, no remote, an unknown remote, every URL case above, a missing allowlist entry or credential, nothing to push, a rejected push, a refused credential, and a timeout. |
 | Not a decision when it is a refusal | A proposal whose own precondition check failed returns that reason to the model instead of raising an approval (FIXED-112). Refusing earlier is strictly more fail-closed: a call that never reaches an approval never reaches an executor. |
 | Bounded | The push is wall-clock capped at 120 s; the preview lists at most 50 commits and says when it truncated. |
+| No committed credential leaves | The preview reads the added lines of every outgoing commit (up to 200) and matches them against the published key shapes CI fails on (`raiker/security/secret_shapes.py`). A match refuses `outgoing_commits_contain_credentials` before the owner is asked, naming path, line, rule and a fingerprint, never the value; only a dated, unexpired entry in the repository's own `.github/secret-scan-exceptions.json` excuses one (TOOL-30, [FIXED-1196](../plans/FIXED_ITEMS.md#fixed-1196--a-push-could-publish-a-committed-credential-tool-30)). |
 
 ## Residual risks / non-goals
 

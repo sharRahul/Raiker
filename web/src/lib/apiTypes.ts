@@ -487,7 +487,8 @@ export type { ConversationBranch };
 export interface OwnerQuestion {
   question: string;
   header: string;
-  options: { label: string; description: string }[];
+  /** TOOL-08 — `recommended` is the model's suggestion, drawn as a tag, never pre-selected. */
+  options: { label: string; description: string; recommended?: boolean; preview?: string }[];
   multiSelect?: boolean;
 }
 

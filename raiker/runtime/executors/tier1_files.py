@@ -7,6 +7,7 @@ from raiker.runtime.executors.base import ExecutionResult
 from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.filesystem import (
     apply_patch_content,
+    edit_options,
     replace_text_content,
     resolve_writable_workspace_path,
 )
@@ -43,6 +44,7 @@ class FileWriteExecutor:
                     path,
                     str(action.arguments.get("old_text", "")),
                     str(action.arguments.get("new_text", "")),
+                    **edit_options(action.arguments),
                     authority=self._authority,
                 )
                 if result["status"] != "success":

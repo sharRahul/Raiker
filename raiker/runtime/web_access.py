@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from collections.abc import Sequence
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -80,6 +82,10 @@ DEFAULT_SEARCH_ENDPOINT = "https://html.duckduckgo.com/html/"
 SEARCH_KEY_ENV = "RAIKER_WEB_SEARCH_KEY"
 SEARCH_KEY_HEADER_ENV = "RAIKER_WEB_SEARCH_KEY_HEADER"
 MAX_SEARCH_RESULTS = 10
+#: TOOL-91 — the smallest content cap a `web_fetch` call may ask for.
+MIN_CONTENT_CHARS = 500
+#: TOOL-90 — the most domains one search may allow or block.
+MAX_SEARCH_DOMAINS = 20
 
 
 def _denied(
@@ -329,8 +335,18 @@ class WebAccessService:
         return None
 
     # ── fetch ────────────────────────────────────────────────────────────
-    def fetch(self, url: str, *, authority: object | None = None) -> dict[str, Any]:
-        """Read one page and return it as bounded, untrusted text."""
+    def fetch(
+        self, url: str, *, authority: object | None = None, max_chars: int | None = None
+    ) -> dict[str, Any]:
+        """Read one page and return it as bounded, untrusted text.
+
+        ``max_chars`` (TOOL-91) lowers the content cap for this call, between
+        :data:`MIN_CONTENT_CHARS` and :data:`MAX_CONTENT_CHARS`; it can never
+        raise it, so a page still costs the context at most what it did.
+        """
+        cap = MAX_CONTENT_CHARS if max_chars is None else max(
+            MIN_CONTENT_CHARS, min(int(max_chars), MAX_CONTENT_CHARS)
+        )
         url = (url or "").strip()
         if not url:
             return _failed("missing_argument:url", "web_fetch needs a url.")
@@ -358,9 +374,9 @@ class WebAccessService:
         # visitor could never see discarded, and anything shaped like a
         # conversation role marker defanged.
         if "html" in content_type or body.lstrip()[:1] == "<":
-            page = sanitize_html(body, max_chars=MAX_CONTENT_CHARS)
+            page = sanitize_html(body, max_chars=cap)
         else:
-            page = sanitize_text(body, max_chars=MAX_CONTENT_CHARS)
+            page = sanitize_text(body, max_chars=cap)
         return {
             "status": "success",
             "url": url,
@@ -483,9 +499,29 @@ class WebAccessService:
         return bool(os.environ.get(SEARCH_ENDPOINT_ENV, "").strip())
 
     def search(
-        self, query: str, *, max_results: int = 5, authority: object | None = None
+        self,
+        query: str,
+        *,
+        max_results: int = 5,
+        authority: object | None = None,
+        allowed_domains: Sequence[str] = (),
+        blocked_domains: Sequence[str] = (),
     ) -> dict[str, Any]:
-        """Run one query against the owner-configured search endpoint."""
+        """Run one query against the owner-configured search endpoint.
+
+        ``allowed_domains`` and ``blocked_domains`` (TOOL-90) filter the results
+        here, before any of them reaches the turn: a result is kept when its
+        host is, or is under, an allowed domain (if any were named) and is not
+        under a blocked one. They narrow what comes back and never widen the
+        owner's blocklist, which still governs every page fetched afterwards.
+        """
+        allowed = _domains(allowed_domains)
+        blocked = _domains(blocked_domains)
+        if allowed is None or blocked is None:
+            return _failed(
+                "web_search_domains_invalid",
+                f"Name at most {MAX_SEARCH_DOMAINS} domains, as host names like example.com.",
+            )
         query = (query or "").strip()
         if not query:
             return _failed("missing_argument:query", "web_search needs a query.")
@@ -526,6 +562,13 @@ class WebAccessService:
                 "web_search_bad_response",
                 "The search endpoint returned nothing this build could read as results.",
             )
+        if allowed or blocked:
+            results = [row for row in results if _host_passes(row.get("url", ""), allowed, blocked)]
+            if not results:
+                return _failed(
+                    "web_search_no_results_in_domains",
+                    "No result came from the domains this search was limited to.",
+                )
         results = results[: max(1, min(int(max_results or 5), MAX_SEARCH_RESULTS))]
         return {
             "status": "success",
@@ -541,6 +584,42 @@ class WebAccessService:
                 source="a web search for " + query,
             ),
         }
+
+
+_DOMAIN = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+def _domains(values: Sequence[str]) -> tuple[str, ...] | None:
+    """Normalised host names, or None when the list is not one."""
+    if isinstance(values, str):
+        values = [values]
+    cleaned: list[str] = []
+    for value in values or ():
+        if not isinstance(value, str):
+            return None
+        host = value.strip().lower()
+        host = host.split("://", 1)[-1].split("/", 1)[0].removeprefix("*.").removeprefix("www.")
+        if not host:
+            continue
+        if not _DOMAIN.match(host):
+            return None
+        cleaned.append(host)
+    if len(cleaned) > MAX_SEARCH_DOMAINS:
+        return None
+    return tuple(dict.fromkeys(cleaned))
+
+
+def _under(host: str, domain: str) -> bool:
+    return host == domain or host.endswith("." + domain)
+
+
+def _host_passes(url: str, allowed: tuple[str, ...], blocked: tuple[str, ...]) -> bool:
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if not host:
+        return False
+    if any(_under(host, domain) for domain in blocked):
+        return False
+    return not allowed or any(_under(host, domain) for domain in allowed)
 
 
 def _url_refusal_message(reason: str) -> str:

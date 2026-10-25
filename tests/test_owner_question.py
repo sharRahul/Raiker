@@ -342,3 +342,21 @@ def test_the_audit_row_records_that_it_was_answered_and_not_the_answer(
     assert len(answered) == 1
     assert answered[0]["payload"]["answered_count"] == 1
     assert "Postgres" not in json.dumps(answered[0])
+
+
+def test_one_option_may_be_recommended_and_carry_a_preview() -> None:
+    """TOOL-08 — a recommended marker and a preview, both bounded and typed."""
+    options: list[dict[str, Any]] = [
+        {"label": "Tabs", "description": "Keep tabs.", "recommended": True, "preview": "\tindent()"},
+        {"label": "Spaces", "description": "Four spaces.", "preview": "    indent()"},
+    ]
+    question: dict[str, Any] = {"question": "Indentation?", "header": "Style", "options": options}
+    action = validate_tool_call(_proposal([question]))
+    assert action.arguments["questions"][0]["options"][0]["recommended"] is True
+    both = [{**option, "recommended": True} for option in options]
+    with pytest.raises(ToolCallRejected, match="question_recommended_more_than_one"):
+        validate_tool_call(_proposal([{**question, "options": both}]))
+    with pytest.raises(ToolCallRejected, match="question_recommended_not_bool"):
+        validate_tool_call(_proposal([{**question, "options": [{**options[0], "recommended": "yes"}, options[1]]}]))
+    with pytest.raises(ToolCallRejected, match="question_option_preview_too_long"):
+        validate_tool_call(_proposal([{**question, "options": [{**options[0], "preview": "x" * 1201}, options[1]]}]))

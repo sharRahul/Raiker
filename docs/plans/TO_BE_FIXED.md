@@ -888,6 +888,37 @@ These parts of the same document are not done:
 * **QUI-P08 — Approvals you've given** in Memory › Controls, with Undo, together
   with *What Raiker has learned to do* (QUI-F09).
 
+## 2026-10-25 Agent tool inventory round — what is still open
+
+The first round of [AGENT_TOOL_INVENTORY.md](AGENT_TOOL_INVENTORY.md#status)
+shipped
+[FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)
+to [FIXED-1204](FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live).
+Left open in it:
+
+* **Raw CI job logs (TOOL-20).** GitHub answers a job-log request with a
+  redirect to a storage host (`*.actions.githubusercontent.com`,
+  `*.blob.core.windows.net`) that the connector egress rule does not include,
+  and the connector GET helper must not follow a redirect with the owner's
+  token (BUG-350). `github_read checks` and `run_jobs` give the failures'
+  annotations and failed steps instead. Reading the log needs a token-free
+  second request to a named storage host, decided with BUG-350.
+* **`web_fetch` provenance and PDF pages (TOOL-91).** Refusing a URL that
+  neither the owner nor an earlier result gave would stop a turn reading a
+  library's documentation when no search provider is configured, so it waits
+  for an owner decision on that trade. PDF pages need the fetch to keep bytes:
+  `_fetch` decodes every body as text.
+* **Images in `read_file` (TOOL-02).** A tool result is text for every
+  provider adapter; handing an image back needs each adapter to carry an image
+  part in a tool result.
+* **`/compress` and `/insights` in Build (TOOL-131).** Chat has both; Build's
+  composer has its own command list and turn controller.
+* **The approval card does not show an edit's diff inline.** RT-TOOL-04: the
+  Safety card for an `edit_file` says *Approving writes this exact change to
+  src/palette.py* and offers **Change**, but the replacement itself is only in
+  the change view. For a `replace_all` edit, the number of places it changes
+  is worth saying on the card. Not triaged.
+
 ## 2026-10-25 Quiet UI polish round — what is still open
 
 The round of 2026-10-25 shipped

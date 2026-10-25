@@ -62,6 +62,9 @@ MIN_OWNER_QUESTION_OPTIONS = 2
 MAX_OWNER_QUESTION_CHARS = 400
 MAX_OWNER_HEADER_CHARS = 12
 MAX_OWNER_OPTION_CHARS = 200
+#: TOOL-08 — an option's preview (a snippet, a layout, a draft line) is shown
+#: only when the owner looks at that option, so it may be longer than a label.
+MAX_OWNER_PREVIEW_CHARS = 1200
 
 
 def _text(value: object, limit: int, field: str) -> str:
@@ -99,6 +102,7 @@ def _validate_owner_questions(value: object) -> None:
         if not MIN_OWNER_QUESTION_OPTIONS <= len(options) <= MAX_OWNER_QUESTION_OPTIONS:
             raise ToolCallRejected("question_option_count", tool_name=OWNER_QUESTION_TOOL)
         labels: set[str] = set()
+        recommended = 0
         for option in options:
             if not isinstance(option, dict):
                 raise ToolCallRejected("question_option_not_object", tool_name=OWNER_QUESTION_TOOL)
@@ -109,6 +113,18 @@ def _validate_owner_questions(value: object) -> None:
                 raise ToolCallRejected("duplicate_option", tool_name=OWNER_QUESTION_TOOL)
             labels.add(label)
             _text(option.get("description"), MAX_OWNER_OPTION_CHARS, "option_description")
+            # TOOL-08 — a recommendation is the model's suggestion, drawn as a
+            # tag by the app; it never pre-selects, so it is a marker and only
+            # one option per question may carry it.
+            if "recommended" in option:
+                if not isinstance(option["recommended"], bool):
+                    raise ToolCallRejected("question_recommended_not_bool", tool_name=OWNER_QUESTION_TOOL)
+                if option["recommended"]:
+                    recommended += 1
+            if "preview" in option:
+                _text(option.get("preview"), MAX_OWNER_PREVIEW_CHARS, "option_preview")
+        if recommended > 1:
+            raise ToolCallRejected("question_recommended_more_than_one", tool_name=OWNER_QUESTION_TOOL)
         if "multiSelect" in entry and not isinstance(entry["multiSelect"], bool):
             raise ToolCallRejected("question_multiselect_not_bool", tool_name=OWNER_QUESTION_TOOL)
 
@@ -205,6 +221,13 @@ def validate_tool_call(proposal: ToolCallProposal) -> ToolAction:
         listed = arguments.get(required)
         if not isinstance(listed, list) or not listed:
             raise ToolCallRejected(f"missing_argument:{required}", tool_name=tool_name)
+    # TOOL-99 — `old_text` became optional so `insert_line` could exist, not so
+    # an edit could name neither: a call with no insert line still has to say
+    # what it replaces, refused here exactly as when it was a required string.
+    if tool_name == "edit_file" and arguments.get("insert_line") in (None, ""):
+        old_text = arguments.get("old_text")
+        if not isinstance(old_text, str) or old_text == "":
+            raise ToolCallRejected("missing_argument:old_text", tool_name=tool_name)
     if tool_name == "create_document" and not str(arguments["path"]).lower().endswith(
         (".md", ".markdown", ".docx", ".xlsx", ".pdf")
     ):

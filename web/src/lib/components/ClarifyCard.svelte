@@ -17,7 +17,7 @@
   import { api, ApiError } from "../api";
   import type { OwnerQuestion, OwnerQuestionAnswered } from "../apiTypes";
   import { publishApprovalResolved } from "../approvalResume";
-  import { clarifyBody, clarifyText, ownerQuestions, type ClarifyReply } from "../clarify";
+  import { clarifyBody, clarifyText, ownerQuestions, previewFor, type ClarifyReply } from "../clarify";
   import { failure } from "../errorCopy";
   import { shownInline } from "../inlineDecisions.svelte";
 
@@ -65,6 +65,9 @@
   const last = $derived(index >= questions.length - 1);
   const ready = $derived(picked.length > 0 || typed.trim() !== "");
   const open = $derived(!disabled && !busy && sent === null);
+  // TOOL-08 — the preview of what was picked; looking is not choosing, so the
+  // recommended option is tagged but never pre-selected.
+  const preview = $derived(current ? previewFor(current, picked) : null);
 
   function toggle(label: string): void {
     if (current.multiSelect) {
@@ -148,11 +151,14 @@
               disabled={!open}
               onchange={() => toggle(option.label)}
             />
-            <span class="label">{option.label}</span>
+            <span class="label"
+              >{option.label}{#if option.recommended}<span class="recommended">Recommended</span>{/if}</span
+            >
             {#if option.description}<span class="description">{option.description}</span>{/if}
           </label>
         {/each}
       </div>
+      {#if preview}<pre class="preview" aria-label="Preview of your choice" data-testid="clarify-preview">{preview}</pre>{/if}
     {/if}
     <input
       class="typed"
@@ -186,6 +192,8 @@
   .options{display:grid;gap:var(--space-1)}
   .option{display:grid;grid-template-columns:auto 1fr;column-gap:var(--space-2);align-items:center;padding:.4rem .6rem;border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;font-size:var(--text-sm)}
   .option.chosen{border-color:var(--accent);background:var(--accent-soft)}
+  .recommended{margin-left:var(--space-2);padding:0 .35rem;border:1px solid var(--accent);border-radius:var(--r-sm);font-size:var(--text-xs);font-weight:600;color:var(--accent)}
+  .preview{margin:0;padding:var(--space-2);max-height:14rem;overflow:auto;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);font-family:var(--font-mono);font-size:var(--text-xs);white-space:pre-wrap;color:var(--text-1)}
   .description{grid-column:2;color:var(--text-3);font-size:var(--text-xs)}
   .typed{width:100%;padding:.45rem .6rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text-1);font:inherit;font-size:var(--text-sm)}
   .actions{display:flex;justify-content:flex-end;gap:var(--space-2)}

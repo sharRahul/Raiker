@@ -236,3 +236,99 @@ def test_unified_patch_rejects_multi_file_change_before_any_write(tmp_path) -> N
     assert result["status"] == "failed"
     assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "one\n"
     assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "two\n"
+
+
+def test_grep_regex_case_and_context(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """TOOL-02 — regex, ignore_case and context lines, each opt-in."""
+    (tmp_path / "a.py").write_text("one\ndef Alpha():\n    pass\nfour\n", encoding="utf-8")
+    plain = grep_files(tmp_path, "def alpha", ".")
+    assert plain["matches"] == []
+    folded = grep_files(tmp_path, "def alpha", ".", ignore_case=True)
+    assert [m["line"] for m in folded["matches"]] == [2]
+    assert "before" not in folded["matches"][0]
+    pattern = grep_files(tmp_path, r"^def \w+\(", ".", regex=True, context=1)
+    match = pattern["matches"][0]
+    assert match["line"] == 2
+    assert match["before"] == ["one"]
+    assert match["after"] == ["    pass"]
+    # A literal search does not interpret regex syntax.
+    assert grep_files(tmp_path, r"\w+", ".")["matches"] == []
+    # Context is capped.
+    wide = grep_files(tmp_path, "pass", ".", context=50)
+    assert wide["matches"][0]["before"] == ["one", "def Alpha():"]
+
+
+def test_grep_refuses_bad_and_catastrophic_patterns(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    (tmp_path / "a.txt").write_text("aaaa\n", encoding="utf-8")
+    assert grep_files(tmp_path, "(", ".", regex=True)["error"]["type"] == "pattern_invalid"
+    assert grep_files(tmp_path, "(a+)+$", ".", regex=True)["error"]["type"] == "pattern_nested_quantifier"
+    assert grep_files(tmp_path, "x" * 501, ".", regex=True)["error"]["type"] == "pattern_too_long"
+    assert grep_files(tmp_path, "", ".")["error"]["type"] == "query_empty"
+
+
+def test_edit_replace_all_and_insert_line(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """TOOL-02 replace_all and TOOL-99 insert_line, through preview and write."""
+    from raiker.tools.filesystem import edit_file_content, edit_options, proposed_edit_snapshot
+
+    target = tmp_path / "a.txt"
+    target.write_text("x = 1\ny = x\nz = x\n", encoding="utf-8")
+    # Without replace_all, an ambiguous match is still refused.
+    assert proposed_edit_snapshot(tmp_path, "a.txt", "x", "w")["error"]["type"] == "old_text_not_unique"
+    preview = proposed_edit_snapshot(tmp_path, "a.txt", "x", "w", **edit_options({"replace_all": True}))
+    assert preview["proposed_text"] == "w = 1\ny = w\nz = w\n"
+    assert target.read_text(encoding="utf-8") == "x = 1\ny = x\nz = x\n"
+    assert edit_file_content(tmp_path, "a.txt", "nope", "w", replace_all=True)["error"]["type"] == "old_text_not_found"
+    edit_file_content(tmp_path, "a.txt", "", "# header", insert_line=0)
+    assert target.read_text(encoding="utf-8").startswith("# header\nx = 1\n")
+    edit_file_content(tmp_path, "a.txt", "", "tail", **edit_options({"insert_line": "4"}))
+    assert target.read_text(encoding="utf-8").endswith("z = x\ntail\n")
+    assert edit_file_content(tmp_path, "a.txt", "", "t", insert_line=99)["error"]["type"] == "insert_line_out_of_range"
+    assert edit_file_content(tmp_path, "a.txt", "x", "t", insert_line=1)["error"]["type"] == "insert_line_with_old_text"
+    assert edit_options({"insert_line": True}) == {"replace_all": False, "insert_line": None}
+    assert edit_options({"replace_all": "yes"})["replace_all"] is False
+
+
+def test_read_file_line_range(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """TOOL-02 — a long file read in parts."""
+    from raiker.tools.filesystem import read_file
+
+    (tmp_path / "a.txt").write_text("".join(f"line {n}\n" for n in range(1, 11)), encoding="utf-8")
+    whole = read_file(tmp_path, "a.txt")
+    assert "line_start" not in whole and whole["truncated"] is False
+    part = read_file(tmp_path, "a.txt", offset=3, limit=2)
+    assert part["text"] == "line 3\nline 4\n"
+    assert (part["line_start"], part["line_end"], part["line_count"]) == (3, 4, 10)
+    assert part["truncated"] is True
+    tail = read_file(tmp_path, "a.txt", offset=9)
+    assert tail["text"] == "line 9\nline 10\n" and tail["truncated"] is False
+    assert read_file(tmp_path, "a.txt", offset=50)["error"]["type"] == "offset_out_of_range"
+    assert read_file(tmp_path, "a.txt", pages="1")["error"]["type"] == "pages_only_for_pdf"
+
+
+def test_read_file_pdf_pages(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """TOOL-02 — a PDF's pages come back as text, a bounded span per call."""
+    from pypdf import PdfWriter
+
+    from raiker.tools.filesystem import read_file
+
+    writer = PdfWriter()
+    for _ in range(3):
+        writer.add_blank_page(width=200, height=200)
+    with (tmp_path / "doc.pdf").open("wb") as handle:
+        writer.write(handle)
+    result = read_file(tmp_path, "doc.pdf", pages="2-3")
+    assert result["status"] == "success"
+    assert result["pages"] == "2-3" and result["page_count"] == 3
+    assert "--- Page 2 ---" in result["text"] and "--- Page 1 ---" not in result["text"]
+    assert read_file(tmp_path, "doc.pdf")["pages"] == "1-3"
+    assert read_file(tmp_path, "doc.pdf", pages="5")["error"]["type"] == "pages_out_of_range"
+    assert read_file(tmp_path, "doc.pdf", pages="1-30")["error"]["type"] == "pages_too_many"
+    assert read_file(tmp_path, "doc.pdf", pages="x")["error"]["type"] == "pages_invalid"
+    import raiker.tools.filesystem as filesystem
+
+    original = filesystem.MAX_READ_PDF_BYTES
+    filesystem.MAX_READ_PDF_BYTES = 10
+    try:
+        assert read_file(tmp_path, "doc.pdf")["error"]["type"] == "pdf_too_large"
+    finally:
+        filesystem.MAX_READ_PDF_BYTES = original

@@ -11,12 +11,14 @@ def github_read(
     workspace_root: str | Path,
     resource: str,
     repo: str,
-    number: Any,
+    number: Any = None,
     *,
+    ref: str | None = None,
+    path: str | None = None,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Governed GitHub issue/PR read, brokered as the ``github_read`` tool.
+    """Governed GitHub read, brokered as the ``github_read`` tool.
 
     Lets a model read one GitHub issue or pull request. Everything is enforced
     inside :class:`GithubConnectorService`: the ``connector_github_runtime``
@@ -35,7 +37,7 @@ def github_read(
     service = GithubConnectorService(
         workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
     )
-    return service.read(resource, repo, number)
+    return service.read(resource, repo, number, ref=ref, path=path)
 
 
 def gmail_read(

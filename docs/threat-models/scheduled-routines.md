@@ -30,6 +30,7 @@ the routines whose `next_run` has passed.
 | Valid payload | The payload must parse as a bounded subagent spec, else `invalid_payload`. |
 | No fabricated success | Malformed ops/payloads and failed routines return `ok=False` with a reason. |
 | AI principals | Capability gate + `route_action` block non-human principals from running or enabling the gate. |
+| Injected instructions are named | A task's title and instructions are scanned when it is saved with the deterministic rules untrusted context gets (`raiker/security/injection_scan.py`). A match raises a redacted finding and the notice *A task's instructions look injected*; the prompt is never stored in the finding, and the save is not blocked, because the tool gate is still what refuses an action. A model-proposed task says the same on its approval card (TOOL-124, [FIXED-1201](../plans/FIXED_ITEMS.md#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124)). |
 
 ## Activation requirements
 

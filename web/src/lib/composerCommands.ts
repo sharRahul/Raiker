@@ -55,6 +55,8 @@ export interface SlashCommand {
     | "schedule"
     | "tasks"
     | "shortcuts"
+    | "compress"
+    | "insights"
     | "skill";
 }
 
@@ -87,6 +89,12 @@ const CHAT_ONLY: readonly SlashCommand[] = [
   // automation the approval path exists to prevent.
   { name: "schedule", summary: "Schedule a task or a daily routine", action: "schedule" },
   { name: "tasks", summary: "Show tasks, schedules and background agents", action: "tasks" },
+  // TOOL-131 — the conversation's own upkeep. `/compress` summarises the turns
+  // so far for the model (the transcript keeps every word); `/insights` shows
+  // what this conversation used and cost. Neither sends anything to the model
+  // on the owner's behalf beyond what the turn menu's Summarise already does.
+  { name: "compress", summary: "Summarise this conversation so far for the model", action: "compress" },
+  { name: "insights", summary: "Show what this conversation used and cost", action: "insights" },
 ];
 
 const BUILD_ONLY: readonly SlashCommand[] = [

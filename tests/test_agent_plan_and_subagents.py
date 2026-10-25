@@ -512,3 +512,38 @@ class TestEveryEmittedEventIsDeclared:
             "model_tool_calls_dropped",
         ):
             assert event_type in EVENT_TYPES
+
+
+def test_plan_steps_can_wait_on_other_steps() -> None:
+    """TOOL-04 — `blocked_by` names other steps; the plan stays honest about order."""
+    from raiker.runtime.agent_plan import PlanValidationError, normalize_steps, plan_context_message
+
+    steps = normalize_steps([
+        {"title": "Write migration", "status": "completed"},
+        {"title": "Add model", "status": "in_progress", "blocked_by": [1]},
+        {"title": "Wire API", "status": "pending", "blocked_by": [2, 1, 2]},
+    ])
+    assert steps[2].blocked_by == (1, 2)
+    assert steps[2].to_dict()["blocked_by"] == [1, 2]
+    assert "blocked_by" not in steps[0].to_dict()
+    message = plan_context_message({"steps": [step.to_dict() for step in steps]})
+    assert "3. [ ] Wire API (after step 1, 2)" in message
+    for bad, reason in (
+        ([{"title": "A", "status": "pending", "blocked_by": [1]}], "plan_step_blocked_by_unknown_step"),
+        ([{"title": "A", "status": "pending", "blocked_by": [5]}], "plan_step_blocked_by_unknown_step"),
+        ([{"title": "A", "status": "pending", "blocked_by": "1"}], "plan_step_blocked_by_invalid"),
+        (
+            [{"title": "A", "status": "pending"}, {"title": "B", "status": "in_progress", "blocked_by": [1]}],
+            "plan_step_ahead_of_dependency",
+        ),
+        (
+            [{"title": "A", "status": "pending", "blocked_by": [2]}, {"title": "B", "status": "pending", "blocked_by": [1]}],
+            "plan_dependency_cycle",
+        ),
+    ):
+        try:
+            normalize_steps(bad)
+        except PlanValidationError as exc:
+            assert exc.reason.startswith(reason), exc.reason
+        else:  # pragma: no cover
+            raise AssertionError(f"accepted {bad}")

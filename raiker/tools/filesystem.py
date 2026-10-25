@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -67,27 +68,129 @@ def _is_binary_bytes(data: bytes) -> bool:
     return b"\x00" in data
 
 
+#: TOOL-02 — the largest file `read_file` will open to serve a line range.
+MAX_LINE_RANGE_SOURCE_BYTES = 5_000_000
+#: TOOL-02 — the most PDF pages one `read_file` call extracts.
+MAX_READ_PDF_PAGES = 20
+#: The largest PDF `read_file` will open; the reader holds the whole file.
+MAX_READ_PDF_BYTES = 50_000_000
+_PAGE_SPEC = re.compile(r"^\s*(\d+)\s*(?:-\s*(\d+))?\s*$")
+
+
+def _page_range(spec: str) -> tuple[int, int] | None:
+    match = _PAGE_SPEC.match(spec)
+    if not match:
+        return None
+    first = int(match.group(1))
+    last = int(match.group(2) or first)
+    if first < 1 or last < first:
+        return None
+    return first, last
+
+
+def _read_pdf(
+    workspace_root: str | Path, resolved: Path, pages: str | None, *, max_bytes: int,
+    authority: Any,
+) -> dict[str, Any]:
+    """Text of a workspace PDF's pages, extracted locally (TOOL-02).
+
+    Uses the same pypdf reader uploaded attachments use; nothing leaves the
+    machine. At most :data:`MAX_READ_PDF_PAGES` pages per call, so a long PDF
+    is read in parts rather than folded into the context whole.
+    """
+    import io
+
+    try:
+        from pypdf import PdfReader
+        from pypdf.errors import PyPdfError
+    except ImportError:
+        return _failure("pdf_extraction_unavailable")
+    if resolved.stat().st_size > MAX_READ_PDF_BYTES:
+        return _failure("pdf_too_large", limit=MAX_READ_PDF_BYTES)
+    try:
+        reader = PdfReader(io.BytesIO(resolved.read_bytes()))
+        page_count = len(reader.pages)
+    except (PyPdfError, ValueError, OSError):
+        return _failure("pdf_unreadable")
+    if pages:
+        span = _page_range(pages)
+        if span is None:
+            return _failure("pages_invalid")
+        first, last = span
+    else:
+        first, last = 1, min(page_count, MAX_READ_PDF_PAGES)
+    if first > page_count:
+        return _failure("pages_out_of_range", page_count=page_count)
+    if last - first + 1 > MAX_READ_PDF_PAGES:
+        return _failure("pages_too_many", limit=MAX_READ_PDF_PAGES)
+    last = min(last, page_count)
+    parts: list[str] = []
+    for number in range(first, last + 1):
+        try:
+            text = reader.pages[number - 1].extract_text() or ""
+        except Exception:  # noqa: BLE001 — one bad page must not abort the read
+            text = ""
+        parts.append(f"--- Page {number} ---\n{text}")
+    joined = "\n".join(parts)
+    return {
+        "status": "success",
+        "path": _relative_path(workspace_root, resolved, authority=authority),
+        "text": joined[:max_bytes],
+        "truncated": len(joined) > max_bytes or (last < page_count and not pages),
+        "pages": f"{first}-{last}",
+        "page_count": page_count,
+    }
+
+
 def read_file(
     workspace_root: str | Path, path: str | Path, *, max_bytes: int = 200_000,
+    offset: int | None = None, limit: int | None = None, pages: str | None = None,
     authority: Any = None,
 ) -> dict[str, Any]:
+    """Read a workspace file: UTF-8 text, a line range of one, or a PDF's pages.
+
+    TOOL-02 added ``offset`` (first line, 1-based) and ``limit`` (number of
+    lines) for reading a long file in parts, and PDF text by ``pages``
+    (``"3"`` or ``"1-5"``). Without them a call returns what it always did.
+    """
     resolved = resolve_workspace_path(workspace_root, path, authority=authority)
     if not resolved.exists():
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
     if not resolved.is_file():
         return {"status": "failed", "error": {"type": "not_file", "path": str(path)}}
-    data = resolved.read_bytes()[: max_bytes + 1]
+    with resolved.open("rb") as handle:
+        head = handle.read(5)
+    if head == b"%PDF-":
+        return _read_pdf(workspace_root, resolved, pages, max_bytes=max_bytes, authority=authority)
+    if pages:
+        return _failure("pages_only_for_pdf")
+    ranged = offset is not None or limit is not None
+    if ranged and resolved.stat().st_size > MAX_LINE_RANGE_SOURCE_BYTES:
+        return _failure("file_too_large_for_line_range", limit=MAX_LINE_RANGE_SOURCE_BYTES)
+    data = resolved.read_bytes() if ranged else resolved.read_bytes()[: max_bytes + 1]
     if _is_binary_bytes(data):
         return {"status": "failed", "error": {"type": "binary_file", "path": str(path)}}
     try:
-        text = data[:max_bytes].decode("utf-8")
+        text = (data if ranged else data[:max_bytes]).decode("utf-8")
     except UnicodeDecodeError:
         return {"status": "failed", "error": {"type": "binary_file", "path": str(path)}}
+    relative = _relative_path(workspace_root, resolved, authority=authority)
+    if not ranged:
+        return {"status": "success", "path": relative, "text": text, "truncated": len(data) > max_bytes}
+    lines = text.splitlines(keepends=True)
+    start = max(1, offset or 1)
+    if start > max(len(lines), 1):
+        return _failure("offset_out_of_range", line_count=len(lines))
+    end = len(lines) if limit is None else min(len(lines), start - 1 + max(1, limit))
+    chunk = "".join(lines[start - 1:end])
     return {
         "status": "success",
-        "path": _relative_path(workspace_root, resolved, authority=authority),
-        "text": text,
-        "truncated": len(data) > max_bytes,
+        "path": relative,
+        "text": chunk[:max_bytes],
+        "truncated": len(chunk) > max_bytes or end < len(lines),
+        "line_start": start,
+        "line_end": end,
+        "line_count": len(lines),
     }
 
 
@@ -139,6 +242,37 @@ def is_text_file(path: Path, sample_size: int = 4096) -> bool:
     return True
 
 
+#: TOOL-02 — the most context lines either side of a match `grep` returns.
+MAX_GREP_CONTEXT = 5
+#: A model-written pattern is bounded before it is compiled.
+MAX_GREP_PATTERN_CHARS = 500
+#: Python's `re` has no time limit, so a pattern with a quantified group that
+#: is itself quantified — `(a+)+`, `(\w*)*` — can backtrack for minutes on one
+#: line and hold the host's thread. Such patterns are refused by shape rather
+#: than run and timed out; the search they meant is always expressible without
+#: the nesting.
+_NESTED_QUANTIFIER = re.compile(r"\([^()]*[+*][^()]*\)\s*[+*{]")
+
+
+def _grep_matcher(
+    query: str, *, regex: bool, ignore_case: bool
+) -> Callable[[str], bool] | dict[str, Any]:
+    if not regex:
+        if ignore_case:
+            folded = query.casefold()
+            return lambda line: folded in line.casefold()
+        return lambda line: query in line
+    if len(query) > MAX_GREP_PATTERN_CHARS:
+        return _failure("pattern_too_long", limit=MAX_GREP_PATTERN_CHARS)
+    if _NESTED_QUANTIFIER.search(query):
+        return _failure("pattern_nested_quantifier")
+    try:
+        compiled = re.compile(query, re.IGNORECASE if ignore_case else 0)
+    except re.error as exc:
+        return _failure("pattern_invalid", message=str(exc))
+    return lambda line: compiled.search(line) is not None
+
+
 def grep_files(
     workspace_root: str | Path,
     query: str,
@@ -146,7 +280,22 @@ def grep_files(
     *,
     include: str = "*",
     max_results: int = 100,
+    regex: bool = False,
+    ignore_case: bool = False,
+    context: int = 0,
 ) -> dict[str, Any]:
+    """Search file contents; literal by default, a regular expression on request.
+
+    TOOL-02 added `regex`, `ignore_case` and `context` (lines either side, at
+    most :data:`MAX_GREP_CONTEXT`). A match carries `before` and `after` only
+    when context was asked for, so a plain search returns exactly what it did.
+    """
+    if not query:
+        return _failure("query_empty")
+    matcher = _grep_matcher(query, regex=regex, ignore_case=ignore_case)
+    if isinstance(matcher, dict):
+        return matcher
+    span = max(0, min(int(context), MAX_GREP_CONTEXT))
     root = Path(workspace_root).resolve()
     base = resolve_workspace_path(root, path)
     if not base.exists():
@@ -156,19 +305,21 @@ def grep_files(
     for file_path in sorted(files):
         if not fnmatch.fnmatch(file_path.name, include) or not is_text_file(file_path):
             continue
-        for line_number, line in enumerate(
-            file_path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
-        ):
-            if query in line:
-                results.append(
-                    {
-                        "path": str(file_path.relative_to(root)),
-                        "line": line_number,
-                        "text": line[:500],
-                    }
-                )
-                if len(results) >= max_results:
-                    return {"status": "success", "matches": results, "truncated": True}
+        lines = file_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        for index, line in enumerate(lines):
+            if not matcher(line):
+                continue
+            match: dict[str, Any] = {
+                "path": str(file_path.relative_to(root)),
+                "line": index + 1,
+                "text": line[:500],
+            }
+            if span:
+                match["before"] = [item[:500] for item in lines[max(0, index - span):index]]
+                match["after"] = [item[:500] for item in lines[index + 1:index + 1 + span]]
+            results.append(match)
+            if len(results) >= max_results:
+                return {"status": "success", "matches": results, "truncated": True}
     return {"status": "success", "matches": results, "truncated": False}
 
 
@@ -383,6 +534,63 @@ def _replace_candidate(
         if before[start:end].endswith("\n") and not replacement.endswith("\n"):
             replacement += "\n"
     return resolved, before, before[:start] + replacement + before[end:]
+
+
+def edit_options(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """The `edit_file` modes a call asked for, read the same way at every site.
+
+    TOOL-02 added ``replace_all`` and TOOL-99 ``insert_line``. The preview, the
+    approval diff and the executor all read a call through this, so the change
+    the owner approves is the change that runs.
+    """
+    raw_line = arguments.get("insert_line")
+    insert_line: int | None = None
+    if raw_line is not None and raw_line != "" and not isinstance(raw_line, bool):
+        try:
+            insert_line = int(raw_line)
+        except (TypeError, ValueError):
+            insert_line = -1
+    return {"replace_all": arguments.get("replace_all") is True, "insert_line": insert_line}
+
+
+def _edit_candidate(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
+) -> tuple[Path, str, str] | dict[str, Any]:
+    """One edit, in whichever of its three modes the call named.
+
+    * the default: replace one unique match (whitespace-tolerant, never ambiguous);
+    * ``replace_all``: replace every exact occurrence, at least one required;
+    * ``insert_line``: insert ``new_text`` after that line (0 is the top), with
+      ``old_text`` left empty so a call cannot mean two edits at once.
+    """
+    if insert_line is not None:
+        if old_text:
+            return _failure("insert_line_with_old_text")
+        if replace_all:
+            return _failure("insert_line_with_replace_all")
+        target = _existing_text_target(workspace_root, path, authority=authority)
+        if isinstance(target, dict):
+            return target
+        resolved, before = target
+        lines = before.splitlines(keepends=True)
+        if insert_line < 0 or insert_line > len(lines):
+            return _failure("insert_line_out_of_range", line_count=len(lines))
+        if insert_line and not lines[insert_line - 1].endswith("\n"):
+            lines[insert_line - 1] += "\n"
+        inserted = new_text if new_text.endswith("\n") or not new_text else new_text + "\n"
+        return resolved, before, "".join([*lines[:insert_line], inserted, *lines[insert_line:]])
+    if replace_all:
+        if not old_text:
+            return _failure("old_text_empty")
+        target = _existing_text_target(workspace_root, path, authority=authority)
+        if isinstance(target, dict):
+            return target
+        resolved, before = target
+        if old_text not in before:
+            return _failure("old_text_not_found")
+        return resolved, before, before.replace(old_text, new_text)
+    return _replace_candidate(workspace_root, path, old_text, new_text, authority=authority)
 
 
 def _leading_whitespace(line: str) -> str:
@@ -637,11 +845,14 @@ def _proposal_from_candidate(
 
 def proposed_edit_snapshot(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
 ) -> dict[str, Any]:
     return _proposal_from_candidate(
         workspace_root,
-        _replace_candidate(workspace_root, path, old_text, new_text, authority=authority),
+        _edit_candidate(
+            workspace_root, path, old_text, new_text,
+            replace_all=replace_all, insert_line=insert_line, authority=authority,
+        ),
         authority=authority,
     )
 
@@ -700,20 +911,26 @@ def _write_candidate(
 
 def replace_text_content(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
 ) -> dict[str, Any]:
     return _write_candidate(
         workspace_root,
-        _replace_candidate(workspace_root, path, old_text, new_text, authority=authority),
+        _edit_candidate(
+            workspace_root, path, old_text, new_text,
+            replace_all=replace_all, insert_line=insert_line, authority=authority,
+        ),
         authority=authority,
     )
 
 
 def edit_file_content(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
 ) -> dict[str, Any]:
-    return replace_text_content(workspace_root, path, old_text, new_text, authority=authority)
+    return replace_text_content(
+        workspace_root, path, old_text, new_text,
+        replace_all=replace_all, insert_line=insert_line, authority=authority,
+    )
 
 
 def apply_patch_content(

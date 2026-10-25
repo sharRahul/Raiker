@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 def web_fetch(
     workspace_root: str | Path,
     url: str,
+    max_chars: Any = None,
     *,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
@@ -36,13 +37,19 @@ def web_fetch(
     service = WebAccessService(
         workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
     )
-    return service.fetch(url)
+    try:
+        cap = int(max_chars) if max_chars not in (None, "") and not isinstance(max_chars, bool) else None
+    except (TypeError, ValueError):
+        cap = None
+    return service.fetch(url, max_chars=cap)
 
 
 def web_search(
     workspace_root: str | Path,
     query: str,
     max_results: Any = 5,
+    allowed_domains: Any = (),
+    blocked_domains: Any = (),
     *,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
@@ -64,7 +71,12 @@ def web_search(
     service = WebAccessService(
         workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
     )
-    return service.search(query, max_results=limit)
+    return service.search(
+        query,
+        max_results=limit,
+        allowed_domains=allowed_domains if isinstance(allowed_domains, (list, tuple, str)) else (),
+        blocked_domains=blocked_domains if isinstance(blocked_domains, (list, tuple, str)) else (),
+    )
 
 
 def web_extract(

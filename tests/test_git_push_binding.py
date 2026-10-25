@@ -13,6 +13,7 @@ Three defects found reviewing the code for DEC-21b's amendment:
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -267,3 +268,32 @@ def test_an_ssh_push_uses_the_selected_key_and_pinned_hosts(
     assert "IdentitiesOnly=yes" in command and str(key) in command
     assert "github_known_hosts" in command
     assert push["env"].get("RAIKER_GIT_PUSH_TOKEN", "") == ""
+
+
+def test_a_push_adding_a_credential_is_refused_before_the_owner_is_asked(repo: Path) -> None:
+    """TOOL-30 — outgoing commits are scanned with the shapes CI fails on."""
+    fake_key = "AKIA" + "Q" * 16  # built at run time so the source holds no key shape
+    (repo / "config.py").write_text(f"KEY = '{fake_key}'\n", encoding="utf-8")
+    _git(repo, "add", "config.py")
+    _git(repo, "commit", "-m", "add config")
+    # A later commit removing it does not help: the remote keeps history.
+    (repo / "config.py").write_text("KEY = None\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "remove key")
+    snapshot = git_tools.proposed_push_snapshot(repo, credential_configured=True)
+    assert snapshot["status"] == "failed"
+    error = snapshot["error"]
+    assert error["type"] == "outgoing_commits_contain_credentials"
+    assert error["findings"][0]["path"] == "config.py"
+    assert error["findings"][0]["line"] == 1
+    assert error["findings"][0]["rule"] == "aws_access_key"
+    assert fake_key not in str(snapshot)
+    # The repository's own dated exception excuses a deliberate fixture.
+    (repo / ".github").mkdir()
+    exception = {
+        "path": "config.py", "fingerprint": error["findings"][0]["fingerprint"],
+        "owner": "me", "reason": "fixture", "expires": "2999-01-01",
+    }
+    (repo / ".github" / "secret-scan-exceptions.json").write_text(
+        json.dumps({"exceptions": [exception]}), encoding="utf-8"
+    )
+    assert git_tools.proposed_push_snapshot(repo, credential_configured=True)["status"] == "success"

@@ -253,6 +253,15 @@ A `git_commit` records the change set you reviewed and stages exactly the paths
 you saw — never `--all` — so `.raiker/` and `.git/` cannot be swept in, and the
 repository's own hooks are disabled for the invocation.
 
+**A push never carries a committed key.** Before you are asked, Raiker reads
+the lines every outgoing commit adds and refuses the push if one looks like a
+published credential (an Anthropic, OpenAI, GitHub, AWS, Slack, Google, Stripe
+or Hugging Face key, or a private key block), naming the file, line and kind of
+key but never the key. A key removed by a later commit still counts, because the
+remote keeps history: rewrite the commits and rotate the key. A test fixture
+your repository excuses, with a date, in `.github/secret-scan-exceptions.json`
+is not counted.
+
 **A push answers to its own switch.** Publishing sends repository content off
 the machine, so `git_push` answers to **Git push** (`git_push_execution`) rather
 than to Git writes, and it does nothing until the remote's host is on
@@ -308,6 +317,14 @@ with the head commit it shows; **GitHub answered differently** means it
 returned another branch or number; **Not confirmed** means the read-back
 failed, so only the create response is known. The approval's result says the
 same. A receipt is evidence only; merging stays with you, on GitHub.
+
+**Reading CI and fixing the pull request.** With the GitHub connector on, a
+Build turn can read a commit's or a pull request's checks, with the failures'
+annotations (*tests/test_a.py:4: assert 1 == 2*), the recent workflow runs, a
+run's failed jobs and steps, recent commits and one file at a branch or tag,
+without a clone. It can also propose a new title or description for a pull
+request, which asks you first like any GitHub write. It cannot merge, close or
+change a pull request's base. Raw job logs are not read yet.
 
 ## Whether a change was checked
 

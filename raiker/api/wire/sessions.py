@@ -399,6 +399,8 @@ class AgentPlanStep(TypedDict):
     title: str
     status: Literal["pending", "in_progress", "completed", "blocked"]
     note: NotRequired[str]
+    #: TOOL-04 — the 1-based numbers of the steps this one waits on.
+    blocked_by: NotRequired[list[int]]
 
 
 class AgentPlan(TypedDict):

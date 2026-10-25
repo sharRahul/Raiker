@@ -71,6 +71,7 @@ Canonical technical references:
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
 - [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
+- [Agent tool inventory](plans/AGENT_TOOL_INVENTORY.md) — tools to bring into Raiker later (TOOL-01–TOOL-83)
 - [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/TESTING.md) and
   [test-round record](plans/TESTING.md)

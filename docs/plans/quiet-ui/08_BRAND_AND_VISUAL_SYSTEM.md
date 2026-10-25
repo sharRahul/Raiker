@@ -4,6 +4,24 @@ Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 [VISUAL_DESIGN_SPEC.md](../../architecture/VISUAL_DESIGN_SPEC.md) remains the
 owner of tokens; this records the decisions to apply to it.
 
+## Status
+
+**Applied 2026-10-25**
+([FIXED-1168](../FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)
+and [FIXED-1169](../FIXED_ITEMS.md#fixed-1169--the-palette-and-type-were-not-the-ones-08-decided-qui-v01-qui-v02);
+live cases RT-QUI-57 and RT-QUI-70).
+
+| Item | State |
+|---|---|
+| QUI-V01 | **Done.** Both themes use these roles in `web/src/app.css` and the desktop shell; soft fills were set so success and risk text stay at 4.5:1 on them (`appCss.test.ts`). |
+| QUI-V02 | **Done** for type: Inter everywhere, bundled. Body stays 15 px. Radius and spacing were already on this scale. |
+| QUI-V03 | **Done.** The eye-orb is gone from the app, the lock screen, the icons, the desktop Setup window and the installer art. |
+| QUI-V04 | **Done.** The owner chose the open ring on 2026-10-25. `Logo.svelte` draws it; `scripts/render_brand_icons.py` renders every PNG from the same geometry. No route cue on one end. |
+| QUI-V05 | **Open.** The companion's art does not exist. |
+| QUI-V06 | **Done** earlier (Home's Continue and This week, the path line in plans and steps). |
+| QUI-V07 | **Unchanged.** |
+| QUI-V08 | **Done** earlier (QUI-Q06); this round also replaced the last glyph icons (a star and a cross in Threads) with drawn ones. |
+
 ## QUI-V01 — Colour tokens
 
 | Role | Light | Dark | Use |

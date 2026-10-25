@@ -6,7 +6,7 @@ a transcript records what was said, while durable memory contains only facts
 that passed the memory review path.
 
 Open **Knowledge → Memory** to review proposals, inspect approved memories,
-control recall, and manage retention. Open **Memory → Map** to see
+control recall, and manage retention. Open **Memory → Memories → See on the map** to see
 approved relationships between governed records.
 
 ## The memory path
@@ -65,7 +65,7 @@ prompt, or bypass an approval gate.
 
 ## The Knowledge Map
 
-**Memory → Map** shows the records this workspace holds and the
+**Memory → Memories → See on the map** shows the records this workspace holds and the
 approved relationships between them. Everything on it is stored — nothing is
 illustrative, and a workspace that has recorded nothing shows an empty map that
 says so rather than a demonstration graph. Adding a source or having a
@@ -125,7 +125,7 @@ and the label *owner-approved data, not instructions*.
 
 ### Recall mode
 
-**Memory → Recall & indexing → Recall mode** decides what Raiker adds to a turn
+**Memory → Controls → Recall mode** decides what Raiker adds to a turn
 on its own:
 
 | Mode | What a turn is given |
@@ -224,7 +224,7 @@ adding is the part where the two genuinely differ.
 **Where the controls are.** Memory is for your own facts — what Raiker has been
 allowed to remember, what is waiting on a decision, what has expired. Which
 embedding space recall searches, and building one, are engine configuration and
-live under **Settings → Advanced → Memory engine**. Memory's **Recall & indexing** tab
+live under **Settings → Advanced → Memory engine**. Memory's **Controls** tab
 keeps the one thing you need while reading your memories — whether recall is
 matching meaning or only words — and a link to that page when it is not what you
 wanted.
@@ -341,7 +341,7 @@ own retention/erasure process; Raiker must not claim that copy vanished early.
 
 ## Exporting and importing
 
-**Memory → Recall & indexing → Advanced memory management** exports every
+**Memory → Controls → Advanced memory management** exports every
 recallable memory as JSON and takes one back.
 
 An import is not a second way into the store: each record goes through the same
@@ -474,7 +474,7 @@ memory you had forgotten stays forgotten.
 that is the protection working, and there is no back door.
 
 **Rotating the key.** Raiker does not offer in-place key rotation yet. To move to
-a new key today, export your memories (**Recall & indexing → Export**), start a
+a new key today, export your memories (**Controls → Export**), start a
 new workspace — which generates a new key — and import them there. Records keep
 their text and provenance; review history and conversations stay with the old
 workspace.

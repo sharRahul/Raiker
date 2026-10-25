@@ -8,14 +8,18 @@ Part of the [Quiet UI redesign plan](README.md). Proposed, 2026-10-21.
 ([FIXED-1101](../FIXED_ITEMS.md#fixed-1101--the-shell-was-wider-and-looser-than-the-layout-system-qui-l01-qui-l14)
 to [FIXED-1123](../FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08);
 live cases RT-QUI-17 to RT-QUI-25 in
-[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)).
+[WEB_APP_LIVE_TEST.md](../../architecture/WEB_APP_LIVE_TEST.md)). **Diagnostics,
+Recovery, the pages that already fit, and Build and Design shipped 2026-10-25**
+([FIXED-1170](../FIXED_ITEMS.md#fixed-1170--diagnostics-opened-on-seven-tiles-reading-ready-and-0-qui-l11)
+to [FIXED-1175](../FIXED_ITEMS.md#fixed-1175--design-had-no-revision-strip-and-builds-postures-said-edit-and-auto-qui-l13);
+live cases RT-QUI-61 to RT-QUI-63 and RT-QUI-67).
 
 | Item | State |
 |---|---|
 | Shell | **Done.** Sidebar 232 px, 40 px rows, one 1,180 px page width, 2rem gutter (1.5rem below 1,280 px). |
 | QUI-L01 | **Done** through the shell sizes; Chat, Build and Design keep their own composers (03, L13). |
 | QUI-L02 | **Done.** `ListDetail.svelte`, used by Connections, Channels, Permissions and My models. |
-| QUI-L03 | **Done** for Security and Account: rows, with forms in dialogs (`FormDialog.svelte`). Other Settings sections keep their cards. |
+| QUI-L03 | **Done** for Security, Account, Privacy and General: rows, with forms in dialogs (`FormDialog.svelte`) and explanations in disclosures. Advanced › Runtime shows one line per environment with its detail on request. Other Settings sections keep their cards. |
 | QUI-L04 | **Done.** `AddDialog.svelte`: Add connection, Add channel, Add model. It is a page-level layer, not a top-layer modal, so a sign-in window a step opens draws above it. |
 | QUI-L05 | **Done.** The help panel. |
 | QUI-L06 | **Done.** Category rail, policy in words, the detail pane, **Select several** and **Group by technical area** in **⋯**. A **Schedules** category was added. Deviation: *Not decided here* and *How your permissions apply* stay as read-only disclosures under **Advanced** rather than help articles, because they show this account's live data. |
@@ -23,11 +27,11 @@ live cases RT-QUI-17 to RT-QUI-25 in
 | QUI-L08 | **Done.** Deviation: the global spending limit lives in **Settings → Advanced → Usage and spending**, beside spend across providers, rather than on Models. |
 | QUI-L09 | **Done.** Deviation: Account is part of **General** rather than its own section. |
 | QUI-L10 | **Done.** The Guide page is gone; `#/guide…` opens the panel. |
-| QUI-L11 | **Open**, except the name (FIXED-1095). |
-| QUI-L12 | **Open**, except Connections › Advanced (one segmented list). |
-| QUI-L13 | **Open.** |
+| QUI-L11 | **Partly done.** Overview is *What needs attention* with one card per issue and healthy systems folded (FIXED-1170); Checkpoints is **Recovery**, and a restore first says what will be undone and what stays, with Restore never the dominant button (FIXED-1171). Open: Sessions into Work › Threads, activity inside each task and project, Recovery reached from the affected task, live work on Home only. |
+| QUI-L12 | **Done**, except Projects, which stays a card grid. Work pages after 50 rows with 64 px thread and goal rows (FIXED-1172); Memory's map opens from Memories and Recall folds into Controls (FIXED-1173); Approvals' evidence is closed below 1,600 px (since 2026-10-22); Connections › Advanced is one segmented list. |
+| QUI-L13 | **Done.** Design's revision strip of three 56 px thumbnails; Build's postures are Plan · Suggest changes · Run within limits (FIXED-1175). Build's rail and side panel were already closed by default, and Design's export already existed only once a picture did. |
 | QUI-L14 | **Done.** 1,024–1,279 px shows the icon rail. |
-| Acceptance | **Partly met.** No destination shows a catalogue; old addresses forward. Size: 8 of 70 measurements still over budget (TO_BE_FIXED, QUI-G01 follow-up). |
+| Acceptance | **Partly met.** No destination shows a catalogue; old addresses forward. Size: Memory › Controls (929 px) and Memory › Map (922 px) are still just over budget at 1440×900; every other destination fits (TO_BE_FIXED, QUI-G01 follow-up). |
 
 ## The problem, measured
 

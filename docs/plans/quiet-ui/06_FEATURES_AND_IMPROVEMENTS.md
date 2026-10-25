@@ -12,11 +12,11 @@ live cases RT-QUI-44 to RT-QUI-56 in
 
 | Item | State |
 |---|---|
-| QUI-F01 | **Done.** Ctrl/Cmd+Shift+Space opens a 560×120 window from anywhere: one input, *Send to* (New task or one of five recent conversations), Esc hides. Also on the tray menu. A new task starts now through `POST /api/tasks`. |
+| QUI-F01 | **Done.** Ctrl/Cmd+Shift+Space opens a 560×120 window from anywhere: one input, *Send to* (New task or one of five recent conversations), Esc hides. Also on the tray menu. A new task starts now through `POST /api/tasks`. Signed out, it says *Sign in to Raiker first* and opens the main window (2026-10-25, [FIXED-1177](../FIXED_ITEMS.md#fixed-1177--quick-entry-before-sign-in-showed-the-lock-screen-in-a-560120-window)). |
 | QUI-F02 | **Done** on the existing `ask_owner_question`, which parks a turn without being an approval: the card replaces the approval card that Chat, Build and the floating card drew for it. Picks go back as picks; typed or skipped answers go back in the owner's words. |
 | QUI-F03 | **Open.** Depends on goal intake from Chat ([BUG-355](../TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)). |
 | QUI-F04 | **Done.** A task's own `current_step`, or the turn's status line; several open a menu. |
-| QUI-F05 | **Done.** Deviation: *Approval needed* and *Input needed* switch the desktop alert only, because DEC-21a keeps decisions from being muted inside Raiker; a critical approval has no switch. |
+| QUI-F05 | **Done.** Deviation: *Approval needed* and *Input needed* switch the desktop alert only, because DEC-21a keeps decisions from being muted inside Raiker; a critical approval has no switch. A decision marks its own notice read (2026-10-25, [FIXED-1178](../FIXED_ITEMS.md#fixed-1178--a-notice-outlived-the-decision-it-announced)). |
 | QUI-F06 | **Done** for the three templates. Results go to Home and the task's own conversation, which the form now says; delivering them to a connected channel is open. |
 | QUI-F07 | **Open.** Needs more than one account per service in the connector store. |
 | QUI-F08 | **Done** earlier, as [02, QUI-P06](02_PERMISSIONS_AND_APPROVALS.md#status). |

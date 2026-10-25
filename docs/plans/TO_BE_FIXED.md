@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355, BUG-356 and BUG-357, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355 and BUG-356, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -95,7 +95,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
-| [BUG-357](#bug-357--connecting-a-provider-and-using-it-in-chat-leaves-no-default-model) | Medium | Models / Home / goals | Open — found 2026-10-21 in the Quiet UI live round (RT-QUI-07); Home now names the gap truthfully ([FIXED-1074](FIXED_ITEMS.md#fixed-1074--home-said-no-model-is-set-up-while-a-chat-was-answering)) |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -803,28 +802,6 @@ data-class fields as PA-D05/PA-D07 give steps those inputs.
 each profile governs; a refused Chat or Build turn names the profile and offers
 the Settings route, exactly as a goal step does.
 
-## BUG-357 — Connecting a provider and using it in Chat leaves no default model
-
-**Severity: Medium. Area: Models / Home / goals. Status: Open — found
-2026-10-21 in the Quiet UI live round (RT-QUI-07).**
-
-**Observed.** On a fresh workspace, Anthropic was connected through **Models →
-Connect**, Haiku 4.5 kept, and chosen from Chat's model menu; Chat answered. Home
-then still listed a readiness gap: the runtime's `No model profile is selected.`
-(`raiker/control/dashboard_parts/models.py`, `_missing_config`), now shown as
-*No default model is chosen · Choose a model*. A Chat choice is remembered per
-surface (`surface-models`) and never sets `current_profile_id`, so a task, goal
-or chat with no model of its own still has none.
-
-**Proposed fix.** When the first hosted or local model becomes ready and no
-default exists, offer **Use as default** on the connect confirmation (never set
-it silently), and let the readiness gap's action set the default from the model
-Chat already uses.
-
-**Required user-interface outcome.** After connecting a first model, the owner
-is asked once whether it should be the default; Home's gap disappears when they
-agree, and stays, with its action, when they decline.
-
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 
 The focused regression set, documentation contracts, Ruff, mypy, and web checks passed. The complete local Python suite reached 100% but reported five failures on this Windows host:
@@ -836,29 +813,6 @@ The focused regression set, documentation contracts, Ruff, mypy, and web checks 
 - `tests/test_notification_quiet_hours.py::test_the_os_command_obeys_the_stored_desktop_decision` (configured `true` notifier returned `failed` instead of `sent`)
 
 These are not closed by this documentation/live-test pass. They need follow-up investigation to determine which are Windows-environment assumptions and which are regressions in command, Git proposal, or notification behavior.
-
-## 2026-10-19 verification follow-up — readiness line after a live Anthropic Build turn
-
-Found while running `br-d02-d04-build-target-and-review-live.spec.ts` against a
-fresh `raiker-web` (closed work: [FIXED-954](FIXED_ITEMS.md#fixed-954--a-build-check-counted-wherever-it-ran-and-a-written-file-was-never-read-back-br-d01)
-to [FIXED-957](FIXED_ITEMS.md#fixed-957--nothing-proved-an-injected-fault-could-not-read-as-verified-br-d06-first-slice)).
-Anthropic was connected through Models with an identity-linked key and its
-workspace ID, `claude-haiku-4-5-20251001` was kept through the picker without
-**Check**, and a Build turn completed. Afterwards the composer showed two lines
-that disagree: the readiness strip read *Checking this model — you can still
-send*, while the line under the composer read *No readiness check exists for
-this exact model. Open Models*. The turn itself was admitted and ran, so this is
-presentation, not a refusal. Not triaged in this run: whether the gateway's
-first-use check stores its observation under a different key than the composer
-reads (the FIXED-953 round saw neither line with Ollama), or whether the footer
-line is read before the post-turn refresh. The capture is
-`02-real-turn-outcome-target.png` in
-`docs/screenshots/2026-10-19-br-d02-d04-build-target-review/` (not committed). **Seen again later on 2026-10-19** in the BR-D04 repair round: with Run enabled
-and a request in the composer, the strip read *Checking this model — you can still
-send* while the footer read *The last model check has expired. Open Models*
-(`02-repair-request-in-composer.png`). The two lines read the same readiness
-record differently: the strip treats an aged-out observation as non-blocking
-(BUG-238), the footer still words it as a problem to fix.
 
 ## 2026-10-21 verification follow-up — the top bar's STOP count after a finished turn
 
@@ -877,14 +831,11 @@ the layout round shipped [FIXED-1101](FIXED_ITEMS.md#fixed-1101--the-shell-was-w
 to [FIXED-1123](FIXED_ITEMS.md#fixed-1123--chats-readiness-steps-disappeared-with-the-models-overview-qui-l08).
 These parts of the same items are not done:
 
-* **QUI-G01 — 8 of 70 size measurements are still over budget** after the
-  layout round ([01 Status](quiet-ui/01_LAYOUT_SYSTEM_AND_PAGES.md#status);
-  29 of 94 before it): Diagnostics › Overview (1,186 px at both sizes) and
-  Activity (about 6,000 px at both), Memory › Map (955 px at 1440×900),
-  Settings › Privacy (about 1,970 px at both) and Settings › General at
-  1280×800 (1,399 px against 1,200). Diagnostics waits for QUI-L11; Memory and
-  Privacy for QUI-L12. The report is in `all-pages-live.spec.ts`; it becomes a
-  failing check when those pages are rebuilt.
+* **QUI-G01 — two pages are still a little over budget** after the
+  2026-10-25 round ([FIXED-1174](FIXED_ITEMS.md#fixed-1174--settings--privacy-general-and-advanced-were-over-their-size-budget-qui-l03-qui-g01)):
+  Memory › Controls (929 px at 1440×900 against 900) and Memory › Map (922 px,
+  a canvas). Diagnostics, Privacy, General and Advanced now fit. The report is
+  in `all-pages-live.spec.ts`; it becomes a failing check once these two fit.
 * **QUI-G06 — about 200 other error messages** still give a status code, or
   *Could not X*, without what it affected and a next step. The pattern and the
   helper are in `web/src/lib/errorCopy.ts`; the ones on Stop, steer, continuing,
@@ -892,13 +843,14 @@ These parts of the same items are not done:
 * **QUI-G04 — actions that paint before their request returns.** Long
   transcripts are windowed; optimistic rename, pin and archive with a visible
   roll-back are not built.
-* **QUI-L11 — Diagnostics and Recovery.** Only the name changed. Overview as
-  issue cards, Sessions into Threads, Checkpoints as Recovery and the other
-  moves are not built.
-* **QUI-L12 and QUI-L13 — the pages that already fit, and Build and Design.**
-  Work's 64 px rows and pagination, Memory's map from search, Approvals side
-  by side, and the Build and Design rails are not built. Connections › Advanced
-  as one segmented list is done.
+* **QUI-L11 — the moves out of Diagnostics.** Overview as issue cards and
+  Recovery shipped 2026-10-25 ([FIXED-1170](FIXED_ITEMS.md#fixed-1170--diagnostics-opened-on-seven-tiles-reading-ready-and-0-qui-l11),
+  [FIXED-1171](FIXED_ITEMS.md#fixed-1171--restoring-a-checkpoint-was-the-dominant-button-and-named-little-qui-l11)).
+  Sessions as Work › Threads, activity inside each task and project, and
+  Recovery reached from the affected task are not built; Diagnostics keeps its
+  six tabs until they are.
+* **QUI-L12 — Projects as rows.** Work's lists page after 50 and threads and
+  goals are 64 px rows; Projects is still a card grid.
 * **Older live specs still drive the pages the layout round replaced.** About
   70 specs under `web/e2e/*-live.spec.ts` (written before 2026-10-21) open
   Models by its old tabs, Extensions tabs, Permissions rows that opened in
@@ -913,11 +865,6 @@ These parts of the same items are not done:
 * **QUI-C04 — *More*** (schedule, research depth, answer style) is not built.
   **Run in background** sits in Tools until it is. The profile chip on both
   composers shipped 2026-10-22 ([FIXED-1130](FIXED_ITEMS.md#fixed-1130--a-conversation-could-not-say-how-careful-raiker-should-be-qui-p02)).
-* **Needs the owner's decision: QUI-W01** (the open-ring mark replacing the
-  eye-orb is recorded as a recommendation, not a decision). QUI-P02 was
-  decided 2026-10-22.
-* **BUG-357 is still open**: RT-QUI-10 shows Home's *No default model is
-  chosen.* beside a Chat that answers with Haiku 4.5.
 
 ## 2026-10-22 Quiet UI approvals round — what is still open
 
@@ -940,20 +887,37 @@ These parts of the same document are not done:
   operation's `requires_confirmation` comes from its manifest.
 * **QUI-P08 — Approvals you've given** in Memory › Controls, with Undo, together
   with *What Raiker has learned to do* (QUI-F09).
-* **The Careful profile is remembered in this browser only.** It is applied by
-  the runtime on every turn it is sent with, but it is chosen per browser. If
-  it should follow the owner to another device, it needs a field on the
-  session.
-* **The tool row above an expired approval still reads *waiting for your
-  decision*.** Found live in RT-QUI-31: the Safety card below it says *Not done:
-  no decision*, but the turn's tool row (`ToolActivity`) is built from the
-  turn's events, and nothing records the expiry as an event. It should read
-  *not done* too. Recording expiry as an event (with the sweep below) would let
-  the row follow.
-* **An expired approval stays `pending` in storage** until something tries to
-  decide it, and the read model reports `is_expired`. Every surface now treats
-  it as expired. A sweep that settles it to `expired` (and closes its parked
-  turn) would let the stored state say the same.
+
+## 2026-10-25 Quiet UI polish round — what is still open
+
+The round of 2026-10-25 shipped
+[FIXED-1168](FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)
+to [FIXED-1187](FIXED_ITEMS.md#fixed-1187--the-readiness-strip-and-a-footer-line-disagreed-closed-as-not-reproducing).
+Found or left open in it:
+
+* **QUI-V05 — the companion.** The open ring and palette are in; the companion
+  waits for its art, and with it the pick in Hello (QUI-W02) and the picture on
+  a first-day Home (QUI-H02).
+* ***Loading conversation…* stays after a reopened conversation has drawn.**
+  Seen in the RT-QUI-66 captures: after a reload the transcript, the tool row
+  and the Safety card are on screen while the line above still says it is
+  loading. Not triaged: which of the reads after the transcript (attachments,
+  sources, recall) holds the flag.
+* **Older live specs and this round's changes.** Live specs written before
+  2026-10-25 that click **Re-measure boundary** or **Reset environment** in
+  Settings › Advanced › Runtime now need to open that environment's *Details*;
+  specs that look for *Recall & indexing* use the old tab name (the address
+  still forwards); and specs that sort an empty Approvals queue find no sort.
+  The mocked suite and `quiet-ui-polish-live` are updated (related to
+  BUG-248).
+* **The Workstations view keeps its own colours.** Diagnostics › Work in
+  action's optional *Workstations* scene draws desks and characters in fixed
+  colours rather than tokens, so it does not follow the QUI-V01 palette. It is
+  opt-in and kept by an earlier decision; restyling it is open.
+* **A Python test is sensitive to a loaded machine.**
+  `test_background_execution.py::test_a_foreground_run_holds_no_lease_and_is_never_swept`
+  failed once in a four-worker local run and passes alone; CI runs each shard
+  serially. Watch it in the shards.
 
 ## 2026-10-24 Quiet UI features round — what is still open
 
@@ -984,18 +948,9 @@ These parts of the same document are not done:
 * **QUI-F20 — corrections made by editing.** A correction typed as *That's
   wrong*, *No,* or *Actually* is offered; one made by editing Raiker's draft is
   not, because an edit carries no statement of what was wrong.
-* **Quick Entry before sign-in.** The Quick Entry window shares the main
-  window's session; with no signed-in session it shows the lock screen in a
-  560×120 window. It should say *Sign in to Raiker first* and offer to open the
-  main window.
 * **Older live specs answer native confirms.** Eight earlier live specs wait
   for the browser's `dialog` event; the in-app dialog (QUI-F10) needs them to
   press its button instead. The mocked suite and this round's live spec do.
-* **A notice outlives the decision it announced.** Seen in the RT-QUI-51 and
-  RT-QUI-55 screenshots: *Input needed* stayed in the corner after the question
-  was answered in Chat. Approval notices behave the same way — a decision does
-  not mark its notice read; only opening the notice or its page does. The
-  answer and decision routes could mark the notice for that approval read.
 * **The receipt is per turn, not per task.** A background task's receipt would
   sum the turns of its run; Tasks does not show one yet.
 
@@ -1019,29 +974,10 @@ These parts of the same document are not done:
   said it overrides the general guidance. Above three blocks the answer offers
   **Create document**. Nothing enforces either rule in the runtime, because the
   runtime cannot tell whether the owner asked for a report or for a table.
-* **Streaming shows the raw fence until the turn finishes.** The typed parts
-  arrive with the final response, so while a turn streams its `raiker:` block is
-  visible as JSON in a code sample, and is replaced by the drawn block at the
-  end. A renderer that holds back an open `raiker:` fence while streaming would
-  remove the flash.
-* **The Plan card covers the line under it.** Seen in the RT-QUI-37
-  screenshot: when a turn has a plan, the sticky Plan card at the top of the
-  transcript sits over the turn's *Completed · N steps* line, so only its lower
-  edge shows. Not caused by this round; seen in Chat with any planned turn.
 * **A corrected-block retry streams twice.** On a local model, the first answer
   streams, then the corrected one streams after it, and the final response
   replaces both. Not seen live (this round used a hosted model, which is not
   retried).
-
-## 2026-10-21 verification follow-up — the Python CI job is at its 45-minute limit
-
-On `main`, CI run 39606078093 spent 40 min 42 s in `pytest` alone, and the next
-run (39612791351, attempt 1) was cancelled at the job's `timeout-minutes: 45`
-partway through the tests; attempt 2 passed. No Python changed in either push,
-so the suite itself is now at the limit, and runner speed decides the result.
-Triage: split the job (for example the SQLite cache, memory-security and import
-isolation tests, the slowest by far) or shard the suite, rather than raising the
-limit.
 
 ## Decision statements added 2026-10-05
 

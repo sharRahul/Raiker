@@ -43,9 +43,12 @@ recall and durable transcript use for that conversation.
 
 Use **Diagnostics** when you need evidence rather than a summary:
 
-- **Overview** opens with **Needs your attention** — only the things that are
-  wrong, most urgent first, with a link to where you act on each. When there is
-  nothing it says so, and names what it checked: an all-clear covers what was
+- **Overview** opens with **What needs attention** — one card per thing that is
+  wrong, most urgent first. Each card says what is wrong, what it affects, what
+  kind of problem it is (*Security*, *Stops work*, *Waiting on you* or *Not
+  known*), when it was last checked, and carries the safe fix as its button;
+  the runtime's own words are under *Technical details*. When there is
+  nothing it says so in one line, and names what it checked: an all-clear covers what was
   read, never what could not be. A read that failed says *unknown* in that same
   list rather than counting as healthy. A disk with little space left where the
   workspace lives is on it too — waiting under 2 GB or 5% free, blocking under
@@ -79,10 +82,13 @@ Use **Diagnostics** when you need evidence rather than a summary:
   is showing part of the record it says so above the rows, names what is
   narrowing it, and offers **Show everything**. A filtered timeline read as the
   whole record is the one way this page could mislead you.
-- **Checkpoints** lists recoverable pre-change state and offers governed rewind.
+- **Recovery** lists recoverable pre-change state and offers a governed restore.
   Each snapshot's **Turn** links back to the exchange it was taken at, and
-  *Preview rewind* opens the same preflight **Rewind to before this** opens from
-  a message in Chat or Build.
+  *Preview restore* opens the same panel **Rewind to before this** opens from
+  a message in Chat or Build: where the checkpoint came from and when, *What
+  will be undone*, *What stays as it is* (skipped files, and anything that
+  already left this computer), the safety checkpoint taken first, then **Keep
+  things as they are** and **Ask to restore**.
 - **Work in action** shows live background activity. It opens as a list — every
   recorded subagent, task, last run and schedule, with the stored status and
   progress, and a link straight to each task's own detail. **Workstations** draws
@@ -109,10 +115,11 @@ Use **Diagnostics** when you need evidence rather than a summary:
   bell and alerted once.
 
 **Overview** answers the whole of "is this instance in a state I can work in",
-in the order that question is actually asked. What needs you comes first, then
-what changed, and the resting state of a working install is below both: the
-runtime's readiness, how many capability gates are closed, and what
-configuration is missing, each linking to the page where you change it.
+in the order that question is actually asked. What needs you comes first; below
+it four folded rows: **What is working** (Raiker's readiness, permissions turned
+off, required settings, decisions, background work and notifications, each
+linking to where you change it), **What changed**, **Share or export** (the
+support bundle and telemetry) and **Health, in detail**.
 
 **Health, in detail** is the specialist view, and it is a disclosure
 because on a healthy install it has nothing to say: the health transitions the
@@ -206,7 +213,7 @@ file checkpoint mechanism.
 
 ### Sending the record to your own tools
 
-**Overview → Can I see this outside Raiker?** sends governed events to an
+**Overview → Share or export** sends governed events to an
 OpenTelemetry collector you name — the same record you read on this page, on a
 wire your existing dashboards already watch.
 
@@ -269,7 +276,7 @@ default vector representation is a feature-hashed bag of tokens, not a
 meaning-aware embedding model, so paraphrases without shared terms can be missed.
 See [Known limits](../architecture/KNOWN_LIMITS.md).
 
-**Overview → Is the runtime itself healthy?** compares every index and projection memory
+**Overview → Health, in detail** compares every index and projection memory
 depends on — including the conversation index behind Threads — against the
 table that owns the content. It reports `clean` or names the drift, **Rescan**
 runs it again on request, and the one repair it offers appears only beside the

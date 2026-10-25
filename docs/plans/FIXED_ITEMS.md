@@ -1254,6 +1254,27 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1165](#fixed-1165--a-project-could-not-be-opened-in-a-second-window-qui-f13) | Low | Desktop shell / Projects | Fixed 2026-10-24 |
 | [FIXED-1166](#fixed-1166--there-was-no-way-to-ask-raiker-something-without-switching-to-it-qui-f01) | Medium | Desktop shell | Fixed 2026-10-24 |
 | [FIXED-1167](#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round) | Low | Web tests | Fixed 2026-10-24 |
+| [FIXED-1168](#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04) | Medium | Brand / web / desktop | Fixed 2026-10-25 |
+| [FIXED-1169](#fixed-1169--the-palette-and-type-were-not-the-ones-08-decided-qui-v01-qui-v02) | Medium | Design tokens | Fixed 2026-10-25 |
+| [FIXED-1170](#fixed-1170--diagnostics-opened-on-seven-tiles-reading-ready-and-0-qui-l11) | Medium | Diagnostics | Fixed 2026-10-25 |
+| [FIXED-1171](#fixed-1171--restoring-a-checkpoint-was-the-dominant-button-and-named-little-qui-l11) | Low | Recovery | Fixed 2026-10-25 |
+| [FIXED-1172](#fixed-1172--works-lists-had-no-page-size-and-threads-drew-glyphs-as-icons-qui-l12) | Low | Work | Fixed 2026-10-25 |
+| [FIXED-1173](#fixed-1173--memory-carried-recall-and-the-knowledge-map-as-tabs-qui-l12) | Low | Memory | Fixed 2026-10-25 |
+| [FIXED-1174](#fixed-1174--settings--privacy-general-and-advanced-were-over-their-size-budget-qui-l03-qui-g01) | Low | Settings | Fixed 2026-10-25 |
+| [FIXED-1175](#fixed-1175--design-had-no-revision-strip-and-builds-postures-said-edit-and-auto-qui-l13) | Low | Design / Build | Fixed 2026-10-25 |
+| [FIXED-1176](#fixed-1176--connecting-a-provider-and-using-it-in-chat-left-no-default-model-bug-357) | Medium | Models / Home | Fixed 2026-10-25 |
+| [FIXED-1177](#fixed-1177--quick-entry-before-sign-in-showed-the-lock-screen-in-a-560120-window) | Low | Desktop | Fixed 2026-10-25 |
+| [FIXED-1178](#fixed-1178--a-notice-outlived-the-decision-it-announced) | Low | Notifications | Fixed 2026-10-25 |
+| [FIXED-1179](#fixed-1179--an-expired-approval-stayed-pending-in-storage-and-its-row-still-waited) | Medium | Approvals | Fixed 2026-10-25 |
+| [FIXED-1180](#fixed-1180--a-streaming-answer-showed-its-raiker-block-as-raw-json-04) | Low | Chat / Build | Fixed 2026-10-25 |
+| [FIXED-1181](#fixed-1181--the-careful-profile-was-remembered-in-one-browser-only-qui-p02) | Low | Chat | Fixed 2026-10-25 |
+| [FIXED-1182](#fixed-1182--cards-and-callouts-carried-coloured-side-stripes-ui-pass) | Low | Web | Fixed 2026-10-25 |
+| [FIXED-1183](#fixed-1183--small-labels-were-uppercase-and-letter-spaced-above-headings-ui-pass) | Low | Web | Fixed 2026-10-25 |
+| [FIXED-1184](#fixed-1184--the-browsers-own-surfaces-were-not-themed-ui-pass) | Low | Web | Fixed 2026-10-25 |
+| [FIXED-1185](#fixed-1185--stray-controls-repeated-or-floated-on-several-pages-ui-pass) | Low | Web | Fixed 2026-10-25 |
+| [FIXED-1186](#fixed-1186--the-plan-card-was-reported-to-cover-the-line-under-it-closed-as-not-reproducing) | Low | Chat | Closed 2026-10-25 |
+| [FIXED-1187](#fixed-1187--the-readiness-strip-and-a-footer-line-disagreed-closed-as-not-reproducing) | Low | Composer | Closed 2026-10-25 |
+| [FIXED-1188](#fixed-1188--the-python-ci-job-reached-its-45-minute-limit) | Medium | CI | Fixed 2026-10-25 |
 
 ---
 
@@ -37288,3 +37309,191 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** Both state a 20 s limit, with the reason beside it. The shared model store also tolerates an `/api/models` answer without `profiles`, which a Home test fixture sends and which now reaches Home's composer.
 
 **Evidence.** `ChatView.test.ts`, `WorkbenchView.test.ts`.
+
+## FIXED-1168 — The app mark was the eye-orb (QUI-W01, QUI-V03, QUI-V04)
+
+**Severity: Medium. Area: Brand / web / desktop. Status: Fixed 2026-10-25.**
+
+**Observed.** The sidebar, the lock screen, the favicons, the web manifest icons, the desktop app icon, its Setup window and the installer art all used the rendered sphere with the prompt eye. 08 recorded the open ring as a recommendation only, so QUI-W01 waited on the owner.
+
+**Fixed.** The owner chose the open ring on 2026-10-25. `Logo.svelte` draws it as one SVG path in the accent colour (radius 11, stroke 5, round caps, the gap at half past one) and never rotates or animates it; an empty label makes it decorative beside a visible name. The wordmark is lowercase *raiker* in Inter. The lock screen shows the ring alone: the hero render, its three orbit rings, the accent bars under the headings and the glass blur are gone. `scripts/render_brand_icons.py` draws every PNG from the same geometry (favicons light and dark, `favicon.ico`, the touch and manifest icons, `raiker/assets/raiker-icon.png`, the Setup window's mark), and `scripts/desktop_installer_art.py` redraws the installer art on the new palette.
+
+**Evidence.** `LoginView.test.ts`, `Sidebar.test.ts`; RT-QUI-57.
+
+## FIXED-1169 — The palette and type were not the ones 08 decided (QUI-V01, QUI-V02)
+
+**Severity: Medium. Area: Design tokens. Status: Fixed 2026-10-25.**
+
+**Observed.** `app.css` and the desktop shell still used the earlier slate palette and Manrope; 08 decided warm neutrals, `#2F6F8F` / `#78B7D5` for primary action, `#8A6411` for attention text, and Inter.
+
+**Fixed.** Both themes take the QUI-V01 roles (background, surface, text, secondary text, primary action, attention fill and text, success, risk), with the derived soft fills and borders checked for contrast. Inter (`@fontsource-variable/inter` 5.3.0, SIL OFL 1.1) replaces Manrope in the web app and the desktop shell; the font licence notes are updated. The palette test now pins the QUI-V01 roles and checks secondary text on surface, background and sunken fills, accent on background, and success and risk on their soft fills at 4.5:1, and that the light attention fill stays a fill.
+
+**Evidence.** `appCss.test.ts`; RT-QUI-57, RT-QUI-70 (dark theme).
+
+## FIXED-1170 — Diagnostics opened on seven tiles reading Ready and 0 (QUI-L11)
+
+**Severity: Medium. Area: Diagnostics. Status: Fixed 2026-10-25.**
+
+**Observed.** Overview showed a list, then three and four big-number tiles (*Closed capability gates 46*), what changed, the support bundle and telemetry, all at one level; a healthy install was 1,222 px of resting state. Each unset setting was one row reading *1 required setting is unset* with the runtime's sentence as detail.
+
+**Fixed.** Overview is **What needs attention**: one flat card per issue with the problem, what it affects, the kind of problem in words and an icon, *last checked*, the safe fix as its button, and the runtime's own words under *Technical details*. An unset default model reads *No default model is chosen* with **Choose a model**, the same words as Home. With nothing wrong it is one line. *What is working*, *What changed*, *Share or export* and *Health, in detail* are folded rows below. No coloured side stripe carries a status.
+
+**Evidence.** `ObserveView.test.ts`, `observeAttention.test.ts`; RT-QUI-61.
+
+## FIXED-1171 — Restoring a checkpoint was the dominant button and named little (QUI-L11)
+
+**Severity: Low. Area: Recovery. Status: Fixed 2026-10-25.**
+
+**Observed.** The tab was *Checkpoints*, the panel *Rewind preflight*, and *Request this rewind* was the primary button.
+
+**Fixed.** The tab is **Recovery**. The panel, *Before you restore*, says where the checkpoint came from and when, *What will be undone* (each file, and *changed since this point* in words), *What stays as it is* (skipped files, and anything that already left the computer), and the safety checkpoint taken before it runs. **Keep things as they are** and **Ask to restore** are both ordinary buttons. Deviation: there is no separate *Create safety checkpoint* button, because the restore already captures the current state first.
+
+**Evidence.** `CheckpointsView.test.ts`, `ChatView.rewind.test.ts`; RT-QUI-61.
+
+## FIXED-1172 — Work's lists had no page size, and threads drew glyphs as icons (QUI-L12)
+
+**Severity: Low. Area: Work. Status: Fixed 2026-10-25.**
+
+**Observed.** Tasks, Goals and Projects drew every row; thread rows were as short as their text, and a pin was a `★` and tag removal a `×`.
+
+**Fixed.** One page size for Work (`pagination.ts`, 50) with **Show N more** and *Showing 50 of 120* (`ShowMore.svelte`) on Tasks, Goals and Projects; Threads already paged from the server. Thread and goal rows are at least 64 px. The pin and the remove button are drawn icons. Deviation: Projects stays a card grid.
+
+**Evidence.** `pagination.test.ts`, `TasksView.test.ts`, `GoalsView.test.ts`, `ProjectsView.test.ts`, `SearchChatView.test.ts`.
+
+## FIXED-1173 — Memory carried Recall and the Knowledge Map as tabs (QUI-L12)
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-25.**
+
+**Fixed.** Memory has five tabs: Overview, Memories, Suggestions, Sources, Controls. Controls holds recall and indexing (incognito, recall mode, backend, import and export) below *What Raiker has learned to do* and *Approvals you've given*; `#/memory?tab=recall` forwards there. The map is still `#/memory?tab=map` and `#/brain`, opened from Memories' **See on the map**, and carries a way back instead of the tab strip.
+
+**Evidence.** `MemoryView.test.ts`, `memoryHub.test.ts`, `nav.test.ts`; RT-QUI-62.
+
+## FIXED-1174 — Settings › Privacy, General and Advanced were over their size budget (QUI-L03, QUI-G01)
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-25.**
+
+**Observed.** At 1280×800: Privacy about 1,970 px, General 1,399 px (1,470 px with Inter), Advanced 1,793 px, against 1,200 px.
+
+**Fixed.** Privacy is rows: what is kept and what can leave, one line each with where it is governed, and the explanations under *How this works* disclosures; *Keep the model's working with the turn* is a switch row. General has two cards (*Language and time*, *Startup and answers*) with one-line help, and Delete account is a row of the Profile card. Advanced › Runtime shows each execution environment as one line with its measurements under *Details*. General is 1,197 px, Privacy 1,135 px and Advanced 1,195 px.
+
+**Evidence.** `General.test.ts`, `Privacy.test.ts`, `Account.test.ts`, `BackupsCard.test.ts`, `Runtime.test.ts`; RT-QUI-63.
+
+## FIXED-1175 — Design had no revision strip and Build's postures said Edit and Auto (QUI-L13)
+
+**Severity: Low. Area: Design / Build. Status: Fixed 2026-10-25.**
+
+**Fixed.** Once a picture exists, the three newest sit above Design's composer as 56 px thumbnails; pressing one selects it, so Enter edits it. Build's postures are **Plan · Suggest changes · Run within limits**, each with its consequence; the stored ids are unchanged. Export already existed only for a picture that exists, and Build's rail and side panel were already closed by default.
+
+**Evidence.** `DesignView.test.ts`, `BuildView.test.ts`; RT-QUI-67.
+
+## FIXED-1176 — Connecting a provider and using it in Chat left no default model (BUG-357)
+
+**Severity: Medium. Area: Models / Home. Status: Fixed 2026-10-25.**
+
+**Observed.** RT-QUI-07 and RT-QUI-10: Home said *No default model is chosen* beside a Chat that answered with Haiku 4.5, because a Chat choice is remembered per surface and never sets the default.
+
+**Fixed.** The gap offers **Use Haiku 4.5, as in Chat** when Chat has a model of its own, beside **Choose a model**; it sets the default only when pressed, and a failure says nothing changed. Add model's review step already asks to **Make default** once.
+
+**Evidence.** `WorkbenchView.test.ts`, `readinessGaps.test.ts`; RT-QUI-59.
+
+## FIXED-1177 — Quick Entry before sign-in showed the lock screen in a 560×120 window
+
+**Severity: Low. Area: Desktop. Status: Fixed 2026-10-25.**
+
+**Fixed.** Signed out, `#/quick-entry` says *Sign in to Raiker first* with **Open Raiker**, which hides Quick Entry and brings the main window forward through a new `showMainWindow` bridge call (`raiker:show-main`, accepted only from Raiker's own origin). In a browser it opens Home.
+
+**Evidence.** `App.test.ts`, `desktop/e2e/shell.spec.ts` (bridge surface); RT-QUI-58.
+
+## FIXED-1178 — A notice outlived the decision it announced
+
+**Severity: Low. Area: Notifications. Status: Fixed 2026-10-25.**
+
+**Observed.** RT-QUI-51 and RT-QUI-55: *Input needed* stayed after the question was answered, and an approval's notice after its decision.
+
+**Fixed.** Every path that settles an approval (approve, deny, answer, expire) marks the *Approval needed*, *Input needed* or critical notice for that approval read, and nothing else.
+
+**Evidence.** `tests/test_approval_notice_settles.py`; RT-QUI-65.
+
+## FIXED-1179 — An expired approval stayed pending in storage and its row still waited
+
+**Severity: Medium. Area: Approvals. Status: Fixed 2026-10-25.**
+
+**Observed.** RT-QUI-31: the Safety card said *Not done: no decision* while the tool row above it said *waiting for your decision*, and the approval stayed `pending` until something tried to decide it.
+
+**Fixed.** The host tick has an `approval_expiry` pass: every pending approval past its time limit is settled to `expired` through the same guarded transition a decision uses, its call's row and its notice settle with it, and an `approval_expired` event names the approval, the call and the tool. The tool row reads *not done — no decision* beside an expired card, live or reopened. Found live this round: on a reopened conversation the swept row read *failed*; it reads *not done* too.
+
+**Evidence.** `tests/test_approval_notice_settles.py`, `ToolActivity.test.ts`; RT-QUI-66.
+
+## FIXED-1180 — A streaming answer showed its raiker: block as raw JSON (04)
+
+**Severity: Low. Area: Chat / Build. Status: Fixed 2026-10-25.**
+
+**Fixed.** While a turn streams, each `raiker:` fence, finished or still open, is held back and shown as one line naming it (*Preparing key figures…*); the drawn block replaces it when the turn ends. Ordinary code samples are untouched.
+
+**Evidence.** `answerBlocks.test.ts`; RT-QUI-64 (every sample taken during the stream was free of the fence).
+
+## FIXED-1181 — The Careful profile was remembered in one browser only (QUI-P02)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-25.**
+
+**Observed.** A Careful conversation opened on another device read Standard.
+
+**Fixed.** The owner decided on 2026-10-25 that the profile belongs to the conversation. Sessions carry `conversation_profile` (migration `RAIKER-2122-session-conversation-profile`), set through `PUT /api/sessions/{id}/profile`, which accepts only Careful or Standard, is human-only and respects account boundaries. A choice an earlier build kept in this browser is moved to the conversation once.
+
+**Evidence.** `tests/test_session_conversation_profile.py`, contract case, `conversationProfile.test.ts`, `ChatView.profile.test.ts`; RT-QUI-60.
+
+## FIXED-1182 — Cards and callouts carried coloured side stripes (UI pass)
+
+**Severity: Low. Area: Web. Status: Fixed 2026-10-25.**
+
+**Observed.** Twenty-six rules drew a 2–4 px coloured left border on a card, callout or list item as its status (the Safety card, readiness tiles, previews, held items, the notification panel).
+
+**Fixed.** Each is a full 1 px border in the matching soft colour, and the state each stripe stood for is also said in words. Neutral quote and timeline rules stay.
+
+## FIXED-1183 — Small labels were uppercase and letter-spaced above headings (UI pass)
+
+**Severity: Low. Area: Web. Status: Fixed 2026-10-25.**
+
+**Fixed.** The 54 rules that set a label in letter-spaced capitals are sentence case, and `.kicker` and `.eyebrow` are small, semi-bold metadata. Eyebrows that sat directly above a heading (Models' *Model in use*, the Knowledge Map, Advanced › Runtime, Updates) are gone; *Model in use* is the first fact under the model's name.
+
+## FIXED-1184 — The browser's own surfaces were not themed (UI pass)
+
+**Severity: Low. Area: Web. Status: Fixed 2026-10-25.**
+
+**Fixed.** The caret takes the accent, and table cells, meters and times use tabular numerals.
+
+## FIXED-1185 — Stray controls repeated or floated on several pages (UI pass)
+
+**Severity: Low. Area: Web. Status: Fixed 2026-10-25.**
+
+**Observed.** Home had a row of two icons alone between the starters and *Needs your attention*; Models, Memory, Approvals and Recovery started with a help icon on a row of its own; Connections showed **Add connection** twice when nothing was connected; Approvals offered a sort over an empty queue; the map kept Memory's refresh row above its way back.
+
+**Fixed.** Help and refresh sit beside the heading or the page actions they belong to; an empty Connections page has one **Add connection**; an empty queue hides its sort; the map shows only its way back.
+
+**Evidence.** RT-QUI-68, RT-QUI-70 screenshots.
+
+## FIXED-1186 — The Plan card was reported to cover the line under it (closed as not reproducing)
+
+**Severity: Low. Area: Chat. Status: Closed 2026-10-25.**
+
+**Observed (2026-10-23).** RT-QUI-37's capture showed the Plan card over a turn's *Completed · N steps* line.
+
+**Closed.** The Plan card sits in the column's flow above the scrolling transcript, not over it; the earlier capture showed the transcript scrolled under the card's edge. RT-QUI-69 checks a planned turn's status line sits wholly below the card.
+
+## FIXED-1187 — The readiness strip and a footer line disagreed (closed as not reproducing)
+
+**Severity: Low. Area: Composer. Status: Closed 2026-10-25.**
+
+**Observed (2026-10-19).** *Checking this model — you can still send* above the composer while a footer read *No readiness check exists for this exact model*.
+
+**Closed.** The Quiet UI composer has one readiness line; the footer that read the record differently is gone. RT-QUI-59 checks that after connecting Anthropic without **Check**, Chat shows at most one readiness line and never that sentence.
+
+## FIXED-1188 — The Python CI job reached its 45-minute limit
+
+**Severity: Medium. Area: CI. Status: Fixed 2026-10-25.**
+
+**Observed.** CI run 39612791351 was cancelled at the job's 45-minute limit partway through the tests; the suite alone took 40 min 42 s on the run before it.
+
+**Fixed.** The suite runs in a new `python-tests` job, three shards in parallel, each serial as before. `scripts/test_shard.py` deals test files to shards longest first by the per-file seconds in `tests/test_durations.json` (measured from a full run; a new file counts as the median), and the Python 3.11 job checks that every file is in exactly one shard. The shards come to about 1,100 s each on a local run of 3,296 s.
+
+**Evidence.** `tests/test_ci_workflow.py`.

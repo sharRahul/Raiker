@@ -31,7 +31,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-C10 | **Done**, without the companion. |
 | QUI-C11 | **Done** in the composer's **Tools** menu, because *More* does not exist yet (QUI-C04). The task shows in Background work and Home's In progress. |
 | QUI-C12 | **Done.** Below 1,920 px the panel opens over the transcript and ends above the composer; from 1,920 px it sits beside it. |
-| QUI-W01 | **Needs the owner's decision**: the open-ring mark in [QUI-V04](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v04--app-mark-the-open-ring) is recorded as a recommendation, not a decision. |
+| QUI-W01 | **Done.** The owner chose the open ring on 2026-10-25 ([QUI-V04](08_BRAND_AND_VISUAL_SYSTEM.md#qui-v04--app-mark-the-open-ring), [FIXED-1168](../FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)); it is on the lock screen, the sidebar and every icon. |
 | QUI-W02 | **Done**, without the companion pick (no art yet). The stored `welcome` stage is the Hello step; the name is saved to Settings › Account. |
 | QUI-W03 | **Done.** On this computer shows what this device can run; keys go in the provider card's secure field. |
 | QUI-W04 | **Done.** |

@@ -360,13 +360,14 @@ Two things worth knowing about how these rows behave elsewhere:
   is refused before any of those paths can store it. With the gate off — the
   shipped default — no turn can propose either, and the Memory page says so
   rather than promising proposals it cannot produce.
-- **Build's Mode menu — Plan / Edit / Auto — does not change anything on this
-  page.** It is the posture of one conversation, sent with each prompt and applied
-  to that turn: Plan refuses file writes, patches and commands, Edit turns each one
-  into a decision. A turn may only ever tighten itself, so **Auto** adds no
+- **Build's Mode menu — Plan / Suggest changes / Run within limits — does not
+  change anything on this page.** It is the posture of one conversation, sent with
+  each prompt and applied to that turn: Plan refuses file writes, patches and
+  commands, Suggest changes turns each one into a decision. A turn may only ever
+  tighten itself, so **Run within limits** adds no
   restriction of its own and does exactly as much as the modes here already
   allow — which the Build composer states. `Shift+Tab` cycles the three, and
-  Build **opens in Auto**: opening in a mode that sends no override means a new
+  Build **opens in Run within limits**: opening in a mode that sends no override means a new
   conversation runs under exactly what you set here, rather than silently
   tightening below it. Widening a permission happens here, under the step-up.
 

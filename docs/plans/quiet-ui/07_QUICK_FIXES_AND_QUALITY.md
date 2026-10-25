@@ -22,7 +22,7 @@ redesign and can ship on its own.
 
 | Item | State |
 |---|---|
-| QUI-G01 | **Report done** ([FIXED-1096](../FIXED_ITEMS.md#fixed-1096--page-size-was-not-measured-anywhere-qui-g01)). 29 of 94 measurements over budget; becomes a failing check after the rebuilds in 01. |
+| QUI-G01 | **Report done** ([FIXED-1096](../FIXED_ITEMS.md#fixed-1096--page-size-was-not-measured-anywhere-qui-g01)). 29 of 94 measurements over budget at first; after the 2026-10-25 round only Memory › Controls (929 px) and Memory › Map (922 px) are, both at 1440×900. Becomes a failing check once they fit; RT-QUI-63 already fails on Settings › General, Privacy and Advanced and Diagnostics at 1280×800. |
 | QUI-G02 | **Done** ([FIXED-1095](../FIXED_ITEMS.md#fixed-1095--user-facing-copy-used-words-the-plan-retires-qui-g02)). |
 | QUI-G03 | **Done** ([FIXED-1097](../FIXED_ITEMS.md#fixed-1097--there-was-no-single-place-to-see-every-shared-state-qui-g03)), at `#/state-gallery` in development builds. |
 | QUI-G04 | **Partly done** ([FIXED-1100](../FIXED_ITEMS.md#fixed-1100--a-long-conversation-rendered-every-turn-qui-g04)): long transcripts. Open: actions that paint first and roll back visibly. |

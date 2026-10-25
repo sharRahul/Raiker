@@ -491,7 +491,7 @@ Five destinations are tabbed, and Settings has its own rail:
 | Destination | Tabs |
 |---|---|
 | Work | Threads, Tasks, Projects |
-| Memory | Overview, Memories, Suggestions, Sources, Recall & indexing, Map |
+| Memory | Overview, Memories, Suggestions, Sources, Controls (the map opens from Memories) |
 | Connections | Services, Channels, Advanced (MCP servers, Skills, Hooks, Plugins) |
 | Diagnostics | Overview, Sessions, Audit log, Checkpoints, Work in action, Notifications |
 | Settings | General, Personalisation, Notifications, Security, Privacy, Execution profiles, Web access, Advanced (Runtime, Memory engine, Model serving, Usage and spending), About & updates |

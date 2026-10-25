@@ -128,7 +128,8 @@ in this conversation: **Standard** or **Careful**. Its menu says what each means
   applies it to that turn, so it can only make Raiker ask more, never less. It
   also asks when the account's approval mode would otherwise approve for you.
 
-The chip is remembered for each conversation in this browser. Home's composer
+The chip is kept with the conversation, so opening it on another device shows
+the same choice. Home's composer
 has the same chip; what you pick there goes with the message to the new chat.
 The account's approval mode (*Manually approve*, *Automatically approve*,
 *Skip*, *Decline*) is not on the composer; it is in **Permissions → Advanced**.

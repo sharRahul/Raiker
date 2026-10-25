@@ -38,14 +38,15 @@ posture** sent with the prompt, not a setting you have to remember to put back.
 | Mode | What it does | When to use it |
 |---|---|---|
 | **Plan** | Refuses file writes, patches and commands outright. The runtime refuses them under `denied_by_turn_posture` — it is not prompt wording asking the model to behave | Reading an unfamiliar codebase, or getting a proposal before anything moves |
-| **Edit** | Turns every file write, patch and command into a decision you accept or reject, and the unattended approval modes cannot swallow it | Changing code you want to see change |
-| **Auto** | Adds no restriction of its own. The turn runs under exactly the permissions you already granted | Work you have already decided the shape of |
+| **Suggest changes** | Turns every file write, patch and command into a decision you accept or reject, and the unattended approval modes cannot swallow it | Changing code you want to see change |
+| **Run within limits** | Adds no restriction of its own. The turn runs under exactly the permissions you already granted | Work you have already decided the shape of |
 
-`Shift+Tab` cycles Plan → Edit → Auto without leaving the prompt.
+`Shift+Tab` cycles Plan → Suggest changes → Run within limits without leaving
+the prompt. (These were called Edit and Auto before 2026-10-25.)
 
 **A mode can only ever tighten.** `allow` and `auto` are refused by the prompt
 contract and refused again by the broker, so a turn can never grant itself
-authority you have not given it. **That is why Build opens in Auto**: Auto is the
+authority you have not given it. **That is why Build opens in Run within limits**: it is the
 only mode that sends no override, so a new conversation runs under exactly your
 standing permissions rather than quietly tightening below them. Choosing Plan or
 Edit is a deliberate act.
@@ -200,14 +201,14 @@ turn that made it.** The previous contents are captured before the write, and a
 rewind is a governed request rather than a button:
 
 1. Hover your own message, open `⋯`, and choose **Rewind to before this** — or
-   start from **Diagnostics → Checkpoints** → *Preview rewind*. It is the same
+   start from **Diagnostics → Recovery** → *Preview restore*. It is the same
    panel either way. From the turn it resolves *that turn's* checkpoint, not the
    most recent one; a turn that wrote none says so rather than offering a
    control that would fail.
 2. The preflight names every file a rewind would rewrite, delete, or skip, and
    whether any of them was last changed by a different principal. Reading it
    changes nothing.
-3. Tick the acknowledgement and press **Request this rewind**. That raises an
+3. Tick the acknowledgement and press **Ask to restore**. That raises an
    ordinary approval and still changes nothing — the server recomputes its own
    plan, so the request cannot name the files.
 4. Approve it in **Approvals**. The workspace goes back, the action re-passes its

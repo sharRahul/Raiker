@@ -221,29 +221,40 @@ first frame for an instant, which is enough to flash.
 Unchanged from the token pass that shipped with the first half of BUG-37, and
 restated here so this document is complete:
 
-- **Three colours per theme, named once.** The palette was reset on 2026-08-16 to
-  the owner's choice, and every other token is *derived* from one of the three
-  rather than introduced beside it:
+- **The Quiet UI palette (2026-10-25).** The roles decided in
+  [Quiet UI 08, QUI-V01](../plans/quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#qui-v01--colour-tokens)
+  replaced the three-colour palette of 2026-08-16. Every other token is derived
+  from one of these roles rather than introduced beside them:
 
-  | | Light ("paper") | Dark ("deck") |
+  | Role | Light | Dark |
   |---|---|---|
-  | Action / active state | steel blue `#2779a7` | gold `#ecd06f` |
-  | Brand mark, pending / ask | gold `#ecd06f` | gold `#ecd06f` |
-  | Neutral scaffold — borders, muted text | grey `#9c9c9c` | grey `#9c9c9c` |
-  | Ground | near-white `#f4f4f5`, surfaces white | black `#000000` |
-  | Ink | `#1b1c1e` | white `#ffffff` |
+  | Background | `#F7F6F2` | `#121212` |
+  | Surface | `#FFFFFF` | `#1B1B1B` |
+  | Main text | `#1C1C1A` | `#F4F1EA` |
+  | Secondary text | `#686761` | `#B7B4AC` |
+  | Primary action, focus, the app mark | `#2F6F8F` | `#78B7D5` |
+  | Attention: fill / text | `#B8871B` / `#8A6411` | `#E0B64A` |
+  | Success | `#2F7D5C` | `#62B68D` |
+  | Risk | `#B5453C` | `#E47B70` |
 
-  `--brand-gold`, `--brand-blue`, `--brand-grey`, `--brand-black` and
-  `--brand-white` are declared on `:root` so the three are addressable by name and
-  a view cannot invent a fourth.
-- **Two hues survive outside the three, and they are facts rather than
-  decoration.** `--ok` (a run happened) and `--danger` (a run was refused) are how
-  the four governed states — allow, pending, deny, read-only — stay tellable apart
-  at a glance; they are mixed toward the palette so they read as part of it.
-  Pending/ask is gold, and read-only/info is the accent's quieter half, so neither
-  needs a hue of its own.
+  `--brand-gold` and `--brand-blue` carry the attention fill and the primary
+  action by name. The light attention fill is a fill only: as text it is 2.98:1,
+  so attention text uses `#8A6411`. `appCss.test.ts` checks secondary text,
+  the accent and the state colours at 4.5:1 on the grounds they sit on.
+- **Type.** Inter for all interface text and JetBrains Mono for code, both
+  bundled (`web/src/assets/fonts/`, SIL OFL 1.1). Inter replaced Manrope on
+  2026-10-25 (QUI-V02).
+- **The mark.** The open ring (QUI-V04): one SVG path in the accent, drawn by
+  `Logo.svelte`, never rotated or animated. Every PNG is rendered from the same
+  geometry by `scripts/render_brand_icons.py`.
+- **Success and risk are facts rather than decoration.** `--ok` (a run happened)
+  and `--danger` (a run was refused) are how the four governed states — allow,
+  pending, deny, read-only — stay tellable apart at a glance. Pending/ask is the
+  attention colour, and read-only/info is the accent, so neither needs a hue of
+  its own. A state is also said in words: no card or callout carries it as a
+  coloured side stripe.
 - **`--text-inverse` is the contrast pair for the accent**, not a synonym for
-  white: white on light's blue, black on dark's gold. Every accent-backed control
+  white: white on light's blue, near-black on dark's light blue. Every accent-backed control
   reads it rather than hard-coding a colour, which is what let the accent change
   hue without a single button becoming illegible.
 - **Radii climb with importance.** `--r-sm` for controls, `--r-md` for cards,
@@ -279,7 +290,9 @@ Two rules follow from the table rather than being separate opinions:
 - **A container has to earn its border.** If a group of things is not one of the
   five, it is whitespace and a heading, not a card.
 - **A label mark is declared once.** `.kicker` (muted) and `.eyebrow` (accent)
-  are the two tiny-metadata marks; a view may adjust their spacing or colour and
+  are the two tiny-metadata marks, sentence case and untracked since 2026-10-25
+  (an uppercase, letter-spaced label above a heading is decoration doing the
+  heading's job), and neither sits directly above a heading; a view may adjust their spacing or colour and
   may not restate their type. `visualRubric.test.ts` holds this, because
   `.eyebrow` had already fragmented into six private copies at four weights and
   five trackings without anyone disagreeing on purpose.

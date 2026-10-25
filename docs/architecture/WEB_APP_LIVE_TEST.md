@@ -15,6 +15,40 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-25 (Quiet UI brand, Diagnostics and open items, hosted Anthropic Haiku 4.5)
+
+The round of 2026-10-25 across the [Quiet UI plan](../plans/quiet-ui/README.md):
+the open ring and the QUI-V01 palette, Diagnostics and Recovery, the pages that
+already fit, Build and Design, and the open items of earlier rounds
+([FIXED-1168](../plans/FIXED_ITEMS.md#fixed-1168--the-app-mark-was-the-eye-orb-qui-w01-qui-v03-qui-v04)
+to [FIXED-1187](../plans/FIXED_ITEMS.md#fixed-1187--the-readiness-strip-and-a-footer-line-disagreed-closed-as-not-reproducing)).
+Fresh workspaces served by `raiker-web` at 1440×900 (RT-QUI-63 at 1280×800).
+Anthropic was connected through **Add model**, with the identity-linked key and
+its workspace ID typed from the run's environment; neither appears in a spec,
+command, document, screenshot or the server log. Spec:
+`web/e2e/quiet-ui-polish-live.spec.ts`, developed against one workspace, then
+run on a second fresh workspace: **14/14** (RT-QUI-57 to 65 in one run, and
+RT-QUI-66 to 70 after the fix found in that run).
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-57 | The lock screen shows one labelled open ring (a round-capped SVG path), the lowercase wordmark *raiker*, no orbit rings or rendered orb; the favicon is served | ✅ |
+| RT-QUI-58 | Signed out, `#/quick-entry` at 560×120 reads *Sign in to Raiker first.* with no lock-screen form; **Open Raiker** opens Home in a browser | ✅ |
+| RT-QUI-59 | Anthropic connected without making it the default; Chat on Haiku 4.5 shows at most one readiness line and never *No readiness check exists*; Home's gap offers **Use Haiku 4.5, as in Chat**, and pressing it clears *No default model is chosen.* | ✅ |
+| RT-QUI-60 | A conversation set to Careful is Careful in a second browser with empty storage | ✅ |
+| RT-QUI-61 | Diagnostics opens on *What needs attention* with *Checked just now*, no tiles, and *What is working* folded with its rows; the **Recovery** tab says *Nothing to recover* | ✅ |
+| RT-QUI-62 | Memory's tabs are Overview, Memories, Suggestions, Sources, Controls; `#/memory?tab=recall` opens Controls with Incognito and *What Raiker has learned to do*; **See on the map** opens the Knowledge Map with a way back to Memories | ✅ after a spec fix (the first *Memory* link was the sidebar's) |
+| RT-QUI-63 | At 1280×800 Settings › General, Privacy, Advanced and Diagnostics are within their size budgets | ✅ |
+| RT-QUI-64 | A turn asked for a `raiker:figures` block is sampled every 120 ms while it streams: no sample shows the fence or its JSON, and the key figures are drawn at the end | ✅ |
+| RT-QUI-65 | A file write waits on the Raiker Safety card with one unread *Approval needed*; **Decline** settles the card and the notice is read | ✅ after a spec fix (a decided card is replaced by the resumed turn, not relabelled) |
+| RT-QUI-66 | A waiting approval's expiry is moved into the past; within 90 s the host's sweep stores it as `expired`, an `approval_expired` event exists, and after a reload the card reads *Not done: no decision* and its tool row *not done — no decision* | ✅ after a fix found in this round ([FIXED-1179](../plans/FIXED_ITEMS.md#fixed-1179--an-expired-approval-stayed-pending-in-storage-and-its-row-still-waited)): on a reopened conversation the row read *failed*, because a reopened parked approval carries no action id |
+| RT-QUI-67 | Build's Mode menu lists **Plan**, **Suggest changes** and **Run within limits** | ✅ |
+| RT-QUI-68 | An empty Connections page has one **Add connection** | ✅ |
+| RT-QUI-69 | A turn that set a three-step plan: its *Completed · 1 step* line sits wholly below the Plan card | ✅ |
+| RT-QUI-70 | Home, Chat, Build, Design, Work, Memory, Approvals, Permissions, Models, Connections, Diagnostics and Settings captured in the dark theme | ✅ |
+| Suites | Python suite (7,478 passed; one load-sensitive test passes alone), ruff, mypy, secret scan, SAST; web unit suite, `svelte-check`, ESLint, design tokens, build, mocked end-to-end 16/16, `npm audit`; desktop lint, type-check, unit tests, build | ✅ |
+| Visual review | Every destination at 1440×900 before and after, in both themes, inspected at original resolution: the stray help and refresh rows, the duplicate **Add connection**, the empty-queue sort, Memory's row above the map and the *failed* row after a sweep were found from the images and fixed. Still seen: *Loading conversation…* stays above a reopened conversation that has already drawn ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-25-quiet-ui-polish-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-24 (Quiet UI features and improvements, hosted Anthropic Haiku 4.5)
 
 Fifteen features of the [Quiet UI plan, 06](../plans/quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#status)

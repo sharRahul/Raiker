@@ -13,11 +13,11 @@ live cases RT-QUI-26 to RT-QUI-34 in
 | Item | State |
 |---|---|
 | QUI-P01 | **Unchanged.** The layers already hold in the runtime; no surface was added for them. |
-| QUI-P02 | **Done** for Careful and Standard on Chat's and Home's composers (decided 2026-10-22: per conversation, narrows only). **Within limits** waits for Allow-with-limits rules (QUI-P03). The account's approval mode moved to Permissions › Advanced. |
+| QUI-P02 | **Done** for Careful and Standard on Chat's and Home's composers (decided 2026-10-22: per conversation, narrows only). Since 2026-10-25 the choice is kept on the conversation, so every device opens it the same way (owner's decision; [FIXED-1181](../FIXED_ITEMS.md#fixed-1181--the-careful-profile-was-remembered-in-one-browser-only-qui-p02)). **Within limits** waits for Allow-with-limits rules (QUI-P03). The account's approval mode moved to Permissions › Advanced. |
 | QUI-P03 | **Partly done** through QUI-L06. Open: **Allow with limits** and the limits it requires. |
 | QUI-P04 | **Partly done.** Done: *What Raiker may do with …* with each activity as *Reads*, *Changes* or *Can't be undone*. Open: the three presets, named accounts and recent activity under the list, which need a per-connection policy the runtime does not store yet. |
 | QUI-P05 | **Done**, except **Allow for this task**, which waits for limits the runtime can enforce. The card is in Chat; the floating card and Approvals use the same words. |
-| QUI-P06 | **Done.** 30 minutes by default, set in Settings › Security. *Ask again* asks the same request as a new turn. |
+| QUI-P06 | **Done.** 30 minutes by default, set in Settings › Security. *Ask again* asks the same request as a new turn. Since 2026-10-25 the host settles an approval past its limit to `expired` with an `approval_expired` event, and its tool row reads *not done* ([FIXED-1179](../FIXED_ITEMS.md#fixed-1179--an-expired-approval-stayed-pending-in-storage-and-its-row-still-waited)). |
 | QUI-P07 | **Done.** |
 | QUI-P08 | **Done.** History names and links the conversation each decision belongs to; *Approvals you've given* with Undo is in Memory › Controls (2026-10-24, [FIXED-1158](../FIXED_ITEMS.md#fixed-1158--what-raiker-learned-and-the-approvals-given-could-not-be-undone-in-one-place-qui-f09)). |
 | QUI-P09 | **Open.** Suggesting an Allow-with-limits rule needs QUI-P03. |

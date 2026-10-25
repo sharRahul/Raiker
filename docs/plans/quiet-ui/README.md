@@ -13,7 +13,12 @@ the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
 of [04](04_VISUAL_ANSWERS.md#status) (2026-10-23; diagrams and Pin to project
 open), and fifteen of the features in [06](06_FEATURES_AND_IMPROVEMENTS.md#status)
 (2026-10-24; goals noticed in conversation, named accounts, the Library, undo
-windows and project limits open). These documents record the UI/UX direction agreed in the October 2026
+windows and project limits open), and on 2026-10-25 the brand of
+[08](08_BRAND_AND_VISUAL_SYSTEM.md#status) (open ring, palette, Inter; the
+companion open), Diagnostics as issue cards, Recovery, the pages that already
+fit and Build and Design in [01](01_LAYOUT_SYSTEM_AND_PAGES.md#status), and the
+open items of earlier rounds (BUG-357, notices, expiry, streaming, the
+conversation's profile). These documents record the UI/UX direction agreed in the October 2026
 design review and turn it into numbered, testable work items. They extend
 [PERSONAL_AGENT_UX_SPEC.md](../PERSONAL_AGENT_UX_SPEC.md); where the two
 disagree on layout or presentation, this folder is the newer decision. Neither
@@ -91,8 +96,7 @@ modes and "Off" approval mode, Muse's feed, up-front data requests and
 7. Visual answers: key figures, comparison, horizontal bar, callout first (04). Shipped 2026-10-23.
 8. Live work line, Quick Entry, goals noticed in conversation (06). Shipped 2026-10-24, except goals noticed.
 9. Task receipt, data label in the composer, Library, Make this repeatable (06). Shipped 2026-10-24, except the Library.
-10. Brand: tokens, mark, companion (08). Token and eye-orb work may start earlier
-    because it touches nothing else.
+10. Brand: tokens, mark, companion (08). Tokens and the mark shipped 2026-10-25; the companion waits for its art.
 11. Raiker Browser, step 1 (05), once the core workspace feels polished.
 
 ## How measurements were taken

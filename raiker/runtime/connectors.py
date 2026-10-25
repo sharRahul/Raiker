@@ -54,7 +54,15 @@ _READ_RISK = tool_risk_band("connector_read")
 
 _RESOURCE_PATHS = {"issue": "issues", "pull_request": "pulls"}
 #: TOOL-20/22/23/24 — the read-only GitHub reads beyond one issue or pull request.
-GITHUB_EXTRA_RESOURCES: tuple[str, ...] = ("checks", "workflow_runs", "run_jobs", "commits", "file")
+GITHUB_EXTRA_RESOURCES: tuple[str, ...] = (
+    "checks", "workflow_runs", "run_jobs", "commits", "file",
+    # Second round: TOOL-23 history, TOOL-24 code search, TOOL-27 review
+    # comments, TOOL-28 issues beyond one number, TOOL-29 the account.
+    "branches", "tags", "releases", "search_code", "issues", "search_issues",
+    "issue_comments", "review_comments", "account",
+)
+#: The most characters a model-written search query may carry.
+_MAX_QUERY_CHARS = 256
 _FAILED_CONCLUSIONS = frozenset({"failure", "timed_out", "cancelled", "action_required", "startup_failure"})
 _MAX_ANNOTATED_RUNS = 5
 _FILE_PATH_RE = re.compile(r"^[A-Za-z0-9_.\-/ ]{1,400}$")
@@ -163,6 +171,7 @@ class GithubConnectorService:
         authority: object | None = None,
         ref: str | None = None,
         path: str | None = None,
+        query: str | None = None,
     ) -> dict[str, Any]:
         """Run one governed GitHub read; returns a tool-result-shaped dict.
 
@@ -180,7 +189,8 @@ class GithubConnectorService:
         resource = (resource or "").strip()
         if resource in GITHUB_EXTRA_RESOURCES:
             return self._read_extra(
-                resource, repo, number=number, ref=ref, path=path, authority=authority
+                resource, repo, number=number, ref=ref, path=path, query=query,
+                authority=authority,
             )
         if resource not in _RESOURCE_PATHS:
             return _failed(
@@ -283,8 +293,9 @@ class GithubConnectorService:
         ref: str | None,
         path: str | None,
         authority: object | None,
+        query: str | None = None,
     ) -> dict[str, Any]:
-        """TOOL-20/22/23/24 — CI status, history and remote files, read-only."""
+        """TOOL-20 – TOOL-29 — CI, history, files, issues, reviews and the account, read-only."""
         repo = (repo or "").strip()
         if not _REPO_RE.match(repo):
             return _failed("invalid_repo", "repo must be 'owner/name'.")
@@ -308,6 +319,13 @@ class GithubConnectorService:
             not file_path or ".." in file_path.split("/") or not _FILE_PATH_RE.match(file_path)
         ):
             return _failed("invalid_path", "file needs path: a file in the repository, e.g. 'src/app.py'.")
+        query_text = " ".join((query or "").split())
+        if len(query_text) > _MAX_QUERY_CHARS:
+            return _failed("query_too_long", f"query is at most {_MAX_QUERY_CHARS} characters.")
+        if resource in ("search_code", "search_issues") and not query_text:
+            return _failed("missing_argument:query", f"{resource} needs query: the words to look for.")
+        if resource in ("issue_comments", "review_comments") and number_int is None:
+            return _failed("missing_argument:number", f"{resource} needs number: the issue or pull request.")
 
         refusal = self._read_refusal(authority)
         if refusal is not None:
@@ -328,10 +346,12 @@ class GithubConnectorService:
                 query = "?per_page=20" + (f"&sha={quote(ref_text, safe='')}" if ref_text else "")
                 data = self._get_json(repo, "fetch", f"{base}/commits{query}")
                 text, extra = _commits_text(repo, data)
-            else:  # file
+            elif resource == "file":
                 query = f"?ref={quote(ref_text, safe='')}" if ref_text else ""
                 data = self._get_json(repo, "fetch", f"{base}/contents/{quote(file_path)}{query}")
                 text, extra = _file_text(repo, file_path, ref_text, data)
+            else:
+                text, extra = self._listing(resource, repo, base, number_int, query_text)
         except GitCredentialError as exc:
             return _denied(exc.reason, f"GitHub read denied: {exc.message}")
         except SandboxError as exc:
@@ -355,6 +375,66 @@ class GithubConnectorService:
             "content_truncated": truncated,
             **extra,
         }
+
+    def _listing(
+        self, resource: str, repo: str, base: str, number: int | None, query: str
+    ) -> tuple[str, dict[str, Any]]:
+        """The list-shaped reads of the second round, one line per item."""
+        api = f"https://{GITHUB_HOST}"
+        if resource == "branches":
+            data = self._get_json(repo, "fetch", f"{base}/branches?per_page=50")
+            rows = [f"- {_s(b, 'name', 120)} @{_s(b.get('commit'), 'sha', 12)}" + (" (protected)" if b.get("protected") else "")
+                    for b in _items(data)]
+        elif resource == "tags":
+            data = self._get_json(repo, "fetch", f"{base}/tags?per_page=30")
+            rows = [f"- {_s(t, 'name', 120)} @{_s(t.get('commit'), 'sha', 12)}" for t in _items(data)]
+        elif resource == "releases":
+            data = self._get_json(repo, "fetch", f"{base}/releases?per_page=10")
+            rows = [
+                f"- {_s(r, 'tag_name', 80)} {_s(r, 'name', 120)} {_s(r, 'published_at', 20)}"
+                + (" (draft)" if r.get("draft") else "") + (" (pre-release)" if r.get("prerelease") else "")
+                + ("\n  " + _s(r, "body", 600).replace("\n", " ") if r.get("body") else "")
+                for r in _items(data)
+            ]
+        elif resource == "search_code":
+            q = quote(f"{query} repo:{repo}", safe="")
+            data = self._get_json(repo, "fetch", f"{api}/search/code?q={q}&per_page=20")
+            rows = [f"- {_s(i, 'path', 300)}" for i in _items(_field(data, "items"))]
+        elif resource == "issues":
+            data = self._get_json(repo, "read_issue", f"{base}/issues?state=open&per_page=30")
+            rows = [_issue_line(i) for i in _items(data)]
+        elif resource == "search_issues":
+            q = quote(f"{query} repo:{repo}", safe="")
+            data = self._get_json(repo, "read_issue", f"{api}/search/issues?q={q}&per_page=20")
+            rows = [_issue_line(i) for i in _items(_field(data, "items"))]
+        elif resource == "issue_comments":
+            data = self._get_json(repo, "read_issue", f"{base}/issues/{number}/comments?per_page=30")
+            rows = [
+                f"- {_s(c.get('user'), 'login', 80)} {_s(c, 'created_at', 20)} (id {c.get('id', '')}):\n  "
+                + _s(c, "body", 1500).replace("\n", "\n  ")
+                for c in _items(data)
+            ]
+        elif resource == "review_comments":
+            data = self._get_json(repo, "read_pull_request", f"{base}/pulls/{number}/comments?per_page=50")
+            rows = [
+                f"- {_s(c.get('user'), 'login', 80)} on {_s(c, 'path', 200)}:{c.get('line') or c.get('original_line') or ''}"
+                f" (comment id {c.get('id', '')}" + (f", reply to {c['in_reply_to_id']}" if c.get("in_reply_to_id") else "")
+                + "):\n  " + _s(c, "body", 1500).replace("\n", "\n  ")
+                for c in _items(data)
+            ]
+        else:  # account
+            data = self._get_json(repo, "fetch", f"{api}/user")
+            if not isinstance(data, dict):
+                raise _GithubShapeError("GitHub did not say which account this is.")
+            rows = [
+                f"login: {_s(data, 'login', 80)}",
+                f"name: {_s(data, 'name', 120)}",
+                f"type: {_s(data, 'type', 40)}",
+            ]
+            return "connected GitHub account\n" + "\n".join(rows), {"login": _s(data, "login", 80)}
+        label = resource.replace("_", " ")
+        header = f"{label} in {repo}" + (f" for #{number}" if number else "") + (f" matching '{query}'" if query else "")
+        return header + f" ({len(rows)})\n" + ("\n".join(rows) or "none"), {"item_count": len(rows)}
 
     def _checks_text(
         self, repo: str, base: str, ref: str, number: int | None
@@ -664,6 +744,140 @@ class GithubConnectorService:
             "content_length": sum(len(str(value)) for value in payload.values()),
         }
 
+    def _governed_write(
+        self,
+        repo: str,
+        operation: str,
+        url: str,
+        payload: dict[str, object],
+        *,
+        method: str,
+        authority: object | None,
+        noun: str,
+    ) -> dict[str, Any]:
+        """One governed GitHub write: gate, mode, credential, egress, then the call."""
+        if not is_routed(authority, _CAP):
+            withheld = self._write_withheld(noun)
+            if withheld is not None:
+                return withheld
+        if not self.credential_configured():
+            return _denied(
+                "connector_not_configured",
+                f"GitHub write denied: no owner credential is configured ({GITHUB_TOKEN_ENV}).",
+            )
+        if not self.egress_allowed():
+            return _denied(
+                "connector_egress_denied",
+                f"GitHub write denied: {GITHUB_HOST} is not on the owner connector egress allowlist.",
+            )
+        try:
+            with self._borrow(repo, operation) as token:
+                resp = post_json_url(
+                    url, payload, egress_allowlist=connector_egress_allowlist(),
+                    headers=_headers(token), method=method,
+                )
+        except GitCredentialError as exc:
+            return _denied(exc.reason, f"GitHub write denied: {exc.message}")
+        except SandboxError as exc:
+            return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
+        except Exception:  # noqa: BLE001 — every transport failure fails closed
+            return _denied("connector_fetch_failed", "GitHub write failed closed.")
+        text = str(resp.get("body_text") or "")
+        try:
+            data: Any = json.loads(text) if text.strip() else {}
+        except json.JSONDecodeError:
+            return _failed("connector_bad_response", "GitHub returned an unparseable response.")
+        return {"status": "success", "data": data if isinstance(data, dict) else {}}
+
+    @staticmethod
+    def _positive(value: Any, name: str) -> int | dict[str, Any]:
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            return _failed(f"invalid_{name}", f"{name} must be a positive integer.")
+        return number if number > 0 else _failed(f"invalid_{name}", f"{name} must be a positive integer.")
+
+    def reply_review_comment(
+        self, repo: str, number: Any, comment_id: Any, body: str, *, authority: object | None = None
+    ) -> dict[str, Any]:
+        """Reply in one pull request review thread (TOOL-27). Asked first, like every write."""
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        pr = self._positive(number, "number")
+        comment = self._positive(comment_id, "comment_id")
+        if isinstance(pr, dict):
+            return pr
+        if isinstance(comment, dict):
+            return comment
+        text = (body or "").strip()
+        if not text:
+            return _failed("empty_body", "reply body must not be empty.")
+        outcome = self._governed_write(
+            repo, "pull_request",
+            f"https://{GITHUB_HOST}/repos/{repo}/pulls/{pr}/comments/{comment}/replies",
+            {"body": text[:MAX_BODY_CHARS]}, method="POST", authority=authority, noun="review reply",
+        )
+        if outcome["status"] != "success":
+            return outcome
+        html_url = str(outcome["data"].get("html_url", ""))
+        return {
+            "status": "success", "repo": repo, "number": pr, "comment_id": comment,
+            "html_url": html_url, "untrusted": True,
+            "content": f"GitHub review reply posted (untrusted data):\n{html_url}",
+            "content_length": len(text),
+        }
+
+    def update_pull_request_branch(
+        self, repo: str, number: Any, *, authority: object | None = None
+    ) -> dict[str, Any]:
+        """Merge the base branch into a pull request's branch on GitHub (TOOL-26).
+
+        GitHub's own *Update branch*: never a rebase or a force-push, so a
+        contributor's checkout stays valid.
+        """
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        pr = self._positive(number, "number")
+        if isinstance(pr, dict):
+            return pr
+        outcome = self._governed_write(
+            repo, "push", f"https://{GITHUB_HOST}/repos/{repo}/pulls/{pr}/update-branch",
+            {}, method="PUT", authority=authority, noun="branch update",
+        )
+        if outcome["status"] != "success":
+            return outcome
+        return {
+            "status": "success", "repo": repo, "number": pr, "untrusted": True,
+            "content": "GitHub accepted the branch update (untrusted data): "
+            + str(outcome["data"].get("message", ""))[:300],
+            "content_length": 0,
+        }
+
+    def rerun_failed_jobs(
+        self, repo: str, run_id: Any, *, authority: object | None = None
+    ) -> dict[str, Any]:
+        """Re-run a workflow run's failed jobs once (TOOL-21), asked first."""
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        run = self._positive(run_id, "number")
+        if isinstance(run, dict):
+            return run
+        outcome = self._governed_write(
+            repo, "rerun_jobs",
+            f"https://{GITHUB_HOST}/repos/{repo}/actions/runs/{run}/rerun-failed-jobs",
+            {}, method="POST", authority=authority, noun="re-run",
+        )
+        if outcome["status"] != "success":
+            return outcome
+        return {
+            "status": "success", "repo": repo, "number": run, "untrusted": True,
+            "content": f"GitHub queued the failed jobs of run {run} again.",
+            "content_length": 0,
+        }
+
     def _receipt(
         self,
         repo: str,
@@ -827,6 +1041,30 @@ def _summarize(resource: str, repo: str, number: int, body_text: str) -> dict[st
         "content_truncated": truncated,
         "text": text,
     }
+
+
+def _items(data: Any) -> list[dict[str, Any]]:
+    if not isinstance(data, list):
+        raise _GithubShapeError("GitHub returned an unexpected list response.")
+    return [item for item in data if isinstance(item, dict)]
+
+
+def _field(data: Any, key: str) -> Any:
+    return data.get(key) if isinstance(data, dict) else None
+
+
+def _s(data: Any, key: str, limit: int) -> str:
+    value = data.get(key) if isinstance(data, dict) else None
+    return str(value or "")[:limit]
+
+
+def _issue_line(item: dict[str, Any]) -> str:
+    kind = "pull request" if "pull_request" in item else "issue"
+    labels = ", ".join(_s(label, "name", 40) for label in (item.get("labels") or [])[:5] if isinstance(label, dict))
+    return (
+        f"- #{item.get('number', '')} {_s(item, 'title', 200)} [{_s(item, 'state', 10)} {kind}]"
+        f" by {_s(item.get('user'), 'login', 80)}" + (f" — {labels}" if labels else "")
+    )
 
 
 def _workflow_runs_text(repo: str, data: Any) -> tuple[str, dict[str, Any]]:

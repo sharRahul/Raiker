@@ -1438,6 +1438,23 @@ class RuntimeOrchestrator:
             return None
         return plan_context_message(plan) if plan else None
 
+    def _background_prompt(self, envelope: PromptEnvelope) -> str | None:
+        """TOOL-01 — one system line about earlier turns' background commands."""
+        store = getattr(self.tool_broker, "store", None)
+        service = getattr(self.tool_broker, "command_service", None)
+        if store is None or service is None:
+            return None
+        try:
+            from raiker.runtime.background_notice import background_notice
+
+            owner = self.tool_broker.owner_scope or self.tool_broker.principal_id
+            runs = service.store.list_runs(owner, session_id=envelope.session_id, limit=25)
+            return background_notice(
+                store, runs, session_id=envelope.session_id, turn_id=envelope.turn_id
+            )
+        except Exception:  # noqa: BLE001 — a broken read carries no notice
+            return None
+
     def _emit_plan_event(
         self, envelope: PromptEnvelope, action: ToolAction, result: ToolResult
     ) -> None:
@@ -2582,6 +2599,12 @@ class RuntimeOrchestrator:
         if plan_prompt is not None:
             messages.append(ModelMessage(role="system", content=plan_prompt))
             self._event(envelope, "agent_plan_replayed", {"plan_chars": len(plan_prompt)})
+        # TOOL-01 — background commands that settled since the last turn, so the
+        # model hears about them without polling.
+        background = self._background_prompt(envelope)
+        if background is not None:
+            messages.append(ModelMessage(role="system", content=background))
+            self._event(envelope, "background_runs_reported", {"notice_chars": len(background)})
         skills_prompt, skill_names = self._skills_prompt(envelope.user.id)
         if skills_prompt is not None:
             messages.append(ModelMessage(role="system", content=skills_prompt))

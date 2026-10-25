@@ -155,3 +155,18 @@ def test_rows_are_scoped_to_their_own_turn(
     assert "README.md" in str(by_turn[first_turn][0]["action"])
     assert len(by_turn[second_turn]) == 1
     assert "LICENSE" in str(by_turn[second_turn][0]["action"])
+
+
+def test_a_suggested_connection_keeps_its_card_after_a_reload(
+    service: DashboardService, store: SQLiteStore
+) -> None:
+    """TOOL-72 — found live: the reopened row lost its Add connection card."""
+    session_id, turn_id = _turn(store)
+    _record(store, session_id, turn_id, "suggest_connection", {"service": "Gmail", "reason": "To read the invoice."}, "success")
+    detail = service.get_session(session_id, user_id=None)
+    assert detail is not None
+    row = detail.turns[0].tool_rows[0]
+    assert row["connection"] == {
+        "connector_id": "gmail", "service": "Gmail", "connected": False,
+        "reason": "To read the invoice.", "href": "#/connections?add=gmail",
+    }

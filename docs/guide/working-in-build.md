@@ -41,6 +41,16 @@ posture** sent with the prompt, not a setting you have to remember to put back.
 | **Suggest changes** | Turns every file write, patch and command into a decision you accept or reject, and the unattended approval modes cannot swallow it | Changing code you want to see change |
 | **Run within limits** | Adds no restriction of its own. The turn runs under exactly the permissions you already granted | Work you have already decided the shape of |
 
+**Approving a plan.** After a Plan turn writes a plan with steps still to do,
+the plan card says *Made in Plan, so nothing has changed yet.* with **Approve
+plan · Suggest changes**. Pressing it switches to Suggest changes, where every
+change still asks, and tells Raiker to go ahead with the plan. That press is the
+only way from planning to acting besides choosing a mode yourself.
+
+**Background commands.** A command Raiker started in the background is reported
+at the start of the next turn — finished, with its exit code, or still running —
+so it does not have to keep checking.
+
 `Shift+Tab` cycles Plan → Suggest changes → Run within limits without leaving
 the prompt. (These were called Edit and Auto before 2026-10-25.)
 
@@ -321,10 +331,14 @@ same. A receipt is evidence only; merging stays with you, on GitHub.
 **Reading CI and fixing the pull request.** With the GitHub connector on, a
 Build turn can read a commit's or a pull request's checks, with the failures'
 annotations (*tests/test_a.py:4: assert 1 == 2*), the recent workflow runs, a
-run's failed jobs and steps, recent commits and one file at a branch or tag,
-without a clone. It can also propose a new title or description for a pull
-request, which asks you first like any GitHub write. It cannot merge, close or
-change a pull request's base. Raw job logs are not read yet.
+run's failed jobs and steps, recent commits, branches, tags and releases, one
+file at a branch or tag, open issues, a code or issue search inside the
+repository, an issue's comments, a pull request's review comments and which
+account is connected, without a clone. It can propose, each asked first like
+any GitHub write: a new title or description for a pull request, a reply in a
+review thread, bringing the pull request's branch up to date with its base (a
+merge, never a rebase), and re-running a run's failed jobs once. It cannot
+merge, close or change a pull request's base. Raw job logs are not read yet.
 
 ## Whether a change was checked
 

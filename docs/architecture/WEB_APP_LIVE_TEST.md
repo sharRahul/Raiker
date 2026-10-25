@@ -15,6 +15,32 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-25 (Agent tool inventory, second round, hosted Anthropic Haiku 4.5)
+
+The second round of the [agent tool inventory](../plans/AGENT_TOOL_INVENTORY.md#status)
+([FIXED-1205](../plans/FIXED_ITEMS.md#fixed-1205--branches-tags-and-releases-needed-a-clone-tool-23)
+to [FIXED-1219](../plans/FIXED_ITEMS.md#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01)).
+A fresh workspace served by `raiker-web` at 1440×900, holding `src/shapes.py`
+in a git repository. Anthropic was connected through **Add model**, with the key
+and workspace ID typed from the run's environment; neither appears in a spec,
+command, document, screenshot or the server log. Spec:
+`web/e2e/tool-inventory-round2-live.spec.ts`: **6/6** (RT-TOOL-11 to 14 in one
+run, RT-TOOL-15 and 16 after a spec fix). The GitHub reads and writes, PDF pages
+over the web, a recalled memory's conversation and the background command notice
+need a credential, an outside host or a long command this host does not have;
+the unit suite proves them.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-TOOL-11 | Anthropic connects through **Add model** and becomes the default | ✅ |
+| RT-TOOL-12 | A turn calls `suggest_connection` for Gmail: the row *Suggest a connection Gmail* carries a card *Connect Gmail* with the turn's reason and **Add connection**; the link opens Connections with the Add connection dialog on Gmail (**Add Gmail**) | ✅ |
+| RT-TOOL-13 | `skill_search` for *security review* names `security-review`; the row reads *Find a skill* | ✅ |
+| RT-TOOL-14 | After a `help_read` of *memory*, the *Help: How Raiker memory works* source opens the help panel on that article | ✅ |
+| RT-TOOL-15 | In a project, a Plan turn writes a three-step plan; the card says *Made in Plan, so nothing has changed yet.* with **Approve plan · Suggest changes**; pressing it sets the mode to Suggest changes and sends *Go ahead with the plan. Every change still asks me first.*, and the offer goes away | ✅ after a spec fix (Build needs a project or repository before it sends) |
+| RT-TOOL-16 | Build's `/insights` sheet after a tool-using turn, and `/compress` saying what it summarised | ✅ after the same spec fix |
+| Suites | Python suite in three shards, ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
+| Visual review | The card, the dialog it opens, the plan approval before and after, the help panel and the insights sheet inspected at original resolution; nothing needed changing. Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-25 (Agent tool inventory, first round, hosted Anthropic Haiku 4.5)
 
 The first round of the [agent tool inventory](../plans/AGENT_TOOL_INVENTORY.md#status)

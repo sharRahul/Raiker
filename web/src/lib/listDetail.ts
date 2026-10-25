@@ -19,6 +19,12 @@ export function itemFromHash(hash: string): string | null {
   return value !== null && value.length > 0 && value.length <= 256 ? value : null;
 }
 
+/** TOOL-72 — the service an `?add=` link asks the Add dialog to open on. */
+export function addFromHash(hash: string): string | null {
+  const value = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("add");
+  return value !== null && /^[a-z0-9-]{1,64}$/.test(value) ? value : null;
+}
+
 /**
  * The same hash with its `?item=` set to `id` (or removed for null), every
  * other part kept in place.

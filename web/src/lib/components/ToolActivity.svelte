@@ -118,6 +118,21 @@
             >
           {/if}
         {/if}
+        {#if row.connection && row.state === "success"}
+          <!-- TOOL-72 — the turn offered a connection; the owner makes it in
+               Connections, where it still grants nothing until Permissions does. -->
+          <div class="connect-card" role="group" aria-label={`Connect ${row.connection.service}`} data-testid="connect-card">
+            {#if row.connection.connected}
+              <span>{row.connection.service} is connected.</span>
+            {:else}
+              <span class="connect-text">
+                <strong>Connect {row.connection.service}</strong>
+                {#if row.connection.reason}<span class="connect-reason">{row.connection.reason}</span>{/if}
+              </span>
+              <a class="btn btn-primary btn-sm" href={row.connection.href}>Add connection</a>
+            {/if}
+          </div>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -202,4 +217,7 @@
   @media (prefers-reduced-motion: reduce) {
     .tool-pulse { animation: none; opacity: 0.8; }
   }
+  .connect-card{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:.35rem 0 .15rem;padding:.5rem .7rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--raised);font-size:var(--text-sm);max-width:36rem}
+  .connect-text{display:grid;gap:.1rem}
+  .connect-reason{color:var(--text-3);font-size:var(--text-xs)}
 </style>

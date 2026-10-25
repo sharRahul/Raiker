@@ -60,6 +60,33 @@ export interface ToolCallRow {
   /** Named reasons, present only for a refusal or a failure. */
   reasons: string[];
   remediationRoute?: string;
+  /** TOOL-72 — a suggested connection: the card under the row, from the catalogue. */
+  connection?: ConnectionSuggestion;
+}
+
+export interface ConnectionSuggestion {
+  connectorId: string;
+  service: string;
+  connected: boolean;
+  /** Model-written; rendered as text. */
+  reason: string;
+  href: string;
+}
+
+function connectionFrom(raw: unknown): ConnectionSuggestion | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const entry = raw as Record<string, unknown>;
+  const connectorId = str(entry.connector_id);
+  const href = str(entry.href);
+  // Only an address inside Raiker's own Connections page is drawn as a link.
+  if (connectorId === "" || !href.startsWith("#/connections?add=")) return null;
+  return {
+    connectorId,
+    service: str(entry.service) || connectorId,
+    connected: entry.connected === true,
+    reason: str(entry.reason),
+    href,
+  };
 }
 
 const STATES: Record<string, ToolCallState> = {
@@ -104,6 +131,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
       : [];
     const reason = str(payload.reason);
     const remediationRoute = str(payload.remediation_route);
+    const connection = connectionFrom(payload.connection);
     const row: ToolCallRow = {
       actionId,
       toolName,
@@ -113,6 +141,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
       state: STATES[str(payload.status)] ?? "running",
       reasons: reasons.length > 0 ? reasons : reason ? [reason] : [],
       ...(remediationRoute ? { remediationRoute } : {}),
+      ...(connection ? { connection } : {}),
     };
     const existing = byAction.get(actionId);
     if (existing === undefined) {
@@ -136,6 +165,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
       ...(row.remediationRoute || before.remediationRoute
         ? { remediationRoute: row.remediationRoute ?? before.remediationRoute }
         : {}),
+      ...(row.connection || before.connection ? { connection: row.connection ?? before.connection } : {}),
     };
   }
   return rows;

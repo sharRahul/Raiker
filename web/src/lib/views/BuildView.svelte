@@ -83,11 +83,13 @@
     StreamEvent,
   } from "../apiTypes";
   import {
+    APPROVED_PLAN_PROMPT,
     BUILD_WRITE_CAPABILITIES,
     buildMode,
     DEFAULT_BUILD_MODE,
     buildPrimaryAction,
     nextBuildMode,
+    offerPlanApproval,
     repoPreamble,
     standingPostureNote,
     turnCapabilityModes,
@@ -135,6 +137,8 @@
   import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
   import ReadAloudButton from "../components/ReadAloudButton.svelte";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
+  import InsightsSheet from "../components/InsightsSheet.svelte";
+  import { compressNotice, latestSettledTurnId, threadInsights } from "../threadInsights";
   import {
     applyMention,
     autoGrow,
@@ -1104,6 +1108,14 @@
     }
   }
 
+  /** TOOL-09 — the owner approves the plan: Suggest changes, and go ahead. */
+  function approvePlan() {
+    if (streaming) return;
+    setMode("edit");
+    draft.text = APPROVED_PLAN_PROMPT;
+    void submit();
+  }
+
   function setMode(next: BuildMode) {
     // Local, instant, and free of consequence beyond this conversation's turns.
     mode = next;
@@ -1184,6 +1196,7 @@
   // commands, one controller shared with the other composer.
   const lookups = new ComposerLookups({ href: "#/build?tab=repositories", label: "Repositories" });
   let shortcutsOpen = $state(false);
+  let insightsOpen = $state(false);
 
   const slashItems = $derived.by<MenuItem[]>(() => {
     const fragment = menuKind === "slash" ? slashFragment(draft.text, caret()) : null;
@@ -1338,6 +1351,27 @@
       case "mode-auto": setMode("auto"); break;
       case "terminal": commandPaneOpen = true; break;
       case "repos": window.location.hash = "#/build?tab=repositories"; break;
+      // TOOL-131 — the same two Chat has: summarise through the latest settled
+      // turn, and what this conversation used.
+      case "compress": void compressConversation(); break;
+      case "insights": insightsOpen = true; void refreshContextUsage(); break;
+    }
+  }
+
+  async function compressConversation() {
+    const through = latestSettledTurnId(turns);
+    if (sessionId === null || through === null || streaming) {
+      projectNotice = "There is nothing to summarise yet.";
+      return;
+    }
+    projectNotice = null;
+    try {
+      projectNotice = compressNotice(await api.compactConversation(sessionId, through));
+    } catch (error) {
+      projectNotice =
+        error instanceof ApiError
+          ? `That range could not be summarised (${error.reasonCode ?? error.status}).`
+          : "That range could not be summarised.";
     }
   }
 
@@ -2103,6 +2137,12 @@
            stay visible while the thread scrolls under it. -->
       <div class="plan-slot">
         <PlanChecklist {plan} bind:collapsed={planCollapsed} />
+        {#if offerPlanApproval(mode, plan, streaming)}
+          <div class="plan-approval" role="group" aria-label="Approve this plan">
+            <span>Made in Plan, so nothing has changed yet.</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick={approvePlan}>Approve plan · Suggest changes</button>
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -2514,6 +2554,9 @@
 
         {#if shortcutsOpen}
           <ShortcutSheet surface="build" onclose={() => (shortcutsOpen = false)} />
+        {/if}
+        {#if insightsOpen}
+          <InsightsSheet insights={threadInsights(turns, contextUsage)} onclose={() => (insightsOpen = false)} />
         {/if}
         {#if menuKind !== "none"}
           <ComposerMenu
@@ -3063,6 +3106,15 @@
   }
 
 
+  .plan-approval {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-2);
+  }
   .plan-slot {
     flex: 0 0 auto;
     margin-bottom: var(--space-3);

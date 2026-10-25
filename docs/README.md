@@ -71,7 +71,7 @@ Canonical technical references:
 
 - [Open defects](plans/TO_BE_FIXED.md) and [fixed items](plans/FIXED_ITEMS.md)
 - [Proposed additions](plans/PERSONAL_AUTONOMOUS_AGENT_SPEC.md)
-- [Agent tool inventory](plans/AGENT_TOOL_INVENTORY.md) — Claude, Hermes Agent and Muse tools compared, input to the tools refactor (TOOL-01–TOOL-153); first round shipped 2026-10-25
+- [Agent tool inventory](plans/AGENT_TOOL_INVENTORY.md) — Claude, Hermes Agent and Muse tools compared, input to the tools refactor (TOOL-01–TOOL-153); first and second rounds shipped 2026-10-25
 - [Release acceptance scenarios](plans/TESTING.md) — candidate scope, RR-01–RR-41, pass criteria and GO/NO-GO evidence
 - [Live manual test plan](plans/TESTING.md) and
   [test-round record](plans/TESTING.md)

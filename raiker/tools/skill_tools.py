@@ -72,3 +72,57 @@ def skill_load(
         "files": files,
         "instructions": str(row.get("skill_md", "")),
     }
+
+
+#: TOOL-70 — how many skills one search names.
+MAX_SKILL_HITS = 8
+
+
+def skill_search(
+    workspace_root: str | Path,
+    query: str,
+    *,
+    owner_principal_id: str | None = None,
+) -> dict[str, Any]:
+    """The owner's skills that match *query*, best first (TOOL-70).
+
+    The system context lists active skills one line each; this searches their
+    names, descriptions and instructions, so a turn finds the skill a task
+    needs without loading every one. A skill the owner turned off is named as
+    off, with where to turn it on, and its instructions stay withheld. No
+    arguments lists every skill.
+    """
+    if not owner_principal_id:
+        return _failed("not_found", "No owner scope for this turn.")
+    words = [word for word in (query or "").lower().split() if len(word) > 1]
+    rows = SQLiteStore(workspace_root).list_skills(owner_principal_id)
+    hits: list[tuple[int, dict[str, Any]]] = []
+    for row in rows:
+        name = str(row.get("name", ""))
+        description = str(row.get("description", ""))
+        body = str(row.get("skill_md", "")).lower()
+        # The name says what a skill is for, the description how, the body
+        # merely mentions things: weighted in that order.
+        score = (
+            sum(
+                10 * name.lower().count(word) + 3 * description.lower().count(word) + min(body.count(word), 5)
+                for word in words
+            )
+            if words
+            else 1
+        )
+        if score == 0:
+            continue
+        hits.append((score, {
+            "name": name,
+            "description": description[:300],
+            "active": bool(row.get("active")),
+            **({} if row.get("active") else {"note": "Turned off. The owner can turn it on in Skills."}),
+        }))
+    hits.sort(key=lambda pair: (-pair[0], pair[1]["name"]))
+    return {
+        "status": "success",
+        "query": query,
+        "skills": [hit for _score, hit in hits[:MAX_SKILL_HITS]],
+        "hint": "Load an active one with skill_load.",
+    }

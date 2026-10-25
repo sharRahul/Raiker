@@ -210,3 +210,22 @@ export function buildPrimaryAction(mode: BuildMode): string {
       return "Run";
   }
 }
+
+/**
+ * TOOL-09 — leaving Plan is the owner's decision, made on the plan itself.
+ *
+ * A Plan turn changes nothing, so a plan it wrote is a proposal. When one is
+ * on screen with work still to do, the plan card offers to approve it: the
+ * posture moves to Suggest changes (every change still asks) and the turn is
+ * told to go ahead. Nothing moves to acting without that press.
+ */
+export const APPROVED_PLAN_PROMPT = "Go ahead with the plan. Every change still asks me first.";
+
+export function offerPlanApproval(
+  mode: BuildMode,
+  plan: { steps: readonly { status: string }[] } | null,
+  streaming: boolean,
+): boolean {
+  if (mode !== "plan" || streaming || plan === null) return false;
+  return plan.steps.some((step) => step.status !== "completed");
+}

@@ -185,7 +185,7 @@ model for something — the same summary a turn's **Summarise** makes:
 | `/schedule` | Open **Tasks**, where a one-off schedule, a daily routine or a background agent is created |
 | `/tasks` | Open **Tasks** to see schedules and runs already under way |
 | `/export` | Export this conversation |
-| `/compress` | Summarise the conversation so far for the model, through the latest finished turn. The transcript keeps every word; later turns read the summary instead of the full history |
+| `/compress` | (Chat and Build) Summarise the conversation so far for the model, through the latest finished turn. The transcript keeps every word; later turns read the summary instead of the full history |
 | `/insights` | Show what this conversation used: turns and model calls, the model, tokens in and out, the cost (*Not priced* when the price is unknown), tool calls and the tools used most |
 | `/stop` | Stop the running turn at its next safe boundary |
 | `/shortcuts` | Show the keyboard map |
@@ -629,7 +629,15 @@ Ask Raiker how to do something in Raiker — *how do I connect Gmail?* — and i
 reads this guide (the `help_read` tool) rather than answering from memory. The
 rows say which article or search it read, and the answer cites **Raiker help**
 under *Sources*. It reads only the guide this install ships; nothing leaves the
-computer for it.
+computer for it. Pressing a **Raiker help** source opens the help panel on that
+article.
+
+### When a task needs a service you have not connected
+
+Raiker offers a card under its step — *Connect Gmail*, with why it wants it —
+and **Add connection**, which opens Connections on that service. Nothing is
+connected until you finish there, and a connection still does nothing your
+Permissions do not allow. Raiker carries on with what it can do without it.
 
 ### When Raiker asks you a question
 

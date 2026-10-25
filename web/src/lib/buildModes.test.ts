@@ -162,3 +162,15 @@ describe("the primary action's word (COMPOSER-15)", () => {
     expect(buildPrimaryAction("plan")).not.toBe("Run");
   });
 });
+
+describe("TOOL-09 approving a plan leaves Plan", async () => {
+  const { offerPlanApproval } = await import("./buildModes");
+  const plan = { steps: [{ status: "completed" }, { status: "pending" }] };
+  it("is offered only in Plan, between turns, with work left", () => {
+    expect(offerPlanApproval("plan", plan, false)).toBe(true);
+    expect(offerPlanApproval("edit", plan, false)).toBe(false);
+    expect(offerPlanApproval("plan", plan, true)).toBe(false);
+    expect(offerPlanApproval("plan", { steps: [{ status: "completed" }] }, false)).toBe(false);
+    expect(offerPlanApproval("plan", null, false)).toBe(false);
+  });
+});

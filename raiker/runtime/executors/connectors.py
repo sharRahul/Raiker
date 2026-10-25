@@ -47,10 +47,14 @@ class GithubConnectorExecutor:
         if operation == "create_pull_request":
             head = str(action.arguments.get("head", "")).strip()
             return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": head or None}
-        if operation == "update_pull_request":
-            # TOOL-26 — editing words on an existing pull request names no branch,
-            # so a branch-scoped delegation cannot cover it: it always asks.
+        if operation in ("update_pull_request", "reply_review_comment"):
+            # TOOL-26 / TOOL-27 — words on an existing pull request name no
+            # branch, so a branch-scoped delegation cannot cover them: they ask.
             return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": None}
+        if operation == "update_pull_request_branch":
+            # A merge commit GitHub makes on the pull request's branch: a push,
+            # and with no branch named here no delegation covers it.
+            return {"repository": f"github.com/{repo}", "operation": "push", "branch": None}
         if operation == "read":
             return None
         # A comment, or anything else that writes: never covered by a delegation.
@@ -157,6 +161,34 @@ class GithubConnectorExecutor:
                     "content_redacted": True,
                 },
             )
+        if operation in ("reply_review_comment", "update_pull_request_branch", "rerun_failed_jobs"):
+            authority = current_routed_authority(action.action_id)
+            repo = str(action.arguments.get("repo", ""))
+            number = action.arguments.get("number")
+            if operation == "reply_review_comment":
+                outcome = service.reply_review_comment(
+                    repo, number, action.arguments.get("comment_id"),
+                    str(action.arguments.get("body", "")), authority=authority,
+                )
+            elif operation == "update_pull_request_branch":
+                outcome = service.update_pull_request_branch(repo, number, authority=authority)
+            else:
+                outcome = service.rerun_failed_jobs(repo, number, authority=authority)
+            if outcome.get("status") != "success":
+                error = outcome.get("error", {})
+                return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary=f"GitHub {operation.replace('_', ' ')} done; content withheld from artifacts.",
+                artifacts={
+                    "repo": outcome.get("repo"),
+                    "number": outcome.get("number"),
+                    "html_url": outcome.get("html_url"),
+                    "content_redacted": True,
+                },
+            )
         if operation != "read":
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
         outcome = service.read(
@@ -166,6 +198,7 @@ class GithubConnectorExecutor:
             authority=current_routed_authority(action.action_id),
             ref=str(action.arguments.get("ref") or "") or None,
             path=str(action.arguments.get("path") or "") or None,
+            query=str(action.arguments.get("query") or "") or None,
         )
         if outcome.get("status") != "success":
             error = outcome.get("error", {})

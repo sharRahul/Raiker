@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ContextUsage, StreamEvent } from "./apiTypes";
-import { latestSettledTurnId, threadInsights } from "./threadInsights";
+import { compressNotice, latestSettledTurnId, threadInsights } from "./threadInsights";
 
 const tool = (action: string, label: string, status: string): StreamEvent =>
   ({ kind: "tool", payload: { tool_name: label.toLowerCase(), action_id: action, label, status } }) as unknown as StreamEvent;
@@ -37,5 +37,10 @@ describe("TOOL-131 /insights and /compress", () => {
       ]),
     ).toBe("t2");
     expect(latestSettledTurnId([])).toBeNull();
+  });
+
+  it("words the compaction answer", () => {
+    expect(compressNotice({ compacted: true, source_turn_count: 1 })).toMatch(/^Summarised 1 earlier exchange for/);
+    expect(compressNotice({ compacted: false, reason_code: "nothing_to_summarise" })).toBe("Everything up to that point is already summarised.");
   });
 });

@@ -499,3 +499,43 @@ class TestSearchDomainsAndFetchCap:
         assert specs["web_search"].parameters["properties"]["allowed_domains"]["type"] == "array"
         assert "blocked_domains" in specs["web_search"].parameters["properties"]
         assert specs["web_fetch"].parameters["properties"]["max_chars"]["type"] == "integer"
+
+
+class TestFetchPdf:
+    """TOOL-91 — a fetched PDF comes back as the text of its pages."""
+
+    @staticmethod
+    def _pdf_bytes(pages: int) -> bytes:
+        import io
+
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        for _ in range(pages):
+            writer.add_blank_page(width=200, height=200)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        return buffer.getvalue()
+
+    def test_pages_are_extracted_and_marked(self, workspace: Path, store: SQLiteStore) -> None:
+        raw = self._pdf_bytes(3)
+
+        def pdf(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            assert "application/pdf" in headers["Accept"]
+            return {"final_url": url, "status": 200, "content_type": "application/pdf", "body": "", "raw": raw, "truncated": False}
+
+        _allow(_enable_gate(workspace, store))
+        service = _governed(workspace, store, pdf)
+        whole = service.fetch("https://docs.example.com/paper.pdf")
+        assert whole["status"] == "success" and whole["pages"] == "1-3" and whole["page_count"] == 3
+        assert "--- Page 2 ---" in whole["content"]
+        part = service.fetch("https://docs.example.com/paper.pdf", pages="3")
+        assert part["pages"] == "3-3" and "--- Page 1 ---" not in part["content"]
+        assert service.fetch("https://docs.example.com/paper.pdf", pages="9")["error"]["type"] == "pages_out_of_range"
+
+    def test_a_cut_short_pdf_is_named(self, workspace: Path, store: SQLiteStore) -> None:
+        def broken(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            return {"final_url": url, "status": 200, "content_type": "application/pdf", "body": "", "raw": b"%PDF-1.4 junk", "truncated": True}
+
+        _allow(_enable_gate(workspace, store))
+        assert _governed(workspace, store, broken).fetch("https://docs.example.com/x.pdf")["error"]["type"] == "pdf_unreadable"

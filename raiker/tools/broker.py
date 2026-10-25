@@ -50,6 +50,7 @@ from raiker.runtime.identity.verifier import MachineIdentityVerifier
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
 from raiker.tools.codemap_tools import code_map_references, code_map_search
+from raiker.tools.connection_tools import suggest_connection
 from raiker.tools.connector_tools import (
     connector_read,
     gcal_read,
@@ -89,7 +90,7 @@ from raiker.tools.memory_tools import (
 )
 from raiker.tools.presentation import tool_row
 from raiker.tools.search import glob, grep
-from raiker.tools.skill_tools import skill_load
+from raiker.tools.skill_tools import skill_load, skill_search
 from raiker.tools.vector_tools import vector_get
 from raiker.tools.web_tools import weather_lookup, web_extract, web_fetch, web_search
 
@@ -246,6 +247,14 @@ class ToolBroker:
                 # never return a tool the turn could not have been offered.
                 mcp_specs=mcp_tool_specs(self.workspace_root, self.store, self.principal_id),
             ),
+            # TOOL-72 — a suggestion the conversation draws as a card; it
+            # connects nothing.
+            "suggest_connection": lambda args: suggest_connection(
+                str(args.get("service", "") or ""),
+                str(args.get("reason", "") or ""),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
             # TOOL-46 — the guide this install ships, static and local.
             "help_read": lambda args: help_read(
                 str(args.get("slug", "") or ""), str(args.get("query", "") or "")
@@ -314,6 +323,11 @@ class ToolBroker:
                 file=str(args["file"]) if args.get("file") else None,
                 owner_principal_id=self.owner_scope,
             ),
+            "skill_search": lambda args: skill_search(
+                self.workspace_root,
+                str(args.get("query", "") or ""),
+                owner_principal_id=self.owner_scope,
+            ),
             "vector_get": lambda args: vector_get(
                 self.workspace_root,
                 str(args.get("vector_id", "")),
@@ -332,6 +346,7 @@ class ToolBroker:
                 args.get("number", ""),
                 ref=str(args["ref"]) if args.get("ref") else None,
                 path=str(args["path"]) if args.get("path") else None,
+                query=str(args["query"]) if args.get("query") else None,
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -361,6 +376,7 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("url", "")),
                 args.get("max_chars"),
+                args.get("pages"),
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -1041,6 +1057,7 @@ class ToolBroker:
         *,
         status: str,
         reason: str = "",
+        extra: dict[str, object] | None = None,
     ) -> None:
         """Put one tool call on the live stream (BUG-206 slices A and B).
 
@@ -1059,6 +1076,8 @@ class ToolBroker:
         }
         if reason:
             payload["reason"] = reason
+        if extra:
+            payload.update(extra)
         self.stream_sink.append(
             StreamEvent(kind=TOOL, event_type=event_type, payload=payload)
         )
@@ -1122,7 +1141,15 @@ class ToolBroker:
     def _stream_tool_result(self, action: ToolAction, result: ToolResult) -> None:
         """The settled half of a row, from the result the broker just produced."""
         if result.status == "success":
-            self._stream_tool(action, "tool_completed", status="success")
+            extra: dict[str, object] = {}
+            output = result.output if isinstance(result.output, dict) else {}
+            if action.tool_name == "suggest_connection" and output.get("connector_id"):
+                # TOOL-72 — what the card needs, from Raiker's own catalogue;
+                # the reason is model text the client renders as data.
+                extra["connection"] = {
+                    key: output.get(key) for key in ("connector_id", "service", "connected", "reason", "href")
+                }
+            self._stream_tool(action, "tool_completed", status="success", extra=extra)
             return
         self._stream_tool(
             action,
@@ -1435,6 +1462,12 @@ class ToolBroker:
                         if operation == "create_pull_request"
                         else "pull request change"
                         if operation == "update_pull_request"
+                        else "review reply"
+                        if operation == "reply_review_comment"
+                        else "branch update"
+                        if operation == "update_pull_request_branch"
+                        else "re-run of the failed jobs"
+                        if operation == "rerun_failed_jobs"
                         else "comment" if operation == "create_comment" else "write"
                     )
                     return (

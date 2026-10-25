@@ -1291,6 +1291,21 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1202](#fixed-1202--plan-steps-could-not-say-what-they-waited-on-tool-04) | Low | Chat / Build | Fixed 2026-10-25 |
 | [FIXED-1203](#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131) | Low | Chat | Fixed 2026-10-25 |
 | [FIXED-1204](#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live) | Low | Top bar | Fixed 2026-10-25 |
+| [FIXED-1205](#fixed-1205--branches-tags-and-releases-needed-a-clone-tool-23) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1206](#fixed-1206--a-turn-could-not-search-a-repositorys-code-on-github-tool-24) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1207](#fixed-1207--issues-could-be-read-one-number-at-a-time-tool-28) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1208](#fixed-1208--review-comments-could-not-be-read-or-answered-tool-27) | Medium | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1209](#fixed-1209--a-pull-requests-branch-could-not-be-brought-up-to-date-tool-26) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1210](#fixed-1210--a-failed-ci-run-could-not-be-re-run-from-a-turn-tool-21) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1211](#fixed-1211--a-turn-could-not-say-which-github-account-it-was-acting-as-tool-29) | Low | GitHub connector | Fixed 2026-10-25 |
+| [FIXED-1212](#fixed-1212--a-pdf-on-the-web-came-back-as-garbled-text-tool-91) | Medium | Web access | Fixed 2026-10-25 |
+| [FIXED-1213](#fixed-1213--build-had-no-compress-or-insights-tool-131) | Low | Build | Fixed 2026-10-25 |
+| [FIXED-1214](#fixed-1214--leaving-builds-plan-posture-was-a-menu-change-not-a-decision-on-the-plan-tool-09) | Medium | Build | Fixed 2026-10-25 |
+| [FIXED-1215](#fixed-1215--a-raiker-help-source-opened-an-excerpt-not-the-article-tool-129) | Low | Chat / Help | Fixed 2026-10-25 |
+| [FIXED-1216](#fixed-1216--a-turn-that-needed-an-unconnected-service-could-only-explain-how-to-connect-it-tool-72-tool-126) | Medium | Chat / Connections | Fixed 2026-10-25 |
+| [FIXED-1217](#fixed-1217--a-turn-could-load-a-skill-only-by-its-exact-name-tool-70) | Low | Skills | Fixed 2026-10-25 |
+| [FIXED-1218](#fixed-1218--a-recalled-memory-did-not-say-which-conversation-it-came-from-tool-104) | Low | Memory | Fixed 2026-10-25 |
+| [FIXED-1219](#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01) | Medium | Shell / runtime | Fixed 2026-10-25 |
 
 ---
 
@@ -37649,3 +37664,125 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** A queued task whose scheduled time is still ahead is waiting for its slot and is left out of the line; one that is due still counts.
 
 **Evidence.** `liveWork.test.ts`; RT-TOOL-10.
+
+## FIXED-1205 — Branches, tags and releases needed a clone (TOOL-23)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` gains `branches` (with the head commit and whether the branch is protected), `tags` and `releases` (tag, name, date, draft or pre-release, and the start of the notes), each governed like every GitHub read and narrowed to `contents: read`.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1206 — A turn could not search a repository's code on GitHub (TOOL-24)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` `search_code` takes a `query` of at most 256 characters, always scoped to the named repository (`repo:owner/name` is added by Raiker, never by the model), and returns the matching paths.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1207 — Issues could be read one number at a time (TOOL-28)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` gains `issues` (open issues and pull requests, each marked as which), `search_issues` (a `query` within the repository) and `issue_comments` (an issue's or pull request's comments, with their ids). Comments are untrusted content like every GitHub read.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1208 — Review comments could not be read or answered (TOOL-27)
+
+**Severity: Medium. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` `review_comments` lists a pull request's review comments with file, line, id and which comment each replies to. `github_write` `reply_review_comment` posts one reply in a thread (`number`, `comment_id`, `body`), asked first; a branch-scoped delegation cannot cover it. Resolving a thread needs GitHub's GraphQL API and is not done.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1209 — A pull request's branch could not be brought up to date (TOOL-26)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_write` `update_pull_request_branch` asks GitHub to merge the base into the pull request's branch (GitHub's *Update branch*: a merge commit, never a rebase or force-push). It is a push, so it asks first, and no delegation covers it because it names no branch.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1210 — A failed CI run could not be re-run from a turn (TOOL-21)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_write` `rerun_failed_jobs` re-runs a workflow run's failed jobs once, asked first, under an installation token narrowed to `actions: write` (the permission ceiling now allows `actions: write`; reads still ask for `actions: read`).
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1211 — A turn could not say which GitHub account it was acting as (TOOL-29)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-25.**
+
+**Fixed.** `github_read` `account` returns the connected account's login, name and type.
+
+**Evidence.** `tests/test_github_connector.py`.
+
+## FIXED-1212 — A PDF on the web came back as garbled text (TOOL-91)
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-25.**
+
+**Observed.** `web_fetch` decoded every body as text, so a PDF reached the model as binary noise, and the 400 KB fetch limit cut most PDFs short.
+
+**Fixed.** A PDF response (by content type or its `%PDF-` header) is read up to 10 MB, kept as bytes, turned into text locally with pypdf, page by page with each page marked, and then passed through the same sanitiser as any page. `pages` chooses a page or range (at most 20; default the first 20). A cut-short or damaged PDF says so (`pdf_unreadable`). Requests now accept `application/pdf`.
+
+**Evidence.** `tests/test_web_access.py`.
+
+## FIXED-1213 — Build had no /compress or /insights (TOOL-131)
+
+**Severity: Low. Area: Build. Status: Fixed 2026-10-25.**
+
+**Fixed.** Both commands are in the shared composer list, so Build has them too: `/compress` summarises through the latest settled turn and `/insights` opens the same sheet over Build's composer. Chat and Build word the summary's outcome with one function.
+
+**Evidence.** `threadInsights.test.ts`, `composerCommands.test.ts`; RT-TOOL-16.
+
+## FIXED-1214 — Leaving Build's Plan posture was a menu change, not a decision on the plan (TOOL-09)
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-10-25.**
+
+**Fixed.** When a Plan turn has written a plan with steps still to do, the plan card says *Made in Plan, so nothing has changed yet.* with **Approve plan · Suggest changes**. Pressing it moves the posture to Suggest changes, where every change still asks, and sends *Go ahead with the plan. Every change still asks me first.* Nothing moves from planning to acting without that press.
+
+**Evidence.** `buildModes.test.ts`; RT-TOOL-15.
+
+## FIXED-1215 — A Raiker help source opened an excerpt, not the article (TOOL-129)
+
+**Severity: Low. Area: Chat / Help. Status: Fixed 2026-10-25.**
+
+**Fixed.** A **Raiker help** source chip opens the help panel on the article the turn read (or the article list for a search), where the owner reads the guide, instead of the source inspector.
+
+**Evidence.** `SourceChips.test.ts`; RT-TOOL-14.
+
+## FIXED-1216 — A turn that needed an unconnected service could only explain how to connect it (TOOL-72, TOOL-126)
+
+**Severity: Medium. Area: Chat / Connections. Status: Fixed 2026-10-25.**
+
+**Fixed.** A new low-risk tool, `suggest_connection`, names a service from Raiker's connector catalogue with the turn's reason. Its row carries an **Add connection** card (*Connect Gmail* and the reason), in Chat and Build; the card links to `#/connections?add=gmail`, which opens the Add connection dialog on that service. The tool connects, stores and reaches nothing, and a connection still grants nothing until Permissions allows it. The client draws a link only to an address inside Connections. Found live: a reopened conversation showed the row without its card; the card is now rebuilt from the call's stored arguments and the catalogue.
+
+**Evidence.** `tests/test_suggest_connection.py`, `chatPresentation.test.ts`; RT-TOOL-12.
+
+## FIXED-1217 — A turn could load a skill only by its exact name (TOOL-70)
+
+**Severity: Low. Area: Skills. Status: Fixed 2026-10-25.**
+
+**Fixed.** A new low-risk tool, `skill_search`, searches the owner's installed skills by what they do, weighting the name above the description above the body, and lists them all with no query. A skill the owner turned off is named as off, with where to turn it on, and its instructions stay withheld.
+
+**Evidence.** `tests/test_skill_search.py`; RT-TOOL-13.
+
+## FIXED-1218 — A recalled memory did not say which conversation it came from (TOOL-104)
+
+**Severity: Low. Area: Memory. Status: Fixed 2026-10-25.**
+
+**Fixed.** Each `memory_search` hit remembered in one of the owner's conversations carries that conversation's id and title, read from the memory's own provenance; a conversation that is gone or belongs to another account is left out. The tool tells the model to say which conversation a fact came from when it uses it.
+
+**Evidence.** `tests/test_phase_4_memory_mvp.py`.
+
+## FIXED-1219 — A background command finished unseen unless the model polled (TOOL-01)
+
+**Severity: Medium. Area: Shell / runtime. Status: Fixed 2026-10-25.**
+
+**Fixed.** Each turn starts with one system line naming this conversation's background commands that finished since the previous turn began, with their state and exit code, and those still running, from the durable run rows (at most five of each). A `background_runs_reported` event records the notice's length. It grants nothing: reading a log or stopping a run still goes through `background_run`.
+
+**Evidence.** `tests/test_background_notice.py`.

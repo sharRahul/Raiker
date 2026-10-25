@@ -209,12 +209,15 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
         # at all ("Look up a tool · commit my work").
         "tool_search",
         "conversation_search",
+        "skill_search",
     }:
         return _quoted(args, "query")
     if tool_name in {"code_map_references", "find_definition"}:
         return _quoted(args, "name")
     if tool_name == "skill_load":
         return _clean(args.get("name"))[:_MAX_PHRASE]
+    if tool_name == "suggest_connection":
+        return _clean(args.get("service"))[:_MAX_PHRASE]
     if tool_name == "help_read":
         # TOOL-46 — the article read, else what was looked for, else the list.
         return (

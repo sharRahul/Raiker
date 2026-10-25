@@ -74,3 +74,14 @@ export function latestSettledTurnId(
   }
   return null;
 }
+
+/** What the composer says after `/compress`, from the compaction route's answer. */
+export function compressNotice(result: { compacted: boolean; source_turn_count?: number; reason_code?: string | null }): string {
+  if (result.compacted) {
+    const count = result.source_turn_count ?? 0;
+    return `Summarised ${count} earlier ${count === 1 ? "exchange" : "exchanges"} for the model. Nothing was removed from this transcript.`;
+  }
+  return result.reason_code === "nothing_to_summarise"
+    ? "Everything up to that point is already summarised."
+    : `That range could not be summarised (${result.reason_code ?? "unknown"}).`;
+}

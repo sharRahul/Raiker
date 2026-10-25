@@ -903,16 +903,17 @@ Left open in it:
   token (BUG-350). `github_read checks` and `run_jobs` give the failures'
   annotations and failed steps instead. Reading the log needs a token-free
   second request to a named storage host, decided with BUG-350.
-* **`web_fetch` provenance and PDF pages (TOOL-91).** Refusing a URL that
-  neither the owner nor an earlier result gave would stop a turn reading a
-  library's documentation when no search provider is configured, so it waits
-  for an owner decision on that trade. PDF pages need the fetch to keep bytes:
-  `_fetch` decodes every body as text.
+* **`web_fetch` provenance (TOOL-91).** Refusing a URL that neither the owner
+  nor an earlier result gave would stop a turn reading a library's
+  documentation when no search provider is configured, so it waits for an
+  owner decision on that trade. PDF pages shipped in the second round
+  ([FIXED-1212](FIXED_ITEMS.md#fixed-1212--a-pdf-on-the-web-came-back-as-garbled-text-tool-91)).
 * **Images in `read_file` (TOOL-02).** A tool result is text for every
   provider adapter; handing an image back needs each adapter to carry an image
   part in a tool result.
-* **`/compress` and `/insights` in Build (TOOL-131).** Chat has both; Build's
-  composer has its own command list and turn controller.
+* **Resolving a review thread (TOOL-27).** `reply_review_comment` answers in a
+  thread; resolving it needs GitHub's GraphQL API, which the connector does not
+  call yet.
 * **The approval card does not show an edit's diff inline.** RT-TOOL-04: the
   Safety card for an `edit_file` says *Approving writes this exact change to
   src/palette.py* and offers **Change**, but the replacement itself is only in

@@ -67,6 +67,11 @@ _CAP = "web_fetch"
 _READ_RISK = tool_risk_band("web_fetch")
 
 MAX_FETCH_BYTES = 400_000
+#: TOOL-91 — a PDF is read further than a page of HTML, since its text is a
+#: fraction of its bytes; still bounded, and only for a PDF response.
+MAX_PDF_FETCH_BYTES = 10_000_000
+#: TOOL-91 — the most PDF pages one fetch extracts.
+MAX_FETCH_PDF_PAGES = 20
 MAX_CONTENT_CHARS = 20_000
 MAX_REDIRECTS = 3
 FETCH_TIMEOUT_SECONDS = 15.0
@@ -210,6 +215,9 @@ def _fetch(
                 data = response.read(MAX_FETCH_BYTES + 1)
                 charset = response.headers.get_content_charset() or "utf-8"
                 content_type = (response.headers.get_content_type() or "").lower()
+                is_pdf = content_type == "application/pdf" or data[:5] == b"%PDF-"
+                if is_pdf and len(data) > MAX_FETCH_BYTES:
+                    data += response.read(MAX_PDF_FETCH_BYTES + 1 - len(data))
         except urllib.error.HTTPError as exc:
             if exc.code in (301, 302, 303, 307, 308):
                 location = exc.headers.get("Location", "") if exc.headers else ""
@@ -222,9 +230,11 @@ def _fetch(
             raise
         except Exception as exc:  # noqa: BLE001 — every transport failure fails closed
             raise SandboxError(f"web_fetch_failed:{type(exc).__name__}") from None
-        truncated = len(data) > MAX_FETCH_BYTES
-        body = data[:MAX_FETCH_BYTES].decode(charset, errors="replace")
+        limit = MAX_PDF_FETCH_BYTES if is_pdf else MAX_FETCH_BYTES
+        truncated = len(data) > limit
+        body = "" if is_pdf else data[:limit].decode(charset, errors="replace")
         return {
+            "raw": data[:limit] if is_pdf else b"",
             "final_url": current,
             "status": status,
             "content_type": content_type,
@@ -336,7 +346,12 @@ class WebAccessService:
 
     # ── fetch ────────────────────────────────────────────────────────────
     def fetch(
-        self, url: str, *, authority: object | None = None, max_chars: int | None = None
+        self,
+        url: str,
+        *,
+        authority: object | None = None,
+        max_chars: int | None = None,
+        pages: str | None = None,
     ) -> dict[str, Any]:
         """Read one page and return it as bounded, untrusted text.
 
@@ -360,7 +375,10 @@ class WebAccessService:
             return _denied(decision.reason_code, refusal_message(decision.reason_code))
         fetch_fn = self._fetch_fn or _fetch
         try:
-            fetched = fetch_fn(url, rules, {"User-Agent": "raiker-web-fetch", "Accept": "text/html,text/plain"})
+            fetched = fetch_fn(
+                url, rules,
+                {"User-Agent": "raiker-web-fetch", "Accept": "text/html,text/plain,application/pdf"},
+            )
         except SandboxError as exc:
             return _denied(str(exc), "Web fetch failed closed.")
         except Exception:  # noqa: BLE001 — every transport failure fails closed
@@ -373,7 +391,18 @@ class WebAccessService:
         # window: markup dropped, invisible characters removed, elements a
         # visitor could never see discarded, and anything shaped like a
         # conversation role marker defanged.
-        if "html" in content_type or body.lstrip()[:1] == "<":
+        raw = fetched.get("raw") or b""
+        pdf_pages: dict[str, Any] = {}
+        if isinstance(raw, bytes) and raw[:5] == b"%PDF-":
+            # TOOL-91 — a PDF becomes text locally, its pages marked, and then
+            # goes through the same sanitiser as any page.
+            extracted = _pdf_text(raw, pages)
+            if "error" in extracted:
+                return _failed(extracted["error"], extracted["message"])
+            body = extracted["text"]
+            pdf_pages = {"pages": extracted["pages"], "page_count": extracted["page_count"]}
+            page = sanitize_text(body, max_chars=cap)
+        elif "html" in content_type or body.lstrip()[:1] == "<":
             page = sanitize_html(body, max_chars=cap)
         else:
             page = sanitize_text(body, max_chars=cap)
@@ -386,6 +415,7 @@ class WebAccessService:
             "content": as_model_content(page, source=final_url),
             "content_length": len(page.text),
             "content_truncated": bool(fetched.get("truncated")) or page.truncated,
+            **pdf_pages,
             "sanitiser": {
                 "hidden_blocks_removed": page.hidden_blocks_removed,
                 "invisible_characters_removed": page.invisible_characters_removed,
@@ -620,6 +650,41 @@ def _host_passes(url: str, allowed: tuple[str, ...], blocked: tuple[str, ...]) -
     if any(_under(host, domain) for domain in blocked):
         return False
     return not allowed or any(_under(host, domain) for domain in allowed)
+
+
+def _pdf_text(raw: bytes, pages: str | None) -> dict[str, Any]:
+    """The text of a fetched PDF's pages (TOOL-91), or a named reason it has none."""
+    import io
+
+    try:
+        from pypdf import PdfReader
+        from pypdf.errors import PyPdfError
+    except ImportError:
+        return {"error": "pdf_extraction_unavailable", "message": "PDF text extraction is not installed."}
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        count = len(reader.pages)
+    except (PyPdfError, ValueError, OSError):
+        return {"error": "pdf_unreadable", "message": "The PDF could not be read (it may be cut short or damaged)."}
+    first, last = 1, min(count, MAX_FETCH_PDF_PAGES)
+    if pages:
+        match = re.match(r"^\s*(\d+)\s*(?:-\s*(\d+))?\s*$", pages)
+        if not match:
+            return {"error": "pages_invalid", "message": "pages is a page or a range, e.g. '3' or '1-5'."}
+        first, last = int(match.group(1)), int(match.group(2) or match.group(1))
+        if first < 1 or last < first or first > count:
+            return {"error": "pages_out_of_range", "message": f"The PDF has {count} pages."}
+        if last - first + 1 > MAX_FETCH_PDF_PAGES:
+            return {"error": "pages_too_many", "message": f"At most {MAX_FETCH_PDF_PAGES} pages at a time."}
+        last = min(last, count)
+    parts = []
+    for number in range(first, last + 1):
+        try:
+            text = reader.pages[number - 1].extract_text() or ""
+        except Exception:  # noqa: BLE001 — one bad page must not abort the read
+            text = ""
+        parts.append(f"--- Page {number} ---\n{text}")
+    return {"text": "\n".join(parts), "pages": f"{first}-{last}", "page_count": count}
 
 
 def _url_refusal_message(reason: str) -> str:

@@ -318,3 +318,20 @@ def test_classify_memory_sensitivity() -> None:
 def test_memory_write_empty_denied(workspace: Path) -> None:
     assert memory_write(workspace, "")["status"] == "failed"
     assert memory_write(workspace, "   ")["status"] == "failed"
+
+
+def test_a_recalled_memory_names_the_conversation_it_came_from(workspace: Path) -> None:
+    """TOOL-104 — a hit carries its source conversation, when one exists."""
+    from raiker.storage.sqlite import SQLiteStore
+
+    # `_memory_write_action` names `sess_test_memory` as the memory's source.
+    SQLiteStore(workspace).create_session("sess_test_memory", str(workspace), title="Database choice")
+    broker = _governed_broker(workspace)
+    tool_result, _ = broker.execute(
+        _memory_write_action("Raiker keeps its metadata in SQLite."),
+        session_id="sess_origin",
+        turn_id="turn_origin",
+    )
+    assert tool_result.status == "success"
+    hit = next(r for r in memory_search(workspace, "SQLite")["results"] if "metadata in SQLite" in r["text"])
+    assert hit["conversation"] == {"session_id": "sess_test_memory", "title": "Database choice"}

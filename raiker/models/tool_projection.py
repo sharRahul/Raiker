@@ -79,6 +79,8 @@ ALWAYS_PROJECTED: frozenset[str] = frozenset({
     "conversation_search",
     # How Raiker itself works (TOOL-46): asked about often, and small.
     "help_read",
+    # The way a turn offers what it cannot reach (TOOL-72).
+    "suggest_connection",
     # The outside world and the work it produces.
     "web_search",
     "web_fetch",

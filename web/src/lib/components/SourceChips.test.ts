@@ -67,4 +67,19 @@ describe("SourceChips", () => {
     render(SourceChips, { sources: [source({ openable: false })], onopen: () => {} });
     expect(screen.getByRole("button", { name: /contracts\/meridian\.md/ })).toBeDisabled();
   });
+
+  it("opens a Raiker help source in the help panel, not the inspector (TOOL-129)", async () => {
+    const { help, closeHelp } = await import("../help.svelte");
+    const onopen = vi.fn();
+    render(SourceChips, {
+      sources: [source({ kind: "help", title: "Help: Memory", locator: "memory", tool_name: "help_read", openable: false })],
+      citedIds: new Set<string>(),
+      onopen,
+    });
+    screen.getByRole("button", { name: /Help: Memory/ }).click();
+    expect(onopen).not.toHaveBeenCalled();
+    expect(help.open).toBe(true);
+    expect(help.slug).toBe("memory");
+    closeHelp();
+  });
 });

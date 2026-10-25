@@ -25,7 +25,7 @@
   import { endpointRefusal, networkClassLabel } from "../mcpEndpoint";
   import { humanize, relativeTime } from "../format";
   import { operationEffect } from "../connectionEffects";
-  import { itemFromHash } from "../listDetail";
+  import { addFromHash, itemFromHash } from "../listDetail";
   import {
     connectionBlockedCopy,
     connectionStatus,
@@ -157,6 +157,16 @@
     if (!githubConnected && !adding && itemFromHash(window.location.hash) === GITHUB_ID) {
       chosen = GITHUB_ID;
       adding = true;
+    }
+    // TOOL-72 — a conversation's "Connect Gmail" card links here with `?add=`;
+    // the dialog opens on that service and connecting is still the owner's step.
+    const wanted = addFromHash(window.location.hash);
+    if (wanted !== null && !adding) {
+      const id = wanted === "github" ? GITHUB_ID : wanted;
+      if (catalogue.some((option) => option.id === id)) {
+        chosen = id;
+        adding = true;
+      }
     }
   }
 

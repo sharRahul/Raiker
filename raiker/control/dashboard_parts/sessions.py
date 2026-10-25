@@ -966,17 +966,30 @@ class SessionService:
             tool_name = str(stored.get("tool_name") or "")
             if not tool_name:
                 continue
-            rows.append(
-                {
-                    "action_id": str(stored.get("action_id") or ""),
-                    **tool_row(
-                        tool_name, arguments if isinstance(arguments, dict) else {}
-                    ).to_payload(),
-                    "status": self._STORED_ROW_STATES.get(
-                        str(stored.get("status") or ""), "running"
-                    ),
-                }
-            )
+            row: dict[str, Any] = {
+                "action_id": str(stored.get("action_id") or ""),
+                **tool_row(
+                    tool_name, arguments if isinstance(arguments, dict) else {}
+                ).to_payload(),
+                "status": self._STORED_ROW_STATES.get(
+                    str(stored.get("status") or ""), "running"
+                ),
+            }
+            if tool_name == "suggest_connection" and row["status"] == "success" and isinstance(arguments, dict):
+                # TOOL-72 — the card is rebuilt from the stored arguments and the
+                # catalogue, exactly as the live call produced it, so a reopened
+                # conversation still offers the connection.
+                from raiker.tools.connection_tools import suggest_connection
+
+                suggestion = suggest_connection(
+                    str(arguments.get("service") or ""), str(arguments.get("reason") or "")
+                )
+                if suggestion.get("status") == "success":
+                    row["connection"] = {
+                        key: suggestion.get(key)
+                        for key in ("connector_id", "service", "connected", "reason", "href")
+                    }
+            rows.append(row)
         return tuple(rows)
 
     @staticmethod

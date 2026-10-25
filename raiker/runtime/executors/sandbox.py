@@ -696,7 +696,7 @@ def post_json_url(
     body_bytes = _json.dumps(payload).encode("utf-8")
     merged = dict(headers or {})
     merged.setdefault("Content-Type", "application/json")
-    if method not in ("POST", "PATCH"):
+    if method not in ("POST", "PATCH", "PUT"):
         raise SandboxError(f"method_not_allowed:{method}")
     request = urllib.request.Request(  # noqa: S310 - scheme checked above
         url, data=body_bytes, method=method, headers=merged,

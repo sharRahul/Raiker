@@ -258,3 +258,15 @@ describe("turnOutcome", () => {
     expect(turnOutcome("denied", [row("denied")])).toMatchObject({ label: "Not done" });
   });
 });
+
+describe("TOOL-72 a suggested connection on a tool row", () => {
+  it("keeps the catalogue fields and only an address inside Connections", async () => {
+    const { toolActivity } = await import("./chatPresentation");
+    const event = (connection: unknown) =>
+      ({ kind: "tool", payload: { tool_name: "suggest_connection", action_id: "a", label: "Suggest a connection", status: "success", connection } }) as never;
+    const [row] = toolActivity([event({ connector_id: "gmail", service: "Gmail", connected: false, reason: "To read the invoice", href: "#/connections?add=gmail" })]);
+    expect(row.connection).toEqual({ connectorId: "gmail", service: "Gmail", connected: false, reason: "To read the invoice", href: "#/connections?add=gmail" });
+    const [unsafe] = toolActivity([event({ connector_id: "gmail", href: "https://evil.example" })]);
+    expect(unsafe.connection).toBeUndefined();
+  });
+});

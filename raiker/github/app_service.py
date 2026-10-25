@@ -42,7 +42,7 @@ PERMISSION_CEILING: dict[str, str] = {
     "pull_requests": "write",
     "issues": "write",
     "checks": "read",
-    "actions": "read",
+    "actions": "write",
 }
 #: What each operation's installation token is narrowed to.
 OPERATION_PERMISSIONS: dict[str, dict[str, str]] = {
@@ -54,6 +54,8 @@ OPERATION_PERMISSIONS: dict[str, dict[str, str]] = {
     "issue_comment": {"issues": "write", "metadata": "read"},
     # TOOL-20/22 — CI status and workflow runs, read-only.
     "read_checks": {"checks": "read", "actions": "read", "metadata": "read"},
+    # TOOL-21 — re-running a run's failed jobs, asked first.
+    "rerun_jobs": {"actions": "write", "metadata": "read"},
 }
 _LEVEL = {"read": 1, "write": 2, "admin": 3}
 

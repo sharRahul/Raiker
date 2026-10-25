@@ -17,6 +17,7 @@
    * fetched until one is clicked.
    */
   import Icon from "./Icon.svelte";
+  import { openHelp } from "../help.svelte";
   import type { IconName } from "../icons";
   import type { TurnSourceView } from "../apiTypes";
 
@@ -64,6 +65,12 @@
     help: "Raiker help",
   };
 
+  // TOOL-129 — a help source is an article this install ships, so it opens in
+  // the help panel where the owner reads the guide, not in the source inspector.
+  function opens(source: TurnSourceView): boolean {
+    return source.kind === "help" || source.openable;
+  }
+
   function icon(kind: string): IconName {
     return KIND_ICONS[kind] ?? "file";
   }
@@ -84,11 +91,11 @@
             type="button"
             class="source-chip"
             class:cited={citedIds.has(source.source_id)}
-            class:inert={!source.openable}
-            disabled={!source.openable}
-            aria-expanded={openSourceId === source.source_id}
+            class:inert={!opens(source)}
+            disabled={!opens(source)}
+            aria-expanded={source.kind === "help" ? undefined : openSourceId === source.source_id}
             title={hint(source)}
-            onclick={() => onopen(source)}
+            onclick={() => (source.kind === "help" ? openHelp(source.locator || null) : onopen(source))}
           >
             <span class="marker" aria-hidden="true">{source.source_id.slice(1)}</span>
             <Icon name={icon(source.kind)} size="sm" />

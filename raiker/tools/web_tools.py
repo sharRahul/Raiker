@@ -11,6 +11,7 @@ def web_fetch(
     workspace_root: str | Path,
     url: str,
     max_chars: Any = None,
+    pages: Any = None,
     *,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
@@ -41,7 +42,7 @@ def web_fetch(
         cap = int(max_chars) if max_chars not in (None, "") and not isinstance(max_chars, bool) else None
     except (TypeError, ValueError):
         cap = None
-    return service.fetch(url, max_chars=cap)
+    return service.fetch(url, max_chars=cap, pages=str(pages) if pages not in (None, "") else None)
 
 
 def web_search(

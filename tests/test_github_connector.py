@@ -550,3 +550,84 @@ def test_update_pull_request_changes_only_title_and_body(
     specs = {spec.name: spec for spec in default_tool_specs()}
     assert "update_pull_request" in specs["github_write"].parameters["properties"]["operation"]["enum"]
     assert specs["github_read"].parameters["required"] == ["resource", "repo"]
+
+
+# ── Second round: TOOL-21, TOOL-23, TOOL-24, TOOL-26 (branch), TOOL-27, TOOL-28, TOOL-29 ──
+
+
+def test_listings_branches_tags_releases_issues_and_comments(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    seen: list[str] = []
+    responses: dict[str, object] = {
+        "/branches": [{"name": "main", "commit": {"sha": "abcdef1234567"}, "protected": True}],
+        "/tags": [{"name": "v1.0", "commit": {"sha": "1234567abcdef"}}],
+        "/releases": [{"tag_name": "v1.0", "name": "First", "published_at": "2026-10-01T00:00:00Z", "body": "Notes"}],
+        "/search/code": {"items": [{"path": "src/app.py"}]},
+        "/search/issues": {"items": [{"number": 3, "title": "Crash", "state": "open", "user": {"login": "ann"}}]},
+        "/issues/5/comments": [{"user": {"login": "bo"}, "created_at": "2026-10-02", "id": 9, "body": "Me too"}],
+        "/issues?": [{"number": 7, "title": "Add dark mode", "state": "open", "user": {"login": "cy"},
+                      "pull_request": {}, "labels": [{"name": "ui"}]}],
+        "/pulls/7/comments": [{"user": {"login": "rev"}, "path": "a.py", "line": 4, "id": 11, "body": "Rename this"}],
+        "/user": {"login": "octocat", "name": "Octo", "type": "User"},
+    }
+
+    def fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+        assert url.startswith("https://api.github.com/")
+        seen.append(url)
+        for fragment, payload in responses.items():
+            if fragment in url:
+                text = json.dumps(payload)
+                return {"status": 200, "body_bytes": len(text), "body_text": text, "truncated": False}
+        raise AssertionError(url)
+
+    service = GithubConnectorService(workspace, store, fetch_fn=fetch)
+    assert "main @abcdef123456 (protected)" in service.read("branches", "acme/demo")["content"]
+    assert "v1.0 @1234567abcde" in service.read("tags", "acme/demo")["content"]
+    assert "First" in service.read("releases", "acme/demo")["content"]
+    code = service.read("search_code", "acme/demo", query="def  main")
+    assert "src/app.py" in code["content"] and "q=def%20main%20repo%3Aacme%2Fdemo" in seen[-1]
+    assert "#3 Crash [open issue] by ann" in service.read("search_issues", "acme/demo", query="crash")["content"]
+    assert "#7 Add dark mode [open pull request] by cy — ui" in service.read("issues", "acme/demo")["content"]
+    assert "Me too" in service.read("issue_comments", "acme/demo", 5)["content"]
+    review = service.read("review_comments", "acme/demo", 7)["content"]
+    assert "rev on a.py:4 (comment id 11)" in review
+    account = service.read("account", "acme/demo")
+    assert account["login"] == "octocat"
+    assert service.read("search_code", "acme/demo")["error"]["type"] == "missing_argument:query"
+    assert service.read("search_code", "acme/demo", query="x" * 300)["error"]["type"] == "query_too_long"
+    assert service.read("review_comments", "acme/demo")["error"]["type"] == "missing_argument:number"
+
+
+def test_reply_update_branch_and_rerun_are_governed_writes(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent: list[tuple[str, str, dict[str, object]]] = []
+
+    def fake_post(url: str, payload: dict[str, object], **kwargs: object) -> dict[str, object]:
+        sent.append((str(kwargs["method"]), url, payload))
+        return {"status": 200, "body_text": json.dumps({"html_url": "https://github.com/x", "message": "ok"})}
+
+    monkeypatch.setattr("raiker.runtime.connectors.post_json_url", fake_post)
+    service = GithubConnectorService(workspace, store)
+    # Gate off: nothing is sent.
+    assert service.rerun_failed_jobs("acme/demo", 55)["error"]["type"] == "connector_gate_disabled"
+    assert sent == []
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    assert service.reply_review_comment("acme/demo", 7, 11, "Done in abc123")["status"] == "success"
+    assert service.update_pull_request_branch("acme/demo", 7)["status"] == "success"
+    assert service.rerun_failed_jobs("acme/demo", 55)["status"] == "success"
+    assert [(m, u.split("/repos/acme/demo")[1]) for m, u, _ in sent] == [
+        ("POST", "/pulls/7/comments/11/replies"),
+        ("PUT", "/pulls/7/update-branch"),
+        ("POST", "/actions/runs/55/rerun-failed-jobs"),
+    ]
+    assert sent[0][2] == {"body": "Done in abc123"}
+    assert service.reply_review_comment("acme/demo", 7, "x", "hi")["error"]["type"] == "invalid_comment_id"
+    assert service.reply_review_comment("acme/demo", 7, 11, " ")["error"]["type"] == "empty_body"
+    specs = {spec.name: spec for spec in default_tool_specs()}
+    assert "rerun_failed_jobs" in specs["github_write"].parameters["properties"]["operation"]["enum"]
+    assert "account" in specs["github_read"].parameters["properties"]["resource"]["enum"]

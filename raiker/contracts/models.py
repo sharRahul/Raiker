@@ -134,6 +134,9 @@ EVENT_TYPES = {
     # model's own short statements of intent, never workspace content.
     "agent_plan_updated",
     "agent_plan_replayed",
+    # TOOL-01 — the turn was told about earlier turns' background commands
+    # (character count only).
+    "background_runs_reported",
     # B7 — a bounded, read-only subagent finished. Metadata only: its name, its
     # contract id, the steps it ran and the read-only tools it used. The
     # findings themselves reach the calling model and nothing else.

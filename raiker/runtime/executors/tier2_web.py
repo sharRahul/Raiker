@@ -51,7 +51,8 @@ class WebFetchExecutor:
         raw_cap = action.arguments.get("max_chars")
         cap = raw_cap if isinstance(raw_cap, int) and not isinstance(raw_cap, bool) else None
         result = service.fetch(
-            url, authority=current_routed_authority(action.action_id), max_chars=cap
+            url, authority=current_routed_authority(action.action_id), max_chars=cap,
+            pages=str(action.arguments["pages"]) if action.arguments.get("pages") else None,
         )
         if result.get("status") != "success":
             error = result.get("error") or {}

@@ -15,6 +15,7 @@ def github_read(
     *,
     ref: str | None = None,
     path: str | None = None,
+    query: str | None = None,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
 ) -> dict[str, Any]:
@@ -37,7 +38,7 @@ def github_read(
     service = GithubConnectorService(
         workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
     )
-    return service.read(resource, repo, number, ref=ref, path=path)
+    return service.read(resource, repo, number, ref=ref, path=path, query=query)
 
 
 def gmail_read(

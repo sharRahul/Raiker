@@ -7,7 +7,8 @@ round shipped 2026-10-25** ([FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searche
 [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md)): the owner chose
 this document for the round and that the *Proposed Raiker capability* column
 is the decision for the items taken. Everything not named in the status table
-below is still a backlog idea. It records
+below is still a backlog idea. **Second round shipped 2026-10-25** ([FIXED-1205](FIXED_ITEMS.md#fixed-1205--branches-tags-and-releases-needed-a-clone-tool-23)
+to [FIXED-1219](FIXED_ITEMS.md#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01); live cases RT-TOOL-11 to RT-TOOL-16). It records
 the tools of three agents, so the refactor can see the whole field before it
 reshapes Raiker's own set:
 
@@ -49,19 +50,29 @@ These come from the existing posture and do not change per item:
 
 | Item | State |
 |---|---|
+| TOOL-01 | **Done.** Each turn is told which of the conversation's background commands finished since the last turn and which still run ([FIXED-1219](FIXED_ITEMS.md#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01)). |
 | TOOL-02 | **Partly done.** `grep` takes `regex`, `ignore_case`, `context`, `path`, `include` and `max_results` ([FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)); `edit_file` takes `replace_all` ([FIXED-1190](FIXED_ITEMS.md#fixed-1190--edit_file-could-replace-exactly-one-occurrence-tool-02)); `read_file` reads a line range and a PDF's pages ([FIXED-1192](FIXED_ITEMS.md#fixed-1192--read_file-read-the-first-200-kb-of-a-text-file-and-nothing-else-tool-02)). Open: images in `read_file`. |
 | TOOL-04 | **Partly done.** Plan steps carry `blocked_by` ([FIXED-1202](FIXED_ITEMS.md#fixed-1202--plan-steps-could-not-say-what-they-waited-on-tool-04)). Open: an owner per item and stopping a running item. |
 | TOOL-08 | **Done.** A recommended option and a preview per option ([FIXED-1193](FIXED_ITEMS.md#fixed-1193--a-question-could-not-say-which-option-raiker-would-choose-tool-08)). |
+| TOOL-09 | **Done.** Build's plan card offers **Approve plan · Suggest changes** after a Plan turn ([FIXED-1214](FIXED_ITEMS.md#fixed-1214--leaving-builds-plan-posture-was-a-menu-change-not-a-decision-on-the-plan-tool-09)). |
 | TOOL-20, TOOL-22 | **Partly done.** `github_read` `checks`, `workflow_runs` and `run_jobs`, with failure annotations and failed steps ([FIXED-1197](FIXED_ITEMS.md#fixed-1197--build-could-not-read-its-own-ci-tool-20-tool-22)). Open: raw job logs, served from a host outside the connector egress rule. |
-| TOOL-23, TOOL-24 | **Partly done.** `github_read` `commits` and `file` at a ref ([FIXED-1198](FIXED_ITEMS.md#fixed-1198--a-remote-file-or-the-repositorys-history-needed-a-clone-tool-23-tool-24)). Open: branches, tags, releases and code search. |
-| TOOL-26 | **Partly done.** `github_write` `update_pull_request`, title and body only ([FIXED-1199](FIXED_ITEMS.md#fixed-1199--a-pull-request-raiker-opened-could-not-be-corrected-tool-26)). Open: bringing a pull request's branch up to date. Merging stays the owner's. |
+| TOOL-21 | **Done.** `github_write` `rerun_failed_jobs`, asked first ([FIXED-1210](FIXED_ITEMS.md#fixed-1210--a-failed-ci-run-could-not-be-re-run-from-a-turn-tool-21)). |
+| TOOL-23, TOOL-24 | **Done.** `commits` and `file` ([FIXED-1198](FIXED_ITEMS.md#fixed-1198--a-remote-file-or-the-repositorys-history-needed-a-clone-tool-23-tool-24)); `branches`, `tags`, `releases` ([FIXED-1205](FIXED_ITEMS.md#fixed-1205--branches-tags-and-releases-needed-a-clone-tool-23)) and `search_code` ([FIXED-1206](FIXED_ITEMS.md#fixed-1206--a-turn-could-not-search-a-repositorys-code-on-github-tool-24)). Repository search across GitHub is not offered. |
+| TOOL-26 | **Done.** `update_pull_request`, title and body only ([FIXED-1199](FIXED_ITEMS.md#fixed-1199--a-pull-request-raiker-opened-could-not-be-corrected-tool-26)), and `update_pull_request_branch` ([FIXED-1209](FIXED_ITEMS.md#fixed-1209--a-pull-requests-branch-could-not-be-brought-up-to-date-tool-26)). Merging stays the owner's. |
+| TOOL-27 | **Partly done.** `review_comments` and `reply_review_comment` ([FIXED-1208](FIXED_ITEMS.md#fixed-1208--review-comments-could-not-be-read-or-answered-tool-27)). Open: resolving a thread (GraphQL only). |
+| TOOL-28 | **Partly done.** `issues`, `search_issues` and `issue_comments` ([FIXED-1207](FIXED_ITEMS.md#fixed-1207--issues-could-be-read-one-number-at-a-time-tool-28)). Open: commenting on an issue beyond `create_comment`, sub-issues. |
+| TOOL-29 | **Partly done.** `account` ([FIXED-1211](FIXED_ITEMS.md#fixed-1211--a-turn-could-not-say-which-github-account-it-was-acting-as-tool-29)). Open: teams and collaborators. |
 | TOOL-30 | **Done.** A push whose outgoing commits add a credential is refused before the owner is asked ([FIXED-1196](FIXED_ITEMS.md#fixed-1196--a-push-could-publish-a-committed-credential-tool-30)). |
 | TOOL-46 | **Done** for `read_documentation`: `help_read` reads Raiker's own help articles ([FIXED-1200](FIXED_ITEMS.md#fixed-1200--a-how-do-i-question-about-raiker-was-answered-from-memory-tool-46)). The rest of TOOL-46 is about the cloud session and does not apply. |
+| TOOL-70 | **Partly done.** `skill_search` over the owner's skills ([FIXED-1217](FIXED_ITEMS.md#fixed-1217--a-turn-could-load-a-skill-only-by-its-exact-name-tool-70)). Open: suggesting a skill that is not installed. |
+| TOOL-72, TOOL-126 | **Done.** `suggest_connection` and its **Add connection** card ([FIXED-1216](FIXED_ITEMS.md#fixed-1216--a-turn-that-needed-an-unconnected-service-could-only-explain-how-to-connect-it-tool-72-tool-126)). |
 | TOOL-90 | **Partly done.** `allowed_domains` and `blocked_domains` on `web_search`, filtered before the turn ([FIXED-1194](FIXED_ITEMS.md#fixed-1194--web_search-could-not-be-kept-to-sources-the-turn-trusted-tool-90)). |
-| TOOL-91 | **Partly done.** `max_chars` on `web_fetch` ([FIXED-1195](FIXED_ITEMS.md#fixed-1195--every-web_fetch-cost-up-to-20000-characters-of-context-tool-91)). Open: the provenance rule (a URL from the owner or an earlier result) and PDF pages. |
+| TOOL-91 | **Partly done.** `max_chars` ([FIXED-1195](FIXED_ITEMS.md#fixed-1195--every-web_fetch-cost-up-to-20000-characters-of-context-tool-91)) and PDF pages ([FIXED-1212](FIXED_ITEMS.md#fixed-1212--a-pdf-on-the-web-came-back-as-garbled-text-tool-91)). Open: the provenance rule (a URL from the owner or an earlier result), which waits for an owner decision. |
 | TOOL-99 | **Partly done.** `insert_line` on `edit_file` ([FIXED-1191](FIXED_ITEMS.md#fixed-1191--edit_file-could-not-insert-at-a-line-tool-99)). Open: merging the editor tools into one, which waits for the refactor. |
+| TOOL-104 | **Done.** A recalled memory names the conversation it came from ([FIXED-1218](FIXED_ITEMS.md#fixed-1218--a-recalled-memory-did-not-say-which-conversation-it-came-from-tool-104)). |
 | TOOL-124 | **Done.** A task's prompt is scanned for injected instructions when it is saved ([FIXED-1201](FIXED_ITEMS.md#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124)). |
-| TOOL-131 | **Partly done.** `/compress` and `/insights` in Chat ([FIXED-1203](FIXED_ITEMS.md#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131)). Open: Build's composer. |
+| TOOL-129 | **Partly done.** A **Raiker help** source opens the help panel on its article ([FIXED-1215](FIXED_ITEMS.md#fixed-1215--a-raiker-help-source-opened-an-excerpt-not-the-article-tool-129)). Open: a guided tour. |
+| TOOL-131 | **Done.** `/compress` and `/insights` in Chat ([FIXED-1203](FIXED_ITEMS.md#fixed-1203--a-conversation-could-not-be-summarised-or-measured-from-the-composer-tool-131)) and Build ([FIXED-1213](FIXED_ITEMS.md#fixed-1213--build-had-no-compress-or-insights-tool-131)). |
 | Every other item | **Open** |
 | Capability matrix | **Input to the tools refactor** |
 

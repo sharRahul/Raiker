@@ -15,6 +15,7 @@
  *
  * Moved, not changed: every message and refusal is the one the view printed.
  */
+import { compressNotice } from "../../threadInsights";
 import { api, ApiError } from "../../api";
 import type { ConversationBranchOrigin } from "../../apiTypes";
 
@@ -111,15 +112,7 @@ export class TurnContinuity {
     this.notify(null);
     try {
       const result = await api.compactConversation(session, turnId);
-      this.notify(
-        result.compacted
-          ? `Summarised ${result.source_turn_count} earlier ${
-              result.source_turn_count === 1 ? "exchange" : "exchanges"
-            } for the model. Nothing was removed from this transcript.`
-          : result.reason_code === "nothing_to_summarise"
-            ? "Everything up to that point is already summarised."
-            : `That range could not be summarised (${result.reason_code}).`,
-      );
+      this.notify(compressNotice(result));
     } catch (error) {
       this.notify(
         error instanceof ApiError

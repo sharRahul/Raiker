@@ -47,6 +47,44 @@ def memory_write(
     }
 
 
+def memory_origins(
+    store: SQLiteStore, memory_ids: list[str], owner_principal_id: str | None
+) -> dict[str, dict[str, str]]:
+    """TOOL-104 — the owner's conversation each memory was remembered from.
+
+    Read from the memory's own provenance; a conversation that is gone, or that
+    another account holds, is left out rather than named.
+    """
+    if not memory_ids:
+        return {}
+    import json
+
+    placeholders = ",".join("?" for _ in memory_ids)
+    with store.connect() as connection:
+        rows = connection.execute(
+            f"SELECT memory_id, provenance_json FROM approved_memory WHERE memory_id IN ({placeholders})",  # noqa: S608 — placeholders only
+            memory_ids,
+        ).fetchall()
+    owner_user = store.principal_user_id(owner_principal_id) if owner_principal_id else None
+    origins: dict[str, dict[str, str]] = {}
+    for row in rows:
+        try:
+            provenance = json.loads(row["provenance_json"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        session_id = str(provenance.get("source_session_id") or "") if isinstance(provenance, dict) else ""
+        if not session_id:
+            continue
+        session = store.load_session(session_id)
+        if session is None or session.get("user_id") not in (None, owner_user):
+            continue
+        origins[str(row["memory_id"])] = {
+            "session_id": session_id,
+            "title": str(session.get("title") or "Untitled conversation")[:120],
+        }
+    return origins
+
+
 def memory_search(
     workspace_root: str | Path,
     query: str,
@@ -90,6 +128,7 @@ def memory_search(
         owner_principal_id=owner_principal_id,
         query_embedder=query_embedder,
     )
+    origins = memory_origins(store, [r.memory_id for r in results], owner_principal_id)
     backend = resolve_embedding_backend(store, owner_principal_id=owner_principal_id)
     # Reported from what the graph leg actually anchored on, not from whether an
     # `entity_id` was supplied — since MEM-12 the anchors are resolved from the
@@ -136,6 +175,9 @@ def memory_search(
                 "sources": list(r.sources),
                 "score": round(r.score, 6),
                 "trust_label": r.trust_label,
+                # TOOL-104 — the conversation the fact came from, when it is
+                # one of the owner's own, so an answer can cite it.
+                **({"conversation": origins[r.memory_id]} if r.memory_id in origins else {}),
             }
             for r in results
         ],

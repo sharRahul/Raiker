@@ -57,14 +57,14 @@ export function liveWorkItems(
   tasks: readonly (Pick<TaskView, "task_id" | "title" | "status" | "current_step"> &
     Partial<Pick<TaskView, "scheduled_at">>)[],
   foreground: Readonly<Record<string, LiveWorkItem>>,
-  now: Date = new Date(),
+  now: number = Date.now(),
 ): LiveWorkItem[] {
   const rows: LiveWorkItem[] = Object.values(foreground);
   for (const task of tasks) {
     if (!isActiveTask(task.status)) continue;
     // A routine queued for a later time is waiting for its slot, not running:
     // counting it would make "2 tasks running" untrue (found live, TOOL round).
-    if (task.status === "queued" && task.scheduled_at && Date.parse(task.scheduled_at) > now.getTime()) continue;
+    if (task.status === "queued" && task.scheduled_at && Date.parse(task.scheduled_at) > now) continue;
     const waiting = task.status === "waiting_for_approval" || task.status === "paused";
     const reported = (task.current_step ?? "").trim();
     // A waiting task says so even when it last reported a step: what the

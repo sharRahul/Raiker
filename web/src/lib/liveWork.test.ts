@@ -50,7 +50,7 @@ describe("QUI-F04 live work line", () => {
   });
 
   it("does not count a routine queued for later as running", () => {
-    const now = new Date("2026-10-25T12:00:00Z");
+    const now = Date.parse("2026-10-25T12:00:00Z");
     const later = { ...task("t1", "queued"), scheduled_at: "2030-01-01T08:00:00Z" };
     const due = { ...task("t2", "queued", "Due now"), scheduled_at: "2026-10-25T11:00:00Z" };
     const items = liveWorkItems([later, due], {}, now);

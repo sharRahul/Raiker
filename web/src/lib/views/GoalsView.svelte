@@ -35,6 +35,7 @@
     stepProgress,
   } from "../goalPresentation";
   import { routeStateFromHash } from "../routeState";
+  import { takeGoalDraft } from "../goalHandoff";
   import { taskDetailHref } from "../taskHistory";
   import { relativeTime } from "../format";
 
@@ -59,6 +60,10 @@
   let criteria = $state<CriterionDraft[]>([{ text: "", mandatory: true, validator: "steps_finish" }]);
   let steps = $state<StepDraft[]>([{ title: "", instruction: "", surface: "chat", depends_on: [], criteria: [0] }]);
   let formError = $state<string | null>(null);
+  // QUI-F03 / BUG-355 — a goal started from Chat: which conversation filled the
+  // form, and the project that conversation is filed in.
+  let draftFrom = $state<string | null>(null);
+  let draftProject = $state<string | null>(null);
   // The model every step runs on. Chosen here, judged with your fallbacks by
   // the execution profile when the plan is accepted and before each step runs.
   let modelProfile = $state("");
@@ -104,6 +109,16 @@
 
   let timer: ReturnType<typeof setInterval> | null = null;
   onMount(() => {
+    const fromChat = takeGoalDraft();
+    if (fromChat) {
+      resetForm();
+      title = fromChat.title;
+      objective = fromChat.objective;
+      steps = [{ title: "First step", instruction: fromChat.objective, surface: "chat", depends_on: [], criteria: [0] }];
+      draftFrom = fromChat.fromTitle ?? "your conversation";
+      draftProject = fromChat.projectId;
+      composing = true;
+    }
     void load().then(openFromHash);
     void refreshModels();
     window.addEventListener("hashchange", openFromHash);
@@ -127,6 +142,8 @@
     modelProfile = "";
     model = "";
     formError = null;
+    draftFrom = null;
+    draftProject = null;
   }
 
   function startNew() {
@@ -190,6 +207,7 @@
       criteria: criteria.filter((c) => c.text.trim()).map((c) => ({ ...c, text: c.text.trim() })),
       steps: steps.map((s) => ({ ...s, title: s.title.trim(), instruction: s.instruction.trim() })),
       ...chosenModel(),
+      ...(draftProject && !editingId ? { project_id: draftProject } : {}),
     };
     try {
       const goal = editingId && selected
@@ -283,6 +301,13 @@
   {#if composing}
     <form class="card goal-form" onsubmit={submitPlan} aria-labelledby="goal-form-h">
       <h3 id="goal-form-h" class="kicker">{editingId ? "Edit draft" : "New goal"}</h3>
+      {#if draftFrom && !editingId}
+        <!-- Ask only for what is missing: the outcome and the first step come
+             from the owner's own words; how they will know it is done does not. -->
+        <p class="from-chat" role="note">
+          Filled in from “{draftFrom}”. Add how you will know it is done, then save. Nothing runs until you accept and start it.
+        </p>
+      {/if}
       <label>Outcome <input bind:value={title} maxlength="120" required placeholder="Plan a weekend in Lisbon" /></label>
       <label>What a good result looks like <textarea bind:value={objective} maxlength="4000" rows="2"></textarea></label>
 
@@ -476,6 +501,14 @@
 </div>
 
 <style>
+  .from-chat {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+    color: var(--text-1);
+    font-size: var(--text-sm);
+  }
   .goals { display: grid; gap: var(--space-4); }
   .goals-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
   .goals-head h2 { margin: 0; }

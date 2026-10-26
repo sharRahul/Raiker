@@ -17,6 +17,11 @@
    * past deciding. The task did not proceed and does not proceed on its own;
    * the card says so and offers **Ask again**, which asks the same request
    * again as a new turn.
+   *
+   * QUI-F19 — allowing a connector write does not send it at once: the
+   * server holds it for ten seconds, and the card says *Sending in 10 s* with
+   * **Undo** while it waits. Undo (or Stop on the conversation) takes it back
+   * and nothing is sent.
    */
   import { onMount } from "svelte";
   import { api, ApiError } from "../api";
@@ -29,6 +34,8 @@
     approvalTimeoutMinutes,
   } from "../approvalTimeout";
   import { humanize } from "../format";
+  import { contract } from "../generated/apiContract";
+  import { HELD_SEND_SECONDS, holdsBeforeSending } from "../heldSend";
   import { shownInline } from "../inlineDecisions.svelte";
   import Icon from "./Icon.svelte";
 
@@ -62,6 +69,10 @@
   let timeLimit = $state<number | null>(null);
   let busy = $state(false);
   let failure = $state<string | null>(null);
+  // QUI-F19 — seconds left in a held send's undo window, while it is held.
+  let holdLeft = $state<number | null>(null);
+  let undoing = $state(false);
+  let undone = $state(false);
 
   const critical = $derived(detail?.approval.critical ?? false);
   const settled = $derived(detail !== null && detail.approval.status !== "pending");
@@ -122,11 +133,19 @@
     if (busy || disabled) return;
     busy = true;
     failure = null;
+    let ticker: ReturnType<typeof setInterval> | null = null;
+    if (approve && holdsBeforeSending(approval.tool_name)) {
+      holdLeft = HELD_SEND_SECONDS;
+      ticker = setInterval(() => {
+        holdLeft = holdLeft === null ? null : Math.max(0, holdLeft - 1);
+      }, 1000);
+    }
     try {
       const result = await api.resolveApproval(approval.approval_id, {
         approve,
         reason: approve ? "allowed once in the conversation" : "declined in the conversation",
       });
+      undone = result.status === "undone";
       publishApprovalResolved({
         approvalId: result.approval_id,
         sessionId: result.resume?.session_id ?? sessionId,
@@ -145,7 +164,22 @@
         failure = "That decision was not recorded. Nothing ran. Try again, or decide in Approvals.";
       }
     } finally {
+      if (ticker !== null) clearInterval(ticker);
+      holdLeft = null;
       busy = false;
+    }
+  }
+
+  async function undoSend() {
+    if (undoing) return;
+    undoing = true;
+    try {
+      await contract.undoHeldSend(approval.approval_id);
+    } catch {
+      // Too late: the window closed and it was sent. The decision's own answer
+      // says so when it arrives; nothing to add here.
+    } finally {
+      undoing = false;
     }
   }
 </script>
@@ -165,6 +199,10 @@
     {/if}
     {#if expired}
       <span class="status" role="status">Not done: no decision</span>
+    {:else if holdLeft !== null}
+      <span class="status sending" role="status" aria-live="polite">Sending in {holdLeft} s</span>
+    {:else if undone}
+      <span class="status" role="status">Not sent: you took it back</span>
     {:else if settled}
       <span class="status" role="status">Decided</span>
     {:else}
@@ -199,7 +237,13 @@
     <div class="actions">
       <a class="btn btn-primary btn-sm" href={changeHref}>Review in Approvals</a>
     </div>
-  {:else if !settled}
+  {:else if holdLeft !== null}
+    <div class="actions">
+      <button type="button" class="btn btn-primary btn-sm" disabled={undoing} onclick={() => void undoSend()}>
+        Undo
+      </button>
+    </div>
+  {:else if !settled && !undone}
     {#if failure}<p class="note failure" role="alert">{failure}</p>{/if}
     <div class="actions">
       <button type="button" class="btn btn-sm" disabled={busy || disabled} onclick={() => void decide(false)}>

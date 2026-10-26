@@ -237,6 +237,10 @@ def owner_answer_outcome(
     }
 
 
+#: QUI-F19 — a held send taken back inside its undo window.
+SEND_UNDONE = "send_undone"
+
+
 def approval_outcome(
     *,
     approved: bool,
@@ -298,6 +302,20 @@ def approval_outcome(
             "capability": capability,
             **(artifacts or {}),
             "note": "The owner approved this action and it was executed once.",
+        }
+    if reason_code == SEND_UNDONE:
+        # QUI-F19 — approved, held for its undo window, and taken back by the
+        # owner (Undo) or by Stop before it left. Nothing was sent.
+        return {
+            "status": "not_executed",
+            "executed": False,
+            "capability": capability,
+            "reason_code": reason_code,
+            "note": (
+                "The owner approved this, then took it back with Undo (or Stop) "
+                "before it was sent, so nothing was sent. Do not send it again "
+                "unless the owner asks; tell them it was not sent."
+            ),
         }
     if reason_code and reason_code.startswith(METADATA_ONLY_PREFIX):
         # BUG-346 — the action is one Raiker performs on approval, and an owner

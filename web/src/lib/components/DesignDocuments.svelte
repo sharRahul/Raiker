@@ -17,6 +17,7 @@
    * ever proposes; nothing it says is applied until the owner accepts it.
    */
   import { onMount, tick } from "svelte";
+  import { routeStateFromHash } from "../routeState";
   import Icon from "./Icon.svelte";
   import TabStrip from "./TabStrip.svelte";
   import { api, ApiError } from "../api";
@@ -936,6 +937,12 @@
 
   onMount(async () => {
     await loadList();
+    // QUI-F15 — a Library link names the document (`record=`). Opened only if
+    // it is in this owner's list; anything else leaves the list as it was.
+    const named = routeStateFromHash(window.location.hash).recordId;
+    if (named !== null && (list?.documents ?? []).some((row) => row.document_id === named)) {
+      void openDocument(named);
+    }
     try {
       gallery = await api.images();
     } catch {

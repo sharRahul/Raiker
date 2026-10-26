@@ -43,6 +43,9 @@
   import { taskDetailHref } from "../taskHistory";
   import { createAttachmentStore, wireAttachments } from "../composerAttachments.svelte";
   import { createFileDrop } from "../fileDrop.svelte";
+  import { contract } from "../generated/apiContract";
+  import TaskReceipt from "../components/TaskReceipt.svelte";
+  import type { RoutineDelivery } from "../generated/apiContract";
   import { api, ApiError } from "../api";
   import { resumeRun, runAgain, startRunNow, stopRun } from "../taskLifecycle";
   import { taskActionLabel, taskActions, taskPhase, taskPhaseLabel, type TaskAction } from "../taskPhase";
@@ -466,6 +469,25 @@
     }
     catch (error) { tasks = null; loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable"; }
     try { approvals = await api.approvals(); } catch { approvals = []; }
+    try {
+      deliveries = new Map((await contract.listRoutineDeliveries()).deliveries.map((row) => [row.task_id, row]));
+    } catch {
+      deliveries = new Map();
+    }
+  }
+
+  // QUI-F06 — routines whose results also go to a channel, and how the last send went.
+  let deliveries = $state<Map<string, RoutineDelivery>>(new Map());
+
+  async function stopDelivery(taskId: string) {
+    try {
+      await contract.stopRoutineDelivery(taskId);
+      const next = new Map(deliveries);
+      next.delete(taskId);
+      deliveries = next;
+    } catch {
+      notice = "Sending to the channel was not stopped. Try again.";
+    }
   }
 
   // Backlog #23 — which working method this task's cycles run under. Named
@@ -569,6 +591,13 @@
   // §13.2 item 6 — this draft's key, kept until the server accepts it.
   let draftKey = newIdempotencyKey();
 
+  // QUI-F06 — the paired channels a routine's results may also go to. Sending
+  // there needs the owner's yes in this form; every send still passes the
+  // channel's own gates.
+  let pairedChannels = $state<{ connector_id: string; name: string }[]>([]);
+  let deliverConsent = $state(false);
+  let deliverTo = $state("");
+
   async function createTask() {
     if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt) || endsBeforeFirst) return;
     creating = true; notice = null; noticeHref = null;
@@ -587,9 +616,10 @@
         ...(workMethod === "build" ? { surface: "build" } : {}),
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
+        ...(deliverConsent && deliverTo ? { deliver_to: deliverTo, deliver_consent: true } : {}),
       }, draftKey);
       draftKey = newIdempotencyKey();
-      titleOverride = ""; objective = ""; parentTaskId = ""; partOfOther = false; endsOn = ""; missedRuns = "run_once"; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; workMethod = "chat";
+      deliverConsent = false; titleOverride = ""; objective = ""; parentTaskId = ""; partOfOther = false; endsOn = ""; missedRuns = "run_once"; priority = "normal"; timing = "now"; runMode = "single"; routineEvery = "daily"; scheduledAt = ""; workMethod = "chat";
       // The model stays chosen: it is a choice about how this owner plans work,
       // not part of the draft just filed, and clearing it left the next task's
       // Create button disabled behind "No model is chosen".
@@ -687,6 +717,18 @@
   // while the list sits still, so the page polls rather than show "queued"
   // after the run has ended (BUG-09).
   onMount(() => {
+    void api
+      .channels()
+      .then((view) => {
+        pairedChannels = view.profiles
+          .filter((profile) => profile.pairing_id !== null)
+          .map((profile) => ({ connector_id: profile.connector_id, name: profile.display_label ?? profile.display_name }));
+        deliverTo = pairedChannels[0]?.connector_id ?? "";
+      })
+      .catch(() => {
+        // Without the list the form offers no channel; results still go to Home.
+        pairedChannels = [];
+      });
     // Chat's `/schedule` asks this surface to open on **Schedule once**. It
     // arranges the form and stops: nothing is created and nothing is scheduled.
     // QUI-F06 / QUI-F18 — a draft handed over by Save as routine opens in the
@@ -927,6 +969,30 @@
           <p class="results-go" role="note">
             Results appear on Home and in this task's own conversation, where you can reply to steer the next run.
           </p>
+          {#if pairedChannels.length > 0}
+            <div class="deliver">
+              <label class="deliver-consent">
+                <input type="checkbox" bind:checked={deliverConsent} />
+                Also send each result to
+              </label>
+              <select
+                class="select"
+                aria-label="Channel for results"
+                bind:value={deliverTo}
+                disabled={!deliverConsent}
+              >
+                {#each pairedChannels as channel (channel.connector_id)}
+                  <option value={channel.connector_id}>{channel.name}</option>
+                {/each}
+              </select>
+              {#if deliverConsent}
+                <small>
+                  Raiker sends each finished run's result there without asking again, while that channel is on and
+                  your permissions allow channel messages. Stop it any time from the task.
+                </small>
+              {/if}
+            </div>
+          {/if}
           <fieldset class="detail-group" aria-label="Organisation">
             <legend>Organisation</legend>
             <label>
@@ -1226,6 +1292,14 @@
                     Thread · {task.thread_turns}
                   </a>
                 {/if}
+                {#if deliveries.has(task.task_id)}
+                  {@const delivery = deliveries.get(task.task_id)}
+                  <!-- QUI-F06 — where else its results go, and whether the last one got there. -->
+                  <span class="delivery-line" title={delivery?.last_reason ?? ""}>
+                    Also to {delivery?.channel_name}{delivery?.last_status === "not_delivered" ? " · last one not sent" : ""}
+                    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void stopDelivery(task.task_id)}>Stop sending</button>
+                  </span>
+                {/if}
                 <!-- BUG-299 — every run's attempts, the decision each waited on
                      and the continuation that followed, at one address. -->
                 <a class="btn btn-ghost btn-sm thread-link" href={taskDetailHref(task.task_id)}>
@@ -1256,12 +1330,16 @@
                 {/each}
               </span>
             </footer>
+            {#if (task.thread_turns ?? 0) > 0}
+              <!-- QUI-F16 — what this task's own conversation used, read, changed and sent. -->
+              <TaskReceipt taskId={task.task_id} />
+            {/if}
           </article>
         {/each}
         <ShowMore total={rows.length} shown={Math.min(shownRows, rows.length)} noun="tasks" onmore={() => (shownRows += PAGE_SIZE)} />
       </section>
     {/if}
-    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span>{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><a class="history-title" href={taskDetailHref(task.task_id)}>{task.title}</a><p class="outcome">{outcome(task)}</p>{#if task.delivery_state === "failed"}<!-- DEC-12 step 5 — the work's outcome, and separately whether the owner was told. --><p class="delivery-failed" role="status" data-testid="task-delivery-failed"><Icon name="warning" size="sm" /> <strong>Delivery failed.</strong> {task.delivery_detail ?? "The notice that this ended did not arrive."}</p>{/if}{#if deliveries.has(task.task_id)}<!-- QUI-F06 --><p class="delivery-line">Also sent to {deliveries.get(task.task_id)?.channel_name}{deliveries.get(task.task_id)?.last_status === "not_delivered" ? " · the last one was not sent" : ""}</p>{/if}{#if (task.thread_turns ?? 0) > 0}<!-- QUI-F16 --><TaskReceipt taskId={task.task_id} />{/if}</div><Badge variant={taskBadge(task.status)} label={stateLabel(task)} /><span>{relativeTime(task.updated_at)}</span>{#if taskActions(task).includes("run_again")}<button type="button" class="btn btn-ghost btn-sm" onclick={() => again(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Filing…" : "Run again"}</button>{/if}</div>{/each}</section>{/if}
   {/if}
 </section>
 
@@ -1293,5 +1371,24 @@
   .delegated{display:flex;align-items:center;gap:var(--space-2);margin-top:.6rem}
   .delegated .progress{flex:1 1 auto;margin-top:0}
   .project-choice select{min-width:12rem}@media(max-width:42rem){.tasks header{flex-direction:column}.task{margin-left:0;max-width:none}.history-row{flex-wrap:wrap}.history-main{flex:1 1 100%}.history-row span:last-of-type,.history-row button{white-space:nowrap}}
+  .delivery-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-2);
+  }
+  .deliver {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    margin: calc(var(--space-2) * -1) 0 var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-1);
+  }
+  /* Wins over `.task-details label`'s grid: the box sits beside its words. */
+  .task-details .deliver-consent { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-1); }
+  .deliver small { flex-basis: 100%; color: var(--text-2); }
   .results-go { margin: 0; font-size: var(--text-xs); color: var(--text-3); }
 </style>

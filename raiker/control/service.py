@@ -1454,6 +1454,26 @@ class RuntimeControlService:
             return mapped
         return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})
 
+    def deliver_routine_result(self, principal_id: str, connector_id: str, text: str) -> ControlResult:
+        """QUI-F06 — a routine's result, sent where the owner consented it may go.
+
+        The same governed path a channel message takes, with no test stamp: the
+        channel's gate, the decision mode, an enabled pairing and the egress
+        allowlist all apply. Consent was checked when the delivery was stored.
+        """
+        principal = self._resolve_or_none(principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="external_channel_runtime",
+            tool_or_service_name="external_channel_runtime",
+            arguments={"connector_id": connector_id, "text": text},
+            risk_level=RiskLevelValue.MEDIUM,
+        )
+        return self._mcp_action_result(self._authority.route_action(action, principal))
+
     # ── BUG-315: a channel turn's answer goes back over the channel ──────
 
     @staticmethod

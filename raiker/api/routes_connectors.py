@@ -12,6 +12,10 @@ from raiker.api.dependencies import workspace_root as _ws
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.connectors import (
+    ConnectorAccount,
+    ConnectorAccountChanged,
+    ConnectorAccountRemoved,
+    ConnectorAccounts,
     ConnectorActionCompleted,
     ConnectorActionQueued,
     ConnectorCredentialsSet,
@@ -24,6 +28,7 @@ from raiker.api.wire.connectors import (
 )
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ToolAction
+from raiker.runtime import connector_accounts as accounts
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.connector_ecosystem import (
     ConnectorCatalog,
@@ -51,6 +56,36 @@ class ConnectorActionRequest(StrictRequest):
     operation_id: str = Field(min_length=1, max_length=200)
     arguments: dict[str, Any] = Field(default_factory=dict)
     session_id: str = Field(default="connector_store", max_length=200)
+    #: QUI-F07 — the named account to act as; omitted means the default account.
+    account_id: str | None = Field(default=None, max_length=64)
+
+
+class ConnectorAccountRequest(StrictRequest):
+    """QUI-F07 — the owner's name for an account: "Work Gmail"."""
+
+    label: str = Field(min_length=1, max_length=60)
+
+
+def _account_views(store: SQLiteStore, principal_id: str, connector_id: str, default_label: str) -> list[ConnectorAccount]:
+    return [
+        {
+            "account_id": str(account["account_id"]),
+            "label": str(account["label"]),
+            "is_default": bool(account["is_default"]),
+            "auth_status": cast(
+                Any,
+                credential_status(account["credential"].get("expires_at"))
+                if account["credential"] else "not_connected",
+            ),
+        }
+        for account in accounts.list_accounts(store, principal_id, connector_id, default_label=default_label)
+    ]
+
+
+def _account_refusal(exc: accounts.AccountError) -> HTTPException:
+    code = str(exc)
+    status_code = 404 if code == "connector_account_unknown" else 409
+    return HTTPException(status_code=status_code, detail={"reason_code": code})
 
 
 def _installation(store: SQLiteStore, principal_id: str, connector_id: str) -> dict[str, Any] | None:
@@ -69,6 +104,13 @@ def _credential_meta(store: SQLiteStore, principal_id: str, connector_id: str) -
             (principal_id, connector_id),
         ).fetchone()
     return dict(row) if row else None
+
+
+def _definition(connector_id: str) -> Any:
+    try:
+        return ConnectorCatalog().get(connector_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc)}) from exc
 
 
 @router.get("/api/connector-store")
@@ -115,6 +157,8 @@ async def connector_store(
                 "active_operation": activity["operation_id"] if activity else None,
                 "last_invoked_at": activity["started_at"] if activity else None,
                 "operations": operations,
+                "accounts": _account_views(store, session.principal_id, definition.connector_id, definition.name)
+                if installed is not None else [],
             })
         )
     answer: ConnectorStoreView = {
@@ -167,6 +211,9 @@ async def uninstall_connector(
             "DELETE FROM connector_installations WHERE principal_id=? AND connector_id=?",
             (session.principal_id, connector_id),
         )
+    if cursor.rowcount:
+        # QUI-F07 — and every further account, with its credential.
+        accounts.remove_all(store, session.principal_id, connector_id)
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail={"reason_code": "connector_not_installed"})
     removed: ConnectorUninstalled = {"ok": True, "connector_id": connector_id, "installed": False}
@@ -223,6 +270,122 @@ async def set_connector_credentials(
     return serialize_dto(credited)
 
 
+@router.get("/api/connector-store/{connector_id}/accounts")
+async def list_connector_accounts(
+    connector_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F07 — this connector's named accounts, default first. Never a credential."""
+    session, _principal = _auth_data
+    definition = _definition(connector_id)
+    store = SQLiteStore(_ws(request))
+    if _installation(store, session.principal_id, connector_id) is None:
+        raise HTTPException(status_code=409, detail={"reason_code": "connector_not_installed"})
+    answer: ConnectorAccounts = {
+        "connector_id": connector_id,
+        "accounts": _account_views(store, session.principal_id, connector_id, definition.name),
+    }
+    return serialize_dto(answer)
+
+
+@router.post("/api/connector-store/{connector_id}/accounts", status_code=status.HTTP_201_CREATED)
+async def add_connector_account(
+    connector_id: str,
+    body: ConnectorAccountRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F07 — add a named account. It has no credential until one is saved for it."""
+    session, _principal = _auth_data
+    _definition(connector_id)
+    store = SQLiteStore(_ws(request))
+    if _installation(store, session.principal_id, connector_id) is None:
+        raise HTTPException(status_code=409, detail={"reason_code": "connector_not_installed"})
+    try:
+        account_id = accounts.add_account(store, session.principal_id, connector_id, body.label)
+    except accounts.AccountError as exc:
+        raise _account_refusal(exc) from exc
+    answer: ConnectorAccountChanged = {
+        "ok": True, "connector_id": connector_id, "account_id": account_id, "label": " ".join(body.label.split()),
+    }
+    return serialize_dto(answer)
+
+
+@router.put("/api/connector-store/{connector_id}/accounts/{account_id}")
+async def rename_connector_account(
+    connector_id: str,
+    account_id: str,
+    body: ConnectorAccountRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F07 — name an account, the default included ("Work Gmail")."""
+    session, _principal = _auth_data
+    _definition(connector_id)
+    store = SQLiteStore(_ws(request))
+    if _installation(store, session.principal_id, connector_id) is None:
+        raise HTTPException(status_code=409, detail={"reason_code": "connector_not_installed"})
+    try:
+        label = accounts.rename_account(store, session.principal_id, connector_id, account_id, body.label)
+    except accounts.AccountError as exc:
+        raise _account_refusal(exc) from exc
+    answer: ConnectorAccountChanged = {
+        "ok": True, "connector_id": connector_id, "account_id": account_id, "label": label,
+    }
+    return serialize_dto(answer)
+
+
+@router.delete("/api/connector-store/{connector_id}/accounts/{account_id}")
+async def remove_connector_account(
+    connector_id: str,
+    account_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F07 — remove a further account and its credential. The default stays."""
+    session, _principal = _auth_data
+    store = SQLiteStore(_ws(request))
+    try:
+        accounts.remove_account(store, session.principal_id, connector_id, account_id)
+    except accounts.AccountError as exc:
+        raise _account_refusal(exc) from exc
+    answer: ConnectorAccountRemoved = {"ok": True, "connector_id": connector_id, "account_id": account_id}
+    return serialize_dto(answer)
+
+
+@router.put("/api/connector-store/{connector_id}/accounts/{account_id}/credentials")
+async def set_connector_account_credentials(
+    connector_id: str,
+    account_id: str,
+    body: CredentialRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F07 — the credential for one named account, in that account's own slot."""
+    session, _principal = _auth_data
+    definition = _definition(connector_id)
+    store = SQLiteStore(_ws(request))
+    if _installation(store, session.principal_id, connector_id) is None:
+        raise HTTPException(status_code=409, detail={"reason_code": "connector_not_installed"})
+    try:
+        account_id, _label = accounts.resolve(
+            store, session.principal_id, connector_id, account_id, default_label=definition.name
+        )
+    except accounts.AccountError as exc:
+        raise _account_refusal(exc) from exc
+    try:
+        ConnectorVault(store).put(
+            session.principal_id, accounts.credential_key(connector_id, account_id), body.values, body.expires_at
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail={"reason_code": str(exc)}) from exc
+    credited: ConnectorCredentialsSet = {
+        "ok": True, "connector_id": connector_id, "auth_status": "connected"
+    }
+    return serialize_dto(credited)
+
+
 @router.post("/api/connector-store/{connector_id}/manifest")
 async def register_connector_manifest(
     connector_id: str,
@@ -272,6 +435,15 @@ async def invoke_connector_action(
         operation, _base_url = invoker._operation(connector_id, body.operation_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"reason_code": str(exc)}) from exc
+    # QUI-F07 — the account is resolved here, by the server, so the approval
+    # names the account the write will really use; an unknown one is refused.
+    try:
+        account_id, account_label = accounts.resolve(
+            store, session.principal_id, connector_id, body.account_id,
+            default_label=_definition(connector_id).name,
+        )
+    except accounts.AccountError as exc:
+        raise _account_refusal(exc) from exc
     if operation["requires_confirmation"]:
         action_id = new_id("act_")
         approval_id = new_id("appr_")
@@ -283,6 +455,7 @@ async def invoke_connector_action(
                 "connector_id": connector_id,
                 "operation_id": body.operation_id,
                 "arguments": body.arguments,
+                "account": account_label,
             },
             risk_level="high",
             requires_approval=True,
@@ -294,8 +467,8 @@ async def invoke_connector_action(
             connection.execute(
                 """INSERT INTO connector_write_intents
                    (intent_id, approval_id, principal_id, connector_id, operation_id,
-                    arguments_json, status, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, 'pending_approval', ?)""",
+                    arguments_json, status, created_at, account_id)
+                   VALUES (?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)""",
                 (
                     intent_id,
                     approval_id,
@@ -304,6 +477,7 @@ async def invoke_connector_action(
                     body.operation_id,
                     json.dumps(body.arguments, sort_keys=True),
                     utc_now(),
+                    account_id,
                 ),
             )
         queued: ConnectorActionQueued = {
@@ -313,11 +487,12 @@ async def invoke_connector_action(
             "connector_id": connector_id,
             "operation_id": body.operation_id,
             "executes_action": False,
+            "account_label": account_label,
         }
         return serialize_dto(queued)
     try:
         result = await invoker.invoke(
-            session.principal_id, connector_id, body.operation_id, body.arguments
+            session.principal_id, connector_id, body.operation_id, body.arguments, account_id
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail={"reason_code": str(exc)}) from exc

@@ -738,6 +738,13 @@ class TaskScheduler:
             manager, task.task_id, response.status, response.message,
             claim=task.claim_generation,
         )
+        if response.status == "completed":
+            # QUI-F06 — and to the channel the owner consented to, through
+            # the channel's own gates. A refused send never fails the run.
+            from raiker.tasks.routine_delivery import deliver
+
+            with suppress(Exception):
+                deliver(self.workspace_root, self.store, task_id=task.task_id, title=task.title, result=response.message or "")
 
 
 # How a governed turn's terminal status lands on the task the scheduler ran, and

@@ -1493,7 +1493,9 @@ class ContextGatherer:
         if not rows:
             return None
         lines = [
-            f"{row['connector_id']}: enabled, invocation={row['activity_status']}" for row in rows
+            f"{row['connector_id']}: enabled, invocation={row['activity_status']}"
+            + self._connector_accounts(store, owner_principal_id, str(row["connector_id"]))
+            for row in rows
         ]
         return self._make_item(
             source_type="connector_status",
@@ -1504,6 +1506,26 @@ class ContextGatherer:
             content="\n".join(lines),
             metadata={"connector_count": len(rows)},
         )
+
+    @staticmethod
+    def _connector_accounts(store: SQLiteStore, owner_principal_id: str | None, connector_id: str) -> str:
+        """QUI-F07 — the owner's names for this connection's accounts, when there is more than one.
+
+        Labels only, never a credential, so the model can say which account it
+        means (``account`` on ``connector_write``) and the approval names it.
+        """
+        if not owner_principal_id:
+            return ""
+        from raiker.runtime.connector_accounts import list_accounts
+
+        accounts = list_accounts(store, owner_principal_id, connector_id, default_label=connector_id)
+        if len(accounts) < 2:
+            return ""
+        names = ", ".join(
+            f"{account['label']} (default)" if account["is_default"] else str(account["label"])
+            for account in accounts
+        )
+        return f", accounts: {names}"
 
     def _model_profile(
         self, root: Path, owner_principal_id: str | None = None

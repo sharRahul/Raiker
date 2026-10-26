@@ -190,3 +190,40 @@ class ManagedFileImport(TypedDict):
     scope_kind: ManagedFileScope
     project_id: str | None
     results: list[ImportedFile | ImportRefused]
+
+
+class ProjectLimitsBody(TypedDict):
+    """QUI-F21 — the repositories, sites and connections a project's work may reach."""
+
+    repositories: list[str]
+    web_domains: list[str]
+    connections: list[str]
+
+
+class ProjectLimitsView(TypedDict):
+    project_id: str
+    limits: ProjectLimitsBody
+    #: The limits in words: "Pushes only to acme/site".
+    summary: list[str]
+
+
+class RoutineDelivery(TypedDict):
+    """QUI-F06 — a routine whose results also go to a channel, with the owner's consent."""
+
+    task_id: str
+    connector_id: str
+    channel_name: str
+    consented_at: str
+    #: ``delivered`` or ``not_delivered`` for the last finished run; ``None`` before one.
+    last_status: str | None
+    last_reason: str | None
+    last_at: str | None
+
+
+class RoutineDeliveries(TypedDict):
+    deliveries: list[RoutineDelivery]
+
+
+class RoutineDeliveryStopped(TypedDict):
+    ok: bool
+    task_id: str

@@ -118,11 +118,58 @@ def _delete_attached(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
 
 CONTEXT = {"instructions": "Be brief.", "attachment_ids": [], "memory_enabled": False, "memory_mode": "inherit"}
 
+def _routine_delivery(_ws: Path, client: TestClient, h: dict[str, str]) -> str:
+    """QUI-F06 — a routine whose results also go to a paired channel."""
+    import pytest
+
+    from raiker.models.readiness import ModelReadinessService
+
+    paired = client.post(
+        "/api/channels/pairings",
+        json={"connector_id": "channel.webhooks", "display_name": "Ops", "senders": ["ops"]},
+        headers=h,
+    )
+    assert paired.status_code == 200, paired.text
+    with pytest.MonkeyPatch.context() as patch:
+        async def ready(*_args: object, **_kwargs: object) -> None:
+            return None
+
+        patch.setattr(ModelReadinessService, "require_ready_async", ready)
+        created = client.post(
+            "/api/tasks",
+            json={"title": "Brief", "description": "Summarise.", "deliver_to": "channel.webhooks", "deliver_consent": True},
+            headers=h,
+        )
+    assert created.status_code == 201, created.text
+    return str(created.json()["task_id"])
+
+
+def _deliveries(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    _routine_delivery(ws, client, h)
+    return "/api/routine-deliveries"
+
+
+def _stop_delivery(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    return f"/api/tasks/{_routine_delivery(ws, client, h)}/delivery"
+
+
+def _task_receipt(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-F16 — a task's receipt, across its own conversation."""
+    return f"/api/tasks/{_routine_delivery(ws, client, h)}/receipt"
+
+
 CASES: Cases = {
+    ("GET", "/api/tasks/{task_id}/receipt"): _task_receipt,
+    ("GET", "/api/routine-deliveries"): _deliveries,
+    ("DELETE", "/api/tasks/{task_id}/delivery"): _stop_delivery,
     ("POST", "/api/projects"): plain("/api/projects", {"name": "Alpha"}),
     ("PUT", "/api/projects/selection"): _select,
     ("GET", "/api/projects/tree"): _tree,
     ("PUT", "/api/projects/{project_id}/context"): _on_project("/context", CONTEXT),
+    ("GET", "/api/projects/{project_id}/limits"): _on_project("/limits"),
+    ("PUT", "/api/projects/{project_id}/limits"): _on_project(
+        "/limits", {"repositories": ["acme/site"], "web_domains": ["example.com"], "connections": []}
+    ),
     ("GET", "/api/projects/{project_id}/deletion-preview"): _on_project("/deletion-preview"),
     ("DELETE", "/api/projects/{project_id}"): _delete_attached,
     ("PUT", "/api/projects/{project_id}/move"): _move,

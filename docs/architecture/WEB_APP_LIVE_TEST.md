@@ -15,6 +15,50 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-26 (BUG-347: a reverse proxy in front of a loopback host)
+
+The owner's decision on remote access
+([FIXED-1264](../plans/FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347),
+[FIXED-1265](../plans/FIXED_ITEMS.md#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347)),
+checked on a fresh workspace served by `raiker-web` on `127.0.0.1` at 1440×900.
+No model or key is needed. Spec: `web/e2e/bug-347-proxied-loopback-live.spec.ts`:
+**2/2**. Screenshot: `docs/screenshots/2026-10-26-bug-347/`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-SEC-01 | A request with `X-Forwarded-For` to the loopback host is answered `403 proxied_request_refused`, and the message names `RAIKER_TRUSTED_PROXY` and `--allow-public`; the same request without the header is served | ✅ |
+| RT-SEC-02 | After that refusal, **Diagnostics** shows *Requests through a reverse proxy are being refused*, with what to change and a link to *Managing the host* | ✅ |
+| Trusted proxy, by hand | With `RAIKER_OWNER_TOKEN` and `RAIKER_TRUSTED_PROXY=127.0.0.1`, a forwarded request with `X-Forwarded-Proto: https` is served with HSTS; `/api/recovery/backups` through it is `403 recovery_loopback_only` and directly is not; forwarded reads are limited (`429` after 120 in the window); without the owner token the host refuses to start | ✅ after a fix found in this round ([FIXED-1265](../plans/FIXED_ITEMS.md#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347)): uvicorn replaced the peer with the forwarded address, so the trusted proxy was refused |
+| Suites | `tests/test_proxied_loopback.py` (13), `tests/test_api_rest_hardening.py`, `observeAttention.test.ts` | ✅ |
+
+## Result — 2026-10-26 (Quiet UI features, second round, hosted Anthropic Haiku 4.5)
+
+The rest of the Quiet UI plan's features and improvements, after which 06 was
+closed
+([FIXED-1252](../plans/FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)
+to [FIXED-1263](../plans/FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round)).
+Fresh workspaces served by `raiker-web` at 1440×900. Anthropic was connected
+through **Add model**, with the key and workspace ID typed from the run's
+environment; neither appears in a spec, command, document, screenshot or the
+server log. Spec: `web/e2e/quiet-ui-features-2-live.spec.ts`, developed against
+earlier workspaces, then run whole on a fresh one: **10/10 in 4.7 min**.
+Screenshots: `docs/screenshots/2026-10-26-quiet-ui-features-2/`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-QUI-71 | Anthropic connects through **Add model → An account I have**, Haiku 4.5 kept and made the default | ✅ |
+| RT-QUI-72 | Haiku answers with key figures; **Pin to the Library** reads *Pinned to the Library* and the button becomes **Unpin**; Work › Library lists the block as *Key figures* and draws it | ✅ after fixes found in this round: two project tabs were both called *Library*; a tile read *1200* ([FIXED-1263](../plans/FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round)) |
+| RT-QUI-73 | The pin moves to *Quarterly review* (*Moved to Quarterly review*); the project's **Set limits** saves *Pushes only to acme/site* and *Reads web pages only from docs.python.org*; *Project library* lists the block | ✅ |
+| RT-QUI-74 | **Make this a goal** under an answer opens Work › Goals with *Filled in from “…”. Add how you will know it is done*, the outcome from the request and no criterion invented | ✅ |
+| RT-QUI-75 | The same aim asked in a second conversation is offered (*This looks like an ongoing goal. Track it?*); after **Not now** a third ask is not | ✅ |
+| RT-QUI-76 | A GitHub connection's default account renamed *Work GitHub*; *Personal GitHub* added and connected with its own token | ✅ |
+| RT-QUI-77 | A write proposed for *Personal GitHub* is approved: the card names the account, the card reads *Sending in N s* with **Undo**, and **Undo** ends with *Not sent: you took it back within its undo window* | ✅ |
+| RT-QUI-78 | A routine's form keeps **Channel for results** disabled until *Also send each result to* is ticked, which says what it allows; the row reads *Also to Ops room*, the finished row *the last one was not sent* (the channel's outbound gate is off, as by default), and the task's receipt reads *Across 1 turn · …* | ✅ after fixes found in this round ([FIXED-1261](../plans/FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)): the receipt kept the page reading until it was opened, and finished rows had none |
+| RT-QUI-79 | Choosing the project in the composer shows *Project limits apply* | ✅ |
+| RT-QUI-80 | Haiku proposes a change; **Edit…** rewrites it, **Propose as a new change**, and *Remember why you changed it* saves the owner's words (*Remembered.*) | ✅ after a fix found in this round ([FIXED-1260](../plans/FIXED_ITEMS.md#fixed-1260--edit-was-never-offered-on-a-proposed-patch-found-this-round)): **Edit…** was never offered on a patch |
+| Suites | Python suite in three shards; ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
+| Visual review | `docs/screenshots/2026-10-26-quiet-ui-features-2/` (72–80), inspected at original resolution. Still seen: docked notices cover a project's **Save** until dismissed, and the approval's account reads in monospace ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-26 (Storage upgrade: SQLCipher 4.19.0, FTS5 required, no memory-security `off`)
 
 The owner's three storage decisions of 2026-10-26
@@ -155,7 +199,7 @@ RT-QUI-66 to 70 after the fix found in that run).
 
 ## Result — 2026-10-24 (Quiet UI features and improvements, hosted Anthropic Haiku 4.5)
 
-Fifteen features of the [Quiet UI plan, 06](../plans/quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#status)
+Fifteen features of the Quiet UI plan, 06 (closed 2026-10-26)
 ([FIXED-1150](../plans/FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04)
 to [FIXED-1167](../plans/FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round)).
 Fresh workspaces served by `raiker-web` at 1440×900. Anthropic was connected
@@ -183,7 +227,7 @@ shortcut) are proved by `desktop/e2e/shell.spec.ts` under Xvfb: **12/12**.
 | RT-QUI-55 | `#/quick-entry` at 560×120: the input has focus, *Send to* is **New task**; Enter files the task and the top bar shows *Write a three-line haiku…* | ✅ after a fix found in this round: the long title pushed the stop switch off the top bar |
 | RT-QUI-56 | In a browser, Settings › General has no *Desktop window* section | ✅ |
 | Suites | Python suite; web unit suite, `svelte-check`, ESLint, design tokens, build; desktop unit tests, lint, type-check and shell end-to-end; ruff, mypy | ✅ |
-| Visual review | `docs/screenshots/2026-10-24-quiet-ui-features/` (45–55), inspected at original resolution: the live line overflow, Memory › Controls' spacing, the lower-case provider and the doubled *Ask owner question* on the floating card were found from the images and fixed. Still seen: a question's notice stays after it is answered ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-24-quiet-ui-features-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | `docs/screenshots/2026-10-24-quiet-ui-features/` (45–55), inspected at original resolution: the live line overflow, Memory › Controls' spacing, the lower-case provider and the doubled *Ask owner question* on the floating card were found from the images and fixed. Still seen: a question's notice stays after it is answered ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)). Dated folders are local evidence and not committed | ✅ |
 
 ## Result — 2026-10-23 (Quiet UI visual answers, hosted Anthropic Haiku 4.5)
 

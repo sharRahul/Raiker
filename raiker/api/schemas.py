@@ -181,6 +181,30 @@ class CorrectionMemoryRequest(StrictRequest):
     turn_id: str | None = None
 
 
+class LibraryPinRequest(StrictRequest):
+    """QUI-F15 — pin one block of a stored answer, by its place in that answer."""
+
+    session_id: str = Field(min_length=1, max_length=128)
+    turn_id: str = Field(min_length=1, max_length=128)
+    part_index: int = Field(ge=0, le=64)
+    #: The project to file it in; ``None`` keeps it in the Library only.
+    project_id: str | None = None
+
+
+class LibraryPinMoveRequest(StrictRequest):
+    """QUI-F15 — file a pin in another project, or in none."""
+
+    project_id: str | None = None
+
+
+class ProjectLimitsRequest(StrictRequest):
+    """QUI-F21 — what a project's work may reach; an empty list limits nothing."""
+
+    repositories: list[str] = Field(default_factory=list, max_length=20)
+    web_domains: list[str] = Field(default_factory=list, max_length=20)
+    connections: list[str] = Field(default_factory=list, max_length=20)
+
+
 class RegisterRequest(StrictRequest):
     username: str
     password: str
@@ -300,6 +324,12 @@ class TaskCreateRequest(StrictModelRequest):
     # DEC-12 step 6 — the longest one run may take, in minutes. Omitted is the
     # default limit, never "no limit".
     max_run_minutes: int | None = Field(default=None, ge=1, le=720)
+    # QUI-F06 — also send each result to this paired channel. Refused unless
+    # `deliver_consent` is true: an unattended outbound send needs the owner's
+    # yes when the routine is set up, and each send still passes the channel's
+    # own gates.
+    deliver_to: str | None = Field(default=None, max_length=64)
+    deliver_consent: bool = False
 
 
 class TaskRunLimitRequest(StrictModelRequest):
@@ -1161,6 +1191,12 @@ class GoalActionRequest(StrictRequest):
     """An owner action on a goal, named against the revision the owner saw."""
 
     base_revision: int = Field(ge=1)
+
+
+class GoalSuggestionDismissRequest(StrictRequest):
+    """QUI-F03 — *Not now*: the aim's keywords, as the suggestion named them."""
+
+    keywords: list[str] = Field(min_length=1, max_length=24)
 
 
 class GoalConfirmRequest(StrictRequest):

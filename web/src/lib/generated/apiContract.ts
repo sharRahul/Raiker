@@ -167,6 +167,13 @@ export type ApprovalResolved = {
   resume: ResumeHandle;
 };
 
+/** QUI-F19 — a held send taken back inside its undo window. */
+export type ApprovalSendUndone = {
+  ok: boolean;
+  approval_id: string;
+  status: string;
+};
+
 export type ApprovalView = {
   approval_id: string;
   action_id: string;
@@ -1417,6 +1424,37 @@ export type ConnectionsView = {
   connector_egress_allowlist_configured: boolean;
 };
 
+/** QUI-F07 — one named account on a connector. Never a credential value. */
+export type ConnectorAccount = {
+  account_id: string;
+  label: string;
+  is_default: boolean;
+  auth_status: "connected" | "reauth_required" | "not_connected";
+};
+
+export type ConnectorAccountChanged = {
+  ok: boolean;
+  connector_id: string;
+  account_id: string;
+  label: string;
+};
+
+export type ConnectorAccountRemoved = {
+  ok: boolean;
+  connector_id: string;
+  account_id: string;
+};
+
+/** QUI-F07 — the owner's name for an account: "Work Gmail". */
+export type ConnectorAccountRequest = {
+  label: string;
+};
+
+export type ConnectorAccounts = {
+  connector_id: string;
+  accounts: ConnectorAccount[];
+};
+
 /** A read, carried out. */
 export type ConnectorActionCompleted = {
   invocation_id: string;
@@ -1437,12 +1475,14 @@ export type ConnectorActionQueued = {
   connector_id: string;
   operation_id: string;
   executes_action: boolean;
+  account_label: string;
 };
 
 export type ConnectorActionRequest = {
   operation_id: string;
   arguments?: Record<string, unknown>;
   session_id?: string;
+  account_id?: string | null;
 };
 
 /** The operation that undoes a write, and how long it stays possible. */
@@ -2270,6 +2310,7 @@ export type DiagnosticsView = {
   memory_pressure: MemoryPressure;
   model_profile_source: ModelProfileSource;
   scope_note: string;
+  remote_access: RemoteAccessView;
 };
 
 export type DisableCapabilityRequest = {
@@ -2889,6 +2930,31 @@ export type GoalStopped = {
   goal: GoalView;
 };
 
+export type GoalSuggestionAnswer = {
+  session_id: string;
+  suggestion: GoalSuggestionView | null;
+};
+
+/** QUI-F03 — *Not now*: the aim's keywords, as the suggestion named them. */
+export type GoalSuggestionDismissRequest = {
+  keywords: string[];
+};
+
+export type GoalSuggestionDismissed = {
+  ok: boolean;
+  aim_key: string;
+};
+
+/** QUI-F03 — an aim that came up in more than one conversation. */
+export type GoalSuggestionView = {
+  aim_key: string;
+  keywords: string[];
+  title: string;
+  objective: string;
+  session_ids: string[];
+  session_titles: string[];
+};
+
 /** One goal: its plan, evidence, budget, profile and the actions its state allows. */
 export type GoalView = {
   goal_id: string;
@@ -3482,6 +3548,55 @@ export type LastUpdateCheck = {
   checked_at: string | null;
 };
 
+export type LibraryItem = {
+  item_id: string;
+  kind: "document" | "image" | "design" | "block" | "pull_request";
+  title: string;
+  detail: string;
+  created_at: string;
+  project_id: string | null;
+  project_name: string | null;
+  session_id: string | null;
+  session_title: string | null;
+  turn_id: string | null;
+  href: string;
+  external: boolean;
+  download_url: string | null;
+  block: Record<string, unknown> | null;
+  pin_id: string | null;
+};
+
+/** QUI-F15 — file a pin in another project, or in none. */
+export type LibraryPinMoveRequest = {
+  project_id?: string | null;
+};
+
+export type LibraryPinRemoved = {
+  ok: boolean;
+  pin_id: string;
+};
+
+/** QUI-F15 — pin one block of a stored answer, by its place in that answer. */
+export type LibraryPinRequest = {
+  session_id: string;
+  turn_id: string;
+  part_index: number;
+  project_id?: string | null;
+};
+
+export type LibraryPinState = {
+  pin_id: string;
+  turn_id: string;
+  part_index: number;
+  project_id: string | null;
+};
+
+export type LibraryPinned = {
+  pin_id: string;
+  project_id: string | null;
+  project_name: string | null;
+};
+
 export type LibraryRescanned = {
   ok: boolean;
   models: LocalModelView[];
@@ -3494,6 +3609,11 @@ export type LibraryRoot = {
 export type LibraryRootAdded = {
   ok: boolean;
   path: string;
+};
+
+export type LibraryView = {
+  items: LibraryItem[];
+  kinds: string[];
 };
 
 /** One limit the provider stated, exactly as stated. */
@@ -4870,6 +4990,26 @@ export type ProjectFolderDetached = {
   project_id: string;
 };
 
+/** QUI-F21 — the repositories, sites and connections a project's work may reach. */
+export type ProjectLimitsBody = {
+  repositories: string[];
+  web_domains: string[];
+  connections: string[];
+};
+
+/** QUI-F21 — what a project's work may reach; an empty list limits nothing. */
+export type ProjectLimitsRequest = {
+  repositories?: string[];
+  web_domains?: string[];
+  connections?: string[];
+};
+
+export type ProjectLimitsView = {
+  project_id: string;
+  limits: ProjectLimitsBody;
+  summary: string[];
+};
+
 export type ProjectMoved = {
   ok: boolean;
   project_id: string;
@@ -5176,6 +5316,16 @@ export type ReleaseTargetView = {
   signing: ReleaseSigning;
 };
 
+/** BUG-347 — how requests reach this host, read from the running process. */
+export type RemoteAccessView = {
+  mode: "loopback" | "trusted_proxy" | "public";
+  trusted_proxies: string[];
+  proxied_requests_refused: number;
+  proxied_requests_served: number;
+  last_refused_at: string | null;
+  last_served_at: string | null;
+};
+
 export type RemoteMcpServerCreated = {
   ok: boolean;
   server_id: string;
@@ -5298,6 +5448,26 @@ export type ReviewAttestationView = {
   state: "verified" | "invalid" | "unknown_key" | "unsigned";
   key_id: string | null;
   signed_at: string | null;
+};
+
+export type RoutineDeliveries = {
+  deliveries: RoutineDelivery[];
+};
+
+/** QUI-F06 — a routine whose results also go to a channel, with the owner's consent. */
+export type RoutineDelivery = {
+  task_id: string;
+  connector_id: string;
+  channel_name: string;
+  consented_at: string;
+  last_status: string | null;
+  last_reason: string | null;
+  last_at: string | null;
+};
+
+export type RoutineDeliveryStopped = {
+  ok: boolean;
+  task_id: string;
 };
 
 export type RoutineDoctor = {
@@ -5482,6 +5652,11 @@ export type SessionPinned = {
   ok: boolean;
   session_id: string;
   pinned: boolean;
+};
+
+export type SessionPins = {
+  session_id: string;
+  pins: LibraryPinState[];
 };
 
 export type SessionProfileSet = {
@@ -5914,6 +6089,7 @@ export type StoreConnector = {
   active_operation: string | null;
   last_invoked_at: string | null;
   operations: ConnectorOperation[];
+  accounts: ConnectorAccount[];
 };
 
 /** What a provider volunteered with a turn about its own limits — never fetched. */
@@ -6004,6 +6180,8 @@ export type TaskCreateRequest = {
   run_until?: string | null;
   missed_runs?: "run_once" | "skip" | null;
   max_run_minutes?: number | null;
+  deliver_to?: string | null;
+  deliver_consent?: boolean;
 };
 
 /** One task at its own address, with the attempts behind its status. */
@@ -6028,6 +6206,19 @@ export type TaskEventView = {
 export type TaskInterrupted = {
   task_id: string;
   result: string;
+};
+
+/** QUI-F16 for a task — its own conversation's turn receipts, summed. */
+export type TaskReceipt = {
+  task_id: string;
+  turns: number;
+  models: string[];
+  local: boolean;
+  cost_usd: number | null;
+  cost_basis: "priced" | "free" | "unknown";
+  reads: Record<string, number>;
+  changes: TurnReceiptLine[];
+  left_computer: string[];
 };
 
 /** The owner's retry of a parked run (BUG-25); ``task_status`` and ``summary`` once it ran. */
@@ -6576,6 +6767,8 @@ export const contract = {
     call<CriticalApprovalResolved>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resolve-critical`, { body }),
   resumeAfterApproval: (approvalId: string) =>
     call<AgentResponse>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/resume`),
+  undoHeldSend: (approvalId: string) =>
+    call<ApprovalSendUndone>("POST", `/api/approvals/${encodeURIComponent(approvalId)}/undo-send`),
   uploadAttachment: (body: UploadAttachmentRequest) =>
     call<UploadedAttachment>("POST", "/api/attachments", { body }),
   getAttention: () =>
@@ -6768,6 +6961,16 @@ export const contract = {
     request<ConnectorStoreView>("/api/connector-store"),
   uninstallConnector: (connectorId: string) =>
     call<ConnectorUninstalled>("DELETE", `/api/connector-store/${encodeURIComponent(connectorId)}`),
+  listConnectorAccounts: (connectorId: string) =>
+    request<ConnectorAccounts>(`/api/connector-store/${encodeURIComponent(connectorId)}/accounts`),
+  addConnectorAccount: (connectorId: string, body: ConnectorAccountRequest) =>
+    call<ConnectorAccountChanged>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/accounts`, { body }),
+  removeConnectorAccount: (connectorId: string, accountId: string) =>
+    call<ConnectorAccountRemoved>("DELETE", `/api/connector-store/${encodeURIComponent(connectorId)}/accounts/${encodeURIComponent(accountId)}`),
+  renameConnectorAccount: (connectorId: string, accountId: string, body: ConnectorAccountRequest) =>
+    call<ConnectorAccountChanged>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/accounts/${encodeURIComponent(accountId)}`, { body }),
+  setConnectorAccountCredentials: (connectorId: string, accountId: string, body: CredentialRequest) =>
+    call<ConnectorCredentialsSet>("PUT", `/api/connector-store/${encodeURIComponent(connectorId)}/accounts/${encodeURIComponent(accountId)}/credentials`, { body }),
   invokeConnectorAction: (connectorId: string, body: ConnectorActionRequest) =>
     call<ConnectorActionCompleted | ConnectorActionQueued>("POST", `/api/connector-store/${encodeURIComponent(connectorId)}/actions`, { body }),
   setConnectorCredentials: (connectorId: string, body: CredentialRequest) =>
@@ -6924,6 +7127,10 @@ export const contract = {
     request<GoalList>("/api/goals"),
   createGoal: (body: CreateGoalRequest) =>
     call<GoalView>("POST", "/api/goals", { body }),
+  goalSuggestion: (query: { session_id: string }) =>
+    request<GoalSuggestionAnswer>(withQuery("/api/goals/suggestion", query)),
+  dismissGoalSuggestion: (body: GoalSuggestionDismissRequest) =>
+    call<GoalSuggestionDismissed>("POST", "/api/goals/suggestion/dismiss", { body }),
   readGoal: (goalId: string) =>
     request<GoalView>(`/api/goals/${encodeURIComponent(goalId)}`),
   acceptGoal: (goalId: string, body: GoalActionRequest) =>
@@ -7002,6 +7209,16 @@ export const contract = {
     request<KnowledgeSources>("/api/knowledge-sources"),
   checkLanguage: (body: LanguageCheckRequest) =>
     call<LanguageCheck>("POST", "/api/language/check", { body }),
+  getLibrary: (query: { project_id?: string; kind?: string } = {}) =>
+    request<LibraryView>(withQuery("/api/library", query)),
+  listSessionPins: (query: { session_id: string }) =>
+    request<SessionPins>(withQuery("/api/library/pins", query)),
+  pinBlock: (body: LibraryPinRequest) =>
+    call<LibraryPinned>("POST", "/api/library/pins", { body }),
+  unpinBlock: (pinId: string) =>
+    call<LibraryPinRemoved>("DELETE", `/api/library/pins/${encodeURIComponent(pinId)}`),
+  movePin: (pinId: string, body: LibraryPinMoveRequest) =>
+    call<LibraryPinned>("PUT", `/api/library/pins/${encodeURIComponent(pinId)}/project`, { body }),
   listLocalRuntimes: () =>
     request<LocalRuntimes>("/api/local-runtimes"),
   detectLocalRuntimes: () =>
@@ -7262,6 +7479,10 @@ export const contract = {
     request<ProjectDeletionPreviewView>(`/api/projects/${encodeURIComponent(projectId)}/deletion-preview`),
   getProjectFiles: (projectId: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(projectId)}/files`),
+  getProjectLimits: (projectId: string) =>
+    request<ProjectLimitsView>(`/api/projects/${encodeURIComponent(projectId)}/limits`),
+  setProjectLimits: (projectId: string, body: ProjectLimitsRequest) =>
+    call<ProjectLimitsView>("PUT", `/api/projects/${encodeURIComponent(projectId)}/limits`, { body }),
   listProjectFiles: (projectId: string) =>
     request<ManagedFileList>(`/api/projects/${encodeURIComponent(projectId)}/managed-files`),
   importProjectFiles: (projectId: string, body: Record<string, unknown>) =>
@@ -7286,6 +7507,8 @@ export const contract = {
     request<RecoveryBackupsView>("/api/recovery/backups"),
   recoveryRestore: (body: RecoveryRestoreRequest) =>
     call<RecoveryRestored>("POST", "/api/recovery/restore", { body }),
+  listRoutineDeliveries: () =>
+    request<RoutineDeliveries>("/api/routine-deliveries"),
   getRuntimeMode: () =>
     request<RuntimeModeView>("/api/runtime-mode"),
   activateRuntimeMode: (body: ActivateRuntimeModeRequest) =>
@@ -7424,8 +7647,12 @@ export const contract = {
     call<TaskView>("POST", "/api/tasks", { body, headers: { "idempotency-key": idempotencyKey } }),
   getTaskDetail: (taskId: string) =>
     request<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`),
+  stopRoutineDelivery: (taskId: string) =>
+    call<RoutineDeliveryStopped>("DELETE", `/api/tasks/${encodeURIComponent(taskId)}/delivery`),
   taskDoctor: (taskId: string) =>
     request<RoutineDoctor>(`/api/tasks/${encodeURIComponent(taskId)}/doctor`),
+  getTaskReceipt: (taskId: string) =>
+    request<TaskReceipt>(`/api/tasks/${encodeURIComponent(taskId)}/receipt`),
   resumeTask: (taskId: string) =>
     call<TaskResumed>("POST", `/api/tasks/${encodeURIComponent(taskId)}/resume`),
   runTask: (taskId: string) =>

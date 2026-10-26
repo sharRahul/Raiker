@@ -2479,7 +2479,7 @@
                   >
                     Reject
                   </button>
-                  {#if approval.status === "pending" && review.diffs[approval.approval_id]?.kind === "patch" && review.diffs[approval.approval_id]?.diff}
+                  {#if approval.status === "pending" && review.diffs[approval.approval_id]?.editable}
                     <button
                       type="button"
                       class="btn btn-ghost btn-sm"
@@ -2488,7 +2488,7 @@
                         (review.edits = {
                           ...review.edits,
                           [approval.approval_id]:
-                            review.diffs[approval.approval_id]?.diff ?? "",
+                            review.diffs[approval.approval_id]?.editable ?? "",
                         })}
                     >
                       Edit…

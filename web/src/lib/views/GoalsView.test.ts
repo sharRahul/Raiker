@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GoalsView from "./GoalsView.svelte";
 import { stubFetch } from "../test-helpers";
+import { requestGoalDraft } from "../goalHandoff";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -62,5 +63,15 @@ describe("GoalsView", () => {
     expect(fetch.mock.calls.some(([url]) => String(url).endsWith("/stop"))).toBe(false);
     await fireEvent.click(screen.getByRole("button", { name: "Stop every step now" }));
     await waitFor(() => expect(screen.getByText(/1 running task was stopped/)).toBeInTheDocument());
+  });
+
+  it("opens a goal started from Chat with the form filled in and asks only for what is missing", async () => {
+    requestGoalDraft({ title: "Plan my week", objective: "Plan my week with gym on Tuesdays", fromTitle: "Week planning", projectId: null });
+    stubFetch({ "GET /api/goals": { goals: [], archived: [], active_profile: PROFILE } });
+    render(GoalsView);
+    expect(await screen.findByText(/Filled in from “Week planning”\. Add how you will know it is done/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Outcome")).toHaveValue("Plan my week");
+    expect(screen.getByLabelText("Step 1 instruction")).toHaveValue("Plan my week with gym on Tuesdays");
+    expect(screen.getByLabelText("Criterion 1 text")).toHaveValue("");
   });
 });

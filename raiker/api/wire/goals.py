@@ -142,3 +142,24 @@ class GoalStopped(TypedDict):
     steps_stopped: int
     tasks_stopped: int
     goal: GoalView
+
+
+class GoalSuggestionView(TypedDict):
+    """QUI-F03 — an aim that came up in more than one conversation."""
+
+    aim_key: str
+    keywords: list[str]
+    title: str
+    objective: str
+    session_ids: list[str]
+    session_titles: list[str]
+
+
+class GoalSuggestionAnswer(TypedDict):
+    session_id: str
+    suggestion: GoalSuggestionView | None
+
+
+class GoalSuggestionDismissed(TypedDict):
+    ok: bool
+    aim_key: str

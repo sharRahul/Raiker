@@ -248,6 +248,17 @@ class ModelProfileSource(TypedDict):
     location: str
 
 
+class RemoteAccessView(TypedDict):
+    """BUG-347 — how requests reach this host, read from the running process."""
+
+    mode: Literal["loopback", "trusted_proxy", "public"]
+    trusted_proxies: list[str]
+    proxied_requests_refused: int
+    proxied_requests_served: int
+    last_refused_at: str | None
+    last_served_at: str | None
+
+
 @dataclass(frozen=True)
 class DiagnosticsView(View):
     runtime_mode: str
@@ -286,6 +297,15 @@ class DiagnosticsView(View):
         default_factory=lambda: ModelProfileSource(kind="", location="")
     )
     scope_note: str = "Status reflects the local single-user runtime only."
+    # BUG-347 — how this host is reached: bound to this computer, reached
+    # through a proxy the owner trusts, or bound publicly; and how many
+    # forwarded requests it refused or served since it started.
+    remote_access: RemoteAccessView = field(
+        default_factory=lambda: RemoteAccessView(
+            mode="loopback", trusted_proxies=[], proxied_requests_refused=0,
+            proxied_requests_served=0, last_refused_at=None, last_served_at=None,
+        )
+    )
 
 
 @dataclass(frozen=True)

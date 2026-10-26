@@ -40,6 +40,25 @@ class TurnReceipt(TypedDict):
     left_computer: list[str]
 
 
+class TaskReceipt(TypedDict):
+    """QUI-F16 for a task — its own conversation's turn receipts, summed."""
+
+    task_id: str
+    #: How many finished turns the receipt adds up.
+    turns: int
+    #: Every model that answered, in the order they first did.
+    models: list[str]
+    #: True when every turn ran on this computer.
+    local: bool
+    #: Summed cost of the priced turns; ``None`` when none was priced.
+    cost_usd: float | None
+    #: ``unknown`` as soon as one billable turn had no known rate.
+    cost_basis: Literal["priced", "free", "unknown"]
+    reads: dict[str, int]
+    changes: list[TurnReceiptLine]
+    left_computer: list[str]
+
+
 class BuildCheckRow(TypedDict):
     """BR-D01 — one declared check, and what the turn's command record says of it."""
 

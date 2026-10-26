@@ -805,6 +805,30 @@
         "title": "ApprovalResolved",
         "type": "object"
       },
+      "ApprovalSendUndone": {
+        "description": "QUI-F19 — a held send taken back inside its undo window.",
+        "properties": {
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "approval_id",
+          "status"
+        ],
+        "title": "ApprovalSendUndone",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action_id": {
@@ -7124,6 +7148,129 @@
         "title": "ConnectionsView",
         "type": "object"
       },
+      "ConnectorAccount": {
+        "description": "QUI-F07 — one named account on a connector. Never a credential value.",
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "auth_status": {
+            "enum": [
+              "connected",
+              "reauth_required",
+              "not_connected"
+            ],
+            "title": "Auth Status",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "label",
+          "is_default",
+          "auth_status"
+        ],
+        "title": "ConnectorAccount",
+        "type": "object"
+      },
+      "ConnectorAccountChanged": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "account_id",
+          "label"
+        ],
+        "title": "ConnectorAccountChanged",
+        "type": "object"
+      },
+      "ConnectorAccountRemoved": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "connector_id",
+          "account_id"
+        ],
+        "title": "ConnectorAccountRemoved",
+        "type": "object"
+      },
+      "ConnectorAccountRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F07 — the owner's name for an account: \"Work Gmail\".",
+        "properties": {
+          "label": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "ConnectorAccountRequest",
+        "type": "object"
+      },
+      "ConnectorAccounts": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorAccount"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connector_id",
+          "accounts"
+        ],
+        "title": "ConnectorAccounts",
+        "type": "object"
+      },
       "ConnectorActionCompleted": {
         "description": "A read, carried out.",
         "properties": {
@@ -7181,6 +7328,10 @@
       "ConnectorActionQueued": {
         "description": "A write: recorded as an intent and waiting for the owner's approval. Nothing ran.",
         "properties": {
+          "account_label": {
+            "title": "Account Label",
+            "type": "string"
+          },
           "approval_id": {
             "title": "Approval Id",
             "type": "string"
@@ -7213,7 +7364,8 @@
           "intent_id",
           "connector_id",
           "operation_id",
-          "executes_action"
+          "executes_action",
+          "account_label"
         ],
         "title": "ConnectorActionQueued",
         "type": "object"
@@ -7221,6 +7373,18 @@
       "ConnectorActionRequest": {
         "additionalProperties": false,
         "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id"
+          },
           "arguments": {
             "additionalProperties": true,
             "title": "Arguments",
@@ -11414,6 +11578,9 @@
             "title": "Readiness",
             "type": "object"
           },
+          "remote_access": {
+            "$ref": "#/components/schemas/RemoteAccessView"
+          },
           "runtime_mode": {
             "title": "Runtime Mode",
             "type": "string"
@@ -14792,6 +14959,116 @@
         "title": "GoalStopped",
         "type": "object"
       },
+      "GoalSuggestionAnswer": {
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalSuggestionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "session_id",
+          "suggestion"
+        ],
+        "title": "GoalSuggestionAnswer",
+        "type": "object"
+      },
+      "GoalSuggestionDismissRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F03 — *Not now*: the aim's keywords, as the suggestion named them.",
+        "properties": {
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Keywords",
+            "type": "array"
+          }
+        },
+        "required": [
+          "keywords"
+        ],
+        "title": "GoalSuggestionDismissRequest",
+        "type": "object"
+      },
+      "GoalSuggestionDismissed": {
+        "properties": {
+          "aim_key": {
+            "title": "Aim Key",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "aim_key"
+        ],
+        "title": "GoalSuggestionDismissed",
+        "type": "object"
+      },
+      "GoalSuggestionView": {
+        "description": "QUI-F03 — an aim that came up in more than one conversation.",
+        "properties": {
+          "aim_key": {
+            "title": "Aim Key",
+            "type": "string"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "session_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Session Ids",
+            "type": "array"
+          },
+          "session_titles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Session Titles",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "aim_key",
+          "keywords",
+          "title",
+          "objective",
+          "session_ids",
+          "session_titles"
+        ],
+        "title": "GoalSuggestionView",
+        "type": "object"
+      },
       "GoalView": {
         "description": "One goal: its plan, evidence, budget, profile and the actions its state allows.",
         "properties": {
@@ -17928,6 +18205,304 @@
         "title": "LastUpdateCheck",
         "type": "object"
       },
+      "LibraryItem": {
+        "properties": {
+          "block": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "download_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Url"
+          },
+          "external": {
+            "title": "External",
+            "type": "boolean"
+          },
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "document",
+              "image",
+              "design",
+              "block",
+              "pull_request"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "pin_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "session_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Title"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          }
+        },
+        "required": [
+          "item_id",
+          "kind",
+          "title",
+          "detail",
+          "created_at",
+          "project_id",
+          "project_name",
+          "session_id",
+          "session_title",
+          "turn_id",
+          "href",
+          "external",
+          "download_url",
+          "block",
+          "pin_id"
+        ],
+        "title": "LibraryItem",
+        "type": "object"
+      },
+      "LibraryPinMoveRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F15 — file a pin in another project, or in none.",
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          }
+        },
+        "title": "LibraryPinMoveRequest",
+        "type": "object"
+      },
+      "LibraryPinRemoved": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pin_id": {
+            "title": "Pin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "pin_id"
+        ],
+        "title": "LibraryPinRemoved",
+        "type": "object"
+      },
+      "LibraryPinRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F15 — pin one block of a stored answer, by its place in that answer.",
+        "properties": {
+          "part_index": {
+            "maximum": 64.0,
+            "minimum": 0.0,
+            "title": "Part Index",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "session_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Session Id",
+            "type": "string"
+          },
+          "turn_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "turn_id",
+          "part_index"
+        ],
+        "title": "LibraryPinRequest",
+        "type": "object"
+      },
+      "LibraryPinState": {
+        "properties": {
+          "part_index": {
+            "title": "Part Index",
+            "type": "integer"
+          },
+          "pin_id": {
+            "title": "Pin Id",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin_id",
+          "turn_id",
+          "part_index",
+          "project_id"
+        ],
+        "title": "LibraryPinState",
+        "type": "object"
+      },
+      "LibraryPinned": {
+        "properties": {
+          "pin_id": {
+            "title": "Pin Id",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          }
+        },
+        "required": [
+          "pin_id",
+          "project_id",
+          "project_name"
+        ],
+        "title": "LibraryPinned",
+        "type": "object"
+      },
       "LibraryRescanned": {
         "properties": {
           "models": {
@@ -17978,6 +18553,30 @@
           "path"
         ],
         "title": "LibraryRootAdded",
+        "type": "object"
+      },
+      "LibraryView": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Kinds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "kinds"
+        ],
+        "title": "LibraryView",
         "type": "object"
       },
       "LimitWindow": {
@@ -25358,6 +25957,96 @@
         "title": "ProjectFolderDetached",
         "type": "object"
       },
+      "ProjectLimitsBody": {
+        "description": "QUI-F21 — the repositories, sites and connections a project's work may reach.",
+        "properties": {
+          "connections": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Connections",
+            "type": "array"
+          },
+          "repositories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Repositories",
+            "type": "array"
+          },
+          "web_domains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Web Domains",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repositories",
+          "web_domains",
+          "connections"
+        ],
+        "title": "ProjectLimitsBody",
+        "type": "object"
+      },
+      "ProjectLimitsRequest": {
+        "additionalProperties": false,
+        "description": "QUI-F21 — what a project's work may reach; an empty list limits nothing.",
+        "properties": {
+          "connections": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Connections",
+            "type": "array"
+          },
+          "repositories": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Repositories",
+            "type": "array"
+          },
+          "web_domains": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Web Domains",
+            "type": "array"
+          }
+        },
+        "title": "ProjectLimitsRequest",
+        "type": "object"
+      },
+      "ProjectLimitsView": {
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/ProjectLimitsBody"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "summary": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Summary",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project_id",
+          "limits",
+          "summary"
+        ],
+        "title": "ProjectLimitsView",
+        "type": "object"
+      },
       "ProjectMoved": {
         "properties": {
           "new_parent_id": {
@@ -26931,6 +27620,67 @@
         "title": "ReleaseTargetView",
         "type": "object"
       },
+      "RemoteAccessView": {
+        "description": "BUG-347 — how requests reach this host, read from the running process.",
+        "properties": {
+          "last_refused_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Refused At"
+          },
+          "last_served_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Served At"
+          },
+          "mode": {
+            "enum": [
+              "loopback",
+              "trusted_proxy",
+              "public"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "proxied_requests_refused": {
+            "title": "Proxied Requests Refused",
+            "type": "integer"
+          },
+          "proxied_requests_served": {
+            "title": "Proxied Requests Served",
+            "type": "integer"
+          },
+          "trusted_proxies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trusted Proxies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "trusted_proxies",
+          "proxied_requests_refused",
+          "proxied_requests_served",
+          "last_refused_at",
+          "last_served_at"
+        ],
+        "title": "RemoteAccessView",
+        "type": "object"
+      },
       "RemoteMcpServerCreated": {
         "properties": {
           "name": {
@@ -27492,6 +28242,105 @@
           "signed_at"
         ],
         "title": "ReviewAttestationView",
+        "type": "object"
+      },
+      "RoutineDeliveries": {
+        "properties": {
+          "deliveries": {
+            "items": {
+              "$ref": "#/components/schemas/RoutineDelivery"
+            },
+            "title": "Deliveries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "deliveries"
+        ],
+        "title": "RoutineDeliveries",
+        "type": "object"
+      },
+      "RoutineDelivery": {
+        "description": "QUI-F06 — a routine whose results also go to a channel, with the owner's consent.",
+        "properties": {
+          "channel_name": {
+            "title": "Channel Name",
+            "type": "string"
+          },
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "consented_at": {
+            "title": "Consented At",
+            "type": "string"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last At"
+          },
+          "last_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reason"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "connector_id",
+          "channel_name",
+          "consented_at",
+          "last_status",
+          "last_reason",
+          "last_at"
+        ],
+        "title": "RoutineDelivery",
+        "type": "object"
+      },
+      "RoutineDeliveryStopped": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "task_id"
+        ],
+        "title": "RoutineDeliveryStopped",
         "type": "object"
       },
       "RoutineDoctor": {
@@ -28329,6 +29178,27 @@
           "pinned"
         ],
         "title": "SessionPinned",
+        "type": "object"
+      },
+      "SessionPins": {
+        "properties": {
+          "pins": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryPinState"
+            },
+            "title": "Pins",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "pins"
+        ],
+        "title": "SessionPins",
         "type": "object"
       },
       "SessionProfileSet": {
@@ -30342,6 +31212,13 @@
       "StoreConnector": {
         "description": "One catalogue connector, as this owner has it. Never a credential value.",
         "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorAccount"
+            },
+            "title": "Accounts",
+            "type": "array"
+          },
           "active_operation": {
             "anyOf": [
               {
@@ -30445,7 +31322,8 @@
           "activity_status",
           "active_operation",
           "last_invoked_at",
-          "operations"
+          "operations",
+          "accounts"
         ],
         "title": "StoreConnector",
         "type": "object"
@@ -30808,6 +31686,23 @@
             ],
             "title": "Attachments"
           },
+          "deliver_consent": {
+            "default": false,
+            "title": "Deliver Consent",
+            "type": "boolean"
+          },
+          "deliver_to": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deliver To"
+          },
           "description": {
             "default": "",
             "title": "Description",
@@ -31079,6 +31974,84 @@
           "result"
         ],
         "title": "TaskInterrupted",
+        "type": "object"
+      },
+      "TaskReceipt": {
+        "description": "QUI-F16 for a task — its own conversation's turn receipts, summed.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/TurnReceiptLine"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "cost_basis": {
+            "enum": [
+              "priced",
+              "free",
+              "unknown"
+            ],
+            "title": "Cost Basis",
+            "type": "string"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "left_computer": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Left Computer",
+            "type": "array"
+          },
+          "local": {
+            "title": "Local",
+            "type": "boolean"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "reads": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reads",
+            "type": "object"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_id",
+          "turns",
+          "models",
+          "local",
+          "cost_usd",
+          "cost_basis",
+          "reads",
+          "changes",
+          "left_computer"
+        ],
+        "title": "TaskReceipt",
         "type": "object"
       },
       "TaskResumed": {
@@ -34497,6 +35470,46 @@
           }
         },
         "summary": "Stream Resume After Approval"
+      }
+    },
+    "/api/approvals/{approval_id}/undo-send": {
+      "post": {
+        "description": "QUI-F19 — take back an approved send while it is still held. Nothing leaves.\n\nAnswers 409 ``send_not_held`` when there is nothing to take back: the window\nclosed and it was sent, it was never held, or it is not this owner's.",
+        "operationId": "undo_held_send_api_approvals__approval_id__undo_send_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "approval_id",
+            "required": true,
+            "schema": {
+              "title": "Approval Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalSendUndone"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Held Send"
       }
     },
     "/api/attachments": {
@@ -38338,6 +39351,259 @@
         "summary": "Uninstall Connector"
       }
     },
+    "/api/connector-store/{connector_id}/accounts": {
+      "get": {
+        "description": "QUI-F07 — this connector's named accounts, default first. Never a credential.",
+        "operationId": "list_connector_accounts_api_connector_store__connector_id__accounts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorAccounts"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Connector Accounts"
+      },
+      "post": {
+        "description": "QUI-F07 — add a named account. It has no credential until one is saved for it.",
+        "operationId": "add_connector_account_api_connector_store__connector_id__accounts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorAccountChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Connector Account"
+      }
+    },
+    "/api/connector-store/{connector_id}/accounts/{account_id}": {
+      "delete": {
+        "description": "QUI-F07 — remove a further account and its credential. The default stays.",
+        "operationId": "remove_connector_account_api_connector_store__connector_id__accounts__account_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorAccountRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Connector Account"
+      },
+      "put": {
+        "description": "QUI-F07 — name an account, the default included (\"Work Gmail\").",
+        "operationId": "rename_connector_account_api_connector_store__connector_id__accounts__account_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorAccountChanged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Connector Account"
+      }
+    },
+    "/api/connector-store/{connector_id}/accounts/{account_id}/credentials": {
+      "put": {
+        "description": "QUI-F07 — the credential for one named account, in that account's own slot.",
+        "operationId": "set_connector_account_credentials_api_connector_store__connector_id__accounts__account_id__credentials_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connector_id",
+            "required": true,
+            "schema": {
+              "title": "Connector Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorCredentialsSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Connector Account Credentials"
+      }
+    },
     "/api/connector-store/{connector_id}/actions": {
       "post": {
         "operationId": "invoke_connector_action_api_connector_store__connector_id__actions_post",
@@ -41497,6 +42763,85 @@
         "summary": "Create Goal"
       }
     },
+    "/api/goals/suggestion": {
+      "get": {
+        "description": "QUI-F03 — whether this conversation's latest request is an aim worth tracking.\n\nRead-only and local: the answer fills nothing and creates nothing. Chat\noffers it under the latest answer; *Track it* opens the Goals form filled\nin, and *Not now* is the dismissal route below.",
+        "operationId": "goal_suggestion_api_goals_suggestion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalSuggestionAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Goal Suggestion"
+      }
+    },
+    "/api/goals/suggestion/dismiss": {
+      "post": {
+        "description": "QUI-F03 — *Not now*. The same aim is never offered again.",
+        "operationId": "dismiss_goal_suggestion_api_goals_suggestion_dismiss_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalSuggestionDismissRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalSuggestionDismissed"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Goal Suggestion"
+      }
+    },
     "/api/goals/{goal_id}": {
       "get": {
         "operationId": "read_goal_api_goals__goal_id__get",
@@ -43030,6 +44375,236 @@
           }
         },
         "summary": "Check Language"
+      }
+    },
+    "/api/library": {
+      "get": {
+        "description": "Documents, images, designs, pinned blocks and pull requests, newest first.",
+        "operationId": "get_library_api_library_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Library"
+      }
+    },
+    "/api/library/pins": {
+      "get": {
+        "description": "Which blocks of one conversation are pinned, so its toolbars can say so.",
+        "operationId": "list_session_pins_api_library_pins_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPins"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Session Pins"
+      },
+      "post": {
+        "description": "Pin one block of a stored answer, filed in a project or in the Library only.",
+        "operationId": "pin_block_api_library_pins_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryPinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPinned"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pin Block"
+      }
+    },
+    "/api/library/pins/{pin_id}": {
+      "delete": {
+        "description": "Remove a pin. The answer it was copied from is untouched.",
+        "operationId": "unpin_block_api_library_pins__pin_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pin_id",
+            "required": true,
+            "schema": {
+              "title": "Pin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPinRemoved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unpin Block"
+      }
+    },
+    "/api/library/pins/{pin_id}/project": {
+      "put": {
+        "description": "File a pin in another project, or in none. Grants and changes nothing else.",
+        "operationId": "move_pin_api_library_pins__pin_id__project_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pin_id",
+            "required": true,
+            "schema": {
+              "title": "Pin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryPinMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryPinned"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Pin"
       }
     },
     "/api/local-runtimes": {
@@ -47805,6 +49380,94 @@
         "summary": "Get Project Files"
       }
     },
+    "/api/projects/{project_id}/limits": {
+      "get": {
+        "description": "What work filed in this project may reach. Empty lists limit nothing.",
+        "operationId": "get_project_limits_api_projects__project_id__limits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLimitsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Project Limits"
+      },
+      "put": {
+        "description": "Replace the project's limits. Applies from the next action its conversations propose.",
+        "operationId": "set_project_limits_api_projects__project_id__limits_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectLimitsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectLimitsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Project Limits"
+      }
+    },
     "/api/projects/{project_id}/managed-files": {
       "get": {
         "operationId": "list_project_files_api_projects__project_id__managed_files_get",
@@ -48298,6 +49961,25 @@
           }
         },
         "summary": "Recovery Restore"
+      }
+    },
+    "/api/routine-deliveries": {
+      "get": {
+        "description": "QUI-F06 — which routines also send their results to a channel, and how the last send went.",
+        "operationId": "list_routine_deliveries_api_routine_deliveries_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineDeliveries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Routine Deliveries"
       }
     },
     "/api/runtime-mode": {
@@ -51234,6 +52916,46 @@
         "summary": "Get Task Detail"
       }
     },
+    "/api/tasks/{task_id}/delivery": {
+      "delete": {
+        "description": "QUI-F06 — stop sending this routine's results to a channel. Home and its conversation keep them.",
+        "operationId": "stop_routine_delivery_api_tasks__task_id__delivery_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutineDeliveryStopped"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Routine Delivery"
+      }
+    },
     "/api/tasks/{task_id}/doctor": {
       "get": {
         "description": "DEC-12 step 8 — whether this routine will be able to run, read from records.\n\nNothing is sent to a provider and nothing is started: the answer comes from\nthe scheduler's pass record, the stored model check, the schedule's terms\nand the owner's delivery policy.",
@@ -51272,6 +52994,46 @@
           }
         },
         "summary": "Task Doctor"
+      }
+    },
+    "/api/tasks/{task_id}/receipt": {
+      "get": {
+        "description": "QUI-F16 — what a task used, read, changed and sent, across its own conversation.",
+        "operationId": "get_task_receipt_api_tasks__task_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Task Receipt"
       }
     },
     "/api/tasks/{task_id}/resume": {

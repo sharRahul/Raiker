@@ -78,6 +78,19 @@ inspection locally (package name `raiker`).
 Gatekeeper on a quarantined download, SmartScreen, a real model provider, and
 an update through a published signed channel.
 
+## Beta readiness — host checks (2026-10-26)
+
+What a beta tester's host does that the installer rows above do not cover,
+checked on a source build served by `raiker-web`:
+
+| Check | Status | How |
+|---|---|---|
+| A request forwarded by a proxy to a loopback host is refused and says what to change | PASS | RT-SEC-01; `tests/test_proxied_loopback.py` |
+| Diagnostics names a refused proxy | PASS | RT-SEC-02 |
+| A named trusted proxy is served as remote: HSTS over HTTPS, recovery refused, rate limited | PASS (by hand and unit) | [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md), BUG-347 round |
+| The host refuses to start with a trusted proxy and no owner token | PASS (unit) | `test_trusting_a_proxy_needs_the_owner_token` |
+| The packaged desktop host behind a proxy | NOT TESTED | The desktop app binds loopback for its own window; it is not meant to sit behind a proxy |
+
 ## Local evidence (Linux x86-64)
 
 Built with `python scripts/build_desktop_app.py --version 0.1.0` at the PR's

@@ -4831,6 +4831,103 @@ SESSION_PROFILE_SQL = """
 ALTER TABLE sessions ADD COLUMN conversation_profile TEXT NOT NULL DEFAULT 'standard';
 """
 
+# QUI-F15 — a block of an answer the owner pinned to the Library (and, from
+# the block toolbar, to a project). The block is copied from the turn's stored
+# answer and re-validated by the runtime, never taken from the browser, so a
+# pin can only hold what the transcript already showed. ``part_index`` is the
+# block's place in that answer; one pin per block.
+LIBRARY_PINS_MIGRATION_ID = "RAIKER-2123-library-pins"
+LIBRARY_PINS_SQL = """
+CREATE TABLE IF NOT EXISTS library_pins (
+  pin_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  part_index INTEGER NOT NULL,
+  part_type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  data_json TEXT NOT NULL,
+  project_id TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (owner_principal_id, turn_id, part_index)
+);
+CREATE INDEX IF NOT EXISTS idx_library_pins_owner
+  ON library_pins(owner_principal_id, created_at DESC);
+"""
+
+# QUI-F03 — an aim Raiker offered to track as a goal and the owner answered
+# *Not now*. Kept as the aim's keywords, so the same aim worded differently in
+# a later conversation is recognised and never offered again.
+GOAL_SUGGESTION_DISMISSALS_MIGRATION_ID = "RAIKER-2124-goal-suggestion-dismissals"
+GOAL_SUGGESTION_DISMISSALS_SQL = """
+CREATE TABLE IF NOT EXISTS goal_suggestion_dismissals (
+  owner_principal_id TEXT NOT NULL,
+  aim_key TEXT NOT NULL,
+  keywords_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, aim_key)
+);
+"""
+
+# QUI-F07 — named accounts per service. Every installed connector has its
+# ``default`` account, whose credential stays where it always was (keyed by the
+# connector id); a further account the owner adds ("Personal Gmail") has its own
+# credential slot keyed ``<connector_id>#<account_id>``. A write intent records
+# the account it will use, so the approval names it and the send uses exactly it.
+CONNECTOR_ACCOUNTS_MIGRATION_ID = "RAIKER-2125-connector-accounts"
+CONNECTOR_ACCOUNTS_SQL = """
+CREATE TABLE IF NOT EXISTS connector_accounts (
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  label TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, connector_id, account_id)
+);
+ALTER TABLE connector_write_intents ADD COLUMN account_id TEXT;
+"""
+
+# QUI-F19 — undo windows. An approved connector write is held for a few
+# seconds before it is sent (``status = 'held'`` until ``held_until``); Undo or
+# Stop inside that window sets ``status = 'undone'`` and nothing is sent. A
+# host that stops mid-hold leaves the intent ``held``, which is never sent
+# later: the send happens only inside the request that held it.
+HELD_SENDS_MIGRATION_ID = "RAIKER-2126-held-sends"
+HELD_SENDS_SQL = """
+ALTER TABLE connector_write_intents ADD COLUMN held_until TEXT;
+ALTER TABLE connector_write_intents ADD COLUMN undone_at TEXT;
+"""
+
+# QUI-F21 — a project's own permission limits ("may push to this one
+# repository only"). They only narrow: a limit refuses what the owner's
+# permissions would otherwise allow for a conversation filed in the project,
+# and never allows anything those permissions refuse. An empty list for a kind
+# means that kind is not limited.
+PROJECT_LIMITS_MIGRATION_ID = "RAIKER-2127-project-limits"
+PROJECT_LIMITS_SQL = """
+CREATE TABLE IF NOT EXISTS project_limits (
+  project_id TEXT PRIMARY KEY,
+  limits_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+# QUI-F06 — a routine's results also sent to a connected channel. Only with
+# the owner's consent given when the routine was set up (``consented_at``); each
+# send still passes the channel's own gate, decision mode, pairing and egress.
+ROUTINE_DELIVERIES_MIGRATION_ID = "RAIKER-2128-routine-deliveries"
+ROUTINE_DELIVERIES_SQL = """
+CREATE TABLE IF NOT EXISTS routine_deliveries (
+  task_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  consented_at TEXT NOT NULL,
+  last_status TEXT,
+  last_reason TEXT,
+  last_at TEXT
+);
+"""
+
 GOALS_AND_EXECUTION_PROFILES_SQL = """
 CREATE TABLE IF NOT EXISTS execution_profiles (
   profile_id TEXT NOT NULL,
@@ -5203,6 +5300,12 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     RunnerStep("_backfill_conversation_fts"),
     RunnerStep("_add_session_and_task_columns"),
     Migration(SESSION_PROFILE_MIGRATION_ID, SESSION_PROFILE_SQL),
+    Migration(LIBRARY_PINS_MIGRATION_ID, LIBRARY_PINS_SQL),
+    Migration(GOAL_SUGGESTION_DISMISSALS_MIGRATION_ID, GOAL_SUGGESTION_DISMISSALS_SQL),
+    Migration(CONNECTOR_ACCOUNTS_MIGRATION_ID, CONNECTOR_ACCOUNTS_SQL),
+    Migration(HELD_SENDS_MIGRATION_ID, HELD_SENDS_SQL),
+    Migration(PROJECT_LIMITS_MIGRATION_ID, PROJECT_LIMITS_SQL),
+    Migration(ROUTINE_DELIVERIES_MIGRATION_ID, ROUTINE_DELIVERIES_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

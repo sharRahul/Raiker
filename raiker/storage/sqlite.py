@@ -621,6 +621,7 @@ from raiker.storage.stores.extensions import ExtensionStore  # noqa: E402
 from raiker.storage.stores.github import GitHubStore  # noqa: E402
 from raiker.storage.stores.governance import GovernanceStore  # noqa: E402
 from raiker.storage.stores.knowledge import KnowledgeStore  # noqa: E402
+from raiker.storage.stores.library import LibraryStore  # noqa: E402
 from raiker.storage.stores.memory import MemoryStore  # noqa: E402
 from raiker.storage.stores.migration_runner import MigrationRunner  # noqa: E402
 from raiker.storage.stores.models import ModelStore  # noqa: E402
@@ -642,6 +643,7 @@ class SQLiteStore(
     GitHubStore,
     GovernanceStore,
     KnowledgeStore,
+    LibraryStore,
     MemoryStore,
     ModelStore,
     MonitoringStore,

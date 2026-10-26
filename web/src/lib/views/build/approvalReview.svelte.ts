@@ -11,6 +11,7 @@
  * performs, a lost preview never removes Accept and Reject, and a decision that
  * ran once and failed is still told apart from one governance stopped (UX-BUILD-04).
  */
+import { editablePatch } from "../../editablePatch";
 import { api, ApiError } from "../../api";
 import type { ApprovalView } from "../../apiTypes";
 import { publishApprovalResolved } from "../../approvalResume";
@@ -26,6 +27,8 @@ export interface ApprovalDiff {
   diff: string | null;
   path: string | null;
   kind: string;
+  /** BUG-271 — the proposal's own patch, when the reviewer may rewrite it. */
+  editable: string | null;
 }
 
 export class ApprovalReview {
@@ -103,9 +106,14 @@ export class ApprovalReview {
           return shows
             ? ([
                 approval.approval_id,
-                // BUG-271 — `kind` decides whether the edit control is offered:
-                // only a proposed patch can be corrected as text.
-                { diff: detail.diff, path: detail.diff_path, kind: detail.preview_kind },
+                // BUG-271 — `editable` decides whether the edit control is
+                // offered: only a proposed patch can be corrected as text.
+                {
+                  diff: detail.diff,
+                  path: detail.diff_path,
+                  kind: detail.preview_kind,
+                  editable: editablePatch(detail.approval.tool_name, detail.arguments),
+                },
               ] as const)
             : null;
         } catch {

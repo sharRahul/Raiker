@@ -35,6 +35,26 @@ execution relay and is metadata-only for every other capability. A command must
 carry its runtime-authored approval id or standing-grant id; selecting an
 execution environment is never authority.
 
+## Local requests and reverse proxies
+
+Some pages and exemptions are for this computer only: password recovery from
+the lock screen, the instance list, and the abuse window's exemption for
+loopback reads. Each asks one question, `is_local_request`
+(`raiker/api/proxy_guard.py`): the socket peer is loopback **and** the request
+carries no forwarding header (`Forwarded`, `X-Forwarded-For`,
+`X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`). uvicorn runs with
+`proxy_headers=False`, so no header can replace the peer.
+
+A loopback-bound host refuses a forwarded request (`proxied_request_refused`,
+owner's decision 2026-10-26), unless its peer is a proxy the owner named in
+`RAIKER_TRUSTED_PROXY`; then it is served as remote, rate limited, and with HSTS
+when the proxy received HTTPS. Naming a proxy requires `RAIKER_OWNER_TOKEN`,
+like `--allow-public`, and an entry that is not an address stops the host from
+starting. Forwarding headers only ever make a request less trusted: the client
+address a proxy reports identifies no one. Diagnostics reports the host's
+remote access and every refused or served proxied request
+([FIXED-1264](../plans/FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347)).
+
 ## Per-turn machine identity boundary
 
 Agentic work never enters the broker as the human owner. An embedded workspace

@@ -2094,6 +2094,29 @@ class ToolBroker:
                 and decision.decision == "allow"
             ):
                 decision = self._hook_ask_decision(action, decision)
+        # QUI-F21 — the project this conversation is filed in may narrow what
+        # it can reach. Applied after policy and only ever toward a refusal.
+        if decision.decision != "deny":
+            from raiker.policy.project_limits import refusal as project_limit_refusal
+
+            limited = project_limit_refusal(
+                identity_store,
+                workspace_root=self.workspace_root,
+                session_id=session_id,
+                owner_principal_id=verified.claims.owner_principal_id,
+                tool_name=action.tool_name,
+                arguments=dict(action.arguments or {}),
+            )
+            if limited is not None:
+                decision = PolicyDecision(
+                    decision_id=new_id("pol_"),
+                    action_id=action.action_id,
+                    decision="deny",
+                    reasons=[f"denied_by_{limited}", *decision.reasons],
+                    requires_user_approval=False,
+                    risk_level="blocked",
+                    timestamp=utc_now(),
+                )
         # BUG-70 — the turn's own posture, applied after policy and only ever in
         # the tightening direction. This is what Build's Plan and Edit chips now
         # do instead of rewriting four standing permissions: Plan denies the
@@ -2153,7 +2176,20 @@ class ToolBroker:
                     tool_name=action.tool_name,
                     status="denied",
                     output=None,
-                    error={"type": "policy_denied", "reasons": decision.reasons},
+                    error={
+                        "type": "policy_denied",
+                        "reasons": decision.reasons,
+                        **(
+                            {
+                                # QUI-F21 — say which limit, so the answer can name it.
+                                "message": "This conversation's project does not allow this: its limits "
+                                "name the repositories, sites and connections its work may reach. The owner "
+                                "can change them on the project's page."
+                            }
+                            if any(reason.startswith("denied_by_project_limit") for reason in decision.reasons)
+                            else {}
+                        ),
+                    },
                     started_at=now,
                     completed_at=utc_now(),
                 ),
@@ -2270,7 +2306,10 @@ class ToolBroker:
                         and isinstance(operation_id, str)
                         and isinstance(arguments, dict)
                     ):
-                        from raiker.runtime.connector_ecosystem import ConnectorInvoker
+                        from raiker.runtime.connector_ecosystem import (
+                            ConnectorCatalog,
+                            ConnectorInvoker,
+                        )
 
                         method: str | None
                         try:
@@ -2280,13 +2319,27 @@ class ToolBroker:
                             method = operation["method"]
                         except ValueError:
                             method = None
-                        if method in {"POST", "PUT", "PATCH", "DELETE"}:
+                        from raiker.runtime import connector_accounts
+
+                        # QUI-F07 — the account the model named, by the
+                        # owner's label; none named is the default. A name
+                        # that matches no account files no intent, so the
+                        # approval can execute nothing rather than guess.
+                        try:
+                            default_label = ConnectorCatalog().get(connector_id).name
+                        except ValueError:
+                            default_label = connector_id
+                        account_id = connector_accounts.match(
+                            self.store, self.principal_id or "", connector_id,
+                            str(action.arguments.get("account") or ""), default_label=default_label,
+                        )
+                        if method in {"POST", "PUT", "PATCH", "DELETE"} and account_id is not None:
                             with self.store.connect() as connection:
                                 connection.execute(
                                 """INSERT INTO connector_write_intents
                                    (intent_id, approval_id, principal_id, connector_id,
-                                    operation_id, arguments_json, status, created_at)
-                                   VALUES (?, ?, ?, ?, ?, ?, 'pending_approval', ?)""",
+                                    operation_id, arguments_json, status, created_at, account_id)
+                                   VALUES (?, ?, ?, ?, ?, ?, 'pending_approval', ?, ?)""",
                                     (
                                     new_id("cwi_"),
                                     approval_id,
@@ -2295,6 +2348,7 @@ class ToolBroker:
                                     operation_id,
                                     json.dumps(arguments, sort_keys=True),
                                         utc_now(),
+                                    account_id,
                                     ),
                                 )
             self._notify_hook(

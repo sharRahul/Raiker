@@ -5,7 +5,7 @@
  * nothing else left this computer". Every part comes from the receipt the
  * runtime built from the turn's audit events; this only words it.
  */
-import type { TurnReceipt } from "./generated/apiContract";
+import type { TaskReceipt, TurnReceipt } from "./generated/apiContract";
 import { formatCost } from "./contextPresentation";
 import { localTime, providerName } from "./format";
 import { modelName } from "./modelPresentation";
@@ -82,5 +82,34 @@ export function receiptRows(receipt: TurnReceipt): { label: string; value: strin
         : "Nothing"
       : [`The conversation, to ${receipt.provider ? providerName(receipt.provider) : "the model's provider"}`, ...receipt.left_computer].join("; "),
   });
+  return rows;
+}
+
+/** A task's receipt in the shape of one turn's, so both read the same way. */
+function asTurn(receipt: TaskReceipt): TurnReceipt {
+  return {
+    turn_id: receipt.task_id,
+    model: receipt.models[0] ?? null,
+    provider: null,
+    local: receipt.local,
+    cost_usd: receipt.cost_usd,
+    cost_basis: receipt.cost_basis,
+    reads: receipt.reads,
+    changes: receipt.changes,
+    left_computer: receipt.left_computer,
+  };
+}
+
+/** QUI-F16 for a task: "Across 3 turns · Claude Haiku 4.5 · ≈ $0.03 · …". */
+export function taskReceiptLine(receipt: TaskReceipt): string {
+  if (receipt.turns === 0) return "Nothing has run yet.";
+  const parts = receiptParts(asTurn(receipt));
+  if (receipt.models.length > 1) parts[0] = receipt.models.map(modelName).join(" + ");
+  return [`Across ${plural(receipt.turns, "turn")}`, ...parts].join(" · ");
+}
+
+export function taskReceiptRows(receipt: TaskReceipt): { label: string; value: string }[] {
+  const rows = receiptRows(asTurn(receipt));
+  if (receipt.models.length > 1) rows[0] = { label: "Models", value: receipt.models.map(modelName).join(", ") };
   return rows;
 }

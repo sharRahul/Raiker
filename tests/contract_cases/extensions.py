@@ -118,6 +118,62 @@ def _enable(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return "/api/connector-store/github/enabled?enabled=true"
 
 
+def _account(client: TestClient, h: dict[str, str]) -> str:
+    """QUI-F07 — a second, named account on the installed connector."""
+    _installed(client, h)
+    added = client.post("/api/connector-store/github/accounts", json={"label": "Personal"}, headers=h)
+    assert added.status_code == 201, added.text
+    return str(added.json()["account_id"])
+
+
+def _accounts(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    _account(client, h)
+    return "/api/connector-store/github/accounts"
+
+
+def _add_account(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    _installed(client, h)
+    return "/api/connector-store/github/accounts", {"label": "Personal"}
+
+
+def _rename_account(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    _installed(client, h)
+    return "/api/connector-store/github/accounts/default", {"label": "Work"}
+
+
+def _remove_account(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    return f"/api/connector-store/github/accounts/{_account(client, h)}"
+
+
+def _account_credentials(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    return f"/api/connector-store/github/accounts/{_account(client, h)}/credentials", {"values": {"token": "gho_two"}}
+
+
+def _held_send(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-F19 — an approved connector write still inside its undo window."""
+    from raiker.runtime import held_sends
+    from raiker.storage.sqlite import SQLiteStore
+
+    store = SQLiteStore(ws)
+    principal = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+    store._execute(
+        "INSERT INTO tool_actions (action_id, session_id, tool_name, arguments_json, risk_level, status, proposed_at) "
+        "VALUES ('act_held', 'connector_store', 'connector_write', '{}', 'high', 'approval_required', '2026-10-26T00:00:00Z')"
+    )
+    store._execute(
+        "INSERT INTO approvals (approval_id, action_id, status, created_at) "
+        "VALUES ('appr_held', 'act_held', 'approved', '2026-10-26T00:00:00Z')"
+    )
+    store._execute(
+        "INSERT INTO connector_write_intents (intent_id, approval_id, principal_id, connector_id, operation_id, "
+        "arguments_json, status, created_at) VALUES ('cwi_held', 'appr_held', ?, 'github', 'postRepo', '{}', "
+        "'pending_approval', '2026-10-26T00:00:00Z')",
+        (principal,),
+    )
+    assert held_sends.hold(store, "cwi_held", seconds=60) is not None
+    return "/api/approvals/appr_held/undo-send"
+
+
 def _git_token(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     assert client.put("/api/git-credential", json={"token": "ghp_contract"}, headers=h).status_code == 200
     return "/api/git-credential"
@@ -562,6 +618,12 @@ CASES: Cases = {
     ("PUT", "/api/skills/{skill_id}/command"): _on_skill("/command", {"command_trigger": "tidy"}),
     ("DELETE", "/api/skills/{skill_id}"): _skill_deleted,
     ("GET", "/api/connector-store"): patched(_store_view, _vault_key),
+    ("POST", "/api/approvals/{approval_id}/undo-send"): _held_send,
+    ("GET", "/api/connector-store/{connector_id}/accounts"): _accounts,
+    ("POST", "/api/connector-store/{connector_id}/accounts"): _add_account,
+    ("PUT", "/api/connector-store/{connector_id}/accounts/{account_id}"): _rename_account,
+    ("DELETE", "/api/connector-store/{connector_id}/accounts/{account_id}"): _remove_account,
+    ("PUT", "/api/connector-store/{connector_id}/accounts/{account_id}/credentials"): patched(_account_credentials, _vault_key),
     ("POST", "/api/connector-store/{connector_id}/install"): plain("/api/connector-store/github/install"),
     ("DELETE", "/api/connector-store/{connector_id}"): _uninstall,
     ("PUT", "/api/connector-store/{connector_id}/credentials"): patched(_credentials, _vault_key),

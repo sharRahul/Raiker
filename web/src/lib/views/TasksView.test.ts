@@ -178,6 +178,37 @@ describe("TasksView", () => {
     });
   });
 
+  it("sends results to a paired channel only with the owner's yes in the form (QUI-F06)", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": {
+        profiles: [],
+        chat_profiles: [
+          { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true, ready: true, readiness_state: "ready" },
+        ],
+      },
+      "GET /api/channels": {
+        profiles: [{ connector_id: "channel.telegram", display_name: "Telegram", pairing_id: "pair_1" }],
+        error: null,
+        outbound: {},
+        inbound: {},
+      },
+      "POST /api/tasks": {},
+    });
+    render(TasksView);
+    await screen.findByText("No work queued");
+    await openDetails();
+    const channel = await screen.findByRole("combobox", { name: "Channel for results" });
+    expect(channel).toBeDisabled();
+    await fireEvent.click(screen.getByRole("checkbox", { name: /Also send each result to/ }));
+    expect(channel).toBeEnabled();
+    expect(screen.getByText(/without asking again, while that channel is on/)).toBeInTheDocument();
+    await instruct("Brief me on today.");
+    await fireEvent.click(screen.getByRole("button", { name: /Create task/ }));
+    const post = await waitFor(() => fetchMock.mock.calls.find(([, init]) => init?.method === "POST"));
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({ deliver_to: "channel.telegram", deliver_consent: true });
+  });
+
   it("carries attachments into scheduled work and renders them outside the instructions", async () => {
     const task = {
       task_id: "task_files", session_id: "sess_inbox", status: "queued",

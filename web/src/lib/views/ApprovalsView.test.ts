@@ -852,10 +852,15 @@ describe("ApprovalsView per-hunk acceptance", () => {
 // a third state of the decision in front of the owner. It denies that proposal
 // and raises theirs, which they then approve like any other change.
 describe("ApprovalsView edit then propose", () => {
+  // What the server really sends for apply_patch: a file-diff preview, with
+  // the proposal's own patch in its arguments (that is what the edit starts from).
+  const PATCH = "--- a/notes.txt\n+++ b/notes.txt\n@@ -1 +1 @@\n-a\n+A\n";
   const PATCH_DETAIL = {
     ...DETAIL,
-    preview_kind: "patch",
-    diff: "--- a/notes.txt\n+++ b/notes.txt\n@@ -1 +1 @@\n-a\n+A\n",
+    approval: { ...DETAIL.approval, tool_name: "apply_patch" },
+    arguments: { patch: PATCH },
+    preview_kind: "file_diff",
+    diff: PATCH,
   };
 
   function routes(overrides: Record<string, unknown> = {}) {
@@ -874,6 +879,14 @@ describe("ApprovalsView edit then propose", () => {
       ...overrides,
     };
   }
+
+  it("offers Edit only where the server accepts a rewritten patch", async () => {
+    stubFetch({ "GET /api/approvals": [PENDING], "GET /api/approvals/appr_1": DETAIL });
+    render(ApprovalsView);
+    await openFirst();
+    await screen.findByText("notes.txt");
+    expect(screen.queryByRole("button", { name: "Edit…" })).not.toBeInTheDocument();
+  });
 
   it("sends the reviewer's own patch to the replace route, never to resolve", async () => {
     const fetchMock = stubFetch(routes());

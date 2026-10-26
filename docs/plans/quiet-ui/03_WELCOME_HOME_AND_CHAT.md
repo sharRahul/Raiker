@@ -21,7 +21,7 @@ live cases RT-QUI-10 to RT-QUI-13 and RT-QUI-16). Both in
 | QUI-H05 | **Done.** Stale means the newest *verified* backup is seven days old, the same window as *This week*. |
 | QUI-C01 | **Done**: editable title, project chip, search in conversation, Context toggle. |
 | QUI-C02 | Already true before this round; unchanged. |
-| QUI-C03 | **Done**: the status line, Add instruction, Stop safely, the outcome line, and the task receipt at the end of each turn (2026-10-24, [06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md#status)). |
+| QUI-C03 | **Done**: the status line, Add instruction, Stop safely, the outcome line, and the task receipt at the end of each turn (2026-10-24, [QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16); per task in Tasks, [FIXED-1261](../FIXED_ITEMS.md#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round)). |
 | QUI-C04 | **Partly done.** Done: the placeholder, the data label and the profile chip (QUI-P02, 2026-10-22); answer style is in Settings › General until *More* exists ([04](04_VISUAL_ANSWERS.md#status), 2026-10-23). Open: *More* (schedule, research depth). |
 | QUI-C05 | **Done.** |
 | QUI-C06 | **Done.** |
@@ -132,7 +132,7 @@ switch in the top bar and keep the draft.
 | Plan | Checklist card with real states and the path line |
 | Result | Bordered card with one action (Open draft, View diff, Open image) |
 | Approval | Raiker Safety card ([02, QUI-P05](02_PERMISSIONS_AND_APPROVALS.md#qui-p05--the-approval-card-raiker-safety)) |
-| Question | Clarifying-question card ([06, QUI-F02](06_FEATURES_AND_IMPROVEMENTS.md)) |
+| Question | Clarifying-question card ([QUI-F02, FIXED-1151](../FIXED_ITEMS.md#fixed-1151--a-question-asked-mid-task-was-offered-as-an-approval-in-chat-build-and-the-floating-card-qui-f02)) |
 | Visual answer | Answer blocks ([04](04_VISUAL_ANSWERS.md)) |
 
 ### QUI-C03 — A turn, step by step
@@ -149,7 +149,7 @@ switch in the top bar and keep the draft.
    your decision".
 6. **Result.** A result card, then a short answer with source chips.
 7. **Outcome line.** Completed · Partially completed · Not done · Outcome
-   unknown, linking to its activity, with the task receipt ([06, QUI-F16](06_FEATURES_AND_IMPROVEMENTS.md)).
+   unknown, linking to its activity, with the task receipt ([QUI-F16, FIXED-1153](../FIXED_ITEMS.md#fixed-1153--a-tasks-end-did-not-say-what-it-used-read-changed-or-sent-qui-f16)).
 8. **Memory.** Anything worth remembering appears as a suggestion (Save ·
    Dismiss). Never saved silently.
 
@@ -161,7 +161,7 @@ switch in the top bar and keep the draft.
 | Input | Starts 56 px, comfortable 96 px, at most 180 px then scrolls |
 | Action row | 44 px: Attach · Project · Profile chip · context count when relevant · More · Send (40×40, far right) |
 | More | Schedule, research depth, model, work mode, answer style |
-| Data label | "Stays on this computer" / "Sent to Anthropic" ([06, QUI-F17](06_FEATURES_AND_IMPROVEMENTS.md)) |
+| Data label | "Stays on this computer" / "Sent to Anthropic" ([QUI-F17, FIXED-1154](../FIXED_ITEMS.md#fixed-1154--homes-composer-did-not-say-where-a-message-would-go-qui-f17)) |
 | Model | Shown as a small label only when it is not the default |
 | Bottom spacing | 24 px |
 

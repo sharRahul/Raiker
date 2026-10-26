@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**471 operations: 457 verified, 0 eligible, 0 deferred, 14 special.**
+**489 operations: 475 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -27,6 +27,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/approvals/{approval_id}/resolve-critical` | ResolveApprovalRequest | CriticalApprovalResolved | verified | declared CriticalApprovalResolved |
 | POST | `/api/approvals/{approval_id}/resume` |  | AgentResponse | verified | AgentGateway.aresume_after_approval |
 | POST | `/api/approvals/{approval_id}/resume/stream` |  |  | special | special |
+| POST | `/api/approvals/{approval_id}/undo-send` |  | ApprovalSendUndone | verified | declared ApprovalSendUndone |
 | POST | `/api/attachments` | UploadAttachmentRequest | UploadedAttachment | verified | declared UploadedAttachment |
 | GET | `/api/attention` |  | AttentionFeedView | verified | declared AttentionFeedView |
 | POST | `/api/audit/export` |  | AuditExportResult | verified | declared by cast |
@@ -124,6 +125,11 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/connections` |  | ConnectionsView | verified | DashboardService.get_connections |
 | GET | `/api/connector-store` |  | ConnectorStoreView | verified | declared ConnectorStoreView |
 | DELETE | `/api/connector-store/{connector_id}` |  | ConnectorUninstalled | verified | declared ConnectorUninstalled |
+| GET | `/api/connector-store/{connector_id}/accounts` |  | ConnectorAccounts | verified | declared ConnectorAccounts |
+| POST | `/api/connector-store/{connector_id}/accounts` | ConnectorAccountRequest | ConnectorAccountChanged | verified | declared ConnectorAccountChanged |
+| DELETE | `/api/connector-store/{connector_id}/accounts/{account_id}` |  | ConnectorAccountRemoved | verified | declared ConnectorAccountRemoved |
+| PUT | `/api/connector-store/{connector_id}/accounts/{account_id}` | ConnectorAccountRequest | ConnectorAccountChanged | verified | declared ConnectorAccountChanged |
+| PUT | `/api/connector-store/{connector_id}/accounts/{account_id}/credentials` | CredentialRequest | ConnectorCredentialsSet | verified | declared ConnectorCredentialsSet |
 | POST | `/api/connector-store/{connector_id}/actions` | ConnectorActionRequest | ConnectorActionCompleted \| ConnectorActionQueued | verified | declared by cast \| declared ConnectorActionQueued |
 | PUT | `/api/connector-store/{connector_id}/credentials` | CredentialRequest | ConnectorCredentialsSet | verified | declared ConnectorCredentialsSet |
 | PUT | `/api/connector-store/{connector_id}/enabled` |  | ConnectorEnabledSet | verified | declared ConnectorEnabledSet |
@@ -205,6 +211,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/github/webhook` |  |  | special | special |
 | GET | `/api/goals` |  | GoalList | verified | declared GoalList |
 | POST | `/api/goals` | CreateGoalRequest | GoalView | verified | _view |
+| GET | `/api/goals/suggestion` |  | GoalSuggestionAnswer | verified | declared GoalSuggestionAnswer |
+| POST | `/api/goals/suggestion/dismiss` | GoalSuggestionDismissRequest | GoalSuggestionDismissed | verified | declared GoalSuggestionDismissed |
 | GET | `/api/goals/{goal_id}` |  | GoalView | verified | _view |
 | POST | `/api/goals/{goal_id}/accept` | GoalActionRequest | GoalView | verified | _act |
 | POST | `/api/goals/{goal_id}/archive` | GoalActionRequest | GoalView | verified | _act |
@@ -245,6 +253,11 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | DELETE | `/api/knowledge-sources` |  | KnowledgeSourceRevoked | verified | DashboardService.revoke_knowledge_source |
 | GET | `/api/knowledge-sources` |  | KnowledgeSources | verified | DashboardService.knowledge_sources |
 | POST | `/api/language/check` | LanguageCheckRequest | LanguageCheck | verified | declared LanguageCheck |
+| GET | `/api/library` |  | LibraryView | verified | declared LibraryView |
+| GET | `/api/library/pins` |  | SessionPins | verified | declared SessionPins |
+| POST | `/api/library/pins` | LibraryPinRequest | LibraryPinned | verified | declared LibraryPinned |
+| DELETE | `/api/library/pins/{pin_id}` |  | LibraryPinRemoved | verified | declared LibraryPinRemoved |
+| PUT | `/api/library/pins/{pin_id}/project` | LibraryPinMoveRequest | LibraryPinned | verified | declared LibraryPinned |
 | GET | `/api/local-runtimes` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | POST | `/api/local-runtimes/detect` |  | LocalRuntimes | verified | declared LocalRuntimes |
 | DELETE | `/api/managed-files/{file_id}` |  | ManagedFileChanged | verified | declared by cast |
@@ -376,6 +389,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/projects/{project_id}/deletion-preview` |  | ProjectDeletionPreviewView | verified | declared ProjectDeletionPreviewView |
 | POST | `/api/projects/{project_id}/export` |  |  | special | special |
 | GET | `/api/projects/{project_id}/files` |  | ProjectFilesView | verified | WebReadModels.project_files |
+| GET | `/api/projects/{project_id}/limits` |  | ProjectLimitsView | verified | declared ProjectLimitsView |
+| PUT | `/api/projects/{project_id}/limits` | ProjectLimitsRequest | ProjectLimitsView | verified | declared ProjectLimitsView |
 | GET | `/api/projects/{project_id}/managed-files` |  | ManagedFileList | verified | _list |
 | POST | `/api/projects/{project_id}/managed-files` | dict | ManagedFileImport | verified | _import |
 | PUT | `/api/projects/{project_id}/move` | MoveProjectRequest | ProjectMoved | verified | declared ProjectMoved |
@@ -389,6 +404,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/read-capabilities` |  | ReadCapabilities | verified | declared ReadCapabilities |
 | GET | `/api/recovery/backups` |  | RecoveryBackupsView | verified | declared by cast |
 | POST | `/api/recovery/restore` | RecoveryRestoreRequest | RecoveryRestored | verified | declared by cast |
+| GET | `/api/routine-deliveries` |  | RoutineDeliveries | verified | declared RoutineDeliveries |
 | GET | `/api/runtime-mode` |  | RuntimeModeView | verified | RuntimeControlService.get_runtime_mode |
 | POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest | RuntimeModeActivated | verified | declared RuntimeModeActivated |
 | POST | `/api/runtime-mode/disable` | DisableRuntimeModeRequest | Ok | verified | built as Ok |
@@ -464,7 +480,9 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/tasks` |  | TaskView[] | verified | DashboardService.list_tasks |
 | POST | `/api/tasks` | TaskCreateRequest | TaskView | verified | _create_task |
 | GET | `/api/tasks/{task_id}` |  | TaskDetailView | verified | DashboardService.get_task_detail |
+| DELETE | `/api/tasks/{task_id}/delivery` |  | RoutineDeliveryStopped | verified | declared RoutineDeliveryStopped |
 | GET | `/api/tasks/{task_id}/doctor` |  | RoutineDoctor | verified | declared RoutineDoctor |
+| GET | `/api/tasks/{task_id}/receipt` |  | TaskReceipt | verified | declared TaskReceipt |
 | POST | `/api/tasks/{task_id}/resume` |  | TaskResumed | verified | declared TaskResumed |
 | POST | `/api/tasks/{task_id}/run` |  | TaskView | verified | DashboardService.run_task_now |
 | PUT | `/api/tasks/{task_id}/run-limit` | TaskRunLimitRequest | TaskView | verified | DashboardService.set_task_run_limit |

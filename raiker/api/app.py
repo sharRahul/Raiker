@@ -20,6 +20,7 @@ from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.instance_runtime import InstanceRuntime
+from raiker.api.proxy_guard import ProxyGuardMiddleware, RemoteAccessRecord, trusted_proxies
 from raiker.api.redaction import (
     RENDER_REDACTION_SCOPE,
     RedactedJSONResponse,
@@ -46,8 +47,10 @@ from raiker.api.routes_images import router as images_router
 from raiker.api.routes_instances import router as instances_router
 from raiker.api.routes_knowledge_files import router as knowledge_files_router
 from raiker.api.routes_language import router as language_router
+from raiker.api.routes_library import router as library_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
+from raiker.api.routes_project_limits import router as project_limits_router
 from raiker.api.routes_project_roots import router as project_roots_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_recovery import router as recovery_router
@@ -644,6 +647,18 @@ def create_app(
         window_seconds=60.0,
         loopback_only=loopback_only,
     )
+    # BUG-347 — inside the security headers (so a refusal carries them) and
+    # outside everything that asks "is this local?": a forwarded request on a
+    # loopback-only host is refused, or, from a proxy the owner named, marked
+    # remote before the rate limit and the local-only routes see it.
+    networks = trusted_proxies()
+    app.state.remote_access = RemoteAccessRecord(loopback_only=loopback_only, networks=networks)
+    app.add_middleware(
+        ProxyGuardMiddleware,
+        loopback_only=loopback_only,
+        record=app.state.remote_access,
+        networks=networks,
+    )
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)
     app.include_router(instances_router)
@@ -659,6 +674,8 @@ def create_app(
     app.include_router(images_router)
     app.include_router(design_router)
     app.include_router(goals_router)
+    app.include_router(library_router)
+    app.include_router(project_limits_router)
     app.include_router(knowledge_files_router)
     app.include_router(project_roots_router)
     app.include_router(code_files_router)

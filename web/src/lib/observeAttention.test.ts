@@ -229,3 +229,38 @@ describe("allClearSentence", () => {
     expect(unknown).toEqual([]);
   });
 });
+
+describe("BUG-347 remote access on Diagnostics", () => {
+  const remote = (overrides: Record<string, unknown>) =>
+    ({
+      ...EVERYTHING_FINE,
+      diagnostics: {
+        ...HEALTHY_DIAGNOSTICS,
+        remote_access: {
+          mode: "loopback",
+          trusted_proxies: [],
+          proxied_requests_refused: 0,
+          proxied_requests_served: 0,
+          last_refused_at: null,
+          last_served_at: null,
+          ...overrides,
+        },
+      },
+    }) as AttentionInputs;
+
+  it("says nothing for a host only this computer reaches", () => {
+    expect(attentionItems(remote({}))).toEqual([]);
+  });
+
+  it("names refused proxied requests and what to change", () => {
+    const [item] = attentionItems(remote({ proxied_requests_refused: 3, last_refused_at: "2026-10-26T12:00:00Z" }));
+    expect(item.tone).toBe("blocking");
+    expect(item.title).toBe("Requests through a reverse proxy are being refused");
+    expect(item.detail).toContain("RAIKER_TRUSTED_PROXY");
+  });
+
+  it("names a host reached through a trusted proxy as public", () => {
+    const [item] = attentionItems(remote({ mode: "trusted_proxy", trusted_proxies: ["127.0.0.1/32"] }));
+    expect(item.title).toBe("Raiker is reachable from the internet through a proxy");
+  });
+});

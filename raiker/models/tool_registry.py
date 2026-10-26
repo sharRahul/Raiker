@@ -455,7 +455,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         required_list_args=(),
         optional_args=(),
         arg_schemas=(),
-        description="Propose one POST, PUT, PATCH, or DELETE connector operation. Every call requires explicit user approval before the external request is sent.",
+        description="Propose one POST, PUT, PATCH, or DELETE connector operation. Every call requires explicit user approval before the external request is sent. Optional account: the owner's name for the account to act as, when the connection lists more than one; without it the default account is used.",
     ),
     # Governed inside the tool: advisor_model_runtime gate + decision mode
     # (default `ask` withholds) + provider policy at call time.

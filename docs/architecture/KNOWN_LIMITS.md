@@ -464,10 +464,13 @@ on the shipped build, not estimated.
   rather than read unchecked ([SSRF](SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf)).
   Connector and channel requests never follow a redirect
   ([FIXED-1237](../plans/FIXED_ITEMS.md#fixed-1237--connector-and-channel-requests-followed-redirects-to-any-host-with-the-owners-token-bug-350)).
-- **A reverse proxy on the same machine makes every remote request look
-  local.** Raiker treats a loopback peer as this machine, so pointing a reverse
-  proxy at `127.0.0.1:8765` erases the distinction; the README warns against it
-  and the fix is open (BUG-347).
+- ~~**A reverse proxy on the same machine makes every remote request look
+  local.**~~ **Closed 2026-10-26.** A forwarded request is never local; a
+  loopback-bound host refuses it unless the proxy is named in
+  `RAIKER_TRUSTED_PROXY` (with `RAIKER_OWNER_TOKEN`), and then serves it as
+  remote ([FIXED-1264](../plans/FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347)).
+  The client address a proxy reports is not used, so per-client rate limits
+  behind a proxy count the proxy, not each browser.
 - ~~**Eight gated capabilities have no threat model.**~~ **Closed 2026-08-23.**
   Opening a higher-risk gate requires a threat-model acknowledgement recorded
   against your principal, and eight capabilities had nothing written to

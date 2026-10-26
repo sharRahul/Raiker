@@ -29,6 +29,7 @@ from raiker.api.schemas import (
     ExecutionProfileBindingRequest,
     GoalActionRequest,
     GoalConfirmRequest,
+    GoalSuggestionDismissRequest,
     UpdateExecutionProfileRequest,
     UpdateGoalPlanRequest,
     serialize_dto,
@@ -39,8 +40,12 @@ from raiker.api.wire.goals import (
     ExecutionProfileView,
     GoalList,
     GoalStopped,
+    GoalSuggestionAnswer,
+    GoalSuggestionDismissed,
+    GoalSuggestionView,
     GoalView,
 )
+from raiker.goals import noticing
 from raiker.goals import profiles as profile_store
 from raiker.goals import store as goal_store
 from raiker.goals.coordinator import GoalCoordinator
@@ -115,6 +120,35 @@ def _plan(body: CreateGoalRequest | UpdateGoalPlanRequest, has_project: bool) ->
 
 
 # ── Goals ────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/goals/suggestion")
+async def goal_suggestion(request: Request, session_id: str) -> dict[str, Any]:
+    """QUI-F03 — whether this conversation's latest request is an aim worth tracking.
+
+    Read-only and local: the answer fills nothing and creates nothing. Chat
+    offers it under the latest answer; *Track it* opens the Goals form filled
+    in, and *Not now* is the dismissal route below.
+    """
+    owner, _principal = _owner(request)
+    store = SQLiteStore(_ws(request))
+    found = noticing.suggestion_for(
+        store, owner_principal_id=owner, user_id=store.principal_user_id(owner), session_id=session_id
+    )
+    answer: GoalSuggestionAnswer = {
+        "session_id": session_id,
+        "suggestion": cast(GoalSuggestionView, noticing.view(found)) if found is not None else None,
+    }
+    return serialize_dto(answer)
+
+
+@router.post("/api/goals/suggestion/dismiss")
+async def dismiss_goal_suggestion(body: GoalSuggestionDismissRequest, request: Request) -> dict[str, Any]:
+    """QUI-F03 — *Not now*. The same aim is never offered again."""
+    owner, _principal = _owner(request, human=True)
+    key = noticing.dismiss(SQLiteStore(_ws(request)), owner_principal_id=owner, words=body.keywords)
+    answer: GoalSuggestionDismissed = {"ok": True, "aim_key": key}
+    return serialize_dto(answer)
 
 
 @router.get("/api/goals")

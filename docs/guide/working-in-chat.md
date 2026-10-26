@@ -283,6 +283,11 @@ or comparison, and **PNG** saves a chart as an image. All of it happens on your
 machine; nothing is fetched and nothing leaves. A screen reader always reaches
 every number, because a chart keeps its table in the page.
 
+**Pin** keeps a block in **Work › Library**, and under the conversation's
+project when it has one; pressed again it unpins. What is kept is copied from
+the stored answer and checked again, so only a block Raiker drew can be pinned.
+From the Library a pin can be moved to another project or out of one.
+
 **At most three blocks** in an answer, unless you asked for a report. When an
 answer has more, it offers **Create document**, which puts that request in the
 composer for you to send — the document is written by the ordinary, governed
@@ -608,7 +613,14 @@ names them:
 
 Decide in place with **Decline** or **Allow once**. **Change** opens the same
 decision on **Approvals**, where a change can be accepted in part or edited
-first. A critical action opens Approvals for your password or code. There is no
+first. After you edit Raiker's draft, Approvals asks once whether there is
+anything to remember for next time, in your own words; **Save** adds it to
+Memory, **Dismiss** keeps nothing.
+
+An approved email or message is **held for ten seconds** before it is sent: the
+card reads *Sending in N s* with **Undo**, and **Undo** (or **Stop** on the
+turn) means it is never sent. When the service has more than one account, the
+card names the one it will use. A critical action opens Approvals for your password or code. There is no
 *Always allow*. Answering anywhere clears the card, the count in the top bar
 and the Approvals queue together.
 

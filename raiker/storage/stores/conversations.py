@@ -1314,6 +1314,15 @@ class ConversationStore:
                  updated_at = excluded.updated_at""",
             (session_id, principal_id, reason, now),
         )
+        # QUI-F19 — Stop reaches a send still in its undo window: it is taken
+        # back, exactly as Undo would, and nothing leaves.
+        self._execute(
+            "UPDATE connector_write_intents SET status = 'undone', undone_at = ? "
+            "WHERE principal_id = ? AND status = 'held' AND approval_id IN ("
+            "  SELECT a.approval_id FROM approvals a JOIN tool_actions t ON t.action_id = a.action_id"
+            "  WHERE t.session_id = ?)",
+            (now, principal_id, session_id),
+        )
         return now
 
     def queue_turn_steer(self: SQLiteStore, session_id: str, principal_id: str, *, text: str) -> int:

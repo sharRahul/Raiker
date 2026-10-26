@@ -8,6 +8,11 @@
    * drawing: Copy and Show as text use the same sentence form the runtime
    * gives an unsourced block and an export, and CSV is the block's own rows.
    * A failed copy or download says so in the toolbar rather than pretending.
+   *
+   * **Pin** (QUI-F15) files the block in the Library, in the conversation's
+   * project when it has one. The surface does the pinning: it names the stored
+   * turn and the block's place in it, and the runtime copies the block from
+   * the record, so a pin holds exactly what this toolbar sits on.
    */
   import type { Snippet } from "svelte";
   import Icon from "./Icon.svelte";
@@ -19,11 +24,36 @@
   let {
     part,
     children,
+    onpin,
+    pinned = false,
+    pinLabel = "Pin to the Library",
   }: {
     part: ContentPart;
     /** The drawn block, given the toolbar's chart-or-table choice. */
     children: Snippet<["chart" | "table"]>;
+    /**
+     * Pin or unpin this block; resolves to the sentence the toolbar says.
+     * Without it there is no Pin button (an unsaved or streaming answer).
+     */
+    onpin?: () => Promise<string>;
+    pinned?: boolean;
+    /** What Pin does here, as its tooltip: "Pin to Quarterly". */
+    pinLabel?: string;
   } = $props();
+
+  let pinning = $state(false);
+
+  async function pin() {
+    if (!onpin || pinning) return;
+    pinning = true;
+    try {
+      say(await onpin());
+    } catch {
+      say(pinned ? "Could not unpin: try again" : "Could not pin: try again");
+    } finally {
+      pinning = false;
+    }
+  }
 
   const BLOCK_NAMES: Record<string, string> = {
     table: "Table",
@@ -104,6 +134,20 @@
     {#if grid !== null}
       <button type="button" class="tool" title="Download as CSV" onclick={csv}>CSV</button>
     {/if}
+    {#if onpin}
+      <button
+        type="button"
+        class="tool icon"
+        aria-pressed={pinned}
+        title={pinned ? "Unpin" : pinLabel}
+        aria-label={pinned ? "Unpin" : pinLabel}
+        disabled={pinning}
+        onclick={pin}
+      >
+        <Icon name="pin" size="sm" />
+        <span class="pin-word">{pinned ? "Pinned" : "Pin"}</span>
+      </button>
+    {/if}
     <span class="notice" role="status">{notice}</span>
   </div>
   {#if asText}
@@ -146,7 +190,8 @@
     cursor: pointer;
     min-height: 1.6rem;
   }
-  .tool.icon { display: inline-flex; align-items: center; }
+  .tool.icon { display: inline-flex; align-items: center; gap: 0.25rem; }
+  .tool:disabled { opacity: 0.6; cursor: progress; }
   .tool:hover,
   .segmented button:hover { border-color: var(--border); color: var(--text-1); }
   .tool[aria-pressed="true"] { color: var(--text-1); border-color: var(--border); }

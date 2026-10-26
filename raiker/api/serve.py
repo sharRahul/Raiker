@@ -76,6 +76,28 @@ def main(argv: list[str] | None = None) -> int:
             "(used to bind the owner session); refusing to expose an unhardened instance.",
         )
         return 2
+    # BUG-347 — a proxy named in RAIKER_TRUSTED_PROXY serves the internet
+    # through a loopback bind, so it takes the same hardened token a public
+    # bind does; an entry that is not an address refuses rather than trusting
+    # nothing (or everything) by accident.
+    from raiker.api.proxy_guard import TRUSTED_PROXY_ENV, ProxyConfigError, trusted_proxies
+
+    try:
+        proxies = trusted_proxies()
+    except ProxyConfigError as exc:
+        print(f"[raiker-web] {exc}. Refusing to start.")
+        return 2
+    if proxies and not public and not os.environ.get("RAIKER_OWNER_TOKEN", "").strip():
+        print(
+            f"[raiker-web] {TRUSTED_PROXY_ENV} lets requests from the internet reach this host through a proxy; "
+            "it requires a hardened owner token in RAIKER_OWNER_TOKEN. Refusing to start.",
+        )
+        return 2
+    if proxies and not public:
+        print(
+            f"[raiker-web] Trusting the reverse proxy at {', '.join(str(p) for p in proxies)}. Requests it "
+            "forwards are treated as remote: rate limited, no recovery, HSTS over HTTPS.",
+        )
     if public:
         print(
             f"[raiker-web] Exposing single-user Raiker on {args.host}:{args.port}. "
@@ -115,7 +137,11 @@ def main(argv: list[str] | None = None) -> int:
     control = HostControl(Path(args.workspace))
     control.record_start(pid=os.getpid(), port=args.port)
     try:
-        uvicorn.run(app, host=args.host, port=args.port)
+        # BUG-347 — uvicorn's own proxy-header handling would rewrite the socket
+        # peer from X-Forwarded-For whenever the peer is 127.0.0.1, so a header
+        # would decide who the client is. Raiker reads the real peer and decides
+        # what a forwarded request is itself (raiker/api/proxy_guard.py).
+        uvicorn.run(app, host=args.host, port=args.port, proxy_headers=False, forwarded_allow_ips="")
     finally:
         control.clear()
     return 0

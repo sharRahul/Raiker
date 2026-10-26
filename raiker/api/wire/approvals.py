@@ -123,6 +123,14 @@ class ApprovalResolved(TypedDict):
     resume: ResumeHandle
 
 
+class ApprovalSendUndone(TypedDict):
+    """QUI-F19 — a held send taken back inside its undo window."""
+
+    ok: bool
+    approval_id: str
+    status: str
+
+
 class CriticalApprovalResolved(TypedDict):
     approval_id: str
     status: str

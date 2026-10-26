@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import os
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -126,6 +127,9 @@ from raiker.api.wire.projects import (
     ProjectMoved,
     ProjectSelected,
     ProjectTreeNode,
+    RoutineDeliveries,
+    RoutineDelivery,
+    RoutineDeliveryStopped,
     project_tree,
 )
 from raiker.api.wire.sessions import (
@@ -147,6 +151,7 @@ from raiker.api.wire.sessions import (
     SessionRenamed,
     SessionsDeleted,
     SessionTagsSet,
+    TaskReceipt,
     TurnReceipt,
 )
 from raiker.auth.vault_key_file import ensure_vault_key
@@ -1066,6 +1071,24 @@ async def get_turn_receipt(
     if data is None:
         raise refusal(status.HTTP_404_NOT_FOUND, "turn_not_found")
     answer: TurnReceipt = cast(TurnReceipt, data)
+    return serialize_dto(answer)
+
+
+@router.get("/api/tasks/{task_id}/receipt")
+async def get_task_receipt(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F16 — what a task used, read, changed and sent, across its own conversation."""
+    data = _service(request).task_receipt(
+        task_id,
+        user_id=auth_data[1].delegated_by_user_id,
+        owner_principal_id=auth_data[0].principal_id,
+    )
+    if data is None:
+        raise refusal(status.HTTP_404_NOT_FOUND, "task_not_found")
+    answer: TaskReceipt = cast(TaskReceipt, data)
     return serialize_dto(answer)
 
 
@@ -2403,6 +2426,14 @@ async def _create_task(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=exc.detail(),
             ) from exc
+    # QUI-F06 — a channel delivery is checked before anything is created, so a
+    # refused one leaves no routine behind that silently does not deliver.
+    deliver_to = (body.deliver_to or "").strip() or None
+    if deliver_to is not None:
+        if not body.deliver_consent:
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "routine_delivery_needs_consent")
+        if store.get_channel_pairing_by_connector(deliver_to) is None:
+            raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, "routine_delivery_channel_unknown")
     # Project-scoped schedules: an explicit project_id wins; otherwise the task
     # is stamped with the active project so project work stays project-scoped.
     try:
@@ -2428,7 +2459,47 @@ async def _create_task(
         )
     except ValueError as exc:
         raise refusal(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    if deliver_to is not None:
+        from raiker.tasks.routine_delivery import set_delivery
+
+        set_delivery(
+            store, task_id=view.task_id, owner_principal_id=session.principal_id,
+            connector_id=deliver_to, consent=body.deliver_consent,
+        )
     return view
+
+
+@router.get("/api/routine-deliveries")
+async def list_routine_deliveries(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F06 — which routines also send their results to a channel, and how the last send went."""
+    from raiker.tasks.routine_delivery import deliveries
+
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    answer: RoutineDeliveries = {
+        "deliveries": cast(
+            list[RoutineDelivery], deliveries(store, owner_principal_id=auth_data[0].principal_id)
+        ),
+    }
+    return serialize_dto(answer)
+
+
+@router.delete("/api/tasks/{task_id}/delivery")
+async def stop_routine_delivery(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F06 — stop sending this routine's results to a channel. Home and its conversation keep them."""
+    from raiker.tasks.routine_delivery import clear_delivery
+
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    if not clear_delivery(store, task_id=task_id, owner_principal_id=auth_data[0].principal_id):
+        raise refusal(status.HTTP_404_NOT_FOUND, "routine_delivery_not_found")
+    answer: RoutineDeliveryStopped = {"ok": True, "task_id": task_id}
+    return serialize_dto(answer)
 
 
 @router.get("/api/tasks/{task_id}/doctor")
@@ -3377,7 +3448,12 @@ async def get_diagnostics(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     _session, principal = _auth_data
-    return serialize_dto(_service(request).get_diagnostics(principal.principal_id))
+    view = _service(request).get_diagnostics(principal.principal_id)
+    # BUG-347 — the guard's record lives in this process, not the store.
+    record = getattr(request.app.state, "remote_access", None)
+    if record is not None:
+        view = dataclasses.replace(view, remote_access=record.view())
+    return serialize_dto(view)
 
 
 @router.get("/api/diagnostics/recovery")

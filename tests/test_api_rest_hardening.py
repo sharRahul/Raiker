@@ -144,6 +144,23 @@ def test_forwarded_headers_cannot_spoof_a_loopback_peer(workspace: Path) -> None
 
     statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
 
+    # BUG-347 — stricter than a rate limit now: a forwarded request on a
+    # loopback-only host is refused outright, and never counted as local.
+    assert statuses == [403, 403, 403, 403]
+
+
+def test_a_trusted_proxys_reads_are_rate_limited_like_any_remote(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIKER_TRUSTED_PROXY", "127.0.0.1")
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=True),
+        client=("127.0.0.1", 50000),
+    )
+    headers = {**_headers(workspace), "X-Forwarded-For": "203.0.113.9"}
+
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
+
     assert statuses[:2] == [200, 200]
     assert statuses[2:] == [429, 429]
 

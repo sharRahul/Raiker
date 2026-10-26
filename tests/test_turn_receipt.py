@@ -72,3 +72,55 @@ def test_a_connector_read_names_its_service() -> None:
     receipt = build_turn_receipt("turn_4", events, local_providers=LOCAL)
     assert receipt["reads"] == {"message": 1}
     assert receipt["left_computer"] == ["Gmail"]
+
+
+def test_a_task_receipt_sums_its_own_conversation(tmp_path: Any, monkeypatch: Any) -> None:
+    """A routine's receipt adds up its turns; one unpriced billable turn makes the cost unknown."""
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.control.dashboard import DashboardService
+    from raiker.storage.sqlite import SQLiteStore
+
+    client = TestClient(create_app(tmp_path))
+    token = client.post("/api/auth/register", json={"username": "owner", "password": "a-long-password-1"}).json()["token"]
+    h = {"Authorization": f"Bearer {token}"}
+    store = SQLiteStore(tmp_path)
+    principal = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+    user_id = store.principal_user_id(principal)
+    from raiker.contracts.models import TaskRecord
+
+    store.create_session("sess_run", str(tmp_path), title="Morning brief", user_id=user_id)
+    store.insert_task(TaskRecord(
+        task_id="task_brief", session_id="sess_run", title="Morning brief", objective="Brief me.",
+        status="completed", created_at="2026-10-26T00:00:00Z", updated_at="2026-10-26T00:00:00Z",
+        thread_session_id="sess_run",
+    ))
+    for turn_id in ("turn_a", "turn_b"):
+        store.insert_turn("sess_run", turn_id, "Brief me.")
+        store.complete_turn(turn_id, "completed", "Done.")
+    receipts = {
+        "turn_a": {"model": "claude-haiku-4-5", "local": False, "reads": {"web page": 2}, "changes": [],
+                   "left_computer": ["the web"], "cost_usd": 0.01, "cost_basis": "priced"},
+        "turn_b": {"model": "claude-haiku-4-5", "local": False, "reads": {"web page": 1, "file": 1},
+                   "changes": [{"label": "Send email", "approved_at": "2026-10-26T08:00:00Z"}],
+                   "left_computer": ["Gmail", "the web"], "cost_usd": 0.02, "cost_basis": "priced"},
+    }
+    monkeypatch.setattr(
+        DashboardService, "turn_receipt",
+        lambda _self, _session, turn_id, **_kw: {"turn_id": turn_id, **receipts[turn_id]},
+    )
+    answer = client.get("/api/tasks/task_brief/receipt", headers=h)
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    assert body["turns"] == 2
+    assert body["models"] == ["claude-haiku-4-5"]
+    assert body["reads"] == {"web page": 3, "file": 1}
+    assert body["changes"] == [{"label": "Send email", "approved_at": "2026-10-26T08:00:00Z"}]
+    assert sorted(body["left_computer"]) == ["Gmail", "the web"]
+    assert body["cost_basis"] == "priced"
+    assert abs(body["cost_usd"] - 0.03) < 1e-9
+    receipts["turn_b"]["cost_basis"] = "unknown"
+    receipts["turn_b"]["cost_usd"] = None
+    assert client.get("/api/tasks/task_brief/receipt", headers=h).json()["cost_basis"] == "unknown"
+    assert client.get("/api/tasks/task_nope/receipt", headers=h).status_code == 404

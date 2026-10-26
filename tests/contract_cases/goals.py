@@ -101,7 +101,26 @@ def _project(_ws: Path, client: TestClient, h: dict[str, str]) -> Call:
     return f"/api/execution-profiles/projects/{project_id}", {"profile_id": profile_id}
 
 
+def _two_chats(ws: Path, client: TestClient, h: dict[str, str]) -> Call:
+    """QUI-F03 — the same aim in two conversations."""
+    from raiker.storage.sqlite import SQLiteStore
+
+    store = SQLiteStore(ws)
+    principal = client.get("/api/auth/whoami", headers=h).json()["principal_id"]
+    user_id = store.principal_user_id(principal)
+    for session_id, prompt in (
+        ("sess_aim_a", "Find a marathon training plan for the Berlin marathon"),
+        ("sess_aim_b", "Adjust my Berlin marathon training plan for September"),
+    ):
+        store.create_session(session_id, str(ws), title=prompt[:30], user_id=user_id)
+        store.insert_turn(session_id, f"turn_{session_id}", prompt)
+        store.complete_turn(f"turn_{session_id}", "completed", "Done.")
+    return "/api/goals/suggestion?session_id=sess_aim_b"
+
+
 CASES: Cases = {
+    ("GET", "/api/goals/suggestion"): _two_chats,
+    ("POST", "/api/goals/suggestion/dismiss"): plain("/api/goals/suggestion/dismiss", {"keywords": ["berlin", "marathon", "training"]}),
     ("GET", "/api/goals"): _listed,
     ("POST", "/api/goals"): plain("/api/goals", _PLAN),
     ("GET", "/api/goals/{goal_id}"): _read,

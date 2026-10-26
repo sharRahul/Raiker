@@ -11,7 +11,7 @@
  * declared parts renders exactly as it always did.
  */
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import AnswerParts from "./AnswerParts.svelte";
 import type { ContentPart } from "../apiTypes";
 import { part } from "../test-helpers";
@@ -273,5 +273,32 @@ describe("more than three blocks", () => {
   it("does not offer one for three", () => {
     render(AnswerParts, { text: "", parts: [FIGURES, COMPARE, TABLE], ondocument: () => {} });
     expect(screen.queryByRole("button", { name: "Create document" })).toBeNull();
+  });
+});
+
+describe("QUI-F15 Pin in the block toolbar", () => {
+  const CALLOUT: ContentPart = part({ type: "callout", data: { tone: "verdict", text: "Ship it." } });
+
+  it("offers Pin only where the surface can pin, and says where it went", async () => {
+    const onpin = vi.fn(async () => "Pinned to Quarterly");
+    render(AnswerParts, { text: "", parts: [CALLOUT], onpin, pinLabel: "Pin to Quarterly" });
+    const pin = screen.getByRole("button", { name: "Pin to Quarterly" });
+    expect(pin).toHaveAttribute("aria-pressed", "false");
+    await fireEvent.click(pin);
+    expect(onpin).toHaveBeenCalledWith(0);
+    expect(await screen.findByText("Pinned to Quarterly")).toBeInTheDocument();
+  });
+
+  it("reads Pinned for a block already pinned, and has no Pin without a handler", () => {
+    const { unmount } = render(AnswerParts, { text: "", parts: [CALLOUT], onpin: async () => "", pinned: new Set([0]) });
+    expect(screen.getByRole("button", { name: "Unpin" })).toHaveAttribute("aria-pressed", "true");
+    unmount();
+    render(AnswerParts, { text: "", parts: [CALLOUT] });
+    expect(screen.queryByRole("button", { name: /Pin/ })).not.toBeInTheDocument();
+  });
+
+  it("does not offer Pin while the answer is still streaming", () => {
+    render(AnswerParts, { text: "", parts: [CALLOUT], onpin: async () => "", streaming: true });
+    expect(screen.queryByRole("button", { name: /Pin/ })).not.toBeInTheDocument();
   });
 });

@@ -331,9 +331,32 @@ Running the host this way inside **WSL2** or on a **VPS** you control — a
 systemd unit, an SSH tunnel, or a bind to a private VPN address — is walked
 through in the README's
 [Running Raiker under WSL2 or on a VPS](../../README.md#running-raiker-under-wsl2-or-on-a-vps).
-Do not put a reverse proxy on the same machine in front of a loopback bind:
-Raiker would read every proxied request as a local one
-([BUG-347](../plans/TO_BE_FIXED.md#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local)).
+### Behind a reverse proxy
+
+A reverse proxy on the same machine (Caddy, nginx) forwarding to
+`127.0.0.1:8765` is refused by default: a request that carries a forwarding
+header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`,
+`X-Forwarded-Proto`, `X-Real-IP`) is never treated as coming from this
+computer, and a host bound to loopback answers it with
+*Raiker is bound to this computer only, and this request came through a reverse
+proxy, so it was refused*, followed by what to change. **Diagnostics** shows
+*Requests through a reverse proxy are being refused*.
+
+To run behind the proxy, name its address and set the owner token:
+
+```bash
+export RAIKER_OWNER_TOKEN="$(openssl rand -hex 32)"
+export RAIKER_TRUSTED_PROXY=127.0.0.1   # comma-separated addresses or ranges
+raiker-web --workspace . --no-browser
+```
+
+Requests the proxy forwards are then served as remote ones: rate limited,
+password recovery and other this-computer-only pages refused, and HSTS added
+when the proxy says the browser reached it over HTTPS. **Diagnostics** shows
+*Raiker is reachable from the internet through a proxy*. The host refuses to
+start when `RAIKER_TRUSTED_PROXY` is set without `RAIKER_OWNER_TOKEN`, or names
+something that is not an address. The client address a proxy reports is never
+used to identify anyone. An SSH tunnel needs neither setting.
 
 For installation failures or stale dashboard builds, see
 [Troubleshooting](troubleshooting.md).

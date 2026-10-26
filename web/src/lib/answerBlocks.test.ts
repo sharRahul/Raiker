@@ -3,7 +3,7 @@
  * text, Copy and CSV all use. The wording matches the runtime's `as_text`.
  */
 import { describe, expect, it } from "vitest";
-import { blockCount, blockFilename, blockGrid, blockText, figure, holdBackBlocks, toCsv } from "./answerBlocks";
+import { blockCount, blockFilename, blockGrid, blockText, displayFigure, figure, holdBackBlocks, toCsv } from "./answerBlocks";
 import { part } from "./test-helpers";
 
 describe("figure", () => {
@@ -78,5 +78,15 @@ describe("holdBackBlocks — a streaming answer's raiker: fences", () => {
   it("leaves an ordinary code sample alone", () => {
     const text = "```python\nprint(1)\n```";
     expect(holdBackBlocks(text)).toBe(text);
+  });
+});
+
+describe("displayFigure", () => {
+  it("groups thousands in the drawn tile only", () => {
+    expect(displayFigure(1200, "$")).toBe("$1,200");
+    expect(displayFigure(-12500, "€")).toBe("-€12,500");
+    expect(displayFigure(1234.5, "km")).toBe("1,234.5 km");
+    expect(displayFigure(999, "£")).toBe("£999");
+    expect(figure(1200, "$")).toBe("$1200");
   });
 });

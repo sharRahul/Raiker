@@ -23,6 +23,7 @@ from raiker.api.sessions import ApiSession
 from raiker.api.wire.approvals import (
     ApprovalReplaced,
     ApprovalResolved,
+    ApprovalSendUndone,
     CriticalApprovalResolved,
     OwnerQuestionAnswered,
     ResumableTurns,
@@ -41,11 +42,13 @@ from raiker.control.views.security import IdentityView
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.runtime import held_sends
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.connector_ecosystem import ConnectorInvoker
 from raiker.runtime.turn_suspension import (
     METADATA_ONLY_PREFIX,
+    SEND_UNDONE,
     TurnSuspensionError,
     approval_outcome,
     deserialize_pending_calls,
@@ -529,6 +532,24 @@ async def replace_approval_with_edit(
     return serialize_dto(replaced)
 
 
+@router.post("/api/approvals/{approval_id}/undo-send")
+async def undo_held_send(
+    approval_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """QUI-F19 — take back an approved send while it is still held. Nothing leaves.
+
+    Answers 409 ``send_not_held`` when there is nothing to take back: the window
+    closed and it was sent, it was never held, or it is not this owner's.
+    """
+    session, _principal = _auth_data
+    if not held_sends.undo(SQLiteStore(_ws(request)), principal_id=session.principal_id, approval_id=approval_id):
+        raise refusal(status.HTTP_409_CONFLICT, "send_not_held")
+    answer: ApprovalSendUndone = {"ok": True, "approval_id": approval_id, "status": "undone"}
+    return serialize_dto(answer)
+
+
 @router.post("/api/approvals/{approval_id}/resolve")
 async def resolve_approval(
     approval_id: str,
@@ -720,19 +741,44 @@ async def resolve_approval(
                     (intent["intent_id"],),
                 )
         else:
-            with store.connect() as connection:
-                claimed = connection.execute(
-                    "UPDATE connector_write_intents SET status='executing' WHERE intent_id=? AND status='pending_approval'",
-                    (intent["intent_id"],),
-                )
-            if claimed.rowcount != 1:
+            # QUI-F19 — approved is not sent yet: the write waits out its undo
+            # window first, and Undo or Stop inside it means nothing is sent.
+            if held_sends.hold(store, str(intent["intent_id"]), seconds=held_sends.HOLD_SECONDS) is None:
                 raise refusal(status.HTTP_409_CONFLICT, "connector_intent_already_consumed")
+            if not await held_sends.wait_for_release(
+                store, str(intent["intent_id"]), seconds=held_sends.HOLD_SECONDS
+            ):
+                proposed_by, approved_by, machine_identity = _approval_attribution(
+                    request, approval_id, user_id=owner_user_id, principal_id=session.principal_id
+                )
+                undone: ApprovalResolved = {
+                    "approval_id": resolution.approval_id,
+                    "action_id": resolution.action_id,
+                    "status": "undone",
+                    "executes_action": False,
+                    "reason": body.reason,
+                    "proposed_by": proposed_by,
+                    "approved_by": approved_by,
+                    "machine_identity": machine_identity,
+                    "not_executed_reason": SEND_UNDONE,
+                    "resume": _record_resume_outcome(
+                        request,
+                        store,
+                        approval_id,
+                        approval_outcome(
+                            approved=True, executed=False, capability="connector_write", reason_code=SEND_UNDONE
+                        ),
+                    ),
+                }
+                return serialize_dto(undone)
             try:
                 output = await ConnectorInvoker(store).invoke(
                     session.principal_id,
                     str(intent["connector_id"]),
                     str(intent["operation_id"]),
                     json.loads(intent["arguments_json"]),
+                    # QUI-F07 — exactly the account the approval named.
+                    intent.get("account_id"),
                 )
             except (ValueError, json.JSONDecodeError) as exc:
                 with store.connect() as connection:

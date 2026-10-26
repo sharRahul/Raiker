@@ -220,10 +220,25 @@ run useful local models). Run Raiker as its own unprivileged user.
    ```
 
    Terminate TLS in front of it if your VPN does not already encrypt the
-   traffic, with the proxy connecting to that private address. **Do not point a
-   reverse proxy at `127.0.0.1:8765`:** Raiker treats a loopback peer as this
-   machine, so every remote request would arrive as a local one, without the
-   public-bind guardrails. A remote instance is still a single-owner instance:
+   traffic, with the proxy connecting to that private address.
+
+5. **Or behind a reverse proxy on the same machine** (Caddy, nginx) that
+   forwards to `127.0.0.1:8765`. Name the proxy's address and set the owner
+   token; Raiker then serves what the proxy forwards as remote requests, rate
+   limited, with password recovery refused and HSTS when the proxy received
+   HTTPS:
+
+   ```ini
+   Environment=RAIKER_OWNER_TOKEN=<a long random value>
+   Environment=RAIKER_TRUSTED_PROXY=127.0.0.1
+   ```
+
+   Without `RAIKER_TRUSTED_PROXY`, a loopback-bound Raiker refuses every request
+   that carries a forwarding header (`X-Forwarded-For`, `Forwarded` and the
+   like) and says what to change, and **Diagnostics** shows the refusals. It
+   never reads a forwarded request as a local one.
+
+   A remote instance is still a single-owner instance:
    every action stays governed, approved and audited, and the owner password
    protects it — choose a strong one and turn on **Settings → Security &
    sign-in → Enroll in MFA**.

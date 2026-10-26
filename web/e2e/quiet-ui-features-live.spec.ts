@@ -1,5 +1,5 @@
 /**
- * Quiet UI — features and improvements (docs/plans/quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md),
+ * Quiet UI — features and improvements (Quiet UI plan 06, closed 2026-10-26: FIXED-1150 … FIXED-1167),
  * against a running host and a real hosted model.
  *
  * Prerequisites:

@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from raiker.api.proxy_guard import is_local_request
 from raiker.api.schemas import InstanceCreateRequest, serialize_dto
 from raiker.api.wire.settings import InstanceCreated
 from raiker.auth.accounts import AccountService, AuthError
@@ -20,7 +21,8 @@ _LOOPBACK = {"127.0.0.1", "::1", "localhost", "testclient"}
 
 def _require_loopback(request: Request) -> None:
     host = request.client.host if request.client else ""
-    if host not in _LOOPBACK:
+    # BUG-347 — a request a proxy forwarded is never from this machine.
+    if host not in _LOOPBACK or not is_local_request(request.scope):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"reason_code": "loopback_only"},

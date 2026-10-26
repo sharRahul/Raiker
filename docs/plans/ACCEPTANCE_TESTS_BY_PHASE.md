@@ -212,6 +212,7 @@ Acceptance tests must prove:
 - Audit export includes events, policy decisions, approvals, tool actions, checkpoints, and config versions.
 - Owner-set hosted provider budgets block over-limit requests.
 - Personal home-lab or owner-selected remote execution configuration does not weaken local-first defaults.
+- A request a reverse proxy forwarded is never treated as local: a loopback-bound host refuses it unless the owner named the proxy in `RAIKER_TRUSTED_PROXY` with `RAIKER_OWNER_TOKEN` set, and then serves it as remote (no recovery, rate limited, HSTS over HTTPS). Diagnostics says how the host is reached (`tests/test_proxied_loopback.py`, RT-SEC-01/02; [FIXED-1264](FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347)).
 
 ---
 
@@ -381,3 +382,20 @@ phase must add and pass the applicable
 This mapping is a future acceptance obligation, not a record of tests run.
 Promotion to release requires a complete candidate scorecard and evidence,
 not only implementation completion or five documentation validators passing.
+
+## Beta release acceptance
+
+The first beta is a **prerelease to the `beta` channel** for testers who know
+it is a beta ([Releasing](../guide/releasing.md#beta-release-checklist)). It is
+accepted when every row below has its evidence on the release commit. A row
+without evidence blocks the beta; it is not waived by a later one.
+
+| Gate | Evidence on the release commit |
+|---|---|
+| CI green | `ci.yml` (Python lint, types, scans and docs; three test shards; Web UI; Electron shell; Licensing and SBOM) and, when packaging paths changed, `desktop-package.yml` |
+| Installers | The [release acceptance matrix](RELEASE_ACCEPTANCE_MATRIX.md) rows for every platform offered; an unsigned beta says so in its notes |
+| Live rounds | The most recent result for each area in [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) is ✅ on a hosted provider, and no ✅ there depends on a fix not on the release commit |
+| Remote access | RT-SEC-01 and RT-SEC-02 pass; the beta notes say a VPS is reached by SSH tunnel, a private address with `--allow-public`, or a named trusted proxy ([Managing the host](../guide/managing-the-host.md#behind-a-reverse-proxy)) |
+| Data safety | A backup is made and restored from Settings, and the lock screen restores one (recovery stays this-computer-only) |
+| Open defects | Every open entry in [TO_BE_FIXED](TO_BE_FIXED.md) is either outside the beta's claims or named in the beta notes; [KNOWN_LIMITS](../architecture/KNOWN_LIMITS.md) is current |
+

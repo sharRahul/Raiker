@@ -285,3 +285,13 @@ def _fresh_channel_loop_guard() -> None:
     _inbound_hits.clear()
     _channel_hits.clear()
     _global_hits.clear()
+
+
+@pytest.fixture(autouse=True)
+def _short_undo_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QUI-F19 — an approved send waits ten seconds for Undo; no test waits that long.
+
+    The window is still real (the write is held, then claimed), only short. A
+    test about the window itself sets its own length.
+    """
+    monkeypatch.setattr("raiker.runtime.held_sends.HOLD_SECONDS", 0.05)

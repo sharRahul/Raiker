@@ -14,8 +14,8 @@ live cases RT-QUI-26 to RT-QUI-34 in
 |---|---|
 | QUI-P01 | **Unchanged.** The layers already hold in the runtime; no surface was added for them. |
 | QUI-P02 | **Done** for Careful and Standard on Chat's and Home's composers (decided 2026-10-22: per conversation, narrows only). Since 2026-10-25 the choice is kept on the conversation, so every device opens it the same way (owner's decision; [FIXED-1181](../FIXED_ITEMS.md#fixed-1181--the-careful-profile-was-remembered-in-one-browser-only-qui-p02)). **Within limits** waits for Allow-with-limits rules (QUI-P03). The account's approval mode moved to Permissions › Advanced. |
-| QUI-P03 | **Partly done** through QUI-L06. Open: **Allow with limits** and the limits it requires. |
-| QUI-P04 | **Partly done.** Done: *What Raiker may do with …* with each activity as *Reads*, *Changes* or *Can't be undone*. Open: the three presets, named accounts and recent activity under the list, which need a per-connection policy the runtime does not store yet. |
+| QUI-P03 | **Partly done** through QUI-L06. A project's own limits (repositories, web domains, connections) are enforced before approval since 2026-10-26 ([FIXED-1257](../FIXED_ITEMS.md#fixed-1257--a-project-could-not-limit-what-raiker-may-touch-in-it-qui-f21)). Open: **Allow with limits** on a single approval and the limits it requires. |
+| QUI-P04 | **Partly done.** Done: *What Raiker may do with …* with each activity as *Reads*, *Changes* or *Can't be undone*. Named accounts shipped 2026-10-26 ([FIXED-1253](../FIXED_ITEMS.md#fixed-1253--a-service-held-one-account-and-an-approval-did-not-say-which-qui-f07)): a connection lists its accounts, each with its own credential, and the approval card names the one a write uses. Open: the three presets and recent activity under the list, which need a per-connection policy the runtime does not store yet. |
 | QUI-P05 | **Done**, except **Allow for this task**, which waits for limits the runtime can enforce. The card is in Chat; the floating card and Approvals use the same words. |
 | QUI-P06 | **Done.** 30 minutes by default, set in Settings › Security. *Ask again* asks the same request as a new turn. Since 2026-10-25 the host settles an approval past its limit to `expired` with an `approval_expired` event, and its tool row reads *not done* ([FIXED-1179](../FIXED_ITEMS.md#fixed-1179--an-expired-approval-stayed-pending-in-storage-and-its-row-still-waited)). |
 | QUI-P07 | **Done.** |
@@ -154,7 +154,7 @@ action, target, source task, risk label, time.
 
 What happened and which approval allowed it appears inside each task and in
 Approvals › History. Memory › Controls lists "Approvals you've given" with Undo,
-alongside "What Raiker has learned to do" ([06, QUI-F09](06_FEATURES_AND_IMPROVEMENTS.md)).
+alongside "What Raiker has learned to do" ([QUI-F09, FIXED-1158](../FIXED_ITEMS.md#fixed-1158--what-raiker-learned-and-the-approvals-given-could-not-be-undone-in-one-place-qui-f09)).
 
 ### QUI-P09 — Approval fatigue
 

@@ -25,6 +25,7 @@ export interface SafetyRow {
 
 /** The labels the facts in `consequenceFacts` use for what an action reaches. */
 const AFFECTS = new Set([
+  "Account",
   "Path",
   "Paths",
   "Destination",

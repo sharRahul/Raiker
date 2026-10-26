@@ -8,7 +8,7 @@
    * "≈ estimate" in words beside its number, never only in a lighter colour.
    * A description list, so a screen reader reads each label with its value.
    */
-  import { PREFIX_UNITS, figure, type Figure } from "../answerBlocks";
+  import { PREFIX_UNITS, displayFigure, type Figure } from "../answerBlocks";
 
   let {
     caption = "",
@@ -26,9 +26,9 @@
         <dt>{item.label}</dt>
         <dd>
           {#if PREFIX_UNITS.has(item.unit)}
-            <span class="value">{figure(item.value, item.unit)}</span>
+            <span class="value">{displayFigure(item.value, item.unit)}</span>
           {:else}
-            <span class="value">{figure(item.value)}</span>
+            <span class="value">{displayFigure(item.value)}</span>
             <span class="unit">{item.unit}</span>
           {/if}
         </dd>

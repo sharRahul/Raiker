@@ -36,6 +36,7 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from raiker.api.proxy_guard import is_local_request
 from raiker.api.schemas import StrictRequest, serialize_dto
 from raiker.api.wire.control import RecoveryBackupsView, RecoveryRestored
 from raiker.control.views.security import BackupView
@@ -64,7 +65,12 @@ def _refuse(code: int, reason: str) -> HTTPException:
 
 def _require_this_machine(request: Request) -> None:
     host = request.client.host if request.client else ""
-    if host not in _LOOPBACK or not bool(getattr(request.app.state, "loopback_only", True)):
+    # BUG-347 — a request a proxy forwarded is never from this machine.
+    if (
+        host not in _LOOPBACK
+        or not is_local_request(request.scope)
+        or not bool(getattr(request.app.state, "loopback_only", True))
+    ):
         raise _refuse(status.HTTP_403_FORBIDDEN, "recovery_loopback_only")
 
 

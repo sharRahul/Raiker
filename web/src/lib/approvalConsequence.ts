@@ -31,6 +31,9 @@ export interface ConsequenceFact {
 
 /** The keys worth lifting, in the order a reviewer needs them. */
 const FIELDS: { keys: string[]; label: string }[] = [
+  // QUI-F07 — which of the owner's accounts acts. Written by the server from
+  // the account it resolved, never by the model, so it names the real one.
+  { keys: ["account"], label: "Account" },
   { keys: ["command", "argv", "cmd"], label: "Command" },
   { keys: ["cwd", "working_directory"], label: "Working directory" },
   { keys: ["path", "file_path", "target_path", "target"], label: "Path" },

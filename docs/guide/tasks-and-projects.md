@@ -30,6 +30,17 @@ waits). A template only fills the form; nothing is saved until you press
 that went well. Every run's result appears on Home and in the task's own
 conversation, where a reply steers the next run.
 
+**Also send each result to** a paired channel (Telegram, Slack) is offered when
+one is paired. It is a box you tick, because it sends every finished run's
+result there without asking again; it still goes through that channel's own
+switch in Permissions, and a run whose result could not be sent says *the last
+one was not sent* on its row. Remove it from the task at any time.
+
+**Each task has a receipt.** Its row in Tasks carries one line adding up its
+run — model, approximate cost, what was read, what changed or was sent, and
+what left this computer — which opens to the details, as a turn's receipt does
+in Chat.
+
 **Quick Entry** (desktop window): **Ctrl+Shift+Space** (**Cmd+Shift+Space** on
 a Mac) opens a small box from anywhere on your computer. Type, choose **Send
 to** — **New task** or one of your five most recent conversations — and press
@@ -313,6 +324,14 @@ lives.
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.
 
+**Project limits.** **Overview → Set limits** narrows what Raiker may reach
+in the project's conversations: the repositories it may push to, the web
+domains it may read and the connections it may use. An empty list sets no
+limit. Anything outside a limit is refused before it reaches an approval, with a
+sentence naming the limit, so you are never asked to approve what the project
+forbids. Limits only narrow; they never allow something your Permissions do
+not. The composer says *Project limits apply* when the chosen project has any.
+
 **Getting back to it.** Chat, Build, Design and Tasks each name the project a
 turn runs inside, in the context line beside the composer. Opening that line
 gives you **Open project work**, which opens *that* project rather than the list
@@ -326,7 +345,7 @@ long column:
 | **Overview** | The project's instructions and memory setting, and how many of each kind of thing is under it |
 | **Files** | The project's folder, any file's provenance, and the files its chats shared, by name, type and size |
 | **Work** | The chats started in it — each with its title, last activity, mode and status, and a click away from where it left off — and the tasks scoped to it |
-| **Assets** | The **images** generated in [Design](design.md) while it was the working project |
+| **Project library** | What Raiker made for it: generated documents, pinned answer blocks and pull requests, each opening where it came from, and the **images** generated in [Design](design.md) while it was the working project |
 | **Evidence** | The checkpoints taken in its sessions |
 
 It opens on **Overview**, and the counts there say whether a section holds
@@ -342,6 +361,17 @@ scoped to this project and a **Show all images** way back out. **View all in
 Design** keeps the project too, so neither route drops you into every image you
 have ever generated. The strip shows eight and says how many there are when
 there are more.
+
+## The Library
+
+**Work › Library** is everything Raiker has made for you in one list, newest
+first: generated documents (with their download), images and documents from
+Design, answer blocks you pinned from Chat, and pull requests Raiker opened.
+Filter by type or project; each item opens the conversation, turn or Design
+document it came from. A pinned block can be moved to another project or
+unpinned from here. Each project's **Project library** is the same list for
+that project. The Library only reads what already exists; nothing is copied
+into it except a block you pin.
 
 ## The work board
 
@@ -587,7 +617,12 @@ of finished steps; Raiker does not estimate a percentage.
   profile.
 
 **Home** lists goals that need you, goals in progress and goals that finished
-recently. Goals cannot yet be started from a Chat message, and a criterion
+recently. From Chat, **Make this a goal** under an answer opens this form
+filled in from your request, and when the same aim comes up in another
+conversation Raiker offers *This looks like an ongoing goal. Track it?*, once;
+**Not now** means it is not offered again. Both only fill the form: nothing is
+saved until you save it. A goal is matched by the words of your requests, not by
+a model, so the same aim put in different words may not be noticed. A criterion
 cannot yet use a Build step's verified outcome as its evidence
 ([BUG-355](../plans/TO_BE_FIXED.md#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
 

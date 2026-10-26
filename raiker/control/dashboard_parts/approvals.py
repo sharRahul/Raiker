@@ -300,6 +300,15 @@ class ApprovalService:
         except (ValueError, TypeError):
             raw_args = {}
         arguments = self._redact_arguments(raw_args)
+        if view.tool_name == "connector_write":
+            # QUI-F07 — the card names the account the write will really use,
+            # read from the intent the server filed, not from the model's text.
+            from raiker.runtime.connector_accounts import intent_account_label
+
+            account = intent_account_label(self.store, approval_id)
+            if account:
+                arguments = {**arguments, "account": account}
+                raw_args = {**raw_args, "account": account}
         diff, diff_path, kind = self._build_preview(
             view.tool_name, raw_args, principal_id=principal_id, approval_id=approval_id
         )
@@ -404,7 +413,7 @@ class ApprovalService:
                 notice = (
                     "Approving this performs the change shown above, once, in your "
                     "workspace — under a fresh capability, policy and posture check. "
-                    f"**This change cannot be rewound.** `{path}` is "
+                    f"This change cannot be rewound: {path} is "
                     f"{size_bytes // (1024 * 1024)} MiB, over the "
                     f"{MAX_PRE_IMAGE_BYTES // (1024 * 1024)} MiB checkpoint pre-image "
                     "cap, so no copy of the previous contents is kept."
@@ -422,7 +431,9 @@ class ApprovalService:
             # expecting the file. Name the switch, before the decision.
             notice = (
                 "Accepting this records your decision only — it will not be carried "
-                f"out, because **{_gate_label(blocking_gate)}** is off in "
+                # Plain text: every surface draws this notice as a sentence,
+                # so Markdown emphasis showed as literal asterisks.
+                f"out, because {_gate_label(blocking_gate)} is off in "
                 "Permissions. Turn it on there for an accepted action to run."
             )
         else:
@@ -690,10 +701,12 @@ class ApprovalService:
         if tool_name == "connector_write":
             connector = str(args.get("connector_id", "connector"))
             operation = str(args.get("operation_id", "operation"))
+            # QUI-F07 — the account the write uses, as the owner named it.
+            account = str(args.get("account") or "").strip()
             request_arguments = self._redact_value(args.get("arguments", {}))
             return (
                 json.dumps(request_arguments, indent=2, sort_keys=True),
-                f"{connector} / {operation}",
+                f"{connector} ({account}) / {operation}" if account else f"{connector} / {operation}",
                 "connector_request",
             )
         # B11 — the git write path. A commit is reviewed the way a file change

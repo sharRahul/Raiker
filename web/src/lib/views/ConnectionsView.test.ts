@@ -25,6 +25,14 @@ function connector(partial: Partial<StoreConnector> = {}): StoreConnector {
     active_operation: null,
     last_invoked_at: null,
     operations: [],
+    accounts: [
+      {
+        account_id: "default",
+        label: "Gmail",
+        is_default: true,
+        auth_status: partial.auth_status ?? "not_connected",
+      },
+    ],
     ...partial,
   };
 }
@@ -144,7 +152,7 @@ describe("Connections › Services (QUI-L07)", () => {
     stubFetch(routes([connector({ installed: true })]));
     render(ConnectionsView);
     await fireEvent.click(await screen.findByRole("option", { name: /gmail/i }));
-    expect(screen.getByLabelText("OAuth access token")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText(/OAuth access token/)).toHaveAttribute("type", "password");
     expect(screen.getByText(/encrypted for this profile/)).toBeInTheDocument();
   });
 
@@ -246,5 +254,25 @@ describe("Connections › Services (QUI-L07)", () => {
     });
     await fireEvent.click(screen.getByRole("button", { name: "Check and register" }));
     await waitFor(() => expect(screen.getByText("1 operations registered")).toBeInTheDocument());
+  });
+
+  it("names each account, adds another and saves its credential in its own slot (QUI-F07)", async () => {
+    const connected = connector({ installed: true, auth_status: "connected" });
+    connected.accounts = [{ account_id: "default", label: "Work Gmail", is_default: true, auth_status: "connected" }];
+    const mock = stubFetch({
+      ...routes([connected]),
+      "POST /api/connector-store/gmail/accounts": { ok: true, connector_id: "gmail", account_id: "cacct_2", label: "Personal Gmail" },
+    });
+    render(ConnectionsView);
+    await fireEvent.click(await screen.findByRole("option", { name: /gmail/i }));
+    expect(await screen.findByText("Work Gmail")).toBeInTheDocument();
+    expect(screen.getByText("Default")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Work Gmail" })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /Add another account/ }));
+    await fireEvent.input(screen.getByLabelText("Name for the new account"), { target: { value: "Personal Gmail" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() =>
+      expect(mock.mock.calls.some(([url, init]) => String(url).includes("/api/connector-store/gmail/accounts") && (init as RequestInit).method === "POST")).toBe(true),
+    );
   });
 });

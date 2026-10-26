@@ -13,6 +13,15 @@ from raiker.runtime.connector_ecosystem import ConnectorInvocation, ConnectorOpe
 ConnectorAuthStatus = Literal["connected", "reauth_required", "not_connected"]
 
 
+class ConnectorAccount(TypedDict):
+    """QUI-F07 — one named account on a connector. Never a credential value."""
+
+    account_id: str
+    label: str
+    is_default: bool
+    auth_status: ConnectorAuthStatus
+
+
 class StoreConnector(TypedDict):
     """One catalogue connector, as this owner has it. Never a credential value."""
 
@@ -30,6 +39,8 @@ class StoreConnector(TypedDict):
     active_operation: str | None
     last_invoked_at: str | None
     operations: list[ConnectorOperation]
+    #: QUI-F07 — the default account first, then any the owner added.
+    accounts: list[ConnectorAccount]
 
 
 class ConnectorStoreView(TypedDict):
@@ -75,6 +86,24 @@ class ManifestRegistered(TypedDict):
     operations: list[ConnectorOperation]
 
 
+class ConnectorAccounts(TypedDict):
+    connector_id: str
+    accounts: list[ConnectorAccount]
+
+
+class ConnectorAccountChanged(TypedDict):
+    ok: bool
+    connector_id: str
+    account_id: str
+    label: str
+
+
+class ConnectorAccountRemoved(TypedDict):
+    ok: bool
+    connector_id: str
+    account_id: str
+
+
 class ConnectorActionQueued(TypedDict):
     """A write: recorded as an intent and waiting for the owner's approval. Nothing ran."""
 
@@ -84,6 +113,8 @@ class ConnectorActionQueued(TypedDict):
     connector_id: str
     operation_id: str
     executes_action: bool
+    #: QUI-F07 — the account the write will use, by the owner's name for it.
+    account_label: str
 
 
 class ConnectorActionCompleted(ConnectorInvocation):

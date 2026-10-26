@@ -19,6 +19,7 @@
   import AddDialog from "../components/AddDialog.svelte";
   import type { AddOption } from "../addDialog";
   import LifecycleTrack from "../components/LifecycleTrack.svelte";
+  import ConnectorAccounts from "../components/ConnectorAccounts.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import GitHubConnection from "./settings/GitHubConnection.svelte";
   import { api, ApiError } from "../api";
@@ -349,25 +350,9 @@
             </p>
           {/if}
 
-          <section>
-            <h3>Account</h3>
-            {#if connector.auth_status !== "connected"}
-              <p>
-                {connector.auth_type === "oauth2"
-                  ? "Paste an OAuth access token. It is encrypted for this profile and never shown again."
-                  : "Paste an API key. It is encrypted for this profile and never shown again."}
-              </p>
-              <label class="field-label" for="credential">
-                {connector.auth_type === "oauth2" ? "OAuth access token" : "API key"}
-              </label>
-              <input id="credential" class="input credential" type="password" bind:value={secret} autocomplete="off" />
-              <button class="btn btn-primary" onclick={() => authenticate(connector)} disabled={busy || !secret}>
-                Connect
-              </button>
-            {:else}
-              <p><Icon name="check" size="sm" /> Account connected. The credential is stored; its value is never shown.</p>
-            {/if}
-          </section>
+          <!-- QUI-F07 — each account named by the owner, each with its own
+               credential; a write names the account it uses. -->
+          <ConnectorAccounts {connector} onchanged={load} />
 
           <section>
             <!-- QUI-P04 — what Raiker may do with this service, in words: each

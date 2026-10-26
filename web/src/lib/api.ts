@@ -516,6 +516,18 @@ export const api = {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url));
   },
+  // QUI-F15 — a Library item's file, fetched with the session credential (a
+  // bare <a download> cannot send one). The path is the one the Library read
+  // named, so it is a route this owner can already read.
+  downloadLibraryItem: async (path: string, filename: string): Promise<void> => {
+    const blob = await requestBlob(path);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url));
+  },
   // ── BUG-231: the audit log, taken out of the product ──
   // Asking for an export is a governed action: it passes the `audit_export`
   // gate, the policy review and the posture check, and appears in the log it

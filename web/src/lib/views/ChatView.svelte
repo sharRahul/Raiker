@@ -10,6 +10,7 @@
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import AnswerParts from "../components/AnswerParts.svelte";
+  import GoalSuggestion from "../components/GoalSuggestion.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
   import ProfileChip from "../components/ProfileChip.svelte";
@@ -24,6 +25,8 @@
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { densityGap, workSurface } from "../workSurface";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
+  import { contract } from "../generated/apiContract";
+  import { goalTitle, requestGoalDraft } from "../goalHandoff";
   import { ComposerLookups } from "../composerLookups.svelte";
   import { SourceInspector } from "./chat/sourceInspector.svelte";
   import { RecallLedger } from "./chat/recallLedger.svelte";
@@ -439,6 +442,55 @@
     });
   });
   $effect(() => () => reportForegroundWork("chat", null));
+  // QUI-F15 — which blocks of this conversation are pinned, by turn and place,
+  // so each block's Pin reads Pinned. Read once per conversation; a pin made
+  // here updates it from the answer the route gave.
+  let pins = $state<Map<string, { pinId: string; index: number }[]>>(new Map());
+  $effect(() => {
+    const id = sessionId;
+    pins = new Map();
+    if (id === null) return;
+    void contract
+      .listSessionPins({ session_id: id })
+      .then((answer) => {
+        if (sessionId !== id) return;
+        const next = new Map<string, { pinId: string; index: number }[]>();
+        for (const pin of answer.pins) {
+          next.set(pin.turn_id, [...(next.get(pin.turn_id) ?? []), { pinId: pin.pin_id, index: pin.part_index }]);
+        }
+        pins = next;
+      })
+      .catch(() => {
+        // Supplementary: without the list every block offers Pin, and pinning
+        // one already pinned keeps the one pin (the route re-files it).
+      });
+  });
+  function pinnedIndexes(turnId: string | undefined): ReadonlySet<number> {
+    return new Set((pins.get(turnId ?? "") ?? []).map((pin) => pin.index));
+  }
+  function pinLabel(): string {
+    return selectedProject ? `Pin to ${selectedProject.name}` : "Pin to the Library";
+  }
+  async function togglePin(turnId: string, index: number): Promise<string> {
+    if (sessionId === null) throw new Error("no conversation");
+    const held = (pins.get(turnId) ?? []).find((pin) => pin.index === index);
+    const next = new Map(pins);
+    if (held) {
+      await contract.unpinBlock(held.pinId);
+      next.set(turnId, (next.get(turnId) ?? []).filter((pin) => pin.pinId !== held.pinId));
+      pins = next;
+      return "Unpinned";
+    }
+    const answer = await contract.pinBlock({
+      session_id: sessionId,
+      turn_id: turnId,
+      part_index: index,
+      project_id: selectedProject?.project_id ?? null,
+    });
+    next.set(turnId, [...(next.get(turnId) ?? []), { pinId: answer.pin_id, index }]);
+    pins = next;
+    return answer.project_name ? `Pinned to ${answer.project_name}` : "Pinned to the Library";
+  }
   // QUI-F05 — *Response ready*: the turn this page ran has its answer while
   // Raiker is in the background. A parked turn is announced by its own notice.
   let wasStreaming = false;
@@ -678,6 +730,22 @@
   const selectedProject = $derived(
     (projects?.projects ?? []).find((project) => project.project_id === projectId) ?? null,
   );
+  // QUI-F21 — the chosen project's limits, in words, read when the project changes.
+  let projectLimitLines = $state<string[]>([]);
+  $effect(() => {
+    const id = selectedProject?.project_id ?? null;
+    projectLimitLines = [];
+    if (id === null) return;
+    void contract
+      .getProjectLimits(id)
+      .then((answer) => {
+        if ((selectedProject?.project_id ?? null) === id) projectLimitLines = answer.summary;
+      })
+      .catch(() => {
+        // Supplementary: the limits still apply; the line just cannot say so.
+        projectLimitLines = [];
+      });
+  });
 
   /**
    * The token count this turn carries, provider-reported once a turn has run
@@ -734,6 +802,16 @@
             href: `#/projects?project=${encodeURIComponent(selectedProject.project_id)}`,
             action: "Open project work",
           },
+          // QUI-F21 — choosing the project puts this chat under its limits.
+          ...(projectLimitLines.length > 0
+            ? [
+                {
+                  label: "Limits",
+                  value: `${projectLimitLines.join(". ")}. Set on the project; they only narrow your permissions.`,
+                  short: "Project limits apply",
+                },
+              ]
+            : []),
         ]
       : []),
     ...(attachStore.items.length > 0
@@ -1450,6 +1528,17 @@
   function saveAsRoutine(prompt: string, rows: ToolCallRow[]) {
     requestTaskDraft(routineFromTurn(prompt, conversationTitle, routineSteps(rows)));
     window.location.hash = "#/tasks";
+  }
+
+  /** QUI-F03 / BUG-355 — this request, as a goal's intake in Work › Goals. Nothing is saved there until Save. */
+  function makeGoal(prompt: string) {
+    requestGoalDraft({
+      title: goalTitle(prompt),
+      objective: prompt,
+      fromTitle: conversationTitle || null,
+      projectId: selectedProject?.project_id ?? null,
+    });
+    window.location.hash = "#/work?tab=goals";
   }
 
   function documentFromAnswer() {
@@ -2332,6 +2421,11 @@
                 oncite={(sourceId) => inspector.openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
                 ondocument={turn.streaming ? undefined : documentFromAnswer}
                 streaming={turn.streaming}
+                onpin={turn.response?.turn_id && sessionId !== null
+                  ? (index) => togglePin(turn.response?.turn_id ?? "", index)
+                  : undefined}
+                pinned={pinnedIndexes(turn.response?.turn_id)}
+                pinLabel={pinLabel()}
               />
             </div>
             {#if !turn.streaming}
@@ -2362,6 +2456,17 @@
                   aria-label="Save as routine"
                   title="Save as routine"
                 ><Icon name="refresh" size="sm" /></button>
+              {/if}
+              {#if turn.response?.status === "completed" && turn.prompt.trim() !== ""}
+                <!-- QUI-F03 / BUG-355 — start a goal from this request. It opens
+                     the Goals form filled in; nothing exists until Save there. -->
+                <button
+                  type="button"
+                  class="copy-message"
+                  onclick={() => makeGoal(turn.prompt)}
+                  aria-label="Make this a goal"
+                  title="Make this a goal"
+                ><Icon name="goal" size="sm" /></button>
               {/if}
               </div>
             {/if}
@@ -2553,6 +2658,23 @@
         </div>
       </div>
     {/each}
+    {#if sessionId !== null && !streaming && turns.length > 0}
+      <!-- QUI-F03 — an aim that came up in another conversation too, offered
+           once under the latest answer. -->
+      <GoalSuggestion
+        {sessionId}
+        revision={turns.length}
+        ontrack={(offer) => {
+          requestGoalDraft({
+            title: offer.title,
+            objective: offer.objective,
+            fromTitle: conversationTitle || null,
+            projectId: selectedProject?.project_id ?? null,
+          });
+          window.location.hash = "#/work?tab=goals";
+        }}
+      />
+    {/if}
   </div>
 
   {#if !following && turns.length > 0}

@@ -11,9 +11,9 @@ Permissions, Connections, Models, Settings and help-panel plans in
 the approvals round of [02](02_PERMISSIONS_AND_APPROVALS.md#status)
 (2026-10-22; Allow with limits and its dependants open), the visual answers
 of [04](04_VISUAL_ANSWERS.md#status) (2026-10-23; diagrams and Pin to project
-open), and fifteen of the features in [06](06_FEATURES_AND_IMPROVEMENTS.md#status)
-(2026-10-24; goals noticed in conversation, named accounts, the Library, undo
-windows and project limits open), and on 2026-10-25 the brand of
+open), and the features and improvements of 06 in two rounds (2026-10-24 and
+2026-10-26; 06 is closed and its one remaining item, the desktop companion, is
+in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)), and on 2026-10-25 the brand of
 [08](08_BRAND_AND_VISUAL_SYSTEM.md#status) (open ring, palette, Inter; the
 companion open), Diagnostics as issue cards, Recovery, the pages that already
 fit and Build and Design in [01](01_LAYOUT_SYSTEM_AND_PAGES.md#status), and the
@@ -50,7 +50,7 @@ companion. It never appears as travel vocabulary in navigation or status
 | [03 Welcome, Home and Chat](03_WELCOME_HOME_AND_CHAT.md) | First run as a setup conversation, Home, the anatomy of a chat turn | QUI-W01 – W06, QUI-H01 – H05, QUI-C01 – C12 |
 | [04 Visual answers](04_VISUAL_ANSWERS.md) | Charts, comparisons, key figures and other answer blocks | QUI-A01 – A08 |
 | [05 Raiker Browser](05_RAIKER_BROWSER.md) | A built-in browser in the desktop app, using the Chromium Electron already ships | QUI-B01 – B04 |
-| [06 Features and improvements](06_FEATURES_AND_IMPROVEMENTS.md) | Features taken from the reference products, and product gaps | QUI-F01 – F23 |
+| 06 Features and improvements (closed 2026-10-26) | Features taken from the reference products, and product gaps. Shipped as [FIXED-1150](../FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04) to [FIXED-1167](../FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round) and [FIXED-1252](../FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03) to [FIXED-1263](../FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round); the rest is in [TO_BE_FIXED](../TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26) | QUI-F01 – F23 |
 | [07 Quick fixes and quality](07_QUICK_FIXES_AND_QUALITY.md) | Small fixes visible today, and the checks that keep quality from slipping | QUI-Q01 – Q08, QUI-G01 – G07 |
 | [08 Brand and visual system](08_BRAND_AND_VISUAL_SYSTEM.md) | Colours, type, the app mark, the companion | QUI-V01 – V08 |
 
@@ -94,8 +94,8 @@ modes and "Off" approval mode, Muse's feed, up-front data requests and
 5. Size budgets in CI (07, QUI-G01).
 6. Welcome, Home and Chat; the approval card; clarifying-question cards (03, 02).
 7. Visual answers: key figures, comparison, horizontal bar, callout first (04). Shipped 2026-10-23.
-8. Live work line, Quick Entry, goals noticed in conversation (06). Shipped 2026-10-24, except goals noticed.
-9. Task receipt, data label in the composer, Library, Make this repeatable (06). Shipped 2026-10-24, except the Library.
+8. Live work line, Quick Entry, goals noticed in conversation (06). Shipped 2026-10-24; goals noticed 2026-10-26.
+9. Task receipt, data label in the composer, Library, Make this repeatable (06). Shipped 2026-10-24; the Library 2026-10-26.
 10. Brand: tokens, mark, companion (08). Tokens and the mark shipped 2026-10-25; the companion waits for its art.
 11. Raiker Browser, step 1 (05), once the core workspace feels polished.
 

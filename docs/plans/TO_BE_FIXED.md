@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -86,7 +86,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-29 by four (`composer-parity-and-turn-honesty`, `fts5-mem03-bug194`, `mem04-bug194-observations`, `bug-37-39-40-41`), each re-run live and brought up to the product; converting them found [FIXED-632](FIXED_ITEMS.md#fixed-632--an-approval-card-covered-settings-save-changes) and [FIXED-633](FIXED_ITEMS.md#fixed-633--choosing-the-default-density-closed-the-panel-it-was-chosen-in). Ten sign in on their own: three must, and seven provider scenarios can now be converted one at a time with reachable providers |
 | [BUG-287](#bug-287--the-image-provider-round-trip-is-unverified-against-a-real-provider) | Medium | Design / image runtime / live evidence | Open remainder — reduced 2026-10-18: real OpenAI generation, edit, four-result variation, lineage, permission-off refusal and empty-allowlist refusal passed; a source-image provider refusal and a live research-reference **Sent with** check remain |
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
-| [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
 | [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
 | [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
 | [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
@@ -540,40 +539,6 @@ therefore remains open; no external repository was changed in this run.
 
 ---
 
-## BUG-347 — A reverse proxy on the same machine makes every remote request look local
-
-**Severity: Medium. Area: Host / remote access. Status: Open — found
-2026-10-19 writing the README's *Running Raiker under WSL2 or on a VPS*.**
-
-**Observed.** `raiker-web` decides what is local from the socket peer: the
-abuse window exempts a loopback peer's reads (`RateLimitMiddleware._safe_loopback_read`
-in `raiker/api/security.py`), password recovery is allowed only from a loopback
-peer (`raiker/api/routes_recovery.py`), and a host bound to `127.0.0.1` runs
-with `loopback_only=True` — no HSTS, no public-bind guardrails. A reverse proxy
-on the same machine (Caddy, nginx) that forwards to `127.0.0.1:8765` is itself
-the loopback peer, so every request from the internet arrives as a local one.
-
-**Effect.** An owner who follows the common "proxy to localhost" pattern on a
-VPS gets an instance that is public in fact and local by every check Raiker
-makes: recovery is reachable from anywhere, reads skip the rate limit, and the
-public-bind refusal (`--allow-public` with `RAIKER_OWNER_TOKEN`) never fires
-because the bind is loopback. Forwarding headers are deliberately not trusted
-(BUG-88), so the host cannot tell.
-
-**Current mitigation.** The README tells the owner to reach a VPS through an
-SSH tunnel, or to bind Raiker to a private VPN address with `--allow-public`
-and point any proxy at that address, and says *Do not point a reverse proxy at
-`127.0.0.1:8765`*. That is documentation, not a guard.
-
-**Proposed fix.** Decide whether Raiker should (a) refuse to serve when a
-`Forwarded`/`X-Forwarded-For` header arrives on a loopback-only host, with a
-reason naming `--allow-public`, or (b) accept an owner-declared trusted proxy
-address and then apply the public-bind posture to forwarded requests. Either is
-an owner-visible decision about remote access; neither has been made, so this
-stays open rather than being guessed. The required UI outcome: Diagnostics
-names a proxied loopback host as public, and the host's own refusal says what
-to change.
-
 ## BUG-348 — The Design canvas is edited by keyboard and inspector only, and five DW requirements are still partial
 
 **Severity: Medium. Area: Design / composition. Status: Open remainder — found
@@ -1011,40 +976,48 @@ Found or left open in it:
   failed once in a four-worker local run and passes alone; CI runs each shard
   serially. Watch it in the shards.
 
-## 2026-10-24 Quiet UI features round — what is still open
+## Quiet UI features and improvements — open items (document closed 2026-10-26)
 
-Fifteen features of [06](quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#status)
-shipped
+`docs/plans/quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md` was worked in two rounds
+and then removed: every item is shipped, or carried here. The first round
+(2026-10-24) shipped
 [FIXED-1150](FIXED_ITEMS.md#fixed-1150--nothing-outside-chat-said-that-work-was-running-qui-f04)
-to [FIXED-1167](FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round).
-These parts of the same document are not done:
+to [FIXED-1167](FIXED_ITEMS.md#fixed-1167--two-long-transcript-tests-ran-at-their-time-limit-quality-found-this-round);
+the second (2026-10-26) shipped goals noticed in conversation, named accounts,
+the Library with 04's **Pin to project**, undo windows, project limits, routine
+results to a channel, corrections made by editing and the task receipt
+([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)
+to [FIXED-1263](FIXED_ITEMS.md#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round)).
+QUI-F08 and QUI-F23 shipped earlier as [02, QUI-P06](quiet-ui/02_PERMISSIONS_AND_APPROVALS.md#status)
+and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
 
-* **QUI-F03 — goals noticed in conversation** waits for goal intake from Chat
-  ([BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario)).
-* **QUI-F07 — named accounts per service.** The connector store holds one
-  account per service, so "Work Gmail" and "Personal Gmail" need a second
-  credential slot per connector and an account name on every approval card.
-* **QUI-F15 — the Library**, and with it 04's **Pin to project**. Needs one
-  owner-scoped read over drafts, documents, generated images, pinned answer
-  blocks and downloads, each linked to the conversation it came from.
-* **QUI-F19 — undo windows.** Holding an email or a message for ten seconds
-  needs a delayed-send stage in the connector write path, between the approval
-  and the send, that a Stop can still reach.
-* **QUI-F21 — projects hold everything.** A project's own permission limits
-  ("may push to this one repository only") need a per-project policy the
-  runtime does not store yet.
-* **QUI-F06 — results to a connected channel.** A routine's result is on Home
-  and in its own conversation. Sending it to Telegram or Slack would be an
-  unattended outbound send, which needs its own consent at the moment the
-  routine is created and the channel executor's existing gates.
-* **QUI-F20 — corrections made by editing.** A correction typed as *That's
-  wrong*, *No,* or *Actually* is offered; one made by editing Raiker's draft is
-  not, because an edit carries no statement of what was wrong.
+* **QUI-F14 — a companion on the desktop.** Planned as *Later*: an opt-in, off
+  by default, small transparent window that reacts only to *needs your
+  decision* and *done*. It waits for the companion's art
+  ([08](quiet-ui/08_BRAND_AND_VISUAL_SYSTEM.md#status)).
+* **Docked notices cover the right column.** Found live in RT-QUI-78: after a
+  routine runs, its notices dock over the right-hand side of the page and cover
+  controls there (a project's **Save** under *Project limits*) until they are
+  dismissed. The spec dismisses them; the page should keep its controls clear.
+* **The account on an approval is shown in monospace.** The card's *Account*
+  line draws *Work Gmail* in the code face used for paths and commands. It is a
+  name the owner chose and should read as text.
+* **`--allow-public` wraps in the Diagnostics card.** In the proxy card the flag
+  breaks across two lines at 1440×900.
+* **Goals are noticed by shared words, not by meaning.** Two requests about the
+  same aim in different words are not matched; two unrelated requests that
+  share three uncommon words can be. **Not now** keeps a wrong offer from
+  returning.
+* **A routine's channel delivery is refused while the channel's outbound gate
+  is off,** which is the default. The task row says *last one not sent*; the
+  form says the gate applies, but not where to turn it on.
 * **Older live specs answer native confirms.** Eight earlier live specs wait
   for the browser's `dialog` event; the in-app dialog (QUI-F10) needs them to
-  press its button instead. The mocked suite and this round's live spec do.
-* **The receipt is per turn, not per task.** A background task's receipt would
-  sum the turns of its run; Tasks does not show one yet.
+  press its button instead. The mocked suite and both rounds' live specs do.
+* **One approvals test is load-sensitive.**
+  `tests/test_api_approvals.py::TestApprovalsResolve::test_approved_shell_executes_once_with_bounded_evidence`
+  failed once in a full local shard under load and passes alone and in its
+  file. Not reproduced in CI.
 
 ## 2026-10-23 Quiet UI visual answers round — what is still open
 
@@ -1056,9 +1029,6 @@ These parts of the same document are not done:
 * **QUI-A08 — diagrams.** Planned as *Later*. Mermaid would be the first
   diagram library in the bundle, and the built UI makes no external requests,
   so it has to ship inside the app.
-* **Pin to project** in the block toolbar needs the Library
-  ([06, QUI-F15](quiet-ui/06_FEATURES_AND_IMPROVEMENTS.md#qui-f15--library)) and
-  a place in a project's Files & links for a saved block.
 * **The three-block limit and the answer style are guidance to the model.**
   Found live: on *Visual where it helps*, Haiku 4.5 once split key figures into
   three blocks (five blocks in one answer) before the instruction said to keep

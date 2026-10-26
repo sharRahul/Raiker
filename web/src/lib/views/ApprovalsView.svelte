@@ -1,4 +1,8 @@
 <script lang="ts">
+  import EditedDraftMemory from "../components/EditedDraftMemory.svelte";
+  import { contract } from "../generated/apiContract";
+  import { HELD_SEND_SECONDS, holdsBeforeSending } from "../heldSend";
+  import { editablePatch } from "../editablePatch";
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import DiffView from "../components/DiffView.svelte";
@@ -334,6 +338,9 @@
    * copy says so, because a control that looked like an edit to the decision in
    * front of them would be a promise the boundary cannot keep.
    */
+  /** QUI-F20 — the conversation whose draft the owner just rewrote, while the offer stands. */
+  let editedFrom = $state<string | null>(null);
+
   async function proposeEdit() {
     if (selected === null || busy || editedPatch === null) return;
     busy = true;
@@ -345,6 +352,10 @@
         reason: decisionReason.trim() || "Replaced by the reviewer's own edit.",
       });
       editedPatch = null;
+      // QUI-F20 — the edit says what, not why; ask once, in the owner's words.
+      editedFrom = selected.approval.session_id && !selected.approval.session_id.startsWith("connector_")
+        ? selected.approval.session_id
+        : null;
       await load();
       // Open the replacement first: `openDetail` clears the notice as part of
       // arriving on an approval, so setting it before would show the sentence
@@ -364,10 +375,31 @@
     }
   }
 
+  // QUI-F19 — seconds left in an approved send's undo window, while it is held.
+  let holdLeft = $state<number | null>(null);
+  let holdApproval = $state<string | null>(null);
+
+  async function undoSend() {
+    if (holdApproval === null) return;
+    try {
+      await contract.undoHeldSend(holdApproval);
+    } catch {
+      // The window closed and it was sent; the decision's own answer says so.
+    }
+  }
+
   async function resolve(approve: boolean) {
     if (selected === null || busy) return;
     busy = true;
     notice = null;
+    let ticker: ReturnType<typeof setInterval> | null = null;
+    if (approve && holdsBeforeSending(selected.approval.tool_name)) {
+      holdApproval = selected.approval.approval_id;
+      holdLeft = HELD_SEND_SECONDS;
+      ticker = setInterval(() => {
+        holdLeft = holdLeft === null ? null : Math.max(0, holdLeft - 1);
+      }, 1000);
+    }
     try {
       const result = await api.resolveApproval(selected.approval.approval_id, {
         approve,
@@ -380,7 +412,9 @@
       });
       const receipt = result.execution?.receipt;
       const checkpoint = result.execution?.checkpoint_capture;
-      notice = {
+      if (result.status === "undone") {
+        notice = { kind: "ok", text: "Not sent: you took it back within its undo window. Nothing left this computer." };
+      } else notice = {
         kind: "ok",
         text: result.executes_action
           ? result.execution?.path
@@ -424,6 +458,9 @@
         text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The decision was rejected.",
       };
     } finally {
+      if (ticker !== null) clearInterval(ticker);
+      holdLeft = null;
+      holdApproval = null;
       busy = false;
     }
   }
@@ -545,6 +582,11 @@
       <a href={notice.link.href}>{notice.link.label}</a>
     {/if}
   </p>
+{/if}
+{#if editedFrom}
+  {#key editedFrom}
+    <EditedDraftMemory sessionId={editedFrom} ondone={() => (editedFrom = null)} />
+  {/key}
 {/if}
 
 {#if resumable !== null}
@@ -897,16 +939,20 @@
           <button type="button" class="btn btn-danger" onclick={() => resolve(false)} disabled={busy}>
             Decline
           </button>
-          {#if selected.preview_kind === "patch" && selected.diff}
+          {#if editablePatch(selected.approval.tool_name, selected.arguments) !== null}
             <button
               type="button"
               class="btn btn-ghost"
-              onclick={() => (editedPatch = selected!.diff ?? "")}
+              onclick={() => (editedPatch = editablePatch(selected!.approval.tool_name, selected!.arguments) ?? "")}
               disabled={busy}
             >
               Edit…
             </button>
           {/if}
+          {#if holdLeft !== null}
+            <span class="held" role="status" aria-live="polite">Sending in {holdLeft} s</span>
+            <button type="button" class="btn btn-primary" onclick={() => void undoSend()}>Undo</button>
+          {:else}
           <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
             {busy
               ? selected.executes_on_approval
@@ -916,6 +962,7 @@
                 ? "Allow once"
                 : "Allow once (record only)"}
           </button>
+          {/if}
         </div>
       {/if}
     {:else if selected.approval.is_expired}
@@ -1007,6 +1054,7 @@
 {/if}
 
 <style>
+  .held { align-self: center; font-size: var(--text-sm); color: var(--text-1); font-weight: 600; }
   /* A fact that did not earn a badge still reads on the row, at one
      quiet weight, so the badges beside it keep meaning something. */
   .row-fact { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; }

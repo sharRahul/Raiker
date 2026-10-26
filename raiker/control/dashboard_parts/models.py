@@ -900,6 +900,64 @@ class ModelService:
         receipt["cost_basis"] = basis
         return receipt
 
+    def task_receipt(
+        self: DashboardService, task_id: str, *, user_id: str | None, owner_principal_id: str
+    ) -> dict[str, Any] | None:
+        """QUI-F16 for a task — every turn of its own conversation, summed.
+
+        The same per-turn receipts Chat shows, added up: the models that
+        answered, the cost (``unknown`` as soon as one billable turn has no
+        known rate, never rounded down to free), reads by kind, every change
+        with its approval time, and each service anything went to. ``None``
+        when the task is not this account's.
+        """
+        record = self.store.load_task_for_user(task_id, user_id)
+        if record is None:
+            return None
+        session_id = record.run_session_id
+        turns = [
+            turn for turn in reversed(self.store.list_turns(session_id, limit=200))
+            if turn.get("completed_at")
+        ] if session_id else []
+        models: list[str] = []
+        reads: dict[str, int] = {}
+        changes: list[dict[str, Any]] = []
+        services: list[str] = []
+        cost = 0.0
+        bases: set[str] = set()
+        local = True
+        for turn in turns:
+            one = self.turn_receipt(
+                session_id, str(turn["turn_id"]), user_id=user_id, owner_principal_id=owner_principal_id
+            )
+            if one is None:
+                continue
+            if one["model"] and one["model"] not in models:
+                models.append(str(one["model"]))
+            for noun, count in one["reads"].items():
+                reads[noun] = reads.get(noun, 0) + int(count)
+            changes.extend(one["changes"])
+            for service in one["left_computer"]:
+                if service not in services:
+                    services.append(service)
+            if one["model"]:
+                local = local and bool(one["local"])
+                bases.add(str(one["cost_basis"]))
+            if one["cost_usd"] is not None:
+                cost += float(one["cost_usd"])
+        basis = "unknown" if "unknown" in bases else "priced" if "priced" in bases else "free"
+        return {
+            "task_id": task_id,
+            "turns": len(turns),
+            "models": models,
+            "local": local and bool(models),
+            "cost_usd": round(cost, 6) if "priced" in bases else None,
+            "cost_basis": basis,
+            "reads": reads,
+            "changes": changes,
+            "left_computer": services,
+        }
+
     def get_context_usage(
         self: DashboardService, session_id: str, acting_principal_id: str | None = None
     ) -> ContextUsageView:

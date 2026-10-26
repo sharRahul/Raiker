@@ -53,6 +53,18 @@ export function figure(value: number, unit = ""): string {
   return unit ? `${text} ${unit}` : text;
 }
 
+/**
+ * A figure as a tile draws it: `figure`, with the thousands grouped ($1,200).
+ * Only the drawing groups; Copy, Show as text and CSV keep `figure`'s plain
+ * form, which is the runtime's own sentence form.
+ */
+export function displayFigure(value: number, unit = ""): string {
+  const plain = Number.isInteger(value) ? value : Number(value.toPrecision(6));
+  const text = Math.abs(plain) >= 1000 ? plain.toLocaleString("en-US", { maximumFractionDigits: 6 }) : String(plain);
+  if (PREFIX_UNITS.has(unit)) return text.startsWith("-") ? `-${unit}${text.slice(1)}` : `${unit}${text}`;
+  return unit ? `${text} ${unit}` : text;
+}
+
 const CALLOUT_LEADS: Record<string, string> = {
   verdict: "Verdict",
   warning: "Warning",

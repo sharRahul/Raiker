@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LibraryView from "./LibraryView.svelte";
+  import ProjectLimits from "../components/ProjectLimits.svelte";
   import ShowMore from "../components/ShowMore.svelte";
   import { PAGE_SIZE, page } from "../pagination";
   import WorkMeta from "../components/WorkMeta.svelte";
@@ -80,7 +82,9 @@
     { id: "overview", label: "Overview" },
     { id: "files", label: "Files" },
     { id: "work", label: "Work" },
-    { id: "assets", label: "Assets" },
+    // QUI-F15 — the project's Library: its images, then everything else made
+    // in it (documents, designs, pinned blocks, pull requests).
+    { id: "assets", label: "Project library" },
     { id: "evidence", label: "Evidence" },
   ] as const;
   type DetailSection = (typeof DETAIL_SECTIONS)[number]["id"];
@@ -965,6 +969,8 @@
         <!-- The overview ends with what the project *is*: how many of each kind
              of thing is under it, so a section is opened deliberately rather
              than to find out whether it holds anything. -->
+        <!-- QUI-F21 — what work filed here may reach. -->
+        <ProjectLimits projectId={detail.project.project_id} />
         <dl class="section-counts">
           <div><dt>Files</dt><dd>{files?.files.length ?? 0}{files?.truncated ? "+" : ""}</dd></div>
           <div><dt>Chats</dt><dd>{detail.sessions.length}</dd></div>
@@ -1068,6 +1074,10 @@
             >View all in Design</a
           >
         {/if}
+        <h3 class="kicker">Made in this project</h3>
+        {#key detail.project.project_id}
+          <LibraryView projectId={detail.project.project_id} compact exclude={["image"]} />
+        {/key}
 
 
         {:else if detailSection === "evidence"}

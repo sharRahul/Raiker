@@ -97,6 +97,14 @@ export const DIAGNOSTICS: Diagnostics = {
   memory_pressure: { state: "ok", available_bytes: 16 * 1024 ** 3, total_bytes: 32 * 1024 ** 3 },
   model_profile_source: { kind: "packaged", location: "raiker.config/model-profiles.json" },
   scope_note: "Status reflects the local single-user runtime only.",
+  remote_access: {
+    mode: "loopback",
+    trusted_proxies: [],
+    proxied_requests_refused: 0,
+    proxied_requests_served: 0,
+    last_refused_at: null,
+    last_served_at: null,
+  },
 };
 
 export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {

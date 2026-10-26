@@ -140,6 +140,10 @@ _PREFIXES = {
     "dprop_",
     "dexp_",
     "dhand_",
+    # QUI-F15 — a block of an answer pinned to the Library.
+    "pin_",
+    # QUI-F07 — a further named account on one connector.
+    "cacct_",
 }
 
 

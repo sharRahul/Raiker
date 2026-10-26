@@ -51,6 +51,9 @@
     oncite,
     ondocument,
     streaming = false,
+    onpin,
+    pinned,
+    pinLabel,
   }: {
     /** The whole answer. Rendered as-is when the runtime declared no parts. */
     text: string;
@@ -65,6 +68,15 @@
     ondocument?: () => void;
     /** The turn is still streaming: `raiker:` fences are held back until it ends. */
     streaming?: boolean;
+    /**
+     * QUI-F15 — pin or unpin the block at this place in `parts`. The surface
+     * passes it only for a stored turn; it resolves to what the toolbar says.
+     */
+    onpin?: (index: number) => Promise<string>;
+    /** The places in `parts` already pinned. */
+    pinned?: ReadonlySet<number>;
+    /** Pin's tooltip, naming where a pin goes: "Pin to Quarterly". */
+    pinLabel?: string;
   } = $props();
 
   const blocks = $derived(blockCount(parts));
@@ -143,7 +155,12 @@
       </p>
     {:else if BLOCK_TYPES.has(part.type) && part.data}
       {@const d = part.data as Record<string, unknown>}
-      <AnswerBlock {part}>
+      <AnswerBlock
+        {part}
+        onpin={onpin && !streaming ? () => onpin(index) : undefined}
+        pinned={pinned?.has(index) ?? false}
+        {pinLabel}
+      >
         {#snippet children(view)}
           {#if part.type === "table"}
             <DataTable caption={String(d.caption ?? "")} columns={(d.columns ?? []) as string[]} rows={(d.rows ?? []) as string[][]} />

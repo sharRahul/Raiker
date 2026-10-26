@@ -561,7 +561,10 @@ def main(argv: list[str] | None = None) -> int:
 
     start_native_tray(url, tray_bootstrap_secret)
     try:
-        uvicorn.run(app, host=LOOPBACK, port=port)
+        # BUG-347 — uvicorn's own proxy-header handling would rewrite the socket
+        # peer from X-Forwarded-For whenever the peer is 127.0.0.1; Raiker decides
+        # what a forwarded request is itself (raiker/api/proxy_guard.py).
+        uvicorn.run(app, host=LOOPBACK, port=port, proxy_headers=False, forwarded_allow_ips="")
     finally:
         control.clear()
     # Set by the Host control's Restart action: a status the platform's service

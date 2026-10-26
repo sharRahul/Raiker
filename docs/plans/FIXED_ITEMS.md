@@ -40,8 +40,8 @@ systemd, bound to loopback and reached through an SSH tunnel, or bound to a
 private VPN address with `--allow-public` and a hardened `RAIKER_OWNER_TOKEN`.
 Writing it found that a reverse proxy pointed at `127.0.0.1` would make remote
 requests look local; the README warns against it and
-[BUG-347](TO_BE_FIXED.md#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local)
-records the defect.
+BUG-347 recorded the defect, closed as
+[FIXED-1264](#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347).
 
 ### FIXED-RELEASE-04 — a draft release carries one installer per platform, named for the platform
 
@@ -1338,6 +1338,20 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1249](#fixed-1249--sqlcipher-was-4120-from-a-third-party-fork) | Medium | Storage / dependencies | Fixed 2026-10-26 |
 | [FIXED-1250](#fixed-1250--search-fell-back-to-fts4-and-recency-ordering-on-a-build-without-fts5) | Medium | Storage / search | Fixed 2026-10-26 |
 | [FIXED-1251](#fixed-1251--the-locked-build-set-carried-a-setuptools-advisory) | Low | Dependencies | Fixed 2026-10-26 |
+| [FIXED-1252](#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03) | Medium | Goals / Chat | Fixed 2026-10-26 |
+| [FIXED-1253](#fixed-1253--a-service-held-one-account-and-an-approval-did-not-say-which-qui-f07) | Medium | Connections / approvals | Fixed 2026-10-26 |
+| [FIXED-1254](#fixed-1254--what-raiker-had-made-was-scattered-across-conversations-with-no-library-qui-f15) | Medium | Work / projects | Fixed 2026-10-26 |
+| [FIXED-1255](#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project) | Low | Chat / visual answers | Fixed 2026-10-26 |
+| [FIXED-1256](#fixed-1256--an-approved-send-went-out-at-once-with-no-way-to-take-it-back-qui-f19) | Medium | Approvals / connectors | Fixed 2026-10-26 |
+| [FIXED-1257](#fixed-1257--a-project-could-not-limit-what-raiker-may-touch-in-it-qui-f21) | Medium | Projects / policy | Fixed 2026-10-26 |
+| [FIXED-1258](#fixed-1258--a-routines-result-could-not-go-to-a-connected-channel-qui-f06) | Low | Tasks / channels | Fixed 2026-10-26 |
+| [FIXED-1259](#fixed-1259--editing-raikers-draft-never-offered-a-memory-qui-f20) | Low | Approvals / memory | Fixed 2026-10-26 |
+| [FIXED-1260](#fixed-1260--edit-was-never-offered-on-a-proposed-patch-found-this-round) | Medium | Approvals / Build | Fixed 2026-10-26 |
+| [FIXED-1261](#fixed-1261--a-background-task-had-no-receipt-qui-f16-found-this-round) | Low | Tasks | Fixed 2026-10-26 |
+| [FIXED-1262](#fixed-1262--approval-notices-showed-markdown-asterisks-found-this-round) | Low | Notices | Fixed 2026-10-26 |
+| [FIXED-1263](#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round) | Low | Visual answers | Fixed 2026-10-26 |
+| [FIXED-1264](#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1265](#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
 
 ---
 
@@ -37263,7 +37277,7 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Observed.** Every repeating task was written from nothing, and the form never said where a run's result would appear.
 
-**Fixed.** *Start from a template* — **Morning brief**, **Weekly inbox tidy** (which sends, archives and deletes nothing) and **Watch this page** — fills the instruction, the cadence and the next first run (`taskDrafts.ts`); nothing is saved until **Create**. The schedule details say *Results appear on Home and in this task's own conversation*. Delivering results to a connected channel is open ([TO_BE_FIXED](TO_BE_FIXED.md#2026-10-24-quiet-ui-features-round--what-is-still-open)).
+**Fixed.** *Start from a template* — **Morning brief**, **Weekly inbox tidy** (which sends, archives and deletes nothing) and **Watch this page** — fills the instruction, the cadence and the next first run (`taskDrafts.ts`); nothing is saved until **Create**. The schedule details say *Results appear on Home and in this task's own conversation*. Delivering results to a connected channel is open ([TO_BE_FIXED](TO_BE_FIXED.md#quiet-ui-features-and-improvements--open-items-document-closed-2026-10-26)).
 
 **Evidence.** `taskDrafts.test.ts`, `TasksView.test.ts` (*fills the form from Morning brief*); RT-QUI-50.
 
@@ -38087,3 +38101,145 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Evidence.** `pip-audit` on both exports: no known vulnerabilities.
 
+
+## FIXED-1252 — The same aim across conversations was never offered as a goal (QUI-F03)
+
+**Severity: Medium. Area: Goals / Chat. Status: Fixed 2026-10-26.**
+
+**Observed.** [06, QUI-F03](quiet-ui/README.md#documents) asked Raiker to notice an aim that comes up in more than one conversation and offer to track it, once, never again after **Not now**. Goals could only be written from Work › Goals, so an aim stated in Chat stayed in the transcript.
+
+**Fixed.** Two ways in, both ending at the Goals form the owner already uses; nothing runs until the owner saves the goal, accepts it and starts it. **Make this a goal** in a finished turn's actions opens Work › Goals filled in from the request, with *Filled in from “…”* naming the request and the conversation's project kept (`goalHandoff.ts`). `raiker/goals/noticing.py` compares the newest request with the owner's earlier conversations by shared content words (at least three, and at least half of the shorter request), skips aims already a goal and aims dismissed before, and `GET /api/goals/suggestion` answers with at most one. `GoalSuggestion.svelte` shows it under the conversation as *This looks like an ongoing goal. Track it?* with **Track it** and **Not now**; **Not now** is kept (migration `RAIKER-2124-goal-suggestion-dismissals`) so the same aim is never offered again. Matching is by words, not by a model, so it reads nothing outside the owner's own conversations.
+
+**Evidence.** `tests/test_goal_noticing.py`; `GoalSuggestion.test.ts`, `goalHandoff.test.ts`; RT-QUI-74 and RT-QUI-75.
+
+## FIXED-1253 — A service held one account, and an approval did not say which (QUI-F07)
+
+**Severity: Medium. Area: Connections / approvals. Status: Fixed 2026-10-26.**
+
+**Observed.** The connector store kept one credential per service, so "Work Gmail" and "Personal Gmail" could not both be connected, and an approval card for a send could not name the account it would use.
+
+**Fixed.** `raiker/runtime/connector_accounts.py` keeps named accounts per connector (migration `RAIKER-2125-connector-accounts`); each has its own credential slot (`connector#account`), the first is the default, and the existing single credential stays the default account, so nothing connected before has to be redone. A connection's page lists its accounts, adds, renames and removes them, and saves each one's credential (`ConnectorAccounts.svelte`). A connector action takes an `account` by its name; the broker resolves it before approval, a write intent records the account it was approved for, and the invoker reads that account's credential only. The approval card's *Account* line names it (*Work Gmail*), and the safety summary counts it among what the action affects. The model sees the account names, never their credentials.
+
+**Evidence.** `tests/test_connector_accounts.py`; `approvalSafety.test.ts`; RT-QUI-76, RT-QUI-77.
+
+## FIXED-1254 — What Raiker had made was scattered across conversations, with no Library (QUI-F15)
+
+**Severity: Medium. Area: Work / projects. Status: Fixed 2026-10-26.**
+
+**Observed.** Generated documents, Design images and documents, pull requests and answer blocks were each reachable only from the conversation or page that made them. QUI-F15 asked for one place, filtered by project and type, each item opening where it came from.
+
+**Fixed.** `raiker/control/library.py` reads what already exists, owner-scoped and newest first: generated documents with their download, Design images and documents, pinned answer blocks and pull requests Raiker opened. `GET /api/library` filters by `kind` and `project_id` and refuses an unknown kind or another account's project. **Work › Library** lists them with type filters and image thumbnails; every item opens its conversation (`#/new-chat?session=…&turn=…`) or its Design document. A project's page has the same list as *Project library* (images are under Design), which replaces the *Assets* tab. An uncaptioned pinned block is named from its contents (*Revenue, Costs*), not *Key figures*.
+
+**Evidence.** `tests/test_library.py`; `LibraryView.test.ts`; contract cases in `tests/contract_cases/library.py`; RT-QUI-72, RT-QUI-73.
+
+## FIXED-1255 — An answer block could not be pinned to a project (04, Pin to project)
+
+**Severity: Low. Area: Chat / visual answers. Status: Fixed 2026-10-26.**
+
+**Observed.** [04](quiet-ui/04_VISUAL_ANSWERS.md#status) left **Pin to project** open in the block toolbar because nothing could keep a block outside its turn.
+
+**Fixed.** **Pin** in every drawn block's toolbar keeps it in the Library (migration `RAIKER-2123-library-pins`), under the conversation's project when it has one; pressed again it reads **Pinned** and unpins. The pin is copied from the stored answer and validated again on the server: prose, a refused block or a place past the end of the answer is refused (`library_pin_not_a_block`), and nothing the browser sends becomes the pinned data. Pinning the same block twice keeps one pin. A pin moves between projects or out of one from the Library.
+
+**Evidence.** `tests/test_library.py`; `AnswerBlock.test.ts`; RT-QUI-72, RT-QUI-73.
+
+## FIXED-1256 — An approved send went out at once, with no way to take it back (QUI-F19)
+
+**Severity: Medium. Area: Approvals / connectors. Status: Fixed 2026-10-26.**
+
+**Observed.** QUI-F19 asked for *Sending in 10 s · Undo* after an approved email or message. The connector write path sent as soon as the approval resolved.
+
+**Fixed.** `raiker/runtime/held_sends.py` holds an approved connector write for ten seconds between the approval and the send (migration `RAIKER-2126-held-sends`). The approval card and Approvals show *Sending in N s* and **Undo**; `POST /api/approvals/{id}/undo-send` cancels it while held, and the card reads *Not sent: you took it back* (`SEND_UNDONE`). **Stop** reaches a held send too: stopping the turn undoes every send it still holds. The hold is an addition to approval, never a substitute: nothing is held that was not approved, and an undone send cannot be resumed.
+
+**Evidence.** `tests/test_held_sends.py` (the suite runs with a short hold); `SafetyCard.test.ts`; RT-QUI-77.
+
+## FIXED-1257 — A project could not limit what Raiker may touch in it (QUI-F21)
+
+**Severity: Medium. Area: Projects / policy. Status: Fixed 2026-10-26.**
+
+**Observed.** QUI-F21 asked for a project's own permission limits ("may push to this one repository only"). The runtime stored no per-project policy.
+
+**Fixed.** `raiker/policy/project_limits.py` keeps, per project (migration `RAIKER-2127-project-limits`), the repositories, web domains and connections its conversations may reach; an empty list means no limit. The broker applies them before approval to every conversation in the project: a push to another remote, a fetch of another domain or a call to another connection is refused with `denied_by_project_limit_*` and a sentence naming the limit, so the owner is never asked to approve something the project forbids. A project's Overview has **Project limits** to set them (`GET`/`PUT /api/projects/{id}/limits`), and the composer says *Project limits apply* when the chosen project has any. Limits narrow; they never grant.
+
+**Evidence.** `tests/test_project_limits.py`; `ProjectLimits.test.ts`; contract cases in `tests/contract_cases/projects.py`; RT-QUI-73, RT-QUI-79.
+
+## FIXED-1258 — A routine's result could not go to a connected channel (QUI-F06)
+
+**Severity: Low. Area: Tasks / channels. Status: Fixed 2026-10-26.**
+
+**Observed.** A routine's result went to Home and to its own conversation only. Sending it to Telegram or Slack is an unattended outbound send, which the 2026-10-24 round left open until it had its own consent.
+
+**Fixed.** The task form offers *Also send each result to* a paired channel, a box the owner ticks, which says what it allows: *Raiker sends each finished run's result there without asking again, while that channel is on and your permissions allow channel messages*. A delivery without that consent is refused by the server (`raiker/tasks/routine_delivery.py`, migration `RAIKER-2128-routine-deliveries`). A completed run is delivered through the channel executor's existing gates, so a channel whose outbound gate is off refuses and the run says so. Active and finished rows read *Also to …*, and the delivery can be removed from the task (`DELETE /api/tasks/{id}/delivery`).
+
+**Evidence.** `tests/test_routine_delivery.py`; `TasksView.test.ts`; RT-QUI-78.
+
+## FIXED-1259 — Editing Raiker's draft never offered a memory (QUI-F20)
+
+**Severity: Low. Area: Approvals / memory. Status: Fixed 2026-10-26.**
+
+**Observed.** A correction typed in words was offered as a memory, but one made by rewriting Raiker's proposed change was not, because an edit says what the owner wanted and not why.
+
+**Fixed.** After **Edit…** on a proposed change, Approvals asks once, *You changed Raiker's draft. Anything to remember for next time?*, in the owner's own words (`EditedDraftMemory.svelte`). **Save** files them through the same proposal and decision Memory › Suggestions uses, so secret-like text is still refused; **Dismiss** keeps nothing. Raiker does not guess a lesson from the diff.
+
+**Evidence.** `EditedDraftMemory.test.ts`; RT-QUI-80.
+
+## FIXED-1260 — Edit… was never offered on a proposed patch (found this round)
+
+**Severity: Medium. Area: Approvals / Build. Status: Fixed 2026-10-26.**
+
+**Observed.** Working QUI-F20 live, **Edit…** never appeared on an `apply_patch` approval. The editor looked for a preview of kind `patch`; the broker sends `file_diff`, so the owner could only allow or deny a change, never correct it.
+
+**Fixed.** `editablePatch.ts` decides from the action and its arguments, not the preview kind, so Approvals and Build offer **Edit…** on every proposed patch with a body.
+
+**Evidence.** `editablePatch.test.ts`, `ApprovalsView.test.ts`; RT-QUI-80.
+
+## FIXED-1261 — A background task had no receipt (QUI-F16, found this round)
+
+**Severity: Low. Area: Tasks. Status: Fixed 2026-10-26.**
+
+**Observed.** The receipt was per turn, so a scheduled task's run, which can span several turns, had none in Tasks.
+
+**Fixed.** `GET /api/tasks/{id}/receipt` adds up the turns of the task's run (`DashboardService.task_receipt`): model, approximate cost, what was read, what changed or was sent and what left this computer. Tasks shows it as one line on active and finished rows; the rows open only when asked, so the page does not read every receipt on load.
+
+**Evidence.** `tests/test_turn_receipt.py`; `turnReceipt.test.ts`; RT-QUI-78.
+
+## FIXED-1262 — Approval notices showed Markdown asterisks (found this round)
+
+**Severity: Low. Area: Notices. Status: Fixed 2026-10-26.**
+
+**Observed.** An approval whose permission switch is off read *…because \*\*Image generation\*\* is off in Permissions*, and an over-cap change read *\*\*This change cannot be rewound.\*\**: every surface draws an approval's notice as a sentence, and `raiker/control/dashboard_parts/approvals.py` wrote Markdown into it.
+
+**Fixed.** Both notices are plain text.
+
+**Evidence.** Screenshot review of this round's approvals; the approval suites read the notices unchanged.
+
+## FIXED-1263 — Key figures read 1200 where 1,200 was meant (found this round)
+
+**Severity: Low. Area: Visual answers. Status: Fixed 2026-10-26.**
+
+**Observed.** A key-figure tile showed *$1200*. Large figures are read at a glance, and ungrouped digits are not.
+
+**Fixed.** `displayFigure` groups thousands in the tiles only; the block's data, **Copy**, **CSV** and **Show as text** keep the number as given.
+
+**Evidence.** `answerBlocks.test.ts`; RT-QUI-72 screenshot.
+
+## FIXED-1264 — A reverse proxy on the same machine made every remote request look local (BUG-347)
+
+**Severity: Medium. Area: Host / remote access. Status: Fixed 2026-10-26. Was BUG-347.**
+
+**Observed.** `raiker-web` decided what is local from the socket peer. A reverse proxy on the same machine (Caddy, nginx) forwarding to `127.0.0.1:8765` is itself that peer, so on a VPS that followed the common "proxy to localhost" pattern every request from the internet arrived as a local one: password recovery reachable from anywhere, reads exempt from the abuse window, and none of the public-bind guardrails in force, because the bind was loopback.
+
+**Owner's decision (2026-10-26).** Refuse by default; trust a named proxy on request.
+
+**Fixed.** `raiker/api/proxy_guard.py`. A request carrying any forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`) is never local, whatever its peer. On a loopback-only host it is refused with `403 proxied_request_refused` and a sentence naming the two ways to run behind a proxy (`RAIKER_TRUSTED_PROXY`, or `--allow-public` on a private address) and that an SSH tunnel needs neither. An owner who names the proxy's address in `RAIKER_TRUSTED_PROXY` gets its requests served under the public posture: remote for recovery, instances and the loopback rate exemption, rate limited, and with HSTS when the proxy says the browser came over HTTPS. Trusting a proxy needs `RAIKER_OWNER_TOKEN`, as `--allow-public` does, and the host refuses to start without it or with an entry that is not an address. Forwarding headers still identify nothing; they only ever make a request less trusted. Recovery, instances and the rate limiter all ask the one `is_local_request`. **Diagnostics** names the host's remote access (`remote_access` on `/api/diagnostics`): a refused proxied request raises *Requests through a reverse proxy are being refused* with what to change, and a trusted proxy raises *Raiker is reachable from the internet through a proxy*. README, *Managing the host* and the security guide describe both set-ups.
+
+**Evidence.** `tests/test_proxied_loopback.py` (13 tests: every forwarding header refused with the security headers kept, recovery refused through a trusted proxy, no loopback rate exemption, Diagnostics, address-only entries, the owner-token requirement, fail-closed configuration); `tests/test_api_rest_hardening.py`; `observeAttention.test.ts`; RT-SEC-01, RT-SEC-02, and a manual check behind a trusted proxy (served with HSTS, recovery 403, rate limited at 120).
+
+## FIXED-1265 — uvicorn rewrote the socket peer from X-Forwarded-For (found fixing BUG-347)
+
+**Severity: Medium. Area: Host / remote access. Status: Fixed 2026-10-26.**
+
+**Observed.** Live, a trusted proxy's requests were refused. uvicorn's default `proxy_headers=True` trusts `X-Forwarded-For` from `127.0.0.1` and replaces the request's client with the address in the header, so the proxy's own peer never reached Raiker: a header was deciding who the client was, the thing BUG-88 had ruled out.
+
+**Fixed.** `raiker-web` and the desktop launcher start uvicorn with `proxy_headers=False` and `forwarded_allow_ips=""`, so the socket peer is always the peer.
+
+**Evidence.** `tests/test_proxied_loopback.py::test_the_server_never_lets_uvicorn_rewrite_the_peer`; RT-SEC-01.

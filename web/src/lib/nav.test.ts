@@ -40,7 +40,7 @@ describe("nav model", () => {
     // of Memory; Messaging is a tab of Extensions. Every old address still
     // opens the matching tab.
     // PA-D06 — Goals joined them: a goal's steps are tasks.
-    expect(HUB_TABS.work).toEqual(["threads", "goals", "tasks", "projects"]);
+    expect(HUB_TABS.work).toEqual(["threads", "goals", "tasks", "projects", "library"]);
     for (const [hash, route, tab] of [
       ["#/search-chat", "work", "threads"],
       ["#/tasks?task=t1", "work", "tasks"],

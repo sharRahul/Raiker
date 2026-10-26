@@ -201,7 +201,8 @@ export const HUB_TABS: Record<string, string[]> = {
   // Quiet UI — one page for everything the owner has going.
   // PA-D06 — goals sit with the work they are made of: a goal's steps are
   // tasks, and it is filed in a project like any other work.
-  work: ["threads", "goals", "tasks", "projects"],
+  // QUI-F15 — the Library: what the work made, filterable by project and type.
+  work: ["threads", "goals", "tasks", "projects", "library"],
   // QUI-L08 — Models is one page with no tabs: the execution profile, My
   // models, and Add model as a dialog. Its old `?tab=` addresses are read by
   // the page itself (Add model opens; serving and usage forward to Settings ›

@@ -136,6 +136,33 @@ the same five files; it refuses to publish an unsigned stable release.
 - **Patch:** branch from the release tag, fix, and release `X.Y.Z+1` to the
   same channel.
 
+## Beta release checklist
+
+A beta goes to the `beta` channel as a **draft**, and is published only when
+the [beta release acceptance](../plans/ACCEPTANCE_TESTS_BY_PHASE.md#beta-release-acceptance)
+rows hold on its commit:
+
+1. CI is green on the commit, including `desktop-package.yml` when packaging
+   paths changed since the last run.
+2. The [release acceptance matrix](../plans/RELEASE_ACCEPTANCE_MATRIX.md) is
+   current for every platform the beta offers.
+3. The latest live rounds in
+   [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) pass on that
+   commit, RT-SEC-01 and RT-SEC-02 among them.
+4. The release notes say what a tester needs:
+   - that it is a beta, and whether the installers are signed;
+   - to back up the workspace before updating (Settings → Account), because an
+     older build refuses data a newer one migrated;
+   - how to reach a remote host: an SSH tunnel, a private address with
+     `--allow-public`, or a reverse proxy named in `RAIKER_TRUSTED_PROXY`
+     ([Managing the host](managing-the-host.md#behind-a-reverse-proxy)). A
+     proxy that is not named is refused;
+   - the open defects that bound what the beta claims
+     ([TO_BE_FIXED](../plans/TO_BE_FIXED.md)) and
+     [known limits](../architecture/KNOWN_LIMITS.md).
+5. Run **Release** with `channel: beta` and `publish: true`, review the draft,
+   then publish it.
+
 ## Compatibility and migration policy
 
 - Application files and owner data are separate: nothing in the profile folder

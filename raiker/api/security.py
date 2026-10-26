@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import ipaddress
 import json
 import time
 from collections import defaultdict, deque
@@ -367,9 +366,9 @@ class RateLimitMiddleware:
     def _safe_loopback_read(self, scope: Scope) -> bool:
         """Whether this request may bypass the abuse window (BUG-88).
 
-        The socket peer is the only identity considered. Forwarding headers are
-        deliberately ignored: on a public bind they are attacker-controlled,
-        and on a loopback bind no proxy assertion is needed.
+        The socket peer is the only identity considered; a forwarding header
+        never names who the client is. It can only take the exemption away
+        (BUG-347): a loopback peer relaying a forwarded request is a proxy.
         """
         if not self._loopback_only or str(scope.get("method", "GET")).upper() not in {
             "GET",
@@ -377,13 +376,11 @@ class RateLimitMiddleware:
             "OPTIONS",
         }:
             return False
-        client = scope.get("client")
-        if not isinstance(client, (tuple, list)) or not client:
-            return False
-        try:
-            return ipaddress.ip_address(str(client[0])).is_loopback
-        except ValueError:
-            return False
+        # BUG-347 — a loopback peer that carries forwarding headers is a proxy
+        # on this machine relaying someone else, so it is not exempt.
+        from raiker.api.proxy_guard import is_local_request
+
+        return is_local_request(scope)
 
     def _sweep(self, now: float) -> None:
         # Drop per-IP deques that have fully aged out. Without this, one entry

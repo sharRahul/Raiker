@@ -119,7 +119,13 @@ export type IconName =
   // It was a file glyph, which named one of the six things the menu offers.
   | "plus"
   // QUI-C01 — rename. A pen, not `file-edit`: what is edited is a name.
-  | "pencil";
+  | "pencil"
+  // QUI-F15 — Pin a block to the Library, and the Library itself: a pushpin,
+  // and three spines on a shelf (the folder already means a project).
+  | "pin"
+  | "library"
+  // QUI-F03 — make this a goal: a flag on a pole.
+  | "goal";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -268,6 +274,18 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   rotate: ["M20 12a8 8 0 1 1-2.3-5.6", "M20 3.5v5h-5"],
   download: ["M12 4v10.5", "M8 11l4 4 4-4", "M5 19h14"],
+  goal: ["M5 21V4", "M5 4.5h11l-2.5 4 2.5 4H5"],
+  pin: [
+    "M9 4h6",
+    "M10 4v5l-3 4h10l-3-4V4",
+    "M12 13v7",
+  ],
+  library: [
+    "M5 4.5v15",
+    "M9 4.5v15",
+    "M13.5 5.2l4 14.3",
+    "M3.5 19.5h17",
+  ],
   copy: [
     "M9 9.5A1.5 1.5 0 0 1 10.5 8h7A1.5 1.5 0 0 1 19 9.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 9 16.5v-7Z",
     "M15 8V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H8",

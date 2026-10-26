@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError, setToken } from "../api";
+import { contract } from "../generated/apiContract";
 import type { ApprovalDetailView, ApprovalInfo } from "../apiTypes";
 import { RESOLVED_HERE } from "../approvalResume";
 import SafetyCard from "./SafetyCard.svelte";
@@ -135,4 +136,29 @@ it("sends a critical decision to Approvals, where the password is asked", async 
   expect(await screen.findByText(/needs your password or a code/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Review in Approvals" })).toBeInTheDocument();
+});
+
+it("holds an allowed connector write with a countdown and Undo, and says when it was taken back (QUI-F19)", async () => {
+  stub(detail({ capability: "connector_write" }, "connector_request"), "external");
+  let finish: (value: unknown) => void = () => {};
+  vi.spyOn(api, "resolveApproval").mockReturnValue(new Promise((resolve) => (finish = resolve)) as never);
+  const undo = vi.spyOn(contract, "undoHeldSend").mockResolvedValue({ ok: true, approval_id: "ap_1", status: "undone" });
+  const connectorWrite = { ...INFO, tool_name: "connector_write", arguments: { connector_id: "gmail", operation_id: "send", account: "Personal Gmail" } } as ApprovalInfo;
+  render(SafetyCard, { props: { approval: connectorWrite, sessionId: "sess_1" } });
+
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  expect(await screen.findByText("Sending in 10 s")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+  await fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(undo).toHaveBeenCalledWith("ap_1");
+  finish({ approval_id: "ap_1", status: "undone", resume: { resumable: true, session_id: "sess_1", turn_id: "turn_1" } });
+  expect(await screen.findByText("Not sent: you took it back")).toBeInTheDocument();
+});
+
+it("does not hold anything that is not sent through a connection", async () => {
+  stub(detail());
+  vi.spyOn(api, "resolveApproval").mockResolvedValue({ approval_id: "ap_1", status: "approved", resume: { resumable: false } } as never);
+  render(SafetyCard, { props: { approval: INFO } });
+  await fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  expect(screen.queryByText(/Sending in/)).not.toBeInTheDocument();
 });

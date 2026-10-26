@@ -519,7 +519,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
-    await openSection("Assets");
+    await openSection("Project library");
 
     // NEW-PROJ-02 — the alt text names the action, because the picture is now
     // a link to itself rather than an illustration.
@@ -539,7 +539,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
-    await openSection("Assets");
+    await openSection("Project library");
 
     const link = (await screen.findByRole("img", { name: /a maple leaf/ })).closest("a");
     expect(link).toHaveAttribute("href", "#/design?project=proj_1&asset=img_1");
@@ -562,7 +562,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
-    await openSection("Assets");
+    await openSection("Project library");
 
     // Eight tiles that look like the whole set are a count nobody stated.
     expect(await screen.findByText("Showing 8 of 11.")).toBeInTheDocument();
@@ -586,7 +586,7 @@ describe("ProjectsView context home", () => {
         },
       }),
     );
-    await openSection("Assets");
+    await openSection("Project library");
 
     expect(
       await screen.findByText(/pictures generated in design while this is the current project/i),

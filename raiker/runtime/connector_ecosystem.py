@@ -16,6 +16,7 @@ from typing_extensions import TypedDict
 
 from raiker.auth.vault_key_file import effective_vault_key, ensure_vault_key
 from raiker.contracts.ids import new_id, utc_now
+from raiker.runtime.connector_accounts import credential_key
 from raiker.runtime.executors.sandbox import connector_egress_allowlist
 from raiker.storage.sqlite import SQLiteStore
 
@@ -442,6 +443,7 @@ class ConnectorInvoker:
         connector_id: str,
         operation_id: str,
         arguments: dict[str, Any],
+        account_id: str | None = None,
     ) -> ConnectorInvocation:
         self._require_enabled(principal_id, connector_id)
         definition = ConnectorCatalog().get(connector_id)
@@ -452,13 +454,15 @@ class ConnectorInvoker:
         if definition.host not in connector_egress_allowlist():
             raise ValueError("connector_egress_denied")
         vault = ConnectorVault(self.store)
-        credential = vault.get(principal_id, connector_id)
+        # QUI-F07 — the named account's own credential; none means the default.
+        key = credential_key(connector_id, account_id)
+        credential = vault.get(principal_id, key)
         if credential is None:
             raise ValueError("connector_auth_required")
-        meta = vault.metadata(principal_id, connector_id)
+        meta = vault.metadata(principal_id, key)
         if meta and credential_status(meta.get("expires_at")) == "reauth_required":
             credential = await self._refresh_oauth(
-                vault, principal_id, connector_id, credential
+                vault, principal_id, connector_id, credential, key=key
             )
         path = operation["path"]
         path_values = arguments.get("path", {})
@@ -553,6 +557,7 @@ class ConnectorInvoker:
         connector_id: str,
         operation_id: str,
         arguments: dict[str, Any],
+        account_id: str | None = None,
     ) -> dict[str, Any]:
         """Synchronous GET-only path used by the model's brokered read tool."""
         self._require_enabled(principal_id, connector_id)
@@ -566,8 +571,9 @@ class ConnectorInvoker:
         if definition.host not in connector_egress_allowlist():
             raise ValueError("connector_egress_denied")
         vault = ConnectorVault(self.store)
-        credential = vault.get(principal_id, connector_id)
-        meta = vault.metadata(principal_id, connector_id)
+        key = credential_key(connector_id, account_id)
+        credential = vault.get(principal_id, key)
+        meta = vault.metadata(principal_id, key)
         if credential is None:
             raise ValueError("connector_auth_required")
         if meta and credential_status(meta.get("expires_at")) == "reauth_required":
@@ -631,10 +637,13 @@ class ConnectorInvoker:
         principal_id: str,
         connector_id: str,
         credential: dict[str, str],
+        *,
+        key: str | None = None,
     ) -> dict[str, str]:
-        async with _refresh_lease(principal_id, connector_id):
+        slot = key or connector_id
+        async with _refresh_lease(principal_id, slot):
             return await self._refresh_oauth_locked(
-                vault, principal_id, connector_id, credential
+                vault, principal_id, connector_id, credential, key=slot
             )
 
     async def _refresh_oauth_locked(
@@ -643,6 +652,8 @@ class ConnectorInvoker:
         principal_id: str,
         connector_id: str,
         credential: dict[str, str],
+        *,
+        key: str | None = None,
     ) -> dict[str, str]:
         """The exchange itself, with the lease held.
 
@@ -653,9 +664,10 @@ class ConnectorInvoker:
         and the credential is already valid again, the refresh it was waiting
         for did the work and there is nothing left to do.
         """
-        current = vault.get(principal_id, connector_id)
+        slot = key or connector_id
+        current = vault.get(principal_id, slot)
         if current is not None:
-            meta = vault.metadata(principal_id, connector_id)
+            meta = vault.metadata(principal_id, slot)
             if meta is None or credential_status(meta.get("expires_at")) == "connected":
                 return current
             credential = current
@@ -710,5 +722,5 @@ class ConnectorInvoker:
             expires_at = (
                 datetime.now(UTC) + timedelta(seconds=max(0, int(payload["expires_in"])))
             ).isoformat()
-        vault.put(principal_id, connector_id, rotated, expires_at)
+        vault.put(principal_id, slot, rotated, expires_at)
         return rotated

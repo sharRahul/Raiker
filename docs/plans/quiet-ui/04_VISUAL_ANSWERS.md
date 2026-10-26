@@ -23,7 +23,7 @@ live cases RT-QUI-35 to RT-QUI-43 in
 | Rules | **Done.** Units required on figures. Figures, measures and comparisons that contain numbers but give no `source` are shown as text, with a line saying why; tables and charts keep their earlier behaviour (deviation: the rule names "a block", and applying it to charts would have changed every existing chart answer). At most three blocks is guidance to the model; more than three offers **Create document**, which puts the request in the composer rather than sending it. Small local models get one corrected-block retry (Ollama, LM Studio, llama.cpp, MLX, vLLM, local GGUF); hosted models do not, because a second paid call is not the owner's choice. |
 | Streaming | **Done** 2026-10-25 ([FIXED-1180](../FIXED_ITEMS.md#fixed-1180--a-streaming-answer-showed-its-raiker-block-as-raw-json-04)): while a turn streams, a `raiker:` fence is held back and shown as *Preparing key figures…* until the drawn block arrives. |
 | Answer style | **Done** in **Settings › General › Answers** (*Auto · Mostly text · Visual where it helps*), read by the runtime for every turn. Deviation: *More* does not exist yet ([03, QUI-C04](03_WELCOME_HOME_AND_CHAT.md#status)), so it is an account setting rather than a composer choice. |
-| Block toolbar | **Done**: **Chart · Table** on charts, **Show as text** on every block, **Copy**, **CSV** for grids, **PNG** for charts. Open: **Pin to project**, which needs the Library ([06, QUI-F15](06_FEATURES_AND_IMPROVEMENTS.md#qui-f15--library)). |
+| Block toolbar | **Done**: **Chart · Table** on charts, **Show as text** on every block, **Copy**, **CSV** for grids, **PNG** for charts, and **Pin**, which keeps the block in the Library and in its project (2026-10-26, [FIXED-1255](../FIXED_ITEMS.md#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project)). |
 | Acceptance | **Met.** Each block has a validator with refusal reasons, a component and a table or text fallback; every number reaches a screen reader (charts keep their table in the page; the measure is a `<meter>`); a malformed block leaves its prose and a visible refusal. Exports keep figures and comparisons as tables and the rest as text. |
 
 ## What exists
@@ -110,8 +110,9 @@ to mark a winner itself.
 
 ## Block toolbar
 
-Table · Chart · Copy · CSV or PNG · **Pin to project** (saves the block into the
-project's Files & links and the Library, [06, QUI-F15](06_FEATURES_AND_IMPROVEMENTS.md)).
+Table · Chart · Copy · CSV or PNG · **Pin to project** (keeps the block in Work ›
+Library and in its project's *Project library*,
+[FIXED-1255](../FIXED_ITEMS.md#fixed-1255--an-answer-block-could-not-be-pinned-to-a-project-04-pin-to-project)).
 
 ## Order
 

@@ -66,10 +66,8 @@ class StaticPolicyConfig:
             # named. Listed here for the same reason every other capability is:
             # one in neither set is hard-denied on its way to its own executor.
             "telemetry_export",
-            # The Design surface. Approval-required, and listed here for the
-            # same reason every other capability is: one in neither set is
-            # hard-denied on its way to its own executor. It spends the owner's
-            # provider credit and leaves the machine, so it waits for them.
+            # The Design surface. Policy recognizes the capability; the human-only
+            # entry point runs the owner's direct request without a second approval.
             "image_generation",
             "process",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",

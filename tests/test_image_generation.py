@@ -106,6 +106,45 @@ def _generate(ws: Path, **args: object) -> GovernedActionResult:
     return authority.route_action(_action(principal.principal_id, **args), principal)
 
 
+def test_owner_can_generate_without_enabling_or_approving(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    svc = RuntimeControlService(ws)
+    svc.activate_runtime_mode("local_single_user_runtime", None, "test")
+    _connect(ws)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        tier2_image, "post_json",
+        lambda *a, **k: {"data": [{"b64_json": base64.b64encode(PNG).decode()}]},
+    )
+    gate = svc.get_capability_gate(CAP, "principal_owner")
+    assert gate is not None
+    assert gate.runtime_enabled and gate.enforced_enabled
+    result = svc.generate_image(
+        "principal_owner", profile_id="openai-hosted", prompt="a cat", size="1024x1024"
+    )
+    assert result.ok, result.reason_code
+    assert len(SQLiteStore(ws).list_image_generations(owner_principal_id="principal_owner")) == 1
+
+
+def test_explicitly_disabled_image_generation_stays_disabled(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    svc = RuntimeControlService(ws)
+    svc.activate_runtime_mode("local_single_user_runtime", None, "test")
+    result = svc.set_capability_state(CAP, "disabled", None, "test")
+    assert result.ok, result.reason_code
+    gate = svc.get_capability_gate(CAP, "principal_owner")
+    assert gate is not None and not gate.enforced_enabled
+    result = svc.generate_image(
+        "principal_owner", profile_id="openai-hosted", prompt="a cat", size="1024x1024"
+    )
+    assert not result.ok
+    assert result.reason_code == "disabled_by_capability_gate"
+
+
 # ── Registration ──
 
 
@@ -121,14 +160,12 @@ def test_it_is_tier_2_because_it_leaves_the_machine() -> None:
 
     gate = default_capability_gates()[CAP]
     assert gate.phase == 2
-    # The shipped table marks a capability with a real executor
-    # `enabled_runtime`; what decides whether it is on for an *account* is the
-    # per-account resolution, and an unset capability that is not in
-    # `CAPABILITY_UNSET_RESOLUTION` resolves off. That is where "off until the
-    # owner turns it on" actually lives, so that is what is asserted.
-    from raiker.runtime.authority.admission import CAPABILITY_UNSET_RESOLUTION
+    from raiker.runtime.authority.admission import (
+        CAPABILITY_UNSET_RESOLUTION,
+        UNSET_SHIPPED_DEFAULT,
+    )
 
-    assert CAP not in CAPABILITY_UNSET_RESOLUTION
+    assert CAPABILITY_UNSET_RESOLUTION[CAP] == UNSET_SHIPPED_DEFAULT
 
 
 # ── The three boundaries, each refusing by name ──
@@ -139,7 +176,9 @@ def test_a_closed_gate_refuses_before_anything_reaches_a_provider(
 ) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("owner", "Owner", workspace_root=ws)
-    RuntimeControlService(ws).activate_runtime_mode("local_single_user_runtime", None, "test")
+    svc = RuntimeControlService(ws)
+    svc.activate_runtime_mode("local_single_user_runtime", None, "test")
+    assert svc.set_capability_state(CAP, "disabled", None, "test").ok
     result = _generate(ws, profile_id="openai-hosted", prompt="a cat", size="1024x1024")
     assert result.decision != "allow" or result.error is not None
 

@@ -1876,8 +1876,8 @@ class RuntimeControlService:
 
         Takes the long way round like :meth:`run_telemetry_export`: the action
         goes through :class:`RuntimeAuthority`, so the ``image_generation``
-        gate, the policy review, the decision mode, the approval and the audit
-        event all apply. A route that called the executor directly would produce
+        gate, the policy review, the decision mode and the audit event apply.
+        A human's request does not need a second approval. A route that called the executor directly would produce
         the same image while proving nothing about the path it came down.
 
         Human-only. Generating an image spends the owner's provider credit and

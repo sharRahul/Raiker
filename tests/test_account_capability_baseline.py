@@ -207,3 +207,30 @@ def test_an_existing_workspace_is_not_re_seeded(tmp_path: Path) -> None:
             f"{capability} was seeded into an existing workspace. The baseline "
             "runs at account creation only."
         )
+
+
+def test_image_generation_defaults_on_for_a_real_account_and_respects_saved_disable(
+    tmp_path: Path,
+) -> None:
+    from raiker.control.service import RuntimeControlService
+    from raiker.events.writer import EventLogWriter
+    from raiker.runtime.authority import RuntimeAuthority
+
+    store = SQLiteStore(tmp_path)
+    owner = _create_account(store)
+    authority = RuntimeAuthority(store, EventLogWriter(store))
+    service = RuntimeControlService(tmp_path)
+    assert store.account_scope(owner) == owner
+    assert capability_admission(store, owner, "image_generation").gate_enabled
+    assert authority.check_capability_gate("image_generation", "image_generation", owner) is None
+    gate = service.get_capability_gate("image_generation", owner)
+    assert gate is not None and gate.runtime_enabled and gate.enforced_enabled
+
+    now = utc_now()
+    store.upsert_principal_capability_gate_state(owner, {
+        "capability": "image_generation", "state": "disabled", "created_at": now, "updated_at": now,
+    })
+    assert not capability_admission(store, owner, "image_generation").gate_enabled
+    assert authority.check_capability_gate("image_generation", "image_generation", owner) == "disabled_by_capability_gate"
+    gate = service.get_capability_gate("image_generation", owner)
+    assert gate is not None and not gate.runtime_enabled and not gate.enforced_enabled

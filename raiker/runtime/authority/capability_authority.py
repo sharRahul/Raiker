@@ -330,9 +330,9 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "The prompt — and, for an edit, the source image — would be sent to a "
         "hosted provider and the owner's credit spent, on a turn's initiative "
         "rather than theirs.",
-        "An owner-enabled gate, a human principal, the owner's saved provider "
+        "Its own gate, enabled by default but respecting an explicit disable, a human principal, the owner's saved provider "
         "connection bound to the provider's image origin, the hosted gate, and "
-        "an approval. An endpoint is built from the configured profile, never "
+        "no separate approval for the owner's request. An endpoint is built from the configured profile, never "
         "from the request.",
     ),
     _row(

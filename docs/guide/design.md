@@ -144,7 +144,7 @@ Three separate things, each with its own remedy, because collapsing them into
 
 | Gate | What it is | Where you change it |
 |---|---|---|
-| Capability | `image_generation` — off until you turn it on | Permissions |
+| Capability | `image_generation` — on by default; an explicit disable is respected | Permissions |
 | Connection | A saved connection for the provider, made for its own API address (not a custom endpoint) | Models |
 | Credential | The connection's key, or the provider's key variable if you connected with **Use the key from the environment** | Models |
 
@@ -152,8 +152,9 @@ Three separate things, each with its own remedy, because collapsing them into
 set in your environment lets nothing leave the machine; connecting OpenAI on the
 Models page is the decision that does, and it authorises OpenAI's own address
 only. Image generation is still refused separately from chat: connecting a
-provider to answer questions is not asking Raiker to spend your credit
-generating pictures.
+provider to answer questions does not itself generate a picture. When you press
+Generate, the request can send the prompt and selected image to that provider and
+may use provider credit; no separate approval is requested for that direct action.
 
 ## Choosing a model
 

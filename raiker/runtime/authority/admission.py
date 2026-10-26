@@ -98,6 +98,8 @@ CAPABILITY_UNSET_RESOLUTION: dict[str, str] = {
     # RAIKER-2021 — an owner who turns web access off writes a row; an empty
     # table on a fresh install is not a refusal.
     "web_fetch": UNSET_SHIPPED_DEFAULT,
+    # Owner-requested image generation is available unless explicitly disabled.
+    "image_generation": UNSET_SHIPPED_DEFAULT,
     # The code map matches `RuntimeAuthority.check_capability_gate`: an account
     # with nothing persisted has not said yes yet; only a caller with no account
     # falls back to the shipped table.

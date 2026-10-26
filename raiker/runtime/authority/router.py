@@ -580,7 +580,7 @@ class RuntimeAuthority:
             if state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
                 return AuthorityReason.DISABLED_BY_CAPABILITY_GATE
             return None
-        if self._uses_principal_controls(principal_id):
+        if cap_name != "image_generation" and self._uses_principal_controls(principal_id):
             return AuthorityReason.DISABLED_BY_CAPABILITY_GATE
         try:
             gates = default_capability_gates()
@@ -610,7 +610,7 @@ class RuntimeAuthority:
         persisted = self.get_persisted_capability_state(cap_name, principal_id)
         if persisted is not None:
             return {"capability": cap_name, "state": persisted["state"], "source": "persisted"}
-        if self._uses_principal_controls(principal_id):
+        if cap_name != "image_generation" and self._uses_principal_controls(principal_id):
             return {
                 "capability": cap_name,
                 "state": CapabilityState.DISABLED,

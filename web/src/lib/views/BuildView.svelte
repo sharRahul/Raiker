@@ -2526,23 +2526,14 @@
         <!-- The composer states the boundary, not the lesson: which project a
              turn will run in is what changes between turns, and what a project
              lets Build reach is explained once in the guide. -->
-        {#if !projectReady}
-          <p class="project-required" role="status">
-            Select a project to start.
-            <button
-              type="button"
-              class="link-button"
-              onclick={() => (projectPickerOpen = true)}>Choose one</button
-            >
-          </p>
-        {:else if boundary?.refusal && boundary.refusal.step !== "project"}
+        {#if projectReady && boundary?.refusal && boundary.refusal.step !== "project"}
           <!-- DEC-06 — the first link the server says would stop this turn,
                and the one place that fixes it. -->
           <p class="project-boundary boundary-refusal" role="status" data-testid="boundary-refusal">
             {boundary.refusal.summary}
             <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
           </p>
-        {:else}
+        {:else if projectReady}
           <!-- BUG-316 — the project files the conversation; the folder work
                happens in is the server's answer, which is the workspace. -->
           <p class="project-boundary" role="status">
@@ -2622,7 +2613,7 @@
         {/if}
         <!-- COMPOSER-03 — opened from `+`, in flow rather than as a popover
              over the text being typed. Build still cannot send without one,
-             which the status above the composer says; what changed is that the control is
+             which the project chooser under + makes clear; what changed is that the control is
              not on the bar for every turn after the first. -->
         {#if projectPickerOpen}
           <div class="project-choice" role="group" aria-label="Choose a project">
@@ -2734,6 +2725,7 @@
               type="submit"
               class="btn btn-primary send"
               disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
+              title={!projectReady ? "Choose a project from the + menu to start" : undefined}
             >
               <Icon name={streaming ? "clock" : "arrow-up"} size="sm" />
               <!-- COMPOSER-15 — one state, one obvious next action. The word
@@ -3305,27 +3297,10 @@
     font-size: var(--text-sm);
     color: var(--text-2);
   }
-  .project-required,
   .project-boundary {
     margin: 0.35rem 0 0;
     font-size: var(--text-xs);
     color: var(--text-3);
-  }
-  /* Deliberately not `--danger`: nothing has failed, the owner simply has not
-     chosen yet. Red here competes with real problems on the same screen. */
-  .project-required { color: var(--text-2); font-weight: 600; }
-  /* The offer is part of the sentence, not a second control beside it. Without
-     this it inherits the shell's button chrome and reads as an action bar under
-     the composer, which is the density COMPOSER-02 just removed. */
-  .project-required .link-button {
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--accent);
-    font: inherit;
-    font-weight: 600;
-    text-decoration: underline;
-    cursor: pointer;
   }
   .project-boundary strong { color: var(--text-1); }
 
@@ -3376,8 +3351,7 @@
     /* Build carries six controls on the left where Chat has four, so its left
        group wraps to a second row rather than compressing off the screen. The
        project select is an entry in `+` at every width (COMPOSER-02/03), and
-       "Select a project to start." carries its own way to open it: a narrow
-       window may lose information, never what gates sending. */
+       the project chooser remains available in `+` at every width. */
     :global(.composer-build .bar-left) { flex-wrap: wrap; }
     .project-choice { max-width: 100%; }
     :global(.composer-build .environment-badge) { display: none; }

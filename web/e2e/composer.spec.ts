@@ -1025,8 +1025,9 @@ test("composer bottoms omit shortcut and project guidance while preserving acces
     await page.getByRole("button", { name: "Close shortcuts" }).click();
     await capture(page, join(shots, `composer-no-footer-${route}.png`));
     if (route === "build") {
-      await expect(page.getByText("Select a project to start.")).toBeVisible();
-      await page.getByRole("button", { name: "Choose one" }).click();
+      await expect(page.getByText("Select a project to start.")).toHaveCount(0);
+      await composer.getByRole("button", { name: "Add to this turn" }).click();
+      await page.getByRole("menuitem", { name: "Work in a project" }).click();
       await expect(page.getByRole("group", { name: /Choose a project/ })).toBeVisible();
     }
   }

@@ -22,7 +22,6 @@
    * has nothing to say, so the control is absent rather than rendering "No
    * project · 0 files" — a line that reports emptiness is still a line.
    */
-  import Icon from "./Icon.svelte";
   import type { Snippet } from "svelte";
 
   export interface ContextFact {
@@ -136,19 +135,18 @@
               <dt>Estimated context</dt>
               <dd>
                 <span class="fact-value">
-                  {Math.round(usedPercent)}% of this model's window
+                  {Math.round(usedPercent)}%
                 </span>
               </dd>
             </div>
           {/if}
         </dl>
-        {#if detail}<div class="inspector-detail">{@render detail()}</div>{/if}
-
-        <p class="inspector-note">
-          <Icon name="info" size="sm" />
-          Everything here rides the next turn. Nothing leaves this machine
-          except what the model itself is sent.
-        </p>
+        {#if detail}
+          <details class="inspector-detail">
+            <summary>Usage details</summary>
+            {@render detail()}
+          </details>
+        {/if}
       </div>
     {/if}
   </div>
@@ -244,16 +242,7 @@
     display: grid;
     gap: var(--space-2);
   }
-  .inspector-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.35rem;
-    margin: 0;
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--border);
-    color: var(--text-3);
-    font-size: var(--text-2xs);
-  }
+  .inspector-detail summary { color: var(--text-2); font-size: var(--text-xs); cursor: pointer; }
   @media (max-width: 47.9rem) {
     .inspector {
       position: fixed;

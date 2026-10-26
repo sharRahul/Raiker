@@ -2694,7 +2694,7 @@
     bind:inputEl={promptEl}
     inputProps={{
       placeholder: "What would you like Raiker to do?",
-      title: "Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file",
+      title: "Shift + Enter: new line · @: mention a file · /: commands at the start of the prompt",
       disabled: streaming,
       onpaste: onComposerPaste,
       oninput: onPromptInput,

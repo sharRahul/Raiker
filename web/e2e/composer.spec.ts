@@ -1031,3 +1031,21 @@ test("composer bottoms omit shortcut and project guidance while preserving acces
     }
   }
 });
+
+
+test("composer context is concise and detailed usage is available on demand", async ({ page }) => {
+  await page.goto("http://raiker.test/#/build");
+  const trigger = page.getByRole("button", { name: /^Context for this turn/ });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const panel = page.getByRole("dialog", { name: "Context for this turn" });
+  await expect(panel).not.toContainText("undefined");
+  const details = panel.locator("details");
+  await expect(details).not.toHaveAttribute("open", "");
+  await expect(panel.getByRole("region", { name: "Context window and cost details" })).toBeHidden();
+  await capture(page, join(shots, "composer-context-quiet.png"));
+  await details.locator("summary").click();
+  await expect(panel.getByRole("region", { name: "Context window and cost details" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();
+});

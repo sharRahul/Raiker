@@ -74,7 +74,6 @@ test("the keyboard map opens from the composer and lists real bindings", async (
   await page.getByRole("listbox", { name: "Commands" }).getByText("/shortcuts", { exact: true }).click();
   const sheet = page.getByRole("region", { name: "Keyboard shortcuts" });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByText("Enter", { exact: true })).toBeVisible();
   await expect(sheet.getByText("Shift + Enter", { exact: true })).toBeVisible();
   // Chat has no mode cycle, so it must not claim one.
   await expect(sheet.getByText("Shift + Tab", { exact: true })).toHaveCount(0);
@@ -101,7 +100,8 @@ test("the Build composer carries the coding-agent commands and the mode cycle", 
   await prompt.fill("/shortcuts");
   await page.getByRole("listbox", { name: "Commands" }).getByText("/shortcuts", { exact: true }).click();
   const sheet = page.getByRole("region", { name: "Keyboard shortcuts" });
-  await expect(sheet.getByText("Shift + Tab", { exact: true })).toBeVisible();
+  await expect(sheet.getByText("Shift + Tab", { exact: true })).toHaveCount(0);
+  await expect(sheet.getByText("@", { exact: true })).toBeVisible();
   await page.screenshot({ path: join(SHOTS, "r0816-build-shortcut-sheet.png") });
 });
 

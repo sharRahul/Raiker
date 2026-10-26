@@ -2,21 +2,19 @@
   /**
    * The keyboard map for a composer (B19).
    *
-   * Every binding a composer has, in one place, reachable with `/shortcuts`.
-   * It documents the code rather than an intention: `shortcuts()` in
-   * `composerCommands.ts` lists only bindings the handlers really implement, so
-   * a row here that stops working is a failing test rather than a stale sheet.
+   * Three everyday composer tips, available on demand through `/shortcuts`.
+   * The underlying bindings remain sourced from `composerCommands.ts`.
    */
   import { shortcuts, type ComposerSurface } from "../composerCommands";
   import Icon from "./Icon.svelte";
 
   let { surface, onclose }: { surface: ComposerSurface; onclose: () => void } = $props();
-  const rows = $derived(shortcuts(surface));
+  const rows = $derived(shortcuts(surface).filter((row) => ["Shift + Enter", "@", "/"].includes(row.keys)));
 </script>
 
 <div class="sheet" role="region" aria-label="Keyboard shortcuts">
   <div class="sheet-head">
-    <strong>Keyboard shortcuts</strong>
+    <strong>Composer tips</strong>
     <button type="button" class="sheet-close" aria-label="Close shortcuts" onclick={onclose}>
       <Icon name="x" size="sm" />
     </button>

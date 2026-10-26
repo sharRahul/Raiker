@@ -882,11 +882,11 @@
           },
         ]
       : []),
-    ...(boundary !== null
+    ...(boundary?.works_in
       ? [
           {
             label: "Works in",
-            value: `${boundary.works_in} — reads, writes and commands start here`,
+            value: boundary.works_in,
             short: boundary.works_in,
           },
         ]
@@ -903,7 +903,7 @@
           },
         ]
       : []),
-    ...(boundary !== null
+    ...(boundary?.environment_name
       ? [
           {
             label: "Runs on",
@@ -2563,7 +2563,7 @@
         placeholder: activeRepo === null
           ? "Describe what you want built…"
           : `Describe the change in ${activeRepo.label}…`,
-        title: "Enter to send, Shift+Enter for a new line, Shift+Tab to change mode, / for commands, @ to mention a file",
+        title: "Shift + Enter: new line · @: mention a file · /: commands at the start of the prompt",
         disabled: streaming,
         onpaste: onComposerPaste,
         oninput: onPromptInput,

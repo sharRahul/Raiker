@@ -402,4 +402,14 @@ describe("LoginView — restoring from the lock screen", () => {
     await waitFor(() => expect(screen.getByText(/I cannot open my encrypted store/)).toBeInTheDocument());
     expect(screen.queryByTestId("lock-recovery")).not.toBeInTheDocument();
   });
+
+  it("says a build without FTS5 needs a reinstall, and offers no backups", async () => {
+    stubFetch({
+      "GET /api/health": { ...UNREADABLE, reason: "store_text_search_unavailable" },
+      "GET /api/auth/bootstrap-status": { can_register: false },
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    expect(await screen.findByText(/missing the full-text search Raiker needs/)).toBeInTheDocument();
+    expect(screen.queryByTestId("lock-recovery")).not.toBeInTheDocument();
+  });
 });

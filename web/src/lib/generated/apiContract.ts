@@ -2958,7 +2958,7 @@ export type HealthView = {
   cipher_memory_security: "on" | "off";
   memory_security_in_force: "on" | "off";
   memory_security_reason: string;
-  memory_security_mode: "auto" | "on" | "off";
+  memory_security_mode: "auto" | "on";
   memory_security_probe: "supported" | "failed" | "not_run";
   memory_security_checked_at: string | null;
   sqlcipher_version: string | null;

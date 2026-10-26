@@ -97,9 +97,11 @@ assert right.execute("SELECT value FROM probe").fetchone()[0] == "workspace secr
 
 # RAIKER-2025 — the packaged build is where an FTS5 regression would actually
 # reach someone: a bundle freezes whichever wheel was installed when it was
-# built, and Raiker's text indexes are FTS5. The runtime probe would fall back
-# to FTS4 without breaking anything, which is exactly why this has to be
-# checked here rather than left to be noticed.
+# built. FTS5 is required, so a bundle without it would refuse every
+# workspace; this names the cause before an owner meets it.
+cipher = right.execute("PRAGMA cipher_version").fetchone()[0]
+if tuple(int(part) for part in cipher.split()[0].split(".")[:3]) < (4, 19, 0):
+    raise SystemExit(f"the packaged SQLCipher is {cipher}; 4.19.0 or newer is required")
 try:
     right.execute("CREATE VIRTUAL TABLE fts_probe USING fts5(text)")
     right.execute("INSERT INTO fts_probe VALUES ('relevance ranked')")
@@ -108,8 +110,7 @@ try:
     ).fetchone()
 except sqlite3.DatabaseError as exc:
     raise SystemExit(
-        f"the packaged sqlcipher has no FTS5, so search would fall back to "
-        f"recency ordering: {exc}"
+        f"the packaged sqlcipher has no FTS5, which Raiker requires: {exc}"
     ) from None
 if ranked is None or ranked[0] is None:
     raise SystemExit("the packaged sqlcipher has FTS5 but no bm25() ranking")

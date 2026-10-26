@@ -29,6 +29,7 @@ from raiker.storage.migrations import (
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 from raiker.storage.store_errors import (
     STORE_UNREADABLE,
+    TEXT_SEARCH_UNAVAILABLE,
     StoreUnavailableError,
 )
 
@@ -210,6 +211,8 @@ _MEMORY_SECURITY: tuple[bool, str] | None = None
 _MEMORY_SECURITY_PROBE: MemorySecurityProbeResult | None = None
 _MEMORY_SECURITY_MODE = "auto"
 _MEMORY_SECURITY_EVER_ENABLED = False
+#: Values the removed ``off`` mode accepted; now read as ``auto`` with a warning.
+_REMOVED_OFF_VALUES = frozenset({"off", "0", "false", "no"})
 
 
 def memory_security_ever_enabled() -> bool:
@@ -252,36 +255,40 @@ def resolve_memory_security(
 ) -> tuple[bool, str]:
     """``(enabled, reason)`` for ``PRAGMA cipher_memory_security``.
 
-    ``off`` never locks, ``on`` requires it, and unset is ``auto``: lock only
-    after a disposable probe proves the platform allows it (see the note
-    above). Resolved once per process and reported verbatim on the health
-    endpoint. ``refresh`` re-resolves it, which only tests need.
+    ``on`` requires it and anything else is ``auto``: lock only after a
+    disposable probe proves the platform allows it (see the note above). There
+    is no ``off``: once a fresh workspace stopped costing seconds to build, an
+    opt-out bought nothing worth unlocked key pages, so a stale ``off`` is read
+    as ``auto`` and logged. Resolved once per process and reported verbatim on
+    the health endpoint. ``refresh`` re-resolves it, which only tests need.
     """
     global _MEMORY_SECURITY, _MEMORY_SECURITY_MODE, _MEMORY_SECURITY_PROBE
     with _MEMORY_SECURITY_LOCK:
         if _MEMORY_SECURITY is not None and not refresh:
             return _MEMORY_SECURITY
         declared = os.environ.get(_MEMORY_SECURITY_ENV, "").strip().casefold()
-        if declared in {"off", "0", "false", "no"}:
-            _MEMORY_SECURITY_MODE = "off"
-            _MEMORY_SECURITY_PROBE = None
-            resolved = (False, "requested_off")
+        if declared in _REMOVED_OFF_VALUES:
+            _LOG.warning(
+                "%s=%s is no longer accepted; SQLCipher memory security is "
+                "resolved automatically instead.",
+                _MEMORY_SECURITY_ENV,
+                declared,
+            )
+        _MEMORY_SECURITY_MODE = "on" if declared in {"on", "1", "true", "yes"} else "auto"
+        probe_root = Path(workspace_root or Path.cwd())
+        _MEMORY_SECURITY_PROBE = probe_memory_security(probe_root)
+        if _MEMORY_SECURITY_PROBE.supported:
+            resolved = (
+                True,
+                "requested_on" if _MEMORY_SECURITY_MODE == "on" else "auto_probe_supported",
+            )
+        elif _MEMORY_SECURITY_MODE == "on":
+            resolved = (
+                False,
+                f"required_but_unavailable_{_MEMORY_SECURITY_PROBE.reason_code}",
+            )
         else:
-            _MEMORY_SECURITY_MODE = "on" if declared in {"on", "1", "true", "yes"} else "auto"
-            probe_root = Path(workspace_root or Path.cwd())
-            _MEMORY_SECURITY_PROBE = probe_memory_security(probe_root)
-            if _MEMORY_SECURITY_PROBE.supported:
-                resolved = (
-                    True,
-                    "requested_on" if _MEMORY_SECURITY_MODE == "on" else "auto_probe_supported",
-                )
-            elif _MEMORY_SECURITY_MODE == "on":
-                resolved = (
-                    False,
-                    f"required_but_unavailable_{_MEMORY_SECURITY_PROBE.reason_code}",
-                )
-            else:
-                resolved = (False, f"auto_probe_{_MEMORY_SECURITY_PROBE.reason_code}")
+            resolved = (False, f"auto_probe_{_MEMORY_SECURITY_PROBE.reason_code}")
         _MEMORY_SECURITY = resolved
         if not resolved[0]:
             # Recorded, not silent: running without locked key pages is a real
@@ -329,22 +336,16 @@ def memory_security_posture(workspace_root: str | Path | None = None) -> dict[st
 def text_search_posture(store: SQLiteStore) -> dict[str, Any]:
     """Which text-search engine is really in force, and what it costs.
 
-    Three keys rather than one, because "fts4" alone means nothing to a reader
-    who has not read the migration: `text_search_ranking` says what they will
-    actually notice, and `text_search_reason` says whether the fallback is a
-    problem to fix or simply what this platform has.
+    FTS5 is required, so a store that opened always answers ``fts5`` with
+    relevance ranking. The three keys stay so a reader of the health answer
+    does not need to know that: `text_search_ranking` says what they will
+    notice, and `text_search_reason` is empty because nothing is degraded.
     """
     engine = store.resolved_text_search_engine()
-    ranked = engine == TEXT_SEARCH_FTS5
     return {
         "text_search_engine": engine,
-        "text_search_ranking": "bm25_relevance" if ranked else "recency",
-        "text_search_reason": (
-            ""
-            if ranked
-            else "this SQLite build has no FTS5, so search ranks by recency rather "
-            "than relevance (sqlcipher3-wheels 0.5.6 or newer provides it)"
-        ),
+        "text_search_ranking": "bm25_relevance",
+        "text_search_reason": "",
     }
 
 
@@ -420,11 +421,8 @@ def store_health(workspace_root: str | Path) -> dict[str, Any]:
         store = SQLiteStore(workspace_root)
         store.connect().execute("SELECT 1")
         # RAIKER-2025 — reported for the same reason `cipher_memory_security`
-        # is: it is a property of the build this process loaded, not of any
-        # configuration, and the degraded case is *silent*. An FTS4 fallback
-        # breaks nothing and answers everything — it just ranks by recency
-        # instead of relevance, which is indistinguishable from working unless
-        # something says so.
+        # is: it is a property of the build this process loaded. FTS5 is
+        # required, so a build without it never gets this far.
         posture = {**posture, **text_search_posture(store)}
     except StoreUnavailableError as exc:
         return {"store": "unavailable", "reason": exc.reason, "detail": exc.detail, **posture}
@@ -824,28 +822,42 @@ class SQLiteStore(
     #: process that opens many.
     _text_search_engine: str | None = None
 
-    @classmethod
-    def text_search_engine(cls, connection: sqlite3.Connection) -> str:
-        """Which full-text engine this build actually has. Measured, not declared.
+    @staticmethod
+    def _fts5_available(connection: sqlite3.Connection) -> bool:
+        """Whether an FTS5 table can really be created on this connection.
 
         ``PRAGMA compile_options`` is not consulted: a build can report
         ``ENABLE_FTS5`` and still refuse the module if it was linked without it,
         and the only question that matters here is whether the table can be
         created. So one is created, in ``temp``, and dropped again.
         """
-        if cls._text_search_engine is not None:
-            return cls._text_search_engine
-        engine = TEXT_SEARCH_FTS4
         try:
             connection.execute("CREATE VIRTUAL TABLE temp.raiker_fts5_probe USING fts5(probe)")
         except sqlite3.Error:
-            pass
-        else:
-            engine = TEXT_SEARCH_FTS5
-            with contextlib.suppress(sqlite3.Error):
-                connection.execute("DROP TABLE temp.raiker_fts5_probe")
-        cls._text_search_engine = engine
-        return engine
+            return False
+        with contextlib.suppress(sqlite3.Error):
+            connection.execute("DROP TABLE temp.raiker_fts5_probe")
+        return True
+
+    @classmethod
+    def text_search_engine(cls, connection: sqlite3.Connection) -> str:
+        """The full-text engine: always FTS5, which this build must provide.
+
+        A build without it is refused by name (owner's decision, 2026-10-26):
+        the FTS4 fallback answered every query but ranked by recency, which is
+        indistinguishable from working unless something says so.
+        """
+        if cls._text_search_engine is not None:
+            return cls._text_search_engine
+        if not cls._fts5_available(connection):
+            raise StoreUnavailableError(
+                TEXT_SEARCH_UNAVAILABLE,
+                "This SQLite build has no FTS5 full-text search, which Raiker "
+                "requires. Reinstall Raiker so it uses the bundled sqlcipher3 "
+                "package (SQLCipher 4.19.0 or newer).",
+            )
+        cls._text_search_engine = TEXT_SEARCH_FTS5
+        return TEXT_SEARCH_FTS5
 
     def resolved_text_search_engine(self) -> str:
         """The engine, probing once if a search runs before any migration did."""
@@ -854,18 +866,10 @@ class SQLiteStore(
                 return self.text_search_engine(connection)
         return SQLiteStore._text_search_engine
 
-    def _snippet_expression(self, table: str, column: int) -> str:
-        """`snippet()` for whichever engine holds *table*.
-
-        The two engines take the same six arguments in a different order, and
-        FTS4 numbers the column *after* the markers while FTS5 numbers it first.
-        Getting that wrong does not raise — FTS4 would read `18` as the column
-        index and return NULL for every row — so the order is derived from the
-        probe rather than written once and assumed.
-        """
-        if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
-            return f"snippet({table}, {column}, '', '', '…', 18)"
-        return f"snippet({table}, '', '', '…', {column}, 18)"
+    @staticmethod
+    def _snippet_expression(table: str, column: int) -> str:
+        """FTS5's `snippet()`: the column first, then markers, ellipsis and size."""
+        return f"snippet({table}, {column}, '', '', '…', 18)"
 
     @staticmethod
     def _index_engine(connection: sqlite3.Connection, table: str) -> str | None:
@@ -882,7 +886,7 @@ class SQLiteStore(
         return None
 
     def _migrate_text_search_engine(self, connection: sqlite3.Connection) -> None:
-        """Move both rebuildable text indexes onto FTS5 where the build has it.
+        """Move every rebuildable text index an older release left on FTS4 onto FTS5.
 
         Written as a method rather than a SQL script because the decision is
         conditional on a probe and the rebuild reads the governed tables. Each
@@ -890,8 +894,7 @@ class SQLiteStore(
         interrupted halfway is completed on the next open, and one that is
         already FTS5 costs two `sqlite_master` reads.
         """
-        if self.text_search_engine(connection) != TEXT_SEARCH_FTS5:
-            return
+        self.text_search_engine(connection)
         converted = False
         for table, rebuild in (
             ("approved_memory_fts", self._rebuild_memory_fts),

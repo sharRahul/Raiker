@@ -250,7 +250,7 @@ class HealthView(TypedDict):
     cipher_memory_security: Literal["on", "off"]
     memory_security_in_force: Literal["on", "off"]
     memory_security_reason: str
-    memory_security_mode: Literal["auto", "on", "off"]
+    memory_security_mode: Literal["auto", "on"]
     memory_security_probe: Literal["supported", "failed", "not_run"]
     memory_security_checked_at: str | None
     sqlcipher_version: str | None

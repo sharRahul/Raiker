@@ -1,9 +1,9 @@
 """RAIKER-2025 — the text indexes are FTS5, and ranking is relevance.
 
 Two claims are under test, and they are different claims. The first is
-structural: both rebuildable projections are created on FTS5 where the build has
-it, and a workspace that was created on FTS4 is converted in place without
-losing a row. The second is behavioural, and is the reason the first one
+structural: every rebuildable projection is created on FTS5, which is required
+(a build without it refuses to open), and a workspace that was created on FTS4
+is converted in place without losing a row. The second is behavioural, and is the reason the first one
 matters: MEM-05 said the oldest exact answer was the first result dropped,
 because ordering by `created_at DESC` is the only deterministic order available
 without a relevance score. With BM25 there is one.
@@ -18,6 +18,7 @@ from raiker.memory.integrity import inspect_memory_integrity
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.migrations import TEXT_SEARCH_FTS5_MIGRATION_ID
 from raiker.storage.sqlite import SQLiteStore, store_health
+from raiker.storage.store_errors import TEXT_SEARCH_UNAVAILABLE, StoreUnavailableError
 
 
 def _governance() -> MemoryGovernance:
@@ -30,7 +31,7 @@ def _write(store: SQLiteStore, root: Path, text: str, scope: str = "project:alph
     ).memory_id
 
 
-def test_both_text_indexes_are_built_on_the_probed_engine(tmp_path: Path) -> None:
+def test_both_text_indexes_are_built_on_fts5(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     engine = store.resolved_text_search_engine()
     assert engine == "fts5", "the shipped SQLite/SQLCipher builds are expected to provide FTS5"
@@ -113,11 +114,7 @@ def test_the_oldest_exact_answer_outranks_newer_partial_ones(tmp_path: Path) -> 
 def test_conversation_search_returns_a_marked_snippet_and_ranks_by_relevance(
     tmp_path: Path,
 ) -> None:
-    """`snippet()` takes its arguments in a different order on each engine.
-
-    Getting that wrong does not raise on FTS4 — it silently returns NULL — so
-    the assertion is on the snippet's *content*, not merely on its presence.
-    """
+    """The snippet is asserted on its *content*, not merely on its presence."""
     store = SQLiteStore(tmp_path)
     store.create_session("sess_1", str(tmp_path), title="Deployments")
     for index, (turn_id, text) in enumerate(
@@ -152,39 +149,29 @@ def test_operator_shaped_prose_is_read_as_words_not_as_syntax(tmp_path: Path) ->
         assert found == [memory_id], query
 
 
-def test_a_build_without_fts5_keeps_fts4_and_still_answers(
+def test_a_build_without_fts5_refuses_to_open_by_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The fallback branch, exercised rather than assumed.
+    """FTS5 is required (owner's decision, 2026-10-26); there is no FTS4 fallback.
 
-    A build without FTS5 is the case the probe exists for, and it is the case
-    no CI runner has — every platform Raiker targets ships FTS5, so without
-    forcing it this path would be dead code that only fails on someone else's
-    machine. The `snippet()` assertion is the point: FTS4 numbers the column
-    *after* the markers, and the wrong order returns NULL for every row rather
-    than raising, so a non-empty snippet is what proves the order is right.
+    The fallback answered every query and ranked by recency, which is
+    indistinguishable from working. A build without FTS5 now refuses the store
+    with a reason the lock screen names, and writes nothing.
     """
-    monkeypatch.setattr(SQLiteStore, "_text_search_engine", "fts4")
-    store = SQLiteStore(tmp_path)
-    assert store.resolved_text_search_engine() == "fts4"
-
-    memory_id = _write(store, tmp_path, "The deployment runbook lives in the ops repository.")
-    assert [row["memory_id"] for row in store.search_approved_memory("deployment")] == [memory_id]
-
-    store.create_session("sess_fts4", str(tmp_path), title="Deploys")
-    store.insert_turn("sess_fts4", "turn_fts4", "How do we handle deployment?")
-    store.complete_turn("turn_fts4", "completed", "Read the runbook.")
-    hits = store.search_conversation_turns("deployment")
-    assert [hit["turn_id"] for hit in hits] == ["turn_fts4"]
-    assert "deployment" in str(hits[0]["snippet"]).lower()
-
-    with store.connect() as connection:
-        for table in ("approved_memory_fts", "conversation_fts"):
-            assert SQLiteStore._index_engine(connection, table) == "fts4", table
+    monkeypatch.setattr(SQLiteStore, "_text_search_engine", None)
+    monkeypatch.setattr(SQLiteStore, "_fts5_available", staticmethod(lambda connection: False))
+    monkeypatch.setenv("RAIKER_SCHEMA_TEMPLATE", "off")
+    with pytest.raises(StoreUnavailableError) as raised:
+        SQLiteStore(tmp_path)
+    assert raised.value.reason == TEXT_SEARCH_UNAVAILABLE
+    assert "FTS5" in raised.value.detail
+    health = store_health(tmp_path)
+    assert health["store"] == "unavailable"
+    assert health["reason"] == TEXT_SEARCH_UNAVAILABLE
 
 
 def test_a_workspace_written_by_an_fts5_less_release_upgrades_without_losing_anything(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     """The upgrade an owner will actually perform, rehearsed end to end.
 
@@ -195,7 +182,6 @@ def test_a_workspace_written_by_an_fts5_less_release_upgrades_without_losing_any
     first, the conversation snippet still marked, integrity still clean, and
     health saying which engine answered.
     """
-    monkeypatch.setattr(SQLiteStore, "_text_search_engine", "fts4")
     older = SQLiteStore(tmp_path)
     memory_ids = [
         _write(older, tmp_path, text)
@@ -208,12 +194,23 @@ def test_a_workspace_written_by_an_fts5_less_release_upgrades_without_losing_any
     older.create_session("sess_upgrade", str(tmp_path), title="Ops")
     older.insert_turn("sess_upgrade", "turn_upgrade", "How often is rotation done?")
     older.complete_turn("turn_upgrade", "completed", "Quarterly, and it is logged.")
+    # Put every index back on FTS4, exactly as a pre-RAIKER-2025 release left it.
     with older.connect() as connection:
-        for table in ("approved_memory_fts", "conversation_fts"):
+        for table, columns, rebuild in (
+            ("approved_memory_fts", "memory_id UNINDEXED, text, tags",
+             SQLiteStore._rebuild_memory_fts),
+            ("conversation_fts",
+             "turn_id UNINDEXED, session_id UNINDEXED, role UNINDEXED, text",
+             SQLiteStore._rebuild_conversation_fts),
+        ):
+            connection.execute(f"DROP TABLE {table}")
+            connection.execute(f"CREATE VIRTUAL TABLE {table} USING fts4({columns})")
+            rebuild(connection)
             assert SQLiteStore._index_engine(connection, table) == "fts4", table
+        connection.execute(
+            "DELETE FROM migrations WHERE migration_id = ?", (TEXT_SEARCH_FTS5_MIGRATION_ID,)
+        )
 
-    # The same files, opened by a build that has FTS5.
-    monkeypatch.setattr(SQLiteStore, "_text_search_engine", None)
     upgraded = SQLiteStore(tmp_path)
     with upgraded.connect() as connection:
         for table in ("approved_memory_fts", "conversation_fts"):
@@ -243,7 +240,7 @@ def test_an_index_left_on_the_wrong_engine_is_reported_rather_than_answered_sile
 
     An FTS4 index on an FTS5 build answers every query, so nothing surfaces it
     except a check that looks. The integrity report is where an owner can act on
-    it — upgrade, or accept recency ordering — so it must not read as clean.
+    it (a reopen converts it), so it must not read as clean.
     """
     store = SQLiteStore(tmp_path)
     _write(store, tmp_path, "The deployment runbook lives in the ops repository.")
@@ -298,7 +295,7 @@ def test_the_ranked_query_evaluates_the_index_once(tmp_path: Path) -> None:
 
 
 def test_health_names_the_engine_and_what_it_costs(tmp_path: Path) -> None:
-    """A silent fallback needs a surface, or it is indistinguishable from working."""
+    """Health names the engine, so the posture is stated rather than assumed."""
     SQLiteStore(tmp_path)
     health = store_health(tmp_path)
     assert health["store"] == "ok"

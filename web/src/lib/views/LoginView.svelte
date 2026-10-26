@@ -88,7 +88,9 @@
           ? "Nothing is wrong with your password — a newer version of Raiker last opened this workspace."
           : storeReason === "store_unreadable"
             ? "Nothing is wrong with your password — this workspace key does not open the database, or part of it is damaged."
-            : "Nothing is wrong with your password — the workspace database will not open on this machine.";
+            : storeReason === "store_text_search_unavailable"
+              ? "Nothing is wrong with your password or your data — this install is missing the full-text search Raiker needs. Reinstall Raiker."
+              : "Nothing is wrong with your password — the workspace database will not open on this machine.";
       return { title: "I cannot open my encrypted store.", sub };
     }
     if (runtimeState === "verification_failed" || runtimeReachable === false) {

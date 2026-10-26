@@ -153,7 +153,7 @@ class Host:
         return f"http://127.0.0.1:{self.port}"
 
     def start(self) -> None:
-        env = {**os.environ, "RAIKER_SQLCIPHER_MEMORY_SECURITY": os.environ.get("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")}
+        env = dict(os.environ)
         handle = self.log.open("ab")
         self.process = subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve()), "--serve", str(self.workspace), str(self.port)],

@@ -56,27 +56,33 @@ the operating system sets — 8 MB by default on the Linux host where FIXED-150
 was reproduced, a working-set quota on Windows.
 
 Raiker's decision, made explicitly rather than left to whatever SQLCipher was
-built with: **the pragma is set on every connection, and it is off unless the
-owner asks for it.** Two measured facts decide it.
+built with: **the pragma is set on every connection, before the key, and it is
+on wherever the platform proves it can hold it.** Two measured facts shape it.
 
-* **Cost.** Locking makes SQLCipher lock and wipe its buffers around every
-  operation. Opening a workspace and running two hundred reads takes **0.17 s**
-  with the pragma off and **1.14 s** with it on — about seven times, paid by
-  every turn, every task and every page load. SQLCipher itself defaults it off
-  in 4.x for this reason.
+* **Cost.** Re-measured 2026-10-26: everyday reads cost the same with the
+  pragma on or off. What locking made slow was *building* a workspace — each
+  `ALTER TABLE` migration rebuilds the schema and every freed allocation is
+  wiped, about 3 s on against 0.4 s off. Fresh workspaces are now copied from a
+  per-process schema template and re-keyed (about 0.08 s either way,
+  FIXED-1247). An earlier note here put the cost at "seven times on every
+  operation"; that was the build, not the operations.
 * **Failure mode.** When the platform's allowance runs out the failure is not
   slower work, it is `MemoryError` on *every* request — because authentication
   opens the store. That is FIXED-150, and BUG-46 before it. A defence whose
-  failure mode is "nobody can sign in" is not a good default for a local-first
-  product.
+  failure mode is "nobody can sign in" cannot be switched on blindly.
 
-So Raiker does not lock key pages by default, and it **says so** rather than
-leaving the owner to guess: `GET /api/health` reports `cipher_memory_security`,
-`memory_security_reason`, and `memlock_allowance_bytes` — what this platform
-would actually have allowed (`-1` unlimited, `null` where it will not say).
+So the default is *auto*: a disposable child-process probe checks that this
+machine's locked-memory allowance will hold, and only then is the pragma
+enabled. A host where the probe fails runs without locking and **says so**:
+`GET /api/health` reports `cipher_memory_security`, `memory_security_reason`,
+and `memlock_allowance_bytes` — what this platform would actually have allowed
+(`-1` unlimited, `null` where it will not say). There is no `off` mode (owner's
+decision, 2026-10-26): with the build cost gone it bought nothing worth
+unlocked key pages, so a stale `RAIKER_SQLCIPHER_MEMORY_SECURITY=off` is read as
+*auto* and logged.
 
 **An owner who wants the stronger posture says so.** With
-`RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is forced on, and because that
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is required, and because that
 is their decision it is honoured exactly: a refused lock fails **closed** by name
 (`store_memory_lock_unavailable`, HTTP 503, naming the setting that asked for
 it) rather than surfacing as a bare `MemoryError` inside a request handler.
@@ -520,17 +526,18 @@ would report a deleted document on every repository read.
 > dependency that moves. The consequence was real — lexical results were ordered
 > by recency rather than relevance, so the oldest exact answer was the first row
 > a limit discarded (MEM-05, closed as [FIXED-231](../plans/FIXED_ITEMS.md)) — and
-> the fix is two things, not one: the floor is now `>=0.5.6`, and CI asserts
-> FTS5 so the next silent wheel change fails a build instead of a search.
+> the fix was two things, not one: a dependency floor with FTS5, and CI
+> asserting FTS5 so the next silent wheel change fails a build instead of a
+> search.
 >
-> **The engine is now probed rather than declared.**
-> `SQLiteStore.text_search_engine` creates a throwaway `fts5` virtual table in
-> `temp` and drops it, because a build can report `ENABLE_FTS5` in
-> `PRAGMA compile_options` and still refuse the module. A build genuinely
-> without FTS5 keeps FTS4 and keeps working — ranked by recency, and saying so.
-> That fallback is not decorative: `snippet()` takes the same six arguments in
-> a **different order** on each engine, and the wrong order does not raise on
-> FTS4, it silently returns NULL, so the order is derived from the probe.
+> **FTS5 is now required (owner's decision, 2026-10-26).** SQLCipher comes from
+> the upstream `sqlcipher3` package, floored at 0.6.4 (SQLCipher 4.19.0 on
+> SQLite 3.53.4). `SQLiteStore.text_search_engine` still creates a throwaway
+> `fts5` virtual table in `temp` and drops it, because a build can report
+> `ENABLE_FTS5` in `PRAGMA compile_options` and still refuse the module — but a
+> build without it now refuses the store as `store_text_search_unavailable`
+> instead of falling back to FTS4 and recency ordering. FTS4 survives only as
+> something to recognise: an index an older release built is converted on open.
 >
 > Both indexes are **rebuildable projections** of governed tables, never a
 > second source of truth. That is what makes changing the engine underneath

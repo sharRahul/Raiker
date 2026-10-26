@@ -1334,6 +1334,10 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1245](#fixed-1245--a-refused-web-read-showed-its-reason-code-on-the-row-found-live) | Low | Chat | Fixed 2026-10-26 |
 | [FIXED-1246](#fixed-1246--settings-counted-the-always-refused-names-as-flags) | Low | Settings | Fixed 2026-10-26 |
 | [FIXED-1247](#fixed-1247--tests-had-to-switch-sqlcipher-memory-security-off-because-creating-a-workspace-replayed-208-migrations) | Medium | Storage / testing | Fixed 2026-10-26 |
+| [FIXED-1248](#fixed-1248--sqlcipher-memory-security-could-still-be-switched-off) | Medium | Storage / security | Fixed 2026-10-26 |
+| [FIXED-1249](#fixed-1249--sqlcipher-was-4120-from-a-third-party-fork) | Medium | Storage / dependencies | Fixed 2026-10-26 |
+| [FIXED-1250](#fixed-1250--search-fell-back-to-fts4-and-recency-ordering-on-a-build-without-fts5) | Medium | Storage / search | Fixed 2026-10-26 |
+| [FIXED-1251](#fixed-1251--the-locked-build-set-carried-a-setuptools-advisory) | Low | Dependencies | Fixed 2026-10-26 |
 
 ---
 
@@ -38039,6 +38043,47 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Root cause, measured.** Memory security barely changes everyday work: 2,000 reads on an open connection took 0.002 s off and 0.003 s on. What it slowed was *building* a workspace. A fresh database replayed every migration, 155 of them `ALTER TABLE ... ADD COLUMN`; each ALTER makes SQLite rebuild its schema, and with memory security on every freed allocation of that rebuild is wiped (13 ms per ALTER against 1 ms). One workspace took about 3 s on against 0.4 s off, and the suite creates thousands. The design note in `raiker/storage/sqlite.py` put the cost at "seven times on every store operation", which was the build, not the operations. It also said memory security was off by default, while the code has defaulted to *auto* since 2026-10-20; the note, KNOWN_LIMITS and a test docstring are corrected to what the code does.
 
-**Fixed.** The first fresh workspace in a process is built by the migrations as before, and its schema and bookkeeping rows, nothing else, are exported to a template under a random per-process key in a private temporary directory, deleted at exit. Every later fresh workspace is a copy, re-keyed to that workspace's own key, with its migration timestamps reset: about 0.08 s with memory security on or off. An existing database is never touched, a template that cannot be used falls back to the normal build, and `RAIKER_SCHEMA_TEMPLATE=off` turns it off. Twenty new workspaces now take 1.9 s with memory security on (59 s before) and 1.25 s off (8 s before). One template is kept per full-text engine, so a build that resolved FTS4 is never handed FTS5 tables. CI's five overrides are removed; the desktop packaging workflow keeps its own, because it runs only on desktop changes and could not be verified here.
+**Fixed.** The first fresh workspace in a process is built by the migrations as before, and its schema and bookkeeping rows, nothing else, are exported to a template under a random per-process key in a private temporary directory, deleted at exit. Every later fresh workspace is a copy, re-keyed to that workspace's own key, with its migration timestamps reset: about 0.08 s with memory security on or off. An existing database is never touched, a template that cannot be used falls back to the normal build, and `RAIKER_SCHEMA_TEMPLATE=off` turns it off. Twenty new workspaces now take 1.9 s with memory security on (59 s before) and 1.25 s off (8 s before). One template is kept per full-text engine, so a build that resolved FTS4 is never handed FTS5 tables. CI's five overrides are removed; the desktop packaging workflow kept its own until [FIXED-1248](#fixed-1248--sqlcipher-memory-security-could-still-be-switched-off) removed the `off` mode altogether.
 
 **Evidence.** `tests/test_schema_template.py` (the copy has the same schema and its own key, carries no data written after the build, never replaces an existing database, follows the search engine, and can be switched off); the full suite, run without the override (743 s in three local shards), found three tests that the template changed, which now count connections by database path and key templates by engine.
+
+## FIXED-1248 — SQLCipher memory security could still be switched off
+
+**Severity: Medium. Area: Storage / security. Status: Fixed 2026-10-26.**
+
+**Observed.** After [FIXED-1247](#fixed-1247--tests-had-to-switch-sqlcipher-memory-security-off-because-creating-a-workspace-replayed-208-migrations) the only reason for `RAIKER_SQLCIPHER_MEMORY_SECURITY=off` was gone, and the owner ruled it is not worth keeping: an opt-out that leaves key pages unlocked, for no measured gain.
+
+**Fixed.** `resolve_memory_security` accepts `on` (required, fails closed) and otherwise resolves *auto* (enabled after the disposable probe passes). A stale `off`, `0`, `false` or `no` is read as *auto* with a logged warning, so an old service file cannot weaken the posture. `memory_security_mode` on the health wire is now `"auto" | "on"`. Settings → Security → Database encryption loses its *Disabled by user* state. The two `off` overrides in `desktop-package.yml` and the default in `scripts/build_restart_fault.py` are removed. Guide, troubleshooting, storage spec, memory strategy and KNOWN_LIMITS describe the two modes.
+
+**Evidence.** `tests/test_sqlcipher_memory_security.py` now runs under the real default; the off cases became probe-failure cases, and `test_a_stale_off_is_read_as_auto_and_logged` covers all four removed spellings. `tests/test_ci_workflow.py` still asserts no override on the test step.
+
+## FIXED-1249 — SQLCipher was 4.12.0 from a third-party fork
+
+**Severity: Medium. Area: Storage / dependencies. Status: Fixed 2026-10-26.**
+
+**Observed.** Raiker took SQLCipher from `sqlcipher3-wheels`, a fork that packages wheels for the upstream `sqlcipher3` binding. Its newest release, 0.5.7 (January 2026), bundles SQLCipher 4.12.0 community on SQLite 3.51.1. The owner asked for SQLCipher 4.19.0 and SQLite 3.54.1.
+
+**Fixed.** The dependency is now the upstream `sqlcipher3>=0.6.4` (released 2026-10-13, wheels for CPython 3.11 to 3.14 on Windows, macOS and Linux including arm64 and musl). It installs the same `sqlcipher3` module, so no import changed. Measured from the wheel: **SQLCipher 4.19.0 community, SQLite 3.53.4**, `ENABLE_FTS5`. SQLite 3.54.1 is not available: SQLCipher is a fork of SQLite, its version is SQLCipher's own baseline, and both 4.19.0 and SQLCipher's main branch are on 3.53.4. That gap is carried in TO_BE_FIXED. `uv.lock` and both `requirements/release*.txt` exports are regenerated. CI's floor check now asserts SQLCipher ≥ 4.19.0 and SQLite ≥ 3.53.4 as well as FTS5 with `bm25()`, `scripts/packaging_smoke_test.py` asserts the SQLCipher floor in the frozen bundle, and CI's lock check moves from `uv==0.8.17` to `uv==0.12.24`, the newest release at least two weeks old (the lock is now revision 5, which the old pin could not have written). README tells a source install to remove `sqlcipher3-wheels` before reinstalling, because both packages provide the same module.
+
+**Evidence.** The full suite in three shards on SQLCipher 4.19.0 without the override; the CI step's version and FTS5 assertions run on every push.
+
+## FIXED-1250 — Search fell back to FTS4 and recency ordering on a build without FTS5
+
+**Severity: Medium. Area: Storage / search. Status: Fixed 2026-10-26.**
+
+**Observed.** The text indexes used FTS5 where the build had it and fell back to FTS4 otherwise. The fallback answered every query but ranked by recency, which is indistinguishable from working, and it kept a second `snippet()` argument order, a recency-only memory query and per-engine schema templates alive for a build no supported platform has. The owner asked for FTS4 to go.
+
+**Fixed.** FTS5 is required. `SQLiteStore.text_search_engine` still probes with a throwaway `temp` table, and a build without FTS5 now refuses the store with `store_text_search_unavailable`; the lock screen says the install is missing full-text search and to reinstall, and offers no backups (nothing is wrong with the data). The FTS4 search branches in memory, conversation and file search are removed, `snippet()` has one form, and `require_text_search_engine` accepts only `fts5`. `TEXT_SEARCH_FTS4` is kept only to recognise an index an older release built, which `_migrate_text_search_engine` converts on open as before.
+
+**Evidence.** `tests/test_text_search_fts5.py`: `test_a_build_without_fts5_refuses_to_open_by_name` (store and health), the upgrade rehearsal now built from real FTS4 tables, and the in-place conversion test. `web/src/lib/views/LoginView.test.ts`: the lock-screen line for `store_text_search_unavailable`.
+
+## FIXED-1251 — The locked build set carried a setuptools advisory
+
+**Severity: Low. Area: Dependencies. Status: Fixed 2026-10-26.**
+
+**Observed.** Auditing the regenerated lock for the SQLCipher change, `pip-audit` on `requirements/release-build.txt` reported GHSA-xmj3-9gf7-h52w against setuptools 84.0.0, fixed in 84.1.0. CI's supply-chain job would have failed on its next run.
+
+**Fixed.** `uv lock --upgrade-package setuptools==84.1.0`, the smallest release with the fix, and both exports regenerated. Nothing else was upgraded: a blanket `uv lock --upgrade` would move 40 packages, among them FastAPI 0.141 → 0.162 and Starlette 1.6 → 1.10, which is a separate change with its own verification. `npm audit --omit=dev` reports nothing for `web/` or `desktop/`.
+
+**Evidence.** `pip-audit` on both exports: no known vulnerabilities.
+

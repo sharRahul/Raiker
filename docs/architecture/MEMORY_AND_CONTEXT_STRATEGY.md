@@ -436,10 +436,11 @@ approval is created.
 
 **Encryption is not key-page locking.** Database encryption protects contents at
 rest. `PRAGMA cipher_memory_security` asks SQLCipher to lock and wipe pages that
-hold key material; it costs roughly seven times per operation and can exhaust
-the host's locked-memory allowance. It is therefore owner-configurable through
-`RAIKER_SQLCIPHER_MEMORY_SECURITY` (`auto` enables it only after a disposable
-probe succeeds; `on` fails closed). The pragma latches on for the life of a
+hold key material; it costs almost nothing on reads, made schema builds slow
+until workspaces were seeded from a template, and can exhaust the host's
+locked-memory allowance. `RAIKER_SQLCIPHER_MEMORY_SECURITY` chooses between
+`auto` (enabled only after a disposable probe succeeds) and `on` (fails
+closed); there is no `off`. The pragma latches on for the life of a
 process, so health reports the state in force, not only the request.
 
 ### Comparative findings and the Raiker response

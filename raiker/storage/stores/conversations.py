@@ -23,7 +23,6 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import AgentEvent, PolicyDecision, ToolAction
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.deletion_journal import SESSION_DELETE, record_deletion
-from raiker.storage.migrations import TEXT_SEARCH_FTS5
 from raiker.storage.sqlite import _SEARCH_STOPWORDS
 
 if TYPE_CHECKING:
@@ -740,10 +739,8 @@ class ConversationStore:
         is what makes an old conversation reachable at all: without them a bounded
         result set is always the recent one.
 
-        MEM-05 — ordering is relevance, then recency. Under FTS4 there was no
-        relevance score to order by, so the oldest exact answer was the first
-        row the limit discarded; under FTS5 `bm25()` supplies one and recency
-        only breaks ties. A query with no indexable term still falls back to a
+        MEM-05 — ordering is relevance, then recency: FTS5's `bm25()` supplies
+        the score and recency only breaks ties. A query with no indexable term still falls back to a
         substring scan, and that branch has no score, so it stays newest-first.
         """
         if limit < 1:
@@ -766,14 +763,13 @@ class ConversationStore:
             )
             conditions.append("conversation_fts MATCH ?")
             params.append(self._match_expression(terms))
-            if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
-                # Only the `text` column is indexed; the other three are
-                # UNINDEXED and can never contribute, but `bm25` still requires
-                # one weight per declared column.
-                ordering = (
-                    "bm25(conversation_fts, 0.0, 0.0, 0.0, 1.0) ASC, turns.created_at DESC, "
-                    "turns.turn_id ASC"
-                )
+            # Only the `text` column is indexed; the other three are
+            # UNINDEXED and can never contribute, but `bm25` still requires
+            # one weight per declared column.
+            ordering = (
+                "bm25(conversation_fts, 0.0, 0.0, 0.0, 1.0) ASC, turns.created_at DESC, "
+                "turns.turn_id ASC"
+            )
         else:
             # Terms shorter than the index tokenizer's floor (an identifier such
             # as `q3`) still have to be findable, so a substring scan stands in.

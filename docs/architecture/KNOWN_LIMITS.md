@@ -344,7 +344,8 @@ alternative would be worse.
   a disposable probe shows this machine's locked-memory allowance will hold, and
   a cap on cached connections keeps it inside that allowance; a host where the
   probe fails runs without locking, and says so. `on` requires locking and fails
-  closed by name, `off` never locks. Locking costs almost nothing on everyday
+  closed by name. There is no `off` (removed 2026-10-26; a stale `off` is read
+  as *auto* and logged). Locking costs almost nothing on everyday
   reads (measured 2026-10-26); it made *creating* a workspace slow until fresh
   workspaces were copied from a schema template (FIXED-1247). `GET /api/health`
   reports the setting, the reason, the probe and the allowance.
@@ -399,8 +400,9 @@ on the shipped build, not estimated.
   being true at 0.5.6 without anyone re-measuring. Both text indexes are now
   FTS5 and both searches rank by `bm25()` before recency, so the exact answer
   from two years ago ranks first instead of being dropped. The engine is probed
-  at runtime and reported on `/api/health`; a build genuinely without FTS5 still
-  falls back to FTS4 and recency, and says so. Closed as FIXED-231.
+  at runtime and reported on `/api/health`. Since 2026-10-26 FTS5 is required: a
+  build without it refuses the store by name instead of falling back to FTS4.
+  Closed as FIXED-231.
 - ~~**Every recall reads every embedding.**~~ **Fixed 2026-08-28
   (FIXED-301).** Eligible-memory mutations increment a durable revision; recall
   reuses its selected owner/scope/model index until that revision changes. Small

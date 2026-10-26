@@ -131,8 +131,6 @@ jobs:
           - { target: macos-arm64, runner: macos-14, os: macos }
           - { target: linux-x86_64, runner: ubuntu-22.04, os: linux }
           - { target: linux-arm64, runner: ubuntu-22.04-arm, os: linux }
-    env:
-      RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
     defaults:
       run:
         shell: bash
@@ -392,8 +390,6 @@ jobs:
           path: x64
       - name: Install, smoke-test and uninstall under emulation
         shell: pwsh
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
         run: |
           New-Item -ItemType Directory -Force evidence | Out-Null
           # The artifact keeps its desktop-release/ folder, so search beneath it.

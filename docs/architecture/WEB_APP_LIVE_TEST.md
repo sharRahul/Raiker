@@ -15,6 +15,22 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-26 (Storage upgrade: SQLCipher 4.19.0, FTS5 required, no memory-security `off`)
+
+The owner's three storage decisions of 2026-10-26
+([FIXED-1248](../plans/FIXED_ITEMS.md#fixed-1248--sqlcipher-memory-security-could-still-be-switched-off)
+to [FIXED-1250](../plans/FIXED_ITEMS.md#fixed-1250--search-fell-back-to-fts4-and-recency-ordering-on-a-build-without-fts5)),
+checked on a fresh workspace served by `raiker-web` at 1440×900 with
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=off` deliberately left in its environment. No
+model or key is needed. Spec: `web/e2e/storage-upgrade-live.spec.ts`: **3/3**.
+Screenshot: `docs/screenshots/2026-10-26-storage-upgrade/`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-STORE-01 | `GET /api/health`: store `ok`, `sqlcipher_version` *4.19.0 community*, `text_search_engine` `fts5`, ranking `bm25_relevance`, no degraded reason | ✅ |
+| RT-STORE-02 | Settings › Security › Encryption › **Details**: *Encrypted*, *Locked in memory* (this host's probe passed), *SQLCipher 4.19.0 community*, and no *Disabled by user* state | ✅ |
+| RT-STORE-03 | With the stale `off` in the server's environment, health reports `memory_security_mode` `auto` and `auto_probe_supported`, and the server log carries one *no longer accepted* warning | ✅ |
+
 ## Result — 2026-10-26 (Agent tool inventory, third round, hosted Anthropic Haiku 4.5)
 
 The third and last round of the agent tool inventory, which then closed (open

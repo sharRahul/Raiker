@@ -15173,8 +15173,7 @@
           "memory_security_mode": {
             "enum": [
               "auto",
-              "on",
-              "off"
+              "on"
             ],
             "title": "Memory Security Mode",
             "type": "string"

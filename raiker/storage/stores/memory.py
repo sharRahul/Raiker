@@ -21,7 +21,6 @@ from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SemanticMemoryWriteRecord, VectorRecord
 from raiker.storage.deletion_journal import MEMORY_FORGET, MEMORY_PURGE, record_deletion
-from raiker.storage.migrations import TEXT_SEARCH_FTS5
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -1430,11 +1429,10 @@ class MemoryStore:
         except sqlite3.OperationalError as exc:
             if "locked" in str(exc).lower():
                 raise
-            # Repair an index whose shadow tables did not survive an import —
-            # historically an FTS5 dump read by an FTS4-only migration, and now
-            # the reverse as well. The FTS table is a rebuildable projection,
-            # never source, so re-creating it on the engine this build actually
-            # has is always the right answer.
+            # Repair an index whose shadow tables did not survive an import
+            # (historically an FTS5 dump read by an FTS4-only migration). The
+            # FTS table is a rebuildable projection, never source, so
+            # re-creating it on FTS5 is always the right answer.
             connection.execute("DROP TABLE IF EXISTS approved_memory_fts")
             connection.execute(
                 "CREATE VIRTUAL TABLE approved_memory_fts USING "
@@ -1481,29 +1479,18 @@ class MemoryStore:
         # on purpose: both plan identically here, and the hint needs SQLite 3.35
         # while FTS5 itself only needs 3.9 — so the CTE would narrow the set of
         # builds this path works on for no measured gain.
-        ranked = self.resolved_text_search_engine() == TEXT_SEARCH_FTS5
-        if ranked:
-            # `bm25()` resolves its first argument as the FTS table's own name,
-            # never a query alias, so the inner select does not alias the table.
-            # One weight per declared column: `memory_id` is UNINDEXED and can
-            # never match, `text` carries the answer, and `tags` are a weaker
-            # signal than the sentence the owner actually approved.
-            source = """approved_memory m
+        #
+        # `bm25()` resolves its first argument as the FTS table's own name,
+        # never a query alias, so the inner select does not alias the table.
+        # One weight per declared column: `memory_id` is UNINDEXED and can
+        # never match, `text` carries the answer, and `tags` are a weaker
+        # signal than the sentence the owner actually approved.
+        source = """approved_memory m
         JOIN (SELECT memory_id, bm25(approved_memory_fts, 0.0, 1.0, 0.4) AS relevance
               FROM approved_memory_fts WHERE approved_memory_fts MATCH ?) AS ranked
           ON ranked.memory_id = m.memory_id"""
-            selected = "m.*, ranked.relevance AS relevance"
-            ordering = "ranked.relevance ASC, m.created_at DESC"
-        else:
-            # No relevance score to order by, so recency is the only
-            # deterministic order available — MEM-05's original situation, kept
-            # working for a build that really has no FTS5.
-            source = """approved_memory m
-        JOIN (SELECT memory_id FROM approved_memory_fts
-              WHERE approved_memory_fts MATCH ?) AS ranked
-          ON ranked.memory_id = m.memory_id"""
-            selected = "m.*, 0.0 AS relevance"
-            ordering = "m.created_at DESC"
+        selected = "m.*, ranked.relevance AS relevance"
+        ordering = "ranked.relevance ASC, m.created_at DESC"
         sql = f"""SELECT {selected} FROM {source}
         WHERE m.deleted_at IS NULL AND m.archived_at IS NULL
           AND m.search_enabled = 1 AND m.sensitivity NOT IN ('secret_like', 'credential_like')

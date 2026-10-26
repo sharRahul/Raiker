@@ -175,7 +175,7 @@ The table lives in `raiker.app.release.TARGETS`, so the workflow, the tests and
 the product read one list rather than three that can disagree.
 
 Each artifact bundles the service, the built web assets, and that platform's own
-dependency wheels resolved on that platform's runner — `sqlcipher3-wheels` above
+dependency wheels resolved on that platform's runner — `sqlcipher3` above
 all, because development-machine success is not evidence about any other target.
 `scripts/packaging_smoke_test.py` runs on each runner against the artifact that
 runner just built: it checks the payload is complete, then opens an encrypted

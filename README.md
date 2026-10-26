@@ -231,7 +231,10 @@ run useful local models). Run Raiker as its own unprivileged user.
 Update a WSL2 or VPS installation with `git pull`, `python -m pip install -e .`
 and `npm --prefix web ci && npm --prefix web run build`, then restart
 `raiker-web` (`sudo systemctl restart raiker`). Back up the workspace directory
-first. More: [Managing the host](docs/guide/managing-the-host.md#explicit-web-server-control).
+first. Updating from a release before 2026-10-26 also needs
+`python -m pip uninstall -y sqlcipher3-wheels` before the install: SQLCipher now
+comes from the upstream `sqlcipher3` package (SQLCipher 4.19.0, SQLite 3.53.4,
+FTS5), and both packages provide the same module. More: [Managing the host](docs/guide/managing-the-host.md#explicit-web-server-control).
 
 ## AI providers
 

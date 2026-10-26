@@ -65,8 +65,9 @@ def schema_generation_of(connection: sqlite3.Connection) -> int:
 # turns it off.
 _TEMPLATE_ENV = "RAIKER_SCHEMA_TEMPLATE"
 _TEMPLATE_LOCK = threading.Lock()
-#: One template per full-text engine: a build that resolved FTS4 must never be
-#: handed a schema built with FTS5 tables, or the reverse.
+#: Keyed by the full-text engine the template was built with. FTS5 is required
+#: now, so there is one; the key still keeps a template from being handed to a
+#: process that has not yet proved which engine it has.
 _TEMPLATE: dict[str, tuple[Path, str]] = {}
 
 

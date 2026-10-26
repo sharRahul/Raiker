@@ -247,7 +247,7 @@ def collect_payload(
     """The three things an artifact must carry, per the distribution design.
 
     The service (``raiker``), the built web assets, and the platform-compatible
-    native dependency wheels — ``sqlcipher3-wheels`` above all, which is why the
+    native dependency wheels — ``sqlcipher3`` above all, which is why the
     workflow resolves them on the target's own runner rather than trusting a
     development machine's copy.
 

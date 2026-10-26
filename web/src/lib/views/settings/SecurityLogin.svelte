@@ -534,9 +534,7 @@
           <strong>
             {storageHealth.cipher_memory_security === "on"
               ? "Locked in memory"
-              : storageHealth.memory_security_mode === "off"
-                ? "Disabled by user"
-                : "Degraded on this host"}
+              : "Degraded on this host"}
           </strong>
         </div>
       </div>

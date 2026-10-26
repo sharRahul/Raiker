@@ -18,13 +18,15 @@ from dataclasses import dataclass
 # — it carries a real relevance score (`bm25`), a better tokenizer, and a
 # `DELETE`/`INSERT` path that does not scan the whole content table.
 #
-# The engine is still **probed, not declared**. A build without FTS5 keeps FTS4
-# and says so, because an index that cannot be created is worse than an index
-# that ranks by recency, and claiming BM25 on a build that has none would be the
-# same class of untrue statement the probe exists to prevent.
+# FTS5 is **required** (owner's decision, 2026-10-26). Every supported build
+# ships it — `sqlcipher3` 0.6.4 bundles SQLCipher 4.19.0 compiled with
+# `ENABLE_FTS5` — so the FTS4 fallback that ranked by recency is gone. The
+# engine is still probed, not assumed: a build without FTS5 refuses to open the
+# store by name rather than quietly answering worse. `TEXT_SEARCH_FTS4` survives
+# only to recognise an index an older release built, which is converted in place.
 TEXT_SEARCH_FTS5 = "fts5"
 TEXT_SEARCH_FTS4 = "fts4"
-TEXT_SEARCH_ENGINES = (TEXT_SEARCH_FTS5, TEXT_SEARCH_FTS4)
+TEXT_SEARCH_ENGINES = (TEXT_SEARCH_FTS5,)
 
 
 def require_text_search_engine(engine: str) -> str:

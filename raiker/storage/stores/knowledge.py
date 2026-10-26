@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, Any
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 
 from raiker.contracts.ids import utc_now
-from raiker.storage.migrations import TEXT_SEARCH_FTS5
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
@@ -588,8 +587,7 @@ class KnowledgeStore:
             selected = f"{self._snippet_expression('managed_file_chunk_fts', 2)} AS snippet"
             conditions.append("managed_file_chunk_fts MATCH ?")
             params.append(self._match_expression(terms))
-            if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
-                ordering = "bm25(managed_file_chunk_fts, 0.0, 0.0, 1.0) ASC, " + ordering
+            ordering = "bm25(managed_file_chunk_fts, 0.0, 0.0, 1.0) ASC, " + ordering
         else:
             # Terms below the tokenizer's floor still have to be findable, so a
             # bounded substring scan stands in -- with no score, hence no reorder.

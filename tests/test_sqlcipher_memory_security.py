@@ -36,12 +36,16 @@ from raiker.storage.sqlite import (
 
 
 def _supported_probe() -> MemorySecurityProbeResult:
-    return MemorySecurityProbeResult(True, "supported", "4.12.0", "2026-08-11T00:00:00Z")
+    return MemorySecurityProbeResult(True, "supported", "4.19.0", "2026-08-11T00:00:00Z")
+
+
+def _failed_probe() -> MemorySecurityProbeResult:
+    return MemorySecurityProbeResult(False, "host_crash", "4.19.0", "2026-08-11T00:00:00Z")
 
 
 @pytest.fixture(autouse=True)
-def _default_memory_security_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+def _default_memory_security_auto(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
     resolve_memory_security(refresh=True)
 
 
@@ -104,8 +108,8 @@ def test_memory_security_auto_enables_only_after_a_passing_probe(
     """Unset is ``auto``: lock key pages only once a probe proves the platform allows it.
 
     The probe is what stands between ``auto`` and BUG-86's lockout, so a passing
-    probe enables it, ``on`` is honoured as a requirement and ``off`` as a
-    refusal.
+    probe enables it and ``on`` is honoured as a requirement. There is no
+    ``off`` any more.
     """
     monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
@@ -113,14 +117,13 @@ def test_memory_security_auto_enables_only_after_a_passing_probe(
 
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
     assert resolve_memory_security(refresh=True) == (True, "requested_on")
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
-    assert resolve_memory_security(refresh=True) == (False, "requested_off")
 
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _failed_probe())
     resolve_memory_security(refresh=True)
     posture = memory_security_posture()
     assert posture["cipher_memory_security"] == "off"
-    assert posture["memory_security_reason"] == "requested_off"
+    assert posture["memory_security_reason"] == "auto_probe_host_crash"
     # The allowance is reported so an owner deciding whether to turn it on can
     # see what this platform would actually give them. -1 is unlimited; None is
     # a platform that will not say.
@@ -128,7 +131,7 @@ def test_memory_security_auto_enables_only_after_a_passing_probe(
     resolve_memory_security(refresh=True)
 
 
-def test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe(
+def test_the_pragma_is_set_explicitly_to_off_when_the_probe_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Set on every connection, so the posture never depends on the build.
@@ -143,7 +146,7 @@ def test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe(
     below, in a process that has never enabled the pragma.
     """
     close_cached_connections()
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _failed_probe())
     resolve_memory_security(refresh=True)
 
     issued: list[str] = []
@@ -178,7 +181,6 @@ def test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe(
     assert first_pragma < first_key
 
     close_cached_connections()
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     resolve_memory_security(refresh=True)
 
 
@@ -187,16 +189,19 @@ def test_a_process_that_never_enabled_the_pragma_really_reads_it_back_off(
 ) -> None:
     """The read-back assertion the test above cannot make in a shared process.
 
-    Run in a pristine interpreter with the variable unset, so it measures the
-    platform rather than the order the suite happened to run in (BUG-205). This
-    is the check that would catch Raiker silently opening keyed connections with
-    memory security on when the owner asked for it off.
+    Run in a pristine interpreter, so it measures the platform rather than the
+    order the suite happened to run in (BUG-205). This is the check that would
+    catch Raiker opening keyed connections with memory security on after the
+    probe said this host cannot hold it.
     """
     script = (
         "import sys\n"
         "from pathlib import Path\n"
+        "import raiker.storage.sqlite as module\n"
+        "from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult\n"
         "from raiker.storage.sqlite import SQLiteStore, resolve_memory_security\n"
-        "assert resolve_memory_security(refresh=True) == (False, 'requested_off'), 'unexpected posture'\n"
+        "module.probe_memory_security = lambda root: MemorySecurityProbeResult(False, 'host_crash', '', '')\n"
+        "assert resolve_memory_security(refresh=True) == (False, 'auto_probe_host_crash'), 'unexpected posture'\n"
         "store = SQLiteStore(Path(sys.argv[1]))\n"
         "print(store.connect().execute('PRAGMA cipher_memory_security').fetchone()[0])\n"
     )
@@ -204,7 +209,7 @@ def test_a_process_that_never_enabled_the_pragma_really_reads_it_back_off(
         [sys.executable, "-c", script, str(tmp_path)],
         capture_output=True,
         text=True,
-        env={**os.environ, "RAIKER_SQLCIPHER_MEMORY_SECURITY": "off"},
+        env={k: v for k, v in os.environ.items() if k != "RAIKER_SQLCIPHER_MEMORY_SECURITY"},
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "0", result.stdout
@@ -216,10 +221,9 @@ def test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved(
     """A latched process must not report ``off`` while every connection is ``on``.
 
     BUG-205 — the latch sticks only in the safe direction, so this can never
-    understate protection. It can overstate a *change*: an owner who set the
-    variable to ``off`` and restarted nothing would otherwise read ``off`` on the
-    health surface while the process kept locking pages. Health says which of the
-    two it is.
+    understate protection. It can overstate a *change*: a re-resolution that
+    came back ``off`` would otherwise read ``off`` on the health surface while
+    the process kept locking pages. Health says which of the two it is.
     """
     close_cached_connections()
     monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
@@ -233,12 +237,13 @@ def test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved(
     assert sqlite_module.memory_security_ever_enabled() is True
 
     close_cached_connections()
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _failed_probe())
     resolve_memory_security(refresh=True)
     posture = memory_security_posture()
-    # What the owner asked for, and — separately — what the process is doing.
+    # What was resolved, and — separately — what the process is doing.
     assert posture["cipher_memory_security"] == "off"
-    assert posture["memory_security_reason"] == "requested_off"
+    assert posture["memory_security_reason"] == "auto_probe_host_crash"
     assert posture["memory_security_in_force"] == "on"
 
     close_cached_connections()
@@ -423,12 +428,15 @@ def test_auto_and_required_modes_use_the_isolated_probe(
     )
 
 
-def test_explicit_off_bypasses_the_probe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
-    monkeypatch.setattr(
-        sqlite_module,
-        "probe_memory_security",
-        lambda root: pytest.fail("explicit off must not launch the probe"),
-    )
+@pytest.mark.parametrize("declared", ["off", "0", "false", "no"])
+def test_a_stale_off_is_read_as_auto_and_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, declared: str
+) -> None:
+    """The ``off`` mode is gone (owner's decision, 2026-10-26): the probe decides."""
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", declared)
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
 
-    assert resolve_memory_security(tmp_path, refresh=True) == (False, "requested_off")
+    with caplog.at_level("WARNING", logger=sqlite_module._LOG.name):
+        assert resolve_memory_security(tmp_path, refresh=True) == (True, "auto_probe_supported")
+    assert memory_security_posture(tmp_path)["memory_security_mode"] == "auto"
+    assert "no longer accepted" in caplog.text

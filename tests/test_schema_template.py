@@ -62,14 +62,3 @@ def test_the_template_can_be_switched_off(tmp_path: Path, monkeypatch: pytest.Mo
     assert migration_runner._TEMPLATE == {}
     assert _schema(SQLiteStore(tmp_path / "b"))
 
-
-def test_a_template_is_only_used_by_a_build_with_the_same_search_engine(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    SQLiteStore(tmp_path / "a")
-    built_with = next(iter(migration_runner._TEMPLATE))
-    other = "fts4" if built_with == "fts5" else "fts5"
-    monkeypatch.setattr(SQLiteStore, "_text_search_engine", other)
-    store = SQLiteStore(tmp_path / "b")
-    assert store.resolved_text_search_engine() == other
-    assert set(migration_runner._TEMPLATE) == {built_with, other}

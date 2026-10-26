@@ -95,6 +95,7 @@ still set.
 | Lock screen: *The workspace key (.raiker/app.key) is missing, but the database it unlocks is still here* (`store_key_missing`) | The key file was moved or lost. Raiker will not make a new one — a new key cannot open this data. Put the original `app.key` back from your backup and restart. Nothing in the workspace was changed. |
 | Lock screen: *this workspace key does not open it, or part of the file is damaged* (`store_unreadable`) | The key in `.raiker/` is not the one the database was made with, or the database file is damaged. Raiker writes nothing over it. Restore the matching `app.key` and restart, or use **Restore from a backup** on the lock screen (in a browser on the same machine): the damaged database is moved to `.raiker/quarantine/` and the verified backup put in its place. |
 | Lock screen: *last opened by a newer Raiker* (`store_schema_newer`) | A newer version of Raiker last shaped this database, and this one will not open it as a downgrade. Start the newer Raiker again, or restore a backup this version can open from the lock screen — the newer database is kept in `.raiker/quarantine/`. |
+| Lock screen: *this install is missing the full-text search Raiker needs* (`store_text_search_unavailable`) | The SQLite library Raiker loaded has no FTS5, which search requires. Nothing in the workspace was changed. Reinstall Raiker; from a source checkout, run `python -m pip uninstall -y sqlcipher3-wheels` and then `python -m pip install -e .` so the bundled `sqlcipher3` (SQLCipher 4.19.0) is the one loaded. |
 | Permissions: *This permission was changed somewhere else since this page loaded* | Another tab or device changed it after this page opened; nothing was changed here. The page now shows the current setting — choose again if you still want to change it. |
 | Tasks: *An earlier attempt of this task was already saved* | The draft was saved on an earlier press whose answer was lost, then edited. Check the queue before saving it again. |
 | Account → Backups: *Damaged — …* or *Unreadable* | *Damaged* means the file changed after it was made (a checksum or integrity failure): remove it and back up again. *Unreadable* means it was made with a different `app.key` than this workspace's; it opens only with that key. Neither is offered for restore. |
@@ -114,6 +115,7 @@ still set.
 | `RAIKER_CONNECTOR_VAULT_KEY` | Overrides the workspace vault key file |
 | `RAIKER_OWNER_TOKEN` | Required with `--allow-public` |
 | `RAIKER_WEB_UI_DIR` | Alternative dashboard build directory |
+| `RAIKER_SQLCIPHER_MEMORY_SECURITY` | `on` requires locked key pages and refuses to open without them; unset is *auto*. `off` was removed and is read as *auto*. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `OLLAMA_API_KEY` | Provider keys, if you prefer the environment over the vault |
 
 ## Desktop app

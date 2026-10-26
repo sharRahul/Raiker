@@ -464,15 +464,14 @@ comment.
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
   per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
   or load/chaos proof exists yet.
-- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`),
-  floored at **0.5.6** — the version where the wheel gained FTS5. Earlier
-  versions genuinely have none (0.5.2 → SQLite 3.44.2, 0.5.4 → 3.46.1), which is
-  why an earlier note here said Raiker used FTS4: it was true at the time and
-  went stale when the wheel moved. Both text indexes are now encrypted FTS5 with
-  BM25 relevance ordering (RAIKER-2025). The engine is still probed at runtime
-  rather than assumed — a build without FTS5 falls back to FTS4 and recency
-  order and says so on `/api/health` — and CI asserts FTS5 so a wheel that lost
-  it fails the build rather than quietly degrading search. Legacy plaintext
+- SQLCipher is provided by the upstream `sqlcipher3` package, floored at
+  **0.6.4**: SQLCipher 4.19.0 on SQLite 3.53.4 (2026-10-26; it replaced the
+  `sqlcipher3-wheels` fork, whose last release carried SQLCipher 4.12.0). Every
+  text index is encrypted FTS5 with BM25 relevance ordering (RAIKER-2025), and
+  FTS5 is **required**: the engine is probed at runtime, a build without it
+  refuses the store as `store_text_search_unavailable`, and CI and the
+  packaging smoke test assert the SQLCipher floor and FTS5 with `bm25()`. A
+  workspace an older release indexed with FTS4 is converted on open. Legacy plaintext
   databases are converted once and the transient plaintext source is removed
   after success.
 - SQLCipher derives its key when a connection is opened, so `raiker/storage/sqlite.py`

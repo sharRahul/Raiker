@@ -37,6 +37,10 @@ STORE_UNREADABLE = "store_unreadable"
 #: written; the lock screen offers the backups this build can open.
 STORE_SCHEMA_NEWER = "store_schema_newer"
 
+#: The SQLite library this process loaded has no FTS5, which full-text search
+#: requires (owner's decision, 2026-10-26). A reinstall fixes it; nothing is written.
+TEXT_SEARCH_UNAVAILABLE = "store_text_search_unavailable"
+
 
 class AppKeyMissingError(StoreUnavailableError):
     """Refused to mint an application key over an existing encrypted store."""

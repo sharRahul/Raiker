@@ -480,14 +480,21 @@ their text and provenance; review history and conversations stay with the old
 workspace.
 
 **Diagnosing key-page protection.** **Settings → Security → Database
-encryption** shows whether key memory is *Locked in memory*, *Disabled by user*
-or *Degraded on this host*. `GET /api/health` gives the detail: `cipher_memory_security` (what was asked for),
+encryption** shows whether key memory is *Locked in memory* or *Degraded on
+this host*. `GET /api/health` gives the detail: `cipher_memory_security` (what was asked for),
 `memory_security_in_force` (what the process is actually doing — once on, it
 stays on until restart), `memory_security_reason`, `memory_security_probe` and
 `memlock_allowance_bytes`. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to require
 locked key pages (Raiker then refuses to open the store rather than run without
-them), `off` to never lock them, or leave it unset for *auto*, which enables it
-only after a disposable probe succeeds. Restart Raiker after changing it.
+them), or leave it unset for *auto*, which enables it only after a disposable
+probe succeeds. There is no `off`: an old `off` setting is read as *auto* and
+logged. Restart Raiker after changing it.
+
+**Full-text search needs FTS5.** Memory, conversation and file search use
+SQLite's FTS5 with relevance ranking. Raiker's bundled SQLCipher always has it;
+a build without it does not open the workspace, and the lock screen says to
+reinstall Raiker. A workspace an older release indexed with FTS4 is converted
+the next time it opens, and nothing in it is lost.
 
 ## Maintenance contract
 

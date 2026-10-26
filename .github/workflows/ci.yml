@@ -33,32 +33,44 @@ jobs:
       - name: Validate documentation contracts
         run: |
           python -m pytest -q tests/test_docs_consistency.py tests/test_governance_entry_paths.py
-      # RAIKER-2025 — the runtime probe degrades to FTS4 honestly when a build
-      # has no FTS5, which is right for a user on an unusual platform and wrong
-      # for this repository's own dependency floor. Without this step a wheel
-      # that lost FTS5 would leave every test passing and every search silently
-      # back on recency ordering, because the fallback is designed not to break
-      # anything. So the floor is asserted here, where it can fail loudly.
-      - name: Verify the SQLCipher build provides FTS5
+      # RAIKER-2025 — FTS5 is required and the runtime refuses a build
+      # without it, so a wheel that lost FTS5 would fail every store test with
+      # a less direct message. The floor is asserted here first, with the
+      # versions the run actually loaded.
+      - name: Verify the SQLCipher build and FTS5
         run: |
           python - <<'PY'
           from importlib.metadata import version
 
           from sqlcipher3 import dbapi2 as sqlcipher
 
+          MIN_SQLCIPHER = (4, 19, 0)
+          MIN_SQLITE = (3, 53, 4)
           connection = sqlcipher.connect(":memory:")
+          cipher = connection.execute("PRAGMA cipher_version").fetchone()[0]
           print(
-              "sqlcipher3-wheels", version("sqlcipher3-wheels"),
+              "sqlcipher3", version("sqlcipher3"),
+              "| SQLCipher", cipher,
               "| SQLite", sqlcipher.sqlite_version,
           )
+
+          def parts(text):
+              return tuple(int(part) for part in text.split()[0].split(".")[:3])
+
+          if parts(cipher) < MIN_SQLCIPHER or parts(sqlcipher.sqlite_version) < MIN_SQLITE:
+              raise SystemExit(
+                  "SQLCipher or SQLite is older than the floor in pyproject.toml "
+                  "(SQLCipher 4.19.0, SQLite 3.53.4)."
+              )
           try:
               connection.execute("CREATE VIRTUAL TABLE probe USING fts5(text)")
+              connection.execute("INSERT INTO probe VALUES ('relevance')")
+              connection.execute(
+                  "SELECT bm25(probe) FROM probe WHERE probe MATCH 'relevance'"
+              ).fetchone()
           except Exception as exc:  # noqa: BLE001 - the message is the report
               raise SystemExit(
-                  "This SQLCipher build has no FTS5, so Raiker's text indexes "
-                  f"would fall back to FTS4 and recency ordering: {exc}. "
-                  "FTS5 arrived in sqlcipher3-wheels 0.5.6; check the floor in "
-                  "pyproject.toml."
+                  f"This SQLCipher build has no FTS5 with bm25(), which Raiker requires: {exc}"
               ) from None
           print("FTS5: available")
           PY
@@ -203,7 +215,7 @@ jobs:
       # a lock that is not exported, fails here rather than at release time.
       - name: Check the release constraints match the lock
         run: |
-          python -m pip install "uv==0.8.17"
+          python -m pip install "uv==0.12.24"
           uv lock --check
           uv export --frozen --no-dev --no-emit-project --format requirements-txt \
             -o requirements/release.txt

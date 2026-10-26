@@ -328,15 +328,12 @@ retrieval meets the Stage F recall/latency budgets without a visibility leak.
 **In progress (backup catalog slice).** Backup manifests now record encryption
 key identifiers, retention/legal-hold state, restore verification, erasure
 requests, and completed erasure. SQLite, FTS, and vector/graph metadata now
-use SQLCipher through `sqlcipher3-wheels` (the `sqlcipher3` DB-API); the
-workspace app key derives the SQLCipher key and legacy plaintext databases are
-converted without retaining a plaintext copy. This distribution **does** provide
-FTS5 from `sqlcipher3-wheels` 0.5.6 onwards, which is now the declared floor; the
-earlier claim here that it did not was true of 0.5.2/0.5.4 and went stale when the
-wheel moved. Lexical ranking is therefore BM25 relevance with recency only as a
-tie-break (RAIKER-2025). The engine is probed at runtime; a build without FTS5
-falls back to FTS4 and deterministic recency order, and reports which one it
-used.
+use SQLCipher through the upstream `sqlcipher3` package (SQLCipher 4.19.0 on
+SQLite 3.53.4, floored at 0.6.4); the workspace app key derives the SQLCipher
+key and legacy plaintext databases are converted without retaining a plaintext
+copy. Lexical ranking is BM25 relevance with recency only as a tie-break
+(RAIKER-2025). FTS5 is required: the engine is probed at runtime and a build
+without it refuses the store by name rather than falling back to FTS4.
 Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
 rows are append-only at the SQLite layer. Raiker's storage enforces principal and workspace isolation wherever separate
 local instances or users exist on a device. This is an isolation boundary, not a

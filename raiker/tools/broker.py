@@ -257,7 +257,9 @@ class ToolBroker:
             ),
             # TOOL-46 — the guide this install ships, static and local.
             "help_read": lambda args: help_read(
-                str(args.get("slug", "") or ""), str(args.get("query", "") or "")
+                str(args.get("slug", "") or ""),
+                str(args.get("query", "") or ""),
+                str(args.get("part", "") or ""),
             ),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
@@ -377,6 +379,7 @@ class ToolBroker:
                 str(args.get("url", "")),
                 args.get("max_chars"),
                 args.get("pages"),
+                args.get("question"),
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -386,6 +389,7 @@ class ToolBroker:
                 args.get("max_results", 5),
                 args.get("allowed_domains") or (),
                 args.get("blocked_domains") or (),
+                args.get("depth"),
                 store=self.store,
                 principal_id=self.principal_id,
             ),
@@ -1143,6 +1147,14 @@ class ToolBroker:
         if result.status == "success":
             extra: dict[str, object] = {}
             output = result.output if isinstance(result.output, dict) else {}
+            if action.tool_name in ("web_fetch", "web_extract") and output.get("alerts"):
+                # Owner's decision 2026-10-25 — a web read alerts rather than
+                # refuses; the row says so where the owner reads it.
+                extra["alerts"] = [
+                    {"kind": str(a.get("kind", "")), "message": str(a.get("message", ""))}
+                    for a in output["alerts"]
+                    if isinstance(a, dict)
+                ][:6]
             if action.tool_name == "suggest_connection" and output.get("connector_id"):
                 # TOOL-72 — what the card needs, from Raiker's own catalogue;
                 # the reason is model text the client renders as data.
@@ -1464,6 +1476,8 @@ class ToolBroker:
                         if operation == "update_pull_request"
                         else "review reply"
                         if operation == "reply_review_comment"
+                        else "thread resolution"
+                        if operation == "resolve_review_thread"
                         else "branch update"
                         if operation == "update_pull_request_branch"
                         else "re-run of the failed jobs"

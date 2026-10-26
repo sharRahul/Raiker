@@ -260,7 +260,7 @@ def test_a_name_that_does_not_resolve_is_not_called_private(
     assert evaluate_host("127.0.0.1", ()).reason == "web_host_not_public"
 
 
-def test_the_check_route_says_why_and_which_list(tmp_path: Path) -> None:
+def test_the_check_route_says_why_and_which_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi.testclient import TestClient
 
     from raiker.api.app import create_app
@@ -274,13 +274,19 @@ def test_the_check_route_says_why_and_which_list(tmp_path: Path) -> None:
         "/api/web-access/blocklist", json={"rule": "ads.example.com", "note": ""}
     ).status_code == 201
 
-    blocked = client.post("/api/web-access/blocklist/test", json={"host": "eu.ads.example.com"})
-    assert blocked.status_code == 200, blocked.text
-    body = blocked.json()
-    assert body["allowed"] is False
+    # Owner's decision 2026-10-25: a flagged site is read with an alert, so the
+    # check says it is reachable and names the rule that flags it.
+    monkeypatch.setattr(
+        "raiker.runtime.web_policy.resolve_public_addresses", lambda host, port=443: ["93.184.216.34"]
+    )
+    flagged = client.post("/api/web-access/blocklist/test", json={"host": "eu.ads.example.com"})
+    assert flagged.status_code == 200, flagged.text
+    body = flagged.json()
+    assert body["allowed"] is True
     assert body["rule"] == "ads.example.com"
     assert body["rule_source"] == "yours"
-    assert body["explanation"].startswith("That destination is on your blocked list")
+    assert body["explanation"] == ""
+    monkeypatch.undo()
 
     private = client.post("/api/web-access/blocklist/test", json={"host": "127.0.0.1"}).json()
     assert private["rule"] is None and private["rule_source"] is None

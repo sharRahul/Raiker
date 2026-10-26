@@ -975,6 +975,14 @@ class SessionService:
                     str(stored.get("status") or ""), "running"
                 ),
             }
+            if tool_name in ("web_fetch", "web_extract") and row["status"] == "success" and isinstance(arguments, dict):
+                # A reopened row says again what its address alone carried.
+                from raiker.runtime.web_access import address_alerts
+                from raiker.runtime.web_policy import load_blocklist
+
+                alerts = address_alerts(str(arguments.get("url") or ""), load_blocklist(self.store))
+                if alerts:
+                    row["alerts"] = [{"kind": a["kind"], "message": a["message"]} for a in alerts]
             if tool_name == "suggest_connection" and row["status"] == "success" and isinstance(arguments, dict):
                 # TOOL-72 — the card is rebuilt from the stored arguments and the
                 # catalogue, exactly as the live call produced it, so a reopened

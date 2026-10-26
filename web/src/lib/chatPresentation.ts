@@ -62,6 +62,17 @@ export interface ToolCallRow {
   remediationRoute?: string;
   /** TOOL-72 — a suggested connection: the card under the row, from the catalogue. */
   connection?: ConnectionSuggestion;
+  /** A web read's alerts (owner's decision 2026-10-25: alert, never refuse). */
+  alerts?: { kind: string; message: string }[];
+}
+
+function alertsFrom(raw: unknown): { kind: string; message: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .map((entry) => ({ kind: str(entry.kind), message: str(entry.message) }))
+    .filter((entry) => entry.message !== "")
+    .slice(0, 6);
 }
 
 export interface ConnectionSuggestion {
@@ -132,6 +143,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
     const reason = str(payload.reason);
     const remediationRoute = str(payload.remediation_route);
     const connection = connectionFrom(payload.connection);
+    const alerts = alertsFrom(payload.alerts);
     const row: ToolCallRow = {
       actionId,
       toolName,
@@ -142,6 +154,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
       reasons: reasons.length > 0 ? reasons : reason ? [reason] : [],
       ...(remediationRoute ? { remediationRoute } : {}),
       ...(connection ? { connection } : {}),
+      ...(alerts.length > 0 ? { alerts } : {}),
     };
     const existing = byAction.get(actionId);
     if (existing === undefined) {
@@ -166,6 +179,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
         ? { remediationRoute: row.remediationRoute ?? before.remediationRoute }
         : {}),
       ...(row.connection || before.connection ? { connection: row.connection ?? before.connection } : {}),
+      ...(row.alerts || before.alerts ? { alerts: row.alerts ?? before.alerts } : {}),
     };
   }
   return rows;

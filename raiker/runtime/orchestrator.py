@@ -360,6 +360,21 @@ LOCAL_ANSWER_PROVIDERS = frozenset(
 )
 
 
+#: TOOL-151 — Build's Plan posture. The turn can change nothing (its posture
+#: denies every write), so what it owes the owner is a plan worth approving.
+#: The second paragraph is Muse Code's `/grill`: a plan that has been questioned
+#: by its author before the owner sees it fails less often after approval.
+PLAN_POSTURE_PROMPT = (
+    "This is a Plan turn: research with read-only tools and propose a plan; change nothing. "
+    "Write the plan as steps with update_plan, each step one change you can check.\n\n"
+    "Before you present it, question your own plan and fix what the questions find: which "
+    "assumption, if wrong, breaks it; what you have not read that it depends on; what the "
+    "smallest version is; how each step will be checked; and what it could break for someone "
+    "else. Then end your reply with the plan and a short 'Questions I asked of this plan' list "
+    "naming the two or three that changed it, or saying that none did."
+)
+
+
 def _system_messages(surface: str, answer_style: str = "auto") -> list[str]:
     """The standing instructions for one turn, chosen by composer surface.
 
@@ -2599,6 +2614,10 @@ class RuntimeOrchestrator:
         if plan_prompt is not None:
             messages.append(ModelMessage(role="system", content=plan_prompt))
             self._event(envelope, "agent_plan_replayed", {"plan_chars": len(plan_prompt)})
+        # TOOL-151 — a Plan turn questions its own plan before it proposes it.
+        if envelope.options.planning_mode == "always":
+            messages.append(ModelMessage(role="system", content=PLAN_POSTURE_PROMPT))
+            self._event(envelope, "plan_posture_applied", {"grill": True})
         # TOOL-01 — background commands that settled since the last turn, so the
         # model hears about them without polling.
         background = self._background_prompt(envelope)

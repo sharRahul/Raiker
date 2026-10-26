@@ -211,13 +211,17 @@ class TestWebFetchGovernance:
         assert "alert(" not in outcome["content"]
         assert "color:red" not in outcome["content"]
 
-    def test_a_blocked_host_is_refused(
+    def test_a_flagged_host_is_read_with_an_alert(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """Owner's decision 2026-10-25: web_fetch alerts on a flagged site, never refuses it."""
         _allow(_enable_gate(workspace, store))
         monkeypatch.setenv("RAIKER_WEB_EGRESS_BLACKLIST", "evil.example.net")
         outcome = _governed(workspace, store).fetch("https://evil.example.net/a")
-        assert outcome["error"]["type"] == "web_egress_blocked:evil.example.net"
+        assert outcome["status"] == "success"
+        assert [a["kind"] for a in outcome["alerts"]] == ["flagged_site"]
+        assert outcome["alerts"][0]["rule"] == "evil.example.net"
+        assert outcome["content"].startswith("Raiker alert: evil.example.net is on your flagged sites")
 
 
 class TestUrlSafety:
@@ -352,15 +356,20 @@ class TestWebSearch:
         assert outcome["results"][0]["url"] == "https://docs.example.com/w"
         assert "Untrusted web content" in outcome["content"]
 
-    def test_a_blocked_search_endpoint_is_refused(
+    def test_a_flagged_search_endpoint_is_still_searched(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The endpoint answers to the blocklist like any other destination."""
+        """A flagged endpoint is a flag, not a refusal (owner's decision 2026-10-25)."""
+        payload = json.dumps({"results": [{"title": "Widget", "url": "https://docs.example.com/w", "description": "x"}]})
+
+        def search_fetch(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            return {"final_url": url, "status": 200, "content_type": "application/json", "body": payload, "truncated": False}
+
         _allow(_enable_gate(workspace, store))
         monkeypatch.setenv(SEARCH_ENDPOINT_ENV, "https://search.example.com/api")
         monkeypatch.setenv("RAIKER_WEB_EGRESS_BLACKLIST", "search.example.com")
-        outcome = _governed(workspace, store).search("widget docs")
-        assert outcome["error"]["type"] == "web_egress_blocked:search.example.com"
+        outcome = _governed(workspace, store, search_fetch).search("widget docs")
+        assert outcome["status"] == "success"
 
 
 class TestModelSurface:
@@ -539,3 +548,104 @@ class TestFetchPdf:
 
         _allow(_enable_gate(workspace, store))
         assert _governed(workspace, store, broken).fetch("https://docs.example.com/x.pdf")["error"]["type"] == "pdf_unreadable"
+
+
+
+class TestReadsAlertRatherThanRefuse:
+    """Owner's decision 2026-10-25: web reads alert; only non-internet addresses refuse."""
+
+    def test_http_and_credentials_are_read_with_alerts(self, workspace: Path, store: SQLiteStore) -> None:
+        seen: list[str] = []
+
+        def plain(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            seen.append(url)
+            return {"final_url": url, "status": 200, "content_type": "text/plain", "body": "hello", "truncated": False}
+
+        _allow(_enable_gate(workspace, store))
+        outcome = _governed(workspace, store, plain).fetch("http://user:pw@docs.example.com/a")
+        assert outcome["status"] == "success"
+        assert {a["kind"] for a in outcome["alerts"]} == {"not_encrypted", "credentials_removed"}
+        assert seen == ["http://docs.example.com/a"]
+
+    def test_the_local_network_still_refuses(self, workspace: Path, store: SQLiteStore) -> None:
+        _allow(_enable_gate(workspace, store))
+        service = _governed(workspace, store)
+        assert service.fetch("https://localhost/x")["error"]["type"] == "web_egress_blocked:localhost"
+        assert service.fetch("https://127.0.0.1/")["error"]["type"].startswith("web_host_not_public")
+        assert service.fetch("ftp://docs.example.com/x")["error"]["type"] == "web_url_invalid"
+
+    def test_a_page_flagged_before_is_named(self, workspace: Path, store: SQLiteStore) -> None:
+        from raiker.cli.principal_resolver import bootstrap_owner
+
+        bootstrap_owner("owner", "Owner", workspace_root=workspace)
+        store.insert_security_finding(
+            principal_id="principal_owner", source="injection_scanner", severity="high",
+            code="prompt_injection_suspected", summary="x", redacted_detail={},
+            subject_id="https://docs.example.com/a",
+        )
+        _allow(_enable_gate(workspace, store))
+        service = WebAccessService(workspace, store, principal_id="principal_owner", fetch_fn=_ok_fetch)
+        outcome = service.fetch("https://docs.example.com/a")
+        assert "flagged_before" in [a["kind"] for a in outcome["alerts"]]
+
+    def test_an_unresolvable_name_goes_through_the_owners_proxy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """BUG-353 — a proxy-only host reads the web through its proxy."""
+        from raiker.runtime.web_access import check_web_read
+
+        monkeypatch.setattr("raiker.runtime.web_policy.resolve_public_addresses", lambda host, port=443: [])
+        monkeypatch.setattr("raiker.runtime.web_policy.resolves_at_all", lambda host, port=443: False)
+        for name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
+        monkeypatch.delenv("NO_PROXY", raising=False)
+        monkeypatch.delenv("no_proxy", raising=False)
+        decision, _url, _alerts = check_web_read("https://html.duckduckgo.com/html/?q=x", ())
+        assert decision.allowed and decision.route == "proxy" and decision.proxy == "http://proxy.example:3128"
+        monkeypatch.delenv("HTTPS_PROXY")
+        monkeypatch.delenv("https_proxy", raising=False)
+        decision, _url, _alerts = check_web_read("https://html.duckduckgo.com/html/?q=x", ())
+        assert decision.reason_code == "web_host_unresolved:html.duckduckgo.com"
+
+
+def test_a_question_returns_the_passages_that_bear_on_it(workspace: Path, store: SQLiteStore) -> None:
+    """TOOL-11 — the answer to a question is rarely in a page's opening characters."""
+    _allow(_enable_gate(workspace, store))
+    filler = "\n\n".join(f"Paragraph {i} about nothing in particular." for i in range(400))
+    body = filler + "\n\nThe retry limit is five attempts with exponential backoff.\n\n" + filler
+
+    def fetch(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+        return {"body": body, "content_type": "text/plain", "final_url": url, "truncated": False}
+
+    service = _governed(workspace, store, fetch_fn=fetch)
+    plain = service.fetch("https://docs.example.com/a", max_chars=2000)
+    assert "retry limit" not in plain["content"]
+    focused = service.fetch("https://docs.example.com/a", max_chars=2000, question="What is the retry limit?")
+    assert "The retry limit is five attempts" in focused["content"]
+    assert focused["passages"] >= 1 and focused["question"] == "What is the retry limit?"
+    assert focused["content_length"] <= 2200
+
+
+def test_an_extended_search_reads_the_top_results(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TOOL-11 — extended depth returns passages from the top results, each read like a web_fetch."""
+    payload = json.dumps({"results": [
+        {"title": f"Page {i}", "url": f"https://docs{i}.example.com/p", "description": "snippet"} for i in range(5)
+    ]})
+    read: list[str] = []
+
+    def fetch(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+        if url.startswith("https://search.example.com"):
+            return {"final_url": url, "status": 200, "content_type": "application/json", "body": payload, "truncated": False}
+        read.append(url)
+        body = "Header line.\nThe widget timeout defaults to thirty seconds.\nFooter line."
+        return {"final_url": url, "status": 200, "content_type": "text/plain", "body": body, "truncated": False}
+
+    _allow(_enable_gate(workspace, store))
+    monkeypatch.setenv(SEARCH_ENDPOINT_ENV, "https://search.example.com/api")
+    service = _governed(workspace, store, fetch)
+    assert "reads" not in service.search("widget timeout") and read == []
+    outcome = service.search("widget timeout", extended=True)
+    assert outcome["depth"] == "extended" and len(read) == 3
+    assert all(item["read"] for item in outcome["reads"])
+    assert outcome["content"].count("thirty seconds") == 3

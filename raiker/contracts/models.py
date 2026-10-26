@@ -137,6 +137,7 @@ EVENT_TYPES = {
     # TOOL-01 — the turn was told about earlier turns' background commands
     # (character count only).
     "background_runs_reported",
+    "plan_posture_applied",
     # B7 — a bounded, read-only subagent finished. Metadata only: its name, its
     # contract id, the steps it ran and the read-only tools it used. The
     # findings themselves reach the calling model and nothing else.

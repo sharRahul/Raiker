@@ -1,5 +1,5 @@
 /**
- * Agent tool inventory, first round (docs/plans/AGENT_TOOL_INVENTORY.md),
+ * Agent tool inventory, first round (the agent tool inventory, closed 2026-10-26; open items in docs/plans/TO_BE_FIXED.md),
  * against a running host and a real hosted model.
  *
  * Prerequisites:

@@ -306,33 +306,92 @@ class EgressDecision:
     addresses: tuple[str, ...] = ()
     #: DEC-21 (Web access) — the blocklist rule that refused it, as written.
     rule: str = ""
+    #: TOOL-91 (2026-10-25, owner's decision) — the owner's own rules a web read
+    #: matched. A web read is never refused for them; it is fetched and alerted.
+    flagged: tuple[str, ...] = ()
+    #: ``direct`` (dialled at a checked address) or ``proxy`` (BUG-353: this
+    #: machine cannot resolve names itself and the owner's proxy carries it).
+    route: str = "direct"
+    proxy: str = ""
 
     @property
     def reason_code(self) -> str:
         return f"{self.reason}:{self.detail}" if self.detail else self.reason
 
 
+_DEFAULT_RULES = frozenset(DEFAULT_BLOCKED_NAMES)
+
+
+def web_proxy_for(scheme: str, host: str, port: int | None = None) -> str:
+    """The owner's proxy for *scheme*://*host*, or ``""`` (BUG-353).
+
+    Read from the process environment (``HTTPS_PROXY``, ``HTTP_PROXY``,
+    ``ALL_PROXY`` minus ``NO_PROXY``), exactly as the model transport does.
+    """
+    import urllib.request
+    from urllib.request import proxy_bypass_environment  # type: ignore[attr-defined]
+
+    proxies = urllib.request.getproxies_environment()
+    chosen = proxies.get(scheme) or proxies.get("all") or ""
+    if not chosen or not host:
+        return ""
+    netloc = f"{host}:{port}" if port else host
+    if proxy_bypass_environment(netloc, proxies):
+        return ""
+    return chosen
+
+
 def evaluate_host(
-    host: str, rules: tuple[BlocklistRule, ...], *, port: int = 443
+    host: str,
+    rules: tuple[BlocklistRule, ...],
+    *,
+    port: int = 443,
+    flag_owner_rules: bool = False,
+    allow_proxy: bool = False,
+    scheme: str = "https",
 ) -> EgressDecision:
     """Decide one hostname against the blocklist and then the address guard.
 
     Order matters: the blocklist is checked first so an owner's own rule is the
     reason given, and so a name they blocked costs no DNS lookup at all.
+
+    ``flag_owner_rules`` (web reads, owner's decision of 2026-10-25): a rule the
+    owner or the environment added does not refuse; the decision is allowed and
+    names the rule in ``flagged``. The built-in names — the local network and
+    cloud metadata services — still refuse, as the address guard does, because
+    neither is a page on the internet.
+
+    ``allow_proxy`` (BUG-353): when this machine cannot resolve the name at all
+    and the owner's environment names a proxy for the scheme, the read goes
+    through that proxy. A name that resolves here to a private address is still
+    refused; only an unresolvable one takes the proxy route.
     """
     target = (host or "").strip().lower().rstrip(".")
     if not target:
         return EgressDecision(False, "web_url_invalid")
 
+    flagged: list[str] = []
+
+    def hit(rule: BlocklistRule, detail: str) -> EgressDecision | None:
+        if flag_owner_rules and rule.raw not in _DEFAULT_RULES:
+            if rule.raw not in flagged:
+                flagged.append(rule.raw)
+            return None
+        return EgressDecision(False, "web_egress_blocked", detail, rule=rule.raw)
+
     for rule in rules:
         if rule.matches_host(target):
-            return EgressDecision(False, "web_egress_blocked", target, rule=rule.raw)
+            refused = hit(rule, target)
+            if refused is not None:
+                return refused
 
     literal = literal_address(target)
     if literal is not None:
         for rule in rules:
             if rule.matches_address(literal):
-                return EgressDecision(False, "web_egress_blocked", target, rule=rule.raw)
+                refused = hit(rule, target)
+                if refused is not None:
+                    return refused
 
     addresses = resolve_public_addresses(target, port)
     if not addresses:
@@ -340,18 +399,21 @@ def evaluate_host(
         # does not resolve at all, sending the owner to look for a network
         # they do not have. Both are refused; only the reason differs.
         if literal is None and not resolves_at_all(target, port):
-            return EgressDecision(False, "web_host_unresolved", target)
-        return EgressDecision(False, "web_host_not_public", target)
+            proxy = web_proxy_for(scheme, target, None if port in (80, 443) else port) if allow_proxy else ""
+            if proxy:
+                return EgressDecision(True, flagged=tuple(flagged), route="proxy", proxy=proxy)
+            return EgressDecision(False, "web_host_unresolved", target, flagged=tuple(flagged))
+        return EgressDecision(False, "web_host_not_public", target, flagged=tuple(flagged))
 
     for address in addresses:
         parsed = ipaddress.ip_address(address)
         for rule in rules:
             if rule.matches_address(parsed):
-                return EgressDecision(
-                    False, "web_egress_blocked", f"{target} ({address})", rule=rule.raw
-                )
+                refused = hit(rule, f"{target} ({address})")
+                if refused is not None:
+                    return refused
 
-    return EgressDecision(True, addresses=tuple(addresses))
+    return EgressDecision(True, addresses=tuple(addresses), flagged=tuple(flagged))
 
 
 def refusal_message(reason_code: str) -> str:
@@ -390,6 +452,30 @@ def refusal_message(reason_code: str) -> str:
 # So the connection is made to an address that already passed, while the TLS
 # handshake and the Host header keep the original name — certificate validation
 # is unchanged, and the destination cannot move between the check and the socket.
+
+
+def pinned_http_opener(address: str) -> Any:
+    """A urllib opener that dials *address* for a plain-http read (TOOL-91).
+
+    The Host header keeps the name; only the dialled address is pinned, for the
+    same rebinding reason as :func:`pinned_https_opener`. Plain http is read
+    only because the owner decided web reads should not refuse a URL; the read
+    carries an alert that it was not encrypted.
+    """
+    import http.client
+    import urllib.request
+
+    class _PinnedHTTPConnection(http.client.HTTPConnection):
+        def connect(self) -> None:
+            import socket as _socket
+
+            self.sock = _socket.create_connection((address, self.port or 80), self.timeout)
+
+    class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+        def http_open(self, req: Any) -> Any:
+            return self.do_open(_PinnedHTTPConnection, req)
+
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _PinnedHTTPHandler())
 
 
 def pinned_https_opener(host: str, address: str, *, direct: bool = False) -> Any:

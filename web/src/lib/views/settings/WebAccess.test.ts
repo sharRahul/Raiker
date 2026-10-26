@@ -68,13 +68,13 @@ describe("Settings → Web access", () => {
     await waitFor(() =>
       expect(screen.getByText(/whoever starts Raiker on this machine/)).toBeInTheDocument(),
     );
-    expect(screen.getByText(/installing a Raiker that ships a different list/)).toBeInTheDocument();
+    expect(screen.getByText(/refused like a private address rather than flagged/)).toBeInTheDocument();
   });
 
   it("keeps the owner's own rules editable in the open", async () => {
     mount();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Unblock ads.example.com" })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: "Remove flag from ads.example.com" })).toBeInTheDocument(),
     );
   });
 });

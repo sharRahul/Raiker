@@ -12,6 +12,7 @@ def web_fetch(
     url: str,
     max_chars: Any = None,
     pages: Any = None,
+    question: Any = None,
     *,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
@@ -42,7 +43,10 @@ def web_fetch(
         cap = int(max_chars) if max_chars not in (None, "") and not isinstance(max_chars, bool) else None
     except (TypeError, ValueError):
         cap = None
-    return service.fetch(url, max_chars=cap, pages=str(pages) if pages not in (None, "") else None)
+    return service.fetch(
+        url, max_chars=cap, pages=str(pages) if pages not in (None, "") else None,
+        question=str(question) if isinstance(question, str) and question.strip() else None,
+    )
 
 
 def web_search(
@@ -51,16 +55,15 @@ def web_search(
     max_results: Any = 5,
     allowed_domains: Any = (),
     blocked_domains: Any = (),
+    depth: Any = None,
     *,
     store: SQLiteStore | None = None,
     principal_id: str | None = None,
 ) -> dict[str, Any]:
-    """Search the web through the owner-configured endpoint (B12 / C7).
+    """Search the web (B12 / C7): DuckDuckGo unless the owner configured another endpoint.
 
-    Same gate, decision mode and egress allowlist as :func:`web_fetch`, and
-    **off unless the owner configures a provider**: Raiker ships no search
-    endpoint, so an unconfigured host refuses with that exact reason rather
-    than reaching somebody's API on the owner's behalf.
+    Same gate, decision mode and flagged-site alerts as :func:`web_fetch`.
+    ``depth="extended"`` (TOOL-11) also reads the top results.
     """
     from raiker.runtime.web_access import WebAccessService
     from raiker.storage.sqlite import SQLiteStore
@@ -77,6 +80,7 @@ def web_search(
         max_results=limit,
         allowed_domains=allowed_domains if isinstance(allowed_domains, (list, tuple, str)) else (),
         blocked_domains=blocked_domains if isinstance(blocked_domains, (list, tuple, str)) else (),
+        extended=depth == "extended",
     )
 
 

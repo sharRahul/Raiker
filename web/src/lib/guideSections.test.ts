@@ -5,7 +5,7 @@
 // file the guide does not have. The link then renders, reads as a promise, and
 // lands on nothing. So the slugs are checked against the guide directory itself
 // rather than against a list somebody has to keep in step with it.
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { guideSectionFor, mappedRoutes } from "./guideSections";
@@ -25,6 +25,22 @@ describe("guide section map", () => {
       const target = guideSectionFor(route);
       expect(target, route).not.toBeNull();
       expect(slugs, `${route} → ${target!.slug}`).toContain(target!.slug);
+    }
+  });
+
+  // A part that is not a `## ` heading of its article opens the article's
+  // intro instead; the link still works, but it stopped meaning what it says.
+  it("points every mapped part at a level-two heading of its article", () => {
+    const anchor = (heading: string) =>
+      heading.trim().toLowerCase().replace(/[^a-z0-9 _-]/g, "").replace(/ /g, "-");
+    for (const route of mappedRoutes()) {
+      const target = guideSectionFor(route)!;
+      if (!target.part) continue;
+      const headings = readFileSync(resolve(GUIDE, `${target.slug}.md`), "utf-8")
+        .split("\n")
+        .filter((line) => line.startsWith("## "))
+        .map((line) => anchor(line.slice(3)));
+      expect(headings, `${route} → ${target.slug}#${target.part}`).toContain(target.part);
     }
   });
 

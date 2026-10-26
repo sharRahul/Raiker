@@ -591,12 +591,14 @@ def test_web_fetch_denied_no_url(tmp_path: Path) -> None:
     assert "missing_argument:url" in result.error
 
 
-def test_web_fetch_refuses_plaintext_scheme(tmp_path: Path) -> None:
+def test_web_fetch_executor_applies_the_tools_rules(tmp_path: Path) -> None:
     """BUG-232: the capability executor enforces what the model-facing tool does.
 
     The old executor called a helper whose only control was a four-host netloc
-    glob, so `http://` was fine as long as the host matched. It now routes
-    through `WebAccessService`, so a plaintext scheme is refused before DNS.
+    glob. It now routes through `WebAccessService`. Since the owner's decision of
+    2026-10-25 plain http is read with an alert rather than refused, so what this
+    proves is the part that still refuses: a scheme that is not a web address,
+    and a plaintext URL to a private address.
     """
     ws = _ws(tmp_path)
     ctx = _setup(ws)
@@ -606,16 +608,20 @@ def test_web_fetch_refuses_plaintext_scheme(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
-    action = governed_action(
-        "web_fetch",
-        principal_id="principal_owner",
-        arguments={"url": "http://malicious.example.com/data"},
-        risk_level=RiskLevelValue.LOW,
-    )
-    result = authority.route_action(action, principal)
-    assert result.decision == "allow"
-    assert result.error is not None
-    assert "web_url_not_https" in result.error
+    for url, reason in (
+        ("file:///etc/passwd", "web_url_invalid"),
+        ("http://169.254.169.254/latest/meta-data/", "web_host_not_public"),
+    ):
+        action = governed_action(
+            "web_fetch",
+            principal_id="principal_owner",
+            arguments={"url": url},
+            risk_level=RiskLevelValue.LOW,
+        )
+        result = authority.route_action(action, principal)
+        assert result.decision == "allow"
+        assert result.error is not None
+        assert reason in result.error, (url, result.error)
 
 
 def test_web_fetch_refuses_private_address(tmp_path: Path) -> None:

@@ -349,6 +349,12 @@ export function routeFromHash(hash: string): string {
  * cannot be validated against a constant here. The view resolves it against the
  * sections the API actually returned and falls back to the first one.
  */
+/** The help part an address names (`&part=approvals`), or null (TOOL-46). */
+export function partFromHash(hash: string): string | null {
+  const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("part");
+  return requested !== null && /^[a-z0-9_-]+$/.test(requested) ? requested : null;
+}
+
 export function sectionFromHash(hash: string): string | null {
   const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("section");
   return requested !== null && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requested) ? requested : null;

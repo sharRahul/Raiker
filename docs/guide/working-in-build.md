@@ -41,6 +41,12 @@ posture** sent with the prompt, not a setting you have to remember to put back.
 | **Suggest changes** | Turns every file write, patch and command into a decision you accept or reject, and the unattended approval modes cannot swallow it | Changing code you want to see change |
 | **Run within limits** | Adds no restriction of its own. The turn runs under exactly the permissions you already granted | Work you have already decided the shape of |
 
+**A Plan turn questions its own plan.** Before it shows you the plan, Raiker
+asks of it which assumption would break it, what it depends on that it has not
+read, what the smallest version is, how each step will be checked and what it
+could break for someone else, and fixes what those questions find. The reply
+ends with *Questions I asked of this plan*, naming the ones that changed it.
+
 **Approving a plan.** After a Plan turn writes a plan with steps still to do,
 the plan card says *Made in Plan, so nothing has changed yet.* with **Approve
 plan · Suggest changes**. Pressing it switches to Suggest changes, where every
@@ -150,6 +156,11 @@ Your own messages carry **Copy**, **Edit** and **Retry**, plus a `⋯` handle fo
 you asked, because the transcript is a record.
 
 ## Making changes
+
+**Notebooks are edited a cell at a time.** Raiker reads a `.ipynb` as its
+numbered cells and proposes an edit to one cell's source; the row says which
+(*notebooks/demo.ipynb › cell 1*), and the file keeps its own formatting, so the
+change you approve is the cell and nothing else.
 
 **One patch, one approval, one reversible change set.** A unified diff may cover
 several files, including creates and deletes, and it is applied as a single

@@ -1306,6 +1306,23 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1217](#fixed-1217--a-turn-could-load-a-skill-only-by-its-exact-name-tool-70) | Low | Skills | Fixed 2026-10-25 |
 | [FIXED-1218](#fixed-1218--a-recalled-memory-did-not-say-which-conversation-it-came-from-tool-104) | Low | Memory | Fixed 2026-10-25 |
 | [FIXED-1219](#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01) | Medium | Shell / runtime | Fixed 2026-10-25 |
+| [FIXED-1220](#fixed-1220--web-reads-and-remote-mcp-calls-failed-on-a-host-whose-only-route-out-is-a-proxy-bug-353) | Medium | Web access / MCP / transport | Fixed 2026-10-26 |
+| [FIXED-1221](#fixed-1221--web_fetch-refused-a-site-the-owner-had-flagged-instead-of-reading-it-with-an-alert) | Medium | Web access | Fixed 2026-10-26 |
+| [FIXED-1222](#fixed-1222--plain-http-and-a-url-with-credentials-in-it-were-refused-outright) | Low | Web access | Fixed 2026-10-26 |
+| [FIXED-1223](#fixed-1223--a-page-raiker-had-already-flagged-was-read-again-with-no-word-of-it) | Medium | Web access | Fixed 2026-10-26 |
+| [FIXED-1224](#fixed-1224--a-reads-alerts-had-nowhere-to-show-and-settings-described-a-blocklist-that-no-longer-blocked) | Low | Chat / Settings | Fixed 2026-10-26 |
+| [FIXED-1225](#fixed-1225--the-help-panel-showed-a-whole-chapter-when-the-owner-wanted-one-part-of-it) | Medium | Help | Fixed 2026-10-26 |
+| [FIXED-1226](#fixed-1226--help_read-returned-up-to-20000-characters-of-a-whole-article) | Low | Help / tools | Fixed 2026-10-26 |
+| [FIXED-1227](#fixed-1227--two-help-parts-came-back-with-the-same-redacted-id-and-could-not-be-opened-found-live) | Medium | Help / API | Fixed 2026-10-26 |
+| [FIXED-1228](#fixed-1228--help-text-broke-at-every-source-line-found-live) | Low | Help | Fixed 2026-10-26 |
+| [FIXED-1229](#fixed-1229--a-help-search-typed-while-an-article-loaded-was-replaced-by-the-article-found-live) | Low | Help | Fixed 2026-10-26 |
+| [FIXED-1230](#fixed-1230--help-summaries-showed-their-own-markdown-found-live) | Low | Help | Fixed 2026-10-26 |
+| [FIXED-1231](#fixed-1231--a-review-thread-could-be-answered-but-not-resolved-tool-27) | Low | GitHub connector | Fixed 2026-10-26 |
+| [FIXED-1232](#fixed-1232--a-turn-could-not-say-who-has-access-to-a-repository-or-read-an-issues-sub-issues-tool-28-tool-29) | Low | GitHub connector | Fixed 2026-10-26 |
+| [FIXED-1233](#fixed-1233--a-jupyter-notebook-could-be-edited-only-as-raw-json-tool-03) | Medium | Files | Fixed 2026-10-26 |
+| [FIXED-1234](#fixed-1234--a-question-about-a-long-page-got-its-first-20000-characters-tool-11) | Medium | Web access | Fixed 2026-10-26 |
+| [FIXED-1235](#fixed-1235--a-search-returned-snippets-and-left-the-reading-to-another-round-of-tool-calls-tool-11) | Low | Web access | Fixed 2026-10-26 |
+| [FIXED-1236](#fixed-1236--builds-plan-posture-sent-planning_mode-always-and-nothing-read-it-tool-151) | Medium | Build | Fixed 2026-10-26 |
 
 ---
 
@@ -37533,7 +37550,7 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Severity: Medium. Area: Tools. Status: Fixed 2026-10-25.**
 
-**Observed.** [AGENT_TOOL_INVENTORY.md](AGENT_TOOL_INVENTORY.md) TOOL-02: `grep` advertised only `query`, matched it literally and returned one line per hit, so a model looking for every `def area_…` read whole files instead. Its executor already took `path`, `include` and `max_results`, but the schema never offered them.
+**Observed.** The agent tool inventory (closed 2026-10-26), TOOL-02: `grep` advertised only `query`, matched it literally and returned one line per hit, so a model looking for every `def area_…` read whole files instead. Its executor already took `path`, `include` and `max_results`, but the schema never offered them.
 
 **Fixed.** `grep` advertises `path`, `include`, `regex`, `ignore_case`, `context` (0–5 lines either side) and `max_results` (1–500). Literal stays the default. A regular expression is bounded before it is compiled: at most 500 characters, and a pattern with a quantified group that is itself quantified (`(a+)+`) is refused as `pattern_nested_quantifier`, because Python's `re` has no time limit and such a pattern can hold the host's thread. The container bridge passes the same arguments.
 
@@ -37786,3 +37803,139 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** Each turn starts with one system line naming this conversation's background commands that finished since the previous turn began, with their state and exit code, and those still running, from the durable run rows (at most five of each). A `background_runs_reported` event records the notice's length. It grants nothing: reading a log or stopping a run still goes through `background_run`.
 
 **Evidence.** `tests/test_background_notice.py`.
+
+## FIXED-1220 — Web reads and remote MCP calls failed on a host whose only route out is a proxy (BUG-353)
+
+**Severity: Medium. Area: Web access / MCP / transport. Status: Fixed 2026-10-26.**
+
+**Fixed.** The route is decided before the opener. A name this host cannot resolve, with `HTTPS_PROXY` set, goes through the proxy, unpinned, with the owner's flagged sites and the address guard applied to what can still be checked; a resolved public name is dialled at its checked address with `direct=True`, so urllib never tunnels the pinned address through a proxy. Remote MCP endpoints take the same decision: a public endpoint goes through the configured proxy, and otherwise its pinned address is dialled directly. DuckDuckGo stays the zero-configuration search provider, and this is what lets it work on a proxied host.
+
+**Evidence.** `tests/test_web_access.py` (`TestReadsAlertRatherThanRefuse`, the proxy route), `tests/test_mcp_remote_transport_trust.py`. Live, the proxy on the test host refuses `duckduckgo.com` by its own network policy, so a live search could not be shown here; `github.com` was read through the proxy (RT-TOOL-20).
+
+## FIXED-1221 — web_fetch refused a site the owner had flagged instead of reading it with an alert
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** Owner's decision, 2026-10-25: `web_fetch` does not refuse a URL; it alerts. A site on the owner's flagged list (Settings › Web access, or `RAIKER_WEB_EGRESS_BLACKLIST`) is read, and the result opens with a *Raiker alert* line the model is told to pass on, naming the rule that matched. The same holds for `web_search` endpoints, `web_extract` and every redirect hop. What still refuses is the owner's own network: loopback, private and link-local addresses, `*.local`, metadata services and the other built-in names, because those are not pages on the internet and reading them would let a turn reach local services, Raiker's own API among them.
+
+**Evidence.** `tests/test_web_access.py` (`test_a_flagged_host_is_read_with_an_alert`, `test_a_flagged_search_endpoint_is_still_searched`), `tests/test_web_egress_blocklist.py`; RT-TOOL-20.
+
+## FIXED-1222 — Plain http and a URL with credentials in it were refused outright
+
+**Severity: Low. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** A plain `http://` page is read with a *not encrypted* alert, through a pinned plain-http opener, and a URL carrying `user:password@` is read with the credentials removed and an alert saying so. Any other scheme (`file:`, `ftp:`) is still refused as not a web address.
+
+**Evidence.** `tests/test_web_access.py` (`TestReadsAlertRatherThanRefuse`), `tests/test_global_read_capabilities.py`.
+
+## FIXED-1223 — A page Raiker had already flagged was read again with no word of it
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** A read now says when the page was flagged before: if the injection scanner has a finding for that address, the result carries a *flagged before* alert, and a page whose text is shaped like instructions carries a *suspicious text* alert, both beside the untrusted-content framing that was already there.
+
+**Evidence.** `tests/test_web_access.py` (`TestReadsAlertRatherThanRefuse`).
+
+## FIXED-1224 — A read's alerts had nowhere to show, and Settings described a blocklist that no longer blocked
+
+**Severity: Low. Area: Chat / Settings. Status: Fixed 2026-10-26.**
+
+**Fixed.** A `web_fetch` or `web_extract` row shows its alerts under the row (*Alerts for this read*, a warning icon per alert), live and on a reopened conversation. Settings › Web access now says what is true: Raiker reads any public page and searches with DuckDuckGo with no account or key; the owner's list is **Flagged sites** (**Flag**, **Remove**), read with an alert; the built-in names are *always refused*, with why; and the address check answers *is read, with an alert*.
+
+**Evidence.** `chatPresentation.test.ts`, `WebAccess.test.ts`, `tests/test_web_egress_blocklist.py`; RT-TOOL-20.
+
+## FIXED-1225 — The help panel showed a whole chapter when the owner wanted one part of it
+
+**Severity: Medium. Area: Help. Status: Fixed 2026-10-26.**
+
+**Fixed.** Owner's directive, 2026-10-25: the help panel no longer hands over the full guide page. An article opens as its intro and an *In this article* list of its parts (each `## ` heading, with its first sentence); a part opens on its own, with *Previous* and *Next* and a back button to its article. Pressing **?** on a page lands on the part that answers it where one does (Approvals on *What approved means*, Permissions on *Capability gates*). Search matches part titles and summaries and lands on the part. `/api/guide/{slug}` returns the intro and the parts list, and `?part=<id>` one part; a guide link's `#fragment` opens the part that holds that heading.
+
+**Evidence.** `tests/test_guide_surface.py`, `HelpPanel.test.ts`, `guideLinks.test.ts`, `guideSections.test.ts`; RT-TOOL-17, RT-TOOL-18.
+
+## FIXED-1226 — help_read returned up to 20,000 characters of a whole article
+
+**Severity: Low. Area: Help / tools. Status: Fixed 2026-10-26.**
+
+**Fixed.** `help_read` with a slug returns the article's intro and its parts; `part` reads one part (at most 12,000 characters); a query returns the matching parts, a heading match weighted above a body match. A help source chip carries `slug#part`, so it opens the panel on the part the turn read.
+
+**Evidence.** `tests/test_help_read_tool.py`.
+
+## FIXED-1227 — Two help parts came back with the same redacted id and could not be opened (found live)
+
+**Severity: Medium. Area: Help / API. Status: Fixed 2026-10-26.**
+
+**Fixed.** The API's response redactor read a long heading anchor (`configuring-something-is-permission-for-it`) as a credential. Two such parts in one article came back as the same `[REDACTED_SECRET]`, the panel's keyed list refused the duplicate, and the view stopped updating. The guide routes now serve their text as written: they return Markdown shipped in `docs/guide`, which cannot carry an owner's secret.
+
+**Evidence.** `tests/test_guide_surface.py::test_part_ids_reach_the_panel_unredacted`; RT-TOOL-17.
+
+## FIXED-1228 — Help text broke at every source line (found live)
+
+**Severity: Low. Area: Help. Status: Fixed 2026-10-26.**
+
+**Fixed.** The guide is wrapped at about 80 columns for reading in a checkout, and the transcript renderer keeps a single newline as a line break, so every source line became its own ragged line in a 360 px panel. Hard-wrapped paragraphs and list items are joined before rendering; headings, lists, quotes, tables and fenced code keep their lines.
+
+**Evidence.** `guideLinks.test.ts`; RT-TOOL-17 screenshot.
+
+## FIXED-1229 — A help search typed while an article loaded was replaced by the article (found live)
+
+**Severity: Low. Area: Help. Status: Fixed 2026-10-26.**
+
+**Fixed.** Each load and each keystroke in search takes a number, and a load that returns after a newer one started is dropped, so an article cannot land over results the owner has started typing for. The panel's open effect also tracks only the request itself, so the panel element binding no longer reopens it.
+
+**Evidence.** `HelpPanel.test.ts` (*never lets a slow article land over a search already typed*); RT-TOOL-18.
+
+## FIXED-1230 — Help summaries showed their own Markdown (found live)
+
+**Severity: Low. Area: Help. Status: Fixed 2026-10-26.**
+
+**Fixed.** A summary is the first full sentence of the first prose paragraph, with emphasis, code marks and link targets removed, skipping a paragraph that continues a list or code block and a numbered item.
+
+**Evidence.** `tests/test_guide_surface.py::test_summaries_are_plain_words_not_markdown`.
+
+## FIXED-1231 — A review thread could be answered but not resolved (TOOL-27)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-26.**
+
+**Fixed.** `github_write resolve_review_thread` (number and any `comment_id` in the thread) finds the thread through GitHub's GraphQL API by the REST comment id `review_comments` shows and resolves it, asked first like every write. An already-resolved thread says so; a comment in no thread fails by name.
+
+**Evidence.** `tests/test_github_connector.py::test_resolve_review_thread_finds_the_thread_by_comment_and_is_governed`.
+
+## FIXED-1232 — A turn could not say who has access to a repository or read an issue's sub-issues (TOOL-28, TOOL-29)
+
+**Severity: Low. Area: GitHub connector. Status: Fixed 2026-10-26.**
+
+**Fixed.** `github_read` takes `collaborators` (each login and role), `teams` (each team and its permission) and `sub_issues` (an issue's sub-issues, one line each), read-only and governed like the other reads.
+
+**Evidence.** `tests/test_github_connector.py::test_collaborators_teams_and_sub_issues`.
+
+## FIXED-1233 — A Jupyter notebook could be edited only as raw JSON (TOOL-03)
+
+**Severity: Medium. Area: Files. Status: Fixed 2026-10-26.**
+
+**Fixed.** `read_file` shows a notebook as its numbered cells (type, id, source, and a count of outputs by type), and `edit_file` takes `cell` (an index or a cell id): the edit, in any of its modes, applies to that cell's source, and the file is written back with its own indentation and key order so the approved diff is the cell. It is `edit_file`, so the approval, checkpoint and execution path are the ones every edit takes; the row reads *demo.ipynb › cell 1*.
+
+**Evidence.** `tests/test_filesystem_tools.py::test_notebook_read_as_cells_and_edited_by_cell`; RT-TOOL-21.
+
+## FIXED-1234 — A question about a long page got its first 20,000 characters (TOOL-11)
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** `web_fetch` takes `question`: the page is read whole (up to 400,000 characters), and the lines that bear on the question come back with a line either side, in page order, within `max_chars`. Local and lexical: no model reads the page, and the passages are the page's own words.
+
+**Evidence.** `tests/test_web_access.py::test_a_question_returns_the_passages_that_bear_on_it`; RT-TOOL-20.
+
+## FIXED-1235 — A search returned snippets and left the reading to another round of tool calls (TOOL-11)
+
+**Severity: Low. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** `web_search` takes `depth: "extended"`, which also reads the top three results with the query as their question and returns their passages, each read governed and alerted exactly like a `web_fetch`.
+
+**Evidence.** `tests/test_web_access.py::test_an_extended_search_reads_the_top_results`.
+
+## FIXED-1236 — Build's Plan posture sent planning_mode always and nothing read it (TOOL-151)
+
+**Severity: Medium. Area: Build. Status: Fixed 2026-10-26.**
+
+**Fixed.** A Plan turn now carries a system instruction: research read-only, write the plan with `update_plan`, then question the plan before presenting it (which assumption breaks it, what it depends on that was not read, the smallest version, how each step is checked, what it could break for someone else) and end with *Questions I asked of this plan*. A `plan_posture_applied` event records it.
+
+**Evidence.** `tests/test_plan_posture_grill.py`; RT-TOOL-22.

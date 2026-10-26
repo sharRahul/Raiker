@@ -47,7 +47,7 @@ class GithubConnectorExecutor:
         if operation == "create_pull_request":
             head = str(action.arguments.get("head", "")).strip()
             return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": head or None}
-        if operation in ("update_pull_request", "reply_review_comment"):
+        if operation in ("update_pull_request", "reply_review_comment", "resolve_review_thread"):
             # TOOL-26 / TOOL-27 — words on an existing pull request name no
             # branch, so a branch-scoped delegation cannot cover them: they ask.
             return {"repository": f"github.com/{repo}", "operation": "pull_request", "branch": None}
@@ -161,7 +161,9 @@ class GithubConnectorExecutor:
                     "content_redacted": True,
                 },
             )
-        if operation in ("reply_review_comment", "update_pull_request_branch", "rerun_failed_jobs"):
+        if operation in (
+            "reply_review_comment", "resolve_review_thread", "update_pull_request_branch", "rerun_failed_jobs",
+        ):
             authority = current_routed_authority(action.action_id)
             repo = str(action.arguments.get("repo", ""))
             number = action.arguments.get("number")
@@ -169,6 +171,10 @@ class GithubConnectorExecutor:
                 outcome = service.reply_review_comment(
                     repo, number, action.arguments.get("comment_id"),
                     str(action.arguments.get("body", "")), authority=authority,
+                )
+            elif operation == "resolve_review_thread":
+                outcome = service.resolve_review_thread(
+                    repo, number, action.arguments.get("comment_id"), authority=authority,
                 )
             elif operation == "update_pull_request_branch":
                 outcome = service.update_pull_request_branch(repo, number, authority=authority)

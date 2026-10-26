@@ -14,19 +14,21 @@
 export interface GuideTarget {
   slug: string;
   label: string;
+  /** The part of the article that answers this page, when one does. */
+  part?: string;
 }
 
 const SECTIONS: Record<string, GuideTarget> = {
   models: { slug: "connecting-a-model", label: "How connecting a model works" },
-  capabilities: { slug: "permissions-and-runtime-modes", label: "How permissions work" },
-  approvals: { slug: "permissions-and-runtime-modes", label: "How approvals work" },
-  projects: { slug: "tasks-and-projects", label: "How projects work" },
-  tasks: { slug: "tasks-and-projects", label: "How tasks work" },
+  capabilities: { slug: "permissions-and-runtime-modes", label: "How permissions work", part: "capability-gates" },
+  approvals: { slug: "permissions-and-runtime-modes", label: "How approvals work", part: "what-approved-means" },
+  projects: { slug: "tasks-and-projects", label: "How projects work", part: "projects" },
+  tasks: { slug: "tasks-and-projects", label: "How tasks work", part: "tasks" },
   work: { slug: "tasks-and-projects", label: "How threads, tasks and projects work" },
   extensions: { slug: "extensions-and-mcp", label: "How extensions work" },
   messaging: { slug: "messaging", label: "How a channel is governed" },
   design: { slug: "design", label: "How image generation is governed" },
-  connections: { slug: "extensions-and-mcp", label: "How connections work" },
+  connections: { slug: "extensions-and-mcp", label: "How connections work", part: "connectors" },
   "new-chat": { slug: "working-in-chat", label: "How Chat works" },
   // REM-GUIDE — two surfaces had no way into the guide at all, and one of them
   // left `working-in-build.md` as a chapter the product shipped and could not
@@ -34,8 +36,8 @@ const SECTIONS: Record<string, GuideTarget> = {
   // works where the link exists, so a page with neither is the one place the
   // explanation has to stay inline. It does not have to be either any more.
   build: { slug: "working-in-build", label: "How Build works on a repository" },
-  brain: { slug: "memory", label: "How the Knowledge Map works" },
-  "search-chat": { slug: "working-in-chat", label: "How threads and chat history work" },
+  brain: { slug: "memory", label: "How the Knowledge Map works", part: "the-knowledge-map" },
+  "search-chat": { slug: "working-in-chat", label: "How threads and chat history work", part: "your-conversations" },
   checkpoints: { slug: "permissions-and-runtime-modes", label: "How checkpoints work" },
   observe: { slug: "troubleshooting", label: "How to read the record" },
   // The audit log carried four sentences of standing explanation above its own
@@ -44,12 +46,12 @@ const SECTIONS: Record<string, GuideTarget> = {
   // existed for is the guide's job.
   activity: { slug: "dashboard-and-observability", label: "What the audit log holds" },
   diagnostics: { slug: "troubleshooting", label: "How diagnostics work" },
-  settings: { slug: "permissions-and-runtime-modes", label: "How the runtime works" },
+  settings: { slug: "permissions-and-runtime-modes", label: "How the runtime works", part: "the-runtime" },
   // Two surfaces that carried standing explanation on the page itself. The
   // explanation is the same on every visit and is read once, so it moved to the
   // guide — which only works if the page can reach it.
-  home: { slug: "tasks-and-projects", label: "How the work board works" },
-  memory: { slug: "working-in-chat", label: "How memory and recall work" },
+  home: { slug: "tasks-and-projects", label: "How the work board works", part: "the-work-board" },
+  memory: { slug: "working-in-chat", label: "How memory and recall work", part: "conversation-memory" },
 };
 
 /** The guide target for a route, or null when the guide does not cover it yet. */

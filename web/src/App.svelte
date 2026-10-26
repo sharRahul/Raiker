@@ -37,7 +37,7 @@
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
   import HelpPanel from "./lib/components/HelpPanel.svelte";
   import ConfirmDialog from "./lib/components/ConfirmDialog.svelte";
-  import { helpSlugFromHash, isHelpAddress, openHelp } from "./lib/help.svelte";
+  import { helpPartFromHash, helpSlugFromHash, isHelpAddress, openHelp } from "./lib/help.svelte";
   import { movedSettingsAddress } from "./lib/settingsSections";
 
   let current = $state(
@@ -196,7 +196,7 @@
     // QUI-L10 — a guide address opens the help panel over the page the owner
     // is on; it is no longer a page of its own.
     if (isHelpAddress(window.location.hash)) {
-      openHelp(helpSlugFromHash(window.location.hash));
+      openHelp(helpSlugFromHash(window.location.hash), helpPartFromHash(window.location.hash));
       history.replaceState(history.state, "", `#/${current}`);
     }
     // QUI-L09 — a Settings section that moved to another page (GitHub went to
@@ -206,7 +206,7 @@
     let shownHash = window.location.hash;
     const handler = () => {
       if (isHelpAddress(window.location.hash)) {
-        openHelp(helpSlugFromHash(window.location.hash));
+        openHelp(helpSlugFromHash(window.location.hash), helpPartFromHash(window.location.hash));
         history.replaceState(history.state, "", shownHash || "#/");
         return;
       }

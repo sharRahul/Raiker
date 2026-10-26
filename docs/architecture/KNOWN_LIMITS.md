@@ -194,23 +194,26 @@ alternative would be worse.
   delegated push asks GitHub whose repository it is first (FIXED-898,
   FIXED-899). Open: BUG-339. See the
   [GitHub connection specification](GITHUB_CONNECTION_SPEC.md).
-- **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
-  and `web_search` work on a fresh install: there is no list to fill in first,
-  and `web_search` uses a keyless endpoint until you point
-  `RAIKER_WEB_SEARCH_ENDPOINT` at your own. What you control is the **blocklist**
-  — **Settings → Web access**, or `RAIKER_WEB_EGRESS_BLACKLIST` — which takes a
-  domain (covering its subdomains), a wildcard, an IP address, a CIDR range, or a
-  `/regex/`, and can be tested against a host without contacting it. What you do
-  **not** control, and cannot switch off, is the address guard: https only, no
-  credential in the URL, and every address a name resolves to must be public, so
-  a fetch can never reach your loopback interface, your home network, or a cloud
-  metadata service — including through a name that resolves to one, an
-  IPv4-mapped IPv6 address, or a redirect. The connection is pinned to an address
-  that already passed, so the destination cannot change between the check and the
-  request. Emptying the blocklist opens none of that. **Behind a proxy** the
-  pinned opener is not yet proxy-aware, so a web read on a host whose only route
-  out is `HTTPS_PROXY` may fail rather than go through it (BUG-353, found
-  2026-10-20 by reading, not yet reproduced live).
+- **Web reads are on, and they alert rather than refuse (owner's decision,
+  2026-10-25).** `web_fetch` and `web_search` work on a fresh install, with no
+  list to fill in first; `web_search` uses DuckDuckGo until you point
+  `RAIKER_WEB_SEARCH_ENDPOINT` at your own. What you control is your list of
+  **flagged sites** (**Settings → Web access**, or
+  `RAIKER_WEB_EGRESS_BLACKLIST`): a domain (covering its subdomains), a
+  wildcard, an IP address, a CIDR range, or a `/regex/`, testable against a host
+  without contacting it. A flagged site **is still read**, and the turn gets a
+  *Raiker alert* to pass on, shown under the row. Plain `http`, a URL with
+  credentials in it (removed before the read), a page Raiker flagged before and
+  text shaped like instructions are alerted the same way. What you do **not**
+  control, and cannot switch off, is the address guard: every address a name
+  resolves to must be public, so a read can never reach your loopback interface,
+  your home network, or a cloud metadata service, including through a name that
+  resolves to one, an IPv4-mapped IPv6 address, or a redirect. Those are refused
+  because they are not pages on the internet. A resolved name is dialled at the
+  address that passed, so the destination cannot change between the check and
+  the request. **Behind a proxy**, a name this machine cannot resolve goes
+  through `HTTPS_PROXY`, unpinned, with the flagged-site rules still applied
+  ([FIXED-1220](../plans/FIXED_ITEMS.md#fixed-1220--web-reads-and-remote-mcp-calls-failed-on-a-host-whose-only-route-out-is-a-proxy-bug-353)).
 - **A model connection authorizes a name, and Raiker checks where the name
   leads (2026-10-20).** An off-machine model is reached only through the
   connection you saved for it, at that connection's own scheme, host and port;

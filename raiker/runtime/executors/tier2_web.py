@@ -53,6 +53,7 @@ class WebFetchExecutor:
         result = service.fetch(
             url, authority=current_routed_authority(action.action_id), max_chars=cap,
             pages=str(action.arguments["pages"]) if action.arguments.get("pages") else None,
+            question=str(action.arguments["question"]) if isinstance(action.arguments.get("question"), str) else None,
         )
         if result.get("status") != "success":
             error = result.get("error") or {}

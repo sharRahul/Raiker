@@ -179,6 +179,9 @@ def humanize_tool_name(tool_name: str) -> str:
 def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR0911, PLR0912
     """What this call acted on, in one short phrase, or "" when nothing is safe."""
     # ── Paths ────────────────────────────────────────────────────────────────
+    if tool_name == "edit_file" and _clean(args.get("cell"), identifier=True):
+        # TOOL-03 — a notebook edit names its cell, which is what the owner checks.
+        return f"{_path(args)} › cell {_clean(args.get('cell'), identifier=True)}"[:_MAX_PHRASE]
     if tool_name in {
         "read_file",
         "stat_path",
@@ -220,8 +223,11 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
         return _clean(args.get("service"))[:_MAX_PHRASE]
     if tool_name == "help_read":
         # TOOL-46 — the article read, else what was looked for, else the list.
+        place = _clean(args.get("slug"), identifier=True)
+        if place and _clean(args.get("part"), identifier=True):
+            place = f"{place} › {_clean(args.get('part'), identifier=True)}"
         return (
-            _clean(args.get("slug"), identifier=True)[:_MAX_PHRASE]
+            place[:_MAX_PHRASE]
             or _quoted(args, "query")
             or "the list of articles"
         )

@@ -158,7 +158,11 @@ async def test_blocklist(
     performs no request to the host itself.
     """
     session, _principal = auth_data
-    decision = evaluate_host(body.host, load_blocklist(_store(request), session.principal_id))
+    # Owner's decision 2026-10-25: a web read alerts on a flagged site rather
+    # than refusing it, so the check answers the way a read now behaves.
+    decision = evaluate_host(
+        body.host, load_blocklist(_store(request), session.principal_id), flag_owner_rules=True
+    )
     probe: BlocklistProbe = {
         "host": body.host,
         "allowed": decision.allowed,
@@ -170,8 +174,12 @@ async def test_blocklist(
         # three sources) said it, so a refusal can be acted on without reading
         # a reason code or guessing which list it is on.
         "explanation": "" if decision.allowed else _explanation(decision.reason_code),
-        "rule": decision.rule or None,
-        "rule_source": _rule_source(decision.rule) if decision.rule else None,
+        "rule": (decision.rule or (decision.flagged[0] if decision.flagged else "")) or None,
+        "rule_source": (
+            _rule_source(decision.rule or decision.flagged[0])
+            if decision.rule or decision.flagged
+            else None
+        ),
     }
     return serialize_dto(probe)
 

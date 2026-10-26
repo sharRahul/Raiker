@@ -15011,12 +15011,47 @@
         "title": "GuideIndex",
         "type": "object"
       },
+      "GuidePart": {
+        "description": "One ``## `` heading of an article: what the help panel lists and opens.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "summary"
+        ],
+        "title": "GuidePart",
+        "type": "object"
+      },
       "GuideSection": {
-        "description": "One section's Markdown, rendered by the client.",
+        "description": "An article's intro, or one part of it when ``part`` names one; never the whole chapter.",
         "properties": {
           "markdown": {
             "title": "Markdown",
             "type": "string"
+          },
+          "part": {
+            "title": "Part",
+            "type": "string"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/GuidePart"
+            },
+            "title": "Parts",
+            "type": "array"
           },
           "slug": {
             "title": "Slug",
@@ -15035,6 +15070,8 @@
           "slug",
           "title",
           "summary",
+          "parts",
+          "part",
           "markdown"
         ],
         "title": "GuideSection",
@@ -15042,6 +15079,13 @@
       },
       "GuideSectionSummary": {
         "properties": {
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/GuidePart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
           "slug": {
             "title": "Slug",
             "type": "string"
@@ -15058,7 +15102,8 @@
         "required": [
           "slug",
           "title",
-          "summary"
+          "summary",
+          "parts"
         ],
         "title": "GuideSectionSummary",
         "type": "object"
@@ -41837,7 +41882,7 @@
     },
     "/api/guide/{slug}": {
       "get": {
-        "description": "One section's Markdown, rendered by the client.",
+        "description": "An article's intro and its list of parts, or one part's Markdown.\n\nThe panel never receives a whole chapter: the owner opens the part they\ncame for, and a 900-line article stays a list of headings until they do.",
         "operationId": "guide_section_api_guide__slug__get",
         "parameters": [
           {
@@ -41846,6 +41891,16 @@
             "required": true,
             "schema": {
               "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "part",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Part",
               "type": "string"
             }
           }

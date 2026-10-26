@@ -88,8 +88,9 @@ the ones that limit what this build can claim are: the governed shell's live
 container and remote proof (BUG-194), a same-machine reverse proxy making
 remote requests look local (BUG-347), the Design canvas remainder (BUG-348),
 the connector GET helper following redirects with the owner's token (BUG-350),
-CLI `/model` commands unable to reach a connected hosted provider (BUG-351),
-and the web/MCP pinned opener not working behind a proxy (BUG-353). Image
+and CLI `/model` commands unable to reach a connected hosted provider
+(BUG-351). The web/MCP pinned opener behind a proxy (BUG-353) was fixed on
+2026-10-26. Image
 provider evidence (BUG-287), the issue-to-PR routine's live run (BUG-339), the
 live-spec sign-in remainder (BUG-248) and a custom endpoint's missing route
 line (BUG-352) are open as well.

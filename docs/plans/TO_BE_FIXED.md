@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-353, BUG-354, BUG-355 and BUG-356, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -91,7 +91,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-350](#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token) | Medium | Connectors / skills import / transport | Open — found 2026-10-20 while removing redirects from the model helpers |
 | [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
 | [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
-| [BUG-353](#bug-353--the-pinned-https-opener-used-for-web-reads-and-mcp-does-not-work-through-a-proxy) | Medium | Web access / MCP / transport | Open — found 2026-10-20 implementing BUG-349; not yet reproduced live |
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
@@ -690,33 +689,6 @@ for `off_machine` and the posture, and check every count that reads
 **Required user-interface outcome.** A custom endpoint pointed at the owner's
 network or the internet reads like any other off-machine card, with its route.
 
-## BUG-353 — The pinned HTTPS opener used for web reads and MCP does not work through a proxy
-
-**Severity: Medium. Area: Web access / MCP / transport. Status: Open — found
-2026-10-20 implementing BUG-349 (FIXED-1023); not yet reproduced live.**
-
-**Observed (by reading).** `web_policy.pinned_https_opener(host, address)`
-builds its opener with urllib's default `ProxyHandler`. With `HTTPS_PROXY` set,
-urllib makes the connection object for the *proxy* and calls `set_tunnel` for
-the destination, but `_PinnedConnection.connect` dials the pinned destination
-address at the proxy's port and then sends `CONNECT` to it. A web read or a
-remote MCP call on a host whose only route out is a proxy would fail, or reach
-the wrong port.
-
-**Root cause.** Pinning and proxying are two routes that cannot both apply, and
-the opener was written for the direct one only. The model image path now passes
-`direct=True` and decides the route itself; `web_access` and `_mcp_opener` do
-not.
-
-**Proposed fix.** Decide the route first, as `transport_guard.proxy_for` does:
-direct → pinned opener with `direct=True`; proxied → the proxy, unpinned, with
-the address guard applied to what can still be checked. Live test on a
-proxy-only host.
-
-**Required user-interface outcome.** A web read or MCP call on a proxied host
-either works or says that the proxy route is not supported — never a bare
-fetch failure.
-
 ## BUG-354 — The workspace key cannot be rotated in place
 
 **Severity: Low. Area: Storage / memory key. Status: Open — found 2026-10-20
@@ -888,37 +860,138 @@ These parts of the same document are not done:
 * **QUI-P08 — Approvals you've given** in Memory › Controls, with Undo, together
   with *What Raiker has learned to do* (QUI-F09).
 
-## 2026-10-25 Agent tool inventory round — what is still open
+## Agent tool inventory — open items (document closed 2026-10-26)
 
-The first round of [AGENT_TOOL_INVENTORY.md](AGENT_TOOL_INVENTORY.md#status)
-shipped
-[FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)
-to [FIXED-1204](FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live).
-Left open in it:
+`docs/plans/AGENT_TOOL_INVENTORY.md` was worked in three rounds on 2026-10-25 and 2026-10-26 and then removed: every item is shipped, already in Raiker, or carried here. Shipped: [FIXED-1189](FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02) to [FIXED-1236](FIXED_ITEMS.md#fixed-1236--builds-plan-posture-sent-planning_mode-always-and-nothing-read-it-tool-151). The capability matrix the inventory built, the input to the tools refactor, is now in [RAIKER_TOOL_AND_PLUGIN_CATALOG.md](../architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md#tool-capability-matrix). Each row below keeps the inventory's *Proposed Raiker capability* as written; it is a backlog idea, not a decision, and still needs its own design, threat model and approval ([THREAT_MODEL.md](../architecture/THREAT_MODEL.md)).
 
-* **Raw CI job logs (TOOL-20).** GitHub answers a job-log request with a
-  redirect to a storage host (`*.actions.githubusercontent.com`,
-  `*.blob.core.windows.net`) that the connector egress rule does not include,
-  and the connector GET helper must not follow a redirect with the owner's
-  token (BUG-350). `github_read checks` and `run_jobs` give the failures'
-  annotations and failed steps instead. Reading the log needs a token-free
-  second request to a named storage host, decided with BUG-350.
-* **`web_fetch` provenance (TOOL-91).** Refusing a URL that neither the owner
-  nor an earlier result gave would stop a turn reading a library's
-  documentation when no search provider is configured, so it waits for an
-  owner decision on that trade. PDF pages shipped in the second round
-  ([FIXED-1212](FIXED_ITEMS.md#fixed-1212--a-pdf-on-the-web-came-back-as-garbled-text-tool-91)).
-* **Images in `read_file` (TOOL-02).** A tool result is text for every
-  provider adapter; handing an image back needs each adapter to carry an image
-  part in a tool result.
-* **Resolving a review thread (TOOL-27).** `reply_review_comment` answers in a
-  thread; resolving it needs GitHub's GraphQL API, which the connector does not
-  call yet.
+**Already in Raiker, so not carried:** TOOL-12 and TOOL-95 (`tool_search` defers tool schemas), TOOL-25 (local `git_branch`, `git_commit`, `git_push`), TOOL-41 (`create_task` with a schedule, asked first), TOOL-98 (one shell tool), TOOL-106 (`create_document` writes .docx, .xlsx and .pdf), TOOL-107 (chart answer blocks), TOOL-109, TOOL-116 (image generation in Design), TOOL-117 (read aloud and dictation), TOOL-118, TOOL-121, TOOL-122 (see TOOL-93), TOOL-128 and TOOL-153 (a paired messaging channel), TOOL-150 (scheduled tasks; see TOOL-44 and TOOL-45), TOOL-152 (backups in Settings). **Decided by the owner, so closed:** TOOL-91's provenance rule. On 2026-10-25 the owner ruled that `web_fetch` refuses no URL and alerts on flagged ones ([FIXED-1221](FIXED_ITEMS.md#fixed-1221--web_fetch-refused-a-site-the-owner-had-flagged-instead-of-reading-it-with-an-alert)). **Not applicable:** the rest of TOOL-46, which is about a cloud session.
+
+### Waits for the tools refactor
+
+These reshape the tool set itself; doing them one by one would be undone by the refactor.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-99 | Text editor (`text_editor_20250728`, `_20250124`), client | Merge `write_file`, `edit_file`, `apply_patch` into one editor tool with commands (the `insert_line` and `cell` parts shipped). |
+| TOOL-102 | Tool definition properties | The refactor's tool manifest carries these: strict schemas, examples, deferral and caller limits per tool |
+| TOOL-110 | `terminal`: `terminal`, `process_manage` | One execution tool with a *where* argument chosen from the owner's configured backends |
+| TOOL-111 | `file`: `read_file`, `write_file`, `patch`, `search_files` | Hermes does it with four tools; a reference point for consolidating Raiker's six |
+| TOOL-130 | Approvals, checkpoints, toolset profiles | **Named toolsets per surface and posture** as the refactor's unit: Chat, Build, Design, a routine and a subagent each get a declared set |
+| TOOL-96 | MCP connector (`mcp_toolset`, beta), server | Keep MCP in the broker; adopt the per-tool allow and defer settings in each connection's manifest |
+
+### Needs its own threat model before any code
+
+Each reaches outside the broker's current reach: a browser, the desktop, payments, credentials handed to code, or a second policy process.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-100 | Computer use (`computer_toolset_20260801`; betas `computer_20251124`, `computer_20250124`), client | A governed desktop-control toolset for the desktop shell, every action shown live and stoppable, off unless the owner turns it on |
+| TOOL-101 | Browser use (`browser_toolset_20260801`), client | A governed browser toolset (see the matrix: all three agents have one) |
+| TOOL-108 | Claude in Chrome, Cowork (Claude apps) | The browser toolset (TOOL-101) first in the desktop shell's own window, not the owner's profile |
+| TOOL-113 | `browser`: `browser_exec`, `browser_cdp`, `browser_dialog`, `browser_vault` | Browser toolset (matrix row); credentials from the vault filled by the broker, never shown to the model |
+| TOOL-141 | Browser subagent | The browser toolset as its own subagent, the main turn seeing only its summary |
+| TOOL-142 | Sentinel | A second, model-free policy check on every egress and connector write, outside the agent's process |
+| TOOL-143 | Approval scopes | *For this task* and *for the next hour* as approval scopes |
+| TOOL-144 | Surrogate credentials | Surrogate tokens for sandboxed code, swapped by the broker |
+| TOOL-145 | Purchases | Out of scope until a payments threat model exists; critical, asked every time |
+| TOOL-93 | Programmatic tool calling (`allowed_callers`) | Let a sandboxed script call read-only Raiker tools through the broker, each call still gated and audited |
+| TOOL-92 | Code execution (`code_execution_20260521`, `_20260120`, `_20250825`), server | A disposable analysis sandbox that takes the owner's attached files and returns files, not only output |
+| TOOL-140 | Secure VM | A per-owner workspace the owner can open and watch, the same one the agent works in |
+
+### Needs infrastructure Raiker does not run
+
+A push service, an inbound webhook endpoint, a cloud repository host or a second conversation runner.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-44 | `watch_url`, `unwatch_url` | Inbound webhooks for routines, signed and owner-approved per source |
+| TOOL-45 | `PushNotification`, `ReadNotifications` | A mobile push channel for *Approval needed* and *Task failed*, under the same quiet hours (DEC-21a) |
+| TOOL-40 | `create_session`, `send_message`, `interrupt_session`, `archive_session`, `unarchive_session`, `get_session`, `list_sessions`, `list_events`, `get_event`, `set_session_title`, `set_session_tags` | One conversation starting and steering another (a routine delegating to a fresh thread), owner-visible in Threads |
+| TOOL-43 | `subscribe_pr_activity`, `unsubscribe_pr_activity` | Build follows its own pull request and fixes CI or answers review, within its permissions |
+| TOOL-42 | `send_later` | A reminder that continues the same conversation, shown in Tasks |
+| TOOL-06 | `ScheduleWakeup` | A self-scheduled continuation of a turn, shown in Tasks and stoppable |
+| TOOL-31 | `create_repository`, `fork_repository` | `create_repository` and `fork_repository` on GitHub, asked first and critical. |
+
+### Needs a connector or catalogue Raiker does not have yet
+
+Each is a new connector, a plugin catalogue, or a provider tool to align with.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-63 | `Figma` (design context, screenshots, variables, Code Connect, `use_figma`, diagrams, …) | A Figma connector for Design: read a frame as a reference, export a design |
+| TOOL-64 | `Canva` (create, edit, export, brand kits, …) | A Canva connector for Design exports |
+| TOOL-65 | `DesignSync` | Keep `app.css` tokens and an external design system in step |
+| TOOL-71 | `ListPlugins`, `SearchPlugins`, `SuggestPluginInstall` | Suggest a plugin from the catalogue; installing stays the owner's |
+| TOOL-70 | `Skill`, `ListSkills`, `SearchSkills`, `SuggestSkills` | Suggest a skill that is not installed yet (searching installed skills shipped, FIXED-1217). |
+| TOOL-73 | `ListMcpResourcesTool`, `ReadMcpResourceTool`, `ReadMcpResourceDirTool` | MCP resources in Connections › Advanced, read-only |
+| TOOL-94 | Advisor (`advisor_20260301`, beta), server | Align `consult_advisor` with the provider tool where the provider offers it |
+| TOOL-112 | `web`: `web_search`, `web_extract`; `x_search` | Source-specific search as connector tools, not core |
+| TOOL-127 | Messaging toolsets: `discord`, `discord_admin`, `feishu_doc_read`, `feishu_drive_*` | Per-platform tools as connector manifests, not core tools |
+| TOOL-146 | Connectors and skills | Show each connection's read and write grants separately |
+| TOOL-80 | Google Workspace | Google Workspace beyond today's `gmail_read` and `gcal_read`: Drive, Docs and Sheets reads, and drafts, labels and calendar writes, each write asked first. |
+| TOOL-81 | Messaging and work | Slack beyond `slack_read`, plus Asana, Linear, ClickUp, Atlassian, monday.com and Notion, as manifest-driven connectors. |
+| TOOL-82 | Sales, finance and commerce | Sales, finance and commerce services (Apollo.io, HubSpot, QuickBooks, Xero, Stripe, PayPal) as manifest-driven connectors; anything that spends is critical. |
+| TOOL-83 | Consumer and travel | Consumer and travel services (job search, booking, flights) as manifest-driven connectors. |
+
+### A product feature of its own
+
+Each is a surface or a loop larger than one tool, with its own design to settle.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-05 | `Monitor` | `watch`: a bounded, owner-visible watch on a background command or a feed, ending on a stated condition |
+| TOOL-07 | `Agent`, `SendMessage`, `ListAgents` | Message a running subagent; list subagents; a fork that inherits the turn's context |
+| TOOL-10 | `EnterWorktree`, `ExitWorktree` | Model-requested worktree for an experiment, discarded unless kept |
+| TOOL-04 | `TaskCreate`, `TaskUpdate`, `TaskGet`, `TaskList`, `TaskStop` | An owner per plan item and stopping a running item (`blocked_by` shipped, FIXED-1202). |
+| TOOL-47 | `SendUserFile` | `create_document` already attaches; a *render now* hint for images and HTML |
+| TOOL-60 | `Artifact` (publish, read, list, open, pin, delete, quickstart), `ArtifactComments`, `ArtifactData` | The Library (QUI-F15) as a place for pages Raiker makes, with comments, private by default |
+| TOOL-61 | `Claude_Docs` (`batch`, `create`, `read`, `update`, `query`, `export`, `delete`, `guide`) | Documents in the Library that a turn can edit section by section, with history |
+| TOOL-62 | `pdf-viewer` (`display_pdf`, `interact`, `list_pdfs`) | PDF annotation and form filling in Design or Chat, asked before a signed file leaves |
+| TOOL-66 | `ReportFindings` | Build's patch review (`review_patch`) as typed findings the transcript draws |
+| TOOL-74 | `ShowOnboardingRolePicker` | A role choice in the setup conversation (QUI-W02) that pre-selects starters and connectors |
+| TOOL-75 | `Artifact` `quickstart` and types | Templates in Design and the Library |
+| TOOL-97 | Memory (`memory_20250818`), client | A scheduled consolidation pass over Memory (merge duplicates, retire stale facts) that proposes its changes in Suggestions |
+| TOOL-105 | Research (Claude apps) | A research mode in Chat: a bounded plan of searches, shown as it runs, ending in a cited document. `web_search` depth `extended` (FIXED-1235) is its first step. |
+| TOOL-115 | `vision`: `vision_analyze`; `video`: `video_analyze` | `video_analyze` for an attached clip |
+| TOOL-119 | `memory`: `memory`; `session_search`: `session_search`; `context_engine` | A *save this?* nudge after a long task, landing in Suggestions; summaries on `conversation_search` hits |
+| TOOL-120 | `skills`: `skills_list`, `skill_view`, `skill_manage` | The model drafts a skill from a finished task, proposed to the owner, never installed by itself |
+| TOOL-123 | `delegation`: `delegate_task` | Asynchronous subagents with a toolset chosen per task and a typed result |
+| TOOL-125 | `kanban`: `kanban_show`, `kanban_list`, `kanban_create`, `kanban_complete`, `kanban_block`, `kanban_unblock`, `kanban_link`, `kanban_comment`, `kanban_heartbeat`, `kanban_request_review`, `kanban_request_changes`, `kanban_attach`, `kanban_attach_url`, `kanban_attachments` | Task tools for the model: comment, block on another task, attach a file, ask for review; a heartbeat on a long task |
+| TOOL-129 | `desktop_ui`: `read_terminal`, `close_terminal`, `desktop_preview`, `drive_preview`, `annotate_preview`, `read_window_below`, `focus_pane`, `gui_tour`, `show_tip`, `set_theme`; `onboarding`: `setup_beat`; `project`: `desktop_project` | A guided tour (`gui_tour`); help sources and contextual parts shipped (FIXED-1215, FIXED-1225). |
+| TOOL-147 | Memory and observers | A *verifier* that checks a turn's claimed result (tests run, file written) before the turn reports done |
+| TOOL-148 | Subagent fan-out | Parallel Build subagents, each in a worktree, under one approval budget |
+| TOOL-149 | Custom tools, documents, images | Model-written tools proposed as skills (TOOL-120) |
+
+### Blocked on a provider or a host
+
+Raiker's side is ready to take them; something outside it is not.
+
+| Item | Inventory tool | Proposed Raiker capability |
+|---|---|---|
+| TOOL-02 | `Read`, `Write`, `Edit`, `Glob`, `Grep` | Images in `read_file`: a tool result is text for every provider adapter, so each adapter has to carry an image part in a tool result first. |
+| TOOL-20 | `actions_list`, `actions_get`, `get_job_logs` | Raw CI job logs: GitHub redirects a log request to a storage host outside the connector egress rule, and the token must not follow a redirect (BUG-350). `checks` and `run_jobs` give annotations and failed steps instead. |
+| TOOL-28 | `issue_read`, `issue_write`, `list_issues`, `search_issues`, `add_issue_comment`, `update_issue_comment`, `sub_issue_write`, `list_issue_types`, `list_issue_fields`, `get_label` | Writing sub-issues; reading them shipped (FIXED-1232). |
+
+### Found while working the inventory, not yet fixed
+
 * **The approval card does not show an edit's diff inline.** RT-TOOL-04: the
   Safety card for an `edit_file` says *Approving writes this exact change to
   src/palette.py* and offers **Change**, but the replacement itself is only in
   the change view. For a `replace_all` edit, the number of places it changes
-  is worth saying on the card. Not triaged.
+  is worth saying on the card, and for a notebook edit (RT-TOOL-21) *Affects*
+  names the file but not the cell, which the row already shows. Not triaged.
+* **A live web search is unproven on the test host.** Its proxy refuses
+  `duckduckgo.com` by its own network policy (403), so the proxy route for
+  search is proven by the unit suite only; a read of `github.com` through the
+  same proxy works (RT-TOOL-20). Re-run RT-TOOL-20 with a search on a host
+  whose network allows DuckDuckGo.
+* **`github.com/about` raised the *suspicious text* alert** (RT-TOOL-20). The
+  sanitiser's instruction-shape check may be too eager on product pages that
+  talk about AI; triage against its rules before relaxing anything.
+* **A Build Plan turn's record says *No plan required for this turn*** under
+  *How this turn was governed* while the turn writes a plan (RT-TOOL-22): the
+  pipeline's planning stage and the Plan posture are two different things with
+  the same word.
 
 ## 2026-10-25 Quiet UI polish round — what is still open
 

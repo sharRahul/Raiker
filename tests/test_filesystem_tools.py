@@ -284,7 +284,7 @@ def test_edit_replace_all_and_insert_line(tmp_path) -> None:  # type: ignore[no-
     assert target.read_text(encoding="utf-8").endswith("z = x\ntail\n")
     assert edit_file_content(tmp_path, "a.txt", "", "t", insert_line=99)["error"]["type"] == "insert_line_out_of_range"
     assert edit_file_content(tmp_path, "a.txt", "x", "t", insert_line=1)["error"]["type"] == "insert_line_with_old_text"
-    assert edit_options({"insert_line": True}) == {"replace_all": False, "insert_line": None}
+    assert edit_options({"insert_line": True}) == {"replace_all": False, "insert_line": None, "cell": None}
     assert edit_options({"replace_all": "yes"})["replace_all"] is False
 
 
@@ -332,3 +332,37 @@ def test_read_file_pdf_pages(tmp_path) -> None:  # type: ignore[no-untyped-def]
         assert read_file(tmp_path, "doc.pdf")["error"]["type"] == "pdf_too_large"
     finally:
         filesystem.MAX_READ_PDF_BYTES = original
+
+
+def test_notebook_read_as_cells_and_edited_by_cell(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    import json as _json
+
+    from raiker.tools.filesystem import edit_file_content, proposed_edit_snapshot, read_file
+
+    notebook = {
+        "cells": [
+            {"cell_type": "markdown", "id": "intro", "metadata": {}, "source": ["# Title\n"]},
+            {"cell_type": "code", "id": "calc", "metadata": {}, "execution_count": 1,
+             "outputs": [{"output_type": "stream", "text": ["2\n"]}], "source": ["x = 1\n", "print(x + 1)"]},
+        ],
+        "metadata": {}, "nbformat": 4, "nbformat_minor": 5,
+    }
+    path = tmp_path / "a.ipynb"
+    path.write_text(_json.dumps(notebook, indent=1) + "\n", encoding="utf-8")
+    shown = read_file(tmp_path, "a.ipynb")
+    assert shown["notebook"] is True
+    assert "[cell 1 · code · id calc]\nx = 1\nprint(x + 1)\n(outputs: 1 — stream)" in shown["text"]
+    preview = proposed_edit_snapshot(tmp_path, "a.ipynb", "x = 1", "x = 2", cell="calc")
+    assert preview["status"] == "proposal"
+    assert edit_file_content(tmp_path, "a.ipynb", "x = 1", "x = 2", cell="1")["status"] == "success"
+    edited = _json.loads(path.read_text(encoding="utf-8"))
+    assert edited["cells"][1]["source"] == ["x = 2\n", "print(x + 1)"]
+    assert edited["cells"][1]["outputs"] == notebook["cells"][1]["outputs"]
+    # Only the cell changed: the rest of the file is byte for byte what it was.
+    assert path.read_text(encoding="utf-8") == (_json.dumps(edited, indent=1) + "\n")
+    assert edit_file_content(tmp_path, "a.ipynb", "", "y = 0", cell="calc", insert_line=0)["status"] == "success"
+    assert _json.loads(path.read_text())["cells"][1]["source"][0] == "y = 0\n"
+    assert edit_file_content(tmp_path, "a.ipynb", "x", "z", cell="9")["error"]["type"] == "cell_not_found"
+    assert edit_file_content(tmp_path, "a.ipynb", "x", "z", cell="calc")["error"]["type"] == "old_text_ambiguous"
+    (tmp_path / "b.py").write_text("x = 1\n", encoding="utf-8")
+    assert edit_file_content(tmp_path, "b.py", "x", "z", cell="0")["error"]["type"] == "cell_needs_a_notebook"

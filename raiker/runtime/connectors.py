@@ -60,6 +60,8 @@ GITHUB_EXTRA_RESOURCES: tuple[str, ...] = (
     # comments, TOOL-28 issues beyond one number, TOOL-29 the account.
     "branches", "tags", "releases", "search_code", "issues", "search_issues",
     "issue_comments", "review_comments", "account",
+    # Third round: TOOL-29 who has access, TOOL-28 an issue's sub-issues.
+    "collaborators", "teams", "sub_issues",
 )
 #: The most characters a model-written search query may carry.
 _MAX_QUERY_CHARS = 256
@@ -324,7 +326,7 @@ class GithubConnectorService:
             return _failed("query_too_long", f"query is at most {_MAX_QUERY_CHARS} characters.")
         if resource in ("search_code", "search_issues") and not query_text:
             return _failed("missing_argument:query", f"{resource} needs query: the words to look for.")
-        if resource in ("issue_comments", "review_comments") and number_int is None:
+        if resource in ("issue_comments", "review_comments", "sub_issues") and number_int is None:
             return _failed("missing_argument:number", f"{resource} needs number: the issue or pull request.")
 
         refusal = self._read_refusal(authority)
@@ -422,6 +424,22 @@ class GithubConnectorService:
                 + "):\n  " + _s(c, "body", 1500).replace("\n", "\n  ")
                 for c in _items(data)
             ]
+        elif resource == "collaborators":
+            data = self._get_json(repo, "fetch", f"{base}/collaborators?per_page=50")
+            rows = [
+                f"- {_s(c, 'login', 80)} ({_s(c, 'role_name', 20) or _top_permission(c.get('permissions'))})"
+                for c in _items(data)
+            ]
+        elif resource == "teams":
+            data = self._get_json(repo, "fetch", f"{base}/teams?per_page=50")
+            rows = [
+                f"- {_s(t, 'slug', 80)} ({_s(t, 'permission', 20)})"
+                + (f": {_s(t, 'description', 200)}" if t.get("description") else "")
+                for t in _items(data)
+            ]
+        elif resource == "sub_issues":
+            data = self._get_json(repo, "read_issue", f"{base}/issues/{number}/sub_issues?per_page=50")
+            rows = [_issue_line(i) for i in _items(data)]
         else:  # account
             data = self._get_json(repo, "fetch", f"{api}/user")
             if not isinstance(data, dict):
@@ -756,20 +774,9 @@ class GithubConnectorService:
         noun: str,
     ) -> dict[str, Any]:
         """One governed GitHub write: gate, mode, credential, egress, then the call."""
-        if not is_routed(authority, _CAP):
-            withheld = self._write_withheld(noun)
-            if withheld is not None:
-                return withheld
-        if not self.credential_configured():
-            return _denied(
-                "connector_not_configured",
-                f"GitHub write denied: no owner credential is configured ({GITHUB_TOKEN_ENV}).",
-            )
-        if not self.egress_allowed():
-            return _denied(
-                "connector_egress_denied",
-                f"GitHub write denied: {GITHUB_HOST} is not on the owner connector egress allowlist.",
-            )
+        refusal = self._write_refusal(authority, noun)
+        if refusal is not None:
+            return refusal
         try:
             with self._borrow(repo, operation) as token:
                 resp = post_json_url(
@@ -788,6 +795,83 @@ class GithubConnectorService:
         except json.JSONDecodeError:
             return _failed("connector_bad_response", "GitHub returned an unparseable response.")
         return {"status": "success", "data": data if isinstance(data, dict) else {}}
+
+    def _write_refusal(self, authority: object | None, noun: str) -> dict[str, Any] | None:
+        """Gate, mode, credential and egress for a write; None when it may go."""
+        if not is_routed(authority, _CAP):
+            withheld = self._write_withheld(noun)
+            if withheld is not None:
+                return withheld
+        if not self.credential_configured():
+            return _denied(
+                "connector_not_configured",
+                f"GitHub write denied: no owner credential is configured ({GITHUB_TOKEN_ENV}).",
+            )
+        if not self.egress_allowed():
+            return _denied(
+                "connector_egress_denied",
+                f"GitHub write denied: {GITHUB_HOST} is not on the owner connector egress allowlist.",
+            )
+        return None
+
+    def _graphql(self, repo: str, operation: str, query: str, variables: dict[str, object]) -> dict[str, Any]:
+        """One GraphQL call under a borrowed token; raises on transport, parse or GraphQL error."""
+        with self._borrow(repo, operation) as token:
+            resp = post_json_url(
+                f"https://{GITHUB_HOST}/graphql", {"query": query, "variables": variables},
+                egress_allowlist=connector_egress_allowlist(), headers=_headers(token), method="POST",
+            )
+        data = json.loads(str(resp.get("body_text") or "{}"))
+        if not isinstance(data, dict) or data.get("errors") or not isinstance(data.get("data"), dict):
+            raise _GithubShapeError("GitHub refused the GraphQL request.")
+        return dict(data["data"])
+
+    def resolve_review_thread(
+        self, repo: str, number: Any, comment_id: Any, *, authority: object | None = None
+    ) -> dict[str, Any]:
+        """Mark the review thread holding one comment resolved (TOOL-27), asked first.
+
+        REST has no way to do this; GraphQL does, by thread id, which the model
+        never sees. So the thread is found here by the REST comment id that
+        ``review_comments`` shows, then resolved, under the one approval.
+        """
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        pr = self._positive(number, "number")
+        comment = self._positive(comment_id, "comment_id")
+        if isinstance(pr, dict):
+            return pr
+        if isinstance(comment, dict):
+            return comment
+        refusal = self._write_refusal(authority, "thread resolution")
+        if refusal is not None:
+            return refusal
+        owner, name = repo.split("/", 1)
+        try:
+            found = self._graphql(repo, "pull_request", _REVIEW_THREADS_QUERY, {"owner": owner, "name": name, "number": pr})
+            thread = _thread_holding(found, comment)
+            if thread is None:
+                return _failed("review_thread_not_found", f"No review thread on #{pr} holds comment {comment}.")
+            if thread.get("isResolved"):
+                return {
+                    "status": "success", "repo": repo, "number": pr, "comment_id": comment,
+                    "already_resolved": True, "untrusted": True,
+                    "content": "That review thread was already resolved.", "content_length": 0,
+                }
+            self._graphql(repo, "pull_request", _RESOLVE_THREAD_MUTATION, {"threadId": str(thread.get("id", ""))})
+        except GitCredentialError as exc:
+            return _denied(exc.reason, f"GitHub write denied: {exc.message}")
+        except SandboxError as exc:
+            return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
+        except (_GithubShapeError, json.JSONDecodeError) as exc:
+            return _failed("connector_bad_response", str(exc) or "GitHub returned an unparseable response.")
+        except Exception:  # noqa: BLE001 — every transport failure fails closed
+            return _denied("connector_fetch_failed", "GitHub write failed closed.")
+        return {
+            "status": "success", "repo": repo, "number": pr, "comment_id": comment, "untrusted": True,
+            "content": f"GitHub review thread resolved on #{pr}.", "content_length": 0,
+        }
 
     @staticmethod
     def _positive(value: Any, name: str) -> int | dict[str, Any]:
@@ -1785,3 +1869,38 @@ def _denied(reason: str, message: str) -> dict[str, Any]:
 
 def _failed(reason: str, message: str) -> dict[str, Any]:
     return {"status": "failed", "error": {"type": reason, "message": message}}
+
+
+#: TOOL-27 — the review threads of one pull request, with each thread's comment ids.
+_REVIEW_THREADS_QUERY = (
+    "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name)"
+    "{pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved "
+    "comments(first:50){nodes{databaseId}}}}}}}"
+)
+_RESOLVE_THREAD_MUTATION = (
+    "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}"
+)
+
+
+def _thread_holding(data: dict[str, Any], comment_id: int) -> dict[str, Any] | None:
+    """The review thread whose comments include ``comment_id``, from the threads query."""
+    repository = data.get("repository") if isinstance(data.get("repository"), dict) else {}
+    pull = (repository or {}).get("pullRequest") or {}
+    threads = ((pull.get("reviewThreads") or {}).get("nodes") or []) if isinstance(pull, dict) else []
+    for thread in threads:
+        if not isinstance(thread, dict):
+            continue
+        comments = (thread.get("comments") or {}).get("nodes") or []
+        if any(isinstance(c, dict) and c.get("databaseId") == comment_id for c in comments):
+            return thread
+    return None
+
+
+def _top_permission(permissions: Any) -> str:
+    """The strongest permission GitHub reports for a collaborator."""
+    if not isinstance(permissions, dict):
+        return "unknown"
+    for name in ("admin", "maintain", "push", "triage", "pull"):
+        if permissions.get(name):
+            return name
+    return "none"

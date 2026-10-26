@@ -70,7 +70,8 @@ export const api = {
   whoami: () => contract.whoami(),
   // ── The user guide, served from the install rather than a repository ──
   guide: () => contract.guideIndex(),
-  guideSection: (slug: string) => contract.guideSection(slug),
+  guideSection: (slug: string, query: { part?: string } = {}) =>
+    contract.guideSection(slug, query),
   // ── Local-account settings, vault key, MFA status ──
   settings: () => contract.getSettings(),
   composerApprovalMode: () => contract.getComposerApprovalMode(),

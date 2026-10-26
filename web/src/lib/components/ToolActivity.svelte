@@ -118,6 +118,14 @@
             >
           {/if}
         {/if}
+        {#if row.alerts && row.alerts.length > 0}
+          <!-- A web read that alerts rather than refuses says why, in words. -->
+          <ul class="tool-alerts" aria-label="Alerts for this read">
+            {#each row.alerts as alert (alert.kind + alert.message)}
+              <li data-kind={alert.kind}><Icon name="warning" size="sm" /><span>{alert.message}</span></li>
+            {/each}
+          </ul>
+        {/if}
         {#if row.connection && row.state === "success"}
           <!-- TOOL-72 — the turn offered a connection; the owner makes it in
                Connections, where it still grants nothing until Permissions does. -->
@@ -220,4 +228,7 @@
   .connect-card{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:.35rem 0 .15rem;padding:.5rem .7rem;border:1px solid var(--border);border-radius:var(--r-md);background:var(--raised);font-size:var(--text-sm);max-width:36rem}
   .connect-text{display:grid;gap:.1rem}
   .connect-reason{color:var(--text-3);font-size:var(--text-xs)}
+  .tool-alerts{grid-column:1/-1;list-style:none;margin:.25rem 0 .1rem;padding:0;display:grid;gap:.2rem;max-width:40rem}
+  .tool-alerts li{display:flex;gap:.4rem;align-items:flex-start;font-size:var(--text-xs);color:var(--warn);line-height:1.4}
+  .tool-alerts li :global(svg){flex:none;margin-top:.1rem}
 </style>

@@ -631,3 +631,61 @@ def test_reply_update_branch_and_rerun_are_governed_writes(
     specs = {spec.name: spec for spec in default_tool_specs()}
     assert "rerun_failed_jobs" in specs["github_write"].parameters["properties"]["operation"]["enum"]
     assert "account" in specs["github_read"].parameters["properties"]["resource"]["enum"]
+
+
+# ── Third round: TOOL-27 (resolve), TOOL-28 (sub-issues), TOOL-29 (collaborators, teams) ──
+
+
+def test_collaborators_teams_and_sub_issues(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    responses: dict[str, object] = {
+        "/collaborators": [{"login": "ann", "role_name": "admin"}, {"login": "bo", "permissions": {"push": True}}],
+        "/teams": [{"slug": "core", "permission": "push", "description": "Maintainers"}],
+        "/issues/4/sub_issues": [{"number": 8, "title": "Part one", "state": "open", "user": {"login": "cy"}}],
+    }
+
+    def fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+        for fragment, payload in responses.items():
+            if fragment in url:
+                text = json.dumps(payload)
+                return {"status": 200, "body_bytes": len(text), "body_text": text, "truncated": False}
+        raise AssertionError(url)
+
+    service = GithubConnectorService(workspace, store, fetch_fn=fetch)
+    people = service.read("collaborators", "acme/demo")["content"]
+    assert "ann (admin)" in people and "bo (push)" in people
+    assert "core (push): Maintainers" in service.read("teams", "acme/demo")["content"]
+    assert "#8 Part one" in service.read("sub_issues", "acme/demo", 4)["content"]
+    assert service.read("sub_issues", "acme/demo")["error"]["type"] == "missing_argument:number"
+
+
+def test_resolve_review_thread_finds_the_thread_by_comment_and_is_governed(
+    workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sent: list[dict[str, object]] = []
+    threads = {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": [
+        {"id": "T_other", "isResolved": False, "comments": {"nodes": [{"databaseId": 5}]}},
+        {"id": "T_mine", "isResolved": False, "comments": {"nodes": [{"databaseId": 11}, {"databaseId": 12}]}},
+    ]}}}}}
+
+    def fake_post(url: str, payload: dict[str, object], **kwargs: object) -> dict[str, object]:
+        assert url == "https://api.github.com/graphql"
+        sent.append(payload)
+        answer = threads if "reviewThreads" in str(payload["query"]) else {"data": {"resolveReviewThread": {}}}
+        return {"status": 200, "body_text": json.dumps(answer)}
+
+    monkeypatch.setattr("raiker.runtime.connectors.post_json_url", fake_post)
+    service = GithubConnectorService(workspace, store)
+    assert service.resolve_review_thread("acme/demo", 7, 12)["error"]["type"] == "connector_gate_disabled"
+    assert sent == []
+    _allow(_enable_gate(workspace, store))
+    _configure_creds(monkeypatch)
+    assert service.resolve_review_thread("acme/demo", 7, 12)["status"] == "success"
+    assert sent[-1]["variables"] == {"threadId": "T_mine"}
+    assert service.resolve_review_thread("acme/demo", 7, 99)["error"]["type"] == "review_thread_not_found"
+    specs = {spec.name: spec for spec in default_tool_specs()}
+    assert "resolve_review_thread" in specs["github_write"].parameters["properties"]["operation"]["enum"]
+    assert "collaborators" in specs["github_read"].parameters["properties"]["resource"]["enum"]

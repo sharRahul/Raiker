@@ -18,15 +18,26 @@ order, on every call:
 2. the per-capability decision mode — **default `ask` withholds**, `deny` blocks,
    and **`auto` withholds too**, because reaching the open internet on a model's
    say-so is never low-risk;
-3. the owner **blocklist** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored
-   in Settings → Web access) — empty by default, and testable against a host
-   without contacting it;
-4. the **address guard**: HTTPS only, no credentials embedded in the URL, and
-   every address the name resolves to must be public;
+3. the owner's **flagged sites** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules
+   stored in Settings → Web access), empty by default and testable against a
+   host without contacting it. **Owner's decision, 2026-10-25: a flagged site is
+   read, with an alert, never refused.** The result opens with a *Raiker alert*
+   line the model is told to pass on, and the row shows it. Plain `http` (a *not
+   encrypted* alert), a URL with credentials (removed, with an alert), a page the
+   injection scanner flagged before, and instruction-shaped text are alerted the
+   same way;
+4. the **address guard**, which still refuses: only `http` and `https`, and
+   every address the name resolves to must be public; the built-in names
+   (`localhost`, `*.local`, metadata hosts) are always refused;
 5. every redirect hop (bounded at `MAX_REDIRECTS = 3`) re-checked against 3 and
-   4, with the connection **pinned** to an address that already passed.
+   4, with the connection **pinned** to an address that already passed, or, for
+   a name this machine cannot resolve, sent through the owner's `HTTPS_PROXY`
+   unpinned (BUG-353, FIXED-1220).
 
-Bounds: 400 000 bytes fetched, 20 000 characters delivered, 15-second timeout.
+Bounds: 400 000 bytes fetched, 20 000 characters delivered (a `question` reads
+up to 400 000 characters of the page and delivers only the passages that bear on
+it, within the same cap), 15-second timeout. `web_search` with depth `extended`
+reads its top three results through this same path, each alerted on its own.
 
 ## Assets
 
@@ -50,18 +61,22 @@ problems: where the request may go, and what the response may do.
 | SSRF to loopback, the LAN, or a cloud metadata service | `resolve_public_addresses` requires every resolved address to be public; `is_global` alone is not trusted, because an IPv4-mapped IPv6 address can defeat it, so the mapped form is unwrapped first | `raiker/runtime/web_policy.py` |
 | DNS rebinding — the name passes, then resolves elsewhere for the real request | The connection is **pinned** to an address that already passed (`pinned_https_opener`), so the name cannot change between check and request | `web_access.py`, `web_policy.py` |
 | A redirect to a private address | urllib's automatic redirect following is **disabled** — `redirect_request` returns `None` so the 3xx surfaces as an error the service handles, and each hop goes back through `check_url` | `web_access.py` |
-| A plaintext or credential-bearing URL | `check_url` refuses a non-`https` scheme (`web_url_not_https`) and a URL carrying userinfo | `web_policy.py` |
+| A plaintext or credential-bearing URL | `check_web_read` reads plain `http` with a *not encrypted* alert and strips userinfo before the request, with an alert; any scheme other than `http` and `https` is refused (`web_url_invalid`) | `web_access.py` |
+| A flagged site being read at all | By the owner's decision it is read; the alert names the rule that matched and is shown on the row and in the content the model must pass on, so the owner sees every read of a site they flagged | `web_access.py`, `ToolActivity.svelte` |
+| A proxy route bypassing the guard | Only a name this machine cannot resolve takes the proxy; the flagged-site rules still apply to it, a resolvable name is always pinned, and a literal private address never reaches the proxy | `web_policy.py` |
 | Prompt injection in the page | The response is framed as **untrusted data, never instruction**. Additionally: scripts, styles and comments are dropped; elements no visitor could see (`hidden`, `display:none`, zero-size, off-screen, `aria-hidden`) are removed *and counted*; zero-width and bidirectional characters are stripped; a line shaped like a conversation role marker is defanged. What was removed is reported alongside the page | `raiker/runtime/web_sanitize.py` |
 | A page persuades the agent to act | Nothing fetched raises a turn's authority. Every subsequent action still passes its own gate, decision mode and approval. The advisory injection scanner names the exact URL that carried the attempt — it reports, it never blocks | `raiker/security/` |
 | Content leaking into the audit log | Broker events drop the content; the executor-side artifacts are byte counts | `raiker/tools/broker.py` |
 | An unbounded page exhausting memory or context | 400 000-byte read cap, 20 000-character delivery cap, 15-second timeout | `web_access.py` |
-| Emptying the blocklist opening the guard | The address guard is **not owner-editable and has no allow path**. Blocklist rules and the address guard are separate controls | `web_access.py` |
+| Emptying the flagged list opening the guard | The address guard is **not owner-editable and has no allow path**. Flagged-site rules and the address guard are separate controls | `web_access.py` |
 
 ## Residual risk, stated plainly
 
 - **Nothing stops the agent reading a public page the owner would rather it did
-  not.** The default is a blocklist, not an allowlist; this is a deliberate
-  trade documented in
+  not.** Flagging a site makes every read of it visible; it does not prevent
+  one (owner's decision, 2026-10-25). The decision mode is the control that
+  stops a read, by asking first. The flagged list replaced a blocklist, which
+  replaced an allowlist; the trade is documented in
   [§3.8](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist).
 - **The injection scanner is a fixed pattern set, not a classifier.** It names a
   suspicious source and raises a finding; it never blocks. The control that
@@ -69,7 +84,11 @@ problems: where the request may go, and what the response may do.
 - **`web_search` shares this capability and this gate.** With no
   `RAIKER_WEB_SEARCH_ENDPOINT` configured, search goes to a keyless public
   endpoint (`html.duckduckgo.com`), so the query text reaches a third party.
-  Results are untrusted data under the same blocklist and address guard.
+  Results are untrusted data under the same alerts and address guard.
+- **Behind a proxy the address guard cannot check what it cannot resolve.** A
+  name this machine cannot resolve goes to the owner's proxy unpinned; the proxy
+  resolves it, so a name that points at the proxy's own network is the proxy's
+  to refuse. Only names reach the proxy, never a literal private address.
 - **A second, weaker egress implementation exists in the tree.**
   `WebFetchExecutor` (`raiker/runtime/executors/tier2_web.py`) reaches the network
   through `sandbox.fetch_url` with a hard-coded four-host allowlist

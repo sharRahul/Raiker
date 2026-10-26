@@ -238,3 +238,23 @@ def test_the_real_transport_does_not_follow_a_redirect_itself() -> None:
         thread.join(timeout=5)
 
     assert str(refusal.value).startswith("mcp_remote_redirect_untrusted:")
+
+
+def test_a_proxied_host_reaches_mcp_through_the_proxy_and_a_direct_one_pins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """BUG-353 — the route is decided before the opener: proxy unpinned, or pinned direct."""
+    from urllib.request import ProxyHandler
+
+    from raiker.runtime.mcp_endpoint_policy import EndpointTrust
+
+    trust = EndpointTrust(allowed=True, scheme="https", host="mcp.example.com", port=443, pin="93.184.216.34")
+    for name in ("https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY", "no_proxy", "NO_PROXY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:3128")
+    proxied = sandbox._mcp_opener(trust)
+    handlers = [h for h in proxied.handlers if isinstance(h, ProxyHandler)]
+    assert handlers and handlers[0].proxies == {"https": "http://127.0.0.1:3128"}
+    monkeypatch.delenv("HTTPS_PROXY")
+    direct = sandbox._mcp_opener(trust)
+    assert not any(isinstance(h, ProxyHandler) and h.proxies for h in direct.handlers)

@@ -405,9 +405,11 @@ class TestWebExtract:
     def test_a_rejected_url_never_reaches_the_parser(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
-        result = self._service(workspace, store).extract("http://docs.example.com/report")
+        # Another scheme is not a page on the internet; plain http now is
+        # (owner's decision 2026-10-25) and is read with an alert instead.
+        result = self._service(workspace, store).extract("file:///etc/passwd")
         assert result["status"] == "denied"
-        assert result["error"]["type"] == "web_url_not_https"
+        assert result["error"]["type"] == "web_url_invalid"
 
 
 class TestBrowserEscalation:

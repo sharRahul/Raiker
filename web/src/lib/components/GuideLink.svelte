@@ -10,6 +10,7 @@
    */
   import Icon from "./Icon.svelte";
   import { guideSectionFor, type GuideTarget } from "../guideSections";
+  import { guideSectionHref } from "../guideLinks";
 
   let {
     /** The route this link sits on; its section is resolved from the map. */
@@ -32,7 +33,7 @@
 {#if target !== null}
   <!-- Quiet UI — an icon with its words as the accessible name and tooltip,
        so a page opens with its own content rather than a sentence about it. -->
-  <a class="guide-link" href={`#/guide?section=${target.slug}`} aria-label={label ?? target.label} title={label ?? target.label}>
+  <a class="guide-link" href={guideSectionHref(target.slug, target.part ?? "")} aria-label={label ?? target.label} title={label ?? target.label}>
     <Icon name="info" size="sm" />
   </a>
 {/if}

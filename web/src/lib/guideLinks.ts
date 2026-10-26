@@ -30,10 +30,13 @@
  * link that would not work or punctuation that reads as a typo.
  */
 
-/** The address the Guide page uses for one chapter. */
-export function guideSectionHref(slug: string): string {
-  return `#/guide?section=${slug}`;
+/** The address the help panel answers for one article, or one part of it. */
+export function guideSectionHref(slug: string, part = ""): string {
+  return part ? `#/guide?section=${slug}&part=${part}` : `#/guide?section=${slug}`;
 }
+
+/** A link to a heading of the article being read: `[Approvals](#approvals)`. */
+const ANCHOR_LINK = /\[([^\]\n]*)\]\(#([a-z0-9_-]+)\)/g;
 
 /**
  * A Markdown link target, as the guide writes them.
@@ -68,16 +71,18 @@ function repositoryPath(target: string): string {
  * chapter only if it names one of those, so a chapter that a build did not ship
  * is not linked to as though it had been.
  */
-export function resolveGuideLinks(markdown: string, slugs: ReadonlySet<string>): string {
-  return markdown.replace(MD_LINK, (_whole: string, label: string, target: string) => {
-    // A sibling chapter: no directory, and a stem the index listed. An
-    // intra-chapter fragment is dropped rather than carried into an address
-    // that would not resolve — the Guide addresses a chapter, not a heading
-    // inside one.
-    const path = target.split("#")[0];
+export function resolveGuideLinks(
+  markdown: string,
+  slugs: ReadonlySet<string>,
+  current = "",
+): string {
+  const linked = markdown.replace(MD_LINK, (_whole: string, label: string, target: string) => {
+    // A sibling chapter: no directory, and a stem the index listed. Its
+    // fragment names a heading, and the panel opens the part that holds it.
+    const [path, fragment = ""] = target.split("#", 2);
     if (!path.includes("/")) {
       const slug = path.slice(0, -".md".length).toLowerCase();
-      if (slugs.has(slug)) return `[${label}](${guideSectionHref(slug)})`;
+      if (slugs.has(slug)) return `[${label}](${guideSectionHref(slug, fragment)})`;
     }
     // Everything else is a repository document, which a reader inside the app
     // cannot open however it is marked up. The path is named once, in plain
@@ -87,4 +92,43 @@ export function resolveGuideLinks(markdown: string, slugs: ReadonlySet<string>):
     const shown = label.trim() === "" ? cited : label;
     return shown === cited ? shown : `${shown} (${cited})`;
   });
+  if (current === "" || !slugs.has(current)) return linked;
+  return linked.replace(
+    ANCHOR_LINK,
+    (_whole: string, label: string, fragment: string) =>
+      `[${label}](${guideSectionHref(current, fragment)})`,
+  );
+}
+
+/** A line that starts a Markdown block of its own rather than continuing prose. */
+const BLOCK_START = /^\s*(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\||```|~~~|<!--)/;
+
+/**
+ * Join a guide's hard-wrapped lines back into paragraphs before rendering.
+ *
+ * `docs/guide/` wraps prose at about 80 columns for reading in a checkout. The
+ * transcript renderer keeps a single newline as a line break, which is right
+ * for a model's answer and wrong here: in a 360 px panel every source line
+ * became its own ragged line. A line that continues a paragraph or a list item
+ * is joined to the one before it; blank lines, headings, list markers, quotes,
+ * tables and fenced code keep their place.
+ */
+export function unwrapGuideProse(markdown: string): string {
+  const out: string[] = [];
+  let fenced = false;
+  for (const line of markdown.split("\n")) {
+    const trimmed = line.trim();
+    if (/^(```|~~~)/.test(trimmed)) fenced = !fenced;
+    const previous = out.length > 0 ? out[out.length - 1] : "";
+    const continues =
+      !fenced &&
+      trimmed !== "" &&
+      !BLOCK_START.test(line) &&
+      previous.trim() !== "" &&
+      !/^\s*(?:#{1,6}\s|\||```|~~~)/.test(previous) &&
+      !/ {2}$|\\$/.test(previous);
+    if (continues) out[out.length - 1] = `${previous.trimEnd()} ${trimmed}`;
+    else out.push(line);
+  }
+  return out.join("\n");
 }

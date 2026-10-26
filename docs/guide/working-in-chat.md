@@ -628,9 +628,15 @@ every row.
 Ask Raiker how to do something in Raiker — *how do I connect Gmail?* — and it
 reads this guide (the `help_read` tool) rather than answering from memory. The
 rows say which article or search it read, and the answer cites **Raiker help**
-under *Sources*. It reads only the guide this install ships; nothing leaves the
-computer for it. Pressing a **Raiker help** source opens the help panel on that
-article.
+under *Sources*. It reads one part of an article at a time, the way the panel
+shows them, and only the guide this install ships; nothing leaves the computer
+for it. Pressing a **Raiker help** source opens the help panel on the part it
+read.
+
+The help panel itself works the same way. **?** opens it on the part that
+answers the page you are on where one does, or the article's intro and its list
+of parts; a part opens on its own, with *Previous* and *Next*, and search lands
+on the part whose heading or first sentence matches.
 
 ### When a task needs a service you have not connected
 

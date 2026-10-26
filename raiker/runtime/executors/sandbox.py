@@ -519,10 +519,19 @@ def _mcp_opener(trust: Any) -> Any:
       deliberately.
     """
 
-    from raiker.runtime.web_policy import pinned_https_opener
+    from urllib.request import ProxyHandler, build_opener
 
+    from raiker.runtime.web_policy import pinned_https_opener, web_proxy_for
+
+    # BUG-353 — pinning and proxying are two routes that cannot both apply. For
+    # a public destination (the only kind with a pin) a proxy the owner
+    # configured carries the request, unpinned, since the address guard already
+    # judged the name; otherwise the pinned address is dialled directly.
+    proxy = web_proxy_for(trust.scheme, trust.host, trust.port or None) if trust.pin else ""
+    if proxy:
+        return build_opener(ProxyHandler({trust.scheme: proxy}), _NoRedirect())
     if trust.pin and trust.scheme == "https":
-        opener = pinned_https_opener(trust.host, trust.pin)
+        opener = pinned_https_opener(trust.host, trust.pin, direct=True)
         opener.add_handler(_NoRedirect())
         return opener
     return _no_redirect_opener()

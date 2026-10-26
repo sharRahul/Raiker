@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -142,6 +143,35 @@ def _read_pdf(
     }
 
 
+def _notebook_cells_text(text: str) -> str | None:
+    """TOOL-03 — a notebook as its numbered cells, so an edit can name one.
+
+    Outputs are summarised by type rather than shown: they are the bulk of most
+    notebooks and nothing an edit changes. ``None`` when the file is not a
+    notebook after all, and the caller reads it as text.
+    """
+    try:
+        notebook = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    cells = notebook.get("cells") if isinstance(notebook, dict) else None
+    if not isinstance(cells, list):
+        return None
+    parts: list[str] = [f"Jupyter notebook, {len(cells)} cells. Edit one with edit_file and cell."]
+    for index, cell in enumerate(cells):
+        if not isinstance(cell, dict):
+            continue
+        raw = cell.get("source", "")
+        source = "".join(raw) if isinstance(raw, list) else str(raw)
+        label = f"[cell {index} · {cell.get('cell_type', 'unknown')}" + (f" · id {cell['id']}" if cell.get("id") else "") + "]"
+        raw_outputs = cell.get("outputs")
+        outputs: list[Any] = raw_outputs if isinstance(raw_outputs, list) else []
+        kinds = sorted({str(item.get("output_type", "output")) for item in outputs if isinstance(item, dict)})
+        tail = f"\n(outputs: {len(outputs)} — {', '.join(kinds)})" if outputs else ""
+        parts.append(f"{label}\n{source}{tail}")
+    return "\n\n".join(parts)
+
+
 def read_file(
     workspace_root: str | Path, path: str | Path, *, max_bytes: int = 200_000,
     offset: int | None = None, limit: int | None = None, pages: str | None = None,
@@ -175,6 +205,10 @@ def read_file(
     except UnicodeDecodeError:
         return {"status": "failed", "error": {"type": "binary_file", "path": str(path)}}
     relative = _relative_path(workspace_root, resolved, authority=authority)
+    if not ranged and resolved.suffix.lower() == ".ipynb" and len(data) <= max_bytes:
+        cells = _notebook_cells_text(text)
+        if cells is not None:
+            return {"status": "success", "path": relative, "text": cells, "truncated": False, "notebook": True}
     if not ranged:
         return {"status": "success", "path": relative, "text": text, "truncated": len(data) > max_bytes}
     lines = text.splitlines(keepends=True)
@@ -550,12 +584,19 @@ def edit_options(arguments: Mapping[str, Any]) -> dict[str, Any]:
             insert_line = int(raw_line)
         except (TypeError, ValueError):
             insert_line = -1
-    return {"replace_all": arguments.get("replace_all") is True, "insert_line": insert_line}
+    raw_cell = arguments.get("cell")
+    cell = None if raw_cell is None or raw_cell == "" or isinstance(raw_cell, bool) else str(raw_cell).strip()
+    return {
+        "replace_all": arguments.get("replace_all") is True,
+        "insert_line": insert_line,
+        "cell": cell,
+    }
 
 
 def _edit_candidate(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, cell: str | None = None,
+    authority: Any = None,
 ) -> tuple[Path, str, str] | dict[str, Any]:
     """One edit, in whichever of its three modes the call named.
 
@@ -563,7 +604,15 @@ def _edit_candidate(
     * ``replace_all``: replace every exact occurrence, at least one required;
     * ``insert_line``: insert ``new_text`` after that line (0 is the top), with
       ``old_text`` left empty so a call cannot mean two edits at once.
+
+    TOOL-03 — ``cell`` makes it a notebook edit: the same three modes, applied
+    to one cell's source in a ``.ipynb`` rather than to the file's JSON.
     """
+    if cell is not None:
+        return _notebook_candidate(
+            workspace_root, path, old_text, new_text,
+            replace_all=replace_all, insert_line=insert_line, cell=cell, authority=authority,
+        )
     if insert_line is not None:
         if old_text:
             return _failure("insert_line_with_old_text")
@@ -591,6 +640,68 @@ def _edit_candidate(
             return _failure("old_text_not_found")
         return resolved, before, before.replace(old_text, new_text)
     return _replace_candidate(workspace_root, path, old_text, new_text, authority=authority)
+
+
+def _notebook_candidate(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, replace_all: bool, insert_line: int | None, cell: str, authority: Any,
+) -> tuple[Path, str, str] | dict[str, Any]:
+    """One edit to one notebook cell, returned as the whole file before and after.
+
+    The cell is named by its index or its ``id``. A plain edit needs exactly one
+    match in that cell's source: a notebook cell is short, and guessing between
+    two matches is the mistake the whitespace-tolerant file path exists to
+    avoid. The file is written back with the indentation it had and its keys in
+    the order they were read, so the diff the owner approves is the cell.
+    """
+    if not str(path).lower().endswith(".ipynb"):
+        return _failure("cell_needs_a_notebook")
+    target = _existing_text_target(workspace_root, path, authority=authority)
+    if isinstance(target, dict):
+        return target
+    resolved, before = target
+    try:
+        notebook = json.loads(before)
+    except json.JSONDecodeError:
+        return _failure("notebook_not_json")
+    cells = notebook.get("cells") if isinstance(notebook, dict) else None
+    if not isinstance(cells, list):
+        return _failure("notebook_has_no_cells")
+    chosen: dict[str, Any] | None = None
+    if cell.isdigit() and int(cell) < len(cells) and isinstance(cells[int(cell)], dict):
+        chosen = cells[int(cell)]
+    else:
+        chosen = next((item for item in cells if isinstance(item, dict) and item.get("id") == cell), None)
+    if chosen is None:
+        return _failure("cell_not_found", cell_count=len(cells))
+    raw = chosen.get("source", "")
+    source = "".join(raw) if isinstance(raw, list) else str(raw)
+    if insert_line is not None:
+        if old_text:
+            return _failure("insert_line_with_old_text")
+        lines = source.splitlines(keepends=True)
+        if insert_line < 0 or insert_line > len(lines):
+            return _failure("insert_line_out_of_range", line_count=len(lines))
+        if insert_line and not lines[insert_line - 1].endswith("\n"):
+            lines[insert_line - 1] += "\n"
+        tail = "" if insert_line == len(lines) or new_text.endswith("\n") else "\n"
+        updated = "".join([*lines[:insert_line], new_text + tail, *lines[insert_line:]])
+    elif not old_text:
+        return _failure("old_text_empty")
+    elif replace_all:
+        if old_text not in source:
+            return _failure("old_text_not_found")
+        updated = source.replace(old_text, new_text)
+    else:
+        count = source.count(old_text)
+        if count != 1:
+            return _failure("old_text_not_found" if count == 0 else "old_text_ambiguous", matches=count)
+        updated = source.replace(old_text, new_text, 1)
+    chosen["source"] = updated.splitlines(keepends=True)
+    indent_match = re.search(r"\n( +)\S", before)
+    indent = len(indent_match.group(1)) if indent_match else 1
+    after = json.dumps(notebook, indent=indent, ensure_ascii=False) + ("\n" if before.endswith("\n") else "")
+    return resolved, before, after
 
 
 def _leading_whitespace(line: str) -> str:
@@ -845,13 +956,14 @@ def _proposal_from_candidate(
 
 def proposed_edit_snapshot(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, cell: str | None = None,
+    authority: Any = None,
 ) -> dict[str, Any]:
     return _proposal_from_candidate(
         workspace_root,
         _edit_candidate(
             workspace_root, path, old_text, new_text,
-            replace_all=replace_all, insert_line=insert_line, authority=authority,
+            replace_all=replace_all, insert_line=insert_line, cell=cell, authority=authority,
         ),
         authority=authority,
     )
@@ -911,13 +1023,14 @@ def _write_candidate(
 
 def replace_text_content(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, cell: str | None = None,
+    authority: Any = None,
 ) -> dict[str, Any]:
     return _write_candidate(
         workspace_root,
         _edit_candidate(
             workspace_root, path, old_text, new_text,
-            replace_all=replace_all, insert_line=insert_line, authority=authority,
+            replace_all=replace_all, insert_line=insert_line, cell=cell, authority=authority,
         ),
         authority=authority,
     )
@@ -925,11 +1038,12 @@ def replace_text_content(
 
 def edit_file_content(
     workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
-    *, replace_all: bool = False, insert_line: int | None = None, authority: Any = None,
+    *, replace_all: bool = False, insert_line: int | None = None, cell: str | None = None,
+    authority: Any = None,
 ) -> dict[str, Any]:
     return replace_text_content(
         workspace_root, path, old_text, new_text,
-        replace_all=replace_all, insert_line=insert_line, authority=authority,
+        replace_all=replace_all, insert_line=insert_line, cell=cell, authority=authority,
     )
 
 

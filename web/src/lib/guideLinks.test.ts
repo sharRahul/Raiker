@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guideSectionHref, resolveGuideLinks } from "./guideLinks";
+import { guideSectionHref, resolveGuideLinks, unwrapGuideProse } from "./guideLinks";
 import { renderMarkdown } from "./markdown";
 
 const CHAPTERS = new Set([
@@ -16,9 +16,15 @@ describe("resolveGuideLinks", () => {
     ).toBe("See [Connecting a model](#/guide?section=connecting-a-model).");
   });
 
-  it("drops a heading fragment, because the Guide addresses a chapter", () => {
+  it("carries a heading fragment as the part the panel opens", () => {
     expect(resolveGuideLinks("[Repairs](troubleshooting.md#repairs)", CHAPTERS)).toBe(
-      "[Repairs](#/guide?section=troubleshooting)",
+      "[Repairs](#/guide?section=troubleshooting&part=repairs)",
+    );
+  });
+
+  it("points a link to a heading of this article at its part", () => {
+    expect(resolveGuideLinks("[Approvals](#approvals)", CHAPTERS, "troubleshooting")).toBe(
+      "[Approvals](#/guide?section=troubleshooting&part=approvals)",
     );
   });
 
@@ -80,5 +86,40 @@ describe("renderMarkdown in-app links", () => {
   it("does not leave the flag set for the next render", () => {
     renderMarkdown("[x](#/guide?section=memory)", { inAppLinks: true });
     expect(renderMarkdown("[x](#/guide?section=memory)")).not.toContain("<a ");
+  });
+});
+
+describe("unwrapGuideProse", () => {
+  it("joins a hard-wrapped paragraph and list item, and leaves blocks alone", () => {
+    const source = [
+      "Approving does one",
+      "of two things.",
+      "",
+      "- **Approve once.** A change",
+      "  is carried out.",
+      "- Second item",
+      "",
+      "```",
+      "line one",
+      "line two",
+      "```",
+      "| a | b |",
+      "| - | - |",
+    ].join("\n");
+    expect(unwrapGuideProse(source)).toBe(
+      [
+        "Approving does one of two things.",
+        "",
+        "- **Approve once.** A change is carried out.",
+        "- Second item",
+        "",
+        "```",
+        "line one",
+        "line two",
+        "```",
+        "| a | b |",
+        "| - | - |",
+      ].join("\n"),
+    );
   });
 });

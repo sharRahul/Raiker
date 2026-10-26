@@ -15,9 +15,40 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-26 (Agent tool inventory, third round, hosted Anthropic Haiku 4.5)
+
+The third and last round of the agent tool inventory, which then closed (open
+items in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#agent-tool-inventory--open-items-document-closed-2026-10-26)),
+with the owner's three directives for it: DuckDuckGo as the search provider,
+`web_fetch` alerting on flagged sites instead of refusing them, and the help
+panel showing a part of an article rather than the whole guide page
+([FIXED-1220](../plans/FIXED_ITEMS.md#fixed-1220--web-reads-and-remote-mcp-calls-failed-on-a-host-whose-only-route-out-is-a-proxy-bug-353)
+to [FIXED-1236](../plans/FIXED_ITEMS.md#fixed-1236--builds-plan-posture-sent-planning_mode-always-and-nothing-read-it-tool-151)).
+A fresh workspace served by `raiker-web` at 1440×900, holding
+`notebooks/demo.ipynb`, on a host whose only route out is an HTTPS proxy.
+Anthropic was connected through **Add model**, with the key and workspace ID
+typed from the run's environment; neither appears in a spec, command, document,
+screenshot or the server log. Spec: `web/e2e/tool-inventory-round3-live.spec.ts`:
+**6/6**, after four product fixes the run found (below) and two spec fixes (a
+heading's quotation marks, and the Permissions page having changed since an
+older helper was written). The GitHub operations need a credential, and an
+extended search needs a search provider the host's proxy allows (it refuses
+`duckduckgo.com`); the unit suite proves them.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-TOOL-17 | **?** on Approvals opens help on the part *What "approved" means*, with *Previous* and *Next*; its back button opens *Permissions and the runtime* as its intro and an *In this article* list (*Capability gates* among the parts), with no part heading above the list | ✅ after two fixes: part ids were redacted as secrets (FIXED-1227), and hard-wrapped guide lines rendered as ragged line breaks (FIXED-1228) |
+| RT-TOOL-18 | Searching help for *fallback* lists the part *Fallback sequence* under *Connecting a model*, and opening it shows that part alone | ✅ after a fix: an article still loading replaced the typed search (FIXED-1229) |
+| RT-TOOL-19 | Anthropic connects through **Add model** and becomes the default | ✅ |
+| RT-TOOL-20 | With `github.com` flagged in Settings › Web access (**Flag**, then *Remove flag from github.com*), a turn's `web_fetch` of `https://github.com/about` with a question is approved once and read through the proxy; the row shows *Alerts for this read* (*github.com is on your flagged sites…*), and the answer passes the alert on | ✅ |
+| RT-TOOL-21 | A turn reads `notebooks/demo.ipynb` as cells and proposes `edit_file` with cell 1; the row reads *Edit file notebooks/demo.ipynb › cell 1* and waits for a decision | ✅ |
+| RT-TOOL-22 | In a project, a Plan turn ends its reply with *Questions I asked of this plan* | ✅ |
+| Suites | Python suite in three shards, ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
+| Visual review | The help part, article and search views, the flagged-sites list, the alert rows, the notebook edit and the Plan reply inspected at original resolution. The review found the summaries showing their own Markdown (FIXED-1230). Still open: the Safety card does not name the notebook cell, and `github.com/about` raised the *suspicious text* alert ([TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#found-while-working-the-inventory-not-yet-fixed)). Dated folders are local evidence and not committed | ✅ |
+
 ## Result — 2026-10-25 (Agent tool inventory, second round, hosted Anthropic Haiku 4.5)
 
-The second round of the [agent tool inventory](../plans/AGENT_TOOL_INVENTORY.md#status)
+The second round of the agent tool inventory (closed 2026-10-26; open items in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#agent-tool-inventory--open-items-document-closed-2026-10-26))
 ([FIXED-1205](../plans/FIXED_ITEMS.md#fixed-1205--branches-tags-and-releases-needed-a-clone-tool-23)
 to [FIXED-1219](../plans/FIXED_ITEMS.md#fixed-1219--a-background-command-finished-unseen-unless-the-model-polled-tool-01)).
 A fresh workspace served by `raiker-web` at 1440×900, holding `src/shapes.py`
@@ -43,7 +74,7 @@ the unit suite proves them.
 
 ## Result — 2026-10-25 (Agent tool inventory, first round, hosted Anthropic Haiku 4.5)
 
-The first round of the [agent tool inventory](../plans/AGENT_TOOL_INVENTORY.md#status)
+The first round of the agent tool inventory (closed 2026-10-26; open items in [TO_BE_FIXED.md](../plans/TO_BE_FIXED.md#agent-tool-inventory--open-items-document-closed-2026-10-26))
 ([FIXED-1189](../plans/FIXED_ITEMS.md#fixed-1189--grep-searched-literal-text-only-with-no-context-lines-tool-02)
 to [FIXED-1204](../plans/FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live)).
 Fresh workspaces served by `raiker-web` at 1440×900, each holding
@@ -69,7 +100,7 @@ unit suite proves them.
 | RT-TOOL-09 | `/compress` after two exchanges says *Summarised … for the model*; the transcript is unchanged | ✅ |
 | RT-TOOL-10 | Two routines saved through `POST /api/tasks`: the ordinary one raises nothing; the one whose instructions carry an override raises *A task's instructions look injected* naming *Weekly report* and the rules, shown in Notifications | ✅ after two fixes found in this round ([FIXED-1201](../plans/FIXED_ITEMS.md#fixed-1201--a-tasks-prompt-was-never-checked-for-injected-instructions-tool-124), [FIXED-1204](../plans/FIXED_ITEMS.md#fixed-1204--the-live-work-line-counted-a-routine-queued-for-later-as-running-found-live)): the notice said the text *was used as data*, and the top bar read *2 tasks running* for routines due in 2030 |
 | Suites | Python suite in three shards, ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |
-| Visual review | Every capture inspected at original resolution: the help rows, the receipt, the insights sheet's numbers and spacing, the notice wording and the top bar's count were found from the images and fixed. Still seen: the Safety card for an edit does not show the change itself ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#2026-10-25-agent-tool-inventory-round--what-is-still-open)). Dated folders are local evidence and not committed | ✅ |
+| Visual review | Every capture inspected at original resolution: the help rows, the receipt, the insights sheet's numbers and spacing, the notice wording and the top bar's count were found from the images and fixed. Still seen: the Safety card for an edit does not show the change itself ([TO_BE_FIXED](../plans/TO_BE_FIXED.md#agent-tool-inventory--open-items-document-closed-2026-10-26)). Dated folders are local evidence and not committed | ✅ |
 
 ## Result — 2026-10-25 (Quiet UI brand, Diagnostics and open items, hosted Anthropic Haiku 4.5)
 

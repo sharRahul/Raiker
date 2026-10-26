@@ -481,7 +481,13 @@ def source_from_tool_result(
         return SourceDraft(
             kind=kind,
             title=f"Help: {title}" if title else (f"Help search: {query}" if query else "Help articles"),
-            locator=_text(output.get("slug"), 80), tool_name=tool_name, passage=passage,
+            # A part travels as ``slug#part`` so the chip opens the panel on it.
+            locator=_text(
+                f"{output.get('slug')}#{output.get('part')}" if output.get("slug") and output.get("part")
+                else output.get("slug"),
+                160,
+            ),
+            tool_name=tool_name, passage=passage,
         )
     if tool_name == "gmail_read":
         return SourceDraft(

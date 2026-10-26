@@ -93,3 +93,45 @@ def test_an_install_without_a_guide_reports_none_rather_than_empty(
     assert guide_root() is None
     assert list_sections() == []
     assert read_section("getting-started") is None
+
+
+def test_parts_split_on_level_two_headings_outside_code() -> None:
+    from raiker.guide import split_parts
+
+    intro, parts = split_parts("# T\n\nIntro.\n\n## One thing\n\nBody one.\n\n```\n## not a heading\n```\n\n## One thing\n\nAgain.\n")
+    assert intro.strip() == "# T\n\nIntro."
+    assert [part.id for part in parts] == ["one-thing", "one-thing-1"]
+    assert "## not a heading" in parts[0].markdown
+    assert parts[0].summary == "Body one."
+
+
+def test_part_ids_reach_the_panel_unredacted(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """A long heading anchor is not a credential: the guide is served as written."""
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.api.sessions import ApiSessionStore
+    from raiker.cli.principal_resolver import bootstrap_owner
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    client = TestClient(create_app(tmp_path))
+    token, _session = ApiSessionStore(tmp_path).create_session("principal_owner")
+    headers = {"Authorization": f"Bearer {token}"}
+    answer = client.get("/api/guide/permissions-and-runtime-modes", headers=headers).json()
+    ids = [part["id"] for part in answer["parts"]]
+    assert "configuring-something-is-permission-for-it" in ids
+    assert len(ids) == len(set(ids))
+    one = client.get(
+        "/api/guide/permissions-and-runtime-modes",
+        params={"part": "configuring-something-is-permission-for-it"},
+        headers=headers,
+    ).json()
+    assert one["part"] == "configuring-something-is-permission-for-it"
+
+
+def test_summaries_are_plain_words_not_markdown() -> None:
+    from raiker.guide import list_sections
+
+    for section in list_sections():
+        for text in [section.summary, *(part.summary for part in section.parts)]:
+            assert "**" not in text and "`" not in text and "](" not in text, text

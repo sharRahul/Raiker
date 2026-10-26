@@ -172,6 +172,19 @@ def _is_session_export_request(scope: Scope, path: str) -> bool:
     )
 
 
+def _is_guide_request(scope: Scope, path: str) -> bool:
+    """TOOL-46 — the help guide is text Raiker ships, not owner data.
+
+    The redactor's high-entropy fallback read a long heading anchor
+    (``configuring-something-is-permission-for-it``) as a credential. Two
+    such parts in one article came back as the same ``[REDACTED_SECRET]`` id,
+    the panel's keyed list refused the duplicate, and the part could not be
+    opened or linked. A guide response is static Markdown from ``docs/guide``
+    that cannot carry an owner's secret, so it is served as written.
+    """
+    return scope.get("method") == "GET" and (path == "/api/guide" or path.startswith("/api/guide/"))
+
+
 def _carries_json(start_message: Message) -> bool:
     """Whether this response is something the JSON redactor can act on.
 
@@ -208,6 +221,7 @@ class RedactionMiddleware:
             or _is_project_export_request(scope, path)
             or _is_session_export_request(scope, path)
             or _is_backup_restore_request(scope, path)
+            or _is_guide_request(scope, path)
         ):
             await self.app(scope, receive, send)
             return

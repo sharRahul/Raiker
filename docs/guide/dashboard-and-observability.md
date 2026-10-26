@@ -304,24 +304,27 @@ changes it. A capability being listed never means it is permitted; the
 permission is a separate decision you make under **Permissions**, and every one
 of these still asks it at the moment of use.
 
-Web reads use HTTPS and reject credentials embedded in URLs. Resolved addresses
-must be public and are checked again on redirects. The fetched page is converted
-to sanitized text, with removed content reported. You control a blocklist; the
-address-safety guard cannot be disabled — no setting on the page and no approval
-lifts it. Extraction opens no connection of its own — it reads what that same
+Raiker reads any public web page and searches with DuckDuckGo, with no account
+or key. A site you flag is still read, and the answer carries an alert you see
+under the read and in the reply; plain http, a link with a password in it (the
+password is removed first), a page Raiker flagged before and text shaped like
+instructions are alerted the same way. Resolved addresses must be public and are
+checked again on redirects, so a read never reaches your own network; that guard
+cannot be disabled, by any setting or approval. The fetched page is converted to
+sanitized text, with removed content reported. Extraction opens no connection of its own — it reads what that same
 bounded fetch returned — so nothing it does can widen what leaves this machine.
 
-**Settings → Web access** leads with the number of rules actually in force and
-the three sources that add up to it: your own, this host's environment, and the
-ones built into the build. The last two are read-only there, folded away and
+**Settings → Web access** leads with your **Flagged sites** (**Flag** to add
+one, **Remove** to drop it) and the sources that add up to what is in force:
+your own, this host's environment (flagged like your own), and the names built
+into the build, which are always refused. The last two are read-only there, folded away and
 each naming who *can* change it — the environment list is set before Raiker is
 started, and the built-in list ships with the build.
 
-**Check a site** answers without contacting the host. A refusal says why
-in a sentence: when a rule refused it, which rule, as written, and which of the
-three lists it is on; otherwise whether the name points inside your network or
-does not resolve from this machine at all — two different problems with two
-different fixes.
+**Check a site** answers without contacting the host: *is read, with an alert*
+and the rule that matched, as written; or, when it is refused, whether the name
+points inside your network or does not resolve from this machine at all, two
+different problems with two different fixes.
 
 A page that builds itself in the browser is reported as such rather than
 guessed at. Interactive browsing — running a page's scripts, filling a form,

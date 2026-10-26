@@ -44,10 +44,19 @@ class ComposerApprovalMode(TypedDict):
     approval_mode: ApprovalMode
 
 
+class GuidePart(TypedDict):
+    """One ``## `` heading of an article: what the help panel lists and opens."""
+
+    id: str
+    title: str
+    summary: str
+
+
 class GuideSectionSummary(TypedDict):
     slug: str
     title: str
     summary: str
+    parts: list[GuidePart]
 
 
 class GuideIndex(TypedDict):
@@ -59,8 +68,9 @@ class GuideIndex(TypedDict):
 
 
 class GuideSection(GuideSectionSummary):
-    """One section's Markdown, rendered by the client."""
+    """An article's intro, or one part of it when ``part`` names one; never the whole chapter."""
 
+    part: str
     markdown: str
 
 

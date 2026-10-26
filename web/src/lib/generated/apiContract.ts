@@ -2925,11 +2925,20 @@ export type GuideIndex = {
   reason_code: string;
 };
 
-/** One section's Markdown, rendered by the client. */
+/** One ``## `` heading of an article: what the help panel lists and opens. */
+export type GuidePart = {
+  id: string;
+  title: string;
+  summary: string;
+};
+
+/** An article's intro, or one part of it when ``part`` names one; never the whole chapter. */
 export type GuideSection = {
   slug: string;
   title: string;
   summary: string;
+  parts: GuidePart[];
+  part: string;
   markdown: string;
 };
 
@@ -2937,6 +2946,7 @@ export type GuideSectionSummary = {
   slug: string;
   title: string;
   summary: string;
+  parts: GuidePart[];
 };
 
 /** Liveness, and whether the encrypted store opens (BUG-86). */
@@ -6916,8 +6926,8 @@ export const contract = {
     call<GoalStopped>("POST", `/api/goals/${encodeURIComponent(goalId)}/stop`, { body }),
   guideIndex: () =>
     request<GuideIndex>("/api/guide"),
-  guideSection: (slug: string) =>
-    request<GuideSection>(`/api/guide/${encodeURIComponent(slug)}`),
+  guideSection: (slug: string, query: { part?: string } = {}) =>
+    request<GuideSection>(withQuery(`/api/guide/${encodeURIComponent(slug)}`, query)),
   health: () =>
     request<HealthView>("/api/health"),
   listHooks: () =>

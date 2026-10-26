@@ -124,8 +124,9 @@
   <header class="section-heading">
     <h2>Web access</h2>
     <p>
-      Raiker can read public web pages. This is where you say which destinations it
-      may not reach.
+      Raiker can read any public web page and searches with DuckDuckGo, with no
+      account or key. Sites you flag are still read, with an alert where you read
+      the answer.
     </p>
   </header>
 
@@ -153,7 +154,7 @@
     </div>
 
     <div class="card">
-      <h3>Blocked destinations</h3>
+      <h3>Flagged sites</h3>
       <!-- REM-SET-WEB — the effective total, which is what a fetch is actually
            evaluated against. The three sources below add up to it, so an owner
            who deletes one of their own rules can see that the number the
@@ -166,14 +167,15 @@
         {data.builtin.length} built in.
       </p>
       <p class="lead">
-        A domain also covers its subdomains. You can also use a wildcard
+        Raiker reads a flagged site and tells you, in the conversation, that it is on
+        this list. A domain also covers its subdomains. You can also use a wildcard
         (<code>*.ads.example.com</code>), an IP address, an IP range
         (<code>10.0.0.0/8</code>), or a regular expression
         (<code>/^tracker[0-9]+\./</code>).
       </p>
 
       <form class="add-row" onsubmit={add}>
-        <label class="field-label" for="blocklist-rule">Site to block</label>
+        <label class="field-label" for="blocklist-rule">Site to flag</label>
         <input
           id="blocklist-rule"
           class="input"
@@ -183,7 +185,7 @@
           aria-invalid={addError ? "true" : undefined}
         />
         <input class="input note" bind:value={note} placeholder="Note (optional)" aria-label="Note" />
-        <button class="btn btn-primary" type="submit" disabled={busy || !draft.trim()}>Block</button>
+        <button class="btn btn-primary" type="submit" disabled={busy || !draft.trim()}>Flag</button>
       </form>
       {#if addError}
         <p class="error" id="blocklist-rule-error" role="alert">{addError}</p>
@@ -191,8 +193,8 @@
 
       {#if data.stored.length === 0}
         <p class="empty">
-          Nothing blocked yet. Raiker can reach any public site that is not on
-          this list.
+          Nothing flagged yet. Raiker reads any public site, and says so when a
+          site you flagged comes up.
         </p>
       {:else}
         <ul class="rules">
@@ -208,7 +210,7 @@
                 type="button"
                 onclick={() => remove(rule.rule_id)}
                 disabled={busy}
-                aria-label={`Unblock ${rule.rule}`}>Unblock</button
+                aria-label={`Remove flag from ${rule.rule}`}>Remove</button
               >
             </li>
           {/each}
@@ -219,7 +221,7 @@
     <div class="card">
       <h3>Check a site</h3>
       <p class="lead">
-        Answers whether Raiker would be allowed to reach a host, without contacting it.
+        Answers what Raiker would do with a host, without contacting it.
       </p>
       <form class="add-row" onsubmit={test}>
         <label class="field-label" for="blocklist-probe">Hostname or address</label>
@@ -230,13 +232,16 @@
         <div class="probe" class:blocked={!probeResult.allowed} role="status">
           <p>
             <strong>{probeResult.host}</strong>
-            {probeResult.allowed ? "is reachable" : "is refused"}
+            {probeResult.allowed ? (probeResult.rule ? "is read, with an alert" : "is reachable") : "is refused"}
             {#if probeResult.addresses.length}
               <span class="addresses">→ {probeResult.addresses.join(", ")}</span>
             {/if}
           </p>
           <!-- DEC-21 — the reason in words and the rule that said it, never
                only a reason code. -->
+          {#if probeResult.allowed && probeResult.rule}
+            <p class="why">On your flagged sites as <code>{probeResult.rule}</code>.</p>
+          {/if}
           {#if !probeResult.allowed}
             {#if probeResult.rule}
               <p class="why">
@@ -271,17 +276,17 @@
         {#if data.environment.length}
           <p class="source"><code>{data.environment_variable}</code></p>
           <p class="remedy">
-            Changed by whoever starts Raiker on this machine, by setting this variable
-            before launch. It is read once, at startup.
+            Flagged like your own sites. Changed by whoever starts Raiker on this
+            machine, by setting this variable before launch.
           </p>
           <ul class="fixed">
             {#each data.environment as rule (rule)}<li><code>{rule}</code></li>{/each}
           </ul>
         {/if}
-        <p class="source">Built in</p>
+        <p class="source">Built in · always refused</p>
         <p class="remedy">
-          Part of this build. Changed only by installing a Raiker that ships a
-          different list.
+          These name this machine's own network and cloud metadata services, so they
+          are refused like a private address rather than flagged. Part of this build.
         </p>
         <ul class="fixed">
           {#each data.builtin as rule (rule)}<li><code>{rule}</code></li>{/each}

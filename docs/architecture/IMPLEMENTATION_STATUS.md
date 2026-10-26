@@ -201,7 +201,8 @@ Strict non-allow blocking, role revoke governed, and capability gate per action 
 | Dial-time address classification, pinning and metadata refusal for provider calls and image calls | `implemented_verified` | `raiker/models/transport_guard.py`, `raiker/models/transport.py`, `tests/test_model_transport_guard.py` (NET-01 … NET-12), live `model-transport-guard-live.spec.ts` 6/6 |
 | Explicit proxy route, shown per card and in the Models posture | `implemented_verified` | `transport_guard.proxy_for` / `proxy_route`; FIXED-1026, FIXED-1029 |
 | A proxied hosted request is resolved by the proxy, not pinned | residual | [hosted-models threat model](../threat-models/hosted-models.md) |
-| Connector GET helper follows redirects; CLI `/model` cannot reach a connected hosted provider; web/MCP pinned opener behind a proxy | open | BUG-350, BUG-351, BUG-353 |
+| Connector GET helper follows redirects; CLI `/model` cannot reach a connected hosted provider | open | BUG-350, BUG-351 |
+| Web/MCP pinned opener behind a proxy | fixed 2026-10-26 | FIXED-1220 |
 
 ## Universal model readiness and acquisition
 

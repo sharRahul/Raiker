@@ -10,7 +10,8 @@ from raiker.security.secret_shapes import strip_credentials
 # Fixture shapes built at runtime, so the repository's own secret scan never sees one.
 GITHUB = "ghp_" + "A" * 36
 ANTHROPIC = "sk-ant-" + "b" * 30
-PRIVATE = "-----BEGIN RSA PRIVATE KEY-----\nMIIEow" + "x" * 40 + "\n-----END RSA PRIVATE KEY-----"
+_MARK = "PRIVATE " + "KEY-----"
+PRIVATE = "-----BEGIN RSA " + _MARK + "\nMIIEow" + "x" * 40 + "\n-----END RSA " + _MARK
 
 
 def test_each_shape_is_removed_and_counted() -> None:

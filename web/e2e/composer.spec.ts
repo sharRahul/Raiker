@@ -986,3 +986,26 @@ test("composer controls share a consistent height", async ({ page }) => {
     expect(Math.max(...heights) - Math.min(...heights), route).toBeLessThanOrEqual(2);
   }
 });
+
+
+test("approval mode menu remains visible in Permissions", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 680 });
+    await page.goto("http://raiker.test/#/capabilities");
+    await page.getByRole("navigation", { name: "Permission categories" }).getByRole("button", { name: /^Advanced/ }).click();
+    const trigger = page.getByRole("button", { name: /Approval mode:/ });
+    await trigger.click();
+    const menu = page.getByRole("menu", { name: "Approval mode" });
+    await expect(menu.getByRole("menuitemradio")).toHaveCount(4);
+    await expect.poll(async () => { const rect = await menu.boundingBox(); return !!rect && rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= width + 1 && rect.y + rect.height <= 681; }).toBe(true);
+    const box = await menu.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(681);
+    await capture(page, join(shots, `approval-menu-${width}.png`));
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
+});

@@ -830,7 +830,7 @@
             <p class="posture-note-text">
               For every conversation on this account. A conversation set to Careful still asks.
             </p>
-            <ApprovalModeControl />
+            <ApprovalModeControl placement="down" />
           </section>
         {/if}
         <ListDetail

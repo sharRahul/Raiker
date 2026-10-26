@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { api } from "../api";
   import { APPROVAL_MODES, type ApprovalMode } from "../approvalMode";
   import Icon from "./Icon.svelte";
 
+  let { placement = "up" }: { placement?: "up" | "down" } = $props();
   let mode = $state<ApprovalMode>("manual");
   let confirmedMode = $state<ApprovalMode>("manual");
   let open = $state(false);
@@ -12,6 +13,34 @@
   let selectionVersion = 0;
   let rootEl: HTMLDivElement | undefined = $state();
   let triggerEl: HTMLButtonElement | undefined = $state();
+  let menuEl: HTMLDivElement | undefined = $state();
+  let direction = $state<"up" | "down">("up");
+  let menuHeight = $state<number | undefined>();
+  let menuShift = $state(0);
+
+  async function positionMenu() {
+    await tick();
+    if (!open || !triggerEl || !menuEl) return;
+    const anchor = triggerEl.getBoundingClientRect();
+    const gap = 8;
+    const above = Math.max(0, anchor.top - gap);
+    const below = Math.max(0, window.innerHeight - anchor.bottom - gap);
+    const needed = menuEl.scrollHeight;
+    direction = placement === "down"
+      ? (below >= needed || below >= above ? "down" : "up")
+      : (above >= needed || above >= below ? "up" : "down");
+    menuHeight = direction === "down" ? below : above;
+    await tick();
+    if (!open || !menuEl) return;
+    menuShift = 0;
+    const box = menuEl.getBoundingClientRect();
+    menuShift = box.right > window.innerWidth - gap ? window.innerWidth - gap - box.right : box.left < gap ? gap - box.left : 0;
+  }
+
+  function toggleMenu() {
+    open = !open;
+    if (open) { direction = placement; menuHeight = undefined; menuShift = 0; void positionMenu(); }
+  }
 
   onMount(async () => {
     const initialSelectionVersion = selectionVersion;
@@ -63,7 +92,7 @@
   }
 </script>
 
-<svelte:window onclick={onWindowClick} />
+<svelte:window onclick={onWindowClick} onresize={() => { if (open) void positionMenu(); }} />
 
 <div class="approval-mode-control" bind:this={rootEl}>
   <button
@@ -74,7 +103,7 @@
     aria-label={`Approval mode: ${descriptor(mode).label}`}
     aria-haspopup="menu"
     aria-expanded={open}
-    onclick={() => (open = !open)}
+    onclick={toggleMenu}
     onkeydown={closeOnEscape}
   >
     <Icon name={descriptor(mode).icon} size="md" />
@@ -83,7 +112,7 @@
   </button>
 
   {#if open}
-    <div class="approval-menu menu-surface" role="menu" aria-label="Approval mode" tabindex="-1" onkeydown={closeOnEscape}>
+    <div class="approval-menu menu-surface" class:down={direction === "down"} bind:this={menuEl} style={`max-height:${menuHeight ?? 448}px; transform:translateX(${menuShift}px)`} role="menu" aria-label="Approval mode" tabindex="-1" onkeydown={closeOnEscape}>
       {#each APPROVAL_MODES as option (option.mode)}
         <button
           type="button"
@@ -125,6 +154,7 @@
      viewport at 390px, where the trigger sits near the left edge and a
      right-anchored menu ran off the other side. */
   .approval-menu { position: absolute; z-index: var(--z-popover); bottom: calc(100% + .3rem); left: 0; min-width: 17rem; max-width: min(22rem, calc(100vw - 2rem)); padding: .25rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); box-shadow: 0 -.4rem 1.2rem color-mix(in srgb, var(--text-1) 14%, transparent); }
+  .approval-menu.down { bottom: auto; top: calc(100% + .3rem); box-shadow: var(--shadow-2); }
   .approval-choice { width: 100%; display: grid; grid-template-columns: 1rem 1fr 1rem; align-items: start; gap: .45rem; padding: .4rem .45rem; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); text-align: left; cursor: pointer; }
   .choice-copy { display: grid; gap: .1rem; min-width: 0; }
   .choice-label { font-weight: 600; }

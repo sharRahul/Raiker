@@ -23,6 +23,11 @@ class TraySessionRequest(StrictRequest):
 
 @router.post("/api/tray/session")
 def exchange_tray_session(body: TraySessionRequest, request: Request) -> dict[str, object]:
+    # BUG-358 — the tray is a process on this computer; its one-time secret is
+    # never exchanged from anywhere else, whatever it is.
+    from raiker.api.routes_instances import _require_loopback
+
+    _require_loopback(request)
     expected = getattr(request.app.state, "tray_bootstrap_digest", None)
     expires = float(getattr(request.app.state, "tray_bootstrap_expires", 0.0))
     used = bool(getattr(request.app.state, "tray_bootstrap_used", False))

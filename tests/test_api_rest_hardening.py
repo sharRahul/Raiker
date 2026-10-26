@@ -73,10 +73,35 @@ def test_rate_limit_returns_429(workspace: Path) -> None:
         create_app(workspace, rate_limit_per_minute=3, loopback_only=False),
         client=("127.0.0.1", 50000),
     )
-    headers = _headers(workspace)
-    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(5)]
+    statuses = [client.get("/api/health").status_code for _ in range(5)]
     assert 429 in statuses
     assert statuses.count(200) == 3
+
+
+def test_a_signed_in_client_has_a_wider_window_of_its_own(workspace: Path) -> None:
+    from raiker.api.security import SESSION_RATE_MULTIPLIER
+
+    # BUG-358 live round — one dashboard page reads dozens of endpoints, so a
+    # remote owner held to the anonymous window was refused within a minute.
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=3, loopback_only=False),
+        client=("10.0.0.9", 50000),
+    )
+    headers = _headers(workspace)
+    allowed = 3 * SESSION_RATE_MULTIPLIER
+    # (Answered 401: this peer is another device and the session has no code.
+    # The window is about how many are answered at all.)
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(allowed + 2)]
+    assert 429 not in statuses[:allowed]
+    assert statuses[allowed:] == [429, 429]
+    # Reads never used up the window sign-in attempts are counted in…
+    assert client.get("/api/health").status_code == 200
+    # …and a credential does not widen the window on sign-in itself.
+    login = [
+        client.post("/api/auth/login", json={"username": "x", "password": "y"}, headers=headers).status_code
+        for _ in range(4)
+    ]
+    assert login[-1] == 429
 
 
 @pytest.mark.parametrize("peer", ["127.0.0.1", "::1"])
@@ -150,18 +175,18 @@ def test_forwarded_headers_cannot_spoof_a_loopback_peer(workspace: Path) -> None
 
 
 def test_the_proxy_listeners_reads_are_rate_limited_like_any_remote(workspace: Path) -> None:
-    from raiker.api.proxy_guard import ProxyListener
+    from raiker.api.proxy_guard import RemoteListener
 
     # BUG-347 — a reverse proxy connects to its own listener; every request
-    # there is remote, with or without a forwarding header.
+    # there is remote, so even a read is counted, with or without a session.
     client = TestClient(
-        create_app(workspace, rate_limit_per_minute=2, loopback_only=True, proxy_listener=ProxyListener(port=8766)),
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=True, proxy_listener=RemoteListener(port=8766)),
         base_url="http://testserver:8766",
         client=("127.0.0.1", 50000),
     )
-    headers = _headers(workspace)
+    headers = {"X-Forwarded-Proto": "https"}
 
-    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
+    statuses = [client.get("/api/health", headers=headers).status_code for _ in range(4)]
 
     assert statuses[:2] == [200, 200]
     assert statuses[2:] == [429, 429]
@@ -172,12 +197,15 @@ def test_public_bind_limits_safe_reads_even_from_the_host(workspace: Path) -> No
         create_app(workspace, rate_limit_per_minute=2, loopback_only=False),
         client=("::1", 50000),
     )
+    from raiker.api.security import SESSION_RATE_MULTIPLIER
+
     headers = _headers(workspace)
+    allowed = 2 * SESSION_RATE_MULTIPLIER
 
-    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(allowed + 2)]
 
-    assert statuses[:2] == [200, 200]
-    assert statuses[2:] == [429, 429]
+    assert statuses[:allowed] == [200] * allowed
+    assert statuses[allowed:] == [429, 429]
 
 
 # ── Body size limit ──

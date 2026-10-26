@@ -130,6 +130,9 @@ export const auth = {
     contract.elevate({ password, mfa_code: mfaCode }),
   enrollMfa: () => contract.mfaEnroll(),
   activateMfa: (code: string) => contract.mfaActivate({ code }),
+  disableMfa: () => contract.mfaDisable(),
+  // BUG-358 — sign out every other device; this one stays signed in.
+  revokeOtherDeviceSessions: () => contract.revokeOtherDeviceSessions(),
   changePassword: (oldPassword: string, newPassword: string) =>
     contract.changePassword({ old_password: oldPassword, new_password: newPassword }),
   listDeviceSessions: () => contract.listDeviceSessions(),

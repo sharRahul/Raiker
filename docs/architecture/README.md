@@ -25,6 +25,7 @@ Prefer these when another technical document disagrees:
 | What is implemented right now? | [Implementation status](IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries and fail-closed controls? | [Security architecture](SECURITY_ARCHITECTURE.md) |
 | What is the security philosophy? | [Security and policy](SECURITY_AND_POLICY.md) |
+| How does another device reach Raiker, and what protects it? | [Remote access](REMOTE_ACCESS.md) |
 | What does the web API expose? | [API and contract schemas](API_AND_CONTRACT_SCHEMAS.md) |
 | How does Raiker compare with reference platforms? | [Reference platform compatibility](REFERENCE_PLATFORM_COMPATIBILITY.md) |
 | What tools and capabilities exist? | [Tool and plugin catalog](RAIKER_TOOL_AND_PLUGIN_CATALOG.md) |

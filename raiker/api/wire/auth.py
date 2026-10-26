@@ -106,3 +106,18 @@ class DeviceSessionView(View):
     expires_at: str | None
     scope: str
     current: bool
+    #: BUG-358 — ``local`` (this computer) or ``remote`` (another device).
+    origin: str = "local"
+    #: Verified with a code from the MFA enrolment in force now.
+    mfa_verified: bool = False
+    #: What the browser said it was ("Chrome on Windows"). Not proof of anything.
+    client_hint: str | None = None
+    absolute_expires_at: str | None = None
+
+
+@dataclass(frozen=True)
+class SessionsRevokedView(View):
+    """Every other device signed out; this one kept."""
+
+    ok: bool
+    revoked: int

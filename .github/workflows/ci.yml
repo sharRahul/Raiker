@@ -316,6 +316,34 @@ jobs:
         run: |
           python -m pytest -q -p no:cacheprovider tests/test_build_target_and_review.py tests/test_build_provenance_and_worktrees.py tests/test_build_fault_boundaries.py tests/test_build_outcome.py tests/test_build_cancel_mid_turn.py tests/test_build_task_target.py
 
+  remote-access:
+    # BUG-347 / BUG-358 — who can reach Raiker is decided by sockets, TLS and
+    # file modes, which differ by platform: Unix sockets do not exist on
+    # Windows, IPv6 loopback and socket permissions differ on macOS. The full
+    # suite runs on Linux; these run the remote-access, MFA-session and
+    # listener tests (real servers, TLS and the restart path included) on the
+    # other two supported platforms.
+    name: Remote access (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python and install the package
+        uses: ./.github/actions/setup-python
+        with:
+          install: dev
+          cache: pip
+      - name: Remote access, listener and MFA-session tests
+        shell: bash
+        run: |
+          python -m pytest -q -p no:cacheprovider tests/test_remote_access.py tests/test_remote_auth.py tests/test_proxied_loopback.py tests/test_api_rest_hardening.py
+
   native:
     # The sandbox runner is the only part of Raiker that is not Python, and it
     # is the part that builds the operating-system boundary. It is built and

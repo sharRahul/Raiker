@@ -230,46 +230,58 @@ describe("allClearSentence", () => {
   });
 });
 
-describe("BUG-347 remote access on Diagnostics", () => {
+describe("BUG-347 / BUG-358 remote access on Diagnostics", () => {
   const remote = (overrides: Record<string, unknown>) =>
     ({
       ...EVERYTHING_FINE,
       diagnostics: {
         ...HEALTHY_DIAGNOSTICS,
-        remote_access: {
-          mode: "loopback",
-          proxy_listener: null,
-          proxied_requests_refused: 0,
-          proxied_requests_served: 0,
-          last_refused_at: null,
-          last_served_at: null,
-          ...overrides,
-        },
+        remote_access: { ...HEALTHY_DIAGNOSTICS.remote_access, ...overrides },
       },
     }) as AttentionInputs;
+  const ids = (overrides: Record<string, unknown>) => attentionItems(remote(overrides)).map((item) => item.id);
 
   it("says nothing for a host only this computer reaches", () => {
     expect(attentionItems(remote({}))).toEqual([]);
   });
 
-  it("names refused proxied requests and what to change", () => {
+  it("names refused proxied requests and what to change, without the retired token", () => {
     const [item] = attentionItems(remote({ proxied_requests_refused: 3, last_refused_at: "2026-10-26T12:00:00Z" }));
     expect(item.tone).toBe("blocking");
     expect(item.title).toBe("Requests through a reverse proxy are being refused");
-    expect(item.detail).toContain("--proxy-port");
-    expect(item.detail).toContain("--allow-public");
+    expect(item.detail).toContain("Remote access");
+    expect(item.detail).not.toContain("RAIKER_OWNER_TOKEN");
   });
 
-  it("names a host with a proxy listener as public, and where the proxy connects", () => {
-    const [item] = attentionItems(remote({ mode: "proxy_listener", proxy_listener: "127.0.0.1:8766" }));
-    expect(item.title).toBe("Raiker is reachable from the internet through a proxy");
+  it("names a host other devices reach, and where", () => {
+    const [item] = attentionItems(remote({ mode: "proxy_listener", proxy_listener: "127.0.0.1:8766", mfa_ready: true, https_seen: true }));
+    expect(item.title).toBe("Raiker is reachable from other devices");
     expect(item.detail).toContain("127.0.0.1:8766");
   });
 
-  it("still names refusals on the local listener when a proxy listener is open", () => {
-    const items = attentionItems(
-      remote({ mode: "proxy_listener", proxy_listener: "unix:/run/raiker/proxy.sock", proxied_requests_refused: 1 }),
-    );
-    expect(items.map((item) => item.id)).toEqual(["remote:refused", "remote:listener"]);
+  it("says remote access is suspended when two-step sign-in is off", () => {
+    expect(ids({ mode: "private_listener", proxy_listener: "https://10.0.0.5:8443", mfa_ready: false })).toEqual(["remote:suspended"]);
+  });
+
+  it("says a proxy is not passing HTTPS", () => {
+    expect(ids({ mode: "proxy_listener", proxy_listener: "127.0.0.1:8766", mfa_ready: true, https_refused: 2 })).toContain("remote:https");
+  });
+
+  it("names failed remote sign-ins, and blocks at five", () => {
+    const items = attentionItems(remote({ remote_sign_in_failures: 2, remote_mfa_failures: 3 }));
+    expect(items[0].id).toBe("remote:failures");
+    expect(items[0].tone).toBe("blocking");
+    expect(items[0].detail).toContain("2 wrong passwords and 3 wrong codes");
+  });
+
+  it("says a start that fell back or failed, in the host's words", () => {
+    const [item] = attentionItems(remote({ start_outcome: "fell_back", start_message: "The new remote-access setting did not start." }));
+    expect(item.title).toBe("Raiker went back to the previous remote setting");
+    expect(item.detail).toBe("The new remote-access setting did not start.");
+  });
+
+  it("still names refusals on the local listener when a remote listener is open", () => {
+    expect(ids({ mode: "proxy_listener", proxy_listener: "unix:/run/raiker/proxy.sock", mfa_ready: true, proxied_requests_refused: 1 }))
+      .toEqual(["remote:refused", "remote:listener"]);
   });
 });

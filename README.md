@@ -137,8 +137,8 @@ Both need Python 3.11+, Node.js 24+ and Git on that machine.
    ```
 
    WSL2 forwards `localhost` to Windows, so open <http://127.0.0.1:8765/> in a
-   Windows browser and complete setup there. Keep the host on loopback; do not
-   pass `--allow-public` just to reach it from the same PC.
+   Windows browser and complete setup there. The host stays on loopback; the
+   same PC needs no remote access.
 
 Notes for WSL2:
 
@@ -206,27 +206,27 @@ run useful local models). Run Raiker as its own unprivileged user.
    create the owner account owns the instance, so do this before anything else
    can reach the port.
 
-4. **Or reach it over a private network** if you need a browser on another
-   device without a tunnel. Put the VPS on a VPN you control (WireGuard,
-   Tailscale), then bind Raiker to that private address — never to a public
-   one. Raiker refuses a non-loopback bind unless you pass `--allow-public`
-   *and* set a hardened `RAIKER_OWNER_TOKEN`, and it then turns on its
-   transport guardrails (security headers, HSTS, rate limit):
+4. **Or reach it from another device.** Remote access needs two-step
+   sign-in: through the tunnel, open **Settings → Security**, turn it on, then
+   use **Remote access** to choose a way in, check it, and apply it. Restart
+   the service to open it. Every device then signs in with your password **and**
+   a code; there is no shared secret to set. See
+   [Remote access](docs/guide/managing-the-host.md#remote-access).
+
+   **Over a private network** (WireGuard, Tailscale): choose *Private
+   network*, the VPS's private address, a port and a TLS certificate and key;
+   Raiker serves HTTPS itself. Never a public address. Or as start options:
 
    ```ini
    # in raiker.service, replacing ExecStart
-   Environment=RAIKER_OWNER_TOKEN=<a long random value, e.g. from: openssl rand -hex 32>
-   ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --host 100.64.0.10 --port 8765 --allow-public --no-browser
+   ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --private-host 100.64.0.10 --private-port 8443 --tls-cert /home/raiker/tls/cert.pem --tls-key /home/raiker/tls/key.pem --no-browser
    ```
 
-   Terminate TLS in front of it if your VPN does not already encrypt the
-   traffic, with the proxy connecting to that private address.
-
-5. **Or behind a reverse proxy on the same machine** (Caddy, nginx). Give the
-   proxy its own listener and point the proxy there, **never at port 8765**:
+5. **Or behind a reverse proxy on the same machine** (Caddy, nginx). Choose
+   *Reverse proxy* in Remote access, or give the proxy its listener as a start
+   option, and point the proxy there, **never at port 8765**:
 
    ```ini
-   Environment=RAIKER_OWNER_TOKEN=<a long random value>
    ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --proxy-socket /run/raiker/proxy.sock --no-browser
    ```
 
@@ -237,15 +237,13 @@ run useful local models). Run Raiker as its own unprivileged user.
    ```
 
    Every request on the proxy listener is remote, whatever headers it carries:
-   rate limited, password recovery refused, and HSTS when the proxy received
-   HTTPS. The socket is created for its owner and group only (`0660`), so add
-   the proxy's user to Raiker's group. `--proxy-port 8766` opens
-   `127.0.0.1:8766` instead, for Windows or a proxy that cannot use a socket.
-   Port 8765 stays for this computer: a request reaching it with a forwarding
-   header (`X-Forwarded-For`, `Forwarded` and the like) is refused with what to
-   change, and **Diagnostics** shows the refusals. A proxy that sends no such
-   header and is pointed at 8765 anyway cannot be told apart from a browser on
-   the server itself, which is why the proxy gets a listener of its own.
+   HTTPS required (Caddy says so with `X-Forwarded-Proto`), rate limited,
+   password recovery and host changes refused, HSTS added. The socket is
+   created for its owner and group only (`0660`), so add the proxy's user to
+   Raiker's group. `--proxy-port 8766` opens `127.0.0.1:8766` instead, for
+   Windows or a proxy that cannot use a socket. Port 8765 stays for this
+   computer: a request reaching it with a forwarding header is refused with
+   what to change, and **Diagnostics** shows the refusals.
 
    A remote instance is still a single-owner instance:
    every action stays governed, approved and audited, and the owner password

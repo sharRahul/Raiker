@@ -144,25 +144,79 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         title: "Requests through a reverse proxy are being refused",
         detail:
           `${remote.proxied_requests_refused} forwarded request${remote.proxied_requests_refused === 1 ? " was" : "s were"} refused on Raiker's local listener since it started. ` +
-          "That listener is for this computer only. Point the proxy at a proxy listener (raiker-web --proxy-port " +
-          "or --proxy-socket, with RAIKER_OWNER_TOKEN set), or bind Raiker to a private address with --allow-public.",
-        href: "#/guide?section=managing-the-host",
-        linkLabel: "How to run behind a proxy",
+          "That listener is for this computer only. In Settings → Security → Remote access, choose Reverse proxy and " +
+          "point the proxy at the listener Raiker opens for it (raiker-web --proxy-port or --proxy-socket do the same).",
+        href: "#/settings?tab=security",
+        linkLabel: "Remote access",
         technical: `proxied_request_refused · last ${remote.last_refused_at ?? "unknown"}`,
       });
     }
-    if (remote && remote.mode === "proxy_listener") {
+    if (remote && (remote.mode === "proxy_listener" || remote.mode === "private_listener")) {
+      const proxy = remote.mode === "proxy_listener";
+      if (!remote.mfa_ready) {
+        items.push({
+          id: "remote:suspended",
+          tone: "blocking",
+          title: "Remote access is suspended",
+          detail:
+            "Two-step sign-in is off, so Raiker refuses your other devices. Turn it on again in Settings → Security " +
+            "to restore remote access.",
+          href: "#/settings?tab=security",
+          linkLabel: "Open Security",
+          technical: `remote_access_suspended · ${remote.suspensions} in the last 24 hours`,
+        });
+      } else {
+        items.push({
+          id: "remote:listener",
+          tone: "waiting",
+          title: "Raiker is reachable from other devices",
+          detail:
+            `Through ${proxy ? "your reverse proxy" : "your private network"} (${remote.proxy_listener ?? "unknown"}). ` +
+            "Every sign-in there needs your password and a code, password recovery is refused, and requests are " +
+            "rate limited. Turn it off in Settings → Security → Remote access.",
+          href: "#/settings?tab=security",
+          linkLabel: "Remote access",
+          technical: `${remote.mode} · ${remote.proxied_requests_served} served · ${remote.proxied_requests_refused} refused`,
+        });
+      }
+      if (proxy && !remote.https_seen && remote.https_refused > 0) {
+        items.push({
+          id: "remote:https",
+          tone: "blocking",
+          title: "Requests through the proxy are not using HTTPS",
+          detail:
+            `${remote.https_refused} request${remote.https_refused === 1 ? " was" : "s were"} refused because the proxy did not say ` +
+            "the browser used HTTPS. Serve Raiker at an https:// address and have the proxy send X-Forwarded-Proto: https.",
+          href: "#/guide?section=managing-the-host",
+          linkLabel: "How to set up the proxy",
+          technical: "remote_https_required",
+        });
+      }
+    }
+    if (remote && (remote.remote_sign_in_failures > 0 || remote.remote_mfa_failures > 0)) {
+      const failures = remote.remote_sign_in_failures + remote.remote_mfa_failures;
       items.push({
-        id: "remote:listener",
-        tone: "waiting",
-        title: "Raiker is reachable from the internet through a proxy",
+        id: "remote:failures",
+        tone: failures >= 5 ? "blocking" : "waiting",
+        title: "Sign-in attempts from other devices failed",
         detail:
-          `Every request on the proxy listener (${remote.proxy_listener ?? "unknown"}) is served as remote: signed in, ` +
-          "rate limited, and password recovery is refused. Start raiker-web without --proxy-port or --proxy-socket " +
-          "to keep Raiker on this computer only.",
-        href: "#/guide?section=managing-the-host",
-        linkLabel: "About remote access",
-        technical: `proxy_listener · ${remote.proxied_requests_served} served · ${remote.proxied_requests_refused} refused`,
+          `${remote.remote_sign_in_failures} wrong password${remote.remote_sign_in_failures === 1 ? "" : "s"} and ` +
+          `${remote.remote_mfa_failures} wrong code${remote.remote_mfa_failures === 1 ? "" : "s"} in the last 24 hours. ` +
+          "If that was not you, sign out other devices and change your password.",
+        href: "#/settings?tab=security",
+        linkLabel: "Signed-in devices",
+        technical: "remote_sign_in_failed · remote_mfa_failed",
+      });
+    }
+    if (remote && (remote.start_outcome === "failed" || remote.start_outcome === "fell_back") && remote.start_message) {
+      items.push({
+        id: "remote:start",
+        tone: remote.start_outcome === "failed" ? "blocking" : "waiting",
+        title: remote.start_outcome === "failed" ? "Remote access did not start" : "Raiker went back to the previous remote setting",
+        detail: remote.start_message,
+        href: "#/settings?tab=security",
+        linkLabel: "Remote access",
+        technical: `start ${remote.start_outcome}`,
       });
     }
     // BUG-322 — a damaged search index fails every search through it. The

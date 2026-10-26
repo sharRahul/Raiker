@@ -55,13 +55,17 @@ _MAX_AGE_SECONDS: Final = 86400 * 30
 
 
 def _secure(request: Request) -> bool:
-    """``Secure`` only over TLS.
+    """``Secure`` over TLS, and always for another device.
 
-    Raiker binds loopback over plain HTTP by default, and a ``Secure`` cookie is
-    simply never sent there — the flag would not harden anything, it would stop
-    the feature working. Over a real HTTPS deployment it is set.
+    Raiker's local listener is plain HTTP on loopback, and a ``Secure`` cookie
+    is simply never sent there — the flag would not harden anything, it would
+    stop the feature working. Every remote request reached its entry point over
+    HTTPS (BUG-358; the guard refuses it otherwise), so its cookie is
+    ``Secure`` even when a proxy talks plain HTTP to Raiker behind it.
     """
-    return request.url.scheme == "https"
+    from raiker.api.proxy_guard import REMOTE_HTTPS_SCOPE_KEY
+
+    return request.url.scheme == "https" or bool(request.scope.get(REMOTE_HTTPS_SCOPE_KEY))
 
 
 def issue(request: Request, response: Response, token: str) -> str:

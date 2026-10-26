@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SecurityLogin from "./SecurityLogin.svelte";
 import { setToken } from "../../api";
+import ConfirmDialog from "../../components/ConfirmDialog.svelte";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -72,7 +73,7 @@ describe("Security settings", () => {
     for (const [label, action] of [
       ["Password", "Change"],
       ["Two-step sign-in", "Turn on"],
-      ["Devices", "Manage"],
+      ["Signed-in devices", "Manage"],
       ["Encryption", "Details"],
       ["Vault key", "Set up"],
       ["Standing approval grants", "Manage"],
@@ -240,4 +241,107 @@ describe("Security settings", () => {
     await fireEvent.click(button);
     await waitFor(() => expect(requestBody).toEqual({ password: "example-password", enabled: true }));
   });
+
+  // BUG-358 — resetting or turning off two-step sign-in needs fresh proof: an
+  // elevation on the password and a code, made before the call.
+  it("resets two-step sign-in only with the password and a fresh code", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${url.split("?")[0]}`;
+        calls.push(key);
+        const body: Record<string, unknown> = {
+          "GET /api/settings": { settings: {}, status: { vault: "missing", mfa_enrolled: true, username: "alice" } },
+          "POST /api/auth/elevate": { token: "elevated" },
+          "POST /api/auth/mfa/enroll": { secret: "S", provisioning_uri: "otpauth://totp/new", backup_codes: ["aa11"] },
+        };
+        if (key in body) return { ok: true, status: 200, json: async () => body[key] } as Response;
+        return { ok: false, status: 404, json: async () => ({ detail: { reason_code: "unrouted" } }) } as Response;
+      }),
+    );
+    render(SecurityLogin);
+    await waitFor(() => within(settingRow("Two-step sign-in")).getByRole("button", { name: "Manage" }));
+    const dialog = await openRow("Two-step sign-in", "Manage");
+    const reset = dialog.getByRole("button", { name: "Reset authenticator" });
+    expect(reset).toBeDisabled();
+    await fireEvent.input(dialog.getByLabelText("Password"), { target: { value: "pw" } });
+    await fireEvent.input(dialog.getByLabelText("Authenticator or recovery code"), { target: { value: "123456" } });
+    await fireEvent.click(reset);
+    expect(await within(screen.getByRole("dialog")).findByText("otpauth://totp/new")).toBeInTheDocument();
+    expect(screen.getByText(/The old one keeps working until you enter a code from this one/)).toBeInTheDocument();
+    expect(calls.indexOf("POST /api/auth/elevate")).toBeLessThan(calls.indexOf("POST /api/auth/mfa/enroll"));
+  });
+
+  it("lists signed-in devices with where and how, and signs out the others", async () => {
+    let revoked = false;
+    const sessions = [
+      { session_id: "s1", created_at: "2026-10-26T10:00:00Z", last_seen_at: "2026-10-26T10:00:00Z", device_label: null, revoked: false, expires_at: null, absolute_expires_at: null, scope: "control", current: true, origin: "local", mfa_verified: false, client_hint: "Firefox on Linux" },
+      { session_id: "s2", created_at: "2026-10-26T09:00:00Z", last_seen_at: null, device_label: null, revoked: false, expires_at: null, absolute_expires_at: null, scope: "control", current: false, origin: "remote", mfa_verified: true, client_hint: "Safari on iPhone" },
+    ];
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "missing", mfa_enrolled: true, username: "alice" } }),
+      "GET /api/auth/sessions": () => sessions,
+      "POST /api/auth/sessions/revoke-others": () => {
+        revoked = true;
+        return { ok: true, revoked: 1 };
+      },
+    });
+    render(ConfirmDialog);
+    render(SecurityLogin);
+    await waitFor(() => expect(within(settingRow("Signed-in devices")).getByText("2 signed in")).toBeInTheDocument());
+    const dialog = await openRow("Signed-in devices", "Manage");
+    const rows = dialog.getAllByTestId("device-session");
+    expect(rows[0]).toHaveTextContent("Firefox on Linux");
+    expect(rows[0]).toHaveTextContent("This device");
+    expect(rows[0]).toHaveTextContent("Password only");
+    expect(rows[1]).toHaveTextContent("Safari on iPhone");
+    expect(rows[1]).toHaveTextContent("Another device");
+    expect(rows[1]).toHaveTextContent("Signed in with a code");
+    expect(dialog.getByText(/does not prove which device it is/)).toBeInTheDocument();
+    await fireEvent.click(dialog.getByRole("button", { name: "Sign out all other devices" }));
+    await fireEvent.click(within(await screen.findByRole("dialog", { name: "Sign out every other device?" })).getByRole("button", { name: "Sign out others" }));
+    await waitFor(() => expect(revoked).toBe(true));
+  });
+
+  it("says it is reading, not Off, before the account's state arrives", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(SecurityLogin);
+    await waitFor(() => settingRow("Two-step sign-in"));
+    expect(within(settingRow("Two-step sign-in")).getByText("Reading…")).toBeInTheDocument();
+    expect(within(settingRow("Signed-in devices")).getByText("Reading…")).toBeInTheDocument();
+    expect(within(settingRow("Vault key")).getByText("Reading…")).toBeInTheDocument();
+  });
+
+  it("reads remote access again after two-step sign-in is turned off", async () => {
+    let reads = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const key = `${(init?.method ?? "GET").toUpperCase()} ${url.split("?")[0]}`;
+        if (key === "GET /api/remote-access") reads += 1;
+        const body: Record<string, unknown> = {
+          "GET /api/settings": { settings: {}, status: { vault: "missing", mfa_enrolled: true, username: "alice" } },
+          "POST /api/auth/elevate": { token: "elevated" },
+          "POST /api/auth/mfa/disable": { ok: true },
+          "GET /api/auth/sessions": [],
+        };
+        if (key in body) return { ok: true, status: 200, json: async () => body[key] } as Response;
+        return { ok: false, status: 404, json: async () => ({ detail: { reason_code: "unrouted" } }) } as Response;
+      }),
+    );
+    render(ConfirmDialog);
+    render(SecurityLogin);
+    await waitFor(() => within(settingRow("Two-step sign-in")).getByRole("button", { name: "Manage" }));
+    await waitFor(() => expect(reads).toBe(1));
+    const dialog = await openRow("Two-step sign-in", "Manage");
+    await fireEvent.input(dialog.getByLabelText("Password"), { target: { value: "pw" } });
+    await fireEvent.input(dialog.getByLabelText("Authenticator or recovery code"), { target: { value: "123456" } });
+    await fireEvent.click(dialog.getByRole("button", { name: "Turn off" }));
+    await fireEvent.click(within(await screen.findByRole("dialog", { name: "Turn off two-step sign-in?" })).getByRole("button", { name: "Turn off" }));
+    await waitFor(() => expect(reads).toBe(2));
+  });
 });
+

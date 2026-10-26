@@ -2260,6 +2260,10 @@ export type DeviceSessionView = {
   expires_at: string | null;
   scope: string;
   current: boolean;
+  origin: string;
+  mfa_verified: boolean;
+  client_hint: string | null;
+  absolute_expires_at: string | null;
 };
 
 /** One problem, at a coordinate the agent can open. */
@@ -3129,6 +3133,13 @@ export type HooksView = {
   activity_counts: Record<string, number>;
 };
 
+/** BUG-358 — how this host is reached, as the running host reports it. */
+export type HostAccessView = {
+  state: "disabled" | "enabled" | "suspended" | "pending_restart" | "error";
+  mode: "local" | "private" | "proxy";
+  address: string | null;
+};
+
 /**
  * A pause, resume, quit or restart. A quit or restart that would interrupt work answers
  * ``waiting_work`` and does nothing until confirmed.
@@ -3145,6 +3156,7 @@ export type HostActionResult = {
   waiting: HostWaitingWork[];
   service: ServiceRegistration;
   restartable: boolean;
+  access: HostAccessView;
   ok: boolean;
   reason_code?: string;
   stopping?: boolean;
@@ -3181,6 +3193,7 @@ export type HostView = {
   waiting: HostWaitingWork[];
   service: ServiceRegistration;
   restartable: boolean;
+  access: HostAccessView;
 };
 
 /** One thing a quit would interrupt or leave undone, in the owner's terms. */
@@ -5316,14 +5329,117 @@ export type ReleaseTargetView = {
   signing: ReleaseSigning;
 };
 
-/** BUG-347 — how requests reach this host, read from the running process. */
+export type RemoteAccessApplyBody = {
+  config: RemoteAccessConfigBody;
+  confirm?: boolean;
+};
+
+export type RemoteAccessCheckView = {
+  code: string;
+  ok: boolean;
+  message: string;
+  field: string | null;
+  severity: "error" | "warning" | "info";
+};
+
+export type RemoteAccessChecksView = {
+  ok: boolean;
+  checks: RemoteAccessCheckView[];
+};
+
+export type RemoteAccessConfigBody = {
+  mode: string;
+  proxy_kind?: string | null;
+  proxy_port?: number | null;
+  proxy_socket?: string | null;
+  private_host?: string | null;
+  private_port?: number | null;
+  tls_cert?: string | null;
+  tls_key?: string | null;
+};
+
+export type RemoteAccessConfigView = {
+  mode: "local" | "private" | "proxy";
+  proxy_kind: "port" | "socket";
+  proxy_port: number | null;
+  proxy_socket: string | null;
+  private_host: string | null;
+  private_port: number | null;
+  tls_cert: string | null;
+  tls_key: string | null;
+};
+
+export type RemoteAccessEventView = {
+  at: string;
+  kind: string;
+};
+
+export type RemoteAccessLastStart = {
+  at: string | null;
+  outcome: string;
+  reason: string | null;
+  message: string | null;
+};
+
+/** The remote listener this running host has open; nothing when there is none. */
+export type RemoteAccessListenerView = {
+  mode: "local" | "private" | "proxy";
+  address: string | null;
+  source: "settings" | "start_options";
+  https_verified: boolean;
+  refusing: boolean;
+};
+
+export type RemoteAccessMfaView = {
+  enrolled: boolean;
+  ready: boolean;
+  accounts_without_mfa: number;
+  reset_pending: boolean;
+};
+
+export type RemoteAccessProblem = {
+  code: string;
+  message: string;
+};
+
+/** Remote access as it is now, from the running host, and what was asked for. */
+export type RemoteAccessStatusView = {
+  state: "disabled" | "enabled" | "suspended" | "pending_restart" | "error";
+  desired: RemoteAccessConfigView;
+  previous: RemoteAccessConfigView | null;
+  active: RemoteAccessListenerView;
+  mfa: RemoteAccessMfaView;
+  https: "verified" | "not_verified" | "not_applicable";
+  connection_address: string | null;
+  restart_required: boolean;
+  restartable: boolean;
+  can_configure: boolean;
+  local_listener: string;
+  problems: RemoteAccessProblem[];
+  last_start: RemoteAccessLastStart | null;
+  recent_events: RemoteAccessEventView[];
+  platform: "windows" | "macos" | "linux" | "other";
+};
+
+/** BUG-347 / BUG-358 — how requests reach this host, read from the running process. */
 export type RemoteAccessView = {
-  mode: "loopback" | "proxy_listener" | "public";
+  mode: "loopback" | "proxy_listener" | "private_listener" | "public";
   proxy_listener: string | null;
+  listener_kind: "proxy" | "private" | null;
+  listener_source: "settings" | "start_options" | null;
+  disabled_while_running: boolean;
+  https_seen: boolean;
+  https_refused: number;
   proxied_requests_refused: number;
   proxied_requests_served: number;
   last_refused_at: string | null;
   last_served_at: string | null;
+  mfa_ready: boolean;
+  remote_sign_in_failures: number;
+  remote_mfa_failures: number;
+  suspensions: number;
+  start_outcome: string | null;
+  start_message: string | null;
 };
 
 export type RemoteMcpServerCreated = {
@@ -5718,6 +5834,12 @@ export type SessionView = {
 export type SessionsDeleted = {
   ok: boolean;
   session_ids: string[];
+};
+
+/** Every other device signed out; this one kept. */
+export type SessionsRevokedView = {
+  ok: boolean;
+  revoked: number;
 };
 
 export type SetCapabilityDecisionModeRequest = {
@@ -6807,6 +6929,8 @@ export const contract = {
     request<SessionStateView>("/api/auth/session-state"),
   listDeviceSessions: () =>
     request<DeviceSessionView[]>("/api/auth/sessions"),
+  revokeOtherDeviceSessions: () =>
+    call<SessionsRevokedView>("POST", "/api/auth/sessions/revoke-others"),
   revokeDeviceSession: (sessionId: string) =>
     call<Ok>("POST", `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`),
   whoami: () =>
@@ -7507,6 +7631,16 @@ export const contract = {
     request<RecoveryBackupsView>("/api/recovery/backups"),
   recoveryRestore: (body: RecoveryRestoreRequest) =>
     call<RecoveryRestored>("POST", "/api/recovery/restore", { body }),
+  getRemoteAccess: () =>
+    request<RemoteAccessStatusView>("/api/remote-access"),
+  applyRemoteAccess: (body: RemoteAccessApplyBody) =>
+    call<RemoteAccessStatusView>("POST", "/api/remote-access/apply", { body }),
+  checkRemoteAccess: (body: RemoteAccessConfigBody) =>
+    call<RemoteAccessChecksView>("POST", "/api/remote-access/check", { body }),
+  disableRemoteAccess: () =>
+    call<RemoteAccessStatusView>("POST", "/api/remote-access/disable"),
+  rollbackRemoteAccess: () =>
+    call<RemoteAccessStatusView>("POST", "/api/remote-access/rollback"),
   listRoutineDeliveries: () =>
     request<RoutineDeliveries>("/api/routine-deliveries"),
   getRuntimeMode: () =>

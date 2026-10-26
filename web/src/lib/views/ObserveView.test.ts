@@ -66,7 +66,7 @@ describe("ObserveView", () => {
     const title = await screen.findByText("Requests through a reverse proxy are being refused");
     const card = title.closest("li.issue") as HTMLElement;
     const terms = [...card.querySelectorAll(".issue-detail .term")].map((node) => node.textContent);
-    expect(terms).toEqual(["--proxy-port", "--proxy-socket", "RAIKER_OWNER_TOKEN", "--allow-public"]);
+    expect(terms).toEqual(["--proxy-port", "--proxy-socket"]);
   });
 
   it("counts as closed only the gates that would actually fail closed", async () => {

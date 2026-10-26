@@ -31,6 +31,14 @@ class ApiSession:
     revoked: bool = False
     scope: str = "control"
     absolute_expires_at: str | None = None
+    #: BUG-358 — how the session was established: ``password`` or ``mfa``.
+    assurance: str = "password"
+    #: Where: ``local`` (this computer's listener) or ``remote``.
+    origin: str = "local"
+    #: The account's MFA enrolment the session was verified against. A session
+    #: verified before MFA was reset or turned off no longer counts as MFA.
+    mfa_epoch: int | None = None
+    last_seen_at: str | None = None
 
     def is_expired(self, now: str | None = None) -> bool:
         check = _parse_ts(now or utc_now())
@@ -62,6 +70,11 @@ class ApiSessionStore:
         scope: str = "control",
         absolute_expires_in_seconds: int | None = None,
         device_label: str | None = None,
+        *,
+        assurance: str = "password",
+        origin: str = "local",
+        mfa_epoch: int | None = None,
+        client_hint: str | None = None,
     ) -> tuple[str, ApiSession]:
         from datetime import datetime, timedelta
 
@@ -84,8 +97,9 @@ class ApiSessionStore:
             connection.execute(
                 """INSERT OR IGNORE INTO api_sessions
                    (session_id, principal_id, token_hash, scopes, created_at, expires_at,
-                    revoked, scope, absolute_expires_at, device_label)
-                   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)""",
+                    revoked, scope, absolute_expires_at, device_label, assurance, origin,
+                    mfa_epoch, client_hint)
+                   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     session_id,
                     principal_id,
@@ -96,6 +110,10 @@ class ApiSessionStore:
                     scope,
                     absolute_expires_at,
                     device_label,
+                    assurance,
+                    origin,
+                    mfa_epoch,
+                    client_hint,
                 ),
             )
         session = ApiSession(
@@ -106,6 +124,9 @@ class ApiSessionStore:
             expires_at=expires_at,
             scope=scope,
             absolute_expires_at=absolute_expires_at,
+            assurance=assurance,
+            origin=origin,
+            mfa_epoch=mfa_epoch,
         )
         return raw_token, session
 
@@ -126,11 +147,36 @@ class ApiSessionStore:
             )
             return cursor.rowcount
 
-    def touch(self, session_id: str, when: str) -> None:
+    def touch(self, session_id: str, when: str, *, slide_seconds: int | None = None) -> None:
+        """Record activity; with ``slide_seconds``, also push the idle expiry forward.
+
+        The idle expiry never passes the absolute one: a session that is used
+        every minute still ends when its hard limit says.
+        """
+        if slide_seconds is None:
+            with self._store.connect() as connection:
+                connection.execute(
+                    "UPDATE api_sessions SET last_seen_at = ? WHERE session_id = ?",
+                    (when, session_id),
+                )
+            return
+        from datetime import timedelta
+
+        slid = (_parse_ts(when) + timedelta(seconds=slide_seconds)).isoformat(timespec="seconds")
         with self._store.connect() as connection:
             connection.execute(
-                "UPDATE api_sessions SET last_seen_at = ? WHERE session_id = ?",
-                (when, session_id),
+                "UPDATE api_sessions SET last_seen_at = ?, expires_at = CASE "
+                "WHEN absolute_expires_at IS NOT NULL AND absolute_expires_at < ? "
+                "THEN absolute_expires_at ELSE ? END WHERE session_id = ?",
+                (when, slid, slid, session_id),
+            )
+
+    def raise_assurance(self, session_id: str, mfa_epoch: int) -> None:
+        """Mark a session MFA-verified against the account's current enrolment."""
+        with self._store.connect() as connection:
+            connection.execute(
+                "UPDATE api_sessions SET assurance = 'mfa', mfa_epoch = ? WHERE session_id = ?",
+                (mfa_epoch, session_id),
             )
 
     def get_by_token(self, raw_token: str) -> ApiSession | None:
@@ -170,7 +216,8 @@ class ApiSessionStore:
         with self._store.connect() as connection:
             rows = connection.execute(
                 "SELECT session_id, created_at, last_seen_at, device_label, revoked, "
-                "expires_at, scope FROM api_sessions WHERE principal_id = ? "
+                "expires_at, absolute_expires_at, scope, assurance, origin, mfa_epoch, "
+                "client_hint FROM api_sessions WHERE principal_id = ? "
                 "ORDER BY created_at DESC",
                 (principal_id,),
             ).fetchall()
@@ -198,4 +245,8 @@ class ApiSessionStore:
             absolute_expires_at=(
                 str(row["absolute_expires_at"]) if row.get("absolute_expires_at") else None
             ),
+            assurance=str(row.get("assurance") or "password"),
+            origin=str(row.get("origin") or "local"),
+            mfa_epoch=int(row["mfa_epoch"]) if row.get("mfa_epoch") is not None else None,
+            last_seen_at=str(row["last_seen_at"]) if row.get("last_seen_at") else None,
         )

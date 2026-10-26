@@ -37,12 +37,19 @@ MFA_TICKET_TTL = 300  # 5 minutes
 PASSWORD_RECOVERY_TICKET_TTL = 300  # 5 minutes
 SESSION_TTL = 86400 * 7  # sliding 7 days
 SESSION_ABSOLUTE_TTL = 86400 * 30  # hard 30-day cap
+# BUG-358 — a session from another device is shorter-lived: idle for twelve
+# hours or seven days old, it signs in again with the password and a code.
+REMOTE_SESSION_IDLE_TTL = 3600 * 12
+REMOTE_SESSION_ABSOLUTE_TTL = 86400 * 7
 ELEVATED_TTL = 300  # 5 minutes
 GENERIC_AUTH_ERROR = "Invalid username or password"
 
 
 class AuthError(Exception):
     """Raised for any authentication failure. Message is safe to surface."""
+
+
+Origin = Literal["local", "remote"]
 
 
 @dataclass(frozen=True)
@@ -88,7 +95,21 @@ class AccountService:
         return principal_id
 
     # ── Login state machine ─────────────────────────────────────────────────
-    def login(self, username: str, password: str, device_label: str | None = None) -> LoginResult:
+    def login(
+        self,
+        username: str,
+        password: str,
+        device_label: str | None = None,
+        *,
+        origin: Origin = "local",
+        client_hint: str | None = None,
+    ) -> LoginResult:
+        """Password first; then MFA when enrolled, and always from another device.
+
+        BUG-358 — a password alone never opens a session for a remote request:
+        an account without MFA gets the generic failure there, after the same
+        password work, so the answer does not say which half was missing.
+        """
         account = self._store.get_account_by_username(username.strip())
         if account is None:
             # Spend comparable work so a missing user is indistinguishable by timing.
@@ -114,7 +135,14 @@ class AccountService:
         if not password_valid:
             self._register_failure(account)
             raise AuthError(GENERIC_AUTH_ERROR)
-        self._reset_failures(account["principal_id"])
+        if origin == "remote" and not account["mfa_enrolled"]:
+            raise AuthError(GENERIC_AUTH_ERROR)
+        # With MFA on, the password is only half the sign-in, so it must not
+        # clear the failure counter: otherwise signing in again between wrong
+        # codes reset it every time and a known password bought unlimited code
+        # guesses (found while building BUG-358). Only a verified code clears it.
+        if not account["mfa_enrolled"]:
+            self._reset_failures(account["principal_id"])
         self._maybe_rehash(account, password)
         if account["mfa_enrolled"]:
             ticket, _ = self._sessions.create_session(
@@ -122,12 +150,16 @@ class AccountService:
                 scope="mfa_pending",
                 expires_in_seconds=MFA_TICKET_TTL,
                 device_label=device_label,
+                origin=origin,
+                client_hint=client_hint,
             )
             return LoginResult(stage="mfa_required", principal_id=account["principal_id"], ticket=ticket)
-        token = self._issue_control_session(account["principal_id"], device_label)
+        token = self._issue_control_session(
+            account["principal_id"], device_label, origin=origin, client_hint=client_hint
+        )
         return LoginResult(stage="session", principal_id=account["principal_id"], token=token)
 
-    def verify_mfa(self, ticket_token: str, code: str) -> LoginResult:
+    def verify_mfa(self, ticket_token: str, code: str, *, origin: Origin = "local") -> LoginResult:
         # Claim the pending ticket and consume a backup code under one writer
         # lock. A control session is minted only after that claim commits.
         token_hash = hashlib.sha256(ticket_token.encode()).hexdigest()
@@ -206,11 +238,23 @@ class AccountService:
                 if claimed.rowcount != 1:
                     raise AuthError("MFA verification failed")
                 connection.commit()
+                epoch = int(account["mfa_epoch"] or 0)
+                client_hint = ticket["client_hint"]
+                device_label = ticket["device_label"]
         except AuthError:
             raise
         except Exception as exc:
             raise AuthError("MFA verification failed") from exc
-        token = self._issue_control_session(principal_id, None)
+        # The session is where the code was entered: a ticket started on one
+        # listener and finished on another takes the second one's origin.
+        token = self._issue_control_session(
+            principal_id,
+            device_label,
+            origin=origin,
+            assurance="mfa",
+            mfa_epoch=epoch,
+            client_hint=client_hint,
+        )
         return LoginResult(stage="session", principal_id=principal_id, token=token)
 
     # ── Password & elevation ────────────────────────────────────────────────
@@ -318,8 +362,20 @@ class AccountService:
             connection.execute("UPDATE api_sessions SET revoked = 1 WHERE principal_id = ?", (principal_id,))
 
     def grant_elevated(
-        self, principal_id: str, password: str | None = None, mfa_code: str | None = None
+        self,
+        principal_id: str,
+        password: str | None = None,
+        mfa_code: str | None = None,
+        *,
+        origin: Origin = "local",
     ) -> str:
+        """A five-minute session for one sensitive action, after fresh proof.
+
+        On this computer the password, or a code, is enough. From another
+        device (BUG-358) both are required. The elevated session records which
+        was given: an action that needs fresh MFA (turning MFA off or resetting
+        it, changing remote access) refuses one granted on the password alone.
+        """
         account = self._store.get_account(principal_id)
         if account is None:
             raise AuthError(GENERIC_AUTH_ERROR)
@@ -328,19 +384,23 @@ class AccountService:
         password_ok = password is not None and passwords.verify_password(
             password, account["password_hash"], account["hash_algo"]
         )
-        # Only reach `_check_mfa` when the password did not already satisfy the
-        # gate — it now charges the lockout counter on a wrong code, so a valid
-        # password paired with a stray/wrong code must not spuriously lock out.
+        # A code is checked only when one was given: `_check_mfa` charges the
+        # lockout counter on a wrong code, so a stray empty field must not.
         mfa_ok = (
-            not password_ok
-            and mfa_code is not None
+            bool(mfa_code)
             and bool(account["mfa_enrolled"])
-            and self._check_mfa(account, mfa_code)
+            and self._check_mfa(account, str(mfa_code))
         )
-        if not (password_ok or mfa_ok):
+        granted = (password_ok and mfa_ok) if origin == "remote" else (password_ok or mfa_ok)
+        if not granted:
             raise AuthError(GENERIC_AUTH_ERROR)
         token, _ = self._sessions.create_session(
-            principal_id, scope="elevated", expires_in_seconds=ELEVATED_TTL
+            principal_id,
+            scope="elevated",
+            expires_in_seconds=ELEVATED_TTL,
+            assurance="mfa" if mfa_ok else "password",
+            origin=origin,
+            mfa_epoch=int(account.get("mfa_epoch") or 0) if mfa_ok else None,
         )
         return token
 
@@ -352,8 +412,19 @@ class AccountService:
         secret = mfa.generate_secret()
         codes = mfa.generate_backup_codes()
         encrypted = mfa.encrypt_secret(self._workspace_root, secret)
-        # Persist the (not-yet-active) secret; mfa_enrolled stays 0 until verified.
-        self._store.set_account_mfa(principal_id, False, encrypted, mfa.hash_backup_codes(codes))
+        if account["mfa_enrolled"]:
+            # BUG-358 — a reset is staged beside the active enrolment, which
+            # keeps working (and keeps remote access up) until the new
+            # authenticator's first code is confirmed in `activate_mfa`.
+            with self._store.connect() as connection:
+                connection.execute(
+                    "UPDATE account_credentials SET mfa_pending_secret_encrypted = ?, "
+                    "mfa_pending_backup_codes = ?, updated_at = ? WHERE principal_id = ?",
+                    (encrypted, mfa.hash_backup_codes(codes), utc_now(), principal_id),
+                )
+        else:
+            # Persist the (not-yet-active) secret; mfa_enrolled stays 0 until verified.
+            self._store.set_account_mfa(principal_id, False, encrypted, mfa.hash_backup_codes(codes))
         uri = mfa.provisioning_uri(secret, account["username"])
         return secret, uri, codes
 
@@ -362,19 +433,50 @@ class AccountService:
             account = connection.execute(
                 "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
             ).fetchone()
-            if account is None or account["mfa_secret_encrypted"] is None:
+            if account is None:
                 raise AuthError("MFA enrollment not started")
-            secret = mfa.decrypt_secret(self._workspace_root, account["mfa_secret_encrypted"])
+            staged = account["mfa_pending_secret_encrypted"]
+            blob = staged if staged is not None else account["mfa_secret_encrypted"]
+            if blob is None or (staged is None and account["mfa_enrolled"]):
+                raise AuthError("MFA enrollment not started")
+            secret = mfa.decrypt_secret(self._workspace_root, blob)
             if not mfa.verify_totp(secret, code):
                 raise AuthError("Invalid verification code")
-            connection.execute(
-                "UPDATE account_credentials SET mfa_enrolled = 1, updated_at = ? WHERE principal_id = ?",
-                (utc_now(), principal_id),
-            )
+            epoch = int(account["mfa_epoch"] or 0) + 1
+            if staged is not None:
+                # The reset's new authenticator replaces the old one, codes and all.
+                connection.execute(
+                    "UPDATE account_credentials SET mfa_enrolled = 1, mfa_epoch = ?, "
+                    "mfa_secret_encrypted = mfa_pending_secret_encrypted, "
+                    "backup_codes_hashed = mfa_pending_backup_codes, "
+                    "mfa_pending_secret_encrypted = NULL, mfa_pending_backup_codes = NULL, "
+                    "updated_at = ? WHERE principal_id = ?",
+                    (epoch, utc_now(), principal_id),
+                )
+            else:
+                connection.execute(
+                    "UPDATE account_credentials SET mfa_enrolled = 1, mfa_epoch = ?, updated_at = ? "
+                    "WHERE principal_id = ?",
+                    (epoch, utc_now(), principal_id),
+                )
             connection.execute(
                 "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? AND session_id != ?",
                 (principal_id, keep_session_id),
             )
+            # The session that just entered a valid code is verified by it.
+            if keep_session_id:
+                connection.execute(
+                    "UPDATE api_sessions SET assurance = 'mfa', mfa_epoch = ? WHERE session_id = ?",
+                    (epoch, keep_session_id),
+                )
+
+    def mfa_epoch(self, principal_id: str) -> int:
+        account = self._store.get_account(principal_id)
+        return int(account.get("mfa_epoch") or 0) if account else 0
+
+    def mfa_reset_pending(self, principal_id: str) -> bool:
+        account = self._store.get_account(principal_id)
+        return bool(account and account.get("mfa_pending_secret_encrypted") is not None)
 
     def mfa_enrolled(self, principal_id: str) -> bool:
         account = self._store.get_account(principal_id)
@@ -386,16 +488,22 @@ class AccountService:
             return False
         return self._check_mfa(account, code)
 
-    def disable_mfa(self, principal_id: str, keep_session_id: str = "") -> None:
+    def disable_mfa(
+        self, principal_id: str, keep_session_id: str = "", also_keep: str = ""
+    ) -> None:
+        """Turn MFA off and sign out every session but the one(s) doing it."""
         with self._store.connect() as connection:
             connection.execute(
                 "UPDATE account_credentials SET mfa_enrolled = 0, mfa_secret_encrypted = NULL, "
-                "backup_codes_hashed = NULL, updated_at = ? WHERE principal_id = ?",
+                "backup_codes_hashed = NULL, mfa_pending_secret_encrypted = NULL, "
+                "mfa_pending_backup_codes = NULL, mfa_epoch = mfa_epoch + 1, updated_at = ? "
+                "WHERE principal_id = ?",
                 (utc_now(), principal_id),
             )
             connection.execute(
-                "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? AND session_id != ?",
-                (principal_id, keep_session_id),
+                "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? "
+                "AND session_id NOT IN (?, ?)",
+                (principal_id, keep_session_id, also_keep or keep_session_id),
             )
 
     # ── Internals ───────────────────────────────────────────────────────────
@@ -403,13 +511,27 @@ class AccountService:
         principal = self._store.get_principal(principal_id)
         return bool(principal and principal["is_active"])
 
-    def _issue_control_session(self, principal_id: str, device_label: str | None) -> str:
+    def _issue_control_session(
+        self,
+        principal_id: str,
+        device_label: str | None,
+        *,
+        origin: Origin = "local",
+        assurance: str = "password",
+        mfa_epoch: int | None = None,
+        client_hint: str | None = None,
+    ) -> str:
+        remote = origin == "remote"
         token, _ = self._sessions.create_session(
             principal_id,
             scope="control",
-            expires_in_seconds=SESSION_TTL,
-            absolute_expires_in_seconds=SESSION_ABSOLUTE_TTL,
+            expires_in_seconds=REMOTE_SESSION_IDLE_TTL if remote else SESSION_TTL,
+            absolute_expires_in_seconds=REMOTE_SESSION_ABSOLUTE_TTL if remote else SESSION_ABSOLUTE_TTL,
             device_label=device_label,
+            assurance=assurance,
+            origin=origin,
+            mfa_epoch=mfa_epoch,
+            client_hint=client_hint,
         )
         return token
 

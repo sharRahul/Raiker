@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 from collections import defaultdict, deque
+from typing import Final
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -118,6 +119,7 @@ class SecurityHeadersMiddleware:
             await self.app(scope, receive, send)
             return
         policed = str(scope.get("path", "")) not in _CSP_EXEMPT_PATHS
+        no_store = str(scope.get("path", "")).startswith(("/api/auth/", "/api/remote-access", "/api/tray/"))
 
         async def wrapped(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -128,6 +130,10 @@ class SecurityHeadersMiddleware:
                         headers.append((key, value))
                 if policed and b"content-security-policy" not in existing:
                     headers.append((b"content-security-policy", _CONTENT_SECURITY_POLICY))
+                # BUG-358 — sign-in answers carry tickets, codes and session
+                # cookies; no browser or proxy in between may keep a copy.
+                if no_store and b"cache-control" not in existing:
+                    headers.append((b"cache-control", b"no-store"))
                 if self._hsts and b"strict-transport-security" not in existing:
                     headers.append(
                         (b"strict-transport-security", b"max-age=63072000; includeSubDomains")
@@ -334,12 +340,47 @@ class MaxBodySizeMiddleware:
             await _send_json(send, *refusal)
 
 
+#: Sign-in, MFA, elevation and recovery keep the strict window whatever the
+#: request carries: these are where a password or a code is guessed.
+SIGN_IN_PATHS: Final = frozenset(
+    {
+        "/api/auth/register",
+        "/api/auth/session",
+        "/api/auth/login",
+        "/api/auth/mfa/verify",
+        "/api/auth/elevate",
+        "/api/auth/password-recovery/begin",
+        "/api/auth/password-recovery/complete",
+    }
+)
+
+#: How many more requests a signed-in client may make than an anonymous one.
+#: One page of the dashboard reads dozens of endpoints, so a remote owner held
+#: to the anonymous window was refused within a minute of normal use.
+SESSION_RATE_MULTIPLIER: Final = 5
+
+
+def _presents_session(scope: Scope) -> bool:
+    """Whether the request carries a session credential (not whether it is valid)."""
+    for name, value in scope.get("headers") or []:
+        if name == b"authorization" and value[:7].lower() == b"bearer ":
+            return True
+        if name == b"cookie" and b"raiker_session=" in value:
+            return True
+    return False
+
+
 class RateLimitMiddleware:
     """Fixed-window in-memory rate limit per client IP, applied to ``/api`` paths.
 
     Single-user and process-local: this is a denial-of-service guardrail for an
     exposed bind, not an auth boundary. The auth check (bearer token -> owner
     principal) remains the real gate.
+
+    A request presenting a session is counted in a wider window of its own,
+    so a signed-in owner's reads never use up the window that limits sign-in
+    attempts. A forged credential buys only that wider, still bounded, window
+    and is refused by the auth check.
     """
 
     def __init__(
@@ -358,12 +399,18 @@ class RateLimitMiddleware:
         self._last_sweep = time.monotonic()
 
     def _client_key(self, scope: Scope) -> str:
-        from raiker.api.proxy_guard import PROXIED_SCOPE_KEY, PROXY_RATE_KEY
+        from raiker.api.proxy_guard import (
+            PROXY_RATE_KEY,
+            REMOTE_SCOPE_KEY,
+            arrived_without_tcp,
+            peer_is_loopback,
+        )
 
-        # BUG-347 — every request on the proxy listener comes from the proxy's
+        # BUG-347 — every request on a proxy listener comes from the proxy's
         # own (loopback) peer, and the address it reports identifies nobody, so
-        # they share one bucket of their own rather than this computer's.
-        if scope.get(PROXIED_SCOPE_KEY):
+        # they share one bucket of their own rather than this computer's. A
+        # private-network listener sees the real peer and keys on it.
+        if scope.get(REMOTE_SCOPE_KEY) and (arrived_without_tcp(scope) or peer_is_loopback(scope)):
             return PROXY_RATE_KEY
         client = scope.get("client")
         if isinstance(client, (tuple, list)) and client:
@@ -411,11 +458,14 @@ class RateLimitMiddleware:
         if now - self._last_sweep >= self._window:
             self._sweep(now)
         key = self._client_key(scope)
+        limit = self._max
+        if scope.get("path") not in SIGN_IN_PATHS and _presents_session(scope):
+            key, limit = f"{key}|session", self._max * SESSION_RATE_MULTIPLIER
         hits = self._hits[key]
         cutoff = now - self._window
         while hits and hits[0] < cutoff:
             hits.popleft()
-        if len(hits) >= self._max:
+        if len(hits) >= limit:
             await _send_json(send, 429, {"ok": False, "reason_code": "rate_limited"})
             return
         hits.append(now)

@@ -33,11 +33,20 @@ class HostStatusView(TypedDict):
     waiting: list[HostWaitingWork]
 
 
+class HostAccessView(TypedDict):
+    """BUG-358 — how this host is reached, as the running host reports it."""
+
+    state: Literal["disabled", "enabled", "suspended", "pending_restart", "error"]
+    mode: Literal["local", "private", "proxy"]
+    address: str | None
+
+
 class HostView(HostStatusView):
     """BUG-40 — state, in-flight work, and whether the host starts on its own."""
 
     service: ServiceRegistration
     restartable: bool
+    access: HostAccessView
 
 
 class HostActionResult(HostView):

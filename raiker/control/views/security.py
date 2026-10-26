@@ -249,16 +249,38 @@ class ModelProfileSource(TypedDict):
 
 
 class RemoteAccessView(TypedDict):
-    """BUG-347 — how requests reach this host, read from the running process."""
+    """BUG-347 / BUG-358 — how requests reach this host, read from the running process.
 
-    mode: Literal["loopback", "proxy_listener", "public"]
-    #: Where a reverse proxy connects (``127.0.0.1:8766`` or ``unix:/path``);
-    #: every request there is remote. None when there is no proxy listener.
+    Never carries a credential, a code, a secret or a session token: counts,
+    times and the listener's address only.
+    """
+
+    mode: Literal["loopback", "proxy_listener", "private_listener", "public"]
+    #: Where other devices connect (``127.0.0.1:8766``, ``unix:/path`` or
+    #: ``https://10.0.0.5:8443``); every request there is remote. None when
+    #: there is no remote listener.
     proxy_listener: str | None
+    listener_kind: Literal["proxy", "private"] | None
+    listener_source: Literal["settings", "start_options"] | None
+    #: Remote access was turned off while running; the listener refuses everything.
+    disabled_while_running: bool
+    #: An HTTPS request has reached the listener (or it serves HTTPS itself).
+    https_seen: bool
+    #: Requests refused on the remote listener for arriving without HTTPS.
+    https_refused: int
     proxied_requests_refused: int
     proxied_requests_served: int
     last_refused_at: str | None
     last_served_at: str | None
+    #: Every account has two-step sign-in, so the listener may answer.
+    mfa_ready: bool
+    #: In the last 24 hours, from the remote-access event log.
+    remote_sign_in_failures: int
+    remote_mfa_failures: int
+    suspensions: int
+    #: What the last start did (``started``, ``fell_back``, ``failed`` …).
+    start_outcome: str | None
+    start_message: str | None
 
 
 @dataclass(frozen=True)
@@ -304,7 +326,10 @@ class DiagnosticsView(View):
     # requests it refused or served since it started.
     remote_access: RemoteAccessView = field(
         default_factory=lambda: RemoteAccessView(
-            mode="loopback", proxy_listener=None, proxied_requests_refused=0,
+            mode="loopback", proxy_listener=None, listener_kind=None, listener_source=None,
+            disabled_while_running=False, https_seen=False, https_refused=0,
+            mfa_ready=False, remote_sign_in_failures=0, remote_mfa_failures=0, suspensions=0,
+            start_outcome=None, start_message=None, proxied_requests_refused=0,
             proxied_requests_served=0, last_refused_at=None, last_served_at=None,
         )
     )

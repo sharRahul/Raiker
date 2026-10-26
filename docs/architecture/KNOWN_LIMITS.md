@@ -475,6 +475,17 @@ on the shipped build, not estimated.
   treated as local; the documentation never sets one up that way. And every
   request on the proxy listener shares one rate-limit bucket, because the
   address a proxy reports identifies nobody.
+- **Remote access needs two-step sign-in, and has five limits (2026-10-26).**
+  Another device signs in with the owner's password **and** a code; there is
+  no shared secret, and `RAIKER_OWNER_TOKEN` is gone. Remote access is
+  suspended whenever an account has no MFA, and recovery, instances, host
+  Quit/Restart and remote-access changes stay on this computer
+  ([REMOTE_ACCESS.md](REMOTE_ACCESS.md)). What remains
+  ([BUG-359](../plans/TO_BE_FIXED.md#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits)):
+  live rounds ran on Linux only; Restart from Settings needs `systemd --user`
+  or `launchd` (on Windows, quit and open Raiker again); a renewed TLS
+  certificate is served from the next start; requests through a reverse proxy
+  share one rate-limit bucket; a Unix socket is not offered on Windows.
 - ~~**Eight gated capabilities have no threat model.**~~ **Closed 2026-08-23.**
   Opening a higher-risk gate requires a threat-model acknowledgement recorded
   against your principal, and eight capabilities had nothing written to

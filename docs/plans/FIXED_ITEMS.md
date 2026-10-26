@@ -1367,6 +1367,14 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1264](#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
 | [FIXED-1265](#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
 | [FIXED-1266](#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) | High | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1267](#fixed-1267--remote-access-was-gated-by-a-token-nothing-read-bug-358) | High | Host / remote access / auth | Fixed 2026-10-26 |
+| [FIXED-1268](#fixed-1268--remote-access-could-be-set-only-with-start-options-and-nothing-showed-what-was-open-bug-347-ui) | Medium | Settings / host / Diagnostics | Fixed 2026-10-26 |
+| [FIXED-1269](#fixed-1269--restart-left-a-systemd-host-stopped-and-was-no-graceful-stop-on-windows-found-building-bug-358) | Medium | Host lifecycle | Fixed 2026-10-26 |
+| [FIXED-1270](#fixed-1270--a-known-password-bought-unlimited-mfa-code-guesses-found-building-bug-358) | High | Auth | Fixed 2026-10-26 |
+| [FIXED-1271](#fixed-1271--any-signed-in-session-could-switch-mfa-off-by-starting-enrolment-again-found-building-bug-358) | High | Auth | Fixed 2026-10-26 |
+| [FIXED-1272](#fixed-1272--host-quit-and-restart-and-the-trays-session-exchange-answered-other-devices-found-building-bug-358) | Medium | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1273](#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live) | Low | Settings | Fixed 2026-10-26 |
+| [FIXED-1274](#fixed-1274--a-signed-in-owner-on-another-device-was-rate-limited-within-a-minute-found-live) | Medium | Host / remote access | Fixed 2026-10-26 |
 
 ---
 
@@ -38284,3 +38292,104 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Evidence.** `tests/test_proxied_loopback.py` (27 tests): every forwarding header and a misleading `X-Forwarded-For: 127.0.0.1` refused on the local listener; the proxy listener remote with no header and with misleading ones; HSTS only over HTTPS; the proxy's own rate-limit bucket; IPv4 and IPv6 loopback on each listener; Unix-socket connections never local; WebSockets classified the same way; Diagnostics; every start-up refusal including `RAIKER_TRUSTED_PROXY`; the socket's mode and stale-socket handling; and a **real uvicorn server** with both listeners (TCP proxy port, and a Unix socket through `httpx`), so the guard is checked against what uvicorn actually puts in `scope["server"]`. `tests/test_api_rest_hardening.py`; `observeAttention.test.ts`, `ObserveView.test.ts`. Live: RT-SEC-01 to RT-SEC-03, and `raiker-web --proxy-socket` by hand with `curl --unix-socket`.
 
+
+## FIXED-1267 — Remote access was gated by a token nothing read (BUG-358)
+
+**Severity: High. Area: Host / remote access / auth. Status: Fixed 2026-10-26. Was BUG-358.**
+
+**Observed.** `raiker-web` refused `--allow-public`, `--proxy-port` and `--proxy-socket` unless `RAIKER_OWNER_TOKEN` was set, and its help, the README and the guides called it a hardened owner token that bound the owner session. Nothing read its value. A remote browser signed in with the password alone whenever MFA was off, and a session made on this computer worked from anywhere it could be sent.
+
+**Owner's decision (2026-10-26).** Remove `RAIKER_OWNER_TOKEN`; require MFA for all remote access; no shared secret replaces it. The owner's password and a verified code are the mechanism, which also suits the mobile apps planned to reach Raiker later.
+
+**Fixed.**
+
+* The token is no longer read or required; a stale one is mentioned once at start. The docstrings and messages that claimed it bound a session are corrected.
+* A remote listener opens only while every account has MFA; otherwise the start is `suspended_mfa`.
+* From another device, sign-in is the password **and** a code, always; with no MFA it is refused as `remote_access_suspended`. No bearer token is returned to another device: the session is an `HttpOnly`, `Secure`, `SameSite=Strict` cookie, 12 hours idle (sliding) and 7 days at most.
+* Sessions record `assurance` (password or mfa), `origin` (local or remote) and the `mfa_epoch` they were verified against (migration `RAIKER-2129-remote-access`). `AuthMiddleware` refuses a remote request on any session that is not remote, MFA-verified and current, so a session from this computer — password-only or not — opens nothing remotely.
+* Turning MFA off or resetting it moves the account's enrolment counter, retiring every session verified against the old one; turning it off signs out every other device, keeps the page's own session, records a `suspended` event and notifies the owner.
+* Turning MFA off, resetting it, and applying or rolling back remote access need **fresh MFA**: an elevated session granted on a code from the current enrolment (`fresh_mfa_required` otherwise). From another device elevation needs the password and a code. A reset is staged beside the active enrolment and swapped in only when the new authenticator's first code is confirmed, so remote access stays up during it.
+* Sign-in, remote-access and tray answers carry `Cache-Control: no-store`.
+* Signed-in devices lists each session's browser as reported (never treated as identity), *This computer* or *Another device*, *Signed in with a code* or *Password only*, and last activity, with *Sign out* per session and *Sign out all other devices* (`POST /api/auth/sessions/revoke-others`).
+
+**Evidence.** `tests/test_remote_auth.py` (17 tests: local access without MFA; suspended without MFA; password alone yields only a ticket; password and code sign in with a protected cookie and no bearer token; wrong codes refused, logged and locked out; local sessions refused remotely; MFA off suspends; a staged reset retires old verifications; revoke one and revoke others across devices; fresh MFA for sensitive actions and both factors remotely; local-only operations refused remotely; disable from another device at once; HTTPS required; shorter remote lifetimes; the token no longer read; no-store); `tests/contract_cases/remote_access.py`; `SecurityLogin.test.ts`; live RT-SEC-05, RT-SEC-08 to RT-SEC-10. Design: [REMOTE_ACCESS.md](../architecture/REMOTE_ACCESS.md).
+
+## FIXED-1268 — Remote access could be set only with start options, and nothing showed what was open (BUG-347 UI)
+
+**Severity: Medium. Area: Settings / host / Diagnostics. Status: Fixed 2026-10-26.**
+
+**Observed.** Reaching Raiker from another device meant `raiker-web` start options and environment variables; the desktop app and a service had no way to do it, the Host menu said *This machine only — loopback, not the network* whatever was true, and nothing confirmed what a host actually had open.
+
+**Owner's decision (2026-10-26).** Keep BUG-347's dedicated-listener architecture and add one Remote access experience under Settings → Security, with three modes (This device only, Private network, Reverse proxy), never trusting forwarding headers to decide what is local.
+
+**Fixed.**
+
+* `raiker/app/remote_access.py` validates, stores (desired, previous, last start) and opens the remote listener; `raiker/app/host_start.py` gives `raiker-app` and `raiker-web` one start sequence, so the desktop app, a service and a server started by hand open the same listeners. A private-network listener serves HTTPS with the owner's certificate (a second uvicorn server on the same loop, `raiker/api/server_runner.py`); a proxy listener is a loopback port or a `0660` Unix socket. On Windows ports are claimed with `SO_EXCLUSIVEADDRUSE`, so a port in use is never shared.
+* `GET /api/remote-access` reports what the running host has open; `check`, `apply` and `rollback` are this computer's, with fresh MFA and (to apply) an explicit confirmation; `disable` works from any signed-in device and takes effect at once. A setting that cannot start falls back to the previous one or to this device only; an unreadable one starts this device only.
+* **Settings → Security → Remote access**: rows for state, connection, two-step sign-in readiness and HTTPS, with problems in words; a guided dialog (choose, details with an *Advanced* fold, server checks, review of who can reach the sign-in page, fresh MFA, then Restart now or quit and reopen); Details with the last start, recent events and Go back; Turn off in one confirmation.
+* The Host menu's *Reachable from* reads the host's status. Diagnostics adds remote access on or suspended, HTTPS never seen through a proxy, remote sign-in and code failures in 24 hours, and a start that failed or fell back. A flag or variable in a card no longer breaks across lines.
+* `--allow-public` and a non-loopback `--host` are retired with a message naming the new options; `--private-host`, `--private-port`, `--tls-cert` and `--tls-key` join `--proxy-port` and `--proxy-socket` as start options.
+
+Found live in this round and fixed before it closed: re-applying a listener the host still held after it was turned off was reported *in use by another program*; a setting that failed to start read *Waiting for a restart* instead of *Not working*; the Remote access rows kept their old state after two-step sign-in was turned off until the page was reloaded.
+
+**Evidence.** `tests/test_remote_access.py` (32 tests), `tests/test_proxied_loopback.py` (real servers over TCP, a Unix socket and TLS), `remoteAccess.test.ts`, `RemoteAccessSettings.test.ts`, `HostControl.test.ts`, `observeAttention.test.ts`; CI job *Remote access* on Windows and macOS; live RT-SEC-04 to RT-SEC-12.
+
+## FIXED-1269 — Restart left a systemd host stopped, and was no graceful stop on Windows (found building BUG-358)
+
+**Severity: Medium. Area: Host lifecycle. Status: Fixed 2026-10-26.**
+
+**Observed.** Restart sets exit status 75, the status the systemd unit (`RestartForceExitStatus=75`) and launchd restart on, and signals its own process. uvicorn, after its graceful shutdown, restores the previous signal handler and raises SIGTERM again, so the process died by signal (status 143) and the launcher never returned 75; systemd's `Restart=on-failure` reads a SIGTERM death as a clean stop, so the host stopped and stayed stopped. HostControl's record was not cleared either. On Windows, `os.kill(pid, SIGTERM)` is `TerminateProcess`: no graceful shutdown at all.
+
+**Fixed.** `raiker/api/server_runner.py` runs uvicorn without re-raising the signal, and puts `request_stop` on the app, which sets the server's own exit flag; Restart and Quit use it on every platform and fall back to a signal only for a host started some other way.
+
+**Evidence.** `test_a_sigterm_lets_the_host_return_instead_of_dying` (a real process returns 75 after SIGTERM), `test_restart_stops_the_server_gracefully_with_its_exit_status`.
+
+## FIXED-1270 — A known password bought unlimited MFA code guesses (found building BUG-358)
+
+**Severity: High. Area: Auth. Status: Fixed 2026-10-26.**
+
+**Observed.** A successful password check reset the failed-attempt counter even when MFA was still to come. Signing in again between wrong codes therefore cleared the five-attempt lockout every time: anyone with the password could guess codes without limit.
+
+**Fixed.** With MFA on, the password no longer clears the counter; only a verified code does. Five wrong codes lock the account for fifteen minutes, as five wrong passwords do.
+
+**Evidence.** `test_wrong_codes_are_refused_logged_and_lock_out`.
+
+## FIXED-1271 — Any signed-in session could switch MFA off by starting enrolment again (found building BUG-358)
+
+**Severity: High. Area: Auth. Status: Fixed 2026-10-26.**
+
+**Observed.** `POST /api/auth/mfa/enroll` needed only a session, and over an active enrolment it stored a new secret and marked MFA not enrolled. A session without fresh proof could turn two-step sign-in off this way, where turning it off directly needed an elevation.
+
+**Fixed.** Over an active enrolment it needs fresh MFA, and the new secret is staged beside the active one, which stays in force until the new authenticator's first code is confirmed.
+
+**Evidence.** `test_an_mfa_reset_is_staged_and_retires_old_verifications`; `SecurityLogin.test.ts` (reset only with the password and a fresh code).
+
+## FIXED-1272 — Host Quit and Restart, and the tray's session exchange, answered other devices (found building BUG-358)
+
+**Severity: Medium. Area: Host / remote access. Status: Fixed 2026-10-26.**
+
+**Observed.** `/api/host/quit` and `/api/host/restart` needed only a host-control session, and `/api/tray/session` only its one-time secret; none was restricted to this computer.
+
+**Fixed.** All three are this computer only (`loopback_only`). Another device can still turn remote access off, which needs neither.
+
+**Evidence.** `test_local_only_operations_refuse_another_device`; live RT-SEC-08.
+
+## FIXED-1273 — Security settings showed their defaults as the account's state while loading (found live)
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-26.**
+
+**Observed.** Until its reads returned, Settings → Security said two-step sign-in *Off*, *0 signed in* and the vault key *Missing*, which are the component's defaults, not the account's state. Found in the RT-SEC-07 screenshot.
+
+**Fixed.** Those rows say *Reading…* until the server has answered, and their actions wait for it.
+
+**Evidence.** `SecurityLogin.test.ts` (says it is reading, not Off).
+
+## FIXED-1274 — A signed-in owner on another device was rate limited within a minute (found live)
+
+**Severity: Medium. Area: Host / remote access. Status: Fixed 2026-10-26.**
+
+**Observed.** In the final RT-SEC run, signing in again from the other device after a few pages was answered `429`, and the lock screen said *Authentication failed.* Every remote request — the dozens of reads one dashboard page makes included — was counted in the same 120-a-minute window that limits sign-in attempts, so ordinary use from another device locked the owner out of signing in.
+
+**Fixed.** `RateLimitMiddleware` (`raiker/api/security.py`) counts a request that presents a session (a bearer token or the session cookie) in a window of its own, five times wider, per peer. Sign-in, MFA, elevation, recovery and the session mint (`SIGN_IN_PATHS`) stay in the strict window whatever the request carries, so a credential cannot buy more password or code guesses; a forged credential buys only the wider, still bounded, read window and is refused by the auth check. The lock screen says *Too many attempts in the last minute* for a `429` instead of blaming the password.
+
+**Evidence.** `tests/test_api_rest_hardening.py::test_a_signed_in_client_has_a_wider_window_of_its_own` (and the existing limits, adjusted to the two windows); `LoginView.test.ts` (too many attempts); live RT-SEC-07 to RT-SEC-11 in one run with no `429` in the host log.

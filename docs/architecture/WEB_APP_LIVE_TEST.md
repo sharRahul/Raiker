@@ -15,7 +15,52 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-26 (BUG-358 and BUG-347: remote access with two-step sign-in)
+
+The owner's decisions
+([REMOTE_ACCESS.md](REMOTE_ACCESS.md),
+[FIXED-1267](../plans/FIXED_ITEMS.md#fixed-1267--remote-access-was-gated-by-a-token-nothing-read-bug-358)
+to [FIXED-1274](../plans/FIXED_ITEMS.md#fixed-1274--a-signed-in-owner-on-another-device-was-rate-limited-within-a-minute-found-live)):
+no shared secret, two-step sign-in for every remote device, remote access
+chosen in Settings. One fresh workspace served by `raiker-web --port 8765` at
+1440×900, carried through every phase. *Another device* is a second browser
+context on `https://10.77.0.1:8443`, a private address this computer owns for
+the run (a `/32` alias on `lo`) with a self-signed certificate made for the run
+and never committed; the throwaway account's TOTP secret lives in a scratch
+file. No model or key is needed. Specs: `web/e2e/remote-access-live.spec.ts`
+in three phases — `configure` **3/3**, then the harness restarts the host,
+`remote` **5/5**, then the harness saves a setting whose certificate it then
+deletes and restarts, `failclosed` **1/1** — and
+`web/e2e/bug-347-proxied-loopback-live.spec.ts` against the same workspace
+restarted with `--proxy-port 8766`: **3/3**. Screenshots:
+`docs/screenshots/2026-10-26-remote-access/`, `docs/screenshots/2026-10-26-bug-347/`.
+
+Run it with `RAIKER_LIVE_REMOTE_PHASE`, `RAIKER_LIVE_REMOTE_STATE`,
+`RAIKER_LIVE_TLS_CERT` and `RAIKER_LIVE_TLS_KEY` set (the spec header lists
+them), as `./node_modules/.bin/playwright test --config playwright.config.ts
+--project=live e2e/remote-access-live.spec.ts`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-SEC-01 | On the local listener, `X-Forwarded-For` and `Forwarded` are answered `403 proxied_request_refused` naming *Remote access*; without a header the request is served | ✅ |
+| RT-SEC-02 | **Diagnostics** shows *Requests through a reverse proxy are being refused* and where to change it | ✅ |
+| RT-SEC-03 | On the proxy listener, a request with no forwarding header is `403 remote_https_required`; with `X-Forwarded-Proto: https` it is remote (`recovery_loopback_only`, also with `X-Forwarded-For: 127.0.0.1`); the owner signs in there with the password **and** a code; **Diagnostics** shows *Raiker is reachable from other devices* naming port 8766 | ✅ after a spec fix: the check now asks from the page, whose `Secure` cookie Playwright's own request client would not send to a plain-http test URL |
+| RT-SEC-04 | Remote access reads *Off — this device only*; **Set up** says *Two-step sign-in must be on for every account* with **Turn it on**, and **Continue** stays disabled | ✅ |
+| RT-SEC-05 | Two-step sign-in is turned on from Settings (*MFA is now active.*), reusing the existing enrolment | ✅ |
+| RT-SEC-06 | *Private network* with port 8765 is refused by the check (*Port 8765 is Raiker's own listener for this computer*); with 8443, the review names `https://10.77.0.1:8443` and who can reach it, and **Turn on remote access** stays disabled until the confirmation is ticked and a fresh password and code are given; after saving, the state is *Waiting for a restart* and the connection still *This device only* | ✅ |
+| RT-SEC-07 | After the restart: *On*, *Private network · https://10.77.0.1:8443*, HTTPS *Verified*; the Host menu's *Reachable from* says other devices through the private network; **Diagnostics** shows *Raiker is reachable from other devices* | ✅ |
+| RT-SEC-08 | From another device the password alone leads only to the code prompt; a wrong code is refused; the right one signs in. From there recovery and host Restart answer `403`, and plain `http://` to the private port does not answer | ✅ |
+| RT-SEC-09 | **Signed-in devices** lists the remote session as *Another device · Signed in with a code*; **Sign out** ends it there (the other device is back at the lock screen) | ✅ |
+| RT-SEC-10 | Turning two-step sign-in off (password and code) reads *remote access is suspended*; the state is *Suspended*; the other device is signed out and its sign-in says *Remote access is suspended because two-step sign-in is off*; **Diagnostics** shows *Remote access is suspended*. Turning it on again restores sign-in from the other device without a restart | ✅ after a fix found in this round ([FIXED-1274](../plans/FIXED_ITEMS.md#fixed-1274--a-signed-in-owner-on-another-device-was-rate-limited-within-a-minute-found-live)): the other device's sign-in was answered `429` and read *Authentication failed.* |
+| RT-SEC-11 | From another device, Remote access says it is *changed on the computer Raiker runs on* (no **Change**), and **Turn off** works: *Other devices are refused now*, the next request is `403 remote_access_disabled`, and this computer reads *Off — this device only* | ✅ |
+| RT-SEC-12 | With a saved setting whose certificate is gone, the host starts on this device only and says why (*Remote access did not start: … does not exist*); state *Not working*, connection *This device only*; the private port does not answer; **Diagnostics** shows *Remote access did not start*; **Details → Go back** with a fresh password and code reads *The previous setting is back.* | ✅ |
+| Suites | `tests/test_remote_auth.py` (17), `tests/test_remote_access.py` (32), `tests/test_proxied_loopback.py` (real servers over TCP, a Unix socket and TLS; restart status 75), `tests/test_api_rest_hardening.py`; `remoteAccess.test.ts`, `RemoteAccessSettings.test.ts`, `SecurityLogin.test.ts`, `HostControl.test.ts`, `LoginView.test.ts`, `observeAttention.test.ts`; CI job *Remote access* on Windows and macOS | ✅ |
+| Visual review | Every capture inspected at original resolution. Still seen ([BUG-359](../plans/TO_BE_FIXED.md#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits)): a certificate path under the run's scratch directory reads `[REDACTED_SECRET]` in the start message; the remote lock screen's note is headed *On this computer*; the suspension notice stays after MFA is on again | — |
+| Not covered | Windows and macOS live rounds (CI unit and real-server tests only); an IPv6 private address; a real Caddy or nginx in front (the proxy listener was exercised directly with the headers a proxy sends) | — |
+
 ## Result — 2026-10-26 (BUG-347 review: the proxy gets a listener of its own)
+
+*Superseded by the result above: `RAIKER_OWNER_TOKEN` is gone and remote access needs two-step sign-in.*
 
 The owner's review of the first BUG-347 fix
 ([FIXED-1266](../plans/FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review)):

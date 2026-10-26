@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355, BUG-356 and BUG-358, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355, BUG-356 and BUG-359, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -92,7 +92,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
-| [BUG-358](#bug-358--raiker_owner_token-is-required-for-remote-access-but-authenticates-nothing) | Medium | Host / remote access / auth | Open — found 2026-10-26 reworking BUG-347; needs the owner's decision on what the token should do |
+| [BUG-359](#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits) | Low | Host / remote access | Open remainder of BUG-347/BUG-358 — remote access shipped 2026-10-26 ([FIXED-1266](FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) to [FIXED-1273](FIXED_ITEMS.md#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live)); live runs on Linux only, and five limits named in the record |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -707,37 +707,53 @@ data-class fields as PA-D05/PA-D07 give steps those inputs.
 each profile governs; a refused Chat or Build turn names the profile and offers
 the Settings route, exactly as a goal step does.
 
-## BUG-358 — RAIKER_OWNER_TOKEN is required for remote access but authenticates nothing
+## BUG-359 — Remote access is verified live on Linux only and has five known limits
 
-**Severity: Medium. Area: Host / remote access / auth. Status: Open — found
-2026-10-26 reworking BUG-347.**
+**Severity: Low. Area: Host / remote access. Status: Open remainder — found
+2026-10-26 closing BUG-347 and BUG-358
+([REMOTE_ACCESS.md](../architecture/REMOTE_ACCESS.md)).**
 
-**Observed.** `raiker-web` refuses `--allow-public`, `--proxy-socket` and
-`--proxy-port` unless `RAIKER_OWNER_TOKEN` is set, and its help, the README
-and the guides call it a *hardened owner token* that binds the owner session.
-Nothing reads its value: the only references are the presence checks in
-`raiker/api/serve.py`. A remote browser signs in with the owner's password
-(and MFA when enrolled), exactly as a local one does; the token adds a step to
-starting the host and no check to any request.
+**Observed.** Remote access — the three modes, mandatory two-step sign-in,
+suspension, fresh MFA, signed-in devices, apply/restart/roll back/turn off —
+passed its unit, contract and live tests (RT-SEC-01 to RT-SEC-12) on Linux.
+What remains:
 
-**Effect.** The documentation promises a second credential that does not exist.
-The protection a remote host really has is the owner password, MFA, the rate
-limit, the public posture and the governed runtime, which is what an owner
-should be told to rely on.
+1. **Windows and macOS are covered by CI unit tests only** (job *Remote
+   access*: real TCP and TLS servers, `SO_EXCLUSIVEADDRUSE`, socket path
+   length). No live browser round has run on either.
+2. **Restart from Settings needs a service manager.** A host not registered
+   with `systemd --user` or `launchd` (and every Windows host) exits on
+   Restart; the owner opens Raiker again. Settings says so.
+3. **A changed TLS certificate needs a restart.** The private listener loads
+   the certificate and key once at start; a renewed certificate is served from
+   the next start.
+4. **Every request through a reverse proxy shares one rate-limit bucket**,
+   because the proxy is the only peer Raiker sees on that listener and
+   forwarding headers are never believed. A busy proxy can throttle the owner's
+   own remote session; it cannot reach the local listener's bucket.
+5. **A certificate path in a check message can show as `[REDACTED_SECRET]`**:
+   the response redactor treats a path under a temporary directory named like a
+   secret as one. The check result is right; only the wording loses the path.
 
-**Proposed fix.** Decide what the token is for, then make the code and the
-words agree. Options: (a) require it from every remote or proxied request as a
-second factor (a header set by the proxy, or entered once per browser and kept
-as a cookie), so the internet cannot reach the sign-in form without it; (b)
-use it to sign the owner session so a stolen session cookie is useless on
-another host; or (c) drop the requirement and say plainly that the password
-and MFA protect a remote host, requiring MFA enrolment before a remote
-listener starts. Each changes how the owner signs in from another device, so
-it is the owner's decision, not a guess.
+Seen in the final live round's screenshots, cosmetic: the lock screen on
+another device still headlines its note *On this computer*; the *Remote access
+is suspended* notice stays in the notification tray after two-step sign-in is
+turned on again; and the coloured *On* state sits a little left of the other
+rows' values.
 
-**Required user-interface outcome.** Whatever is chosen, **Settings → Security
-& sign-in** and the start-up message say what protects remote access, and
-nothing names a token that does nothing.
+The IPv6 private-address path (`fc00::/7`) is unit-tested and was not run
+live; mobile apps that will sign in remotely are later work and need the same
+password-and-code rule.
+
+**Proposed fix.** Run RT-SEC-04 to RT-SEC-12 on a Windows and a macOS host;
+reload the TLS context on a file change (or offer *Reload certificate* in
+Details); key the proxy bucket by session once signed in; narrow the redactor
+rule for file paths in check messages; say *From another device* on the remote lock
+screen; mark the suspension notice read when MFA is on again.
+
+**Required user-interface outcome.** None beyond today's: Settings → Security →
+Remote access already says when a restart is needed, and Details shows the
+check that failed.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 

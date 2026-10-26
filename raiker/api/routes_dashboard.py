@@ -3450,9 +3450,28 @@ async def get_diagnostics(
     _session, principal = _auth_data
     view = _service(request).get_diagnostics(principal.principal_id)
     # BUG-347 — the guard's record lives in this process, not the store.
+    # BUG-358 — the failures and suspensions come from the remote-access log.
     record = getattr(request.app.state, "remote_access", None)
     if record is not None:
-        view = dataclasses.replace(view, remote_access=record.view())
+        from datetime import UTC, datetime, timedelta
+
+        from raiker.app import remote_access as ra
+        from raiker.control.views.security import RemoteAccessView
+        from raiker.storage.sqlite import SQLiteStore
+
+        store = SQLiteStore(request.app.state.workspace_root)
+        since = (datetime.now(UTC) - timedelta(hours=24)).isoformat(timespec="seconds").replace("+00:00", "Z")
+        startup = record.startup or {}
+        remote = {
+            **record.view(),
+            "mfa_ready": bool(ra.mfa_readiness(store)["ready"]),
+            "remote_sign_in_failures": ra.count_events(store, "remote_sign_in_failed", since),
+            "remote_mfa_failures": ra.count_events(store, "remote_mfa_failed", since),
+            "suspensions": ra.count_events(store, "suspended", since),
+            "start_outcome": startup.get("outcome"),
+            "start_message": startup.get("message"),
+        }
+        view = dataclasses.replace(view, remote_access=cast(RemoteAccessView, remote))
     return serialize_dto(view)
 
 

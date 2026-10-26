@@ -17,7 +17,12 @@ def _principal(store: SQLiteStore, pid: str) -> None:
 
 
 def _req(token: str) -> SimpleNamespace:
-    return SimpleNamespace(headers={"Authorization": f"Bearer {token}"})
+    # A request on the local listener, from this computer (BUG-358 decides
+    # local or remote from the connection, so the fake needs one).
+    return SimpleNamespace(
+        headers={"Authorization": f"Bearer {token}"},
+        scope={"type": "http", "client": ("127.0.0.1", 50000), "server": ("127.0.0.1", 8765), "headers": []},
+    )
 
 
 def test_mfa_pending_rejected_on_control_route(tmp_path) -> None:  # type: ignore[no-untyped-def]

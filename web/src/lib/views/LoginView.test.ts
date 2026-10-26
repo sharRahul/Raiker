@@ -145,6 +145,14 @@ describe("LoginView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Authentication failed.");
   });
 
+  it("says when sign-in was refused for too many attempts, not that the password was wrong", async () => {
+    stubFetch({ ...HEALTH_OK, "POST /api/auth/login": { __status: 429, ok: false, reason_code: "rate_limited" } });
+    render(LoginView, { props: { onAuthenticated } });
+    await fillCredentials();
+    await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many attempts in the last minute");
+  });
+
   it("transitions to MFA, moves focus, and verifies the one-time code", async () => {
     stubFetch({
       ...HEALTH_OK,

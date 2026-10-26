@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**489 operations: 475 verified, 0 eligible, 0 deferred, 14 special.**
+**495 operations: 481 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -48,6 +48,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/auth/session` | AuthSessionRequest | IssuedSessionView | verified | built as IssuedSessionView |
 | GET | `/api/auth/session-state` |  | SessionStateView | verified | built as SessionStateView |
 | GET | `/api/auth/sessions` |  | DeviceSessionView[] | verified | built as DeviceSessionView |
+| POST | `/api/auth/sessions/revoke-others` |  | SessionsRevokedView | verified | built as SessionsRevokedView |
 | POST | `/api/auth/sessions/{session_id}/revoke` |  | Ok | verified | built as Ok |
 | GET | `/api/auth/whoami` |  | WhoamiView | verified | built as WhoamiView |
 | GET | `/api/backups` |  | BackupsView | verified | declared BackupsView |
@@ -404,6 +405,11 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | GET | `/api/read-capabilities` |  | ReadCapabilities | verified | declared ReadCapabilities |
 | GET | `/api/recovery/backups` |  | RecoveryBackupsView | verified | declared by cast |
 | POST | `/api/recovery/restore` | RecoveryRestoreRequest | RecoveryRestored | verified | declared by cast |
+| GET | `/api/remote-access` |  | RemoteAccessStatusView | verified | declared RemoteAccessStatusView |
+| POST | `/api/remote-access/apply` | RemoteAccessApplyBody | RemoteAccessStatusView | verified | declared RemoteAccessStatusView |
+| POST | `/api/remote-access/check` | RemoteAccessConfigBody | RemoteAccessChecksView | verified | declared RemoteAccessChecksView |
+| POST | `/api/remote-access/disable` |  | RemoteAccessStatusView | verified | declared RemoteAccessStatusView |
+| POST | `/api/remote-access/rollback` |  | RemoteAccessStatusView | verified | declared RemoteAccessStatusView |
 | GET | `/api/routine-deliveries` |  | RoutineDeliveries | verified | declared RoutineDeliveries |
 | GET | `/api/runtime-mode` |  | RuntimeModeView | verified | RuntimeControlService.get_runtime_mode |
 | POST | `/api/runtime-mode/activate` | ActivateRuntimeModeRequest | RuntimeModeActivated | verified | declared RuntimeModeActivated |

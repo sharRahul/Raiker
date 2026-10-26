@@ -148,19 +148,20 @@ rows hold on its commit:
    current for every platform the beta offers.
 3. The latest live rounds in
    [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) pass on that
-   commit, RT-SEC-01 to RT-SEC-03 among them.
+   commit, RT-SEC-01 to RT-SEC-12 among them.
 4. The release notes say what a tester needs:
    - that it is a beta, and whether the installers are signed;
    - to back up the workspace before updating (Settings → Account), because an
      older build refuses data a newer one migrated;
-   - how to reach a remote host: an SSH tunnel, a private address with
-     `--allow-public`, or a reverse proxy pointed at a proxy listener
-     (`--proxy-socket` or `--proxy-port`), never at port 8765
-     ([Managing the host](managing-the-host.md#behind-a-reverse-proxy));
-   - that the owner password and MFA are what protect remote access while
-     `RAIKER_OWNER_TOKEN` authenticates nothing
-     ([BUG-358](../plans/TO_BE_FIXED.md#bug-358--raiker_owner_token-is-required-for-remote-access-but-authenticates-nothing)),
-     unless that is fixed first;
+   - how to reach a remote host: an SSH tunnel, or **Settings → Security →
+     Remote access** (a private network with HTTPS, or a reverse proxy pointed
+     at the remote listener, never at port 8765)
+     ([Remote access](managing-the-host.md#remote-access));
+   - that remote access needs two-step sign-in on every device and has no
+     shared secret: `RAIKER_OWNER_TOKEN`, `--allow-public` and a non-loopback
+     `--host` are retired, and an old service unit using them must be updated;
+   - what remote access has not been verified on
+     ([BUG-359](../plans/TO_BE_FIXED.md#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits));
    - the open defects that bound what the beta claims
      ([TO_BE_FIXED](../plans/TO_BE_FIXED.md)) and
      [known limits](../architecture/KNOWN_LIMITS.md).

@@ -53,12 +53,30 @@ which uvicorn fills from the socket:
   forwarding header. A forwarding header there is refused
   (`proxied_request_refused`): it means a proxy was pointed at the wrong
   listener.
-* **The proxy listener** (`--proxy-socket` or `--proxy-port`, owner's decision
-  2026-10-26 after review). Every request is remote, whatever its headers:
-  recovery and instances refused, rate limited in one bucket of its own, HSTS
-  when the proxy received HTTPS. Opening it requires `RAIKER_OWNER_TOKEN` to be
-  set, as `--allow-public` does.
+* **The remote listener**, off by default and chosen in **Settings → Security →
+  Remote access** (owner's decision 2026-10-26): a *private network* address
+  that Raiker serves over HTTPS with the owner's certificate, or a *reverse
+  proxy* listener (`127.0.0.1:<port>` or a Unix socket). Every request there is
+  remote, whatever its headers: recovery, instances, host Quit/Restart, the
+  tray exchange and remote-access changes refused; HTTPS required (on the proxy
+  listener, `X-Forwarded-Proto: https` is believed there and only there); HSTS;
+  rate limited apart from local requests.
 * A connection with no TCP address (a Unix socket) is never local.
+
+**Remote requests need two-step sign-in (BUG-358).** There is no shared
+secret: `RAIKER_OWNER_TOKEN` was required to open a remote listener and nothing
+ever read it, so it is removed. The remote listener does not open while an
+account has no MFA; a remote sign-in needs the password **and** a code; and
+every authenticated remote request must carry a session made from another
+device, verified with a code, against the MFA enrolment in force now
+(`AuthMiddleware` in `raiker/api/auth.py`). Turning MFA off or resetting it
+suspends remote access at once and retires every session verified against the
+old enrolment. Remote sessions are cookie-only (`Secure`, `HttpOnly`,
+`SameSite=Strict`, 12 hours idle, 7 days at most); no bearer token is returned.
+Turning MFA off, resetting it and changing remote access need a fresh code.
+This computer is unchanged: local sign-in works without MFA. Full design,
+lifecycle and regression scenarios:
+[REMOTE_ACCESS.md](REMOTE_ACCESS.md).
 
 uvicorn runs with `proxy_headers=False`, so no header can replace the peer.
 Forwarding headers only ever make a request less trusted. Diagnostics reports

@@ -66,6 +66,7 @@ before they decide.
 | Boundary | Control |
 |---|---|
 | Client to gateway | Loopback web API, authentication, principal resolution |
+| Another device to gateway | One remote listener chosen in Settings (private network over HTTPS, or a reverse-proxy listener), classified by the socket a connection arrived on; password **and** a code on every remote session; suspended without MFA; local-only operations refused ([Remote access](REMOTE_ACCESS.md)) |
 | Model to tools | Schema validation, policy, capability and decision-mode checks |
 | Sensitive mutation | Human approval and executor-specific controls |
 | Workspace data | Path containment, redaction, and audit metadata |

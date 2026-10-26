@@ -322,56 +322,102 @@ yourself if you want the disk back.
 raiker-web --workspace . --no-browser
 ```
 
-It binds to `127.0.0.1:8765` by default. Binding beyond loopback requires both
-`--allow-public` and a hardened `RAIKER_OWNER_TOKEN`. Put TLS and appropriate
-network controls in front of any non-loopback deployment. This does not turn
-Raiker into a supported hosted multi-user service.
+It binds to `127.0.0.1:8765` by default, and that listener is always for this
+computer only. `--allow-public` and a non-loopback `--host` are retired: other
+devices reach Raiker through **Remote access** below. This does not turn Raiker
+into a supported hosted multi-user service.
 
 Running the host this way inside **WSL2** or on a **VPS** you control — a
-systemd unit, an SSH tunnel, or a bind to a private VPN address — is walked
-through in the README's
+systemd unit, an SSH tunnel, or a private VPN address — is walked through in
+the README's
 [Running Raiker under WSL2 or on a VPS](../../README.md#running-raiker-under-wsl2-or-on-a-vps).
+
+### Remote access
+
+Open **Settings → Security → Remote access**. It is off by default
+(*This device only*). To reach Raiker from another device:
+
+1. **Turn on two-step sign-in** in the same section, if it is not on. Remote
+   access cannot be set up without it, and is suspended whenever it is off.
+2. Choose **Set up** and a way in:
+
+   | Mode | Use when | You provide |
+   |---|---|---|
+   | **Private network** | your devices share a home network or a VPN such as Tailscale or WireGuard | a private address of this computer (`10.x`, `172.16–31.x`, `192.168.x`, `100.64–127.x`, or an IPv6 `fc00::/7` address), a port, and a TLS certificate and key file — Raiker serves HTTPS itself |
+   | **Reverse proxy** | Caddy or nginx on this computer already serves HTTPS | a port on `127.0.0.1` (or a Unix socket path on Linux and macOS) for the proxy to send requests to |
+
+3. **Check**, read what Raiker found, then **review and apply** with a fresh
+   code from your authenticator. Applying is possible only on this computer.
+4. **Restart Raiker.** A host registered as a service restarts from Settings;
+   otherwise quit and open it again. Until it restarts, Settings says
+   *Waiting for a restart*; it never shows a setting as active before the
+   running host reports it.
+
+From another device, sign in with your password **and** a code. Password
+alone is not enough, and a session made on this computer does not work from
+another device. Password recovery, instances, host Quit and Restart, and
+remote-access changes are refused from other devices. **Turn off** works from
+any signed-in device and takes effect at once; **Details → Go back** restores
+the previous setting for the next start. If a saved setting cannot open at
+start, Raiker falls back to the previous one or to this device only, and says
+why in Settings and Diagnostics — an invalid setting never leaves Raiker more
+exposed.
+
+**Signed-in devices** lists every session: the browser as it describes itself
+(a label, not an identity), this computer or another device, whether it was
+verified with a code, and its last activity. Sign one out, or every other
+device.
+
+Start options open a remote listener for one start without saving it, for a
+service unit or a script. Settings shows such a listener and does not change
+it:
+
+```bash
+# Reverse proxy on a local port (or --proxy-socket /run/raiker/proxy.sock)
+raiker-web --workspace . --proxy-port 8766 --no-browser
+# Private network with Raiker's own HTTPS
+raiker-web --workspace . --private-host 100.64.0.10 --private-port 8443 \
+  --tls-cert /etc/raiker/cert.pem --tls-key /etc/raiker/key.pem --no-browser
+```
+
+Two-step sign-in must already be on, or the listener is not opened. The host
+refuses to start with `RAIKER_TRUSTED_PROXY` set; `RAIKER_OWNER_TOKEN` is no
+longer read and only prints a notice.
+
 ### Behind a reverse proxy
 
 Raiker decides what is local by **where a connection arrives**, not by what a
-request says about itself. It has two kinds of listener:
+request says about itself:
 
 | Listener | For | What a request there is |
 |---|---|---|
-| `--host`/`--port` (default `127.0.0.1:8765`) | This computer | Local when the peer is this computer. A request carrying a forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`) is refused with `proxied_request_refused` |
-| `--proxy-socket PATH` or `--proxy-port N` | A reverse proxy | Always remote, with or without headers |
+| `127.0.0.1:8765` | This computer | Local. A request carrying a forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`) is refused with `proxied_request_refused` |
+| The reverse-proxy port or socket | Your proxy | Always remote, with or without headers; HTTPS is required and `X-Forwarded-Proto: https` is believed here only |
 
-To run behind a proxy (Caddy, nginx), open a proxy listener and point the proxy
-at it:
+Point the proxy at the remote listener and have it say HTTPS was used. Caddy
+does this by default; for nginx:
 
-```bash
-export RAIKER_OWNER_TOKEN="$(openssl rand -hex 32)"
-raiker-web --workspace . --proxy-socket /run/raiker/proxy.sock --no-browser
-# or, on Windows or for a proxy that cannot use a socket:
-raiker-web --workspace . --proxy-port 8766 --no-browser
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8766;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
 ```
 
-Everything on the proxy listener is served as remote: rate limited (in one
-bucket for the proxy, since the address a proxy reports identifies nobody),
-password recovery and the other this-computer-only pages refused, and HSTS
-added when the proxy says the browser reached it over HTTPS. A Unix socket is
-created with mode `0660`, so the proxy's user needs Raiker's group; a stale
-socket left by an earlier run is replaced; a socket another process is serving,
-or any other file at that path, is not.
-**Diagnostics** shows *Raiker is reachable from the internet through a proxy*,
-naming the listener.
-
-The host refuses to start when a proxy listener is asked for without
-`RAIKER_OWNER_TOKEN`, together with `--allow-public` (a public bind already
-treats everything as remote), on the same port as `--port`, or with both
-`--proxy-socket` and `--proxy-port`. `RAIKER_TRUSTED_PROXY`, which an earlier
-build read, now stops the host from starting until it is unset.
+Every request through the proxy is rate limited in one bucket (the proxy is
+the only peer Raiker sees there). A Unix socket is created with mode `0660`,
+so the proxy's user needs Raiker's group; a stale socket left by an earlier run
+is replaced; a socket another process is serving, or any other file at that
+path, is not. Unix sockets are not offered on Windows.
 
 **Never point a proxy at port 8765.** If it sends a forwarding header, Raiker
 refuses the request and **Diagnostics** shows *Requests through a reverse proxy
 are being refused*. If it sends none, nothing in the request tells it apart
-from a browser on the server itself, so it would be treated as local. That is
-the reason the proxy has a listener of its own. An SSH tunnel needs neither.
+from a browser on the server itself. That is why the proxy has a listener of
+its own. An SSH tunnel needs neither.
 
 For installation failures or stale dashboard builds, see
 [Troubleshooting](troubleshooting.md).

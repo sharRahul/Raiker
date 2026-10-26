@@ -2,6 +2,7 @@
 // prefix (query strings ignored), so tests declare only the endpoints they use;
 // anything unrouted rejects loudly instead of fabricating data.
 import { vi } from "vitest";
+import type { RemoteAccessStatusView } from "./generated/apiContract";
 import type {
   CapabilityGate,
   ContentPart,
@@ -100,6 +101,17 @@ export const DIAGNOSTICS: Diagnostics = {
   remote_access: {
     mode: "loopback",
     proxy_listener: null,
+    listener_kind: null,
+    listener_source: null,
+    disabled_while_running: false,
+    https_seen: false,
+    https_refused: 0,
+    mfa_ready: false,
+    remote_sign_in_failures: 0,
+    remote_mfa_failures: 0,
+    suspensions: 0,
+    start_outcome: null,
+    start_message: null,
     proxied_requests_refused: 0,
     proxied_requests_served: 0,
     last_refused_at: null,
@@ -344,5 +356,29 @@ export function modelsView(over: Partial<ModelsView> = {}): ModelsView {
     catalogues: {},
     side_tasks: { summarise: [], vision: [] },
     ...over,
+  };
+}
+
+const REMOTE_LOCAL_CONFIG = { mode: "local", proxy_kind: "port", proxy_port: null, proxy_socket: null, private_host: null, private_port: null, tls_cert: null, tls_key: null } as const;
+
+/** BUG-358 — a remote-access status as the running host reports it. */
+export function remoteStatus(overrides: Partial<RemoteAccessStatusView> = {}): RemoteAccessStatusView {
+  return {
+    state: "disabled",
+    desired: { ...REMOTE_LOCAL_CONFIG },
+    previous: null,
+    active: { mode: "local", address: null, source: "settings", https_verified: false, refusing: false },
+    mfa: { enrolled: true, ready: true, accounts_without_mfa: 0, reset_pending: false },
+    https: "not_applicable",
+    connection_address: null,
+    restart_required: false,
+    restartable: false,
+    can_configure: true,
+    local_listener: "127.0.0.1:8765",
+    problems: [],
+    last_start: null,
+    recent_events: [],
+    platform: "linux",
+    ...overrides,
   };
 }

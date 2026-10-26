@@ -28,7 +28,13 @@ itself. They remain below because they can still appear for a provider you have
 | `model_dial_refused:metadata_address` | The address is a cloud metadata service (`169.254.169.254`, `metadata.google.internal`, …) | Never a model destination; there is no setting. Use your model server's own address |
 | `model_dial_refused:credential_over_http_proxy` | A plain-HTTP hosted endpoint would carry your key through your proxy | Use `https://`, or add the host to `NO_PROXY` and restart |
 | `redirect_refused:<status>` | The provider answered with a redirect; Raiker does not follow one with your key | Check the endpoint is the provider's real API address |
-| `proxied_request_refused` | A request reached Raiker's local listener (port 8765) through a reverse proxy: it carried `X-Forwarded-For`, `Forwarded` or a similar header. That listener is for this computer only | Point the proxy at a proxy listener (`raiker-web --proxy-socket` or `--proxy-port`, with `RAIKER_OWNER_TOKEN` set), bind to a private address with `--allow-public`, or use an SSH tunnel. See [Managing the host](managing-the-host.md#behind-a-reverse-proxy) |
+| `proxied_request_refused` | A request reached Raiker's local listener (port 8765) through a reverse proxy: it carried `X-Forwarded-For`, `Forwarded` or a similar header. That listener is for this computer only | Point the proxy at the reverse-proxy listener set in **Settings → Security → Remote access** (or `--proxy-port`/`--proxy-socket`), or use an SSH tunnel. See [Remote access](managing-the-host.md#remote-access) |
+| `remote_access_suspended` | Remote sign-in or a remote request was refused because an account has no two-step sign-in | On this computer, turn two-step sign-in on in **Settings → Security**. A listener that was not opened at start needs a restart |
+| `remote_mfa_required` | A request from another device used a session that was not verified with a code, was made on this computer, or was verified before MFA was reset | Sign in again on that device with your password and a code |
+| `remote_https_required` | A request reached the remote listener without HTTPS | Use the `https://` address; behind a proxy, make it send `X-Forwarded-Proto: https` |
+| `remote_access_disabled` | Remote access was turned off; the listener refuses everything until it closes at the next restart | Turn it on again on this computer in **Settings → Security → Remote access** |
+| `fresh_mfa_required` | Turning MFA off, resetting it, or changing remote access needs a code entered in the last few minutes | Confirm with a code from your authenticator (or a recovery code) when asked |
+| `loopback_only` or `recovery_loopback_only` from another device | Recovery, instances, host Quit/Restart and remote-access changes are for this computer only | Do it on this computer |
 | `environment_credential_unavailable` | You asked to use the key from the environment, and Raiker's environment does not have it | Paste the key, or set the variable and restart Raiker |
 | `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security → Generate key |
 | `connector_vault_key_unset` | Only on a **read**: credentials exist but the key is gone, so they cannot be decrypted | Restore the key, or clear and re-enter the affected credentials. Writes provision a key automatically; reads deliberately do not, because minting a new key would hide a real problem. |
@@ -102,7 +108,7 @@ still set.
 | Account → Backups: *Damaged — …* or *Unreadable* | *Damaged* means the file changed after it was made (a checksum or integrity failure): remove it and back up again. *Unreadable* means it was made with a different `app.key` than this workspace's; it opens only with that key. Neither is offered for restore. |
 | Settings: *Not saved: a setting you changed here was also changed somewhere else* | Another tab or page saved the same setting after this page opened. Your edits are still on the page; **Show the newer settings** loads what was saved, and you can make your change again on top of it. |
 | A request answered 415 `request_body_encoding_unsupported` | The client compressed its request body. Raiker reads only uncompressed bodies; send it without `Content-Encoding`. |
-| `Refusing to bind to non-loopback host … without --allow-public` | Add `--allow-public` **and** set `RAIKER_OWNER_TOKEN` |
+| `--host must be a loopback address and --allow-public is retired` | Raiker's own listener stays on this computer. Remove `--host`/`--allow-public`; use **Settings → Security → Remote access** or `--private-host`/`--proxy-port` |
 | Dashboard is blank or stale | `npm --prefix web run build`, then restart `raiker-web` |
 | Backend change has no effect | Restart `raiker-web` — Python is not hot-reloaded |
 | Too many device sessions listed | Settings → Security → revoke individually, or change your password to sign out all other devices |
@@ -114,7 +120,8 @@ still set.
 | `RAIKER_MODEL_EGRESS_ALLOWLIST` | **Retired** and ignored. Model providers are authorised by the connections you save in **Models**. Remove it. |
 | `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` | Hosts service connectors may be reached on |
 | `RAIKER_CONNECTOR_VAULT_KEY` | Overrides the workspace vault key file |
-| `RAIKER_OWNER_TOKEN` | Required with `--allow-public` |
+| `RAIKER_OWNER_TOKEN` | **Retired** and not read; remote access is protected by your password and two-step sign-in. Remove it |
+| `RAIKER_TRUSTED_PROXY` | **Retired**; the host refuses to start while it is set. Point the proxy at the remote-access listener instead |
 | `RAIKER_WEB_UI_DIR` | Alternative dashboard build directory |
 | `RAIKER_SQLCIPHER_MEMORY_SECURITY` | `on` requires locked key pages and refuses to open without them; unset is *auto*. `off` was removed and is read as *auto*. |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `HF_TOKEN`, `OLLAMA_API_KEY` | Provider keys, if you prefer the environment over the vault |

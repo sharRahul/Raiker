@@ -165,6 +165,20 @@
       if (registerIntent && e.status === 409) {
         return "This Raiker already has its owner. Unlock it below, or create a separate instance for another person.";
       }
+      // BUG-358 — answers about the host, not the account, said plainly so an
+      // owner at another device knows a password will not help.
+      if (e.reasonCode === "remote_access_suspended") {
+        return "Remote access is suspended because two-step sign-in is off. Turn it on, on the computer Raiker runs on.";
+      }
+      if (e.reasonCode === "remote_access_disabled") {
+        return "Remote access to this Raiker is turned off. Turn it on, on the computer Raiker runs on.";
+      }
+      if (e.reasonCode === "remote_https_required") {
+        return "Raiker answers other devices only over HTTPS. Open it at its https:// address.";
+      }
+      if (e.status === 429) {
+        return "Too many attempts in the last minute. Wait a minute, then try again.";
+      }
       // Generic by design: never confirm whether the username exists.
       return e.message.includes("Request failed") ? "Authentication failed." : e.message;
     }

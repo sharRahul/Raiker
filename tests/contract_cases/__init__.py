@@ -13,6 +13,7 @@ from tests.contract_cases.memory import CASES as MEMORY
 from tests.contract_cases.models import CASES as MODELS
 from tests.contract_cases.projects import CASES as PROJECTS
 from tests.contract_cases.read_models import CASES as READ_MODELS
+from tests.contract_cases.remote_access import CASES as REMOTE_ACCESS
 from tests.contract_cases.sessions import CASES as SESSIONS
 
-CASES = merge(READ_MODELS, AUTH, SESSIONS, PROJECTS, MEMORY, MODELS, GOVERNANCE, EXTENSIONS, HOST, GITHUB, DESIGN, GOALS, LIBRARY)
+CASES = merge(READ_MODELS, AUTH, SESSIONS, PROJECTS, MEMORY, MODELS, GOVERNANCE, EXTENSIONS, HOST, GITHUB, DESIGN, GOALS, LIBRARY, REMOTE_ACCESS)

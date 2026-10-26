@@ -14,6 +14,11 @@
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
   // governed backend directly; no fabricated state.
   import FormDialog from "../../components/FormDialog.svelte";
+  import RemoteAccessSettings from "../../components/RemoteAccessSettings.svelte";
+  import { askConfirm } from "../../confirm.svelte";
+  import { relativeTime } from "../../format";
+  import type { DeviceSessionView } from "../../generated/apiContract";
+  import { withFreshMfa } from "../../remoteAccess";
   import {
     APPROVAL_TIMEOUT_CHOICES,
     APPROVAL_TIMEOUT_KEY,
@@ -42,6 +47,10 @@
 
   let vaultState = $state<string>("missing");
   let mfaEnrolled = $state(false);
+  // Until the server has answered, a row says so rather than showing its
+  // default ("Off", "0 signed in") as if it were the account's state.
+  let settingsLoaded = $state(false);
+  let sessionsLoaded = $state(false);
   let requireMfaForVault = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -79,10 +88,15 @@
   let oldPassword = $state("");
   let newPassword = $state("");
 
-  // Active device sessions
-  let sessions = $state<
-    Array<{ session_id: string; created_at: string; last_seen_at: string | null; current: boolean; revoked: boolean }>
-  >([]);
+  // Active device sessions (BUG-358: where each one is, and how it signed in)
+  let sessions = $state<DeviceSessionView[]>([]);
+  // Fresh proof for resetting or turning off MFA: the password and a current code.
+  let freshPassword = $state("");
+  let freshCode = $state("");
+  let mfaResetting = $state(false);
+  // BUG-358 — a change to two-step sign-in changes remote access with it, so the
+  // Remote access rows read the host again whenever MFA changes here.
+  let remoteRefresh = $state(0);
   let credentials = $state<CredentialLifecycle[]>([]);
   let findings = $state<McpFinding[]>([]);
   let health = $state<SecurityHealth[]>([]);
@@ -183,6 +197,7 @@
       const s = await api.settings();
       vaultState = s.status.vault;
       mfaEnrolled = s.status.mfa_enrolled;
+      settingsLoaded = true;
       requireMfaForVault = Boolean(
         (s.settings as Record<string, unknown>)["security.require_mfa_for_vault"],
       );
@@ -231,6 +246,7 @@
   async function loadSessions() {
     try {
       sessions = (await auth.listDeviceSessions()).filter((s) => !s.revoked);
+      sessionsLoaded = true;
     } catch {
       sessions = [];
     }
@@ -255,6 +271,74 @@
       await loadSessions();
     } catch (e) {
       notice = { kind: "error", text: message(e, "Could not revoke the session.") };
+    }
+  }
+
+  async function signOutOthers() {
+    const yes = await askConfirm({
+      title: "Sign out every other device?",
+      body: "Every other browser and device signed in to Raiker has to sign in again. This one stays signed in.",
+      confirmLabel: "Sign out others",
+      danger: true,
+    });
+    if (!yes) return;
+    try {
+      const answer = await auth.revokeOtherDeviceSessions();
+      notice = { kind: "ok", text: answer.revoked === 1 ? "1 other device was signed out." : `${answer.revoked} other devices were signed out.` };
+      await loadSessions();
+    } catch (e) {
+      notice = { kind: "error", text: message(e, "Could not sign out the other devices.") };
+    }
+  }
+
+  function deviceName(s: DeviceSessionView): string {
+    if (s.client_hint) return s.client_hint;
+    if (s.device_label) return s.device_label;
+    return s.scope === "host_control" ? "Raiker tray" : "Unknown browser";
+  }
+
+  function freshError(e: unknown, fallback: string): string {
+    if (e instanceof ApiError && (e.status === 401 || e.reasonCode === "fresh_mfa_required")) {
+      return "That password or code was not accepted. Enter your password and a current code (or a recovery code).";
+    }
+    return message(e, fallback);
+  }
+
+  // BUG-358 — resetting MFA is staged: the current authenticator keeps working
+  // until the new one's first code is confirmed. It needs fresh MFA to start.
+  async function startReset() {
+    notice = null;
+    try {
+      const { provisioning_uri, backup_codes } = await withFreshMfa(freshPassword, freshCode, () => auth.enrollMfa());
+      enrollUri = provisioning_uri;
+      backupCodes = [...backup_codes];
+      mfaResetting = true;
+      freshPassword = "";
+      freshCode = "";
+    } catch (e) {
+      notice = { kind: "error", text: freshError(e, "Could not start the reset.") };
+    }
+  }
+
+  async function turnOffMfa() {
+    const yes = await askConfirm({
+      title: "Turn off two-step sign-in?",
+      body: "Every other signed-in device is signed out, and remote access is suspended until you turn it on again.",
+      confirmLabel: "Turn off",
+      danger: true,
+    });
+    if (!yes) return;
+    notice = null;
+    try {
+      await withFreshMfa(freshPassword, freshCode, () => auth.disableMfa());
+      mfaEnrolled = false;
+      freshPassword = "";
+      freshCode = "";
+      remoteRefresh += 1;
+      notice = { kind: "ok", text: "Two-step sign-in is off. Other devices were signed out and remote access is suspended." };
+      await loadSessions();
+    } catch (e) {
+      notice = { kind: "error", text: freshError(e, "Two-step sign-in was not turned off.") };
     }
   }
 
@@ -327,7 +411,15 @@
       mfaEnrolled = true;
       enrollUri = null;
       activateCode = "";
-      notice = { kind: "ok", text: "MFA is now active." };
+      notice = {
+        kind: "ok",
+        text: mfaResetting
+          ? "The new authenticator is active. Sessions verified with the old one were signed out."
+          : "MFA is now active.",
+      };
+      mfaResetting = false;
+      remoteRefresh += 1;
+      await loadSessions();
     } catch (e) {
       notice = { kind: "error", text: message(e, "Invalid verification code.") };
     }
@@ -375,15 +467,19 @@
   </div>
   <div class="setting-row">
     <h3>Two-step sign-in</h3>
-    <span class="setting-value">{mfaEnrolled ? "On" : "Off"}</span>
-    <button type="button" class="btn btn-sm" onclick={() => openPanel("mfa")}>{mfaEnrolled ? "Manage" : "Turn on"}</button>
+    <span class="setting-value">{settingsLoaded ? (mfaEnrolled ? "On" : "Off") : "Reading…"}</span>
+    <button type="button" class="btn btn-sm" disabled={!settingsLoaded} onclick={() => openPanel("mfa")}>{mfaEnrolled ? "Manage" : "Turn on"}</button>
   </div>
   <div class="setting-row">
-    <h3>Devices</h3>
-    <span class="setting-value">{sessions.length} signed in</span>
+    <h3>Signed-in devices</h3>
+    <span class="setting-value">{sessionsLoaded ? `${sessions.length} signed in` : "Reading…"}</span>
     <button type="button" class="btn btn-sm" onclick={() => openPanel("devices")}>Manage</button>
   </div>
 </section>
+
+{#key remoteRefresh}
+  <RemoteAccessSettings onopenmfa={() => openPanel("mfa")} />
+{/key}
 
 <section class="card" aria-labelledby="security-vault-h">
   <h2 id="security-vault-h">Encryption and the vault</h2>
@@ -394,7 +490,7 @@
   </div>
   <div class="setting-row">
     <h3>Vault key</h3>
-    <span class="setting-value">{vaultState === "configured_valid" ? "Set" : "Missing — connections fail closed"}</span>
+    <span class="setting-value">{!settingsLoaded ? "Reading…" : vaultState === "configured_valid" ? "Set" : "Missing — connections fail closed"}</span>
     <button type="button" class="btn btn-sm" onclick={() => openPanel("vault")}>{vaultState === "configured_valid" ? "Change" : "Set up"}</button>
   </div>
 </section>
@@ -462,31 +558,45 @@
       {#if notice}
         <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
       {/if}
-    <p class="sub">An authenticator code (TOTP) in addition to your password.</p>
-    {#if !mfaEnrolled}
-      {#if enrollUri === null}
-        <button type="button" class="btn btn-soft" onclick={startEnroll}>Enroll in MFA</button>
-      {:else}
-        <p class="sub">Add this to your authenticator app, then enter the current code:</p>
-        <code class="uri">{enrollUri}</code>
-        {#if backupCodes.length > 0}
-          <p class="sub">
-            Save these recovery codes somewhere other than this computer. Each works once,
-            in place of an authenticator code — including to recover your password from
-            the lock screen — and they are not shown again.
-          </p>
-          <ul class="backup-codes" aria-label="Recovery codes">
-            {#each backupCodes as code (code)}<li><code>{code}</code></li>{/each}
-          </ul>
-        {/if}
-        <label>
-          Verification code
-          <input bind:value={activateCode} inputmode="numeric" autocomplete="one-time-code" />
-        </label>
-        <button type="button" class="btn btn-primary" disabled={!activateCode} onclick={activate}>
-          Activate
-        </button>
+    <p class="sub">An authenticator code (TOTP) in addition to your password. Remote access needs it.</p>
+    {#if enrollUri !== null}
+      <p class="sub">
+        {mfaResetting ? "Add this new entry to your authenticator app. The old one keeps working until you enter a code from this one:" : "Add this to your authenticator app, then enter the current code:"}
+      </p>
+      <code class="uri">{enrollUri}</code>
+      {#if backupCodes.length > 0}
+        <p class="sub">
+          Save these recovery codes somewhere other than this computer. Each works once,
+          in place of an authenticator code — including to recover your password from
+          the lock screen — and they are not shown again.
+        </p>
+        <ul class="backup-codes" aria-label="Recovery codes">
+          {#each backupCodes as code (code)}<li><code>{code}</code></li>{/each}
+        </ul>
       {/if}
+      <label>
+        Verification code
+        <input bind:value={activateCode} inputmode="numeric" autocomplete="one-time-code" />
+      </label>
+      <button type="button" class="btn btn-primary" disabled={!activateCode} onclick={activate}>
+        Activate
+      </button>
+    {:else if !mfaEnrolled}
+      <button type="button" class="btn btn-soft" onclick={startEnroll}>Enroll in MFA</button>
+    {:else}
+      <p class="sub">On. To reset it or turn it off, confirm it is you with your password and a current code, or a recovery code if you no longer have the authenticator.</p>
+      <label>
+        Password
+        <input type="password" bind:value={freshPassword} autocomplete="current-password" />
+      </label>
+      <label>
+        Authenticator or recovery code
+        <input bind:value={freshCode} inputmode="numeric" autocomplete="one-time-code" />
+      </label>
+      <div class="actions">
+        <button type="button" class="btn btn-soft" disabled={!freshPassword || !freshCode} onclick={startReset}>Reset authenticator</button>
+        <button type="button" class="btn btn-danger" disabled={!freshPassword || !freshCode} onclick={turnOffMfa}>Turn off</button>
+      </div>
     {/if}
     <label class="toggle">
       <input type="checkbox" checked={requireMfaForVault} onchange={toggleRequireMfa} disabled={!mfaEnrolled} />
@@ -502,21 +612,34 @@
     {#if sessions.length === 0}
       <p class="sub">No active sessions.</p>
     {:else}
-      <ul class="sessions">
+      <ul class="sessions" aria-label="Signed-in devices">
         {#each sessions as s (s.session_id)}
-          <li>
-            <span>
-              {s.session_id.slice(0, 16)}…
-              {#if s.current}<span class="pill pill-ok">This device</span>{/if}
+          <li data-testid="device-session">
+            <span class="device">
+              <strong>{deviceName(s)}</strong>
+              <span class="device-facts">
+                {#if s.current}<span class="pill pill-ok">This device</span>{/if}
+                <span class="pill">{s.origin === "remote" ? "Another device" : "This computer"}</span>
+                <span class="pill">{s.mfa_verified ? "Signed in with a code" : "Password only"}</span>
+              </span>
+              <span class="sub small">
+                {s.last_seen_at ? `Active ${relativeTime(s.last_seen_at)}` : `Signed in ${relativeTime(s.created_at)}`}
+              </span>
             </span>
             {#if !s.current}
-              <button type="button" class="btn btn-danger" onclick={() => revokeSession(s.session_id)}>
-                Revoke
+              <button type="button" class="btn btn-sm btn-danger" onclick={() => revokeSession(s.session_id)}>
+                Sign out
               </button>
             {/if}
           </li>
         {/each}
       </ul>
+      <p class="sub small">The browser name is what each browser reports about itself; it does not prove which device it is.</p>
+      {#if sessions.some((s) => !s.current)}
+        <div class="actions">
+          <button type="button" class="btn btn-danger" onclick={signOutOthers}>Sign out all other devices</button>
+        </div>
+      {/if}
     {/if}
   </FormDialog>
 {:else if panel === "encryption"}
@@ -828,6 +951,25 @@
     color: var(--text-2);
     font-size: var(--text-sm);
   }
+  ul.sessions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  ul.sessions li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border);
+  }
+  ul.sessions li:first-child { border-top: none; }
+  .device { display: grid; gap: 0.2rem; min-width: 0; }
+  .device-facts { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .small { font-size: var(--text-sm); }
   .pill {
     padding: 2px 10px;
     border-radius: 999px;

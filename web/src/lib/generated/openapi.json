@@ -11291,6 +11291,30 @@
       "DeviceSessionView": {
         "description": "One sign-in of this account, without its token.",
         "properties": {
+          "absolute_expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Absolute Expires At"
+          },
+          "client_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Client Hint"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -11331,6 +11355,16 @@
               }
             ],
             "title": "Last Seen At"
+          },
+          "mfa_verified": {
+            "default": false,
+            "title": "Mfa Verified",
+            "type": "boolean"
+          },
+          "origin": {
+            "default": "local",
+            "title": "Origin",
+            "type": "string"
           },
           "revoked": {
             "title": "Revoked",
@@ -16006,9 +16040,55 @@
         "title": "HooksView",
         "type": "object"
       },
+      "HostAccessView": {
+        "description": "BUG-358 — how this host is reached, as the running host reports it.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "mode": {
+            "enum": [
+              "local",
+              "private",
+              "proxy"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "disabled",
+              "enabled",
+              "suspended",
+              "pending_restart",
+              "error"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "mode",
+          "address"
+        ],
+        "title": "HostAccessView",
+        "type": "object"
+      },
       "HostActionResult": {
         "description": "A pause, resume, quit or restart. A quit or restart that would interrupt\nwork answers ``waiting_work`` and does nothing until confirmed.",
         "properties": {
+          "access": {
+            "$ref": "#/components/schemas/HostAccessView"
+          },
           "detail": {
             "title": "Detail",
             "type": "string"
@@ -16119,6 +16199,7 @@
           "waiting",
           "service",
           "restartable",
+          "access",
           "ok"
         ],
         "title": "HostActionResult",
@@ -16204,6 +16285,9 @@
       "HostView": {
         "description": "BUG-40 — state, in-flight work, and whether the host starts on its own.",
         "properties": {
+          "access": {
+            "$ref": "#/components/schemas/HostAccessView"
+          },
           "detail": {
             "title": "Detail",
             "type": "string"
@@ -16297,7 +16381,8 @@
           "paused_reason",
           "waiting",
           "service",
-          "restartable"
+          "restartable",
+          "access"
         ],
         "title": "HostView",
         "type": "object"
@@ -27620,9 +27705,588 @@
         "title": "ReleaseTargetView",
         "type": "object"
       },
-      "RemoteAccessView": {
-        "description": "BUG-347 — how requests reach this host, read from the running process.",
+      "RemoteAccessApplyBody": {
+        "additionalProperties": false,
         "properties": {
+          "config": {
+            "$ref": "#/components/schemas/RemoteAccessConfigBody"
+          },
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "RemoteAccessApplyBody",
+        "type": "object"
+      },
+      "RemoteAccessCheckView": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "info"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "ok",
+          "message",
+          "field",
+          "severity"
+        ],
+        "title": "RemoteAccessCheckView",
+        "type": "object"
+      },
+      "RemoteAccessChecksView": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/RemoteAccessCheckView"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "checks"
+        ],
+        "title": "RemoteAccessChecksView",
+        "type": "object"
+      },
+      "RemoteAccessConfigBody": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "maxLength": 16,
+            "title": "Mode",
+            "type": "string"
+          },
+          "private_host": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private Host"
+          },
+          "private_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private Port"
+          },
+          "proxy_kind": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Kind"
+          },
+          "proxy_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Port"
+          },
+          "proxy_socket": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Socket"
+          },
+          "tls_cert": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tls Cert"
+          },
+          "tls_key": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tls Key"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "RemoteAccessConfigBody",
+        "type": "object"
+      },
+      "RemoteAccessConfigView": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "local",
+              "private",
+              "proxy"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "private_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private Host"
+          },
+          "private_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private Port"
+          },
+          "proxy_kind": {
+            "enum": [
+              "port",
+              "socket"
+            ],
+            "title": "Proxy Kind",
+            "type": "string"
+          },
+          "proxy_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Port"
+          },
+          "proxy_socket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Socket"
+          },
+          "tls_cert": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tls Cert"
+          },
+          "tls_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tls Key"
+          }
+        },
+        "required": [
+          "mode",
+          "proxy_kind",
+          "proxy_port",
+          "proxy_socket",
+          "private_host",
+          "private_port",
+          "tls_cert",
+          "tls_key"
+        ],
+        "title": "RemoteAccessConfigView",
+        "type": "object"
+      },
+      "RemoteAccessEventView": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "kind"
+        ],
+        "title": "RemoteAccessEventView",
+        "type": "object"
+      },
+      "RemoteAccessLastStart": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "at",
+          "outcome",
+          "reason",
+          "message"
+        ],
+        "title": "RemoteAccessLastStart",
+        "type": "object"
+      },
+      "RemoteAccessListenerView": {
+        "description": "The remote listener this running host has open; nothing when there is none.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "https_verified": {
+            "title": "Https Verified",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "local",
+              "private",
+              "proxy"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "refusing": {
+            "title": "Refusing",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "settings",
+              "start_options"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "address",
+          "source",
+          "https_verified",
+          "refusing"
+        ],
+        "title": "RemoteAccessListenerView",
+        "type": "object"
+      },
+      "RemoteAccessMfaView": {
+        "properties": {
+          "accounts_without_mfa": {
+            "title": "Accounts Without Mfa",
+            "type": "integer"
+          },
+          "enrolled": {
+            "title": "Enrolled",
+            "type": "boolean"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reset_pending": {
+            "title": "Reset Pending",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enrolled",
+          "ready",
+          "accounts_without_mfa",
+          "reset_pending"
+        ],
+        "title": "RemoteAccessMfaView",
+        "type": "object"
+      },
+      "RemoteAccessProblem": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RemoteAccessProblem",
+        "type": "object"
+      },
+      "RemoteAccessStatusView": {
+        "description": "Remote access as it is now, from the running host, and what was asked for.",
+        "properties": {
+          "active": {
+            "$ref": "#/components/schemas/RemoteAccessListenerView"
+          },
+          "can_configure": {
+            "title": "Can Configure",
+            "type": "boolean"
+          },
+          "connection_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Address"
+          },
+          "desired": {
+            "$ref": "#/components/schemas/RemoteAccessConfigView"
+          },
+          "https": {
+            "enum": [
+              "verified",
+              "not_verified",
+              "not_applicable"
+            ],
+            "title": "Https",
+            "type": "string"
+          },
+          "last_start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RemoteAccessLastStart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "local_listener": {
+            "title": "Local Listener",
+            "type": "string"
+          },
+          "mfa": {
+            "$ref": "#/components/schemas/RemoteAccessMfaView"
+          },
+          "platform": {
+            "enum": [
+              "windows",
+              "macos",
+              "linux",
+              "other"
+            ],
+            "title": "Platform",
+            "type": "string"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RemoteAccessConfigView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/RemoteAccessProblem"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "recent_events": {
+            "items": {
+              "$ref": "#/components/schemas/RemoteAccessEventView"
+            },
+            "title": "Recent Events",
+            "type": "array"
+          },
+          "restart_required": {
+            "title": "Restart Required",
+            "type": "boolean"
+          },
+          "restartable": {
+            "title": "Restartable",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "disabled",
+              "enabled",
+              "suspended",
+              "pending_restart",
+              "error"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "desired",
+          "previous",
+          "active",
+          "mfa",
+          "https",
+          "connection_address",
+          "restart_required",
+          "restartable",
+          "can_configure",
+          "local_listener",
+          "problems",
+          "last_start",
+          "recent_events",
+          "platform"
+        ],
+        "title": "RemoteAccessStatusView",
+        "type": "object"
+      },
+      "RemoteAccessView": {
+        "description": "BUG-347 / BUG-358 — how requests reach this host, read from the running process.\n\nNever carries a credential, a code, a secret or a session token: counts,\ntimes and the listener's address only.",
+        "properties": {
+          "disabled_while_running": {
+            "title": "Disabled While Running",
+            "type": "boolean"
+          },
+          "https_refused": {
+            "title": "Https Refused",
+            "type": "integer"
+          },
+          "https_seen": {
+            "title": "Https Seen",
+            "type": "boolean"
+          },
           "last_refused_at": {
             "anyOf": [
               {
@@ -27645,10 +28309,45 @@
             ],
             "title": "Last Served At"
           },
+          "listener_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "proxy",
+                  "private"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listener Kind"
+          },
+          "listener_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "settings",
+                  "start_options"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listener Source"
+          },
+          "mfa_ready": {
+            "title": "Mfa Ready",
+            "type": "boolean"
+          },
           "mode": {
             "enum": [
               "loopback",
               "proxy_listener",
+              "private_listener",
               "public"
             ],
             "title": "Mode",
@@ -27672,15 +28371,60 @@
               }
             ],
             "title": "Proxy Listener"
+          },
+          "remote_mfa_failures": {
+            "title": "Remote Mfa Failures",
+            "type": "integer"
+          },
+          "remote_sign_in_failures": {
+            "title": "Remote Sign In Failures",
+            "type": "integer"
+          },
+          "start_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Message"
+          },
+          "start_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Outcome"
+          },
+          "suspensions": {
+            "title": "Suspensions",
+            "type": "integer"
           }
         },
         "required": [
           "mode",
           "proxy_listener",
+          "listener_kind",
+          "listener_source",
+          "disabled_while_running",
+          "https_seen",
+          "https_refused",
           "proxied_requests_refused",
           "proxied_requests_served",
           "last_refused_at",
-          "last_served_at"
+          "last_served_at",
+          "mfa_ready",
+          "remote_sign_in_failures",
+          "remote_mfa_failures",
+          "suspensions",
+          "start_outcome",
+          "start_message"
         ],
         "title": "RemoteAccessView",
         "type": "object"
@@ -29512,6 +30256,25 @@
           "session_ids"
         ],
         "title": "SessionsDeleted",
+        "type": "object"
+      },
+      "SessionsRevokedView": {
+        "description": "Every other device signed out; this one kept.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "revoked"
+        ],
+        "title": "SessionsRevokedView",
         "type": "object"
       },
       "SetCapabilityDecisionModeRequest": {
@@ -35870,6 +36633,7 @@
     },
     "/api/auth/mfa/disable": {
       "post": {
+        "description": "Turn MFA off, with fresh MFA; remote access is suspended at once (BUG-358).",
         "operationId": "mfa_disable_api_auth_mfa_disable_post",
         "responses": {
           "200": {
@@ -35888,6 +36652,7 @@
     },
     "/api/auth/mfa/enroll": {
       "post": {
+        "description": "Start enrolment, or (BUG-358) a reset of an active one, which needs fresh MFA.\n\nA reset is staged: the current authenticator keeps working, and remote\naccess with it, until the new one's first code is confirmed.",
         "operationId": "mfa_enroll_api_auth_mfa_enroll_post",
         "responses": {
           "200": {
@@ -36170,6 +36935,25 @@
           }
         },
         "summary": "List Device Sessions"
+      }
+    },
+    "/api/auth/sessions/revoke-others": {
+      "post": {
+        "description": "Sign out every other device; this one stays signed in.",
+        "operationId": "revoke_other_device_sessions_api_auth_sessions_revoke_others_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsRevokedView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke Other Device Sessions"
       }
     },
     "/api/auth/sessions/{session_id}/revoke": {
@@ -49965,6 +50749,141 @@
           }
         },
         "summary": "Recovery Restore"
+      }
+    },
+    "/api/remote-access": {
+      "get": {
+        "description": "Remote access as the running host has it, and what the next start opens.",
+        "operationId": "get_remote_access_api_remote_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAccessStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Remote Access"
+      }
+    },
+    "/api/remote-access/apply": {
+      "post": {
+        "description": "Save a checked configuration for the next start. Fresh MFA and a confirmation.",
+        "operationId": "apply_remote_access_api_remote_access_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteAccessApplyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAccessStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Remote Access"
+      }
+    },
+    "/api/remote-access/check": {
+      "post": {
+        "description": "Everything that would stop a configuration working, before anything is saved.",
+        "operationId": "check_remote_access_api_remote_access_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoteAccessConfigBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAccessChecksView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Remote Access"
+      }
+    },
+    "/api/remote-access/disable": {
+      "post": {
+        "description": "Turn remote access off now, from any signed-in device.",
+        "operationId": "disable_remote_access_api_remote_access_disable_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAccessStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Disable Remote Access"
+      }
+    },
+    "/api/remote-access/rollback": {
+      "post": {
+        "description": "Go back to the configuration before the last change, for the next start.",
+        "operationId": "rollback_remote_access_api_remote_access_rollback_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteAccessStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rollback Remote Access"
       }
     },
     "/api/routine-deliveries": {

@@ -22,6 +22,21 @@
   import type { HostStatusView, UpdateStatusView } from "../apiTypes";
 
   let host = $state<HostStatusView | null>(null);
+
+  // BUG-358 — the running host's own account of how it is reached.
+  function accessLine(access: HostStatusView["access"] | undefined): string {
+    if (!access || access.mode === "local" || access.address === null) {
+      return access?.state === "pending_restart"
+        ? "This computer only, until Raiker restarts with remote access."
+        : access?.state === "suspended"
+          ? "This computer only — remote access is suspended."
+          : "This computer only.";
+    }
+    const how = access.mode === "proxy" ? "your reverse proxy" : "your private network";
+    if (access.state === "suspended") return `Remote access through ${how} is suspended.`;
+    if (access.state === "disabled") return "This computer only — remote access is turned off.";
+    return `This computer, and other devices through ${how}.`;
+  }
   let build = $state<UpdateStatusView | null>(null);
   let checking = $state(false);
   let open = $state(false);
@@ -187,8 +202,10 @@
                prose at the foot of the navigation rail, which is chrome saying
                the same thing on every page whether or not it is what the owner
                came to check. It belongs with the rest of the host's posture. -->
+          <!-- BUG-358 — what the running host reports, not a promise: how other
+               devices reach it is set in Settings → Security → Remote access. -->
           <dt>Reachable from</dt>
-          <dd>This machine only — loopback, not the network.</dd>
+          <dd data-testid="host-access">{accessLine(host.access)} <a href="#/settings?tab=security">Remote access</a></dd>
           {#if host.pid !== null}<dt>Process</dt><dd class="mono">{host.pid}{host.port !== null ? ` · port ${host.port}` : ""}</dd>{/if}
           <dt>Starts on its own</dt>
           <dd>

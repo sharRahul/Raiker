@@ -526,52 +526,51 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     from raiker.api.app import create_app
+    from raiker.app.host_start import HostStartError, start_host
 
     print(f"[raiker] {os_name} · data in {workspace}")
-    print(f"[raiker] Starting on {url} (loopback only)")
+    print(f"[raiker] Starting on {url}")
 
     tray_bootstrap_secret = secrets.token_urlsafe(32)
-    app = create_app(
-        workspace,
-        ui_dir=ui_dir,
-        tray_bootstrap_secret=tray_bootstrap_secret,
-        loopback_only=True,
-    )
-
-    # Once the server answers — not after a guessed delay — open the window and
-    # tell a desktop shell that started this host where it is.
     ready_file = Path(args.ready_file) if args.ready_file else None
-    if ready_file is not None or not args.no_browser:
-        threading.Thread(
-            target=_announce_when_ready,
-            args=(url, port, os_name, ready_file, not args.no_browser, args.browser),
-            name="raiker-ready",
-            daemon=True,
-        ).start()
 
-    import uvicorn
+    def before_serve() -> None:
+        # Once the server answers — not after a guessed delay — open the window
+        # and tell a desktop shell that started this host where it is.
+        if ready_file is not None or not args.no_browser:
+            threading.Thread(
+                target=_announce_when_ready,
+                args=(url, port, os_name, ready_file, not args.no_browser, args.browser),
+                name="raiker-ready",
+                daemon=True,
+            ).start()
+        from raiker.app.tray import start_native_tray
 
-    # BUG-40 — claim the workspace for this process, so `raiker-app status` in
-    # another terminal, the in-app Host control, and the service manager are all
-    # talking about the same host. Cleared on the way out whatever the reason,
-    # including a crash-free quit, so a stale record never reports "running".
-    control = HostControl(workspace)
-    control.record_start(pid=os.getpid(), port=port)
-    from raiker.app.tray import start_native_tray
+        start_native_tray(url, tray_bootstrap_secret)
 
-    start_native_tray(url, tray_bootstrap_secret)
+    # BUG-40 — the workspace is claimed for this process (HostControl) inside
+    # `start_host`, so `raiker-app status` in another terminal, the in-app Host
+    # control, and the service manager are all talking about the same host.
+    # BUG-358 — the remote listener, when Settings has one, opens here too.
     try:
-        # BUG-347 — uvicorn's own proxy-header handling would rewrite the socket
-        # peer from X-Forwarded-For whenever the peer is 127.0.0.1; Raiker decides
-        # what a forwarded request is itself (raiker/api/proxy_guard.py).
-        uvicorn.run(app, host=LOOPBACK, port=port, proxy_headers=False, forwarded_allow_ips="")
-    finally:
-        control.clear()
-    # Set by the Host control's Restart action: a status the platform's service
-    # manager is configured to restart on, rather than a clean exit it would
-    # (correctly) leave stopped.
-    exit_code = getattr(app.state, "exit_code", 0)
-    return int(exit_code) if isinstance(exit_code, int) else 0
+        return start_host(
+            workspace,
+            host=LOOPBACK,
+            port=port,
+            make_app=lambda listener, source: create_app(
+                workspace,
+                ui_dir=ui_dir,
+                tray_bootstrap_secret=tray_bootstrap_secret,
+                loopback_only=True,
+                proxy_listener=listener,
+                remote_source=source,
+            ),
+            log_prefix="[raiker]",
+            before_serve=before_serve,
+        )
+    except HostStartError as error:
+        print(f"[raiker] {error}", file=sys.stderr)
+        return 2
 
 
 # ── the lifecycle subcommands ────────────────────────────────────────────

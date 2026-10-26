@@ -4928,6 +4928,42 @@ CREATE TABLE IF NOT EXISTS routine_deliveries (
 );
 """
 
+# BUG-358 — remote access by MFA. A session records how it was established
+# (``assurance``: password or mfa), where (``origin``: the local listener or a
+# remote one), and which enrolment it was verified against (``mfa_epoch``),
+# because a session must not outlive the factor that admitted it. The account
+# counts its enrolments, so resetting or turning off MFA retires every session
+# verified against the old one; a reset is staged beside the active enrolment
+# and swapped in only when its first code is confirmed. The remote-access settings are one row: the
+# configuration the owner chose, the one before it (the rollback target) and
+# what the last start actually did. The event log is append-only.
+REMOTE_ACCESS_MIGRATION_ID = "RAIKER-2129-remote-access"
+REMOTE_ACCESS_SQL = """
+ALTER TABLE api_sessions ADD COLUMN assurance TEXT NOT NULL DEFAULT 'password';
+ALTER TABLE api_sessions ADD COLUMN origin TEXT NOT NULL DEFAULT 'local';
+ALTER TABLE api_sessions ADD COLUMN mfa_epoch INTEGER;
+ALTER TABLE api_sessions ADD COLUMN client_hint TEXT;
+ALTER TABLE account_credentials ADD COLUMN mfa_epoch INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE account_credentials ADD COLUMN mfa_pending_secret_encrypted BLOB;
+ALTER TABLE account_credentials ADD COLUMN mfa_pending_backup_codes TEXT;
+CREATE TABLE IF NOT EXISTS remote_access_settings (
+  settings_id INTEGER PRIMARY KEY CHECK (settings_id = 1),
+  desired_json TEXT NOT NULL,
+  previous_json TEXT,
+  last_start_json TEXT,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);
+CREATE TABLE IF NOT EXISTS remote_access_events (
+  event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  detail_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_remote_access_events_kind_at
+  ON remote_access_events(kind, at DESC);
+"""
+
 GOALS_AND_EXECUTION_PROFILES_SQL = """
 CREATE TABLE IF NOT EXISTS execution_profiles (
   profile_id TEXT NOT NULL,
@@ -5306,6 +5342,7 @@ MIGRATIONS: tuple[MigrationStep, ...] = (
     Migration(HELD_SENDS_MIGRATION_ID, HELD_SENDS_SQL),
     Migration(PROJECT_LIMITS_MIGRATION_ID, PROJECT_LIMITS_SQL),
     Migration(ROUTINE_DELIVERIES_MIGRATION_ID, ROUTINE_DELIVERIES_SQL),
+    Migration(REMOTE_ACCESS_MIGRATION_ID, REMOTE_ACCESS_SQL),
 )
 
 #: DEC-17 step 8 — how far along the registry this build is, as one number.

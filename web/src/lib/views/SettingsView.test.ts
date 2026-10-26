@@ -108,6 +108,7 @@ describe("supported-preferences settings", () => {
       "Encryption and the vault",
       "Findings and monitoring",
       "Approvals and standing access",
+      "Remote access",
     ]) {
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
@@ -116,7 +117,7 @@ describe("supported-preferences settings", () => {
     for (const control of [
       "Password",
       "Two-step sign-in",
-      "Devices",
+      "Signed-in devices",
       "Encryption",
       "Vault key",
       "Security scan",

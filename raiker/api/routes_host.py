@@ -93,6 +93,9 @@ def _payload(request: Request) -> HostView:
     service = registration(control.workspace_root, port=_port(request))
     view["service"] = service.to_dict()
     view["restartable"] = service.registered
+    from raiker.api.routes_remote_access import access_summary
+
+    view["access"] = access_summary(request)
     return cast(HostView, view)
 
 
@@ -135,6 +138,9 @@ async def quit_host(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Stop the host, reporting what that interrupts unless already confirmed."""
+    # BUG-358 — stopping or restarting the host is this computer's decision.
+    # Another device can turn remote access off, which needs neither.
+    _require_loopback(request)
     view = _payload(request)
     if view["waiting"] and not body.confirm:
         waiting = cast(
@@ -153,6 +159,7 @@ async def restart_host(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Stop with the status the platform's service manager restarts on."""
+    _require_loopback(request)
     view = _payload(request)
     if not view["restartable"]:
         raise HTTPException(
@@ -188,8 +195,15 @@ def _schedule_stop(request: Request, exit_code: int) -> None:
     """
     request.app.state.exit_code = exit_code
     loop = asyncio.get_running_loop()
+    # The server's own stop (raiker/api/server_runner.py) is a graceful
+    # shutdown on every platform; a signal to this process is the fallback for
+    # a host started some other way. On Windows that signal is TerminateProcess.
+    request_stop = getattr(request.app.state, "request_stop", None)
 
     def stop() -> None:
+        if callable(request_stop):
+            request_stop()
+            return
         with suppress(OSError, ValueError, AttributeError):
             os.kill(os.getpid(), getattr(signal, "SIGTERM", signal.SIGINT))
 

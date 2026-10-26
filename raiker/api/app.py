@@ -20,7 +20,7 @@ from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.instance_runtime import InstanceRuntime
-from raiker.api.proxy_guard import ProxyGuardMiddleware, ProxyListener, RemoteAccessRecord
+from raiker.api.proxy_guard import ProxyGuardMiddleware, RemoteAccessRecord, RemoteListener
 from raiker.api.redaction import (
     RENDER_REDACTION_SCOPE,
     RedactedJSONResponse,
@@ -54,6 +54,7 @@ from raiker.api.routes_project_limits import router as project_limits_router
 from raiker.api.routes_project_roots import router as project_roots_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_recovery import router as recovery_router
+from raiker.api.routes_remote_access import router as remote_access_router
 from raiker.api.routes_settings import router as settings_router
 from raiker.api.routes_setup import router as setup_router
 from raiker.api.routes_skills import router as skills_router
@@ -498,7 +499,8 @@ def create_app(
     hsts: bool = False,
     tray_bootstrap_secret: str | None = None,
     loopback_only: bool = True,
-    proxy_listener: ProxyListener | None = None,
+    proxy_listener: RemoteListener | None = None,
+    remote_source: str = "settings",
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -652,7 +654,9 @@ def create_app(
     # outside everything that asks "is this local?": a request on the proxy
     # listener is marked remote before the rate limit and the local-only routes
     # see it, and a forwarded request on the loopback listener is refused.
-    app.state.remote_access = RemoteAccessRecord(loopback_only=loopback_only, listener=proxy_listener)
+    app.state.remote_access = RemoteAccessRecord(
+        loopback_only=loopback_only, listener=proxy_listener, source=remote_source
+    )
     app.add_middleware(
         ProxyGuardMiddleware,
         loopback_only=loopback_only,
@@ -675,6 +679,7 @@ def create_app(
     app.include_router(design_router)
     app.include_router(goals_router)
     app.include_router(library_router)
+    app.include_router(remote_access_router)
     app.include_router(project_limits_router)
     app.include_router(knowledge_files_router)
     app.include_router(project_roots_router)

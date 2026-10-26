@@ -5,11 +5,21 @@ from pathlib import Path
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from raiker.api.proxy_guard import is_remote_request
 from raiker.api.refusals import refusal
 from raiker.api.session_cookie import cookie_token, csrf_failure
 from raiker.api.sessions import ApiSession, ApiSessionStore
 from raiker.runtime.authority.models import RAIKER_RUNTIME, Principal, PrincipalType
 from raiker.storage.sqlite import SQLiteStore
+
+#: How often a session's last activity is written. Often enough to show which
+#: device is in use; rare enough not to write on every request.
+TOUCH_INTERVAL_SECONDS = 60
+
+#: BUG-358 — refusal codes for a remote request without the assurance it needs.
+REMOTE_MFA_REQUIRED = "remote_mfa_required"
+REMOTE_ACCESS_SUSPENDED = "remote_access_suspended"
+FRESH_MFA_REQUIRED = "fresh_mfa_required"
 
 
 class AuthMiddleware:
@@ -89,6 +99,67 @@ class AuthMiddleware:
             )
         if not self._scope_satisfies(session.scope, required_scope):
             raise refusal(status.HTTP_403_FORBIDDEN, "scope_insufficient")
+        remote = is_remote_request(request.scope)
+        if remote:
+            self._require_remote_assurance(session)
+        self._touch(session, remote=remote)
+        return session, principal
+
+    def _require_remote_assurance(self, session: ApiSession) -> None:
+        """BUG-358 — another device needs a session made there with a password and a code.
+
+        Enforced here, on every authenticated request, so no route and no
+        client can skip it. A session from this computer — password-only or
+        not — is refused from another device, so a token copied off this
+        machine opens nothing remotely. A remote session is refused once the
+        enrolment it was verified against is reset or turned off, and every
+        remote session is refused while the account has no MFA at all: that is
+        remote access suspended. Both answer 401, so a remote page returns to
+        its sign-in screen rather than showing an error over a dead session.
+        """
+        account = self._sqlite.get_account(session.principal_id)
+        if account is None or not account.get("mfa_enrolled"):
+            raise refusal(status.HTTP_401_UNAUTHORIZED, REMOTE_ACCESS_SUSPENDED)
+        epoch = int(account.get("mfa_epoch") or 0)
+        if session.origin != "remote" or session.assurance != "mfa" or session.mfa_epoch != epoch:
+            raise refusal(status.HTTP_401_UNAUTHORIZED, REMOTE_MFA_REQUIRED)
+
+    def _touch(self, session: ApiSession, *, remote: bool) -> None:
+        """Note activity at most once a minute; a remote session's idle limit slides with it."""
+        from datetime import UTC, datetime
+
+        from raiker.auth.accounts import REMOTE_SESSION_IDLE_TTL
+        from raiker.contracts.ids import utc_now
+
+        now = utc_now()
+        if session.last_seen_at:
+            try:
+                last = datetime.fromisoformat(session.last_seen_at.replace("Z", "+00:00"))
+                if (datetime.now(UTC) - last).total_seconds() < TOUCH_INTERVAL_SECONDS:
+                    return
+            except ValueError:
+                pass
+        try:
+            self._session_store.touch(
+                session.session_id,
+                now,
+                slide_seconds=REMOTE_SESSION_IDLE_TTL if remote and session.origin == "remote" and session.scope == "control" else None,
+            )
+        except Exception:  # noqa: BLE001 - activity is a record, never a reason to refuse
+            return
+
+    def require_fresh_mfa(self, request: Request) -> tuple[ApiSession, Principal]:
+        """An elevated session granted, minutes ago, on an MFA code from the current enrolment.
+
+        For the actions that change who can reach Raiker or how it is
+        protected: turning MFA off, resetting it, and changing remote access.
+        A password-only elevation does not count.
+        """
+        session, principal = self.authenticate(request, required_scope="elevated")
+        account = self._sqlite.get_account(session.principal_id)
+        epoch = int(account.get("mfa_epoch") or 0) if account else -1
+        if session.assurance != "mfa" or session.mfa_epoch != epoch:
+            raise refusal(status.HTTP_403_FORBIDDEN, FRESH_MFA_REQUIRED)
         return session, principal
 
     def _resolve_principal(self, principal_id: str) -> Principal | None:

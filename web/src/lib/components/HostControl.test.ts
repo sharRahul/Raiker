@@ -23,6 +23,7 @@ const HOST = {
   waiting: [],
   service: { supported: true, registered: false, mechanism: "systemd --user", label: "", path: null, note: "" },
   restartable: false,
+  access: { state: "disabled", mode: "local", address: null },
 };
 
 const TARGETS = [
@@ -165,5 +166,31 @@ describe("HostControl install and updates", () => {
     await waitFor(() => expect(checks()).toHaveLength(1));
     // Once as the panel's build message, once as the action's notice.
     await waitFor(() => expect(screen.getAllByText("Nothing newer.")).toHaveLength(2));
+  });
+});
+
+// BUG-358 — the menu says how the running host is reached, as it reports it.
+describe("HostControl reachability", () => {
+  async function line(access: Record<string, unknown>) {
+    stubFetch({ "GET /api/host": { ...HOST, access }, "GET /api/host/update": update() });
+    render(HostControl);
+    await fireEvent.click(await screen.findByRole("button", { name: /host/i }));
+    return screen.findByTestId("host-access");
+  }
+
+  it("says this computer only when nothing else is open", async () => {
+    expect(await line({ state: "disabled", mode: "local", address: null })).toHaveTextContent("This computer only.");
+  });
+
+  it("says other devices reach it through the proxy when the host reports it", async () => {
+    const shown = await line({ state: "enabled", mode: "proxy", address: "127.0.0.1:8766" });
+    expect(shown).toHaveTextContent("This computer, and other devices through your reverse proxy.");
+    expect(shown.querySelector("a")).toHaveAttribute("href", "#/settings?tab=security");
+  });
+
+  it("says when remote access is suspended", async () => {
+    expect(await line({ state: "suspended", mode: "private", address: "https://10.0.0.5:8443" })).toHaveTextContent(
+      "Remote access through your private network is suspended.",
+    );
   });
 });

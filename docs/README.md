@@ -60,6 +60,9 @@ Canonical technical references:
   boundaries and fail-closed behavior.
 - [Security and policy](architecture/SECURITY_AND_POLICY.md) — security
   philosophy and operational rules.
+- [Remote access](architecture/REMOTE_ACCESS.md) — how another device reaches
+  Raiker: the remote listener, mandatory two-step sign-in, sessions, and the
+  configuration lifecycle.
 - [Model destination authorization](adr/ADR-0004-connection-bound-model-authorization.md)
   — why a saved model connection, not an environment allowlist, decides where a
   model request may go.

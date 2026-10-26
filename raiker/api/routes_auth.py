@@ -11,8 +11,11 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from raiker.api.auth import AuthMiddleware
+from raiker.api import client_hint
+from raiker.api.auth import REMOTE_ACCESS_SUSPENDED, AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.proxy_guard import is_remote_request
+from raiker.api.refusals import refusal
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     ChangePasswordRequest,
@@ -37,10 +40,11 @@ from raiker.api.wire.auth import (
     LoginResultView,
     MfaEnrollmentView,
     PasswordRecoveryBeginView,
+    SessionsRevokedView,
     SessionStateView,
     WhoamiView,
 )
-from raiker.auth.accounts import AccountService, AuthError, LoginResult
+from raiker.auth.accounts import AccountService, AuthError, LoginResult, Origin
 
 router = APIRouter()
 
@@ -49,21 +53,54 @@ def _service(request: Request) -> AccountService:
     return AccountService(_ws(request))
 
 
+def _origin(request: Request) -> Origin:
+    """BUG-358 — ``remote`` for anything that is not provably this computer."""
+    return "remote" if is_remote_request(request.scope) else "local"
+
+
+def _remote_event(request: Request, kind: str, **detail: object) -> None:
+    from raiker.app.remote_access import record_event
+    from raiker.storage.sqlite import SQLiteStore
+
+    record_event(SQLiteStore(_ws(request)), kind, **detail)  # type: ignore[arg-type]
+
+
+def _require_remote_ready(request: Request) -> None:
+    """Remote sign-in is refused outright while remote access is suspended.
+
+    It says so (``remote_access_suspended``) instead of the generic failure:
+    whether two-step sign-in is on describes the host, not an account, and the
+    owner at another device needs to know that a password will not help.
+    """
+    from raiker.app.remote_access import mfa_readiness
+    from raiker.storage.sqlite import SQLiteStore
+
+    if not mfa_readiness(SQLiteStore(_ws(request)))["ready"]:
+        _remote_event(request, "remote_sign_in_refused", reason="suspended")
+        raise refusal(status.HTTP_403_FORBIDDEN, REMOTE_ACCESS_SUSPENDED)
+
+
 def _result_body(result: LoginResult, request: Request, response: Response) -> LoginResultView:
     """The login result, and — on a full session — the cookie that survives a reload.
 
-    BUG-253. The bearer token still travels in the body, because the CLI, the
-    tray and the tests use it. The cookie is set alongside it so refreshing the
-    page keeps the session, and the CSRF token it must be paired with is
-    returned here rather than parsed back out of a cookie by the page.
+    BUG-253. The bearer token still travels in the body on this computer,
+    because the CLI, the tray and the tests use it. The cookie is set alongside
+    it so refreshing the page keeps the session, and the CSRF token it must be
+    paired with is returned here rather than parsed back out of a cookie by the
+    page.
+
+    BUG-358 — to another device the token is **not** returned: a browser there
+    holds the session only as an ``HttpOnly``, ``Secure``, ``SameSite=Strict``
+    cookie, which page script cannot read or send anywhere else.
     """
     csrf_token = None
     if result.stage == "session" and result.token:
         csrf_token = issue_session_cookie(request, response, result.token)
+    remote = _origin(request) == "remote"
     return LoginResultView(
         stage=result.stage,
         principal_id=result.principal_id,
-        token=result.token,
+        token=None if remote else result.token,
         ticket=result.ticket,
         csrf_token=csrf_token,
     )
@@ -83,9 +120,20 @@ async def register(body: RegisterRequest, request: Request, response: Response) 
 
 @router.post("/api/auth/login")
 async def login(body: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    origin = _origin(request)
+    if origin == "remote":
+        _require_remote_ready(request)
     try:
-        result = _service(request).login(body.username, body.password, body.device_label)
+        result = _service(request).login(
+            body.username,
+            body.password,
+            body.device_label,
+            origin=origin,
+            client_hint=client_hint.describe(request.headers.get("user-agent")),
+        )
     except AuthError as exc:
+        if origin == "remote":
+            _remote_event(request, "remote_sign_in_failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
@@ -123,18 +171,33 @@ async def complete_password_recovery(
 
 @router.post("/api/auth/mfa/verify")
 async def mfa_verify(body: MfaVerifyRequest, request: Request, response: Response) -> dict[str, Any]:
+    origin = _origin(request)
+    if origin == "remote":
+        _require_remote_ready(request)
     try:
-        result = _service(request).verify_mfa(body.ticket, body.code)
+        result = _service(request).verify_mfa(body.ticket, body.code, origin=origin)
     except AuthError as exc:
+        if origin == "remote":
+            _remote_event(request, "remote_mfa_failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
+    if origin == "remote":
+        _remote_event(request, "remote_signed_in", device=client_hint.describe(request.headers.get("user-agent")))
     return serialize_dto(_result_body(result, request, response))
 
 
 @router.post("/api/auth/mfa/enroll")
 async def mfa_enroll(request: Request) -> dict[str, Any]:
-    session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    """Start enrolment, or (BUG-358) a reset of an active one, which needs fresh MFA.
+
+    A reset is staged: the current authenticator keeps working, and remote
+    access with it, until the new one's first code is confirmed.
+    """
+    middleware = AuthMiddleware(_ws(request))
+    session, principal = middleware.authenticate(request)
+    if _service(request).mfa_enrolled(principal.principal_id):
+        session, principal = middleware.require_fresh_mfa(request)
     secret, uri, codes = _service(request).begin_enroll_mfa(principal.principal_id)
     return serialize_dto(
         MfaEnrollmentView(secret=secret, provisioning_uri=uri, backup_codes=tuple(codes))
@@ -155,11 +218,41 @@ async def mfa_activate(body: MfaCodeRequest, request: Request) -> dict[str, Any]
 
 @router.post("/api/auth/mfa/disable")
 async def mfa_disable(request: Request) -> dict[str, Any]:
-    session, principal = AuthMiddleware(_ws(request)).authenticate(
-        request, required_scope="elevated"
+    """Turn MFA off, with fresh MFA; remote access is suspended at once (BUG-358)."""
+    session, principal = AuthMiddleware(_ws(request)).require_fresh_mfa(request)
+    # The page's own signed-in session (its cookie) is kept beside the
+    # five-minute elevated one, so turning MFA off does not sign the owner out
+    # of the page they did it from. Every other device is signed out.
+    from raiker.api.session_cookie import cookie_token
+
+    browser = cookie_token(request)
+    store = ApiSessionStore(_ws(request))
+    browser_session = store.get_by_token(browser) if browser else None
+    also_keep = (
+        browser_session.session_id
+        if browser_session is not None and browser_session.principal_id == principal.principal_id
+        else ""
     )
-    _service(request).disable_mfa(principal.principal_id, keep_session_id=session.session_id)
+    _service(request).disable_mfa(
+        principal.principal_id, keep_session_id=session.session_id, also_keep=also_keep
+    )
+    _suspend_remote_access(request, reason="mfa_disabled")
     return serialize_dto(Ok())
+
+
+def _suspend_remote_access(request: Request, *, reason: str) -> None:
+    """Record and announce that other devices just lost access, when they had it."""
+    from raiker.app.remote_access import load_state
+    from raiker.notify.remote_access_notifier import notify_remote_access_suspended
+    from raiker.storage.sqlite import SQLiteStore
+
+    store = SQLiteStore(_ws(request))
+    record = getattr(request.app.state, "remote_access", None)
+    listening = record is not None and record.listener is not None and not record.disabled
+    if not listening and load_state(store).desired.mode == "local":
+        return
+    _remote_event(request, "suspended", reason=reason)
+    notify_remote_access_suspended(store, reason=reason)
 
 
 @router.post("/api/auth/elevate")
@@ -167,7 +260,10 @@ async def elevate(body: ElevateRequest, request: Request) -> dict[str, Any]:
     session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     try:
         token = _service(request).grant_elevated(
-            principal.principal_id, password=body.password, mfa_code=body.mfa_code
+            principal.principal_id,
+            password=body.password,
+            mfa_code=body.mfa_code,
+            origin=_origin(request),
         )
     except AuthError as exc:
         raise HTTPException(
@@ -262,6 +358,7 @@ async def session_state(request: Request, response: Response) -> dict[str, Any]:
 async def list_device_sessions(request: Request) -> list[dict[str, Any]]:
     session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     store = ApiSessionStore(_ws(request))
+    epoch = _service(request).mfa_epoch(principal.principal_id)
     return serialize_dto(
         [
             DeviceSessionView(
@@ -273,10 +370,33 @@ async def list_device_sessions(request: Request) -> list[dict[str, Any]]:
                 expires_at=row["expires_at"],
                 scope=str(row["scope"] or "control"),
                 current=row["session_id"] == session.session_id,
+                origin=str(row.get("origin") or "local"),
+                # MFA-verified against the enrolment in force now; a session
+                # verified before a reset reads as not verified.
+                mfa_verified=str(row.get("assurance") or "") == "mfa"
+                and row.get("mfa_epoch") is not None
+                and int(row["mfa_epoch"]) == epoch,
+                client_hint=row.get("client_hint"),
+                absolute_expires_at=row.get("absolute_expires_at"),
             )
             for row in store.list_for_principal(principal.principal_id)
+            # A sign-in ticket, a recovery ticket and a five-minute elevation
+            # are steps of something the owner is doing, not devices.
+            if str(row.get("scope") or "control") not in {"mfa_pending", "password_recovery", "elevated"}
         ]
     )
+
+
+@router.post("/api/auth/sessions/revoke-others")
+async def revoke_other_device_sessions(request: Request) -> dict[str, Any]:
+    """Sign out every other device; this one stays signed in."""
+    session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    revoked = ApiSessionStore(_ws(request)).revoke_others_for_principal(
+        principal.principal_id, session.session_id
+    )
+    if _origin(request) == "remote" or revoked:
+        _remote_event(request, "sessions_revoked", count=revoked)
+    return serialize_dto(SessionsRevokedView(ok=True, revoked=revoked))
 
 
 @router.post("/api/auth/sessions/{session_id}/revoke")

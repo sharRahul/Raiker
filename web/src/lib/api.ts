@@ -28,6 +28,7 @@ import type {
   CreateTelemetryDestinationRequest,
   GenerateImageRequest,
   ModelPriceRequest,
+  RemoteAccessConfigBody,
   TaskCreateRequest,
 } from "./generated/apiContract";
 
@@ -130,6 +131,15 @@ export const api = {
   // work is in flight, and the four actions the distribution design requires.
   // Quit and Restart report waiting work first and only stop once confirmed.
   host: () => contract.getHost(),
+  // BUG-347 / BUG-358 — Settings → Security → Remote access. The status is the
+  // running host's own account of what is open; check, apply and roll back are
+  // this computer's, with fresh MFA; turning it off works from anywhere.
+  remoteAccess: () => contract.getRemoteAccess(),
+  checkRemoteAccess: (config: RemoteAccessConfigBody) => contract.checkRemoteAccess(config),
+  applyRemoteAccess: (config: RemoteAccessConfigBody, confirm: boolean) =>
+    contract.applyRemoteAccess({ config, confirm }),
+  rollbackRemoteAccess: () => contract.rollbackRemoteAccess(),
+  disableRemoteAccess: () => contract.disableRemoteAccess(),
   // BUG-251 — the host lists directory *names* so a field can offer Browse…
   // instead of asking the owner to spell an absolute path. Names only; nothing
   // here reads a file, and every approval path still governs what happens next.

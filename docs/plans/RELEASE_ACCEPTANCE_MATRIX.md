@@ -89,7 +89,10 @@ checked on a source build served by `raiker-web`:
 | Diagnostics names a refused proxy, with flags kept on one line | PASS | RT-SEC-02 |
 | Every request on the proxy listener is remote, with no forwarding header or a misleading one: recovery refused, rate limited, HSTS over HTTPS | PASS (live, unit, and a real uvicorn server) | RT-SEC-03; `test_a_real_server_tells_its_listeners_apart` |
 | The proxy listener as a Unix socket (`--proxy-socket`), mode `0660` | PASS (by hand and unit) | `test_a_real_unix_socket_listener_is_remote`; [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md), BUG-347 review round |
-| The host refuses a proxy listener without `RAIKER_OWNER_TOKEN`, and refuses to start while `RAIKER_TRUSTED_PROXY` is set | PASS (unit and by hand) | `test_a_proxy_listener_that_cannot_be_trusted_refuses_to_start` |
+| The host refuses to start while `RAIKER_TRUSTED_PROXY` is set, and refuses `--allow-public` or a non-loopback `--host`; `RAIKER_OWNER_TOKEN` is not read | PASS (unit and by hand) | `tests/test_proxied_loopback.py`, `tests/test_remote_auth.py` |
+| Remote access is chosen, checked, applied with fresh MFA, restarted into, rolled back and turned off from Settings; the UI shows only what the running host reports | PASS (live, Linux) | RT-SEC-04 to RT-SEC-07, RT-SEC-11, RT-SEC-12 |
+| Another device needs the password and a code over HTTPS; password-only and local sessions are refused; MFA off suspends at once | PASS (live, Linux; unit on all three) | RT-SEC-08 to RT-SEC-10; `tests/test_remote_auth.py` |
+| Real listeners (TCP, TLS, Unix socket), port claims and restart status on Windows and macOS | PASS (CI job *Remote access*) | `tests/test_remote_access.py`, `tests/test_proxied_loopback.py`; no live browser round on either ([BUG-359](TO_BE_FIXED.md#bug-359--remote-access-is-verified-live-on-linux-only-and-has-five-known-limits)) |
 | The packaged desktop host behind a proxy | NOT TESTED | The desktop app binds loopback for its own window; it is not meant to sit behind a proxy |
 
 ## Local evidence (Linux x86-64)

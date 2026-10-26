@@ -1033,7 +1033,7 @@
   >
     {#snippet left()}
       <label class="upload-image" title="Import an image to edit">
-        <span aria-hidden="true">+</span><span class="sr-only">Import image</span>
+        <Icon name="plus" size="sm" /><span class="sr-only">Import image</span>
         <input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy || importing} onchange={(event) => void importImage(event)} />
       </label>
       <label class="composer-scope model-scope">
@@ -1053,6 +1053,7 @@
               </option>
             {/each}
           </select>
+          <Icon name="chevron-down" size="sm" />
         {:else}
           <a
             class="bar-select bar-empty"
@@ -1316,11 +1317,25 @@
      tooltip, because the sentence is an explanation and the button is the
      thing that must stay reachable. */
   .model-scope {
+    height: 2.5rem;
+    box-sizing: border-box;
+    padding: 0 0.45rem;
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    color: var(--text-2);
     min-width: 0;
     max-width: min(16rem, 40vw);
   }
+  .model-scope select { appearance: none; }
+  .model-scope :global(svg) { flex: none; pointer-events: none; }
+  .model-scope:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   .model-scope .bar-empty,
   .model-scope .bar-select {
+    border: 0;
+    background: transparent;
+    outline: none;
+    box-shadow: none;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;

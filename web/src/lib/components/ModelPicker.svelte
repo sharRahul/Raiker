@@ -604,6 +604,9 @@
     background: var(--surface);
     box-shadow: var(--shadow-2);
   }
+  @media (max-width: 47.9rem) {
+    .model-menu { position: fixed; left: 1rem; right: 1rem; bottom: 5rem; width: auto; max-width: none; }
+  }
   .model-provider-group + .model-provider-group {
     margin-top: 0.28rem;
     padding-top: 0.28rem;

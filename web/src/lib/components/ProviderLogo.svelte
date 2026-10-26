@@ -33,12 +33,13 @@
   let { provider, size = 18 }: { provider: string; size?: number } = $props();
   const label = $derived(`${providerName(provider)} logo`);
   const source = $derived(OFFICIAL_ASSETS[provider]);
+  let failedSource = $state<string | undefined>();
   const mark = $derived(NEUTRAL_MARKS[provider] ?? "M5 5h14v14H5zM8.5 8.5h7v7h-7z");
 </script>
 
 <span class="provider-logo" data-provider={provider} role="img" aria-label={label} style={`--logo-size:${size}px`}>
-  {#if source}
-    <img src={source} alt="" />
+  {#if source && source !== failedSource}
+    <img src={source} alt="" onerror={() => (failedSource = source)} />
   {:else}
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d={mark} /></svg>
   {/if}

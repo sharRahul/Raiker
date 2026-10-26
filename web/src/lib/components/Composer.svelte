@@ -249,6 +249,15 @@
     text-decoration: underline;
   }
 
+  /* Keep the controls on a common baseline and touch target across surfaces. */
+  :global(.composer-card .action-trigger),
+  :global(.composer-card .mode-trigger),
+  :global(.composer-card .profile .chip),
+  :global(.composer-card .model-trigger),
+  :global(.composer-card .voice-button) { min-height: 2.5rem; height: 2.5rem; box-sizing: border-box; }
+  :global(.composer-card .action-trigger:not(.is-tools)),
+  :global(.composer-card .voice-button) { width: 2.5rem; }
+
   :global(.design-composer .send), :global(.chat-composer .send), :global(.composer-build .send) { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0; border-radius: 50%; }
   :global(.design-composer .send-label), :global(.chat-composer .send-label), :global(.composer-build .send-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

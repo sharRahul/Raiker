@@ -1,4 +1,4 @@
-import { render } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import ProviderLogo from "./ProviderLogo.svelte";
 
@@ -26,6 +26,13 @@ const officialAsset = new Map([
 ]);
 
 describe("ProviderLogo", () => {
+  it("renders a fallback mark when the provider image fails to load", async () => {
+    const { getByRole } = render(ProviderLogo, { provider: "anthropic" });
+    const logo = getByRole("img", { name: "Anthropic logo" });
+    await fireEvent.error(logo.querySelector("img")!);
+    expect(logo.querySelector("img")).toBeNull();
+    expect(logo.querySelector("svg")).not.toBeNull();
+  });
   it.each(configuredProviders)("renders a provider mark for %s", (provider) => {
     const { getByRole } = render(ProviderLogo, { provider });
     const logo = getByRole("img", { name: /logo$/i });

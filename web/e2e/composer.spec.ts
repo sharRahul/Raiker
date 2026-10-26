@@ -203,7 +203,7 @@ test.beforeEach(async ({ page }) => {
     }
     const relative = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     const file = join(dist, relative);
-    const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2" };
+    const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png" };
     await route.fulfill({ body: await readFile(file), contentType: types[extname(file)] ?? "application/octet-stream" });
   });
   await page.goto("http://raiker.test/#/new-chat");
@@ -899,6 +899,7 @@ test("Design starters prepare an editable draft and keep composer controls at na
   await expect(composer.getByLabel("Size")).toHaveCount(0);
   await expect(composer.getByLabel("How many")).toHaveCount(0);
   await expect(composer.getByLabel("Image model")).toBeVisible();
+  await expect(composer.locator(".model-scope svg")).toHaveCount(2);
   await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
   await capture(page, join(shots, "design-starters-desktop.png"));
   await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
@@ -947,4 +948,41 @@ test("imported image is the source of a Design edit", async ({ page }) => {
   await composer.getByRole("button", { name: "Edit" }).click();
   await expect.poll(() => submitted?.source_generation_id).toBe("imported_1");
   await expect.poll(() => submitted?.model).toBe("gpt-image-1");
+});
+
+
+test("composer model icons load and menus stay within the viewport", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const route of ["new-chat", "build"]) {
+      await page.goto(`http://raiker.test/#/${route}`);
+      const picker = page.getByRole("button", { name: /Model for this turn/ });
+      await expect(picker).toBeVisible();
+      const logo = picker.locator(".provider-logo img");
+      await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+      await picker.click();
+      const menu = page.getByRole("menu", { name: "Models" });
+      await expect(menu).toBeVisible();
+      const bounds = await menu.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1);
+      await capture(page, join(shots, `composer-${route}-${width}-model.png`));
+      await page.keyboard.press("Escape");
+    }
+  }
+});
+
+
+test("composer controls share a consistent height", async ({ page }) => {
+  for (const route of ["new-chat", "build", "design"]) {
+    await page.goto(`http://raiker.test/#/${route}`);
+    const card = page.locator(".composer-card:visible");
+    await expect(card).toBeVisible();
+    const controls = route === "design"
+      ? card.locator(".upload-image, .model-scope, .voice-button, .send")
+      : card.locator(".action-trigger, .mode-trigger, .profile .chip, .model-trigger, .voice-button, .send");
+    const heights = await controls.evaluateAll(nodes => nodes.filter(node => (node as HTMLElement).offsetParent !== null).map(node => node.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...heights) - Math.min(...heights), route).toBeLessThanOrEqual(2);
+  }
 });

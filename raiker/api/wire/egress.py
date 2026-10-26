@@ -69,3 +69,24 @@ class BlocklistProbe(TypedDict):
     rule: str | None
     #: Where that rule comes from: ``built_in``, ``environment`` or ``yours``.
     rule_source: Literal["built_in", "environment", "yours"] | None
+
+
+class ThreatFeedStatus(TypedDict):
+    """One public threat feed: what it lists, how much, and when it was last read."""
+
+    id: str
+    name: str
+    what: str
+    url: str
+    entries: int
+    fetched_at: float | None
+    last_error: str
+
+
+class ThreatFeeds(TypedDict):
+    """Owner's decision, 2026-10-26: a flag means a feed registers a site as malicious."""
+
+    feeds: list[ThreatFeedStatus]
+    #: Sites never flagged as a whole: widely used ones, and those Raiker signs in to.
+    known_sites: list[str]
+    authenticated_sites: list[str]

@@ -29,6 +29,7 @@ import ipaddress
 import os
 import re
 import socket
+import urllib.request
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -341,6 +342,84 @@ def web_proxy_for(scheme: str, host: str, port: int | None = None) -> str:
     return chosen
 
 
+#: Top-level labels that name a private network rather than the internet:
+#: RFC 6761/6762/8375 special-use names and the suffixes networks commonly use
+#: for themselves. A name ending in one is never handed to a proxy (SSRF).
+_INTERNAL_SUFFIXES = frozenset({
+    "local", "localhost", "localdomain", "internal", "intranet", "corp", "home",
+    "lan", "private", "priv", "test", "invalid", "example", "arpa", "onion",
+    "domain", "workgroup", "home-network", "intra", "office", "cluster",
+})
+_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
+
+
+def public_shaped_name(host: str) -> bool:
+    """Whether *host* looks like an internet name, judged without resolving it.
+
+    The proxy route exists for a machine that cannot resolve public names
+    itself. The owner's proxy can often resolve *internal* names too, so a name
+    this machine cannot check is sent to it only when it has the shape of a
+    public one: at least two valid labels and an alphabetic top-level label that
+    is not a private-network suffix. A single-label name (``intranet``), a
+    literal address, or ``wiki.corp`` is refused instead.
+    """
+    labels = (host or "").strip().lower().rstrip(".").split(".")
+    if len(labels) < 2 or not all(_LABEL.match(label) for label in labels):
+        return False
+    top = labels[-1]
+    if not (top.isalpha() or top.startswith("xn--")) or len(top) < 2:
+        return False
+    return top not in _INTERNAL_SUFFIXES
+
+
+#: SSRF — where a proxied name is looked up before the proxy is asked to reach
+#: it (DNS over HTTPS, JSON form). The owner may point it at their own resolver.
+DOH_ENDPOINT_ENV = "RAIKER_WEB_DOH_ENDPOINT"
+DEFAULT_DOH_ENDPOINT = "https://cloudflare-dns.com/dns-query"
+_DOH_TIMEOUT_SECONDS = 5.0
+
+
+def resolve_via_proxy(host: str, proxy: str) -> list[str] | None:
+    """Every A and AAAA answer for *host*, looked up over HTTPS through *proxy*.
+
+    ``[]`` when the name has no address, ``None`` when the lookup could not be
+    made or read: the caller refuses the read either way, since an answer it
+    cannot check is not one it may act on. A DoH answer is not a pin (the proxy
+    resolves again when it connects), so a name re-pointed between the two
+    lookups is the residual; a name that simply points inside a network is not.
+    """
+    import json
+    from urllib.parse import quote
+    from urllib.request import ProxyHandler, Request, build_opener
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args: object, **kwargs: object) -> None:
+            return None
+
+    endpoint = os.environ.get(DOH_ENDPOINT_ENV, "").strip() or DEFAULT_DOH_ENDPOINT
+    if not endpoint.startswith("https://"):
+        return None
+    opener = build_opener(ProxyHandler({"https": proxy}), _NoRedirect())
+    found: list[str] = []
+    for record_type, code in (("A", 1), ("AAAA", 28)):
+        url = f"{endpoint}{'&' if '?' in endpoint else '?'}name={quote(host)}&type={record_type}"
+        request = Request(url, headers={"Accept": "application/dns-json"})  # noqa: S310 - https only
+        try:
+            with opener.open(request, timeout=_DOH_TIMEOUT_SECONDS) as response:  # noqa: S310
+                answer = json.loads(response.read(65_536).decode("utf-8"))
+        except Exception:  # noqa: BLE001 — an unreadable lookup is no answer
+            return None
+        if not isinstance(answer, dict) or answer.get("Status") not in (0, 3):
+            return None
+        for record in answer.get("Answer") or []:
+            if isinstance(record, dict) and record.get("type") == code:
+                try:
+                    found.append(str(ipaddress.ip_address(str(record.get("data", "")))))
+                except ValueError:
+                    return None
+    return found
+
+
 def evaluate_host(
     host: str,
     rules: tuple[BlocklistRule, ...],
@@ -364,7 +443,11 @@ def evaluate_host(
     ``allow_proxy`` (BUG-353): when this machine cannot resolve the name at all
     and the owner's environment names a proxy for the scheme, the read goes
     through that proxy. A name that resolves here to a private address is still
-    refused; only an unresolvable one takes the proxy route.
+    refused; only an unresolvable one takes the proxy route, and only when it has
+    the shape of a public name (:func:`public_shaped_name`), so the proxy is not
+    used to reach the owner's internal names (SSRF). It is then looked up
+    through the proxy (:func:`resolve_via_proxy`) and every answer must pass the
+    address guard; a lookup that cannot be made refuses the read.
     """
     target = (host or "").strip().lower().rstrip(".")
     if not target:
@@ -399,9 +482,26 @@ def evaluate_host(
         # does not resolve at all, sending the owner to look for a network
         # they do not have. Both are refused; only the reason differs.
         if literal is None and not resolves_at_all(target, port):
-            proxy = web_proxy_for(scheme, target, None if port in (80, 443) else port) if allow_proxy else ""
+            proxy = (
+                web_proxy_for(scheme, target, None if port in (80, 443) else port)
+                if allow_proxy and public_shaped_name(target)
+                else ""
+            )
             if proxy:
-                return EgressDecision(True, flagged=tuple(flagged), route="proxy", proxy=proxy)
+                # SSRF (owner's decision, 2026-10-26): the proxy would resolve
+                # the name itself, out of Raiker's sight. The name is looked up
+                # through the proxy first and the address guard applied to every
+                # answer; a lookup that cannot be made refuses the read.
+                looked_up = resolve_via_proxy(target, proxy)
+                if looked_up is None:
+                    return EgressDecision(False, "web_host_unverified", target, flagged=tuple(flagged))
+                if not looked_up:
+                    return EgressDecision(False, "web_host_unresolved", target, flagged=tuple(flagged))
+                if not all(address_is_reachable(ipaddress.ip_address(item)) for item in looked_up):
+                    return EgressDecision(False, "web_host_not_public", target, flagged=tuple(flagged))
+                return EgressDecision(
+                    True, addresses=tuple(looked_up), flagged=tuple(flagged), route="proxy", proxy=proxy
+                )
             return EgressDecision(False, "web_host_unresolved", target, flagged=tuple(flagged))
         return EgressDecision(False, "web_host_not_public", target, flagged=tuple(flagged))
 
@@ -428,6 +528,11 @@ def refusal_message(reason_code: str) -> str:
         "web_egress_blocked": (
             "Web access denied: that destination is on your blocked list "
             "(Settings → Web access, or RAIKER_WEB_EGRESS_BLACKLIST)."
+        ),
+        "web_host_unverified": (
+            "Web access denied: this machine reaches the web through a proxy, and the "
+            "name could not be looked up through it to check where it leads. Raiker "
+            "does not read a page it cannot check (RAIKER_WEB_DOH_ENDPOINT sets the lookup)."
         ),
         "web_host_unresolved": (
             "Web access denied: that name does not resolve to any address from this "

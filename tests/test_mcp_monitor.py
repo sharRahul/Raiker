@@ -254,6 +254,13 @@ def test_shape_sensitivity_labels_secrets_only(tmp_path: Path) -> None:
     # value is never returned — only the label.
     assert shape_sensitivity("password: hunter2-supersecret-value") == "credential_like"
     assert shape_sensitivity("just a normal sentence") is None
+    # A public page about secret scanning, with a long URL slug, is not a secret.
+    page = (
+        "GitHub secret scanning finds leaked keys. Read more at "
+        "https://docs.github.com/en/code-security/secret-scanning-introduction-and-overview"
+    )
+    assert shape_sensitivity(page) is None
+    assert shape_sensitivity("token " + "ghp_" + "A" * 36) == "credential_like"
     assert shape_sensitivity("") is None
 
 

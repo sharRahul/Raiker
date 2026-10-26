@@ -76,7 +76,7 @@ claim, and this table does not make claims.
 | ID | Risk | Doc | Code | What is enforced today, and what is not |
 |---|---|---|---|---|
 | LLM01 | Prompt injection | yes | ✅ | Structural, not prompt-level: external content is framed as untrusted data and never as instruction (`raiker/runtime/web_access.py`, `raiker/runtime/retrieval.py`, `raiker/runtime/attachments.py`), each context item carries source and trust (`raiker/context/models.py`), and hijacked intent still has to cross a deny-by-default tool gate (`raiker/policy/engine.py`). The scanning hook this document requires now exists as an **advisory** signal: `raiker/security/injection_scan.py` raises a redacted finding naming the exact page or document, and never blocks — the refusal path stays the gate. |
-| LLM02 | Sensitive information disclosure | yes | ✅ | One redaction pass covers the API surface and the event log by *shape*, not keyword (`raiker/api/redaction.py`, `raiker/context/redaction.py`); egress answers per-capability rules — an owner blocklist plus a non-optional public-address guard for `web_fetch` (`RAIKER_WEB_EGRESS_BLACKLIST`, `raiker/runtime/web_policy.py`), and an allowlist for connectors and pushes (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty ⇒ fail closed); local-only profiles refuse hosted routing (`raiker/models/endpoint_policy.py`). Remaining gap: no classifier ranks *content* sensitivity before model egress — the boundary is the allowlist, not the payload. |
+| LLM02 | Sensitive information disclosure | yes | ✅ | One redaction pass covers the API surface and the event log by *shape*, not keyword (`raiker/api/redaction.py`, `raiker/context/redaction.py`); egress answers per-capability rules — an owner blocklist plus a non-optional public-address guard for `web_fetch` (`RAIKER_WEB_EGRESS_BLACKLIST`, `raiker/runtime/web_policy.py`), and an allowlist for connectors and pushes (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty ⇒ fail closed); local-only profiles refuse hosted routing (`raiker/models/endpoint_policy.py`). Since 2026-10-26 a tool result is stripped of every published credential shape before a model reads it (`raiker/security/secret_shapes.py::strip_credentials`, applied in `raiker/runtime/orchestrator.py`), so a key in a file or page the agent read never reaches a hosted provider; `tests/test_tool_result_credentials.py`. Remaining gap: a credential in a format no provider publishes is not recognised. |
 | LLM03 | Supply chain | yes | 🟡 | Manifest validation, permission diff and checksums are real, and both HMAC and Ed25519 signature verification are implemented (`raiker/plugins/verify.py`). The default install has no owner key, so a signature is verified as **present-only** rather than authentic — which is now a first-class, owner-visible property of every plugin rather than a silent default (FIXED-166). A trusted-publisher allowlist is still absent. |
 | LLM04 | Data & model poisoning | yes | 🔒 | The governed memory lifecycle is real — proposal, provenance, confidence, contradiction review and forgetting (`raiker/memory/`) — and credential-shaped text is refused before the owner is asked (`raiker/memory/policy.py`). The `memory_write` / `memory_forget` gates ship **off**, so this is disabled-by-default rather than unimplemented. |
 | LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools and missing arguments are rejected (`model_tool_call_rejected`) before execution. |
@@ -94,6 +94,48 @@ classifier before egress (LLM02) and a trusted-publisher allowlist (LLM03) — r
 inferred from a status glyph.
 
 ---
+
+## OWASP Top 10 for Agentic Applications (2026) — controls and evidence
+
+Added 2026-10-26 on the owner's requirement that Raiker detect and prevent
+these classes. Each row names the control that stops the class and the test
+that proves it; ✅ is implemented and tested, 🟡 is partial, with what is open.
+
+| ID | Risk | Status | Control | Evidence |
+|---|---|---|---|---|
+| ASI01 | Agent goal hijack | ✅ | Outside text is framed as untrusted data, never instruction; an advisory injection scan names the source and a task's saved prompt is scanned too; whatever the model is talked into still has to cross the deny-by-default tool gate and the owner's approval | `tests/test_prompt_injection_scan.py`, `tests/test_policy_engine.py` |
+| ASI02 | Tool misuse and exploitation | ✅ | Every call is schema-validated and brokered; risk bands from declared signals; writes ask first; SSRF refused for every model-steered request ([SECURITY_AND_POLICY.md](SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf)); `curl`/`wget`/interpreters refused as commands | `tests/test_ssrf_redirects.py`, `tests/test_web_access.py`, `tests/test_command_sandbox.py` |
+| ASI03 | Identity and privilege abuse | ✅ | Per-turn machine identity; credentials stay in the vault and are borrowed per call; a tool result is stripped of credential shapes before a model reads it; connector requests never follow a redirect with a token | `tests/test_turn_containment_and_delegation.py`, `tests/test_tool_result_credentials.py`, `tests/test_ssrf_redirects.py` |
+| ASI04 | Agentic supply chain | 🟡 | Plugin manifests, checksums and HMAC/Ed25519 signatures; MCP endpoints classified when added; skill imports from fixed hosts; dependency and image audits in CI. Open: a trusted-publisher allowlist (LLM03) | `tests/test_phase_4_plugin_signature_verification.py`, CI `supply-chain`, `image-scan` |
+| ASI05 | Unexpected code execution | ✅ | Code runs in the native sandbox with no network, or on the host only after the owner turns on `host_network_code_execution`; chaining, substitution and interpreter flags refused | `tests/test_command_sandbox.py` |
+| ASI06 | Memory and context poisoning | ✅ | Governed memory (proposal, provenance, review, forgetting), off by default; credential-shaped text refused; recalled memory names its conversation | `tests/test_phase_4_memory_mvp.py` |
+| ASI07 | Insecure inter-agent communication | ✅ | Subagents are read-only, cannot spawn others, and their results are identity-bound to the spawn that produced them | `tests/test_subagent_delegation_binding.py`, `tests/test_agent_plan_and_subagents.py` |
+| ASI08 | Cascading failures | ✅ | A durable circuit breaker per tool and provider, with a half-open probe; per-turn budgets | `tests/test_capability_containment.py` |
+| ASI09 | Human-agent trust exploitation | ✅ | Approval cards state the exact effect; a web read's alerts (registered-malicious site, plain http, credentials removed, instruction-shaped text) are shown on the row and passed on; monitor alerts fire on credential shapes only, so an alert means something | `tests/test_site_reputation.py`, `tests/test_mcp_monitor.py` |
+| ASI10 | Rogue agents | ✅ | Stop everything; containment that trips on anomalies and that the owner can lift; every action is an audited event | `tests/test_stop_all_work.py`, `tests/test_mcp_containment.py` |
+
+## OWASP Top 10 web application risks (2021) — controls and evidence
+
+| ID | Risk | Status | Control | Evidence |
+|---|---|---|---|---|
+| A01 | Broken access control | ✅ | Every API route authenticates; rows are owner-scoped; state-changing requests need the CSRF header with a SameSite=Strict session | `tests/test_routes_auth.py`, `tests/test_api_rest_hardening.py` |
+| A02 | Cryptographic failures | ✅ | SQLCipher store, Fernet vault, TLS for hosted providers, secrets never logged (shape redaction on every response) | `tests/test_redaction_middleware_content_types.py` |
+| A03 | Injection | ✅ | Parameterised SQL (identifiers only from the module's own lists, reviewed by SAST); command policy refuses shell metacharacters; Markdown escapes HTML and emits links only for safe schemes; prompt injection under ASI01 | CI `scan_sast`, `tests/test_command_sandbox.py`, `web/src/lib/markdown.test.ts` |
+| A04 | Insecure design | ✅ | A threat model per capability before it ships (`docs/threat-models/`) | `tests/test_docs_consistency.py` |
+| A05 | Security misconfiguration | ✅ | Binds to `127.0.0.1` unless `--allow-public` with its own token; CSP with `frame-ancestors 'none'`, `nosniff`; gates ship off for acting capabilities | `tests/test_api_rest_hardening.py` |
+| A06 | Vulnerable and outdated components | ✅ | `pip-audit` on declared ranges and the locked release set, `npm audit`, and a pinned image scanner, each failing CI | CI `supply-chain`, `web`, `image-scan` |
+| A07 | Identification and authentication failures | ✅ | Account lockout after failed attempts, MFA, session expiry and revocation, rate limiting | `tests/test_accounts.py`, `tests/test_mfa.py` |
+| A08 | Software and data integrity failures | ✅ | Signed updates and Authenticode on Windows; lockfile with hashes; plugin signatures | `tests/test_signed_updates.py`, `tests/test_windows_authenticode.py` |
+| A09 | Security logging and monitoring failures | ✅ | Append-only event log, audit export, capability and MCP monitors with owner notifications | `tests/test_capability_containment.py` |
+| A10 | Server-side request forgery | ✅ | The SSRF table in [SECURITY_AND_POLICY.md](SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf): address guard with pinning, no redirects followed, public-shaped names only to a proxy and checked through it, fail closed | `tests/test_ssrf_redirects.py` |
+
+**What "prevents all of them" can and cannot mean.** Each class above has a
+control in code and a test that fails if the control is removed; that is the
+claim. It is not a claim that no attack in a class can succeed: a new
+credential format, a model talked into a harmful but permitted action the owner
+then approves, or a dependency advisory published tomorrow are each still
+possible, which is why the gates, approvals and audits stay in place rather
+than being replaced by any one detector.
 
 ## Prompt Injection Requirements
 

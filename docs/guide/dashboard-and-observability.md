@@ -305,19 +305,24 @@ permission is a separate decision you make under **Permissions**, and every one
 of these still asks it at the moment of use.
 
 Raiker reads any public web page and searches with DuckDuckGo, with no account
-or key. A site you flag is still read, and the answer carries an alert you see
-under the read and in the reply; plain http, a link with a password in it (the
-password is removed first), a page Raiker flagged before and text shaped like
-instructions are alerted the same way. Resolved addresses must be public and are
+or key. It flags only sites a public threat feed registers as malicious
+(URLhaus for malware hosts, OpenPhish for phishing pages): the page is still
+read, as data, and the answer carries an alert you see under the read and in the
+reply. GitHub, Google, Slack, the other services you sign in to and widely used
+sites are never flagged. Plain http, a link with a password in it (removed
+first), a page Raiker flagged before and text shaped like instructions are
+alerted the same way. Resolved addresses must be public and are
 checked again on redirects, so a read never reaches your own network; that guard
 cannot be disabled, by any setting or approval. The fetched page is converted to
 sanitized text, with removed content reported. Extraction opens no connection of its own — it reads what that same
 bounded fetch returned — so nothing it does can widen what leaves this machine.
 
-**Settings → Web access** leads with your **Flagged sites** (**Flag** to add
-one, **Remove** to drop it) and the sources that add up to what is in force:
-your own, this host's environment (flagged like your own), and the names built
-into the build, which are always refused. The last two are read-only there, folded away and
+**Settings → Web access** shows the **Known malicious sites** feeds, each with
+its size, when it was last updated and why an update failed, and **Update now**.
+The feeds are matched on this computer, so the address you read is never sent
+anywhere to be checked. **Your own flags** is optional (**Flag**, **Remove**); a
+known site cannot be flagged. The names built into the build, your own network
+and cloud metadata services, are always refused, not flagged. The last two are read-only there, folded away and
 each naming who *can* change it — the environment list is set before Raiker is
 started, and the built-in list ships with the build.
 

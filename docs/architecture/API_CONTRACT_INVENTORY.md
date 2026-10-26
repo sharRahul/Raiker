@@ -12,7 +12,7 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 * **deferred** — the body has no declared type; a test fails while any is.
 * **special** — a stream, a file or another non-JSON transport; hand-written.
 
-**469 operations: 455 verified, 0 eligible, 0 deferred, 14 special.**
+**471 operations: 457 verified, 0 eligible, 0 deferred, 14 special.**
 
 | Method | Path | Request | Response | Status | Why |
 |---|---|---|---|---|---|
@@ -482,6 +482,8 @@ operation answers with, and whether OpenAPI describes it (OPT-01/OPT-02 —
 | POST | `/api/web-access/blocklist` | BlocklistRuleRequest | BlocklistRuleAdded | verified | declared BlocklistRuleAdded |
 | POST | `/api/web-access/blocklist/test` | BlocklistTestRequest | BlocklistProbe | verified | declared BlocklistProbe |
 | DELETE | `/api/web-access/blocklist/{rule_id}` |  | BlocklistRuleDeleted | verified | declared BlocklistRuleDeleted |
+| GET | `/api/web-access/threat-feeds` |  | ThreatFeeds | verified | declared ThreatFeeds |
+| POST | `/api/web-access/threat-feeds/refresh` |  | ThreatFeeds | verified | declared ThreatFeeds |
 | GET | `/api/work-in-flight` |  | WorkInFlight | verified | declared WorkInFlight |
 | GET | `/api/work-threads` |  | WorkThreadView[] | verified | DashboardService.list_work_threads |
 | GET | `/api/work-threads/page` |  | WorkThreadPage | verified | DashboardService.work_thread_page |

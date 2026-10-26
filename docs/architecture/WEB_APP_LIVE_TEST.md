@@ -29,7 +29,7 @@ A fresh workspace served by `raiker-web` at 1440×900, holding
 Anthropic was connected through **Add model**, with the key and workspace ID
 typed from the run's environment; neither appears in a spec, command, document,
 screenshot or the server log. Spec: `web/e2e/tool-inventory-round3-live.spec.ts`:
-**6/6**, after four product fixes the run found (below) and two spec fixes (a
+**7/7** with RT-TOOL-23 (RT-TOOL-20 revised 2026-10-26), after the product fixes the runs found (below) and two spec fixes (a
 heading's quotation marks, and the Permissions page having changed since an
 older helper was written). The GitHub operations need a credential, and an
 extended search needs a search provider the host's proxy allows (it refuses
@@ -40,7 +40,8 @@ extended search needs a search provider the host's proxy allows (it refuses
 | RT-TOOL-17 | **?** on Approvals opens help on the part *What "approved" means*, with *Previous* and *Next*; its back button opens *Permissions and the runtime* as its intro and an *In this article* list (*Capability gates* among the parts), with no part heading above the list | ✅ after two fixes: part ids were redacted as secrets (FIXED-1227), and hard-wrapped guide lines rendered as ragged line breaks (FIXED-1228) |
 | RT-TOOL-18 | Searching help for *fallback* lists the part *Fallback sequence* under *Connecting a model*, and opening it shows that part alone | ✅ after a fix: an article still loading replaced the typed search (FIXED-1229) |
 | RT-TOOL-19 | Anthropic connects through **Add model** and becomes the default | ✅ |
-| RT-TOOL-20 | With `github.com` flagged in Settings › Web access (**Flag**, then *Remove flag from github.com*), a turn's `web_fetch` of `https://github.com/about` with a question is approved once and read through the proxy; the row shows *Alerts for this read* (*github.com is on your flagged sites…*), and the answer passes the alert on | ✅ |
+| RT-TOOL-20 | Revised 2026-10-26 (owner's decision): Settings › Web access shows **Known malicious sites** with URLhaus and OpenPhish, their size and update state (*Could not reach the feed from this computer* on this host), and *Never flagged: 89 known and signed-in sites*; flagging `github.com` is refused with *github.com is a known site and is never flagged.* The first version of this case had flagged github.com by hand to prove the alert, which is what the owner objected to | ✅ after a spec fix (a line break in the text) and two product fixes: the count line mixed in the always-refused names (FIXED-1246), and a feed error showed its reason code |
+| RT-TOOL-23 | On this proxy host (DNS over HTTPS refused by the proxy), a turn's `web_fetch` of `https://duckduckgo.com/about` is refused before any request: the row reads *refused — could not check where it leads through your proxy* and the reply says the read was refused because it could not be verified. `github.com`, which this host resolves directly, is read on the pinned route | ✅ after two fixes: the row showed the raw reason code (FIXED-1245), and a security alert had fired on GitHub's About page (FIXED-1244) |
 | RT-TOOL-21 | A turn reads `notebooks/demo.ipynb` as cells and proposes `edit_file` with cell 1; the row reads *Edit file notebooks/demo.ipynb › cell 1* and waits for a decision | ✅ |
 | RT-TOOL-22 | In a project, a Plan turn ends its reply with *Questions I asked of this plan* | ✅ |
 | Suites | Python suite in three shards, ruff, mypy, secret scan, SAST, API contract check; web unit suite, `svelte-check`, ESLint, build | ✅ |

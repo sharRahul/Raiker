@@ -3,6 +3,7 @@
   import { api, ApiError } from "../../api";
   import PageState from "../../components/PageState.svelte";
   import type { WebBlocklistProbe as BlocklistProbe } from "../../apiTypes";
+  import type { ThreatFeeds } from "../../generated/apiContract";
 
   type StoredRule = {
     rule_id: string;
@@ -21,6 +22,8 @@
   };
 
   let data = $state<Blocklist | null>(null);
+  let feeds = $state<ThreatFeeds | null>(null);
+  let updating = $state(false);
   let loadError = $state<string | null>(null);
   let draft = $state("");
   let note = $state("");
@@ -61,6 +64,9 @@
 
   function ruleError(detail: string): string {
     const key = detail.split(":")[0];
+    if (key === "known_site_not_flaggable") {
+      return `${draft.trim()} is a known site and is never flagged. Raiker flags only sites a public threat feed registers as malicious.`;
+    }
     if (key === "blocklist_regex_invalid") {
       return `That regular expression will not compile: ${detail.split(":").slice(1).join(":")}`;
     }
@@ -71,6 +77,8 @@
     try {
       loadError = null;
       data = await api.webBlocklist();
+      // The feeds are their own card: one that cannot load never hides the page.
+      feeds = await api.threatFeeds().catch(() => null);
     } catch (error) {
       loadError = error instanceof ApiError ? error.message : String(error);
     }
@@ -91,6 +99,30 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function updateFeeds(): Promise<void> {
+    updating = true;
+    try {
+      feeds = await api.refreshThreatFeeds();
+    } finally {
+      updating = false;
+    }
+  }
+
+  // A reason code is for the record; the owner reads what it means.
+  function feedError(code: string): string {
+    if (/^(fetch_failed|egress_denied)/.test(code)) {
+      return "Could not reach the feed from this computer. The last copy, if any, is still used.";
+    }
+    if (code.startsWith("redirect_refused")) return "The feed tried to send Raiker elsewhere, so it was not read.";
+    if (code.startsWith("http_error")) return `The feed answered with an error (${code.split(":")[1] ?? "?"}).`;
+    return "The last update failed. The last copy, if any, is still used.";
+  }
+
+  function updated(at: number | null): string {
+    if (!at) return "Not downloaded yet";
+    return `Updated ${new Date(at * 1000).toLocaleString()}`;
   }
 
   async function remove(ruleId: string): Promise<void> {
@@ -124,9 +156,10 @@
   <header class="section-heading">
     <h2>Web access</h2>
     <p>
-      Raiker can read any public web page and searches with DuckDuckGo, with no
-      account or key. Sites you flag are still read, with an alert where you read
-      the answer.
+      Raiker reads any public web page and searches with DuckDuckGo, with no account
+      or key. It flags only sites a public threat feed registers as malicious, with
+      an alert where you read the answer. Known sites, and the services you sign in
+      to, are never flagged.
     </p>
   </header>
 
@@ -153,22 +186,58 @@
       </p>
     </div>
 
+    {#if feeds}
+      <div class="card" data-testid="threat-feeds">
+        <div class="card-head">
+          <h3>Known malicious sites</h3>
+          <button class="btn btn-sm" type="button" onclick={updateFeeds} disabled={updating}>
+            {updating ? "Updating…" : "Update now"}
+          </button>
+        </div>
+        <p class="lead">
+          Matched on this computer: the address you read is never sent anywhere to be
+          checked. Refreshed daily while Raiker runs.
+        </p>
+        <ul class="feeds">
+          {#each feeds.feeds as feed (feed.id)}
+            <li>
+              <div>
+                <strong>{feed.name}</strong>
+                <span class="kind">{feed.what}</span>
+              </div>
+              <div class="feed-state">
+                <span>{feed.entries.toLocaleString()} {feed.entries === 1 ? "entry" : "entries"}</span>
+                <span class="kind">{updated(feed.fetched_at)}</span>
+                {#if feed.last_error}
+                  <span class="error" role="status" title={feed.last_error}>{feedError(feed.last_error)}</span>
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+        <p class="kind never">
+          Never flagged: {feeds.authenticated_sites.length + feeds.known_sites.length} known
+          and signed-in sites, GitHub, Google and Slack among them. One page on such a
+          site that a feed lists is still flagged, as that page.
+        </p>
+      </div>
+    {/if}
+
     <div class="card">
-      <h3>Flagged sites</h3>
+      <h3>Your own flags</h3>
       <!-- REM-SET-WEB — the effective total, which is what a fetch is actually
            evaluated against. The three sources below add up to it, so an owner
            who deletes one of their own rules can see that the number the
            runtime uses moved with it. -->
       <p class="effective" role="status">
-        <strong>{data.effective_count}</strong>
-        {data.effective_count === 1 ? "rule" : "rules"} in force —
-        {data.stored.length} yours,
-        {data.environment.length} from this host's environment,
-        {data.builtin.length} built in.
+        <strong>{data.stored.length}</strong> of your own{data.environment.length > 0
+          ? `, ${data.environment.length} from this host's environment`
+          : ""}.
       </p>
       <p class="lead">
-        Raiker reads a flagged site and tells you, in the conversation, that it is on
-        this list. A domain also covers its subdomains. You can also use a wildcard
+        Optional. Raiker reads a site you flag and tells you, in the conversation, that
+        it is on this list; a known site cannot be flagged. A domain also covers its
+        subdomains. You can also use a wildcard
         (<code>*.ads.example.com</code>), an IP address, an IP range
         (<code>10.0.0.0/8</code>), or a regular expression
         (<code>/^tracker[0-9]+\./</code>).
@@ -193,8 +262,7 @@
 
       {#if data.stored.length === 0}
         <p class="empty">
-          Nothing flagged yet. Raiker reads any public site, and says so when a
-          site you flagged comes up.
+          Nothing of your own. The feeds above are what Raiker flags.
         </p>
       {:else}
         <ul class="rules">
@@ -323,6 +391,44 @@
      the button never stretches to fill a column it was only borrowing, and
      `min-width: 0` is what lets a field actually shrink rather than merely
      being asked to. */
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .card-head h3 {
+    margin: 0;
+  }
+  .feeds {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .feeds li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border);
+  }
+  .feeds li > div {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .feed-state {
+    text-align: right;
+    font-size: var(--text-sm);
+  }
+  .never {
+    margin: var(--space-3) 0 0;
+  }
+  .feeds .kind,
+  .never.kind {
+    margin-left: 0;
+  }
   .add-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: end; }
   .add-row .field-label { flex: 1 0 100%; margin: 0; }
   .add-row .input { flex: 1 1 12rem; min-width: 0; }

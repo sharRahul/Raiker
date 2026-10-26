@@ -163,6 +163,32 @@ reattachment, persistent sessions, and remote command supervisors are still not
 security boundaries; see BUG-194 and the compatibility matrix.
 
 
+## Server-side request forgery (SSRF)
+
+**Requirement (owner, 2026-10-26): a tool-calling agent must not be able to make
+Raiker send a request to the owner's own network or a cloud metadata service.**
+Every path by which a model's tool call can choose, or steer, a destination is
+listed here with what stops it. A path that is not in this table does not take
+a destination from a model.
+
+| Path | What the model controls | What stops SSRF | Where |
+|---|---|---|---|
+| `web_fetch`, `web_extract`, `web_search` (and its extended reads) | The URL | Only `http` and `https`. Every address the name resolves to must be public (loopback, private, link-local, CGNAT, multicast, unspecified and IPv4-mapped forms refused); the built-in names (`localhost`, `*.local`, metadata hosts) always refused. The connection is pinned to the checked address, so DNS cannot change between check and request. Redirects are never followed by the client; each hop is checked again. Flagging a site alerts and does not refuse, but nothing opens the address guard | `raiker/runtime/web_policy.py`, `web_access.py` |
+| The same reads on a proxy-only host | The URL | Only a name this machine cannot resolve takes the proxy, and only when it has the shape of a public name (`public_shaped_name`): a single-label name or a private-network suffix (`.corp`, `.internal`, `.lan`, `.home.arpa`, …) is refused, never proxied, and a literal address never reaches the proxy. The name is then looked up through the proxy over DNS over HTTPS (`RAIKER_WEB_DOH_ENDPOINT`, default Cloudflare's) and every answer must pass the address guard; **a lookup that cannot be made refuses the read** (`web_host_unverified`, owner's decision 2026-10-26) | `web_policy.py` (`resolve_via_proxy`) |
+| Connector reads and writes (GitHub, Gmail, Calendar, Slack, manifest connectors) | Path values, ids, bodies | The host is fixed by the connector, never taken from the model; model values are percent-encoded into the path; the host must be on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`; **no redirect is ever followed** (`redirect_refused:<status>`), so a token cannot be carried to another host | `raiker/runtime/executors/sandbox.py` (`get_url`, `post_url`, `post_json_url`), `connector_ecosystem.py` |
+| Remote MCP calls | Tool arguments only; the endpoint is the owner's | Endpoint classified when the owner adds it; pinned to its checked address; redirects re-checked and never followed by the client | `mcp_endpoint_policy.py`, `sandbox.py` (`_mcp_opener`) |
+| Shell commands | The command | `curl`, `wget`, `nc`, `ssh`, `socat` and the interpreters are refused as commands; code runs in the native sandbox with no network, or on the host only after the owner turns on `host_network_code_execution` | `raiker/runtime/command_policy.py`, `raiker/execution/code_placement.py` |
+| `git_push` | The remote name | Only `https` or SSH to a known forge host, no credentials in the URL, the host on the push egress allowlist | `raiker/tools/git.py` |
+
+**Residual risk, stated plainly.** On a proxy-only host the checked DNS
+answer is not a pin: the proxy resolves the name again when it connects, so a
+name re-pointed to a private address in the moment between the two lookups
+(DNS rebinding with a very short TTL) is the remaining window. A name that
+simply points inside a network is refused. Code the owner has allowed to run on
+the host with network access (`host_network_code_execution`) can reach anything
+the host can; that is an owner grant of arbitrary code, not a URL Raiker can
+check.
+
 ## Model supply and readiness controls
 
 Readiness fails closed and is exact-model scoped. Hosted checks make a bounded

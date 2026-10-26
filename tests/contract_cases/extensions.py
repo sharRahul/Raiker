@@ -70,6 +70,14 @@ def _fake_skill_host(monkeypatch: Any) -> None:
 # ── connectors, the git credential ───────────────────────────────────────────
 
 
+def _offline_feeds(monkeypatch: Any) -> None:
+    """A feed refresh that reaches no network: the case is about the answer's shape."""
+    monkeypatch.setattr(
+        "raiker.runtime.site_reputation.ThreatFeeds.refresh",
+        lambda self, fetch=None: self.status(),
+    )
+
+
 def _vault_key(monkeypatch: Any) -> None:
     """A configured connector vault, so credentials can be stored."""
     monkeypatch.setenv("RAIKER_CONNECTOR_VAULT_KEY", Fernet.generate_key().decode())
@@ -574,6 +582,10 @@ CASES: Cases = {
         "/api/web-access/blocklist/test", {"host": "127.0.0.1"}
     ),
     ("DELETE", "/api/web-access/blocklist/{rule_id}"): _rule_deleted,
+    ("GET", "/api/web-access/threat-feeds"): plain("/api/web-access/threat-feeds"),
+    ("POST", "/api/web-access/threat-feeds/refresh"): patched(
+        plain("/api/web-access/threat-feeds/refresh"), _offline_feeds
+    ),
     ("POST", "/api/mcp/servers"): plain(
         "/api/mcp/servers", {"name": "echo", "template": "python-stdio-echo"}
     ),

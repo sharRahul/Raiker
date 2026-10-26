@@ -78,3 +78,47 @@ def excused(repo_root: Path, today: dt.date | None = None) -> set[tuple[str, str
         except (KeyError, TypeError, ValueError):
             continue
     return pairs
+
+
+_PRIVATE_KEY_SPAN = re.compile(
+    r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?"
+    r"(?:-----END (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----|\Z)",
+    re.DOTALL,
+)
+
+
+def strip_credentials(value: Any) -> tuple[Any, dict[str, int]]:
+    """*value* with every published credential shape replaced, and what was removed.
+
+    OWASP LLM02 / ASI03 — a tool result is about to be handed to a model, which
+    may be hosted. A key in a file the agent read, a log it fetched or a page it
+    opened would otherwise travel to the provider verbatim. Each match becomes
+    ``[credential removed: <rule>]``, so the model can still say *that* a key is
+    there and where, without ever holding it. Walks dicts and lists; leaves
+    every other type as it is.
+    """
+    removed: dict[str, int] = {}
+
+    def text(item: str) -> str:
+        def mark(rule: str) -> Any:
+            def replace(_match: re.Match[str]) -> str:
+                removed[rule] = removed.get(rule, 0) + 1
+                return f"[credential removed: {rule}]"
+            return replace
+
+        item = _PRIVATE_KEY_SPAN.sub(mark("private_key_block"), item)
+        for rule, pattern in RULES.items():
+            if rule != "private_key_block":
+                item = pattern.sub(mark(rule), item)
+        return item
+
+    def walk(item: Any) -> Any:
+        if isinstance(item, str):
+            return text(item)
+        if isinstance(item, dict):
+            return {key: walk(inner) for key, inner in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [walk(inner) for inner in item]
+        return item
+
+    return walk(value), removed

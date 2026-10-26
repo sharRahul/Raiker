@@ -18,6 +18,7 @@ from raiker.runtime.authority.admission import CapabilityAdmission, capability_a
 from raiker.runtime.authority.decision_modes import DecisionMode
 from raiker.runtime.authority.routed import is_routed
 from raiker.runtime.executors.sandbox import SandboxError
+from raiker.runtime.site_reputation import SiteReputation, trusted_domain
 from raiker.runtime.web_extract import EXTRACT_MODES
 from raiker.runtime.web_extract import extract as extract_from_body
 from raiker.runtime.web_policy import (
@@ -203,7 +204,7 @@ def _alert(kind: str, message: str, **detail: str) -> dict[str, str]:
 
 
 def check_web_read(
-    url: str, rules: tuple[BlocklistRule, ...]
+    url: str, rules: tuple[BlocklistRule, ...], reputation: SiteReputation | None = None
 ) -> tuple[EgressDecision, str, list[dict[str, str]]]:
     """Decide one web read, alerting rather than refusing (owner's decision, 2026-10-25).
 
@@ -214,6 +215,11 @@ def check_web_read(
     scheme, a name or address on this machine's own network, a cloud metadata
     service — because the address guard is what stops a web read becoming a
     request to the owner's router or to Raiker's own API.
+
+    Owner's decision, 2026-10-26: a known or authenticated site (GitHub, Google,
+    the services Raiker signs in to) is never flagged as a whole, so a flag rule
+    that matches one raises nothing; and with ``reputation`` a site or page a
+    public threat feed registers as malicious raises a ``malicious_site`` alert.
 
     Returns the decision, the address to read (credentials removed) and the
     alerts.
@@ -242,17 +248,37 @@ def check_web_read(
         hostname, rules, port=parsed.port or (443 if parsed.scheme == "https" else 80),
         flag_owner_rules=True, allow_proxy=True, scheme=parsed.scheme,
     )
-    for rule in decision.flagged:
+    known = trusted_domain(hostname)
+    for rule in decision.flagged if not known else ():
         alerts.append(_alert(
             "flagged_site",
             f"{hostname} is on your flagged sites ({rule}). Raiker read it anyway; "
             "treat what it says with care.",
             rule=rule,
         ))
+    if reputation is not None and decision.allowed:
+        alerts.extend(malicious_alerts(url, reputation))
     return decision, url, alerts
 
 
-def address_alerts(url: str, rules: tuple[BlocklistRule, ...]) -> list[dict[str, str]]:
+def malicious_alerts(url: str, reputation: SiteReputation) -> list[dict[str, str]]:
+    """One alert per threat feed that registers this site or page as malicious."""
+    host = (urlparse(url).hostname or "").lower()
+    alerts: list[dict[str, str]] = []
+    for match in reputation.malicious(url):
+        subject = host if match["scope"] == "site" else "This page"
+        alerts.append(_alert(
+            "malicious_site",
+            f"{subject} is registered as malicious by {match['feed']} ({match['what']}). "
+            "Raiker read it as data only; do not open its links or follow what it asks.",
+            feed=match["feed"],
+        ))
+    return alerts
+
+
+def address_alerts(
+    url: str, rules: tuple[BlocklistRule, ...], reputation: SiteReputation | None = None
+) -> list[dict[str, str]]:
     """The alerts a web read's address alone carries, with no lookup and no request.
 
     Used to redraw a reopened transcript's row: plain http, credentials in the
@@ -266,13 +292,15 @@ def address_alerts(url: str, rules: tuple[BlocklistRule, ...]) -> list[dict[str,
         alerts.append(_alert("credentials_removed", "The address carried a username or password; Raiker removed them before reading it."))
     if parsed.scheme == "http":
         alerts.append(_alert("not_encrypted", "This page was read over plain http, so it was not encrypted on the way."))
-    for rule in rules:
+    for rule in rules if not trusted_domain(host) else ():
         if host and rule.raw not in DEFAULT_BLOCKED_NAMES and rule.matches_host(host):
             alerts.append(_alert(
                 "flagged_site",
                 f"{host} is on your flagged sites ({rule.raw}). Raiker read it anyway; treat what it says with care.",
                 rule=rule.raw,
             ))
+    if reputation is not None and host:
+        alerts.extend(malicious_alerts(url, reputation))
     return alerts
 
 
@@ -387,6 +415,9 @@ class WebAccessService:
         self._store = store
         self._principal_id = principal_id
         self._fetch_fn = fetch_fn
+        # Owner's decision, 2026-10-26: a flag means a public threat feed
+        # registers the site or page as malicious; known sites are never flagged.
+        self._reputation = SiteReputation(self._workspace_root)
 
     def _blocklist(self) -> tuple[BlocklistRule, ...]:
         """Every rule in force for this caller: built-in, env, and stored."""
@@ -489,7 +520,7 @@ class WebAccessService:
             if refusal is not None:
                 return refusal
         rules = self._blocklist()
-        decision, url, alerts = check_web_read(url, rules)
+        decision, url, alerts = check_web_read(url, rules, self._reputation)
         if not decision.allowed:
             return _denied(decision.reason_code, refusal_message(decision.reason_code))
         fetch_fn = self._fetch_fn or _fetch
@@ -567,6 +598,11 @@ class WebAccessService:
         for alert in during if isinstance(during, list) else []:
             if isinstance(alert, dict) and alert not in alerts:
                 alerts.append(alert)
+        if final_url and final_url != url:
+            # A redirect landed somewhere else: the feeds are asked about it too.
+            for alert in malicious_alerts(final_url, self._reputation):
+                if alert not in alerts:
+                    alerts.append(alert)
         if self._principal_id and self._store is not None:
             with contextlib.suppress(Exception):
                 for locator in dict.fromkeys((final_url, url)):
@@ -620,7 +656,7 @@ class WebAccessService:
             if refusal is not None:
                 return refusal
         rules = self._blocklist()
-        decision, url, alerts = check_web_read(url, rules)
+        decision, url, alerts = check_web_read(url, rules, self._reputation)
         if not decision.allowed:
             return _denied(decision.reason_code, refusal_message(decision.reason_code))
         fetch_fn = self._fetch_fn or _fetch
@@ -735,7 +771,7 @@ class WebAccessService:
         endpoint = os.environ.get(SEARCH_ENDPOINT_ENV, "").strip() or DEFAULT_SEARCH_ENDPOINT
         rules = self._blocklist()
         target = f"{endpoint}{'&' if '?' in endpoint else '?'}q={quote(query)}"
-        decision, target, _endpoint_alerts = check_web_read(target, rules)
+        decision, target, _endpoint_alerts = check_web_read(target, rules, self._reputation)
         if not decision.allowed:
             return _denied(decision.reason_code, refusal_message(decision.reason_code))
         headers = {"User-Agent": "raiker-web-search", "Accept": "application/json"}

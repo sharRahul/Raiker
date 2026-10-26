@@ -782,6 +782,8 @@ export const api = {
   // loopback destinations is not represented here because it is not editable —
   // the read below reports it so the page can say so.
   webBlocklist: () => contract.getBlocklist(),
+  threatFeeds: () => contract.getThreatFeeds(),
+  refreshThreatFeeds: () => contract.refreshThreatFeeds(),
   addWebBlocklistRule: (rule: string, note = "") => contract.addBlocklistRule({ rule, note }),
   deleteWebBlocklistRule: (ruleId: string) => contract.deleteBlocklistRule(ruleId),
   testWebBlocklist: (host: string) => contract.testBlocklist({ host }),

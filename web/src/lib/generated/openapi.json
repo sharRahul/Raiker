@@ -31754,6 +31754,90 @@
         "title": "TextIndexesRebuilt",
         "type": "object"
       },
+      "ThreatFeedStatus": {
+        "description": "One public threat feed: what it lists, how much, and when it was last read.",
+        "properties": {
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "title": "Last Error",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "what",
+          "url",
+          "entries",
+          "fetched_at",
+          "last_error"
+        ],
+        "title": "ThreatFeedStatus",
+        "type": "object"
+      },
+      "ThreatFeeds": {
+        "description": "Owner's decision, 2026-10-26: a flag means a feed registers a site as malicious.",
+        "properties": {
+          "authenticated_sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authenticated Sites",
+            "type": "array"
+          },
+          "feeds": {
+            "items": {
+              "$ref": "#/components/schemas/ThreatFeedStatus"
+            },
+            "title": "Feeds",
+            "type": "array"
+          },
+          "known_sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Known Sites",
+            "type": "array"
+          }
+        },
+        "required": [
+          "feeds",
+          "known_sites",
+          "authenticated_sites"
+        ],
+        "title": "ThreatFeeds",
+        "type": "object"
+      },
       "ThreatModelAcknowledged": {
         "properties": {
           "acknowledged": {
@@ -51817,6 +51901,44 @@
           }
         },
         "summary": "Delete Blocklist Rule"
+      }
+    },
+    "/api/web-access/threat-feeds": {
+      "get": {
+        "description": "The public threat feeds flags come from, and the sites never flagged.",
+        "operationId": "get_threat_feeds_api_web_access_threat_feeds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreatFeeds"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Threat Feeds"
+      }
+    },
+    "/api/web-access/threat-feeds/refresh": {
+      "post": {
+        "description": "Download every feed now. A feed that cannot be read keeps what it had and says why.",
+        "operationId": "refresh_threat_feeds_api_web_access_threat_feeds_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreatFeeds"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh Threat Feeds"
       }
     },
     "/api/work-in-flight": {

@@ -270,3 +270,14 @@ describe("TOOL-72 a suggested connection on a tool row", () => {
     expect(unsafe.connection).toBeUndefined();
   });
 });
+
+describe("reasonWords", () => {
+  it("says an SSRF refusal in words and leaves other codes alone", async () => {
+    const { reasonWords } = await import("./chatPresentation");
+    expect(reasonWords("web_host_unverified:duckduckgo.com")).toBe(
+      "could not check where it leads through your proxy",
+    );
+    expect(reasonWords("web_host_not_public:10.0.0.5")).toBe("it points inside your own network");
+    expect(reasonWords("denied_by_turn_posture")).toBe("denied_by_turn_posture");
+  });
+});

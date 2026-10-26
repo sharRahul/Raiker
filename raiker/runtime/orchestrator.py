@@ -404,6 +404,19 @@ def _queued_call_message(proposal: ToolCallProposal) -> ModelMessage:
     return ModelMessage(role="assistant", content="", tool_calls=(proposal,))
 
 
+def _tool_content(payload: Any) -> str:
+    """A tool result as the model reads it, with every credential shape removed.
+
+    OWASP LLM02 / ASI03: the result may be on its way to a hosted provider, and
+    a key in a file or page the agent read must not go with it. The owner's
+    record keeps its own redaction; this is the copy the model gets.
+    """
+    from raiker.security.secret_shapes import strip_credentials
+
+    cleaned, _removed = strip_credentials(payload)
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
 def _queued_call_exchange(
     proposal: ToolCallProposal, *, tool_name: str, payload: dict[str, Any]
 ) -> list[ModelMessage]:
@@ -412,7 +425,7 @@ def _queued_call_exchange(
         _queued_call_message(proposal),
         ModelMessage(
             role="tool",
-            content=json.dumps(payload, ensure_ascii=False),
+            content=_tool_content(payload),
             tool_call_id=proposal.call_id,
             name=tool_name,
         ),
@@ -3526,7 +3539,7 @@ class RuntimeOrchestrator:
                         messages.append(
                             ModelMessage(
                                 role="tool",
-                                content=json.dumps(answered_payload, ensure_ascii=False),
+                                content=_tool_content(answered_payload),
                                 tool_call_id=answered_proposal.call_id,
                                 name=answered_name,
                             )
@@ -3597,7 +3610,7 @@ class RuntimeOrchestrator:
                 messages.append(
                     ModelMessage(
                         role="tool",
-                        content=json.dumps(answered_payload, ensure_ascii=False),
+                        content=_tool_content(answered_payload),
                         tool_call_id=answered_proposal.call_id,
                         name=answered_name,
                     )

@@ -40,6 +40,8 @@ def _ensure_git_identity() -> None:
     os.environ.setdefault("GIT_AUTHOR_EMAIL", "raiker-test@example.com")
     os.environ.setdefault("GIT_COMMITTER_NAME", "Raiker Test")
     os.environ.setdefault("GIT_COMMITTER_EMAIL", "raiker-test@example.com")
+    # The threat feeds are downloaded at startup; a test never reaches the internet.
+    os.environ.setdefault("RAIKER_THREAT_FEEDS", "off")
 
 
 @pytest.fixture(autouse=True)

@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-350, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-347, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -88,7 +88,6 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-339](#bug-339--the-issue-to-pull-request-routine-has-a-template-and-no-runner) | Low | Tasks / routines | Open remainder — reduced 2026-10-18 ([FIXED-950](FIXED_ITEMS.md#fixed-950--the-issue-to-pull-request-routine-can-now-be-scheduled-as-a-build-task-bug-339-reduced)): the template schedules a governed Build task from Settings → GitHub; RR-40 live evidence against a consented repository remains; 2026-10-19 the pull request receipt ([FIXED-974](FIXED_ITEMS.md#fixed-974--a-pull-request-raiker-opened-was-known-only-from-the-create-response-br-12)) and the task's repository binding ([FIXED-976](FIXED_ITEMS.md#fixed-976--a-scheduled-build-task-ran-in-whatever-repository-build-was-pointed-at-br-02)) the run will read back are in place |
 | [BUG-347](#bug-347--a-reverse-proxy-on-the-same-machine-makes-every-remote-request-look-local) | Medium | Host / remote access | Open — found 2026-10-19 writing the README's VPS section; the README warns against the configuration |
 | [BUG-348](#bug-348--the-design-canvas-is-edited-by-keyboard-and-inspector-only-and-five-dw-requirements-are-still-partial) | Medium | Design / composition | Open remainder — reduced 2026-10-20 ([FIXED-998](FIXED_ITEMS.md#fixed-998--a-layer-could-only-be-moved-with-the-arrow-keys-dw-02-bug-348) to [FIXED-1010](FIXED_ITEMS.md#fixed-1010--after-a-restart-the-design-agent-said-no-chat-model-was-connected)): pointer editing, imports, components, notes, vector PDF and proposal receipts ship; selecting inside a group on the canvas, brand-guide import, system-level components and presentation export remain |
-| [BUG-350](#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token) | Medium | Connectors / skills import / transport | Open — found 2026-10-20 while removing redirects from the model helpers |
 | [BUG-351](#bug-351--cli-model-commands-cannot-reach-a-connected-hosted-provider) | Low | CLI / models | Open — compatibility consequence of ADR-0004, found 2026-10-20 |
 | [BUG-352](#bug-352--a-custom-endpoint-saved-off-the-machine-shows-no-route-on-its-card) | Low | Models / UI | Open — found 2026-10-20 in the BUG-349 live round (MT-03) |
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
@@ -611,38 +610,6 @@ components, then a presentation export.
 **Required user-interface outcome.** The remaining rows are reachable from the
 Documents workspace and absent until they are.
 
-## BUG-350 — The connector GET helper follows redirects with the owner's token
-
-**Severity: Medium. Area: Connectors / skills import / breach monitoring /
-transport. Status: Open — found 2026-10-20 while removing redirect following
-from the model helpers.**
-
-**Observed.** `sandbox.get_url` checks its host allowlist on the URL it is
-given and then calls `urllib.request.urlopen`, whose default handler follows
-301/302/303/307/308 to any host and re-sends the request headers, an
-`Authorization` header among them. It is used by the GitHub, Gmail, Calendar
-and Slack read connectors, the skill importer and breach monitoring. A
-redirect from an allowlisted host would take an owner token to a host the
-allowlist does not name.
-
-**Evidence (2026-10-20).** Two loopback servers on different ports; the first
-answers `302` to the second. `get_url(first, egress_allowlist={first's
-host:port}, headers={"Authorization": "Bearer tok"})` returned `200`, and the
-second server — not on the allowlist — received `Authorization: Bearer tok`.
-
-**Root cause.** Redirect handling was only ever made explicit for MCP
-(`_mcp_opener`). ADR-0004 moved `post_json` and `post_multipart` to the shared
-no-redirect opener and deliberately left `get_url` alone, because changing
-connector behaviour was out of that change's scope.
-
-**Proposed fix.** Send `get_url` through `_open_without_redirects` as well, and
-for connectors whose APIs legitimately redirect (GitHub archive downloads),
-follow a redirect only after re-checking the new host against the same
-allowlist and dropping `Authorization` on a host change. Tests per connector.
-
-**Required user-interface outcome.** A refused redirect reads as
-`redirect_refused:<status>` in the connector's result, not as a fetch failure.
-
 ## BUG-351 — CLI model commands cannot reach a connected hosted provider
 
 **Severity: Low. Area: CLI / models. Status: Open — compatibility consequence of
@@ -985,6 +952,20 @@ Raiker's side is ready to take them; something outside it is not.
   search is proven by the unit suite only; a read of `github.com` through the
   same proxy works (RT-TOOL-20). Re-run RT-TOOL-20 with a search on a host
   whose network allows DuckDuckGo.
+* **Web reads are refused on a proxy host that blocks DNS over HTTPS.** By the
+  owner's decision of 2026-10-26 a proxied name must be looked up through the
+  proxy first ([FIXED-1239](FIXED_ITEMS.md#fixed-1239--a-proxied-name-was-reached-without-checking-where-it-leads-ssrf)).
+  The test host's proxy refuses `cloudflare-dns.com` and `dns.google`, so a name
+  it cannot resolve directly is refused as unverified (RT-TOOL-23); names it
+  resolves itself are read on the pinned route.
+* **The threat feeds are unproven live.** The test host cannot reach
+  `urlhaus.abuse.ch` or `openphish.com`, so the feeds' download is proven with
+  fixtures only and Settings shows *Could not reach the feed* there. Run
+  RT-TOOL-20 on a host that can reach them and read a URLhaus-listed host.
+* **`tests/test_lock_screen_recovery.py` fails intermittently under parallel
+  load.** Twice in this round one of its tests failed in a three-shard parallel
+  run and passed alone and in every rerun (the restore and same-origin cases).
+  Not reproduced on CI; triage the timing it depends on.
 * **`github.com/about` raised the *suspicious text* alert** (RT-TOOL-20). The
   sanitiser's instruction-shape check may be too eager on product pages that
   talk about AI; triage against its rules before relaxing anything.

@@ -1323,6 +1323,16 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1234](#fixed-1234--a-question-about-a-long-page-got-its-first-20000-characters-tool-11) | Medium | Web access | Fixed 2026-10-26 |
 | [FIXED-1235](#fixed-1235--a-search-returned-snippets-and-left-the-reading-to-another-round-of-tool-calls-tool-11) | Low | Web access | Fixed 2026-10-26 |
 | [FIXED-1236](#fixed-1236--builds-plan-posture-sent-planning_mode-always-and-nothing-read-it-tool-151) | Medium | Build | Fixed 2026-10-26 |
+| [FIXED-1237](#fixed-1237--connector-and-channel-requests-followed-redirects-to-any-host-with-the-owners-token-bug-350) | High | Connectors / channels / SSRF | Fixed 2026-10-26 |
+| [FIXED-1238](#fixed-1238--the-proxy-route-could-reach-the-owners-internal-names-found-auditing-ssrf) | Medium | Web access / SSRF | Fixed 2026-10-26 |
+| [FIXED-1239](#fixed-1239--a-proxied-name-was-reached-without-checking-where-it-leads-ssrf) | Medium | Web access / SSRF | Fixed 2026-10-26 |
+| [FIXED-1240](#fixed-1240--a-flag-meant-any-rule-anyone-typed-not-a-site-registered-as-malicious) | Medium | Web access | Fixed 2026-10-26 |
+| [FIXED-1241](#fixed-1241--known-sites-and-the-services-the-owner-signs-in-to-could-be-flagged) | Medium | Web access | Fixed 2026-10-26 |
+| [FIXED-1242](#fixed-1242--every-rule-settings-refused-said-only-that-it-could-not-be-understood) | Low | Settings | Fixed 2026-10-26 |
+| [FIXED-1243](#fixed-1243--a-credential-in-a-tool-result-was-sent-to-the-model-as-it-was-owasp-llm02) | High | Runtime / data protection | Fixed 2026-10-26 |
+| [FIXED-1244](#fixed-1244--a-security-alert-fired-on-githubs-own-about-page-found-live) | Medium | Security monitoring | Fixed 2026-10-26 |
+| [FIXED-1245](#fixed-1245--a-refused-web-read-showed-its-reason-code-on-the-row-found-live) | Low | Chat | Fixed 2026-10-26 |
+| [FIXED-1246](#fixed-1246--settings-counted-the-always-refused-names-as-flags) | Low | Settings | Fixed 2026-10-26 |
 
 ---
 
@@ -35707,7 +35717,7 @@ explicitly and a test asserts it.
 **Evidence.** `test_egr12_egr13_urllib_model_helper_refuses_a_redirect`,
 `test_egr12_egr13_provider_http_client_does_not_follow_a_redirect` — loopback
 servers, the redirect target receives nothing. The same defect in the connector
-GET helper is open as [BUG-350](TO_BE_FIXED.md#bug-350--the-connector-get-helper-follows-redirects-with-the-owners-token).
+GET helper was BUG-350, fixed in [FIXED-1237](#fixed-1237--connector-and-channel-requests-followed-redirects-to-any-host-with-the-owners-token-bug-350).
 
 ## FIXED-1015 — Image generation could send a key saved for another endpoint to the provider's image host
 
@@ -37939,3 +37949,83 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** A Plan turn now carries a system instruction: research read-only, write the plan with `update_plan`, then question the plan before presenting it (which assumption breaks it, what it depends on that was not read, the smallest version, how each step is checked, what it could break for someone else) and end with *Questions I asked of this plan*. A `plan_posture_applied` event records it.
 
 **Evidence.** `tests/test_plan_posture_grill.py`; RT-TOOL-22.
+
+## FIXED-1237 — Connector and channel requests followed redirects to any host, with the owner's token (BUG-350)
+
+**Severity: High. Area: Connectors / channels / SSRF. Status: Fixed 2026-10-26.**
+
+**Fixed.** `get_url`, `post_url` and `post_json_url`, the helpers behind every connector read and write (GitHub, Gmail, Calendar, Slack, manifest connectors, the new GraphQL calls), channel delivery, skill imports and breach monitoring, used urllib's default opener, which follows `301`/`302`/`303`/`307`/`308` to whatever host the response names and re-sends the headers. An allowlisted host answering `302 → http://169.254.169.254/…` would have been followed, carrying the `Authorization` header: SSRF and token leakage together. All three now go through the shared no-redirect opener, and a redirect fails as `redirect_refused:<status>`, never followed. Found auditing SSRF on the owner's requirement that tool-calling agents cannot reach the owner's own network.
+
+**Evidence.** `tests/test_ssrf_redirects.py`: the bug record's own reproduction (two loopback servers, the first redirecting to the second) against each helper, and the second server receives nothing.
+
+## FIXED-1238 — The proxy route could reach the owner's internal names (found auditing SSRF)
+
+**Severity: Medium. Area: Web access / SSRF. Status: Fixed 2026-10-26.**
+
+**Fixed.** The proxy route added for BUG-353 sent any name this machine could not resolve to the owner's proxy, and a corporate proxy can often resolve internal names (`intranet`, `wiki.corp`, `db.internal`) that Raiker never sees. Only a name with the shape of a public one now takes the proxy: two or more valid labels and an alphabetic top-level label that is not a private-network suffix (`.corp`, `.internal`, `.lan`, `.local`, `.home.arpa` and the RFC 6761 special-use names). Anything else is refused as unresolved. The SSRF position across every model-steered request path is now written down in [SECURITY_AND_POLICY.md](../architecture/SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf), with the residual stated.
+
+**Evidence.** `tests/test_ssrf_redirects.py` (`test_only_public_shaped_names_may_take_the_proxy`, `test_an_internal_name_is_refused_not_proxied`, and the address guard pinned against sixteen non-public addresses, NAT64 and 6to4 forms among them).
+
+## FIXED-1239 — A proxied name was reached without checking where it leads (SSRF)
+
+**Severity: Medium. Area: Web access / SSRF. Status: Fixed 2026-10-26.**
+
+**Fixed.** Owner's decision, 2026-10-26: on a proxy-only host, a public-shaped name is looked up through the proxy over DNS over HTTPS (`RAIKER_WEB_DOH_ENDPOINT`, default `https://cloudflare-dns.com/dns-query`, A and AAAA) before the proxy is asked to reach it, and every answer must pass the address guard, so `rebind.example.org → 10.0.0.5` is refused as not public. A lookup that cannot be made or read refuses the read as `web_host_unverified`, with a sentence naming the setting; it is never read unchecked. The lookup itself goes only to an `https` resolver and follows no redirect. Stated with the remaining window (a re-point between the two lookups) in [SECURITY_AND_POLICY.md](../architecture/SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf).
+
+**Evidence.** `tests/test_ssrf_redirects.py` (`test_a_proxied_name_is_looked_up_and_its_answers_guarded`, `test_the_lookup_reads_a_and_aaaa_answers_and_fails_closed`), `tests/test_web_access.py`.
+
+## FIXED-1240 — A flag meant any rule anyone typed, not a site registered as malicious
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** Owner's decision, 2026-10-26: Raiker flags only sites a public threat feed registers as malicious. Two free, keyless feeds are downloaded to the workspace (`.raiker/threat_feeds/`): URLhaus (abuse.ch) for hosts that distribute malware, matched by host, and the OpenPhish community feed for phishing pages, matched by exact page. A match raises a `malicious_site` alert on the read, on the row, and in what the model is told to pass on; a redirect's landing page is checked too. Matching is local, so the address being read is never sent anywhere to be checked. Feeds refresh at startup when older than a day and from **Update now** in Settings › Web access, which shows each feed's size, when it was updated, and why an update failed. A feed that cannot be reached keeps its last copy. The owner's own flag rules stay as an option.
+
+**Evidence.** `tests/test_site_reputation.py`, `WebAccess.test.ts`; RT-TOOL-20. The test host cannot reach either feed, so their download is proven with fixtures.
+
+## FIXED-1241 — Known sites and the services the owner signs in to could be flagged
+
+**Severity: Medium. Area: Web access. Status: Fixed 2026-10-26.**
+
+**Fixed.** GitHub, Google, Slack, the other connectors' hosts, the forges Raiker pushes to, model providers and a short list of widely used sites are never flagged as a whole: no owner rule, environment rule or feed entry for the site raises an alert on them, and Settings refuses to flag one (*github.com is a known site and is never flagged*). One page on such a site that a feed lists (a phishing page on a site builder) is still flagged, as that page. The round-3 live test had flagged github.com by hand to prove the alert; it now proves the refusal instead.
+
+**Evidence.** `tests/test_site_reputation.py`; RT-TOOL-20.
+
+## FIXED-1242 — Every rule Settings refused said only that it could not be understood
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-26.**
+
+**Fixed.** The rule endpoint sent its refusal as a plain string, while the page reads `detail.reason_code`, so an invalid domain, a bad wildcard and a regex that would not compile all showed *That rule could not be understood.* Refusals now carry their reason code, and the page says which shape failed.
+
+**Evidence.** `tests/test_site_reputation.py::test_settings_refuses_to_flag_a_known_site`, `WebAccess.test.ts`.
+
+## FIXED-1243 — A credential in a tool result was sent to the model as it was (OWASP LLM02)
+
+**Severity: High. Area: Runtime / data protection. Status: Fixed 2026-10-26.**
+
+**Fixed.** A file the agent read, a log it fetched or a page it opened went to the model, possibly hosted, verbatim; only the event log was redacted. Every published credential shape (Anthropic, OpenAI, GitHub, Hugging Face, AWS, Slack, Google, Stripe keys and private key blocks) is now replaced with `[credential removed: <kind>]` in the copy the model reads, so it can say a key is there without ever holding it.
+
+**Evidence.** `tests/test_tool_result_credentials.py`.
+
+## FIXED-1244 — A security alert fired on GitHub's own About page (found live)
+
+**Severity: Medium. Area: Security monitoring. Status: Fixed 2026-10-26.**
+
+**Fixed.** The capability monitor labelled any text containing the word *secret*, or any 40-character token, as secret-like, so a page about secret scanning or a URL with a long slug raised *handled a value that looks like a secret or credential*. The monitor now alerts on credential shapes only; memory keeps its broader rule for deciding what may be remembered.
+
+**Evidence.** `tests/test_mcp_monitor.py::test_shape_sensitivity_labels_secrets_only`; RT-TOOL-23 screenshot.
+
+## FIXED-1245 — A refused web read showed its reason code on the row (found live)
+
+**Severity: Low. Area: Chat. Status: Fixed 2026-10-26.**
+
+**Fixed.** `refused — web_host_unverified:duckduckgo.com` is now *refused — could not check where it leads through your proxy*, and the other address-guard refusals read the same way (*it points inside your own network*, *that name does not resolve*).
+
+**Evidence.** `chatPresentation.test.ts`; RT-TOOL-23.
+
+## FIXED-1246 — Settings counted the always-refused names as flags
+
+**Severity: Low. Area: Settings. Status: Fixed 2026-10-26.**
+
+**Fixed.** *Your own flags* said *8 rules in force, 0 yours, 0 from this host's environment, 8 built in*, but the built-in names are the local network and metadata hosts, always refused, not flagged. The line now counts only the owner's and the environment's flags; the built-in names stay listed under *Set outside this app*.
+
+**Evidence.** `WebAccess.test.ts`; RT-TOOL-20 screenshot.

@@ -317,10 +317,12 @@ per-capability decision mode (**default `ask` ⇒ the owner approves the read**;
 `auto` asks too, because reaching the open internet on a model's say-so is never
 low-risk).
 
-**Owner's decision, 2026-10-25: a web read alerts, it does not refuse.** A site
-on the owner's **flagged sites** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules in
-Settings → Web access, `raiker/runtime/web_policy.py`) is read, and the result
-opens with a *Raiker alert* the model must pass on; the row shows it too. Plain
+**Owner's decision, 2026-10-25: a web read alerts, it does not refuse.** Since
+2026-10-26 a flag means a public threat feed (URLhaus, OpenPhish) registers the
+site or page as malicious, or the owner added a rule; known sites and the
+services Raiker signs in to are never flagged (`raiker/runtime/site_reputation.py`).
+A flagged page is read, and the result opens with a *Raiker alert* the model
+must pass on; the row shows it too. Plain
 `http`, a URL with credentials in it (removed before the read), a page the
 injection scanner flagged before, and text shaped like instructions are alerted
 the same way. Every redirect hop is checked the same way.

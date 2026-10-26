@@ -8,7 +8,8 @@ accepts it takes it and does not read it back.
 """
 from __future__ import annotations
 
-from typing import Any, Literal
+import asyncio
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import Field
@@ -21,11 +22,15 @@ from raiker.api.wire.egress import (
     BlocklistProbe,
     BlocklistRuleAdded,
     BlocklistRuleDeleted,
+    ThreatFeedStatus,
     WebBlocklist,
     blocklist_rule,
 )
+from raiker.api.wire.egress import ThreatFeeds as ThreatFeedsView
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.git_credential import GitCredentialBroker, GitCredentialError
+from raiker.runtime.site_reputation import KNOWN_SITES, authenticated_sites, trusted_domain
+from raiker.runtime.site_reputation import ThreatFeeds as ThreatFeedsStore
 from raiker.runtime.web_policy import (
     BLOCKLIST_ENV,
     DEFAULT_BLOCKED_NAMES,
@@ -118,15 +123,60 @@ async def add_blocklist_rule(
     try:
         rule = parse_rule(body.rule)
     except BlocklistRuleError as exc:
+        # As a reason code, which is the part of a refusal the page reads; a bare
+        # string detail reached it as "That rule could not be understood".
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"reason_code": str(exc)}
         ) from None
+    known = trusted_domain(rule.raw.removeprefix("*.")) if rule.kind in ("domain", "wildcard") else ""
+    if known:
+        # Owner's decision, 2026-10-26: known sites, and the services Raiker
+        # signs in to, are never flagged; only sites a public threat feed
+        # registers as malicious are.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "reason_code": f"known_site_not_flaggable:{known}",
+                "message": (
+                    f"{rule.raw} is a known site ({known}) and is never flagged. Raiker flags "
+                    "only sites a public threat feed registers as malicious."
+                ),
+            },
+        )
     rule_id = _store(request).add_web_blocklist_rule(
         rule.raw, rule.kind,
         principal_id=session.principal_id, note=body.note, created_by=session.principal_id,
     )
     added: BlocklistRuleAdded = {"rule_id": rule_id, "rule": rule.raw, "kind": rule.kind}
     return serialize_dto(added)
+
+
+@router.get("/api/web-access/threat-feeds")
+async def get_threat_feeds(
+    request: Request, _auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """The public threat feeds flags come from, and the sites never flagged."""
+    answer: ThreatFeedsView = {
+        "feeds": [cast(ThreatFeedStatus, item) for item in ThreatFeedsStore(_ws(request)).status()],
+        "known_sites": list(KNOWN_SITES),
+        "authenticated_sites": list(authenticated_sites()),
+    }
+    return serialize_dto(answer)
+
+
+@router.post("/api/web-access/threat-feeds/refresh")
+async def refresh_threat_feeds(
+    request: Request, _auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Download every feed now. A feed that cannot be read keeps what it had and says why."""
+    store = ThreatFeedsStore(_ws(request))
+    await asyncio.to_thread(store.refresh)
+    answer: ThreatFeedsView = {
+        "feeds": [cast(ThreatFeedStatus, item) for item in store.status()],
+        "known_sites": list(KNOWN_SITES),
+        "authenticated_sites": list(authenticated_sites()),
+    }
+    return serialize_dto(answer)
 
 
 @router.delete("/api/web-access/blocklist/{rule_id}")

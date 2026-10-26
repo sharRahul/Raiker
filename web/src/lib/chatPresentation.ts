@@ -66,6 +66,22 @@ export interface ToolCallRow {
   alerts?: { kind: string; message: string }[];
 }
 
+/**
+ * A web read's refusal in words. These are the SSRF guard's answers: a row that
+ * read `refused — web_host_unverified:duckduckgo.com` told the owner nothing
+ * they could act on. Any other code is shown as it was.
+ */
+const WEB_REFUSALS: Record<string, string> = {
+  web_host_unverified: "could not check where it leads through your proxy",
+  web_host_not_public: "it points inside your own network",
+  web_host_unresolved: "that name does not resolve",
+  web_url_invalid: "not a web address",
+};
+
+export function reasonWords(code: string): string {
+  return WEB_REFUSALS[code.split(":")[0]] ?? code;
+}
+
 function alertsFrom(raw: unknown): { kind: string; message: string }[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -151,7 +167,7 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
       label: str(payload.label) || toolName,
       action: str(payload.action),
       state: STATES[str(payload.status)] ?? "running",
-      reasons: reasons.length > 0 ? reasons : reason ? [reason] : [],
+      reasons: (reasons.length > 0 ? reasons : reason ? [reason] : []).map(reasonWords),
       ...(remediationRoute ? { remediationRoute } : {}),
       ...(connection ? { connection } : {}),
       ...(alerts.length > 0 ? { alerts } : {}),

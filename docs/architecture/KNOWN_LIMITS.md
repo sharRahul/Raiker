@@ -201,8 +201,12 @@ alternative would be worse.
   **flagged sites** (**Settings → Web access**, or
   `RAIKER_WEB_EGRESS_BLACKLIST`): a domain (covering its subdomains), a
   wildcard, an IP address, a CIDR range, or a `/regex/`, testable against a host
-  without contacting it. A flagged site **is still read**, and the turn gets a
-  *Raiker alert* to pass on, shown under the row. Plain `http`, a URL with
+  without contacting it. Since 2026-10-26 Raiker itself flags only sites a public
+  threat feed (URLhaus, OpenPhish) registers as malicious, and never a known site
+  or one you sign in to ([FIXED-1240](../plans/FIXED_ITEMS.md#fixed-1240--a-flag-meant-any-rule-anyone-typed-not-a-site-registered-as-malicious)). A flagged site **is still
+  read**, and the turn gets a *Raiker alert* to pass on, shown under the row. The
+  feeds are only as current as their last download: a site listed after it, or
+  on a host that cannot reach the feeds, is not flagged. Plain `http`, a URL with
   credentials in it (removed before the read), a page Raiker flagged before and
   text shaped like instructions are alerted the same way. What you do **not**
   control, and cannot switch off, is the address guard: every address a name
@@ -448,11 +452,16 @@ on the shipped build, not estimated.
   read no saved connection and refuse a hosted provider with
   `model_connection_required`. A Chat turn from the terminal goes through the
   owner's gateway and is unaffected (BUG-351).
-- **Read connectors and the skill importer follow a redirect with your token
-  (2026-10-20).** The connector GET helper checks its host allowlist on the URL
-  it was given and then lets urllib follow a redirect — headers included — to a
-  host the allowlist does not name. The model and image helpers refuse redirects;
-  this one does not yet (BUG-350).
+- **On a proxy-only host, the proxy resolves names, not Raiker (2026-10-26).**
+  A name this machine cannot resolve goes to your `HTTPS_PROXY` only when it
+  has the shape of a public name; `intranet`, `*.corp`, `*.internal`, `*.lan`
+  and similar are refused. A public-shaped name is first looked up through the
+  proxy over DNS over HTTPS and refused if any answer is private; when that
+  lookup cannot be made (a proxy that blocks `cloudflare-dns.com`, or whatever
+  `RAIKER_WEB_DOH_ENDPOINT` names), **web reads are refused on that host**
+  rather than read unchecked ([SSRF](SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf)).
+  Connector and channel requests never follow a redirect
+  ([FIXED-1237](../plans/FIXED_ITEMS.md#fixed-1237--connector-and-channel-requests-followed-redirects-to-any-host-with-the-owners-token-bug-350)).
 - **A reverse proxy on the same machine makes every remote request look
   local.** Raiker treats a loopback peer as this machine, so pointing a reverse
   proxy at `127.0.0.1:8765` erases the distinction; the README warns against it

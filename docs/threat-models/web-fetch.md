@@ -18,9 +18,11 @@ order, on every call:
 2. the per-capability decision mode — **default `ask` withholds**, `deny` blocks,
    and **`auto` withholds too**, because reaching the open internet on a model's
    say-so is never low-risk;
-3. the owner's **flagged sites** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules
-   stored in Settings → Web access), empty by default and testable against a
-   host without contacting it. **Owner's decision, 2026-10-25: a flagged site is
+3. **flags**: since 2026-10-26 a site or page a public threat feed registers as
+   malicious (URLhaus hosts, OpenPhish pages, matched locally against copies in
+   the workspace), plus any rule the owner adds (`RAIKER_WEB_EGRESS_BLACKLIST` or
+   Settings → Web access). Known sites and the services Raiker signs in to are
+   never flagged as a whole (`raiker/runtime/site_reputation.py`). **Owner's decision, 2026-10-25: a flagged site is
    read, with an alert, never refused.** The result opens with a *Raiker alert*
    line the model is told to pass on, and the row shows it. Plain `http` (a *not
    encrypted* alert), a URL with credentials (removed, with an alert), a page the
@@ -86,9 +88,15 @@ problems: where the request may go, and what the response may do.
   endpoint (`html.duckduckgo.com`), so the query text reaches a third party.
   Results are untrusted data under the same alerts and address guard.
 - **Behind a proxy the address guard cannot check what it cannot resolve.** A
-  name this machine cannot resolve goes to the owner's proxy unpinned; the proxy
-  resolves it, so a name that points at the proxy's own network is the proxy's
-  to refuse. Only names reach the proxy, never a literal private address.
+  name this machine cannot resolve goes to the owner's proxy unpinned, and only
+  when it has the shape of a public name (`public_shaped_name`): single-label
+  names and private-network suffixes (`.corp`, `.internal`, `.lan`, …) are
+  refused, never proxied, and a literal address never reaches the proxy. The
+  name is looked up through the proxy (DNS over HTTPS) and every answer must
+  pass the address guard; an unreachable lookup refuses the read. The answer is
+  not a pin, so a re-point between the lookup and the proxy's own is the
+  remaining window; see the SSRF section of
+  [SECURITY_AND_POLICY.md](../architecture/SECURITY_AND_POLICY.md#server-side-request-forgery-ssrf).
 - **A second, weaker egress implementation exists in the tree.**
   `WebFetchExecutor` (`raiker/runtime/executors/tier2_web.py`) reaches the network
   through `sandbox.fetch_url` with a hard-coded four-host allowlist

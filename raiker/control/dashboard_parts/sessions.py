@@ -977,10 +977,14 @@ class SessionService:
             }
             if tool_name in ("web_fetch", "web_extract") and row["status"] == "success" and isinstance(arguments, dict):
                 # A reopened row says again what its address alone carried.
+                from raiker.runtime.site_reputation import SiteReputation
                 from raiker.runtime.web_access import address_alerts
                 from raiker.runtime.web_policy import load_blocklist
 
-                alerts = address_alerts(str(arguments.get("url") or ""), load_blocklist(self.store))
+                alerts = address_alerts(
+                    str(arguments.get("url") or ""), load_blocklist(self.store),
+                    SiteReputation(self.store.paths.workspace_root),
+                )
                 if alerts:
                     row["alerts"] = [{"kind": a["kind"], "message": a["message"]} for a in alerts]
             if tool_name == "suggest_connection" and row["status"] == "success" and isinstance(arguments, dict):

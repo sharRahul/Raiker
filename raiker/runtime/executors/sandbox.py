@@ -250,10 +250,15 @@ def get_url(
         url, method="GET", headers=headers or {},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        # BUG-350 — a redirect is never followed. urllib's default handler
+        # would take this request, its Authorization header among the rest, to
+        # whatever host the response names, the owner's own network included.
+        with _open_without_redirects(request, timeout) as resp:
             data = resp.read(max_bytes + 1)
             status_code = resp.status if hasattr(resp, "status") else 200
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise SandboxError(f"redirect_refused:{exc.code}") from None
         # Surface the HTTP status (404/403/...) without leaking the body.
         raise SandboxError(f"http_error:{exc.code}") from None
     except Exception as exc:
@@ -307,10 +312,17 @@ def post_url(
     request = urllib.request.Request(  # noqa: S310 - scheme checked above
         url, data=payload, method="POST", headers=merged,
     )
+    import urllib.error
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        # BUG-350 — never follow a redirect: a channel's signed delivery goes to
+        # the allowlisted host or nowhere.
+        with _open_without_redirects(request, timeout) as resp:
             data = resp.read(max_bytes + 1)
             status_code = resp.status if hasattr(resp, "status") else 200
+    except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise SandboxError(f"redirect_refused:{exc.code}") from None
+        raise SandboxError("delivery_failed:HTTPError") from None
     except Exception as exc:
         raise SandboxError(f"delivery_failed:{type(exc).__name__}") from None
     answer: dict = {
@@ -711,10 +723,13 @@ def post_json_url(
         url, data=body_bytes, method=method, headers=merged,
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+        # BUG-350 — a connector write never follows a redirect with its token.
+        with _open_without_redirects(request, timeout) as resp:
             data = resp.read(max_bytes + 1)
             status_code = resp.status if hasattr(resp, "status") else 200
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise SandboxError(f"redirect_refused:{exc.code}") from None
         raise SandboxError(f"http_error:{exc.code}") from None
     except Exception as exc:
         raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None

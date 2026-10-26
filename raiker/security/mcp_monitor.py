@@ -113,8 +113,17 @@ def shape_sensitivity(text: str) -> str | None:
     handed to the monitor."""
     if not text:
         return None
+    # Credential shapes only. Memory's broader ``secret_like`` rule (the word
+    # "secret", or any 40-character token) is right for deciding what may be
+    # remembered and wrong for raising a security alert: every page about
+    # secret scanning, and every URL with a long slug, tripped it, so the alert
+    # fired on GitHub's own About page and meant nothing.
+    from raiker.security.secret_shapes import RULES
+
+    if any(pattern.search(text) for pattern in RULES.values()):
+        return "credential_like"
     label = classify_memory_sensitivity(text)
-    if label.value in _SENSITIVE_LABELS:
+    if label.value == "credential_like":
         return label.value
     return None
 

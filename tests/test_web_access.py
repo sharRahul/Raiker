@@ -594,6 +594,7 @@ class TestReadsAlertRatherThanRefuse:
 
         monkeypatch.setattr("raiker.runtime.web_policy.resolve_public_addresses", lambda host, port=443: [])
         monkeypatch.setattr("raiker.runtime.web_policy.resolves_at_all", lambda host, port=443: False)
+        monkeypatch.setattr("raiker.runtime.web_policy.resolve_via_proxy", lambda host, proxy: ["93.184.216.34"])
         for name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"):
             monkeypatch.delenv(name, raising=False)
         monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")

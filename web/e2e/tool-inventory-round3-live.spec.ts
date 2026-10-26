@@ -14,7 +14,7 @@
  * allows; the unit suite proves them.
  *
  * Live cases (docs/architecture/WEB_APP_LIVE_TEST.md, "Agent tool inventory,
- * third round"): RT-TOOL-17 … RT-TOOL-22.
+ * third round"): RT-TOOL-17 … RT-TOOL-23.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -118,39 +118,21 @@ test("RT-TOOL-19 — Anthropic connects through Add model and becomes the defaul
   await expect(dialog).toBeHidden();
 });
 
-test("RT-TOOL-20 — a flagged site is read, with an alert on the row (owner's decision)", async ({ page }) => {
-  test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
-  test.setTimeout(600_000);
+test("RT-TOOL-20 — only feed-registered sites are flagged; a known site cannot be (owner's decision)", async ({ page }) => {
+  test.setTimeout(180_000);
   await start(page);
   await open(page, "#/settings?tab=web-access");
-  const site = page.getByLabel("Site to flag");
-  await expect(site).toBeVisible({ timeout: 30_000 });
-  await site.fill("github.com");
+  const feeds = page.getByTestId("threat-feeds");
+  await expect(feeds).toContainText("URLhaus (abuse.ch)", { timeout: 30_000 });
+  await expect(feeds).toContainText("OpenPhish community feed");
+  await expect(feeds).toContainText(/Never flagged: \d+ known\s+and signed-in sites/);
+  await page.getByLabel("Site to flag").fill("github.com");
   await page.getByRole("button", { name: "Flag", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Remove flag from github.com" })).toBeVisible({ timeout: 30_000 });
-  await capture(page, `${SHOTS}/20-flagged-sites.png`, page.locator("main"));
-  await open(page, "#/new-chat");
-  await chooseModelForTurn(page, /Haiku|claude/i);
-  await page
-    .getByLabel("Prompt", { exact: true })
-    .fill(
-      "Call web_fetch once with url https://github.com/about and question 'what is GitHub', then tell me in " +
-        "one sentence what the page says, and pass on any Raiker alert.",
-    );
-  await page.getByRole("button", { name: "Send", exact: true }).click();
-  // A fresh instance reads web pages after asking: the read is approved here.
-  const card = page.getByRole("region", { name: "Raiker Safety" }).last();
-  const answer = page.locator(".message-group-raiker").last();
-  await expect(card.getByText("Waiting for your decision").or(answer.locator(".response-actions"))).toBeVisible({
-    timeout: 240_000,
+  await expect(page.getByRole("alert")).toContainText("github.com is a known site and is never flagged.", {
+    timeout: 30_000,
   });
-  if (await card.getByText("Waiting for your decision").isVisible().catch(() => false)) {
-    await card.getByRole("button", { name: /Allow once/ }).click();
-  }
-  const done = await finished(page);
-  const alerts = done.getByRole("list", { name: "Alerts for this read" });
-  await expect(alerts).toContainText("flagged", { timeout: 60_000 });
-  await capture(page, `${SHOTS}/20-flagged-read-alert.png`, done);
+  await expect(page.getByRole("button", { name: "Remove flag from github.com" })).toHaveCount(0);
+  await capture(page, `${SHOTS}/20-feeds-and-known-site.png`, page.locator("main"));
 });
 
 test("RT-TOOL-21 — a notebook reads as cells and an edit names its cell (TOOL-03)", async ({ page }) => {
@@ -188,4 +170,27 @@ test("RT-TOOL-22 — a Plan turn questions its own plan before proposing it (TOO
   await page.getByRole("button", { name: /^(Run|Plan|Propose)$/ }).first().click();
   await expect(page.getByText(/Questions I asked of this plan/i).first()).toBeVisible({ timeout: 300_000 });
   await capture(page, `${SHOTS}/22-plan-grill.png`);
+});
+
+test("RT-TOOL-23 — on a proxy host that blocks DNS over HTTPS, a web read fails closed (SSRF)", async ({ page }) => {
+  test.skip(KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is unset");
+  test.setTimeout(600_000);
+  await start(page);
+  await open(page, "#/new-chat");
+  await chooseModelForTurn(page, /Haiku|claude/i);
+  await page
+    .getByLabel("Prompt", { exact: true })
+    .fill("Call web_fetch once with url https://duckduckgo.com/about, then tell me in one sentence what happened.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const card = page.getByRole("region", { name: "Raiker Safety" }).last();
+  const answer = page.locator(".message-group-raiker").last();
+  await expect(card.getByText("Waiting for your decision").or(answer.locator(".response-actions"))).toBeVisible({
+    timeout: 240_000,
+  });
+  if (await card.getByText("Waiting for your decision").isVisible().catch(() => false)) {
+    await card.getByRole("button", { name: /Allow once/ }).click();
+  }
+  const done = await finished(page);
+  await expect(done).toContainText(/look(ed)? up|verif|check where it leads|proxy/i, { timeout: 60_000 });
+  await capture(page, `${SHOTS}/23-proxy-read-fails-closed.png`, done);
 });

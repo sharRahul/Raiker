@@ -516,6 +516,14 @@ def create_app(
         app.state.runtime_started = True
         for runtime in runtimes:
             await runtime.start()
+        # Owner's decision, 2026-10-26: flags come from public threat feeds.
+        # A stale feed is refreshed off the request path; failing to reach a
+        # feed keeps what it had and says so in Settings.
+        with suppress(Exception):
+            from raiker.runtime.site_reputation import refresh_in_background
+
+            for runtime in runtimes:
+                refresh_in_background(runtime.workspace_root)
         try:
             yield
         finally:

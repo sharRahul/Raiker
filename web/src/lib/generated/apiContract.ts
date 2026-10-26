@@ -6138,6 +6138,24 @@ export type TextIndexesRebuilt = {
   damaged_text_indexes: string[];
 };
 
+/** One public threat feed: what it lists, how much, and when it was last read. */
+export type ThreatFeedStatus = {
+  id: string;
+  name: string;
+  what: string;
+  url: string;
+  entries: number;
+  fetched_at: number | null;
+  last_error: string;
+};
+
+/** Owner's decision, 2026-10-26: a flag means a feed registers a site as malicious. */
+export type ThreatFeeds = {
+  feeds: ThreatFeedStatus[];
+  known_sites: string[];
+  authenticated_sites: string[];
+};
+
 export type ThreatModelAcknowledged = {
   ok: boolean;
   capability: string;
@@ -7442,6 +7460,10 @@ export const contract = {
     call<BlocklistProbe>("POST", "/api/web-access/blocklist/test", { body }),
   deleteBlocklistRule: (ruleId: string) =>
     call<BlocklistRuleDeleted>("DELETE", `/api/web-access/blocklist/${encodeURIComponent(ruleId)}`),
+  getThreatFeeds: () =>
+    request<ThreatFeeds>("/api/web-access/threat-feeds"),
+  refreshThreatFeeds: () =>
+    call<ThreatFeeds>("POST", "/api/web-access/threat-feeds/refresh"),
   workInFlight: () =>
     request<WorkInFlight>("/api/work-in-flight"),
   listWorkThreads: (query: { limit?: number } = {}) =>

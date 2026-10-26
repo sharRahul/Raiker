@@ -33,11 +33,12 @@ function mount(overrides: Partial<typeof BLOCKLIST> = {}) {
 }
 
 describe("Settings → Web access", () => {
-  it("states the number of rules a fetch is evaluated against", async () => {
+  it("counts only the flags that are flags: yours and the environment's", async () => {
     mount();
-    await waitFor(() => expect(screen.getByText("4")).toBeInTheDocument());
-    expect(screen.getByText(/1 yours/)).toBeInTheDocument();
-    expect(screen.getByText(/2 built in/)).toBeInTheDocument();
+    const line = await screen.findByText(/of your own/);
+    expect(line).toHaveTextContent("1 of your own, 1 from this host's environment.");
+    // The built-in names are always refused, not flagged; they are listed apart.
+    expect(line).not.toHaveTextContent(/built in/);
   });
 
   it("says the private-address guard admits no grant", async () => {
@@ -137,5 +138,48 @@ describe("Settings → Web access — checking a destination", () => {
     });
     expect(await screen.findByText(/is reachable/)).toBeInTheDocument();
     expect(screen.getByText(/151\.101\.0\.223/)).toBeInTheDocument();
+  });
+});
+
+// Owner's decision, 2026-10-26: flags come from public threat feeds, and a known
+// or signed-in site is never flagged.
+describe("Settings → Web access — threat feeds", () => {
+  const FEEDS = {
+    feeds: [
+      { id: "urlhaus", name: "URLhaus (abuse.ch)", what: "hosts that distribute malware", url: "https://urlhaus.abuse.ch/downloads/hostfile/", entries: 12345, fetched_at: 1792972800, last_error: "" },
+      { id: "openphish", name: "OpenPhish community feed", what: "phishing pages", url: "https://openphish.com/feed.txt", entries: 0, fetched_at: null, last_error: "fetch_failed:URLError" },
+    ],
+    known_sites: ["github.com", "google.com"],
+    authenticated_sites: ["api.github.com"],
+  };
+
+  it("shows each feed, how much it holds, and a failed update in words", async () => {
+    stubFetch({ "GET /api/web-access/blocklist": BLOCKLIST, "GET /api/web-access/threat-feeds": FEEDS });
+    render(WebAccess);
+    const card = await screen.findByTestId("threat-feeds");
+    expect(card).toHaveTextContent("URLhaus (abuse.ch)");
+    expect(card).toHaveTextContent("12,345 entries");
+    expect(card).toHaveTextContent("Not downloaded yet");
+    expect(card).toHaveTextContent("Could not reach the feed from this computer.");
+    expect(card).toHaveTextContent("Never flagged: 3 known and signed-in sites");
+    expect(screen.getByRole("button", { name: "Update now" })).toBeInTheDocument();
+  });
+
+  it("says why a known site cannot be flagged", async () => {
+    const sentence = "github.com is a known site (github.com) and is never flagged. Raiker flags only sites a public threat feed registers as malicious.";
+    stubFetch({
+      "GET /api/web-access/blocklist": BLOCKLIST,
+      "GET /api/web-access/threat-feeds": FEEDS,
+      "POST /api/web-access/blocklist": {
+        __status: 422,
+        detail: { reason_code: "known_site_not_flaggable:github.com", message: sentence },
+      },
+    });
+    render(WebAccess);
+    await fireEvent.input(await screen.findByLabelText("Site to flag"), { target: { value: "github.com" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Flag" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "github.com is a known site and is never flagged.",
+    );
   });
 });

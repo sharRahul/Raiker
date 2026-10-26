@@ -168,8 +168,8 @@ jobs:
         working-directory: desktop
         run: npm ci
       - name: Download web assets
-        # actions/download-artifact v4
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        # actions/download-artifact v7.0.0, the first release on Node 24 (v5 and v6 run on Node 20)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           name: desktop-web-assets
           path: web/dist
@@ -384,7 +384,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Download the x86-64 installers
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           name: desktop-windows-x86_64
           path: x64
@@ -424,7 +424,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Collect the evidence
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: evidence

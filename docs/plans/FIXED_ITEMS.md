@@ -20,6 +20,20 @@ Evidence: `screenshots/working/` (verified behaviour),
 
 ## Release packaging maintenance
 
+### FIXED-RELEASE-07 — the artifact download still ran on Node.js 20
+
+**Fixed 2026-10-26, reported by the owner from the Desktop package run.** GitHub
+warned that `actions/download-artifact@634f93cb…` targets Node.js 20 and was
+being forced onto Node.js 24. The pin was v5.0.0, annotated *(Node 24)* in both
+workflows; its `action.yml` says `node20`, and so does v6.0.0. FIXED-RELEASE-02
+had counted it as moved. All six uses in `desktop-package.yml` and
+`release.yml` now pin v7.0.0 (`37930b1c…`, December 2025), the first release
+whose `action.yml` says `node24`; its only change from v6 is that runtime, so
+the inputs (`name`, `pattern`, `path`) behave as before. The other pinned
+actions (`checkout`, `setup-node`, `setup-python`, `upload-artifact`) were each
+read at their pinned commit and declare `node24`. `tests/test_release_workflow.py`
+passes.
+
 ### FIXED-RELEASE-06 — seven workflows became three
 
 **Fixed 2026-10-19, at the owner's request.** `web.yml`, `desktop.yml`,

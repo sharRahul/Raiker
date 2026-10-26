@@ -132,8 +132,8 @@ jobs:
       - name: Install package
         run: python -m pip install -e .
       - name: Collect every target's installers
-        # actions/download-artifact v4
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        # actions/download-artifact v7.0.0, the first release on Node 24 (v5 and v6 run on Node 20)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: collected
@@ -233,8 +233,8 @@ jobs:
       contents: write
     steps:
       - name: Collect the signed channel
-        # actions/download-artifact v4
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        # actions/download-artifact v7.0.0, the first release on Node 24 (v5 and v6 run on Node 20)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           name: release-channel
           path: dist
@@ -307,7 +307,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Collect the desktop artifacts
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0 (Node 24)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
         with:
           pattern: desktop-*
           path: collected

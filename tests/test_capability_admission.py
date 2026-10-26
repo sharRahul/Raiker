@@ -123,6 +123,7 @@ def test_the_resolution_is_a_table_rather_than_a_call_site_decision() -> None:
     assert set(CAPABILITY_UNSET_RESOLUTION) == {
         "web_fetch",
         "code_map_indexing",
+        "image_generation",
         # B10 — the same three-branch resolution as the code map it sits beside,
         # so an owner meets one posture for "read my repository" rather than two.
         "language_intelligence",

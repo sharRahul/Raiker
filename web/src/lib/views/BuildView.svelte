@@ -2516,6 +2516,42 @@
       <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
     {/if}
 
+    <div class="composer-status">
+        <!-- COMPOSER-12 — governance appears when it changes what the next
+             press will do. At the careful default this renders nothing; the
+             posture stays inspectable through Permissions, which Tools links
+             to, and the execution environment is a fact about *where* the turn
+             runs that the context line above already carries. -->
+        <PostureControl exceptionOnly={true} />
+        <!-- The composer states the boundary, not the lesson: which project a
+             turn will run in is what changes between turns, and what a project
+             lets Build reach is explained once in the guide. -->
+        {#if !projectReady}
+          <p class="project-required" role="status">
+            Select a project to start.
+            <button
+              type="button"
+              class="link-button"
+              onclick={() => (projectPickerOpen = true)}>Choose one</button
+            >
+          </p>
+        {:else if boundary?.refusal && boundary.refusal.step !== "project"}
+          <!-- DEC-06 — the first link the server says would stop this turn,
+               and the one place that fixes it. -->
+          <p class="project-boundary boundary-refusal" role="status" data-testid="boundary-refusal">
+            {boundary.refusal.summary}
+            <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
+          </p>
+        {:else}
+          <!-- BUG-316 — the project files the conversation; the folder work
+               happens in is the server's answer, which is the workspace. -->
+          <p class="project-boundary" role="status">
+            Filed in <strong>{selectedProject?.name}</strong>{#if boundary}&#32;·
+              works in <strong>{boundary.works_in}</strong>{/if}
+          </p>
+        {/if}
+    </div>
+
     <Composer
       ariaLabel="Build composer"
       cardClass="composer-build"
@@ -2586,7 +2622,7 @@
         {/if}
         <!-- COMPOSER-03 — opened from `+`, in flow rather than as a popover
              over the text being typed. Build still cannot send without one,
-             which the footer below says; what changed is that the control is
+             which the status above the composer says; what changed is that the control is
              not on the bar for every turn after the first. -->
         {#if projectPickerOpen}
           <div class="project-choice" role="group" aria-label="Choose a project">
@@ -2709,48 +2745,8 @@
             </button>
       {/snippet}
 
-      {#snippet footer()}
-        <!-- COMPOSER-12 — governance appears when it changes what the next
-             press will do. At the careful default this renders nothing; the
-             posture stays inspectable through Permissions, which Tools links
-             to, and the execution environment is a fact about *where* the turn
-             runs that the context line above already carries. -->
-        <PostureControl exceptionOnly={true} />
-        <!-- The composer states the boundary, not the lesson: which project a
-             turn will run in is what changes between turns, and what a project
-             lets Build reach is explained once in the guide. -->
-        {#if !projectReady}
-          <p class="project-required" role="status">
-            Select a project to start.
-            <button
-              type="button"
-              class="link-button"
-              onclick={() => (projectPickerOpen = true)}>Choose one</button
-            >
-          </p>
-        {:else if boundary?.refusal && boundary.refusal.step !== "project"}
-          <!-- DEC-06 — the first link the server says would stop this turn,
-               and the one place that fixes it. -->
-          <p class="project-boundary boundary-refusal" role="status" data-testid="boundary-refusal">
-            {boundary.refusal.summary}
-            <a class="link-button" href={boundary.refusal.action_href}>{boundary.refusal.action_label}</a>
-          </p>
-        {:else}
-          <!-- BUG-316 — the project files the conversation; the folder work
-               happens in is the server's answer, which is the workspace. -->
-          <p class="project-boundary" role="status">
-            Filed in <strong>{selectedProject?.name}</strong>{#if boundary}&#32;·
-              works in <strong>{boundary.works_in}</strong>{/if}
-          </p>
-        {/if}
-      {/snippet}
 
-      {#snippet hint()}
-        <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
-          all shortcuts
-        </button>
-      {/snippet}
-    </Composer>
+  </Composer>
   </div>
 
   {#if exportOpen && sessionId !== null}
@@ -3398,6 +3394,7 @@
     :global(.composer-build .mode-trigger > span),
     :global(.composer-build .mode-trigger > svg:last-child) { display: none; }
   }
+  .composer-status { width: min(100%, 47.5rem); margin: 0 auto; }
   .retry-of { margin: 0.2rem 0 0; font-size: var(--text-xs); color: var(--text-3); text-align: right; }
   .retry-link {
     border: 0; background: none; padding: 0; font: inherit; color: var(--accent);

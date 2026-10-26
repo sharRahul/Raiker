@@ -2888,13 +2888,6 @@
         {/if}
       </div>
     {/snippet}
-
-    {#snippet hint()}
-      <!-- Quiet UI — one link; the shortcuts are listed behind it. -->
-      <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
-        all shortcuts
-      </button>
-    {/snippet}
   </Composer>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
   {#if backgroundNotice}

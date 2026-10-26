@@ -1009,3 +1009,25 @@ test("approval mode menu remains visible in Permissions", async ({ page }) => {
     await expect(trigger).toBeFocused();
   }
 });
+
+
+test("composer bottoms omit shortcut and project guidance while preserving access", async ({ page }) => {
+  for (const [route, label] of [["new-chat", "Message composer"], ["build", "Build composer"]] as const) {
+    await page.goto(`http://raiker.test/#/${route}`);
+    const composer = page.getByRole("group", { name: label });
+    await expect(composer).toBeVisible();
+    await expect(composer.getByRole("button", { name: "all shortcuts" })).toHaveCount(0);
+    await expect(composer.getByText("Select a project to start.")).toHaveCount(0);
+    const prompt = composer.getByRole("textbox");
+    await prompt.fill("/shortcuts");
+    await page.getByRole("listbox", { name: "Commands" }).getByText("/shortcuts", { exact: true }).click();
+    await expect(page.getByRole("region", { name: "Keyboard shortcuts" })).toBeVisible();
+    await page.getByRole("button", { name: "Close shortcuts" }).click();
+    await capture(page, join(shots, `composer-no-footer-${route}.png`));
+    if (route === "build") {
+      await expect(page.getByText("Select a project to start.")).toBeVisible();
+      await page.getByRole("button", { name: "Choose one" }).click();
+      await expect(page.getByRole("group", { name: /Choose a project/ })).toBeVisible();
+    }
+  }
+});

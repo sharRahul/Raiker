@@ -70,7 +70,8 @@ test("the keyboard map opens from the composer and lists real bindings", async (
   const prompt = page.getByLabel("Prompt");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
 
-  await page.getByRole("button", { name: "all shortcuts" }).click();
+  await prompt.fill("/shortcuts");
+  await page.getByRole("listbox", { name: "Commands" }).getByText("/shortcuts", { exact: true }).click();
   const sheet = page.getByRole("region", { name: "Keyboard shortcuts" });
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText("Enter", { exact: true })).toBeVisible();
@@ -97,7 +98,8 @@ test("the Build composer carries the coding-agent commands and the mode cycle", 
 
   await page.screenshot({ path: join(SHOTS, "r0816-build-slash-commands.png") });
 
-  await page.getByRole("button", { name: "all shortcuts" }).click();
+  await prompt.fill("/shortcuts");
+  await page.getByRole("listbox", { name: "Commands" }).getByText("/shortcuts", { exact: true }).click();
   const sheet = page.getByRole("region", { name: "Keyboard shortcuts" });
   await expect(sheet.getByText("Shift + Tab", { exact: true })).toBeVisible();
   await page.screenshot({ path: join(SHOTS, "r0816-build-shortcut-sheet.png") });

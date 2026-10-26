@@ -203,7 +203,7 @@
     if (!visible) audioSessionCoordinator.stopAll("route");
   });
   let projectId = $state(workProject());
-  const draft = $derived(workDraft(projectId));
+  const draft = $derived(workDraft(projectId, "chat"));
   let speechLanguage = $state<SpeechLanguage>("auto");
   // BUG-256 — which speech runtime dictation will use. Read once on mount and
   // defaulted to the browser, so a composer that cannot reach the host still

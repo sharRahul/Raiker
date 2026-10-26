@@ -24,6 +24,22 @@ agent runtime, governance, storage and audit model; it does not introduce a
 separate collaboration product, permission system or ungoverned creative
 executor.
 
+## Composer owner decisions (2026-10-26)
+
+The following direction supersedes older composer-placement proposals. The
+implementation is being validated; these decisions are not a production-readiness claim.
+
+- **DEC-COMPOSER-01 — Shared adaptive architecture:** Home, Chat, Build and Design share the composer interaction pattern with surface-specific context and independent workspace drafts.
+- **DEC-COMPOSER-02 — Minimal Design composer:** Attachment, Voice, Model and Send are the primary controls. Image size and output count belong outside the composer.
+- **DEC-COMPOSER-03 — Design templates:** The empty image workspace offers visual starters that prepare editable prompts, preserve selected assets and ask before replacing a non-empty draft.
+- **DEC-COMPOSER-04 — Active Design state:** The selected canvas and revision history take priority; templates are available through a compact entry, with edit suggestions only for declared edit support.
+- **DEC-COMPOSER-05 — Execution-aware interaction:** Chat and Build retain actual steering, queue, approval and interruption behavior and must not invent progress.
+- **DEC-COMPOSER-06 — Permission preservation:** Composer presentation does not grant or bypass runtime authority or approvals.
+
+The image-import and starter interactions have mocked browser coverage. Live
+provider generation, the complete responsive matrix and end-to-end execution
+flows still require verification.
+
 ## Document boundaries and precedence
 
 | Need | Authoritative source |

@@ -431,7 +431,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
     // so the four reads behind it now run a real governed turn on the `design`
     // surface. The *image* controls COMPOSER-09 lists are still absent for the
     // original reason, and are still recorded in docs/plans/TO_BE_FIXED.md.
-    ["design", "Describe the image", true],
+
   ] as const) {
     await page.goto(`http://raiker.test/#/${route}`);
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
@@ -871,3 +871,72 @@ for (const width of [390, 1440]) {
     await capture(page, join(shots, `permissions-categories-${width}.png`));
   });
 }
+
+
+test("Design starters prepare an editable draft and keep composer controls at narrow widths", async ({ page }) => {
+  await page.route("**/api/images", async route => {
+    await route.fulfill({ json: { sizes: ["1024x1024"], generations: [], deleted: [] } });
+  });
+  await page.goto("http://raiker.test/#/design");
+  const prompt = page.getByLabel("Describe the image");
+  await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+  await page.getByRole("button", { name: "Poster" }).click();
+  await expect(prompt).toHaveValue(/professional poster/);
+  await expect(prompt).toBeFocused();
+  await page.getByRole("button", { name: "Logo concept" }).click();
+  await expect(page.getByText("Replace your draft?")).toBeVisible();
+  await expect(prompt).toHaveValue(/professional poster/);
+  await page.keyboard.press("Escape");
+  const composer = page.getByRole("group", { name: "Image composer" });
+  await expect(composer.getByLabel("Size")).toHaveCount(0);
+  await expect(composer.getByLabel("How many")).toHaveCount(0);
+  await expect(composer.getByLabel("Image model")).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
+  await capture(page, join(shots, "design-starters-desktop.png"));
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  await capture(page, join(shots, "design-starters-dark.png"));
+  await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Password", { exact: true }).fill("test-password");
+  await page.getByRole("button", { name: /unlock/i }).click();
+  await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
+  await expect(composer.getByLabel("Image model")).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Dictate" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  await capture(page, join(shots, "design-starters-narrow.png"));
+});
+
+
+test("imported image is the source of a Design edit", async ({ page }) => {
+  const image = { generation_id: "imported_1", prompt: "Imported reference", model: "import", provider: "local", size: "1x1", status: "ok", reason_code: null, has_image: true, kind: "import", project_id: null, created_at: new Date().toISOString() };
+  let imported = false;
+  let submitted: Record<string, unknown> | null = null;
+  await page.route("**/api/design/assets/import", async route => {
+    imported = true;
+    await route.fulfill({ json: { generation: image } });
+  });
+  await page.route("**/api/images", async route => {
+    if (route.request().method() === "POST") {
+      submitted = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ json: { generation_id: "edit_1" } });
+    } else {
+      await route.fulfill({ json: { sizes: ["1024x1024"], generations: imported ? [image] : [], deleted: [], operations: { openai: ["generate", "edit"] } } });
+    }
+  });
+  await page.route("**/api/images/*/bytes", async route => {
+    await route.fulfill({ body: await readFile(join(dist, "design-starters.png")), contentType: "image/png" });
+  });
+  await page.goto("http://raiker.test/#/design");
+  await page.getByRole("button", { name: /Edit an image/ }).click();
+  const composer = page.getByRole("group", { name: "Image composer" });
+  await expect(composer.getByRole("button", { name: "Generate" })).toBeDisabled();
+  await composer.getByLabel("Import image").setInputFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aE8AAAAASUVORK5CYII=", "base64") });
+  await expect(composer.getByRole("button", { name: "Edit" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Make it cinematic" })).toBeVisible();
+  await capture(page, join(shots, "design-active-imported.png"));
+  await composer.getByRole("button", { name: "Edit" }).click();
+  await expect.poll(() => submitted?.source_generation_id).toBe("imported_1");
+  await expect.poll(() => submitted?.model).toBe("gpt-image-1");
+});

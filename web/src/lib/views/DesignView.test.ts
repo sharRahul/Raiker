@@ -133,14 +133,14 @@ describe("arriving at Design from a project", () => {
     stubFetch(routes());
     render(DesignView);
 
-    expect(await screen.findByText(/Enter edits/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
   });
 
   it("selects nothing when no asset was named", async () => {
     stubFetch(routes());
     render(DesignView);
 
-    expect(await screen.findByText(/Enter generates/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Generate" })).toBeInTheDocument();
   });
 
   it("ignores an asset that is not in this owner's gallery", async () => {
@@ -154,7 +154,7 @@ describe("arriving at Design from a project", () => {
     await waitFor(() => expect(screen.queryByText(/Showing images from/)).toBeNull());
     // Nothing is selected, so the composer is still generating rather than
     // editing a picture that is not there.
-    expect(await screen.findByText(/Enter generates/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Generate" })).toBeInTheDocument();
   });
 });
 
@@ -792,6 +792,6 @@ describe("the revision strip (QUI-L13)", () => {
     expect(buttons[0]).toHaveAccessibleName("Latest picture: leaf d");
     await fireEvent.click(buttons[1]);
     expect(buttons[1]).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByText(/Enter edits/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
   });
 });

@@ -17,7 +17,7 @@ live cases RT-QUI-61 to RT-QUI-63 and RT-QUI-67).
 | Item | State |
 |---|---|
 | Shell | **Done.** Sidebar 232 px, 40 px rows, one 1,180 px page width, 2rem gutter (1.5rem below 1,280 px). |
-| QUI-L01 | **Done** through the shell sizes; Chat, Build and Design keep their own composers (03, L13). |
+| QUI-L01 | **Done** through the shell sizes; Chat, Build and Design use the shared adaptive composer with surface-specific controls (03, L13; see DEC-COMPOSER-01). |
 | QUI-L02 | **Done.** `ListDetail.svelte`, used by Connections, Channels, Permissions and My models. |
 | QUI-L03 | **Done** for Security, Account, Privacy and General: rows, with forms in dialogs (`FormDialog.svelte`) and explanations in disclosures. Advanced › Runtime shows one line per environment with its detail on request. Other Settings sections keep their cards. |
 | QUI-L04 | **Done.** `AddDialog.svelte`: Add connection, Add channel, Add model. It is a page-level layer, not a top-layer modal, so a sign-in window a step opens draws above it. |

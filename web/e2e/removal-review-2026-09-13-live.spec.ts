@@ -155,7 +155,7 @@ test("a project's image opens in Design, not the whole history (NEW-PROJ-02)", a
   await expect(page.getByText(/Showing images from/)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole("link", { name: "Show all images" })).toBeVisible();
   // An asset is selected, so the composer edits rather than generates.
-  await expect(page.getByText(/Enter edits/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeVisible({ timeout: 30_000 });
   await capture(page, `${SHOTS}/design-opened-from-project.png`);
 });
 

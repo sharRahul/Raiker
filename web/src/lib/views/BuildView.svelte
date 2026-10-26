@@ -292,7 +292,7 @@
   let attachOpen = $state(false);
 
   const projectId = $derived(workProject());
-  const draft = $derived(workDraft(projectId));
+  const draft = $derived(workDraft(projectId, "build"));
   let speechLanguage = $state<SpeechLanguage>("auto");
   // BUG-256 — which speech runtime dictation will use. Read once on mount and
   // defaulted to the browser, so a composer that cannot reach the host still

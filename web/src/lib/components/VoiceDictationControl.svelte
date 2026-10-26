@@ -61,6 +61,7 @@
      * already closed.
      */
     showTrigger = true,
+    showPrivacy = true,
     draft,
     selectionStart = draft.length,
     selectionEnd = selectionStart,
@@ -75,6 +76,7 @@
     onactivechange = () => {},
   }: {
     showTrigger?: boolean;
+    showPrivacy?: boolean;
     draft: string;
     selectionStart?: number;
     selectionEnd?: number;
@@ -341,7 +343,7 @@
       class="voice-button"
       aria-label="Dictate"
       aria-describedby={supported ? disclosureId : `${unavailableId} ${disclosureId}`}
-      title="Dictate into the editable prompt"
+      title={showPrivacy ? "Dictate into the editable prompt" : (supported ? disclosure : unavailableReason)}
       disabled={disabled || !supported}
       onclick={start}
     >
@@ -349,7 +351,11 @@
     </button>
   {/if}
 
-  {#if showTrigger || listening}
+  {#if !showPrivacy && (showTrigger || listening)}
+    <span class="sr-only" id={disclosureId}>{disclosure}</span>
+    {#if !supported}<span class="sr-only" id={unavailableId}>{unavailableReason}</span>{/if}
+  {/if}
+  {#if (showTrigger || listening) && showPrivacy}
   <details class="voice-info" ontoggle={keepDisclosureOnScreen}>
     <summary aria-label="About dictation privacy"><Icon name="info" size="sm" /></summary>
     <p id={disclosureId}>{disclosure}</p>

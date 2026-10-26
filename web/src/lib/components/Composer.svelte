@@ -14,7 +14,7 @@
    * This component decides the card, the input, the two-row bar and every
    * breakpoint; a view decides what goes in `left`, `right` and `above`, which
    * is the part that genuinely differs — Build has a mode picker and a
-   * repository, Design has a size and a count, Chat has neither.
+   * repository, while Design exposes a compact image workflow.
    */
   import type { Snippet } from "svelte";
   import type { HTMLTextareaAttributes } from "svelte/elements";
@@ -83,6 +83,13 @@
     footer,
     hint,
   }: Props = $props();
+
+  // Re-measure on draft changes, including restored or programmatically populated drafts.
+  $effect(() => {
+    if (!inputEl || typeof value !== "string") return;
+    inputEl.style.height = "auto";
+    inputEl.style.height = `${Math.min(inputEl.scrollHeight, 180)}px`;
+  });
 </script>
 
 <form
@@ -140,6 +147,8 @@
 <style>
   .composer {
     padding-top: var(--space-3);
+    width: min(100%, 47.5rem);
+    margin-inline: auto;
     background: var(--bg);
   }
   .composer-card {
@@ -177,7 +186,9 @@
     width: 100%;
     border: none;
     outline: none;
-    resize: vertical;
+    resize: none;
+    max-height: 180px;
+    overflow-y: auto;
     background: transparent;
     color: var(--text-1);
     font: inherit;
@@ -191,8 +202,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem 0.75rem;
-    border-top: 1px solid var(--border);
-    padding-top: 0.55rem;
+    padding-top: 0.25rem;
     flex-wrap: wrap;
   }
   .bar-left {
@@ -238,6 +248,9 @@
     text-decoration: underline;
   }
 
+  :global(.design-composer .send) { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0; border-radius: 50%; }
+  :global(.design-composer .send-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
   /* Kept after the base rules so compact declarations win without changing a
      single desktop selector. */
   @media (max-width: 63.9rem) {
@@ -257,6 +270,8 @@
     .shortcut-hint { display: none; }
     :global(.composer-card .composer-scope),
     :global(.composer-card .context-control) { display: none; }
+    :global(.design-composer .model-scope) { display: flex; }
+    :global(.design-composer .model-scope select) { max-width: 8rem; }
     :global(.composer-card .send) {
       width: 2.75rem;
       height: 2.75rem;

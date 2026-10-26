@@ -21,6 +21,8 @@
    */
   import { onMount, tick } from "svelte";
   import Composer from "../components/Composer.svelte";
+  import VoiceDictationControl from "../components/VoiceDictationControl.svelte";
+  import DesignStarters, { type Starter } from "../components/DesignStarters.svelte";
   import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
   import ComposerContext from "../components/ComposerContext.svelte";
   import Icon from "../components/Icon.svelte";
@@ -86,8 +88,51 @@
   let busy = $state(false);
   let failure = $state<string | null>(null);
   let threadEl = $state<HTMLDivElement | undefined>();
+  let promptEl = $state<HTMLTextAreaElement | undefined>();
+  let starterNotice = $state("");
+  let starterNeedsImage = $state(false);
+  let importing = $state(false);
+  let speechRuntime = $state<"browser" | "local">("browser");
 
-  const draft = $derived(workDraft(workProject()));
+  async function importImage(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || importing) return;
+    importing = true;
+    failure = null;
+    try {
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const result = await contract.importDesignAsset({ filename: file.name, media_type: file.type, data_base64: data, project_id: project?.project_id ?? null });
+      await load();
+      selectedId = result.generation.generation_id;
+      starterNotice = "";
+      starterNeedsImage = false;
+    } catch (error) {
+      failure = error instanceof ApiError ? error.message : "The image could not be imported.";
+    } finally { importing = false; }
+  }
+
+  async function chooseStarter(starter: Starter) {
+    if (draft.text.trim() && !(await askConfirm({
+      title: "Replace your draft?",
+      body: "Choosing this starter will replace the text in your Design draft.",
+      confirmLabel: "Replace draft",
+    }))) return;
+    draft.text = starter.prompt;
+    starterNeedsImage = !!starter.needsImage && selectedId === null;
+    starterNotice = starterNeedsImage
+      ? "Select or import an image before requesting this edit." : "";
+    await tick();
+    promptEl?.focus();
+  }
+
+  const draft = $derived(workDraft(workProject(), "design"));
   let size = $state("1024x1024");
   /*
    * The object the next instruction is about, and how many pictures
@@ -545,7 +590,7 @@
   }
 
   async function generate() {
-    if (!draft.text.trim() || choice === null || busy || block.kind !== "none") return;
+    if (!draft.text.trim() || choice === null || busy || importing || (starterNeedsImage && selectedId === null) || block.kind !== "none") return;
     const sentDraft = draft;
     const sentText = sentDraft.text;
     busy = true;
@@ -699,6 +744,7 @@
   }
 
   onMount(async () => {
+    void api.speechRuntime().then((result) => { speechRuntime = result.runtime.effective; }).catch(() => {});
     await load();
     if (arrivedWith.projectId !== null) {
       try {
@@ -781,6 +827,12 @@
     <!-- The region that holds this surface's object, as its own
          component. What Design shows *is* the asset, so how an asset is
          presented lives in one file rather than in the middle of the view. -->
+    {#if view !== null && turns.length === 0 && !loadError}
+      <DesignStarters onchoose={chooseStarter} editAvailable={providerOps?.includes("edit") === true} />
+      {#if (view.deleted ?? []).length > 0}
+        <DesignCanvasRegion turns={turns} loading={false} {readable} bind:selectedId deleted={view.deleted} {filedIn} onrestore={restoreAsset} onpurge={purgeAsset} />
+      {/if}
+    {:else}
     <DesignCanvasRegion
       turns={turns}
       loading={view === null}
@@ -795,6 +847,7 @@
       onpurge={purgeAsset}
       onrevert={revertAsset}
     />
+    {/if}
   </div>
 
   {#if researching || research !== null || researchError !== null}
@@ -865,6 +918,16 @@
     </section>
   {/if}
 
+  {#if turns.length > 0}
+    <details class="design-options"><summary>Templates</summary><DesignStarters onchoose={chooseStarter} editAvailable={providerOps?.includes("edit") === true} /></details>
+  {/if}
+  {#if selectedId !== null && providerOps?.includes("edit")}
+    <div class="quick-actions" aria-label="Edit the selected image">
+      <button type="button" onclick={() => void chooseStarter({ name: "Make cinematic", prompt: "Make this image cinematic with dramatic lighting and composition.", needsImage: true })}>Make it cinematic</button>
+      <button type="button" onclick={() => void chooseStarter({ name: "Change colours", prompt: "Change the colours in this image: ", needsImage: true })}>Change colours</button>
+    </div>
+  {/if}
+
   {#if revisions.length > 0}
     <ul class="revision-strip" aria-label="Latest pictures">
       {#each revisions as generation, index (generation.generation_id)}
@@ -885,20 +948,8 @@
     </ul>
   {/if}
 
-  <Composer
-    ariaLabel="Image composer"
-    inputId="design-prompt"
-    inputLabel="Describe the image"
-    bind:value={draft.text}
-    inputProps={{
-      placeholder: "Describe the image you want…",
-      title: "Enter to generate, Shift+Enter for a new line",
-      disabled: busy,
-      onkeydown: onKeydown,
-    }}
-    onsubmit={() => void generate()}
-  >
-    {#snippet left()}
+  <details class="design-options"><summary>Workspace options</summary>
+    <p>Dictation uses {speechRuntime === "local" ? "the configured local transcription runtime" : "your browser’s speech service, which may process audio externally"}. Raiker does not retain the audio.</p>
       <!-- COMPOSER-09 — the same two entry points Chat and Build carry, so a
            person moving between the three Work modes finds the composer in the
            same shape each time. -->
@@ -964,6 +1015,53 @@
         </select>
       </label>
       <ComposerContext facts={contextFacts} disabled={busy} />
+  </details>
+  <Composer
+    cardClass="design-composer"
+    ariaLabel="Image composer"
+    inputId="design-prompt"
+    bind:inputEl={promptEl}
+    inputLabel="Describe the image"
+    bind:value={draft.text}
+    inputProps={{
+      placeholder: "Describe what you want to create or edit...",
+      title: "Enter to generate, Shift+Enter for a new line",
+      disabled: busy,
+      onkeydown: onKeydown,
+    }}
+    onsubmit={() => void generate()}
+  >
+    {#snippet left()}
+      <label class="upload-image" title="Import an image to edit">
+        <span aria-hidden="true">+</span><span class="sr-only">Import image</span>
+        <input class="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" disabled={busy || importing} onchange={(event) => void importImage(event)} />
+      </label>
+      <label class="composer-scope model-scope">
+        <span class="sr-only">Image model</span>
+        <Icon name="models" size="sm" />
+        {#if imageChoices.length > 0}
+          <select
+            class="bar-select"
+            bind:value={choiceKey}
+            aria-label="Image model"
+            disabled={busy}
+            onchange={(event) => remember((event.currentTarget as HTMLSelectElement).value)}
+          >
+            {#each imageChoices as item (item.key)}
+              <option value={item.key}>
+                {providerName(item.provider)} · {modelName(item.model)}
+              </option>
+            {/each}
+          </select>
+        {:else}
+          <a
+            class="bar-select bar-empty"
+            href="#/models"
+            title="No image model is connected. Connect one on the Models page."
+            >No image model — connect one</a
+          >
+        {/if}
+      </label>
     {/snippet}
 
     {#snippet above()}
@@ -1027,40 +1125,11 @@
     {/snippet}
 
     {#snippet right()}
-      <!-- COMPOSER-05 — model identity stays visible and model *management*
-           does not. Always drawn, whatever is configured: hiding it made "no
-           image model is connected" indistinguishable from "this page has no
-           model control", and the second reading is the one an owner reached. -->
-      <label class="composer-scope model-scope">
-        <span class="sr-only">Image model</span>
-        <Icon name="models" size="sm" />
-        {#if imageChoices.length > 0}
-          <select
-            class="bar-select"
-            bind:value={choiceKey}
-            aria-label="Image model"
-            disabled={busy}
-            onchange={(event) => remember((event.currentTarget as HTMLSelectElement).value)}
-          >
-            {#each imageChoices as item (item.key)}
-              <option value={item.key}>
-                {providerName(item.provider)} · {modelName(item.model)}
-              </option>
-            {/each}
-          </select>
-        {:else}
-          <a
-            class="bar-select bar-empty"
-            href="#/models"
-            title="No image model is connected. Connect one on the Models page."
-            >No image model — connect one</a
-          >
-        {/if}
-      </label>
+      <VoiceDictationControl showPrivacy={false} draft={draft.text} runtime={speechRuntime} disabled={busy} onchange={(next) => (draft.text = next)} />
       <button
         type="submit"
         class="btn btn-primary send"
-        disabled={busy || !draft.text.trim() || choice === null || block.kind !== "none"}
+        disabled={busy || importing || (starterNeedsImage && selectedId === null) || !draft.text.trim() || choice === null || block.kind !== "none"}
         aria-label={busy ? "Working" : primaryAction}
       >
         <Icon name={busy ? "clock" : "send"} size="sm" />
@@ -1072,20 +1141,22 @@
     {/snippet}
 
     {#snippet footer()}
+      {#if starterNotice}<p role="status">{starterNotice}</p>{/if}
       {#if failure}<p class="error" role="alert">{failure}</p>{/if}
     {/snippet}
 
-    {#snippet hint()}
-      <!-- The hint names the same act the button does. "Enter generates" beside
-           a button reading **Edit** is the mismatch COMPOSER-15 is about, one
-           line further down. -->
-      Enter {selectedId ? "edits" : "generates"} · Shift+Enter adds a line
-    {/snippet}
   </Composer>
   {/if}
 </div>
 
 <style>
+  .quick-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); width: min(100%, 45rem); margin: 0 auto var(--space-2); }
+  .quick-actions button { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-1); padding: var(--space-2) var(--space-3); cursor: pointer; font: inherit; }
+  .quick-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .design-options { margin: 0 auto var(--space-2); width: min(100%, 45rem); color: var(--text-2); }
+  .design-options summary { cursor: pointer; }
+  .upload-image { display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%; cursor: pointer; font-size: var(--text-xl); }
+  .upload-image:focus-within { outline: 2px solid var(--accent); }
   .revision-strip { display: flex; gap: var(--space-2); list-style: none; margin: 0 auto var(--space-2); padding: 0; width: min(100%, 45rem); }
   .revision { display: block; width: 56px; height: 56px; padding: 0; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; background: var(--sunken); cursor: pointer; }
   .revision img { display: block; width: 100%; height: 100%; object-fit: cover; }

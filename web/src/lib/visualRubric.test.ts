@@ -202,13 +202,13 @@ describe("visual rubric", () => {
     expect(build).toBeGreaterThan(chat);
   });
 
-  it("keeps every composer to two permanent entry points before the model", () => {
+  it("keeps Chat and Build to two utility entry points before the model", () => {
     // COMPOSER-02/COMPOSER-20 rule 3: at most two utility entry points at rest.
     // The rule exists because a permanent control is the cheapest thing to add
     // and nothing used to say not to — Chat reached four and Build six, one
     // reasonable addition at a time, and the review's count of what *could*
     // have been there by the same logic runs to twenty.
-    for (const view of ["ChatView.svelte", "BuildView.svelte", "DesignView.svelte"]) {
+    for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
       const text = readFileSync(resolve(VIEWS, view), "utf8");
       const from = text.indexOf("snippet left()");
       expect(from, `${view} has no composer left cluster`).toBeGreaterThan(-1);

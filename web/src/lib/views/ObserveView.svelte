@@ -205,6 +205,18 @@
     return () => clearTimeout(timer);
   });
 
+  // A command-line flag or an environment variable in a card's sentence is
+  // something to type: it must not break at its own hyphens across lines.
+  const TERM = /(--[a-z][a-z-]*|\bRAIKER_[A-Z_]+\b)/;
+
+  function detailParts(text: string): { text: string; term: boolean }[] {
+    // split() with a capturing group puts each matched term at an odd index.
+    return text
+      .split(TERM)
+      .map((part, index) => ({ text: part, term: index % 2 === 1 }))
+      .filter((part) => part.text !== "");
+  }
+
   function selectTab(next: string) {
     window.location.hash = `#/observe?tab=${encodeURIComponent(next)}`;
   }
@@ -321,7 +333,9 @@
               <li class="issue" data-tone={item.tone}>
                 <div class="issue-main">
                   <h3 class="issue-title">{item.title}</h3>
-                  <p class="issue-detail">{item.detail}</p>
+                  <p class="issue-detail">
+                    {#each detailParts(item.detail) as part, index (index)}{#if part.term}<span class="term">{part.text}</span>{:else}{part.text}{/if}{/each}
+                  </p>
                   <p class="issue-meta">
                     <Icon name={TONE_ICON[item.tone]} size="sm" />
                     <span>{TONE_LABEL[item.tone]}</span>
@@ -591,6 +605,7 @@
   .issue-main { display: grid; gap: var(--space-1); min-width: 0; }
   .issue-title { margin: 0; font-size: var(--text-base); font-weight: 650; }
   .issue-detail { margin: 0; color: var(--text-2); font-size: var(--text-sm); max-width: 62ch; }
+  .issue-detail .term { white-space: nowrap; }
   .issue-meta { display: flex; align-items: center; gap: 0.35rem; margin: var(--space-1) 0 0; color: var(--text-3); font-size: var(--text-xs); }
   .issue[data-tone="containment"] .issue-meta { color: var(--danger); }
   .issue[data-tone="blocking"] .issue-meta { color: var(--warn); }

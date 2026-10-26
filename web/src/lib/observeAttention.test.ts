@@ -238,7 +238,7 @@ describe("BUG-347 remote access on Diagnostics", () => {
         ...HEALTHY_DIAGNOSTICS,
         remote_access: {
           mode: "loopback",
-          trusted_proxies: [],
+          proxy_listener: null,
           proxied_requests_refused: 0,
           proxied_requests_served: 0,
           last_refused_at: null,
@@ -256,11 +256,20 @@ describe("BUG-347 remote access on Diagnostics", () => {
     const [item] = attentionItems(remote({ proxied_requests_refused: 3, last_refused_at: "2026-10-26T12:00:00Z" }));
     expect(item.tone).toBe("blocking");
     expect(item.title).toBe("Requests through a reverse proxy are being refused");
-    expect(item.detail).toContain("RAIKER_TRUSTED_PROXY");
+    expect(item.detail).toContain("--proxy-port");
+    expect(item.detail).toContain("--allow-public");
   });
 
-  it("names a host reached through a trusted proxy as public", () => {
-    const [item] = attentionItems(remote({ mode: "trusted_proxy", trusted_proxies: ["127.0.0.1/32"] }));
+  it("names a host with a proxy listener as public, and where the proxy connects", () => {
+    const [item] = attentionItems(remote({ mode: "proxy_listener", proxy_listener: "127.0.0.1:8766" }));
     expect(item.title).toBe("Raiker is reachable from the internet through a proxy");
+    expect(item.detail).toContain("127.0.0.1:8766");
+  });
+
+  it("still names refusals on the local listener when a proxy listener is open", () => {
+    const items = attentionItems(
+      remote({ mode: "proxy_listener", proxy_listener: "unix:/run/raiker/proxy.sock", proxied_requests_refused: 1 }),
+    );
+    expect(items.map((item) => item.id)).toEqual(["remote:refused", "remote:listener"]);
   });
 });

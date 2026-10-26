@@ -20,7 +20,7 @@ from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.instance_runtime import InstanceRuntime
-from raiker.api.proxy_guard import ProxyGuardMiddleware, RemoteAccessRecord, trusted_proxies
+from raiker.api.proxy_guard import ProxyGuardMiddleware, ProxyListener, RemoteAccessRecord
 from raiker.api.redaction import (
     RENDER_REDACTION_SCOPE,
     RedactedJSONResponse,
@@ -498,6 +498,7 @@ def create_app(
     hsts: bool = False,
     tray_bootstrap_secret: str | None = None,
     loopback_only: bool = True,
+    proxy_listener: ProxyListener | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -648,16 +649,15 @@ def create_app(
         loopback_only=loopback_only,
     )
     # BUG-347 — inside the security headers (so a refusal carries them) and
-    # outside everything that asks "is this local?": a forwarded request on a
-    # loopback-only host is refused, or, from a proxy the owner named, marked
-    # remote before the rate limit and the local-only routes see it.
-    networks = trusted_proxies()
-    app.state.remote_access = RemoteAccessRecord(loopback_only=loopback_only, networks=networks)
+    # outside everything that asks "is this local?": a request on the proxy
+    # listener is marked remote before the rate limit and the local-only routes
+    # see it, and a forwarded request on the loopback listener is refused.
+    app.state.remote_access = RemoteAccessRecord(loopback_only=loopback_only, listener=proxy_listener)
     app.add_middleware(
         ProxyGuardMiddleware,
         loopback_only=loopback_only,
         record=app.state.remote_access,
-        networks=networks,
+        listener=proxy_listener,
     )
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)

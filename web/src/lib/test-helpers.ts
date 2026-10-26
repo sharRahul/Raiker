@@ -99,7 +99,7 @@ export const DIAGNOSTICS: Diagnostics = {
   scope_note: "Status reflects the local single-user runtime only.",
   remote_access: {
     mode: "loopback",
-    trusted_proxies: [],
+    proxy_listener: null,
     proxied_requests_refused: 0,
     proxied_requests_served: 0,
     last_refused_at: null,

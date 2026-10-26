@@ -149,15 +149,17 @@ def test_forwarded_headers_cannot_spoof_a_loopback_peer(workspace: Path) -> None
     assert statuses == [403, 403, 403, 403]
 
 
-def test_a_trusted_proxys_reads_are_rate_limited_like_any_remote(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("RAIKER_TRUSTED_PROXY", "127.0.0.1")
+def test_the_proxy_listeners_reads_are_rate_limited_like_any_remote(workspace: Path) -> None:
+    from raiker.api.proxy_guard import ProxyListener
+
+    # BUG-347 — a reverse proxy connects to its own listener; every request
+    # there is remote, with or without a forwarding header.
     client = TestClient(
-        create_app(workspace, rate_limit_per_minute=2, loopback_only=True),
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=True, proxy_listener=ProxyListener(port=8766)),
+        base_url="http://testserver:8766",
         client=("127.0.0.1", 50000),
     )
-    headers = {**_headers(workspace), "X-Forwarded-For": "203.0.113.9"}
+    headers = _headers(workspace)
 
     statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
 

@@ -133,35 +133,36 @@ export function attentionItems(inputs: AttentionInputs): AttentionItem[] {
         linkLabel: "See which checks failed",
       });
     }
-    // BUG-347 — how this host is reached. A proxy whose requests were refused
-    // is an owner who tried to reach Raiker that way and could not; a proxy
-    // the owner trusts makes this host public, which is said, not folded away.
+    // BUG-347 — how this host is reached. A forwarded request refused on the
+    // local listener is an owner who pointed a proxy at the wrong place; a
+    // proxy listener makes this host public, which is said, not folded away.
     const remote = inputs.diagnostics.remote_access;
-    if (remote && remote.mode === "loopback" && remote.proxied_requests_refused > 0) {
+    if (remote && remote.mode !== "public" && remote.proxied_requests_refused > 0) {
       items.push({
         id: "remote:refused",
         tone: "blocking",
         title: "Requests through a reverse proxy are being refused",
         detail:
-          `${remote.proxied_requests_refused} forwarded request${remote.proxied_requests_refused === 1 ? " was" : "s were"} refused since Raiker started. ` +
-          "Raiker is bound to this computer only. To use a proxy, name its address in RAIKER_TRUSTED_PROXY " +
-          "(with RAIKER_OWNER_TOKEN set), or bind Raiker to a private address with --allow-public.",
+          `${remote.proxied_requests_refused} forwarded request${remote.proxied_requests_refused === 1 ? " was" : "s were"} refused on Raiker's local listener since it started. ` +
+          "That listener is for this computer only. Point the proxy at a proxy listener (raiker-web --proxy-port " +
+          "or --proxy-socket, with RAIKER_OWNER_TOKEN set), or bind Raiker to a private address with --allow-public.",
         href: "#/guide?section=managing-the-host",
         linkLabel: "How to run behind a proxy",
         technical: `proxied_request_refused · last ${remote.last_refused_at ?? "unknown"}`,
       });
     }
-    if (remote && remote.mode === "trusted_proxy") {
+    if (remote && remote.mode === "proxy_listener") {
       items.push({
-        id: "remote:trusted",
+        id: "remote:listener",
         tone: "waiting",
         title: "Raiker is reachable from the internet through a proxy",
         detail:
-          `Requests from ${remote.trusted_proxies.join(", ")} are served as remote: signed in, rate limited, ` +
-          "and password recovery is refused. Remove RAIKER_TRUSTED_PROXY to keep Raiker on this computer only.",
+          `Every request on the proxy listener (${remote.proxy_listener ?? "unknown"}) is served as remote: signed in, ` +
+          "rate limited, and password recovery is refused. Start raiker-web without --proxy-port or --proxy-socket " +
+          "to keep Raiker on this computer only.",
         href: "#/guide?section=managing-the-host",
         linkLabel: "About remote access",
-        technical: `trusted_proxy · ${remote.proxied_requests_served} served · ${remote.proxied_requests_refused} refused`,
+        technical: `proxy_listener · ${remote.proxied_requests_served} served · ${remote.proxied_requests_refused} refused`,
       });
     }
     // BUG-322 — a damaged search index fails every search through it. The

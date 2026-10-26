@@ -51,6 +51,24 @@ describe("ObserveView", () => {
   // Counting `!runtime_enabled` alone said "2 closed" on a workspace where one
   // of the two would have run, which is the defect Permissions had one surface
   // over.
+  // A flag or a variable named in a card is something the owner types; it is
+  // never broken across two lines at its own hyphens.
+  it("keeps a command-line flag in an issue card on one line", async () => {
+    stubFetch(
+      routes({
+        "GET /api/diagnostics": {
+          ...DIAGNOSTICS,
+          remote_access: { ...DIAGNOSTICS.remote_access, proxied_requests_refused: 2 },
+        },
+      }),
+    );
+    render(ObserveView);
+    const title = await screen.findByText("Requests through a reverse proxy are being refused");
+    const card = title.closest("li.issue") as HTMLElement;
+    const terms = [...card.querySelectorAll(".issue-detail .term")].map((node) => node.textContent);
+    expect(terms).toEqual(["--proxy-port", "--proxy-socket", "RAIKER_OWNER_TOKEN", "--allow-public"]);
+  });
+
   it("counts as closed only the gates that would actually fail closed", async () => {
     stubFetch(
       routes({

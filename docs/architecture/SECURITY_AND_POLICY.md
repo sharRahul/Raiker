@@ -40,20 +40,36 @@ execution environment is never authority.
 Some pages and exemptions are for this computer only: password recovery from
 the lock screen, the instance list, and the abuse window's exemption for
 loopback reads. Each asks one question, `is_local_request`
-(`raiker/api/proxy_guard.py`): the socket peer is loopback **and** the request
-carries no forwarding header (`Forwarded`, `X-Forwarded-For`,
-`X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`). uvicorn runs with
-`proxy_headers=False`, so no header can replace the peer.
+(`raiker/api/proxy_guard.py`).
 
-A loopback-bound host refuses a forwarded request (`proxied_request_refused`,
-owner's decision 2026-10-26), unless its peer is a proxy the owner named in
-`RAIKER_TRUSTED_PROXY`; then it is served as remote, rate limited, and with HSTS
-when the proxy received HTTPS. Naming a proxy requires `RAIKER_OWNER_TOKEN`,
-like `--allow-public`, and an entry that is not an address stops the host from
-starting. Forwarding headers only ever make a request less trusted: the client
-address a proxy reports identifies no one. Diagnostics reports the host's
-remote access and every refused or served proxied request
-([FIXED-1264](../plans/FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347)).
+**The listener a connection arrived on decides, not the request's headers.** A
+header is set by whoever sends the request; the socket a connection was
+accepted on is not. `raiker-web` runs one server with up to two listeners and
+reads which one accepted a connection from the ASGI scope (`scope["server"]`),
+which uvicorn fills from the socket:
+
+* **The local listener** (`--host`/`--port`, loopback by default). A request
+  is local when its peer is loopback, it arrived over TCP, and it carries no
+  forwarding header. A forwarding header there is refused
+  (`proxied_request_refused`): it means a proxy was pointed at the wrong
+  listener.
+* **The proxy listener** (`--proxy-socket` or `--proxy-port`, owner's decision
+  2026-10-26 after review). Every request is remote, whatever its headers:
+  recovery and instances refused, rate limited in one bucket of its own, HSTS
+  when the proxy received HTTPS. Opening it requires `RAIKER_OWNER_TOKEN` to be
+  set, as `--allow-public` does.
+* A connection with no TCP address (a Unix socket) is never local.
+
+uvicorn runs with `proxy_headers=False`, so no header can replace the peer.
+Forwarding headers only ever make a request less trusted. Diagnostics reports
+the listener and every refused or served proxied request.
+
+**What this cannot see.** A proxy pointed at the local listener that adds no
+forwarding header is, on that socket, the same as a browser on the server, and
+is treated as local. No check inside the request can tell them apart; the
+documentation therefore never points a proxy at the local listener, and the
+proxy listener exists so that it never has to
+([FIXED-1266](../plans/FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review)).
 
 ## Per-turn machine identity boundary
 

@@ -333,30 +333,45 @@ through in the README's
 [Running Raiker under WSL2 or on a VPS](../../README.md#running-raiker-under-wsl2-or-on-a-vps).
 ### Behind a reverse proxy
 
-A reverse proxy on the same machine (Caddy, nginx) forwarding to
-`127.0.0.1:8765` is refused by default: a request that carries a forwarding
-header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`,
-`X-Forwarded-Proto`, `X-Real-IP`) is never treated as coming from this
-computer, and a host bound to loopback answers it with
-*Raiker is bound to this computer only, and this request came through a reverse
-proxy, so it was refused*, followed by what to change. **Diagnostics** shows
-*Requests through a reverse proxy are being refused*.
+Raiker decides what is local by **where a connection arrives**, not by what a
+request says about itself. It has two kinds of listener:
 
-To run behind the proxy, name its address and set the owner token:
+| Listener | For | What a request there is |
+|---|---|---|
+| `--host`/`--port` (default `127.0.0.1:8765`) | This computer | Local when the peer is this computer. A request carrying a forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`) is refused with `proxied_request_refused` |
+| `--proxy-socket PATH` or `--proxy-port N` | A reverse proxy | Always remote, with or without headers |
+
+To run behind a proxy (Caddy, nginx), open a proxy listener and point the proxy
+at it:
 
 ```bash
 export RAIKER_OWNER_TOKEN="$(openssl rand -hex 32)"
-export RAIKER_TRUSTED_PROXY=127.0.0.1   # comma-separated addresses or ranges
-raiker-web --workspace . --no-browser
+raiker-web --workspace . --proxy-socket /run/raiker/proxy.sock --no-browser
+# or, on Windows or for a proxy that cannot use a socket:
+raiker-web --workspace . --proxy-port 8766 --no-browser
 ```
 
-Requests the proxy forwards are then served as remote ones: rate limited,
-password recovery and other this-computer-only pages refused, and HSTS added
-when the proxy says the browser reached it over HTTPS. **Diagnostics** shows
-*Raiker is reachable from the internet through a proxy*. The host refuses to
-start when `RAIKER_TRUSTED_PROXY` is set without `RAIKER_OWNER_TOKEN`, or names
-something that is not an address. The client address a proxy reports is never
-used to identify anyone. An SSH tunnel needs neither setting.
+Everything on the proxy listener is served as remote: rate limited (in one
+bucket for the proxy, since the address a proxy reports identifies nobody),
+password recovery and the other this-computer-only pages refused, and HSTS
+added when the proxy says the browser reached it over HTTPS. A Unix socket is
+created with mode `0660`, so the proxy's user needs Raiker's group; a stale
+socket left by an earlier run is replaced; a socket another process is serving,
+or any other file at that path, is not.
+**Diagnostics** shows *Raiker is reachable from the internet through a proxy*,
+naming the listener.
+
+The host refuses to start when a proxy listener is asked for without
+`RAIKER_OWNER_TOKEN`, together with `--allow-public` (a public bind already
+treats everything as remote), on the same port as `--port`, or with both
+`--proxy-socket` and `--proxy-port`. `RAIKER_TRUSTED_PROXY`, which an earlier
+build read, now stops the host from starting until it is unset.
+
+**Never point a proxy at port 8765.** If it sends a forwarding header, Raiker
+refuses the request and **Diagnostics** shows *Requests through a reverse proxy
+are being refused*. If it sends none, nothing in the request tells it apart
+from a browser on the server itself, so it would be treated as local. That is
+the reason the proxy has a listener of its own. An SSH tunnel needs neither.
 
 For installation failures or stale dashboard builds, see
 [Troubleshooting](troubleshooting.md).

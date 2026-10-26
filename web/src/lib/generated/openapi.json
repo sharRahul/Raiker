@@ -27648,7 +27648,7 @@
           "mode": {
             "enum": [
               "loopback",
-              "trusted_proxy",
+              "proxy_listener",
               "public"
             ],
             "title": "Mode",
@@ -27662,17 +27662,21 @@
             "title": "Proxied Requests Served",
             "type": "integer"
           },
-          "trusted_proxies": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Trusted Proxies",
-            "type": "array"
+          "proxy_listener": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxy Listener"
           }
         },
         "required": [
           "mode",
-          "trusted_proxies",
+          "proxy_listener",
           "proxied_requests_refused",
           "proxied_requests_served",
           "last_refused_at",

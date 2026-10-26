@@ -48,7 +48,7 @@ and are compatible with it:
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.
-2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355 and BUG-356, in numeric order.
+2. **Open defect records** — BUG-194, BUG-248, BUG-287, BUG-339, BUG-348, BUG-351, BUG-352, BUG-354, BUG-355, BUG-356 and BUG-358, in numeric order.
 3. **Verification follow-up** — newly observed failures that still need triage.
 4. **Reference baseline and decisions** — verified behavior and historical direction; these sections do not add open defects.
 
@@ -92,6 +92,7 @@ Evidence: `screenshots/not-working/` (defects),
 | [BUG-354](#bug-354--the-workspace-key-cannot-be-rotated-in-place) | Low | Storage / memory key | Open — found 2026-10-20 writing the MEM-KEY-05 runbook; the runbook gives the export/import route |
 | [BUG-355](#bug-355--goals-ship-without-intake-from-chat-validator-backed-criteria-or-a-restart-scenario) | Medium | Goals / personal agent | Open remainder of PA-D01 — the first slice shipped 2026-10-20 ([FIXED-1039](FIXED_ITEMS.md#fixed-1039--an-outcome-could-live-only-in-a-chat-transcript-there-was-no-durable-goal-goal-01-pa-d01) to [FIXED-1048](FIXED_ITEMS.md#fixed-1048--a-goal-had-no-budget-across-its-steps-goal-10-pa-d01)) |
 | [BUG-356](#bug-356--execution-profiles-govern-goal-steps-only-and-cover-one-data-class) | Medium | Execution profiles / models / data handling | Open remainder of PA-D02 — the first slice shipped 2026-10-20 ([FIXED-1049](FIXED_ITEMS.md#fixed-1049--there-was-nowhere-to-say-where-a-goals-work-may-run-prof-01-pa-d02) to [FIXED-1051](FIXED_ITEMS.md#fixed-1051--changing-the-boundary-would-have-applied-silently-to-work-in-flight-prof-03-pa-d02)) |
+| [BUG-358](#bug-358--raiker_owner_token-is-required-for-remote-access-but-authenticates-nothing) | Medium | Host / remote access / auth | Open — found 2026-10-26 reworking BUG-347; needs the owner's decision on what the token should do |
 
 The open defects below retain their original reproductions and remediation contracts. Closed defect evidence is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md); previously removed topic-review rationale remains in Git history.
 
@@ -660,7 +661,7 @@ remain:
 
 | Requirement | What exists | What is missing |
 |---|---|---|
-| Outcome intake | **Work → Goals** form | Starting a goal from a Chat message or a Build turn; asking only for materially missing facts |
+| Outcome intake | **Work → Goals** form; from Chat, **Make this a goal** and goals noticed in conversation fill it in ([FIXED-1252](FIXED_ITEMS.md#fixed-1252--the-same-aim-across-conversations-was-never-offered-as-a-goal-qui-f03)) | Starting a goal from a Build turn; asking only for materially missing facts |
 | Criteria validators | *Met when its steps finish* (a record the steps finished) and *You confirm it* | A Build step's `completed_verified` outcome, a destination read-back or another independent validator as evidence |
 | Leases and recovery | Each step is a task with the task's own claim generation and lease; an interrupted dispatch fails after two minutes rather than re-filing | A goal-level lease for concurrent coordinators across hosts, and the host-restart live scenario the register names |
 | Pause | Files nothing new and parks unclaimed steps; a running step finishes its current turn | A pause that reaches a running step's next safe boundary without stopping it |
@@ -705,6 +706,38 @@ data-class fields as PA-D05/PA-D07 give steps those inputs.
 **Required user-interface outcome.** Settings → Execution profiles states what
 each profile governs; a refused Chat or Build turn names the profile and offers
 the Settings route, exactly as a goal step does.
+
+## BUG-358 — RAIKER_OWNER_TOKEN is required for remote access but authenticates nothing
+
+**Severity: Medium. Area: Host / remote access / auth. Status: Open — found
+2026-10-26 reworking BUG-347.**
+
+**Observed.** `raiker-web` refuses `--allow-public`, `--proxy-socket` and
+`--proxy-port` unless `RAIKER_OWNER_TOKEN` is set, and its help, the README
+and the guides call it a *hardened owner token* that binds the owner session.
+Nothing reads its value: the only references are the presence checks in
+`raiker/api/serve.py`. A remote browser signs in with the owner's password
+(and MFA when enrolled), exactly as a local one does; the token adds a step to
+starting the host and no check to any request.
+
+**Effect.** The documentation promises a second credential that does not exist.
+The protection a remote host really has is the owner password, MFA, the rate
+limit, the public posture and the governed runtime, which is what an owner
+should be told to rely on.
+
+**Proposed fix.** Decide what the token is for, then make the code and the
+words agree. Options: (a) require it from every remote or proxied request as a
+second factor (a header set by the proxy, or entered once per browser and kept
+as a cookie), so the internet cannot reach the sign-in form without it; (b)
+use it to sign the owner session so a stolen session cookie is useless on
+another host; or (c) drop the requirement and say plainly that the password
+and MFA protect a remote host, requiring MFA enrolment before a remote
+listener starts. Each changes how the owner signs in from another device, so
+it is the owner's decision, not a guess.
+
+**Required user-interface outcome.** Whatever is chosen, **Settings → Security
+& sign-in** and the start-up message say what protects remote access, and
+nothing names a token that does nothing.
 
 ## 2026-10-19 verification follow-up — five Windows full-suite failures
 
@@ -1002,8 +1035,6 @@ and [03, QUI-H04](quiet-ui/03_WELCOME_HOME_AND_CHAT.md#status).
 * **The account on an approval is shown in monospace.** The card's *Account*
   line draws *Work Gmail* in the code face used for paths and commands. It is a
   name the owner chose and should read as text.
-* **`--allow-public` wraps in the Diagnostics card.** In the proxy card the flag
-  breaks across two lines at 1440×900.
 * **Goals are noticed by shared words, not by meaning.** Two requests about the
   same aim in different words are not matched; two unrelated requests that
   share three uncommon words can be. **Not now** keeps a wrong offer from

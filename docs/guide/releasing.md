@@ -148,15 +148,19 @@ rows hold on its commit:
    current for every platform the beta offers.
 3. The latest live rounds in
    [WEB_APP_LIVE_TEST.md](../architecture/WEB_APP_LIVE_TEST.md) pass on that
-   commit, RT-SEC-01 and RT-SEC-02 among them.
+   commit, RT-SEC-01 to RT-SEC-03 among them.
 4. The release notes say what a tester needs:
    - that it is a beta, and whether the installers are signed;
    - to back up the workspace before updating (Settings → Account), because an
      older build refuses data a newer one migrated;
    - how to reach a remote host: an SSH tunnel, a private address with
-     `--allow-public`, or a reverse proxy named in `RAIKER_TRUSTED_PROXY`
-     ([Managing the host](managing-the-host.md#behind-a-reverse-proxy)). A
-     proxy that is not named is refused;
+     `--allow-public`, or a reverse proxy pointed at a proxy listener
+     (`--proxy-socket` or `--proxy-port`), never at port 8765
+     ([Managing the host](managing-the-host.md#behind-a-reverse-proxy));
+   - that the owner password and MFA are what protect remote access while
+     `RAIKER_OWNER_TOKEN` authenticates nothing
+     ([BUG-358](../plans/TO_BE_FIXED.md#bug-358--raiker_owner_token-is-required-for-remote-access-but-authenticates-nothing)),
+     unless that is fixed first;
    - the open defects that bound what the beta claims
      ([TO_BE_FIXED](../plans/TO_BE_FIXED.md)) and
      [known limits](../architecture/KNOWN_LIMITS.md).

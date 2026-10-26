@@ -341,6 +341,7 @@ Useful flags:
 | `--workspace PATH` | Where runtime state lives (`.raiker/` inside it). Use a throwaway path to try Raiker without touching a real project. |
 | `--port N` | Bind port (default `8765`). |
 | `--host H` + `--allow-public` | Reach Raiker from another device. Also requires `RAIKER_OWNER_TOKEN` and turns on transport guardrails. Put TLS in front of it. |
+| `--proxy-socket PATH` / `--proxy-port N` | A listener for a reverse proxy on the same machine; every request there is remote. Requires `RAIKER_OWNER_TOKEN`. See [Behind a reverse proxy](managing-the-host.md#behind-a-reverse-proxy). |
 | `--no-browser` | Do not auto-open a browser. (`raiker-app --no-browser` opens neither the window nor a browser.) |
 | `--ui-dir PATH` | Serve a dashboard build from elsewhere. |
 

@@ -358,6 +358,13 @@ class RateLimitMiddleware:
         self._last_sweep = time.monotonic()
 
     def _client_key(self, scope: Scope) -> str:
+        from raiker.api.proxy_guard import PROXIED_SCOPE_KEY, PROXY_RATE_KEY
+
+        # BUG-347 — every request on the proxy listener comes from the proxy's
+        # own (loopback) peer, and the address it reports identifies nobody, so
+        # they share one bucket of their own rather than this computer's.
+        if scope.get(PROXIED_SCOPE_KEY):
+            return PROXY_RATE_KEY
         client = scope.get("client")
         if isinstance(client, (tuple, list)) and client:
             return str(client[0])
@@ -368,7 +375,7 @@ class RateLimitMiddleware:
 
         The socket peer is the only identity considered; a forwarding header
         never names who the client is. It can only take the exemption away
-        (BUG-347): a loopback peer relaying a forwarded request is a proxy.
+        (BUG-347), as does arriving on the proxy listener.
         """
         if not self._loopback_only or str(scope.get("method", "GET")).upper() not in {
             "GET",
@@ -376,8 +383,8 @@ class RateLimitMiddleware:
             "OPTIONS",
         }:
             return False
-        # BUG-347 — a loopback peer that carries forwarding headers is a proxy
-        # on this machine relaying someone else, so it is not exempt.
+        # BUG-347 — a request on the proxy listener, or one carrying forwarding
+        # headers, is someone else relayed by a proxy, so it is not exempt.
         from raiker.api.proxy_guard import is_local_request
 
         return is_local_request(scope)

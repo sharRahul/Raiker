@@ -5318,8 +5318,8 @@ export type ReleaseTargetView = {
 
 /** BUG-347 — how requests reach this host, read from the running process. */
 export type RemoteAccessView = {
-  mode: "loopback" | "trusted_proxy" | "public";
-  trusted_proxies: string[];
+  mode: "loopback" | "proxy_listener" | "public";
+  proxy_listener: string | null;
   proxied_requests_refused: number;
   proxied_requests_served: number;
   last_refused_at: string | null;

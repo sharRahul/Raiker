@@ -222,21 +222,30 @@ run useful local models). Run Raiker as its own unprivileged user.
    Terminate TLS in front of it if your VPN does not already encrypt the
    traffic, with the proxy connecting to that private address.
 
-5. **Or behind a reverse proxy on the same machine** (Caddy, nginx) that
-   forwards to `127.0.0.1:8765`. Name the proxy's address and set the owner
-   token; Raiker then serves what the proxy forwards as remote requests, rate
-   limited, with password recovery refused and HSTS when the proxy received
-   HTTPS:
+5. **Or behind a reverse proxy on the same machine** (Caddy, nginx). Give the
+   proxy its own listener and point the proxy there, **never at port 8765**:
 
    ```ini
    Environment=RAIKER_OWNER_TOKEN=<a long random value>
-   Environment=RAIKER_TRUSTED_PROXY=127.0.0.1
+   ExecStart=/home/raiker/Raiker/.venv/bin/raiker-web --workspace /home/raiker/workspace --proxy-socket /run/raiker/proxy.sock --no-browser
    ```
 
-   Without `RAIKER_TRUSTED_PROXY`, a loopback-bound Raiker refuses every request
-   that carries a forwarding header (`X-Forwarded-For`, `Forwarded` and the
-   like) and says what to change, and **Diagnostics** shows the refusals. It
-   never reads a forwarded request as a local one.
+   ```caddyfile
+   raiker.example.com {
+       reverse_proxy unix//run/raiker/proxy.sock
+   }
+   ```
+
+   Every request on the proxy listener is remote, whatever headers it carries:
+   rate limited, password recovery refused, and HSTS when the proxy received
+   HTTPS. The socket is created for its owner and group only (`0660`), so add
+   the proxy's user to Raiker's group. `--proxy-port 8766` opens
+   `127.0.0.1:8766` instead, for Windows or a proxy that cannot use a socket.
+   Port 8765 stays for this computer: a request reaching it with a forwarding
+   header (`X-Forwarded-For`, `Forwarded` and the like) is refused with what to
+   change, and **Diagnostics** shows the refusals. A proxy that sends no such
+   header and is pointed at 8765 anyway cannot be told apart from a browser on
+   the server itself, which is why the proxy gets a listener of its own.
 
    A remote instance is still a single-owner instance:
    every action stays governed, approved and audited, and the owner password

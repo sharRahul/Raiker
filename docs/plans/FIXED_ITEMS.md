@@ -1352,6 +1352,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1263](#fixed-1263--key-figures-read-1200-where-1200-was-meant-found-this-round) | Low | Visual answers | Fixed 2026-10-26 |
 | [FIXED-1264](#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
 | [FIXED-1265](#fixed-1265--uvicorn-rewrote-the-socket-peer-from-x-forwarded-for-found-fixing-bug-347) | Medium | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1266](#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review) | High | Host / remote access | Fixed 2026-10-26 |
 
 ---
 
@@ -38230,6 +38231,8 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 
 **Owner's decision (2026-10-26).** Refuse by default; trust a named proxy on request.
 
+**Superseded in part, the same day, by [FIXED-1266](#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review).** The owner's review found that trusting a proxy by its headers leaves a proxy that sends none looking local; the trusted proxy (`RAIKER_TRUSTED_PROXY`) was replaced by a listener of its own. The refusal of forwarded requests on the local listener, the single `is_local_request` and Diagnostics below still stand.
+
 **Fixed.** `raiker/api/proxy_guard.py`. A request carrying any forwarding header (`Forwarded`, `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`) is never local, whatever its peer. On a loopback-only host it is refused with `403 proxied_request_refused` and a sentence naming the two ways to run behind a proxy (`RAIKER_TRUSTED_PROXY`, or `--allow-public` on a private address) and that an SSH tunnel needs neither. An owner who names the proxy's address in `RAIKER_TRUSTED_PROXY` gets its requests served under the public posture: remote for recovery, instances and the loopback rate exemption, rate limited, and with HSTS when the proxy says the browser came over HTTPS. Trusting a proxy needs `RAIKER_OWNER_TOKEN`, as `--allow-public` does, and the host refuses to start without it or with an entry that is not an address. Forwarding headers still identify nothing; they only ever make a request less trusted. Recovery, instances and the rate limiter all ask the one `is_local_request`. **Diagnostics** names the host's remote access (`remote_access` on `/api/diagnostics`): a refused proxied request raises *Requests through a reverse proxy are being refused* with what to change, and a trusted proxy raises *Raiker is reachable from the internet through a proxy*. README, *Managing the host* and the security guide describe both set-ups.
 
 **Evidence.** `tests/test_proxied_loopback.py` (13 tests: every forwarding header refused with the security headers kept, recovery refused through a trusted proxy, no loopback rate exemption, Diagnostics, address-only entries, the owner-token requirement, fail-closed configuration); `tests/test_api_rest_hardening.py`; `observeAttention.test.ts`; RT-SEC-01, RT-SEC-02, and a manual check behind a trusted proxy (served with HSTS, recovery 403, rate limited at 120).
@@ -38243,3 +38246,27 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** `raiker-web` and the desktop launcher start uvicorn with `proxy_headers=False` and `forwarded_allow_ips=""`, so the socket peer is always the peer.
 
 **Evidence.** `tests/test_proxied_loopback.py::test_the_server_never_lets_uvicorn_rewrite_the_peer`; RT-SEC-01.
+
+## FIXED-1266 — A proxy that sent no forwarding header was still read as local (BUG-347 review)
+
+**Severity: High. Area: Host / remote access. Status: Fixed 2026-10-26.**
+
+**Observed.** The owner's code review of [FIXED-1264](#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347): the guard told a proxy apart by its forwarding headers, and passed a request with none straight through. A reverse proxy on the same machine that forwards to `127.0.0.1:8765` without `X-Forwarded-For` or its relatives (nginx and Caddy can both be set up that way) arrives from a loopback peer with nothing to mark it, so local-only pages and the loopback rate exemption were reachable through it again. Diagnostics could not see it either. The trusted-proxy setting had the same dependency: a trusted proxy that sent no header was served as local.
+
+**Root cause.** Headers are written by the sender. On one socket, a header-less proxy and a browser on the server are the same bytes; nothing inside the request can be the boundary.
+
+**Owner's decision (2026-10-26, from the review).** Classify a connection by the listener it arrived on. Keep the loopback listener local-only, give the proxy a listener of its own where every request is remote, keep the owner-token requirement, rate limiting and HTTPS protections for proxy traffic.
+
+**Fixed.**
+
+* `raiker-web --proxy-socket PATH` (a Unix domain socket, mode `0660`) or `--proxy-port N` (`127.0.0.1:N`, for Windows) opens a proxy listener beside the local one. One uvicorn server holds both sockets; `ProxyListener.accepted` reads which socket took the connection from `scope["server"]`, which uvicorn fills from the socket and no request can set. Every request there is marked remote before anything asks: recovery and instances refused, no loopback rate exemption, its own rate-limit bucket (`proxy-listener`, since the address a proxy reports identifies nobody), HSTS when the proxy received HTTPS. A header claiming `127.0.0.1` changes nothing.
+* A connection with no TCP address (a Unix socket) is never local, on any listener.
+* The local listener keeps refusing forwarded requests, now with a reason that names the proxy listener.
+* Start-up refuses a proxy listener without `RAIKER_OWNER_TOKEN`, with `--allow-public`, on the same port as `--port`, or with both options; a socket path holding anything but a stale socket (a file, or a socket another process is serving) is left alone and refused, and the socket is created owner-and-group only rather than narrowed after. `RAIKER_TRUSTED_PROXY` is no longer read: the host refuses to start while it is set, so a configuration made for it cannot silently change meaning.
+* Diagnostics: `remote_access.mode` is `loopback`, `proxy_listener` or `public`, with the listener it names (`127.0.0.1:8766`, `unix:/run/raiker/proxy.sock`). Refusals on the local listener are reported whether or not a proxy listener is open. A flag or variable in an issue card no longer breaks across lines at its hyphens (`--proxy-port` read *--* / *proxy-port*), which closes the *--allow-public wraps* item carried from Quiet UI 06.
+* README, *Managing the host*, troubleshooting, the security policy and KNOWN_LIMITS describe the two listeners and never point a proxy at the local one.
+
+**What it cannot do.** A proxy pointed at the local listener that sends no forwarding header is still the same as a browser on the server, and is treated as local. That is now a configuration the documentation never describes, not one Raiker asks for; KNOWN_LIMITS says so.
+
+**Evidence.** `tests/test_proxied_loopback.py` (27 tests): every forwarding header and a misleading `X-Forwarded-For: 127.0.0.1` refused on the local listener; the proxy listener remote with no header and with misleading ones; HSTS only over HTTPS; the proxy's own rate-limit bucket; IPv4 and IPv6 loopback on each listener; Unix-socket connections never local; WebSockets classified the same way; Diagnostics; every start-up refusal including `RAIKER_TRUSTED_PROXY`; the socket's mode and stale-socket handling; and a **real uvicorn server** with both listeners (TCP proxy port, and a Unix socket through `httpx`), so the guard is checked against what uvicorn actually puts in `scope["server"]`. `tests/test_api_rest_hardening.py`; `observeAttention.test.ts`, `ObserveView.test.ts`. Live: RT-SEC-01 to RT-SEC-03, and `raiker-web --proxy-socket` by hand with `curl --unix-socket`.
+

@@ -15,7 +15,29 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-10-26 (BUG-347 review: the proxy gets a listener of its own)
+
+The owner's review of the first BUG-347 fix
+([FIXED-1266](../plans/FIXED_ITEMS.md#fixed-1266--a-proxy-that-sent-no-forwarding-header-was-still-read-as-local-bug-347-review)):
+a connection is classified by the listener it arrived on, not by its headers.
+A fresh workspace served by
+`RAIKER_OWNER_TOKEN=… raiker-web --port 8765 --proxy-port 8766` at 1440×900. No
+model or key is needed. Spec: `web/e2e/bug-347-proxied-loopback-live.spec.ts`
+with `RAIKER_LIVE_PROXY_BASE=http://127.0.0.1:8766`: **3/3**. Screenshots:
+`docs/screenshots/2026-10-26-bug-347/`.
+
+| Case | Check | Result |
+|---|---|---|
+| RT-SEC-01 | On the local listener, `X-Forwarded-For` and `Forwarded` are answered `403 proxied_request_refused`, and the message names `--proxy-port`; the same request without a header is served | ✅ |
+| RT-SEC-02 | **Diagnostics** shows *Requests through a reverse proxy are being refused* with what to change; `--proxy-port`, `--proxy-socket`, `RAIKER_OWNER_TOKEN` and `--allow-public` each stay on one line | ✅ after a fix found in this round: the flags broke at their hyphens |
+| RT-SEC-03 | On the proxy listener with **no forwarding header**, `/api/recovery/backups` is `403 recovery_loopback_only`; with `X-Forwarded-For: 127.0.0.1` too; `X-Forwarded-Proto: https` brings HSTS. The owner registers and signs in through the proxy listener (no `429` in the host log), and **Diagnostics** shows *Raiker is reachable from the internet through a proxy* naming `127.0.0.1:8766` | ✅ |
+| Unix socket, by hand | `raiker-web --proxy-socket <ws>/proxy.sock`: the socket is `srw-rw----`; `curl --unix-socket` reads `/api/health` (200) and is refused recovery (`recovery_loopback_only`), while the local listener answers `recovery_not_needed`. With `RAIKER_TRUSTED_PROXY` set the host refuses to start (exit 2) | ✅ |
+| Suites | `tests/test_proxied_loopback.py` (27, including a real uvicorn server with a TCP proxy port and a Unix socket), `tests/test_api_rest_hardening.py`, `observeAttention.test.ts`, `ObserveView.test.ts` | ✅ |
+| Not covered | A header-less proxy pointed at the local listener is indistinguishable from a browser on the server and is read as local ([KNOWN_LIMITS](KNOWN_LIMITS.md)); the real-server IPv6 loopback test was skipped here (this container has no `::1`) and runs wherever `::1` exists | — |
+
 ## Result — 2026-10-26 (BUG-347: a reverse proxy in front of a loopback host)
+
+*Superseded by the result above: the trusted proxy checked here was replaced by a proxy listener.*
 
 The owner's decision on remote access
 ([FIXED-1264](../plans/FIXED_ITEMS.md#fixed-1264--a-reverse-proxy-on-the-same-machine-made-every-remote-request-look-local-bug-347),

@@ -42,6 +42,7 @@ export type IconName =
   | "moon"
   | "system"
   | "send"
+  | "arrow-up"
   | "check"
   | "x"
   | "chevron-down"
@@ -168,6 +169,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   moon: ["M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"],
   system: ["M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z", "M9 20h6", "M12 16v4"],
+  "arrow-up": ["M12 19V5", "M6 11l6-6 6 6"],
   send: ["M4 12 20 4l-4 16-4.5-6.5L4 12Z", "M20 4 11.5 13.5"],
   check: ["M5 12.5 10 17.5 19 7"],
   x: ["M6 6l12 12", "M18 6 6 18"],

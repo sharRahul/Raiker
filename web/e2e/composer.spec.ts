@@ -225,8 +225,12 @@ test.beforeEach(async ({ page }) => {
  * begin one.
  */
 async function startDictation(page: import("@playwright/test").Page): Promise<void> {
-  await page.getByRole("button", { name: "Add to this turn" }).click();
-  await page.getByRole("menuitem", { name: "Dictate" }).click();
+  const trigger = page.getByRole("button", { name: "Dictate", exact: true });
+  if (await trigger.isVisible()) await trigger.click();
+  else {
+    await page.getByRole("button", { name: "Add to this turn" }).click();
+    await page.getByRole("menuitem", { name: "Dictate" }).click();
+  }
 }
 
 test("governed voice stays editable and visually consistent in Chat, Build, mobile, and Settings", async ({ page }) => {
@@ -279,9 +283,7 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await page.goto("http://raiker.test/#/new-chat");
   // COMPOSER-16 — on a phone the `+` menu is a bottom sheet, so dictation is
   // one thumb reach rather than a control squeezed into a horizontal bar.
-  await page.getByRole("button", { name: "Add to this turn" }).click();
-  await expect(page.getByRole("menuitem", { name: "Dictate" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
   const mobileDrawer = page.locator("#all-navigation");
   await expect(mobileDrawer).toHaveAttribute("aria-hidden", "true");
   await expect.poll(async () => (await mobileDrawer.boundingBox())?.x ?? 0).toBeLessThan(-200);
@@ -387,6 +389,11 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
 
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt", { exact: true });
+  const chatComposer = page.getByRole("group", { name: "Message composer" });
+  await expect(chatComposer.getByRole("button", { name: "Dictate" })).toBeVisible();
+  await expect(chatComposer.locator(".bar-left").getByRole("button", { name: /Model for this turn/ })).toBeVisible();
+  await expect(chatComposer.locator(".bar-left").getByRole("button", { name: /Standard/ })).toBeVisible();
+  await expect(chatComposer.locator(".bar-right").getByRole("button", { name: "Dictate" })).toBeVisible();
   await expect(chat).toHaveAttribute("placeholder", "What would you like Raiker to do?");
   // The Chat composer is deliberately minimal: no surface switch, no duplicate
   // capacity chip. What is left is what a prompt needs.
@@ -400,6 +407,7 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
 
   await page.getByRole("navigation", { name: "All navigation" }).getByRole("link", { name: "Build" }).click();
   await expect(page.getByLabel("Describe the change")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Build composer" }).locator(".bar-left").getByRole("button", { name: /Model for this turn/ })).toBeVisible();
   // The posture is one chip and one menu now, matching where every reference
   // coding agent keeps the same control.
   const mode = page.getByRole("button", { name: /^How much Raiker may do this turn:/ });
@@ -439,7 +447,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
     await expect(composer.getByRole("button", { name: "Add to this turn" })).toBeVisible();
     await expect(composer.getByRole("button", { name: "Tools" })).toHaveCount(tools ? 1 : 0);
     // COMPOSER-02's list of what must not be a permanent button.
-    for (const gone of ["Add attachment", "Dictate"]) {
+    for (const gone of ["Add attachment", ...(route === "build" ? ["Dictate"] : [])]) {
       await expect(composer.getByRole("button", { name: gone })).toHaveCount(0);
     }
     // COMPOSER-12 — no governance control at the careful default.
@@ -453,7 +461,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
   await page.getByRole("button", { name: "Add to this turn" }).click();
   const add = page.getByRole("menu", { name: "Add to this turn" });
   await expect(add.getByRole("menuitem", { name: "Upload a file" })).toBeVisible();
-  await expect(add.getByRole("menuitem", { name: "Dictate" })).toBeVisible();
+  await expect(add.getByRole("menuitem", { name: "Dictate" })).toHaveCount(0);
   await expect(add.getByRole("menuitem", { name: "Work in a project" })).toBeVisible();
   // Build's only; Chat has no code map to mention a file from.
   await expect(add.getByRole("menuitem", { name: /Mention a file/ })).toHaveCount(0);

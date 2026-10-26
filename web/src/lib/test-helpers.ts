@@ -201,9 +201,12 @@ export async function openComposerAttach(): Promise<void> {
   await composerMenuItem("Add to this turn", "Upload a file");
 }
 
-/** Start dictating, the way `+` does. */
+/** Start dictation from the visible trigger or the Build add menu. */
 export async function startComposerDictation(): Promise<void> {
-  await composerMenuItem("Add to this turn", "Dictate");
+  const { fireEvent, screen } = await import("@testing-library/svelte");
+  const trigger = screen.queryByRole("button", { name: "Dictate" });
+  if (trigger) await fireEvent.click(trigger);
+  else await composerMenuItem("Add to this turn", "Dictate");
 }
 
 /** Reveal the project chooser, the way `+` does. */

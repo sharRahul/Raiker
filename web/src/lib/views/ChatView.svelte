@@ -602,7 +602,6 @@
   const HANDLED = new Set([
     "attach-file",
     "set-project",
-    "dictate",
     "web-search",
     "web-read",
     "web-extract",
@@ -2688,6 +2687,7 @@
   {/if}
 
   <Composer
+    cardClass="chat-composer"
     ariaLabel="Message composer"
     inputId="prompt-input"
     bind:value={draft.text}
@@ -2796,24 +2796,7 @@
             disabled={streaming}
             onchoose={runComposerAction}
           />
-          <!-- The session, not the trigger: "Listening…", Done and Cancel are
-               the state of dictation in progress and belong beside the prompt
-               being filled, not behind a menu that has already closed. The
-               trigger is an entry in `+`. -->
-          <VoiceDictationControl
-            bind:this={voiceControl}
-            showTrigger={false}
-            draft={draft.text}
-            selectionStart={promptSelectionStart}
-            selectionEnd={promptSelectionEnd}
-            language={speechLanguage}
-            runtime={speechRuntime}
-            disabled={streaming}
-            onchange={onVoiceDraft}
-            onfinalized={() => (voiceDictated = true)}
-            onrestored={restoreVoiceProvenance}
-            onactivechange={onVoiceActive}
-          />
+
           <!-- COMPOSER-06 — project, attachments and context in one
                inspectable line. -->
           <ComposerContext
@@ -2837,9 +2820,11 @@
             />
           {/snippet}
           </ComposerContext>
-    {/snippet}
-
-    {#snippet right()}
+          <ProfileChip
+          bind:profile={conversationProfile}
+          disabled={streaming}
+          onchange={(next) => saveProfile(sessionId, next)}
+        />
           <ModelPicker
             bind:profileId={modelProfile}
             bind:model
@@ -2854,13 +2839,31 @@
             onreset={() => void forgetSurfaceModel("chat")}
             disabled={streaming}
           />
+    {/snippet}
+
+    {#snippet right()}
+          <VoiceDictationControl
+            bind:this={voiceControl}
+            showPrivacy={false}
+            draft={draft.text}
+            selectionStart={promptSelectionStart}
+            selectionEnd={promptSelectionEnd}
+            language={speechLanguage}
+            runtime={speechRuntime}
+            disabled={streaming}
+            onchange={onVoiceDraft}
+            onfinalized={() => (voiceDictated = true)}
+            onrestored={restoreVoiceProvenance}
+            onactivechange={onVoiceActive}
+          />
+
           <button
             type="submit"
             class="btn btn-primary send"
             disabled={streaming || attachStore.uploading || draft.text.trim() === ""}
             aria-label={streaming ? "Running" : "Send"}
           >
-            <Icon name="send" size="sm" />
+            <Icon name="arrow-up" size="sm" />
             <span class="send-label">{streaming ? "Running…" : "Send"}</span>
           </button>
     {/snippet}
@@ -2874,11 +2877,7 @@
            conversation. It only narrows; the account's approval mode lives
            in Permissions › Advanced. One line with where the message goes. -->
       <div class="footer-facts">
-        <ProfileChip
-          bind:profile={conversationProfile}
-          disabled={streaming}
-          onchange={(next) => saveProfile(sessionId, next)}
-        />
+
         {#if dataLocation !== null}
           <!-- QUI-C04 — where the next message goes, said before it is sent. It
                follows the model chosen for this turn. -->

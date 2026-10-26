@@ -1132,7 +1132,7 @@
         disabled={busy || importing || (starterNeedsImage && selectedId === null) || !draft.text.trim() || choice === null || block.kind !== "none"}
         aria-label={busy ? "Working" : primaryAction}
       >
-        <Icon name={busy ? "clock" : "send"} size="sm" />
+        <Icon name={busy ? "clock" : "arrow-up"} size="sm" />
         <!-- COMPOSER-15 — the word names the act the press performs. Design has
              three now because it has three requests, and the word follows the
              state: Edit only while an asset is on the canvas. -->

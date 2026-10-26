@@ -153,13 +153,13 @@
   }
   .composer-card {
     border: 1px solid var(--border);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-xl);
     background: var(--surface);
     box-shadow: var(--shadow-1);
     transition: border-color 120ms ease, box-shadow 120ms ease;
     /* Even padding all round: a tighter bottom makes the control bar look
        cropped against the card edge. */
-    padding: 0.75rem 0.85rem;
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -195,6 +195,7 @@
     font-size: var(--text-md);
     min-height: 2.6rem;
   }
+  .prompt-input:focus-visible { outline: none; box-shadow: none; }
   .prompt-input::placeholder {
     color: var(--text-3);
   }
@@ -248,8 +249,8 @@
     text-decoration: underline;
   }
 
-  :global(.design-composer .send) { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0; border-radius: 50%; }
-  :global(.design-composer .send-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  :global(.design-composer .send), :global(.chat-composer .send), :global(.composer-build .send) { width: 2.5rem; height: 2.5rem; min-width: 2.5rem; padding: 0; border-radius: 50%; }
+  :global(.design-composer .send-label), :global(.chat-composer .send-label), :global(.composer-build .send-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* Kept after the base rules so compact declarations win without changing a
      single desktop selector. */

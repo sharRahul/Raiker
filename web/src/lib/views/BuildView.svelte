@@ -2676,9 +2676,6 @@
               />
             {/snippet}
             </ComposerContext>
-      {/snippet}
-
-      {#snippet right()}
             <ModelPicker
               bind:profileId={modelProfile}
               bind:model
@@ -2693,12 +2690,16 @@
             onreset={() => void forgetSurfaceModel("build")}
               disabled={streaming}
             />
+      {/snippet}
+
+      {#snippet right()}
+
             <button
               type="submit"
               class="btn btn-primary send"
               disabled={streaming || attachStore.uploading || draft.text.trim() === "" || modelBlocked || !projectReady}
             >
-              <Icon name={streaming ? "clock" : "send"} size="sm" />
+              <Icon name={streaming ? "clock" : "arrow-up"} size="sm" />
               <!-- COMPOSER-15 — one state, one obvious next action. The word
                    follows the posture this turn is already sending, so it can
                    never promise more than the turn will do. -->

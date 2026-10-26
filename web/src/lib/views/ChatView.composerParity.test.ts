@@ -177,7 +177,8 @@ describe("ChatView composer parity", () => {
     expect(screen.getByRole("button", { name: "Tools" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Model for this turn/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
-    for (const gone of ["Add attachment", "Dictate"]) {
+    expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
+    for (const gone of ["Add attachment"]) {
       expect(screen.queryByRole("button", { name: gone })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: /governance posture/i })).toBeNull();

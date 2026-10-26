@@ -49,18 +49,20 @@ def test_every_action_reference_is_pinned_or_local() -> None:
         assert "actions/setup-python@" in path.read_text(encoding="utf-8")
 
 
-def test_ci_probes_memory_locking_without_running_the_whole_suite_locked() -> None:
+def test_ci_runs_the_suite_under_the_products_memory_security_default() -> None:
     job = _workflow()["jobs"]["python"]
     steps = {step["name"]: step for step in job["steps"]}
     assert "Verify SQLCipher memory-security probe" in steps
     assert "scripts/test_shard.py --check 3" in steps["Every test file is in exactly one shard"]["run"]
 
-    # The suite runs in three shards, each serially and unlocked, each inside
-    # the limit the single job used to reach.
+    # The suite runs in three shards, each serially, each inside the limit the
+    # single job used to reach, and under the product's own memory-security
+    # default: fresh workspaces come from a schema template (FIXED-1247), so it
+    # no longer has to be switched off to finish.
     tests = _workflow()["jobs"]["python-tests"]
     assert tests["strategy"]["matrix"]["shard"] == ["1", "2", "3"]
     test_step = {step["name"]: step for step in tests["steps"]}["Run tests"]
-    assert test_step["env"]["RAIKER_SQLCIPHER_MEMORY_SECURITY"] == "off"
+    assert "RAIKER_SQLCIPHER_MEMORY_SECURITY" not in (test_step.get("env") or {})
     assert "-vv" in test_step["run"]
     assert "scripts/test_shard.py ${{ matrix.shard }} 3" in test_step["run"]
     assert tests["timeout-minutes"] == "45"

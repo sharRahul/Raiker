@@ -168,24 +168,25 @@ def cached_connection_count() -> int:
 # connection fails with ``MemoryError`` and *every* request fails with it,
 # because authentication opens the store.
 #
-# The decision, stated rather than left implicit: **the pragma is set on every
-# connection, and it is off unless the owner asks for it.** Two facts decide it,
-# and both were measured rather than assumed:
+# The decision, as the code makes it: **the pragma is set on every connection,
+# and it follows ``RAIKER_SQLCIPHER_MEMORY_SECURITY``**: ``off`` never locks,
+# ``on`` requires locking and fails closed by name when the platform refuses,
+# and unset (``auto``) locks only after a disposable probe proves the platform
+# will allow it. The connection cache's absolute ceiling keeps a process inside
+# that allowance (BUG-86, BUG-46).
 #
-# * **Cost.** Memory security makes SQLCipher lock and wipe its buffers around
-#   every operation. Opening a workspace and running two hundred reads takes
-#   0.17 s with it off and 1.14 s with it on — about seven times. SQLCipher
-#   itself defaults it off in 4.x for this reason.
-# * **Failure mode.** When the platform's locked-memory allowance runs out the
-#   failure is not degraded performance, it is `MemoryError` on *every* request,
-#   because authentication opens the store. That is BUG-86, and BUG-46 before it.
+# Cost, measured 2026-10-26 rather than assumed: reads on an open connection
+# cost the same either way (2,000 reads: 0.002 s off, 0.003 s on). What memory
+# security made slow was *building* a workspace: 155 ``ALTER TABLE`` migrations
+# each make SQLite rebuild its schema, and every freed allocation of that is
+# wiped, so a fresh workspace took about 3 s on against 0.4 s off. An earlier
+# note here put the cost at "seven times on every store operation"; that was the
+# build, not the operations. Fresh workspaces are now copied from a schema
+# template (``migration_runner``), about 0.08 s either way, which is why tests
+# no longer need memory security switched off.
 #
-# So Raiker does not lock key pages by default, and says so rather than leaving
-# it to whatever SQLCipher was built with: `GET /api/health` reports the setting,
-# the reason, and the allowance the platform would have given. An owner who wants
-# the stronger posture sets ``RAIKER_SQLCIPHER_MEMORY_SECURITY=on``, and because
-# that is their decision it is honoured exactly — a refused lock then fails
-# **closed**, by name, instead of surfacing as a bare ``MemoryError``.
+# ``GET /api/health`` reports the setting, the reason, the probe and the
+# allowance the platform would have given.
 #
 # BUG-205 — one property of the pragma is not a Raiker decision and has to be
 # recorded rather than assumed: in the bundled SQLCipher build it is
@@ -251,10 +252,9 @@ def resolve_memory_security(
 ) -> tuple[bool, str]:
     """``(enabled, reason)`` for ``PRAGMA cipher_memory_security``.
 
-    Off unless the owner asks for it, for the two reasons in the note above:
-    locking costs roughly seven times on every store operation, and when the
-    platform's allowance runs out the failure is a total lockout rather than
-    slow work. Resolved once per process and reported verbatim on the health
+    ``off`` never locks, ``on`` requires it, and unset is ``auto``: lock only
+    after a disposable probe proves the platform allows it (see the note
+    above). Resolved once per process and reported verbatim on the health
     endpoint. ``refresh`` re-resolves it, which only tests need.
     """
     global _MEMORY_SECURITY, _MEMORY_SECURITY_MODE, _MEMORY_SECURITY_PROBE

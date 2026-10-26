@@ -41,11 +41,10 @@ def test_worker_reuses_one_keyed_connection_for_a_workspace(
 ) -> None:
     invalidate_workspace_connections(tmp_path)
     real_connect = sqlite_module.sqlite3.connect
-    opened = 0
+    opened: list[str] = []
 
     def counting_connect(*args: Any, **kwargs: Any) -> Any:
-        nonlocal opened
-        opened += 1
+        opened.append(str(args[0]) if args else "")
         return real_connect(*args, **kwargs)
 
     monkeypatch.setattr(sqlite_module.sqlite3, "connect", counting_connect)
@@ -55,7 +54,9 @@ def test_worker_reuses_one_keyed_connection_for_a_workspace(
     assert first.table_names()
     assert second.table_names()
 
-    assert opened == 1
+    # Counted against the workspace's own database: a fresh workspace also
+    # opens its seed copy once, under another name, to re-key it.
+    assert opened.count(str(first.db_path)) == 1
 
 
 def test_repeated_store_facades_do_not_repeat_writing_bootstrap(
@@ -100,21 +101,22 @@ def test_workspace_invalidation_closes_and_rekeys_on_next_read(
 ) -> None:
     invalidate_workspace_connections(tmp_path)
     real_connect = sqlite_module.sqlite3.connect
-    opened = 0
+    opened: list[str] = []
 
     def counting_connect(*args: Any, **kwargs: Any) -> Any:
-        nonlocal opened
-        opened += 1
+        opened.append(str(args[0]) if args else "")
         return real_connect(*args, **kwargs)
 
     monkeypatch.setattr(sqlite_module.sqlite3, "connect", counting_connect)
     store = SQLiteStore(tmp_path)
     assert store.table_names()
-    assert opened == 1
+    # Counted against the workspace's own database: a fresh workspace also
+    # opens its seed copy once, under another name, to re-key it.
+    assert opened.count(str(store.db_path)) == 1
 
     invalidate_workspace_connections(tmp_path)
     assert store.table_names()
-    assert opened == 2
+    assert opened.count(str(store.db_path)) == 2
 
 
 def test_many_workspaces_do_not_grow_the_cache_or_the_descriptor_count(
@@ -159,11 +161,10 @@ def test_eviction_keeps_the_warm_workspace_and_drops_the_stalest(
     assert warm_store.table_names()
 
     real_connect = sqlite_module.sqlite3.connect
-    opened = 0
+    opened: list[str] = []
 
     def counting_connect(*args: Any, **kwargs: Any) -> Any:
-        nonlocal opened
-        opened += 1
+        opened.append(str(args[0]) if args else "")
         return real_connect(*args, **kwargs)
 
     monkeypatch.setattr(sqlite_module.sqlite3, "connect", counting_connect)
@@ -177,8 +178,10 @@ def test_eviction_keeps_the_warm_workspace_and_drops_the_stalest(
         assert warm_store.table_names()
 
     assert cached_connection_count() <= 2
-    # Six cold workspaces opened; the warm one never paid key derivation again.
-    assert opened == 6
+    # Every cold workspace was opened; the warm one never paid key derivation
+    # again. (A fresh workspace also opens its seed copy once to re-key it.)
+    assert str(warm_store.db_path) not in opened
+    assert all(any(f"cold_{index}" in path for path in opened) for index in range(6))
     close_cached_connections()
 
 

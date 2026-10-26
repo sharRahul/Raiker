@@ -33,8 +33,6 @@ jobs:
       - name: Validate documentation contracts
         run: |
           python -m pytest -q tests/test_docs_consistency.py tests/test_governance_entry_paths.py
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
       # RAIKER-2025 — the runtime probe degrades to FTS4 honestly when a build
       # has no FTS5, which is right for a user on an unusual platform and wrong
       # for this repository's own dependency floor. Without this step a wheel
@@ -152,14 +150,10 @@ jobs:
       - name: Run tests
         run: |
           python -m pytest -vv --durations=25 $(python scripts/test_shard.py ${{ matrix.shard }} 3)
-        # The real platform probe in the Python 3.11 job proves Linux page
-        # locking separately. Running thousands of isolated stores with locking
-        # enabled makes the suite roughly seven times slower and can exhaust the
-        # runner's memlock allowance, which hides test progress instead of
-        # adding coverage. The BUG-46 tests exercise enabled and fail-closed
-        # behavior directly.
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+        # Run with the product's own memory-security default. Fresh workspaces
+        # are copied from a schema template (FIXED-1247), so the thousands of
+        # isolated stores no longer pay the per-ALTER cost that once made the
+        # suite seven times slower with locking on.
 
   # Wave 0 of the codebase optimisation review: a baseline taken the same way on
   # every run, so a simplification reports what it removed instead of estimating
@@ -296,8 +290,6 @@ jobs:
           cache: pip
       - name: Run the pair under the fault handler
         shell: bash
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
         run: |
           for run in 1 2 3; do
             echo "::group::run $run"
@@ -309,8 +301,6 @@ jobs:
       # command store, so a path or line-ending assumption fails here first.
       - name: Build target, worktree and provenance tests
         shell: bash
-        env:
-          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
         run: |
           python -m pytest -q -p no:cacheprovider tests/test_build_target_and_review.py tests/test_build_provenance_and_worktrees.py tests/test_build_fault_boundaries.py tests/test_build_outcome.py tests/test_build_cancel_mid_turn.py tests/test_build_task_target.py
 
@@ -476,8 +466,6 @@ jobs:
     name: Build faults (host killed mid-check)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)

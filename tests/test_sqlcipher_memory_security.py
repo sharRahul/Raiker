@@ -101,13 +101,11 @@ def test_a_threadpool_stays_under_the_declared_ceiling(
 def test_memory_security_auto_enables_only_after_a_passing_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The decision is stated, and the default is the cheap, openable one.
+    """Unset is ``auto``: lock key pages only once a probe proves the platform allows it.
 
-    Locking key pages costs roughly seven times on every store operation, and
-    when the platform's allowance runs out the failure is a total lockout at
-    sign-in rather than slow work — which is exactly BUG-86. So Raiker does not
-    lock by default, says which posture it is on, and honours an owner who asks
-    for the other one.
+    The probe is what stands between ``auto`` and BUG-86's lockout, so a passing
+    probe enables it, ``on`` is honoured as a requirement and ``off`` as a
+    refusal.
     """
     monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)

@@ -11,10 +11,16 @@ turns off.
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import hashlib
 import json
+import os
 import re
+import shutil
+import tempfile
+import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
@@ -40,7 +46,45 @@ def schema_generation_of(connection: sqlite3.Connection) -> int:
     return int(connection.execute("PRAGMA user_version").fetchone()[0])
 
 
+# ── Fresh workspaces from a schema template ──────────────────────────────────
+#
+# A new workspace used to replay every migration: 208 steps, 155 of them
+# `ALTER TABLE ... ADD COLUMN`. Each ALTER makes SQLite rebuild its in-memory
+# schema, and with SQLCipher memory security on every freed allocation of that
+# rebuild is wiped, so creating one workspace took about 3 s with memory
+# security on and 0.4 s with it off. Raiker's steady-state reads cost the same
+# either way; it was only this one-off build that was slow, and it is why the
+# test suite and CI had switched memory security off.
+#
+# The first fresh workspace in a process is built by the migrations as before,
+# and the result, schema and bookkeeping rows and nothing else, is exported to a
+# template under a random per-process key in a private temporary directory.
+# Every later fresh workspace is a copy of it, re-keyed to that workspace's own
+# key (about 0.08 s), after which the migration pass finds nothing to apply. An
+# existing database is never touched by this. `RAIKER_SCHEMA_TEMPLATE=off`
+# turns it off.
+_TEMPLATE_ENV = "RAIKER_SCHEMA_TEMPLATE"
+_TEMPLATE_LOCK = threading.Lock()
+#: One template per full-text engine: a build that resolved FTS4 must never be
+#: handed a schema built with FTS5 tables, or the reverse.
+_TEMPLATE: dict[str, tuple[Path, str]] = {}
+
+
+def _template_enabled() -> bool:
+    return os.environ.get(_TEMPLATE_ENV, "").strip().casefold() not in {"off", "0", "false", "no"}
+
+
+def _quoted(path: Path) -> str:
+    return "'" + str(path).replace("'", "''") + "'"
+
+
+def _discard_template(directory: str) -> None:
+    shutil.rmtree(directory, ignore_errors=True)
+
+
 class MigrationRunner:
+    #: The migration ids read once at the start of a bootstrap pass; ``None`` outside one.
+    _applied: set[str] | None
 
     def bootstrap(self: SQLiteStore) -> None:
         try:
@@ -63,6 +107,91 @@ class MigrationRunner:
 
     def _bootstrap(self: SQLiteStore) -> None:
         self.paths.ensure()
+        fresh = not self.db_path.exists() or self.db_path.stat().st_size == 0
+        seeded = fresh and self._seed_from_template()
+        self._bootstrap_schema()
+        if seeded:
+            # The copy carries the template's timestamps; this workspace's own
+            # record says when it was made.
+            with self.connect() as connection:
+                connection.execute("UPDATE migrations SET applied_at = ?", (utc_now(),))
+        elif fresh:
+            self._capture_template()
+
+    def _seed_from_template(self: SQLiteStore) -> bool:
+        """Make this fresh workspace's database a re-keyed copy of the template."""
+        from raiker.auth.app_key import ensure_app_key
+        from raiker.storage.sqlite import resolve_memory_security
+
+        if not _template_enabled():
+            return False
+        engine = type(self)._text_search_engine
+        if engine is None:
+            # The engine is learnt by the first build; until then nothing is known to match.
+            return False
+        with _TEMPLATE_LOCK:
+            template = _TEMPLATE.get(engine)
+        if template is None or not template[0].is_file():
+            return False
+        memory_security, reason = resolve_memory_security(self.paths.workspace_root)
+        if reason.startswith("required_but_unavailable_"):
+            # The normal open refuses this store by name; seeding must not open it first.
+            return False
+        path, template_key = template
+        new_key = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
+        staging = self.db_path.with_name(self.db_path.name + ".seeding")
+        try:
+            with _TEMPLATE_LOCK:
+                shutil.copyfile(path, staging)
+            connection = sqlite3.connect(str(staging))
+            try:
+                connection.execute(
+                    f"PRAGMA cipher_memory_security = {'ON' if memory_security else 'OFF'}"
+                )
+                connection.execute(f"PRAGMA key = \"x'{template_key}'\"")
+                connection.execute(f"PRAGMA rekey = \"x'{new_key}'\"")
+            finally:
+                connection.close()
+            staging.replace(self.db_path)
+        except (OSError, sqlite3.Error):
+            # A template that cannot be used is no reason to fail: build normally.
+            with contextlib.suppress(OSError):
+                staging.unlink()
+            return False
+        return True
+
+    def _capture_template(self: SQLiteStore) -> None:
+        """Keep this just-built, still-empty workspace's schema for the next fresh one."""
+        if not _template_enabled():
+            return
+        engine = type(self)._text_search_engine
+        if engine is None:
+            return
+        with _TEMPLATE_LOCK:
+            if engine in _TEMPLATE:
+                return
+            directory = tempfile.mkdtemp(prefix="raiker-schema-")
+            path = Path(directory) / "template.db"
+            key = os.urandom(32).hex()
+            try:
+                connection = self.connect()
+                connection.execute(
+                    f"ATTACH DATABASE {_quoted(path)} AS raiker_template KEY \"x'{key}'\""
+                )
+                try:
+                    connection.execute("SELECT sqlcipher_export('raiker_template')")
+                    connection.execute(
+                        f"PRAGMA raiker_template.user_version = {int(SCHEMA_GENERATION)}"
+                    )
+                finally:
+                    connection.execute("DETACH DATABASE raiker_template")
+            except (OSError, sqlite3.Error):
+                _discard_template(directory)
+                return
+            atexit.register(_discard_template, directory)
+            _TEMPLATE[engine] = (path, key)
+
+    def _bootstrap_schema(self: SQLiteStore) -> None:
         self._migrate_plaintext_database()
         self._refuse_newer_schema()
         read_before = self._backup_before_upgrade()

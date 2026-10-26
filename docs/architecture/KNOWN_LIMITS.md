@@ -337,17 +337,17 @@ alternative would be worse.
   switching model, pulling, or changing an endpoint or credential still
   invalidates a check immediately — that kind of invalidation is a real change
   under the model, so it is re-checked explicitly rather than silently.
-- **Key pages are not locked into RAM by default.** The workspace database is
-  SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
-  material so they never reach swap — and Raiker leaves that **off**, explicitly,
-  for two measured reasons: it costs about seven times on every store operation
-  (0.17 s versus 1.14 s for a bootstrap plus two hundred reads), and when the
-  platform's locked-memory allowance runs out the failure is not slow work but
-  `MemoryError` on every request, because authentication opens the store — the
-  lockout FIXED-150 records. Which posture you are on is not left to guesswork:
-  `GET /api/health` reports the setting, the reason, and the allowance this
-  machine would have given. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to demand
-  the stronger one; a refused lock then fails closed and names why.
+- **Key pages are locked into RAM only where the platform proves it can.** The
+  workspace database is SQLCipher-encrypted, and SQLCipher can also lock the
+  pages holding key material so they never reach swap. With
+  `RAIKER_SQLCIPHER_MEMORY_SECURITY` unset (*auto*), Raiker locks them only after
+  a disposable probe shows this machine's locked-memory allowance will hold, and
+  a cap on cached connections keeps it inside that allowance; a host where the
+  probe fails runs without locking, and says so. `on` requires locking and fails
+  closed by name, `off` never locks. Locking costs almost nothing on everyday
+  reads (measured 2026-10-26); it made *creating* a workspace slow until fresh
+  workspaces were copied from a schema template (FIXED-1247). `GET /api/health`
+  reports the setting, the reason, the probe and the allowance.
 - **Shipped list prices are unverified defaults.** `raiker/config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current

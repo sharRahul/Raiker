@@ -1333,6 +1333,7 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1244](#fixed-1244--a-security-alert-fired-on-githubs-own-about-page-found-live) | Medium | Security monitoring | Fixed 2026-10-26 |
 | [FIXED-1245](#fixed-1245--a-refused-web-read-showed-its-reason-code-on-the-row-found-live) | Low | Chat | Fixed 2026-10-26 |
 | [FIXED-1246](#fixed-1246--settings-counted-the-always-refused-names-as-flags) | Low | Settings | Fixed 2026-10-26 |
+| [FIXED-1247](#fixed-1247--tests-had-to-switch-sqlcipher-memory-security-off-because-creating-a-workspace-replayed-208-migrations) | Medium | Storage / testing | Fixed 2026-10-26 |
 
 ---
 
@@ -38029,3 +38030,15 @@ MT-04 assert neither *enable its gate* nor *could not be reached* appears.
 **Fixed.** *Your own flags* said *8 rules in force, 0 yours, 0 from this host's environment, 8 built in*, but the built-in names are the local network and metadata hosts, always refused, not flagged. The line now counts only the owner's and the environment's flags; the built-in names stay listed under *Set outside this app*.
 
 **Evidence.** `WebAccess.test.ts`; RT-TOOL-20 screenshot.
+
+## FIXED-1247 — Tests had to switch SQLCipher memory security off because creating a workspace replayed 208 migrations
+
+**Severity: Medium. Area: Storage / testing. Status: Fixed 2026-10-26.**
+
+**Observed.** The test suite, CI (five jobs) and the release packaging set `RAIKER_SQLCIPHER_MEMORY_SECURITY=off`, because with the product's default (*auto*, which locks key pages where a probe passes) the suite ran about seven times slower. The owner asked whether needing that switch meant something was wrong in the implementation. It did.
+
+**Root cause, measured.** Memory security barely changes everyday work: 2,000 reads on an open connection took 0.002 s off and 0.003 s on. What it slowed was *building* a workspace. A fresh database replayed every migration, 155 of them `ALTER TABLE ... ADD COLUMN`; each ALTER makes SQLite rebuild its schema, and with memory security on every freed allocation of that rebuild is wiped (13 ms per ALTER against 1 ms). One workspace took about 3 s on against 0.4 s off, and the suite creates thousands. The design note in `raiker/storage/sqlite.py` put the cost at "seven times on every store operation", which was the build, not the operations. It also said memory security was off by default, while the code has defaulted to *auto* since 2026-10-20; the note, KNOWN_LIMITS and a test docstring are corrected to what the code does.
+
+**Fixed.** The first fresh workspace in a process is built by the migrations as before, and its schema and bookkeeping rows, nothing else, are exported to a template under a random per-process key in a private temporary directory, deleted at exit. Every later fresh workspace is a copy, re-keyed to that workspace's own key, with its migration timestamps reset: about 0.08 s with memory security on or off. An existing database is never touched, a template that cannot be used falls back to the normal build, and `RAIKER_SCHEMA_TEMPLATE=off` turns it off. Twenty new workspaces now take 1.9 s with memory security on (59 s before) and 1.25 s off (8 s before). One template is kept per full-text engine, so a build that resolved FTS4 is never handed FTS5 tables. CI's five overrides are removed; the desktop packaging workflow keeps its own, because it runs only on desktop changes and could not be verified here.
+
+**Evidence.** `tests/test_schema_template.py` (the copy has the same schema and its own key, carries no data written after the build, never replaces an existing database, follows the search engine, and can be switched off); the full suite, run without the override (743 s in three local shards), found three tests that the template changed, which now count connections by database path and key templates by engine.

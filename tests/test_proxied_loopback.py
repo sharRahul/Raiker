@@ -285,11 +285,13 @@ def _serving(app: Any, local: socket.socket, remote: server_runner.RemoteSocket 
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
-    port = local.getsockname()[1]
+    host, port = local.getsockname()[:2]
+    # Poll the address the local listener is actually bound to (it may be ::1).
+    base = f"http://[{host}]:{port}" if ":" in host else f"http://{host}:{port}"
     deadline = time.monotonic() + 20
     while True:
         try:
-            if httpx.get(f"http://127.0.0.1:{port}/api/health", timeout=1).status_code == 200:
+            if httpx.get(f"{base}/api/health", timeout=1).status_code == 200:
                 break
         except httpx.HTTPError:
             pass

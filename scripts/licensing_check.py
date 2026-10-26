@@ -40,6 +40,41 @@ def normalize_license(value: str | None) -> str | None:
     return LICENSE_ALIASES.get(value, value)
 
 
+#: Licence texts recognised by their own wording, for a distribution that ships
+#: the text but declares no licence in its metadata (`sqlcipher3` 0.6.4 ships
+#: the zlib licence from pysqlite and nothing else). Every phrase must appear.
+LICENSE_TEXT_SIGNATURES = (
+    (
+        "Zlib",
+        (
+            "provided 'as-is', without any express or implied warranty",
+            "must not be misrepresented",
+            "altered source versions must be plainly marked",
+            "this notice may not be removed or altered",
+        ),
+    ),
+)
+
+
+def license_from_text(text: str) -> str | None:
+    """The SPDX id of a licence text recognised by its wording, else ``None``."""
+    flat = " ".join(text.lower().split())
+    for spdx, phrases in LICENSE_TEXT_SIGNATURES:
+        if all(phrase in flat for phrase in phrases):
+            return spdx
+    return None
+
+
+def license_from_files(distribution: importlib.metadata.Distribution) -> str | None:
+    """The licence a distribution's bundled ``License-File`` texts identify."""
+    for name in distribution.metadata.get_all("License-File") or []:
+        text = distribution.read_text(f"licenses/{name}") or distribution.read_text(name)
+        found = license_from_text(text or "")
+        if found:
+            return found
+    return None
+
+
 def classify_license(value: str | None, policy: dict[str, list[str]]) -> str:
     value = normalize_license(value)
     if value is None or value.upper() in UNKNOWN:
@@ -102,6 +137,8 @@ def python_components(root: Path) -> list[dict[str, str | None]]:
         if not license_value:
             classifiers = metadata.get_all("Classifier") or []
             license_value = next((item.rsplit("::", 1)[-1].strip() for item in classifiers if item.startswith("License ::")), None)
+        if not license_value:
+            license_value = license_from_files(distribution)
         components.append({"name": metadata["Name"], "version": metadata["Version"], "license": normalize_license(license_value)})
         for requirement in metadata.get_all("Requires-Dist") or []:
             if ";" in requirement and "extra ==" in requirement.split(";", 1)[1]:

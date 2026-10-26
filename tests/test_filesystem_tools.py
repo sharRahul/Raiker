@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from raiker.tools.filesystem import (
@@ -339,7 +341,7 @@ def test_notebook_read_as_cells_and_edited_by_cell(tmp_path) -> None:  # type: i
 
     from raiker.tools.filesystem import edit_file_content, proposed_edit_snapshot, read_file
 
-    notebook = {
+    notebook: dict[str, Any] = {
         "cells": [
             {"cell_type": "markdown", "id": "intro", "metadata": {}, "source": ["# Title\n"]},
             {"cell_type": "code", "id": "calc", "metadata": {}, "execution_count": 1,

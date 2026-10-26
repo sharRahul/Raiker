@@ -254,7 +254,7 @@ def test_a_proxied_host_reaches_mcp_through_the_proxy_and_a_direct_one_pins(
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:3128")
     proxied = sandbox._mcp_opener(trust)
     handlers = [h for h in proxied.handlers if isinstance(h, ProxyHandler)]
-    assert handlers and handlers[0].proxies == {"https": "http://127.0.0.1:3128"}
+    assert handlers and getattr(handlers[0], "proxies", None) == {"https": "http://127.0.0.1:3128"}
     monkeypatch.delenv("HTTPS_PROXY")
     direct = sandbox._mcp_opener(trust)
-    assert not any(isinstance(h, ProxyHandler) and h.proxies for h in direct.handlers)
+    assert not any(isinstance(h, ProxyHandler) and getattr(h, "proxies", None) for h in direct.handlers)

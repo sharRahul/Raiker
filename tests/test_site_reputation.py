@@ -8,6 +8,7 @@ import pytest
 
 from raiker.runtime.site_reputation import (
     FEEDS,
+    Feed,
     SiteReputation,
     ThreatFeeds,
     parse_feed,
@@ -20,7 +21,7 @@ URLHAUS = "# URLhaus hostfile\n127.0.0.1\tmalware-drop.example.net\n127.0.0.1\tl
 OPENPHISH = "https://login-verify.example.org/account/\nhttps://sites.google.com/view/fake-login\n"
 
 
-def _fetch(feed: object) -> str:
+def _fetch(feed: Feed) -> str:
     return URLHAUS if feed.kind == "hosts" else OPENPHISH
 
 

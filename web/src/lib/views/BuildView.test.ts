@@ -783,7 +783,9 @@ describe("Build project requirement", () => {
     });
 
     expect(sendButton()).toBeDisabled();
-    expect(screen.getByText(/select a project to start/i)).toBeVisible();
+    expect(screen.queryByText(/select a project to start/i)).not.toBeInTheDocument();
+    await openComposerProject();
+    expect(await screen.findByLabelText("Project for this build")).toBeVisible();
   });
 
   it("names the boundary once a project is selected", async () => {

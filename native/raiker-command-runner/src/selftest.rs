@@ -18,6 +18,18 @@ use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Unique run name prevents ordinary probe collisions across repeated runs.
+pub fn probe_nonce() -> String {
+    format!(
+        "raiker-probe-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
+}
+
 /// What the probe child is asked to attempt. Every path and address is named
 /// by the caller: a probe that chooses its own targets can pick one that fails
 /// for an unrelated reason and call the boundary proven.
@@ -74,9 +86,9 @@ pub fn attempt(test: &SelfTest) -> Value {
         // through the relay the runner set up, so a boundary that silently
         // drops output cannot pass the probe.
         "nonce": test.nonce,
-        "inside_write": write_probe(&test.inside_path),
+        "inside_write": write_probe(&test.inside_path, &test.nonce),
         "outside_writes": test.outside_paths.iter()
-            .map(|path| write_probe(path))
+            .map(|path| write_probe(path, &test.nonce))
             .collect::<Vec<_>>(),
         "masked_read": read_probe(&test.masked_read_path),
         "connect": connect_probe(&test.connect_address),
@@ -149,7 +161,13 @@ fn detach(command: &mut std::process::Command) {
 /// outlive its parent. If it is still alive after the runner stops, containment
 /// did not cover descendants.
 pub fn linger(marker: &Path) {
-    let _ = std::fs::write(marker, b"alive");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(marker)
+    {
+        let _ = file.write_all(b"alive");
+    }
     std::thread::sleep(Duration::from_secs(600));
 }
 
@@ -161,14 +179,21 @@ pub fn linger(marker: &Path) {
 /// owner's workspace. The parent runs with the owner's own rights and removes
 /// it, and any file an escaping write left outside.
 pub fn remove_probe_writes(test: &SelfTest) {
-    let _ = std::fs::remove_file(&test.inside_path);
-    for path in &test.outside_paths {
-        let _ = std::fs::remove_file(path);
+    for path in std::iter::once(&test.inside_path).chain(test.outside_paths.iter()) {
+        // A pre-existing file is not probe-owned. The nonce also prevents a
+        // stale run from deleting another run's output; paths are not pinned.
+        if std::fs::read(path).is_ok_and(|content| content == test.nonce.as_bytes()) {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 
-fn write_probe(path: &Path) -> Value {
-    match std::fs::write(path, b"raiker-probe") {
+fn write_probe(path: &Path, nonce: &str) -> Value {
+    let opened = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path);
+    match opened.and_then(|mut file| file.write_all(nonce.as_bytes())) {
         Ok(()) => {
             let _ = std::fs::remove_file(path);
             json!({"allowed": true, "error": Value::Null})
@@ -232,6 +257,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn probe_does_not_overwrite_or_remove_an_existing_file() {
+        let path = std::env::temp_dir().join(probe_nonce());
+        std::fs::write(&path, b"owner data").unwrap();
+        assert_eq!(write_probe(&path, "probe nonce")["allowed"], false);
+        let test = SelfTest {
+            nonce: "probe nonce".to_owned(),
+            inside_path: path.clone(),
+            outside_paths: Vec::new(),
+            masked_read_path: path.clone(),
+            connect_address: "127.0.0.1:9".to_owned(),
+            spawn_grandchild: false,
+        };
+        remove_probe_writes(&test);
+        assert_eq!(std::fs::read(&path).unwrap(), b"owner data");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn the_parent_removes_what_the_probe_wrote_in_the_workspace() {
         let dir = std::env::temp_dir().join(format!("raiker-probe-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -243,8 +286,8 @@ mod tests {
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
         };
-        std::fs::write(&test.inside_path, b"raiker-probe").unwrap();
-        std::fs::write(&test.outside_paths[0], b"raiker-probe").unwrap();
+        std::fs::write(&test.inside_path, b"n").unwrap();
+        std::fs::write(&test.outside_paths[0], b"n").unwrap();
         remove_probe_writes(&test);
         assert!(!test.inside_path.exists());
         assert!(!test.outside_paths[0].exists());

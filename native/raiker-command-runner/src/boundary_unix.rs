@@ -54,15 +54,25 @@ pub fn probe(workspace: &Path) -> Value {
     let Ok(current) = std::env::current_exe() else {
         return unavailable("native_sandbox_runner_unreadable");
     };
-    let scratch = workspace.join(".raiker").join("command-probe");
-    let _ = std::fs::create_dir_all(&scratch);
+    let nonce = selftest::probe_nonce();
+    let parent = workspace.join(".raiker");
+    if std::fs::create_dir_all(&parent).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
+    let scratch = parent.join(&nonce);
+    if std::fs::create_dir(&scratch).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
     let masked = scratch.join("state");
-    let _ = std::fs::write(&masked, b"raiker-probe-state");
+    if std::fs::write(&masked, b"raiker-probe-state").is_err() {
+        let _ = std::fs::remove_dir(&scratch);
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
 
     let test = SelfTest {
-        nonce: format!("raiker-probe-{}", std::process::id()),
-        inside_path: workspace.join(".raiker-probe-inside.tmp"),
-        outside_paths: outside_targets(&workspace),
+        nonce: nonce.clone(),
+        inside_path: workspace.join(format!(".{nonce}-inside.tmp")),
+        outside_paths: outside_targets(&workspace, &nonce),
         masked_read_path: masked.clone(),
         connect_address: probe_destination(),
         spawn_grandchild: true,
@@ -88,13 +98,18 @@ pub fn probe(workspace: &Path) -> Value {
     ];
     let arguments = match boundary_arguments(&policy, &argv) {
         Ok(value) => value,
-        Err(reason) => return unavailable(&reason),
+        Err(reason) => {
+            let _ = std::fs::remove_file(&masked);
+            let _ = std::fs::remove_dir(&scratch);
+            selftest::remove_probe_writes(&test);
+            return unavailable(&reason);
+        }
     };
     let output = Command::new(which(tool).expect("probed above"))
         .args(arguments)
         .output();
     let _ = std::fs::remove_file(&masked);
-    let _ = std::fs::remove_dir_all(&scratch);
+    let _ = std::fs::remove_dir(&scratch);
     selftest::remove_probe_writes(&test);
     let Ok(output) = output else {
         return unavailable("native_sandbox_launch_failed");
@@ -385,13 +400,13 @@ pub fn macos_profile(policy: &LaunchPolicy) -> String {
     profile
 }
 
-fn outside_targets(workspace: &Path) -> Vec<PathBuf> {
+fn outside_targets(workspace: &Path, nonce: &str) -> Vec<PathBuf> {
     let mut targets = Vec::new();
     if let Some(parent) = workspace.parent() {
-        targets.push(parent.join(".raiker-probe-escape.tmp"));
+        targets.push(parent.join(format!(".{nonce}-escape.tmp")));
     }
     if let Ok(home) = std::env::var("HOME") {
-        targets.push(PathBuf::from(home).join(".raiker-probe-escape.tmp"));
+        targets.push(PathBuf::from(home).join(format!(".{nonce}-escape.tmp")));
     }
     targets
 }

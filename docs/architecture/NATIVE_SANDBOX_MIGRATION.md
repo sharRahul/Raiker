@@ -112,6 +112,13 @@ the contract; they are not OS enforcement evidence. Symlink and junction races,
 real platform filesystem isolation, seccomp and resource enforcement remain
 release blockers.
 
+Native probe scratch directories and write targets now use per-run names. Probe
+writes use exclusive creation, cleanup checks the probe nonce before removing
+write targets, and scratch cleanup removes only an empty directory rather than
+recursively deleting its contents. This reduces accidental collisions with user
+data; names and cleanup remain path-based and do not protect against concurrent
+replacement by an adversary. Handle-based ownership and cleanup remain open.
+
 Before launching, the runner also checks that the workspace exists and is not a
 link or Windows reparse point, that the working directory resolves inside it,
 and that existing components of the working directory and protected paths are

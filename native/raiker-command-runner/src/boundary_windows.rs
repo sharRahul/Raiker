@@ -111,27 +111,34 @@ pub fn probe(workspace: &Path) -> Value {
         Ok(path) => strip_verbatim(&path),
         Err(_) => return unavailable("native_sandbox_workspace_unreadable"),
     };
-    let scratch = workspace.join(".raiker").join("command-probe");
-    let _ = std::fs::create_dir_all(&scratch);
+    let nonce = selftest::probe_nonce();
+    let parent = workspace.join(".raiker");
+    if std::fs::create_dir_all(&parent).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
+    let scratch = parent.join(&nonce);
+    if std::fs::create_dir(&scratch).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
     let test = SelfTest {
-        nonce: format!("raiker-probe-{}", std::process::id()),
-        inside_path: workspace.join(".raiker-probe-inside.tmp"),
-        outside_paths: outside_targets(&workspace),
-        masked_read_path: workspace
-            .join(".raiker")
-            .join("command-probe")
-            .join("state"),
+        nonce: nonce.clone(),
+        inside_path: workspace.join(format!(".{nonce}-inside.tmp")),
+        outside_paths: outside_targets(&workspace, &nonce),
+        masked_read_path: scratch.join("state"),
         connect_address: probe_destination(),
         spawn_grandchild: true,
     };
-    let _ = std::fs::write(&test.masked_read_path, b"raiker-probe-state");
+    if std::fs::write(&test.masked_read_path, b"raiker-probe-state").is_err() {
+        let _ = std::fs::remove_dir(&scratch);
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
 
     // The control arm. Whatever the boundary does, these are what this token
     // can do without one.
     let outside = selftest::attempt(&test);
     let inside = run_inside(&workspace, &test);
     let _ = std::fs::remove_file(&test.masked_read_path);
-    let _ = std::fs::remove_dir_all(&scratch);
+    let _ = std::fs::remove_dir(&scratch);
     selftest::remove_probe_writes(&test);
     let inside = match inside {
         Ok(value) => value,
@@ -839,15 +846,15 @@ fn capture_in_container(
         .map_err(|_| "native_sandbox_probe_no_output".to_owned())
 }
 
-fn outside_targets(workspace: &Path) -> Vec<PathBuf> {
+fn outside_targets(workspace: &Path, nonce: &str) -> Vec<PathBuf> {
     // Paths the owner's own token can write, so a refusal inside the boundary
     // means containment rather than an unwritable target.
     let mut targets = Vec::new();
     if let Some(parent) = workspace.parent() {
-        targets.push(parent.join(".raiker-probe-escape.tmp"));
+        targets.push(parent.join(format!(".{nonce}-escape.tmp")));
     }
     if let Ok(profile) = std::env::var("USERPROFILE") {
-        targets.push(PathBuf::from(profile).join(".raiker-probe-escape.tmp"));
+        targets.push(PathBuf::from(profile).join(format!(".{nonce}-escape.tmp")));
     }
     targets
 }

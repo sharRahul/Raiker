@@ -31,7 +31,9 @@ Repository-configured clean filters can launch code during a working-tree diff.
 `run_git` refuses this form until it can be executed inside a verified native
 boundary; staged diff remains available. Code review reports the refusal rather
 than claiming a clean result. Restore working-tree diff with positive-control
-filter tests and cross-platform enforcement evidence. Other Git paths remain
+filter tests and cross-platform enforcement evidence. The existing
+`tests/test_phase_2_5_code_review_workflow.py` currently has 11 failures and 2
+passes because unstaged review is unavailable. Other Git paths remain
 unverified.
 
 ## Goal

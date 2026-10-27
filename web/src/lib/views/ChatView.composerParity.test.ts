@@ -1,41 +1,23 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
-import { stubFetch, openComposerProject, startComposerDictation } from "../test-helpers";
+import { stubFetch, openComposerProject, startComposerDictation, installLocalRecordingFake } from "../test-helpers";
 import { refreshModels, resetModels } from "../models.svelte";
 import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import { takeScheduleRequest } from "../scheduleHandoff";
 import { setWorkProject } from "../workProject.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
+vi.mock("../voice", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../voice")>(),
+  isLocalVoicePage: () => true,
+}));
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return { ...actual, streamPrompt: streamPromptMock };
 });
 
 import ChatView from "./ChatView.svelte";
-
-class FakeRecognition {
-  static instance: FakeRecognition;
-  continuous = false;
-  interimResults = false;
-  lang = "";
-  onresult: ((event: unknown) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
-  onend: (() => void) | null = null;
-  constructor() { FakeRecognition.instance = this; }
-  start() {}
-  stop() { this.onend?.(); }
-  abort() { this.onend?.(); }
-  final(text: string) {
-    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
-  }
-}
-
-function installRecognitionFake() {
-  vi.stubGlobal("SpeechRecognition", FakeRecognition);
-  return () => FakeRecognition.instance;
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,6 +51,7 @@ const projects = {
 function routes() {
   const ready = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
   return {
+    "GET /api/speech/runtime": { runtime: { effective: "local" } },
     "GET /api/models": { profiles: [ready], chat_profiles: [ready] },
     "GET /api/tasks": [],
     "PUT /api/sessions/session-chat/project": { ok: true, session_id: "session-chat", project_id: "project-1" },
@@ -185,16 +168,17 @@ describe("ChatView composer parity", () => {
   });
 
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
-    const recognition = installRecognitionFake();
-    stubFetch({ ...routes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
+    const recording = installLocalRecordingFake();
+    recording.transcript.text = "check the repository";
+    stubFetch({ ...routes(), "POST /api/speech/transcribe": recording.transcript, "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
 
     await startComposerDictation();
-    recognition().final("check the repository");
+    await waitFor(() => expect(recording.started).toBe(true));
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Prompt")).toHaveValue("check the repository");
+    await waitFor(() => expect(screen.getByLabelText("Prompt")).toHaveValue("check the repository"));
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
       text: "check the repository",
@@ -203,13 +187,14 @@ describe("ChatView composer parity", () => {
   });
 
   it("uses the first Enter to finish dictation and the second to send", async () => {
-    const recognition = installRecognitionFake();
-    stubFetch(routes());
+    const recording = installLocalRecordingFake();
+    recording.transcript.text = "check this";
+    stubFetch({ ...routes(), "POST /api/speech/transcribe": recording.transcript });
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
     await startComposerDictation();
-    recognition().final("check this");
+    await waitFor(() => expect(recording.started).toBe(true));
 
     await fireEvent.keyDown(prompt, { key: "Enter" });
     expect(streamPromptMock).not.toHaveBeenCalled();
@@ -223,15 +208,17 @@ describe("ChatView composer parity", () => {
   });
 
   it("reports mixed provenance when dictated text is combined with owner edits", async () => {
-    const recognition = installRecognitionFake();
-    stubFetch(routes());
+    const recording = installLocalRecordingFake();
+    recording.transcript.text = "summarize this";
+    stubFetch({ ...routes(), "POST /api/speech/transcribe": recording.transcript });
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
     await fireEvent.input(prompt, { target: { value: "Please " } });
     await startComposerDictation();
-    recognition().final("summarize this");
+    await waitFor(() => expect(recording.started).toBe(true));
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
+    await waitFor(() => expect(prompt).toHaveValue("Please summarize this"));
     await fireEvent.input(prompt, { target: { value: "Please summarize this carefully" } });
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -239,14 +226,14 @@ describe("ChatView composer parity", () => {
   });
 
   it("restores typed provenance when dictation is cancelled", async () => {
-    const recognition = installRecognitionFake();
+    const recording = installLocalRecordingFake();
     stubFetch(routes());
     streamPromptMock.mockResolvedValue(undefined);
     render(ChatView, { projects });
     const prompt = await screen.findByLabelText("Prompt");
     await fireEvent.input(prompt, { target: { value: "keep this" } });
     await startComposerDictation();
-    recognition().final("discard this");
+    await waitFor(() => expect(recording.started).toBe(true));
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
 

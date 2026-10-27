@@ -47,28 +47,25 @@ const imageModel = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    class FakeRecognition {
-      continuous = false;
-      interimResults = false;
-      lang = "";
-      onresult: ((event: unknown) => void) | null = null;
-      onerror: ((event: unknown) => void) | null = null;
-      onend: (() => void) | null = null;
-      constructor() { (window as unknown as { __voiceRecognition: FakeRecognition }).__voiceRecognition = this; }
-      start() { document.documentElement.dataset.voiceListening = "true"; }
-      stop() { delete document.documentElement.dataset.voiceListening; this.onend?.(); }
-      abort() { delete document.documentElement.dataset.voiceListening; this.onend?.(); }
-      emitFinal(text: string) {
-        this.onresult?.({
-          resultIndex: 0,
-          results: [Object.assign([{ transcript: text }], { isFinal: true })],
-        });
+    class FakeRecorder {
+      state = "inactive";
+      mimeType = "audio/wav";
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() { this.state = "recording"; }
+      stop() {
+        this.state = "inactive";
+        this.ondataavailable?.({ data: new Blob(["audio"], { type: "audio/wav" }) });
+        this.onstop?.();
       }
     }
-    Object.assign(window, { SpeechRecognition: FakeRecognition });
+    Object.defineProperty(navigator, "mediaDevices", { value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) }, configurable: true });
+    Object.defineProperty(window, "MediaRecorder", { value: FakeRecorder, configurable: true });
+    Object.defineProperty(window, "AudioContext", { value: undefined, configurable: true });
+    Object.defineProperty(window, "webkitAudioContext", { value: undefined, configurable: true });
   });
   let settings: Record<string, unknown> = {};
-  await page.route("http://raiker.test/**", async (route) => {
+  await page.route("http://127.0.0.1:8765/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.startsWith("/api/")) {
       const path = url.pathname;
@@ -89,14 +86,12 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/models") body = { profiles: [model, imageModel], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
-      // BUG-256 — the composers read which speech runtime the owner's choice
-      // resolved to. This fixture is a default install: no local runtime, so
-      // dictation stays on the browser and the fake recognition above is what
-      // the microphone drives.
+      // The fixture uses the local recording path with a simulated runtime.
       else if (path === "/api/speech/runtime") body = {
-        runtime: { mode: "auto", endpoint: "", model: "", configured: false, effective: "browser" },
+        runtime: { endpoint: "http://127.0.0.1:19843", model: "", configured: true, effective: "local" },
         max_audio_bytes: 12_582_912,
       };
+      else if (path === "/api/speech/transcribe") body = { text: "check the repository" };
       else if (path === "/api/code-repos") body = { repositories: [], active_repo_id: null };
       else if (path === "/api/host") body = { state: "running", detail: "Raiker is running.", pid: 4242, waiting: [], background_work: 0, service: { supported: true, registered: false, mechanism: "systemd --user", label: "raiker.service" } };
       else if (path === "/api/tasks") body = [];
@@ -206,7 +201,7 @@ test.beforeEach(async ({ page }) => {
     const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".png": "image/png" };
     await route.fulfill({ body: await readFile(file), contentType: types[extname(file)] ?? "application/octet-stream" });
   });
-  await page.goto("http://raiker.test/#/new-chat");
+  await page.goto("http://127.0.0.1:8765/#/new-chat");
   await page.getByLabel("Username").fill("owner");
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: /unlock/i }).click();
@@ -243,13 +238,13 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
 
   const chat = page.getByLabel("Prompt", { exact: true });
   await startDictation(page);
-  await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("check the repository"));
-  await expect(chat).toHaveValue("check the repository");
+
   expect(promptPosts).toHaveLength(0);
   await expect(page.getByText("Listening…", { exact: true })).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "Done dictating" }).click();
   expect(promptPosts).toHaveLength(0);
+  await expect(chat).toHaveValue("check the repository");
   await capture(page, join(shots, "voice-chat-desktop.png"));
   await page.getByRole("button", { name: "Send" }).click();
   await expect.poll(() => promptPosts.length).toBe(1);
@@ -259,28 +254,16 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   const build = page.getByLabel("Describe the change");
   await build.fill("keep this");
   await startDictation(page);
-  await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("discard this"));
   await page.getByRole("button", { name: "Cancel dictation" }).click();
   await expect(build).toHaveValue("keep this");
   await capture(page, join(shots, "voice-build-desktop.png"));
 
-  // Speech language is a queued settings write in General. BUG-256 added a
-  // runtime, not a preference: there is no Voice section and nothing asks the
-  // owner where audio should be transcribed, so General is the only place this
-  // control has ever lived.
-  await page.goto("http://raiker.test/#/settings?tab=general");
-  await expect(page.getByRole("button", { name: "Voice" })).toHaveCount(0);
-  await page.getByLabel("Speech language").selectOption("ja");
+  await page.goto("http://127.0.0.1:8765/#/settings?tab=general");
+  await expect(page.getByLabel("Speech language")).toHaveCount(0);
   await capture(page, join(shots, "voice-settings.png"));
-  await Promise.all([
-    page.waitForRequest((request) => request.method() === "PUT" && new URL(request.url()).pathname === "/api/settings"),
-    page.getByRole("button", { name: /save changes/i }).click(),
-  ]);
-  await page.goto("http://raiker.test/#/settings?tab=general");
-  await expect(page.getByLabel("Speech language")).toHaveValue("ja");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("http://raiker.test/#/new-chat");
+  await page.goto("http://127.0.0.1:8765/#/new-chat");
   // COMPOSER-16 — on a phone the `+` menu is a bottom sheet, so dictation is
   // one thumb reach rather than a control squeezed into a horizontal bar.
   await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
@@ -301,7 +284,7 @@ test("both composers stay anchored to the bottom on a tablet, not floating mid-p
     ["new-chat", "Prompt"],
     ["build", "Describe the change"],
   ] as const) {
-    await page.goto(`http://raiker.test/#/${route}`);
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
 
     const gap = await page.evaluate(() => {
@@ -333,7 +316,7 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
     await page.setViewportSize({ width, height });
 
     for (const [route, label] of [["new-chat", "Prompt"], ["build", "Describe the change"]] as const) {
-      await page.goto(`http://raiker.test/#/${route}`);
+      await page.goto(`http://127.0.0.1:8765/#/${route}`);
       await expect(page.getByLabel(label, { exact: true }), `${device} ${route} input`).toBeVisible();
       const activeComposer = page.locator("form.composer:visible");
       await expect(activeComposer.locator(".shortcut-hint"), `${device} ${route} shortcut prose`).toBeHidden();
@@ -380,7 +363,7 @@ test("minimal composers fit representative iPhone, Android, and tablet viewports
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("http://raiker.test/#/new-chat");
+  await page.goto("http://127.0.0.1:8765/#/new-chat");
   await page.getByRole("button", { name: "Open navigation" }).click();
   const navigation = page.getByRole("navigation", { name: "All navigation" });
   await expect(navigation).toBeVisible();
@@ -441,7 +424,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
     // original reason, and are still recorded in docs/plans/TO_BE_FIXED.md.
 
   ] as const) {
-    await page.goto(`http://raiker.test/#/${route}`);
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
     const composer = page.locator("form.composer:visible");
     await expect(composer.getByRole("button", { name: "Add to this turn" })).toBeVisible();
@@ -457,7 +440,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
 
   // COMPOSER-03 — `+` lists only ways of getting something into *this* turn,
   // and only ones the surface can actually carry.
-  await page.goto("http://raiker.test/#/new-chat");
+  await page.goto("http://127.0.0.1:8765/#/new-chat");
   await page.getByRole("button", { name: "Add to this turn" }).click();
   const add = page.getByRole("menu", { name: "Add to this turn" });
   await expect(add.getByRole("menuitem", { name: "Upload a file" })).toBeVisible();
@@ -480,7 +463,7 @@ test("every Work mode composes the same way, simple at rest", async ({ page }) =
 
   // Build's two extra entries, because they are the two that only mean
   // something where there is a repository and a governed terminal.
-  await page.goto("http://raiker.test/#/build");
+  await page.goto("http://127.0.0.1:8765/#/build");
   await page.getByRole("button", { name: "Tools" }).click();
   await expect(
     page.getByRole("menu", { name: "Tools" }).getByRole("menuitem", { name: "Run a command" }),
@@ -495,7 +478,7 @@ test("on a phone the composer's menus are bottom sheets, not upward dropdowns", 
   // rule lives behind a media query, and a media query that stopped applying
   // would leave every unit test passing.
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("http://raiker.test/#/new-chat");
+  await page.goto("http://127.0.0.1:8765/#/new-chat");
   await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Add to this turn" }).click();
@@ -520,7 +503,7 @@ test("on a phone the composer's menus are bottom sheets, not upward dropdowns", 
 });
 
 test("the Hooks tab tells an enforcing rule from a dead one and a broken file", async ({ page }) => {
-  await page.goto("http://raiker.test/#/extensions?tab=hooks");
+  await page.goto("http://127.0.0.1:8765/#/extensions?tab=hooks");
 
   await expect(page.getByRole("heading", { name: "Hooks", exact: true })).toBeVisible();
 
@@ -569,7 +552,7 @@ test("a list badges the row that needs you, not the rows that are ordinary", asy
     queue_position: null,
     queue_total: null,
   });
-  await page.route("http://raiker.test/api/approvals*", async (route) => {
+  await page.route("http://127.0.0.1:8765/api/approvals*", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -581,7 +564,7 @@ test("a list badges the row that needs you, not the rows that are ordinary", asy
       ]),
     });
   });
-  await page.goto("http://raiker.test/#/approvals");
+  await page.goto("http://127.0.0.1:8765/#/approvals");
 
   // QUI-P07 — the queue is a list of rows beside the selected decision.
   const queue = page.getByRole("listbox", { name: "Decisions waiting on you" });
@@ -609,7 +592,7 @@ test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page })
   // the pointer was anywhere on screen the whole page went behind a flat opaque
   // sheet — and it looked enough like a deliberate modal that a full responsive
   // sweep never questioned it.
-  await page.goto("http://raiker.test/#/home");
+  await page.goto("http://127.0.0.1:8765/#/home");
   await page.getByRole("button", { name: "More pages and settings" }).click();
   await expect(page.getByRole("dialog", { name: /^more$/i })).toBeVisible();
   await page.mouse.move(400, 500);
@@ -628,7 +611,7 @@ test("a dismiss scrim stays a scrim when the pointer is on it", async ({ page })
 });
 
 test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {
-  await page.goto("http://raiker.test/#/settings");
+  await page.goto("http://127.0.0.1:8765/#/settings");
   // Scoped to the content region: the top bar carries the same page name, and an
   // unscoped heading query would pass on that alone.
   const main = page.getByRole("main");
@@ -674,7 +657,7 @@ test("Models names providers in plain language and offers a real model list", as
   // Local and Hosted were peers because that is how profiles are
   // stored; both are the same errand, so both are under "Add model" now.
   // QUI-L08 — Add model is a dialog; a source names the step it opens on.
-  await page.goto("http://raiker.test/#/models?tab=add&source=account");
+  await page.goto("http://127.0.0.1:8765/#/models?tab=add&source=account");
   const add = page.getByRole("dialog", { name: "Add model" });
   await expect(add.getByRole("heading", { name: "Your hosted providers" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
@@ -695,7 +678,7 @@ test("Models names providers in plain language and offers a real model list", as
 });
 
 test("Models is one page: the model in use, then My models (QUI-L08)", async ({ page }) => {
-  await page.goto("http://raiker.test/#/models");
+  await page.goto("http://127.0.0.1:8765/#/models");
   await expect(page.getByRole("tablist")).toHaveCount(0);
   await expect(page.locator("#profile-card-title")).toBeVisible();
   await expect(page.getByRole("heading", { name: "My models" })).toBeVisible();
@@ -710,7 +693,7 @@ test("Models is one page: the model in use, then My models (QUI-L08)", async ({ 
   await add.getByRole("button", { name: "Close" }).click();
 
   // What serves models moved to Settings › Advanced; the old address follows.
-  await page.goto("http://raiker.test/#/models?tab=runtime");
+  await page.goto("http://127.0.0.1:8765/#/models?tab=runtime");
   await expect(page).toHaveURL(/#\/settings\?tab=advanced&kind=models/);
   await expect(page.getByRole("heading", { name: "Work defaults" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Default" })).toBeVisible();
@@ -719,7 +702,7 @@ test("Models is one page: the model in use, then My models (QUI-L08)", async ({ 
 });
 
 test("new-account Home opens with a composer over the board", async ({ page }) => {
-  await page.goto("http://raiker.test/#/workbench");
+  await page.goto("http://127.0.0.1:8765/#/workbench");
   await expect(page.getByRole("heading", { name: HOME_GREETING })).toBeVisible();
 
   // QUI-H01 — one composer that hands its message to Chat; no mode tabs and no
@@ -810,7 +793,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
   ];
 
   for (const [route, title, layout] of states) {
-    await page.goto(`http://raiker.test/#/${route}`);
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
     const canvas = page.getByTestId("responsive-page");
     await expect(canvas, route).toHaveAttribute("data-layout", layout);
     await expect(page.locator("header .page-title"), route).toHaveText(title);
@@ -856,7 +839,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
 for (const width of [390, 1440]) {
   test(`permissions: categories beside one permission, accessible at ${width}px (QUI-L06)`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto("http://raiker.test/#/capabilities");
+    await page.goto("http://127.0.0.1:8765/#/capabilities");
     const rail = page.getByRole("navigation", { name: "Permission categories" });
     await expect(rail.getByRole("button", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
     await rail.getByRole("button", { name: /^Advanced/ }).click();
@@ -885,7 +868,7 @@ test("Design starters prepare an editable draft and keep composer controls at na
   await page.route("**/api/images", async route => {
     await route.fulfill({ json: { sizes: ["1024x1024"], generations: [], deleted: [] } });
   });
-  await page.goto("http://raiker.test/#/design");
+  await page.goto("http://127.0.0.1:8765/#/design");
   const prompt = page.getByLabel("Describe the image");
   await expect(page.getByRole("heading", { name: "What would you like to create?" })).toBeVisible();
   await page.getByRole("button", { name: "Poster" }).click();
@@ -937,7 +920,7 @@ test("imported image is the source of a Design edit", async ({ page }) => {
   await page.route("**/api/images/*/bytes", async route => {
     await route.fulfill({ body: await readFile(join(dist, "design-starters.png")), contentType: "image/png" });
   });
-  await page.goto("http://raiker.test/#/design");
+  await page.goto("http://127.0.0.1:8765/#/design");
   await page.getByRole("button", { name: /Edit an image/ }).click();
   const composer = page.getByRole("group", { name: "Image composer" });
   await expect(composer.getByRole("button", { name: "Generate" })).toBeDisabled();
@@ -955,7 +938,7 @@ test("composer model icons load and menus stay within the viewport", async ({ pa
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const route of ["new-chat", "build"]) {
-      await page.goto(`http://raiker.test/#/${route}`);
+      await page.goto(`http://127.0.0.1:8765/#/${route}`);
       const picker = page.getByRole("button", { name: /Model for this turn/ });
       await expect(picker).toBeVisible();
       const logo = picker.locator(".provider-logo img");
@@ -975,7 +958,7 @@ test("composer model icons load and menus stay within the viewport", async ({ pa
 
 test("composer controls share a consistent height", async ({ page }) => {
   for (const route of ["new-chat", "build", "design"]) {
-    await page.goto(`http://raiker.test/#/${route}`);
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
     const card = page.locator(".composer-card:visible");
     await expect(card).toBeVisible();
     const controls = route === "design"
@@ -991,7 +974,7 @@ test("composer controls share a consistent height", async ({ page }) => {
 test("approval mode menu remains visible in Permissions", async ({ page }) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 680 });
-    await page.goto("http://raiker.test/#/capabilities");
+    await page.goto("http://127.0.0.1:8765/#/capabilities");
     await page.getByRole("navigation", { name: "Permission categories" }).getByRole("button", { name: /^Advanced/ }).click();
     const trigger = page.getByRole("button", { name: /Approval mode:/ });
     await trigger.click();
@@ -1013,7 +996,7 @@ test("approval mode menu remains visible in Permissions", async ({ page }) => {
 
 test("composer bottoms omit shortcut and project guidance while preserving access", async ({ page }) => {
   for (const [route, label] of [["new-chat", "Message composer"], ["build", "Build composer"]] as const) {
-    await page.goto(`http://raiker.test/#/${route}`);
+    await page.goto(`http://127.0.0.1:8765/#/${route}`);
     const composer = page.getByRole("group", { name: label });
     await expect(composer).toBeVisible();
     await expect(composer.getByRole("button", { name: "all shortcuts" })).toHaveCount(0);
@@ -1035,7 +1018,7 @@ test("composer bottoms omit shortcut and project guidance while preserving acces
 
 
 test("composer context is concise and detailed usage is available on demand", async ({ page }) => {
-  await page.goto("http://raiker.test/#/build");
+  await page.goto("http://127.0.0.1:8765/#/build");
   const trigger = page.getByRole("button", { name: /^Context for this turn/ });
   await expect(trigger).toBeVisible();
   await trigger.click();

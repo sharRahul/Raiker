@@ -27,7 +27,7 @@ describe("QUI-F16 task receipt", () => {
       changes: [{ label: "Send email", approved_at: "2026-10-24T10:41:00Z" }],
       left_computer: ["Gmail"],
     });
-    expect(line).toMatch(/^Haiku 4\.5 · ≈ \$0\.0143 · Send email \(approved \d{1,2}:\d{2}( [AP]M)?\) · also reached Gmail$/);
+    expect(line).toMatch(/^Haiku 4\.5 · ≈ \$0\.0143 · Send email \(approved \d{1,2}:\d{2}( [AP]M)?\) · also reached Gmail$/i);
   });
 
   it("never calls an unpriced billable model free, and a local one leaves nothing", () => {

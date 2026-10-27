@@ -11,7 +11,7 @@
 // property that matters is that the single audio owner is actually released.
 import { render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeGate, stubFetch, startComposerDictation } from "../test-helpers";
+import { makeGate, stubFetch, startComposerDictation, installLocalRecordingFake } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { audioSessionCoordinator } from "../voice";
 
@@ -19,33 +19,18 @@ vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return { ...actual, streamPrompt: vi.fn() };
 });
+vi.mock("../voice", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../voice")>(),
+  isLocalVoicePage: () => true,
+}));
 
 import ChatView from "./ChatView.svelte";
 import BuildView from "./BuildView.svelte";
-
-class FakeRecognition {
-  static instance: FakeRecognition;
-  static aborted = 0;
-  continuous = false;
-  interimResults = false;
-  lang = "";
-  onresult: ((event: unknown) => void) | null = null;
-  onerror: ((event: { error: string }) => void) | null = null;
-  onend: (() => void) | null = null;
-  constructor() { FakeRecognition.instance = this; }
-  start() {}
-  stop() { this.onend?.(); }
-  abort() { FakeRecognition.aborted += 1; this.onend?.(); }
-  final(text: string) {
-    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
-  }
-}
 
 afterEach(() => {
   audioSessionCoordinator.stopAll("route");
   vi.unstubAllGlobals();
   resetModels();
-  FakeRecognition.aborted = 0;
 });
 
 const READY_PROFILE = {
@@ -55,6 +40,7 @@ const READY_PROFILE = {
 
 function routes() {
   return {
+    "GET /api/speech/runtime": { runtime: { effective: "local" } },
     "GET /api/models": { profiles: [READY_PROFILE], chat_profiles: [READY_PROFILE] },
     "GET /api/code/repos": { repos: [], selected_repo_id: null },
     "GET /api/tasks": [],
@@ -82,13 +68,13 @@ describe.each([
   },
 ])("$name keeps dictation on the surface that owns it", ({ Component, props, promptLabel }) => {
   it("stops listening when the surface is navigated away from", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
+    const recording = installLocalRecordingFake();
     stubFetch(routes());
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const view = render(Component as any, { ...props, visible: true });
 
     await startComposerDictation();
-    FakeRecognition.instance.final("keep these words");
+    await waitFor(() => expect(recording.started).toBe(true));
     expect(await screen.findByRole("button", { name: "Cancel dictation" })).toBeInTheDocument();
 
     // The owner navigates elsewhere. The view stays mounted; the microphone
@@ -98,9 +84,8 @@ describe.each([
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Cancel dictation" })).not.toBeInTheDocument(),
     );
-    expect(FakeRecognition.aborted).toBeGreaterThan(0);
-    // Finalized words are kept, exactly as pressing Done would leave them —
-    // stopping the microphone must not discard what was already dictated.
-    expect(screen.getByLabelText(promptLabel)).toHaveValue("keep these words");
+    expect(recording.stopped).toBeGreaterThan(0);
+    // No transcript was produced before this local recording was cancelled.
+    expect(screen.getByLabelText(promptLabel)).toHaveValue("");
   });
 });

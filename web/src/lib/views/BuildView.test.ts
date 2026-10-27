@@ -7,34 +7,21 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
-import { makeGate, stubFetch, openComposerAttach, openComposerProject, startComposerDictation } from "../test-helpers";
+import { makeGate, stubFetch, openComposerAttach, openComposerProject, startComposerDictation, installLocalRecordingFake } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 import { routeStateFromHash } from "../routeState";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
+vi.mock("../voice", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../voice")>(),
+  isLocalVoicePage: () => true,
+}));
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
   return { ...actual, streamPrompt: streamPromptMock };
 });
 
 import BuildView from "./BuildView.svelte";
-
-class FakeRecognition {
-  static instance: FakeRecognition;
-  continuous = false;
-  interimResults = false;
-  lang = "";
-  onresult: ((event: unknown) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
-  onend: (() => void) | null = null;
-  constructor() { FakeRecognition.instance = this; }
-  start() {}
-  stop() { this.onend?.(); }
-  abort() { this.onend?.(); }
-  final(text: string) {
-    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
-  }
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -139,6 +126,7 @@ const GITHUB_REPO = {
 
 function baseRoutes(overrides: Record<string, unknown> = {}) {
   return {
+    "GET /api/speech/runtime": { runtime: { effective: "local" } },
     "GET /api/models": MODELS,
     "GET /api/capability-gates": gates("ask"),
     "GET /api/code/repos": reposView(),
@@ -426,29 +414,30 @@ describe("Build composer modes", () => {
 
 
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
-    stubFetch({ ...baseRoutes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
+    const recording = installLocalRecordingFake();
+    recording.transcript.text = "check the repository";
+    stubFetch({ ...baseRoutes(), "POST /api/speech/transcribe": recording.transcript, "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
     streamPromptMock.mockResolvedValue(undefined);
     await renderBuildWithProject();
 
     await startComposerDictation();
-    FakeRecognition.instance.final("check the repository");
+    await waitFor(() => expect(recording.started).toBe(true));
     await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
     expect(streamPromptMock).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Describe the change")).toHaveValue("check the repository");
+    await waitFor(() => expect(screen.getByLabelText("Describe the change")).toHaveValue("check the repository"));
     await fireEvent.click(sendButton());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ input_mode: "dictated" });
   });
 
   it("does not retain dictated provenance after the owner cancels it", async () => {
-    vi.stubGlobal("SpeechRecognition", FakeRecognition);
+    const recording = installLocalRecordingFake();
     stubFetch(baseRoutes());
     streamPromptMock.mockResolvedValue(undefined);
     await renderBuildWithProject();
     const prompt = await screen.findByLabelText("Describe the change");
     await fireEvent.input(prompt, { target: { value: "keep this" } });
     await startComposerDictation();
-    FakeRecognition.instance.final("discard this");
+    await waitFor(() => expect(recording.started).toBe(true));
     await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
     await fireEvent.click(sendButton());
 

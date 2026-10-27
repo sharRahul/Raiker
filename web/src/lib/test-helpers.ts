@@ -209,6 +209,26 @@ export async function startComposerDictation(): Promise<void> {
   else await composerMenuItem("Add to this turn", "Dictate");
 }
 
+/** Exercise the local recording adapter without a physical microphone. */
+export function installLocalRecordingFake() {
+  const state = { started: false, stopped: 0, transcript: { text: "" } };
+  const stream = { getTracks: () => [{ stop: () => { state.stopped += 1; } }] };
+  vi.stubGlobal("navigator", { ...navigator, mediaDevices: { getUserMedia: async () => stream } });
+  vi.stubGlobal("MediaRecorder", class {
+    state = "inactive";
+    mimeType = "audio/wav";
+    ondataavailable: ((event: { data: Blob }) => void) | null = null;
+    onstop: (() => void) | null = null;
+    start() { this.state = "recording"; state.started = true; }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["audio"], { type: "audio/wav" }) });
+      this.onstop?.();
+    }
+  });
+  return state;
+}
+
 /** Reveal the project chooser, the way `+` does. */
 export async function openComposerProject(): Promise<void> {
   await composerMenuItem("Add to this turn", "Work in a project");

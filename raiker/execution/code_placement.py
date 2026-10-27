@@ -1,30 +1,7 @@
-"""Where a command that runs code runs, and whether it has the host's network (BUG-308).
+"""Classify command risk separately from native sandbox placement.
 
-CR-09 of the security review: ``python``, ``node``, ``npm`` and ``npx`` are on
-the governed command allowlist, their inline-code flags are refused and every
-path they name must stay in the workspace — and none of that is a network
-boundary. A script in the workspace can open a socket the egress policy never
-sees. The command parser cannot tell what a script will do; only where it runs
-decides that.
-
-The owner's decision (2026-09-28) is what this module implements:
-
-* **Where this machine has the native OS sandbox, code runs inside it** — no
-  network, the same boundary the ``native_sandbox`` environment provides —
-  unless the owner chose an environment themselves.
-* **Where it has none, the code still runs**, as it did before, but under its
-  own capability, :data:`HOST_NETWORK_CODE_CAPABILITY`, which says what it is:
-  code running with this machine's network. It has its own switch in
-  Permissions and, like every capability, its decision mode starts at *Ask me*.
-  Nothing that worked before starts refusing; it starts saying so.
-
-An owner who *chose* an environment keeps it. One who chose the host has chosen
-its network, and is asked under the same named capability; one who chose a
-container or a remote machine gets that boundary, which is theirs to reason
-about.
-
-The sandbox cannot host a background run or a terminal, so a request for either
-is placed on the host — again under the named capability, never silently.
+Risk classification retains existing authorization gates. It never authorizes
+host execution; the command service probes and enforces the boundary at launch.
 """
 from __future__ import annotations
 
@@ -46,20 +23,23 @@ CODE_RUNNERS: frozenset[str] = frozenset({"python", "python3", "pip", "pip3", "n
 #: The two command capabilities a code runner can arrive through.
 COMMAND_CAPABILITIES: frozenset[str] = frozenset({"shell_execution", "process_execution"})
 
-PlacementKind = Literal["not_code", "owner_environment", "sandbox", "host_network"]
+PlacementKind = Literal["sandbox", "unavailable"]
+RiskClassification = Literal["not_code", "owner_environment", "sandbox", "host_network"]
 
 
 @dataclass(frozen=True)
 class CodePlacement:
-    """Where one command will run, and why."""
+    """Risk classification and advisory native placement for one command."""
 
     kind: PlacementKind
     binary: str = ""
     reason: str = ""
+    classification: RiskClassification = "not_code"
+    placement_reason: str = ""
 
     @property
     def needs_host_network_capability(self) -> bool:
-        return self.kind == "host_network"
+        return self.classification == "host_network"
 
 
 def code_runner(argv: Sequence[str]) -> str | None:
@@ -134,23 +114,34 @@ def place_code(
     interactive: bool = False,
     fresh: bool = False,
 ) -> CodePlacement:
-    """Decide where *argv* runs. The router and the command service both ask this."""
-    binary = code_runner(argv)
-    if binary is None:
-        return CodePlacement("not_code")
+    """Classify the request without treating risk as an execution destination."""
+    binary = code_runner(argv) or ""
     chosen = bool(store.execution_environment_was_chosen(owner_principal_id))
     selected = str(store.selected_execution_environment(owner_principal_id))
-    if chosen and selected != "local_native":
-        return CodePlacement("owner_environment", binary, f"owner_chose:{selected}")
-    if chosen:
-        return CodePlacement("host_network", binary, "owner_chose_host")
-    if background or interactive:
-        return CodePlacement(
-            "host_network", binary, "sandbox_cannot_host_background_or_terminal"
-        )
-    if sandbox_available(workspace_root, fresh=fresh):
-        return CodePlacement("sandbox", binary, "native_sandbox_available")
-    return CodePlacement("host_network", binary, "no_sandbox_on_this_host")
+    available = sandbox_available(workspace_root, fresh=fresh)
+    classification: RiskClassification = "not_code"
+    reason = ""
+    if binary:
+        if chosen and selected != "local_native":
+            classification, reason = "owner_environment", f"owner_chose:{selected}"
+        elif chosen:
+            classification, reason = "host_network", "owner_chose_host"
+        elif background or interactive:
+            classification, reason = "host_network", "sandbox_cannot_host_background_or_terminal"
+        elif available:
+            classification, reason = "sandbox", "native_sandbox_available"
+        else:
+            classification, reason = "host_network", "no_sandbox_on_this_host"
+    kind: PlacementKind
+    if chosen and selected not in {"local_native", "native_sandbox"}:
+        kind, placement_reason = "unavailable", "native_sandbox_required"
+    elif background or interactive:
+        kind, placement_reason = "unavailable", "native_sandbox_mode_unsupported"
+    elif not available:
+        kind, placement_reason = "unavailable", "native_sandbox_unavailable"
+    else:
+        kind, placement_reason = "sandbox", "native_sandbox_available"
+    return CodePlacement(kind, binary, reason, classification, placement_reason)
 
 
 def argv_of(capability: str, arguments: dict[str, Any]) -> list[str]:

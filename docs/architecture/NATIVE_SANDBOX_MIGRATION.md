@@ -55,3 +55,9 @@ the runner enforces filesystem, network or process isolation. Plugin execution
 remains blocked pending disposable workspaces and enforceable capability policy;
 local MCP stdio remains blocked pending sandboxed bidirectional stdio, lifecycle
 control and credential handling.
+
+Command risk classification is now separate from the advisory sandbox placement.
+The existing host-network classification and gates are preserved; they do not
+select a host backend. Placement reports unavailable when the native sandbox or
+requested mode cannot be used. The command service still independently probes at
+launch. This does not account for all subprocess paths or prove OS enforcement.

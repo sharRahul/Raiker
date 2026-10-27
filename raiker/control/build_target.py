@@ -94,7 +94,7 @@ def _placement(store: Any, owner_principal_id: str, workspace_root: Path) -> tup
         placement = place_code(store, owner_principal_id, ["python"], workspace_root)
     except Exception:  # noqa: BLE001 — unmeasured is reported as unknown
         return "unknown", "placement_unmeasured"
-    return str(placement.kind), str(getattr(placement, "reason", "") or "")
+    return str(placement.kind), str(getattr(placement, "placement_reason", "") or "")
 
 
 def describe_target(

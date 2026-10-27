@@ -127,7 +127,8 @@ class TestWhereItRuns:
         self, tmp_path: Path, no_sandbox: None
     ) -> None:
         placement = place_code(SQLiteStore(tmp_path), OWNER, ["node", "a.js"], tmp_path)
-        assert placement.kind == "host_network"
+        assert placement.classification == "host_network"
+        assert placement.kind == "unavailable"
         assert placement.reason == "no_sandbox_on_this_host"
 
     def test_an_owner_who_chose_the_host_chose_its_network(
@@ -142,7 +143,9 @@ class TestWhereItRuns:
     ) -> None:
         store = SQLiteStore(tmp_path)
         store.select_execution_environment(OWNER, "container_default")
-        assert place_code(store, OWNER, ["python3", "x.py"], tmp_path).kind == "owner_environment"
+        placement = place_code(store, OWNER, ["python3", "x.py"], tmp_path)
+        assert placement.classification == "owner_environment"
+        assert placement.kind == "unavailable"
 
     def test_a_run_the_sandbox_cannot_host_goes_to_the_host_under_the_named_capability(
         self, tmp_path: Path, with_sandbox: None
@@ -150,12 +153,15 @@ class TestWhereItRuns:
         placement = place_code(
             SQLiteStore(tmp_path), OWNER, ["npm", "run", "dev"], tmp_path, background=True
         )
-        assert placement.kind == "host_network"
+        assert placement.classification == "host_network"
+        assert placement.kind == "unavailable"
 
     def test_a_command_that_runs_no_code_is_untouched(
         self, tmp_path: Path, no_sandbox: None
     ) -> None:
-        assert place_code(SQLiteStore(tmp_path), OWNER, ["ls"], tmp_path).kind == "not_code"
+        placement = place_code(SQLiteStore(tmp_path), OWNER, ["ls"], tmp_path)
+        assert placement.classification == "not_code"
+        assert placement.kind == "unavailable"
 
 
 def _authority(tmp_path: Path) -> tuple[SQLiteStore, RuntimeAuthority]:

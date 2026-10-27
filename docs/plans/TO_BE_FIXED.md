@@ -2,7 +2,8 @@
 
 The requested Docker-free execution migration has not been implemented or
 verified. The command service now requires its native backend, but
-`raiker/execution/code_placement.py` still describes host placement; container,
+`raiker/execution/code_placement.py` now separates host-risk classification from
+sandbox placement, but the execution inventory remains incomplete; container,
 plugin and MCP execution paths remain separate. Their legacy default launchers
 now refuse execution until migrated; other subprocess paths are not yet audited.
 The macOS native

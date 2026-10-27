@@ -21,7 +21,7 @@ from raiker.execution.commands.backends import (
     NativeSandboxDriver,
     UnavailableBackend,
 )
-from raiker.execution.commands.service import CommandService
+from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.profiles import (
     ExecutionProfile,
     ProfileProbe,
@@ -137,7 +137,7 @@ def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -
     local.start.assert_not_called()
 
 
-def test_command_service_routes_selected_container_without_local_fallback(tmp_path: Path) -> None:
+def test_command_service_refuses_selected_container_without_local_fallback(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     _container(store)
     store.select_execution_environment("owner_a", "container_a")
@@ -151,28 +151,19 @@ def test_command_service_routes_selected_container_without_local_fallback(tmp_pa
         backend_factory=lambda profile: selected,
     )
 
-    run = service.start(
-        owner_principal_id="owner_a",
-        acting_principal_id="agent_a",
-        session_id="sess_a",
-        turn_id="turn_a",
-        action_id="act_a",
-        authority_kind="approval",
-        authority_id="appr_a",
-        command="misleading display",
-        argv=["printf", "hello"],
-    )
-
-    routed = selected.start.call_args.args[0]
-    assert run.profile_id == "container_a"
-    assert routed.shell is False
-    assert routed.executable_template == ""
-    assert routed.argv_template == ("printf", "hello")
-    assert routed.safe_display == "printf hello"
-    # BUG-197 — the run names its backend while it is still in flight, not only
-    # once a receipt exists. `run` is read straight back out of the store, so
-    # this is the column the run list reads.
-    assert run.backend == "container"
+    with pytest.raises(CommandServiceError, match="native_sandbox_required"):
+        service.start(
+            owner_principal_id="owner_a",
+            acting_principal_id="agent_a",
+            session_id="sess_a",
+            turn_id="turn_a",
+            action_id="act_a",
+            authority_kind="approval",
+            authority_id="appr_a",
+            command="misleading display",
+            argv=["printf", "hello"],
+        )
+    selected.start.assert_not_called()
     service.shutdown()
 
 
@@ -185,9 +176,6 @@ def test_a_run_in_flight_already_names_the_backend_its_receipt_will_name(
     on the receipt was correct, so the record that proves what ran a command and
     the list the owner reads said different things about the same run.
     """
-    store = SQLiteStore(tmp_path)
-    _container(store)
-    store.select_execution_environment("owner_a", "container_a")
     backend = Mock()
     handle = Mock()
     handle.poll.return_value = None
@@ -211,8 +199,12 @@ def test_a_run_in_flight_already_names_the_backend_its_receipt_will_name(
     )
 
     listed = service.store.list_runs("owner_a", session_id="sess_a")
-    assert [item.backend for item in listed] == ["container"]
+    assert [item.backend for item in listed] == ["native"]
     assert run.backend == listed[0].backend
+    routed = backend.start.call_args.args[0]
+    assert routed.shell is False
+    assert routed.argv_template == ("printf", "hello")
+    assert routed.safe_display == "printf hello"
     service.shutdown()
 
 

@@ -104,3 +104,10 @@ worktree checkout and branch creation from a different base. Both operations
 are now refused pending a sandboxed checkout; creating a branch at HEAD remains
 available and was tested in the same fixture. This does not establish safety
 of every Git operation or platform.
+
+The native runner policy parser rejects non-absolute workspace paths, lexical
+parent traversal, malformed protected-path lists, invalid network/PTY types and
+out-of-range limits. Windows unit tests and Linux/macOS cross-target checks cover
+the contract; they are not OS enforcement evidence. Symlink and junction races,
+real platform filesystem isolation, seccomp and resource enforcement remain
+release blockers.

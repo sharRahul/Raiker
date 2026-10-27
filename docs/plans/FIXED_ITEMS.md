@@ -1,5 +1,12 @@
 # Fixed items
 
+## Native runner policy parser silently accepted malformed restrictions
+
+The runner rejects lexical parent traversal, malformed protected-path lists,
+invalid policy field types and out-of-range resource limits instead of silently
+dropping or widening them. Rust policy tests cover these inputs. This is parser
+validation only; symlink containment and OS enforcement remain open.
+
 ## Uncontained checkout filters in task worktree and cross-base branch creation
 
 Task worktree creation and branch creation from an explicit base now refuse

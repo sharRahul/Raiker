@@ -6,7 +6,7 @@
 //! the runner never writes it.
 
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 /// What the child is allowed to reach on the network.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +57,19 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
             .and_then(Value::as_str)
             .ok_or("runner_policy_cwd_required")?,
     );
-    if !cwd.starts_with(&workspace_root) {
+    if !workspace_root.is_absolute()
+        || workspace_root
+            .components()
+            .any(|part| part == Component::ParentDir)
+        || !policy_path_text_safe(&workspace_root)
+    {
+        return Err("runner_policy_workspace_root_invalid");
+    }
+    if !cwd.is_absolute()
+        || cwd.components().any(|part| part == Component::ParentDir)
+        || !policy_path_text_safe(&cwd)
+        || !cwd.starts_with(&workspace_root)
+    {
         return Err("runner_policy_cwd_outside_workspace");
     }
     let profile_name = object
@@ -67,52 +79,82 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
         .ok_or("runner_policy_profile_name_required")?
         .to_owned();
 
-    let network = match object.get("network").and_then(Value::as_str) {
-        None | Some("none") => NetworkPolicy::Denied,
-        Some(other) => match other.strip_prefix("proxy:") {
-            Some(address) if !address.is_empty() => NetworkPolicy::Proxy(address.to_owned()),
-            _ => return Err("runner_policy_network_invalid"),
+    let network = match object.get("network") {
+        None => NetworkPolicy::Denied,
+        Some(value) => match value.as_str().ok_or("runner_policy_network_invalid")? {
+            "none" => NetworkPolicy::Denied,
+            other => match other.strip_prefix("proxy:") {
+                Some(address) if !address.is_empty() => NetworkPolicy::Proxy(address.to_owned()),
+                _ => return Err("runner_policy_network_invalid"),
+            },
         },
+    };
+    let pty = match object.get("pty") {
+        None => false,
+        Some(value) => value.as_bool().ok_or("runner_policy_pty_invalid")?,
     };
 
     Ok(LaunchPolicy {
         workspace_root,
         cwd,
-        deny_paths: string_list(object.get("deny_paths")),
-        readonly_paths: string_list(object.get("readonly_paths")),
+        deny_paths: string_list(object.get("deny_paths"))?,
+        readonly_paths: string_list(object.get("readonly_paths"))?,
         network,
-        pty: object.get("pty").and_then(Value::as_bool).unwrap_or(false),
-        max_processes: bounded(object.get("max_processes"), 64, 1, 4096) as u32,
+        pty,
+        max_processes: bounded(object.get("max_processes"), 64, 1, 4096)? as u32,
         max_memory_bytes: bounded(
             object.get("max_memory_bytes"),
             2 * 1024 * 1024 * 1024,
             64 * 1024 * 1024,
             32u64 * 1024 * 1024 * 1024,
-        ),
-        deadline_seconds: bounded(object.get("deadline_seconds"), 300, 1, 86_400),
+        )?,
+        deadline_seconds: bounded(object.get("deadline_seconds"), 300, 1, 86_400)?,
         profile_name,
     })
 }
 
-fn string_list(value: Option<&Value>) -> Vec<String> {
-    value
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .filter(|item| !item.is_empty() && !item.contains(".."))
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default()
+fn policy_path_text_safe(path: &Path) -> bool {
+    let text = path.to_string_lossy();
+    !text
+        .chars()
+        .any(|character| character.is_control() || character == '"')
+        && (cfg!(windows) || !text.contains('\\'))
 }
 
-fn bounded(value: Option<&Value>, default: u64, low: u64, high: u64) -> u64 {
-    value
-        .and_then(Value::as_u64)
-        .unwrap_or(default)
-        .clamp(low, high)
+fn string_list(value: Option<&Value>) -> Result<Vec<String>, &'static str> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let items = value.as_array().ok_or("runner_policy_path_list_invalid")?;
+    items
+        .iter()
+        .map(|item| {
+            let text = item.as_str().ok_or("runner_policy_path_list_invalid")?;
+            let path = Path::new(text);
+            if text.is_empty()
+                || text.contains(':')
+                || text.contains('\\')
+                || !policy_path_text_safe(path)
+                || !path
+                    .components()
+                    .all(|part| matches!(part, Component::Normal(_)))
+            {
+                return Err("runner_policy_path_list_invalid");
+            }
+            Ok(text.to_owned())
+        })
+        .collect()
+}
+
+fn bounded(value: Option<&Value>, default: u64, low: u64, high: u64) -> Result<u64, &'static str> {
+    let Some(value) = value else {
+        return Ok(default);
+    };
+    let number = value.as_u64().ok_or("runner_policy_limit_invalid")?;
+    if !(low..=high).contains(&number) {
+        return Err("runner_policy_limit_invalid");
+    }
+    Ok(number)
 }
 
 #[cfg(test)]
@@ -154,11 +196,82 @@ mod tests {
     }
 
     #[test]
-    fn traversal_entries_never_enter_the_path_lists() {
+    fn traversal_entries_are_rejected_instead_of_dropped() {
         let text = minimal().replace(
             "\"profile_name\"",
             "\"deny_paths\":[\".raiker\",\"../etc\"],\"profile_name\"",
         );
-        assert_eq!(parse(&text).unwrap().deny_paths, vec![".raiker".to_owned()]);
+        assert_eq!(parse(&text).unwrap_err(), "runner_policy_path_list_invalid");
+    }
+
+    #[test]
+    fn cwd_with_parent_traversal_is_rejected() {
+        let root = if cfg!(windows) { r"C:\ws" } else { "/ws" };
+        let text = serde_json::json!({
+            "workspace_root": root,
+            "cwd": format!("{root}/../outside"),
+            "profile_name": "raiker.cmd.test"
+        })
+        .to_string();
+        assert_eq!(
+            parse(&text).unwrap_err(),
+            "runner_policy_cwd_outside_workspace"
+        );
+    }
+
+    #[test]
+    fn absolute_protected_path_is_rejected() {
+        let text = minimal().replace(
+            "\"profile_name\"",
+            "\"deny_paths\":[\"/outside\"],\"profile_name\"",
+        );
+        assert_eq!(parse(&text).unwrap_err(), "runner_policy_path_list_invalid");
+    }
+
+    #[test]
+    fn invalid_network_type_is_rejected() {
+        let text = minimal().replace("\"profile_name\"", "\"network\":false,\"profile_name\"");
+        assert_eq!(parse(&text).unwrap_err(), "runner_policy_network_invalid");
+    }
+
+    #[test]
+    fn invalid_limits_are_rejected_instead_of_widened() {
+        let text = minimal().replace("\"profile_name\"", "\"max_processes\":0,\"profile_name\"");
+        assert_eq!(parse(&text).unwrap_err(), "runner_policy_limit_invalid");
+    }
+
+    #[test]
+    fn non_boolean_pty_is_rejected() {
+        let text = minimal().replace("\"profile_name\"", "\"pty\":\"yes\",\"profile_name\"");
+        assert_eq!(parse(&text).unwrap_err(), "runner_policy_pty_invalid");
+    }
+
+    #[test]
+    fn malformed_protected_path_lists_are_rejected() {
+        for invalid in [
+            r#"[".raiker", 12]"#,
+            r#"[".raiker", ""]"#,
+            r#"["foo\\bar"]"#,
+        ] {
+            let text = minimal().replace(
+                "\"profile_name\"",
+                &format!("\"deny_paths\":{invalid},\"profile_name\""),
+            );
+            assert_eq!(parse(&text).unwrap_err(), "runner_policy_path_list_invalid");
+        }
+    }
+
+    #[test]
+    fn relative_workspace_is_rejected() {
+        let text = serde_json::json!({
+            "workspace_root": "workspace",
+            "cwd": "workspace",
+            "profile_name": "raiker.cmd.test"
+        })
+        .to_string();
+        assert_eq!(
+            parse(&text).unwrap_err(),
+            "runner_policy_workspace_root_invalid"
+        );
     }
 }

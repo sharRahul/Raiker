@@ -9,7 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from raiker.tools.git import local_git_environment, run_git
+from raiker.tools.git import (
+    GitWorkingTreeDiffUnavailable,
+    create_commit,
+    local_git_environment,
+    proposed_commit_snapshot,
+    run_git,
+    working_tree_changes,
+    working_tree_diff,
+)
 
 
 def _git(root: Path, *args: str) -> None:
@@ -147,4 +155,32 @@ def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
     (repo / "a.txt").write_text("modified\n", encoding="utf-8")
     result = run_git(repo, "status", ["--short"])
     assert result["status"] == "success"
+    assert not marker.exists()
+
+
+def test_commit_proposal_refuses_uncontained_filter(repo: Path) -> None:
+    marker = repo.parent / "commit-filter-ran"
+    driver = repo.parent / "commit-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = proposed_commit_snapshot(repo, "test")
+    assert result["status"] == "failed"
+    assert result["error"]["type"] == "git_commit_native_sandbox_required"
+    assert not marker.exists()
+    assert create_commit(repo, "test")["error"]["type"] == "git_commit_native_sandbox_required"
+    assert not marker.exists()
+    entries = working_tree_changes(repo)
+    with pytest.raises(GitWorkingTreeDiffUnavailable):
+        working_tree_diff(repo, entries)
     assert not marker.exists()

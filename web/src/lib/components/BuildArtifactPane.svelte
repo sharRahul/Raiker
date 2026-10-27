@@ -251,8 +251,12 @@
             </li>
           {/each}
         </ul>
-        <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
-        <PatchReview repoId={repoId} {revision} {onrepair} {reviewModel} />
+        {#if changes.reason_code === "git_diff_native_sandbox_required"}
+          <p class="note" role="status">The diff is unavailable until the native sandbox can safely run Git.</p>
+        {:else}
+          <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
+          <PatchReview repoId={repoId} {revision} {onrepair} {reviewModel} />
+        {/if}
         {#if changes.diff}
           <DiffView diff={changes.diff} open={true} />
           {#if changes.diff_truncated}

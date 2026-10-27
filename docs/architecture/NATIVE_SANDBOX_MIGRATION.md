@@ -87,3 +87,8 @@ broker can isolate that operation, `run_git` refuses working-tree diff while
 retaining staged diff. Code review propagates the refusal instead of reporting
 a clean result. Restore unstaged diff only with a verified native boundary;
 other Git operations and filter-triggering cases remain under review.
+
+A positive-control test also found the commit preview and Build artifact diff
+helper could launch repository clean filters. Commit proposals and changed-tree
+artifact diffs are now unavailable pending native containment; the Build API
+returns `git_diff_native_sandbox_required` rather than an empty success.

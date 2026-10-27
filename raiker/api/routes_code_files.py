@@ -323,7 +323,11 @@ async def read_code_repo_changes(
     :data:`MAX_CHANGED_FILES` entries, at most
     :data:`MAX_CHANGES_DIFF_CHARS` of diff, each truncation stated.
     """
-    from raiker.tools.git import working_tree_changes, working_tree_diff  # noqa: PLC0415
+    from raiker.tools.git import (  # noqa: PLC0415
+        GitWorkingTreeDiffUnavailable,
+        working_tree_changes,
+        working_tree_diff,
+    )
 
     repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
     root = _repo_root(request, repo)
@@ -358,7 +362,12 @@ async def read_code_repo_changes(
     entries = working_tree_changes(root)
     truncated = len(entries) > MAX_CHANGED_FILES
     entries = entries[:MAX_CHANGED_FILES]
-    diff = working_tree_diff(root, entries) if entries else ""
+    reason_code = None
+    try:
+        diff = working_tree_diff(root, entries) if entries else ""
+    except GitWorkingTreeDiffUnavailable:
+        diff = ""
+        reason_code = "git_diff_native_sandbox_required"
     diff_truncated = len(diff) > MAX_CHANGES_DIFF_CHARS
     answer_2: CodeRepoChangesView = {
         "entries": [
@@ -374,7 +383,7 @@ async def read_code_repo_changes(
         "truncated": truncated,
         "diff_truncated": diff_truncated,
         "root_missing": False,
-        "reason_code": None,
+        "reason_code": reason_code,
     }
     return serialize_dto(answer_2)
 
@@ -483,7 +492,11 @@ async def read_code_repo_target(
 
 def _current_patch(request: Request, repo: dict[str, Any]) -> tuple[str, str | None]:
     """The full working-tree diff for *repo*, or the reason there is none."""
-    from raiker.tools.git import working_tree_changes, working_tree_diff  # noqa: PLC0415
+    from raiker.tools.git import (  # noqa: PLC0415
+        GitWorkingTreeDiffUnavailable,
+        working_tree_changes,
+        working_tree_diff,
+    )
 
     root = _repo_root(request, repo)
     if root is None:
@@ -493,7 +506,10 @@ def _current_patch(request: Request, repo: dict[str, Any]) -> tuple[str, str | N
     if not (root / ".git").exists():
         return "", "not_a_git_repository"
     entries = working_tree_changes(root)
-    return (working_tree_diff(root, entries) if entries else ""), None
+    try:
+        return (working_tree_diff(root, entries) if entries else ""), None
+    except GitWorkingTreeDiffUnavailable:
+        return "", "git_diff_native_sandbox_required"
 
 
 def _review_answer(

@@ -36,6 +36,16 @@ filter tests and cross-platform enforcement evidence. The existing
 passes because unstaged review is unavailable. Other Git paths remain
 unverified.
 
+## Release blocker: sandboxed Git commit and artifact diff unavailable
+
+Commit previews, staging and the Build artifact diff may invoke repository
+clean filters on the host. These operations now refuse until they can use a
+verified native boundary. The Build changes API returns an explicit unavailable
+reason and preserves the changed-file list; the UI must not claim an empty or
+reviewed diff. Restore commit previews, approved commits and artifact diffs with
+positive-control filter tests, disposable workspaces and platform enforcement
+evidence. Existing commit and Build artifact functionality is affected.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

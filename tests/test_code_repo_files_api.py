@@ -337,6 +337,19 @@ class TestWorkingTreeChanges:
             },
         )
 
+    def test_changed_tree_reports_diff_unavailable(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        root = workspace / "project"
+        self._git(root, "init", "--quiet")
+        (root / "new.txt").write_text("change\n", encoding="utf-8")
+        response = client.get(f"/api/code/repos/{repo_id}/changes", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["entries"]
+        assert body["diff"] == ""
+        assert body["reason_code"] == "git_diff_native_sandbox_required"
+
     def test_a_folder_with_no_history_says_so_rather_than_no_changes(
         self, client: TestClient, headers: dict[str, str], repo_id: str
     ) -> None:

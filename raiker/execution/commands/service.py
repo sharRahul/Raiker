@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
-from raiker.execution.code_placement import place_code
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
 from raiker.execution.commands.backends.container import (
     PersistentContainerBackend,
@@ -293,41 +292,21 @@ class CommandService:
         interactive: bool,
         host_network_code: bool,
     ) -> ExecutionProfile:
-        """Run code in the sandbox where there is one; never on the host unasked.
+        """Require the native backend for every governed command.
 
-        BUG-308 — ``python``, ``node``, ``npm`` and ``npx`` passed every argv
-        check and then ran with the host's network, which no check here can see.
-        Where this machine has the native sandbox and the owner has not chosen
-        an environment, such a command runs inside it. Where it would run on the
-        host, the caller must say it was authorised under
-        ``host_network_code_execution`` — the router does, after that
-        capability's own switch and decision mode; a command authorised only as
-        an ordinary shell command is refused rather than run.
-
-        There is no fallback in either direction. A sandbox that fails at launch
-        refuses the command (the native backend's rule), and a command the owner
-        approved for the host that now finds a sandbox runs inside it, which is
-        only ever stricter than what they approved.
+        Executable names and prior host approvals are not isolation boundaries.
+        The native backend probes again and refuses unsupported execution modes.
+        Other selected environments are refused rather than silently changed.
         """
-        if profile.kind != "local":
+        del owner_principal_id, argv, background, interactive, host_network_code
+        if profile.kind == "native":
             return profile
-        placement = place_code(
-            self.sqlite,
-            owner_principal_id,
-            argv,
-            self.workspace_root,
-            background=background,
-            interactive=interactive,
+        if profile.kind != "local":
+            raise CommandServiceError("native_sandbox_required")
+        return next(
+            candidate for candidate in DEFAULT_EXECUTION_PROFILES
+            if candidate.profile_id == "native_sandbox"
         )
-        if placement.kind == "sandbox":
-            return next(
-                candidate
-                for candidate in DEFAULT_EXECUTION_PROFILES
-                if candidate.profile_id == "native_sandbox"
-            )
-        if placement.kind == "host_network" and not host_network_code:
-            raise CommandServiceError("host_network_code_not_authorized")
-        return profile
 
     # ── Background lifecycle (BUG-194) ───────────────────────────────────────
 

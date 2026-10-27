@@ -1,3 +1,18 @@
+## Release blocker: native sandbox migration incomplete
+
+The requested Docker-free execution migration has not been implemented or
+verified. The command service now requires its native backend, but
+`raiker/execution/code_placement.py` still describes host placement; container,
+plugin and MCP execution paths remain separate. The macOS native
+runner permits broad filesystem reads, and Linux seccomp enforcement has not
+been established. Reproduce by inspecting those paths and
+`native/raiker-command-runner/src/boundary_unix.rs`; a dependency probe alone
+does not demonstrate OS enforcement. The security impact is potential access
+to host files or network by code that the target design intends to isolate.
+Complete the inventory, broker migration and adversarial OS-enforcement tests
+before treating this architecture as release-ready. Initial findings and the
+remaining checklist are in `docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

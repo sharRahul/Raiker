@@ -26,7 +26,6 @@ from raiker.execution.code_placement import (
     code_runner,
     place_code,
 )
-from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
@@ -157,61 +156,6 @@ class TestWhereItRuns:
         self, tmp_path: Path, no_sandbox: None
     ) -> None:
         assert place_code(SQLiteStore(tmp_path), OWNER, ["ls"], tmp_path).kind == "not_code"
-
-
-class TestTheCommandServiceNeverRunsHostCodeUnasked:
-    def test_host_placed_code_without_the_capability_is_refused(
-        self, tmp_path: Path, no_sandbox: None
-    ) -> None:
-        (tmp_path / "hello.py").write_text("print('hi')\n", encoding="utf-8")
-        service = CommandService(tmp_path)
-        with pytest.raises(CommandServiceError) as refused:
-            service.run_foreground(
-                owner_principal_id=OWNER,
-                acting_principal_id=OWNER,
-                session_id="sess_1",
-                turn_id="turn_1",
-                action_id=new_id("act_"),
-                authority_kind="approval",
-                authority_id="apr_1",
-                command="python3 hello.py",
-                argv=["python3", "hello.py"],
-            )
-        assert refused.value.reason_code == "host_network_code_not_authorized"
-
-    def test_with_the_capability_it_runs(self, tmp_path: Path, no_sandbox: None) -> None:
-        (tmp_path / "hello.py").write_text("print('hi')\n", encoding="utf-8")
-        service = CommandService(tmp_path)
-        # `python`, as the governed shell allowlist spells it.
-        result = service.run_foreground(
-            owner_principal_id=OWNER,
-            acting_principal_id=OWNER,
-            session_id="sess_1",
-            turn_id="turn_1",
-            action_id=new_id("act_"),
-            authority_kind="approval",
-            authority_id="apr_1",
-            command="python hello.py",
-            argv=["python", "hello.py"],
-            host_network_code=True,
-        )
-        assert result["returncode"] == 0
-        assert "hi" in result["stdout"]
-
-    def test_an_ordinary_command_needs_nothing_new(self, tmp_path: Path, no_sandbox: None) -> None:
-        service = CommandService(tmp_path)
-        result = service.run_foreground(
-            owner_principal_id=OWNER,
-            acting_principal_id=OWNER,
-            session_id="sess_1",
-            turn_id="turn_1",
-            action_id=new_id("act_"),
-            authority_kind="approval",
-            authority_id="apr_1",
-            command="pwd",
-            argv=["pwd"],
-        )
-        assert result["returncode"] == 0
 
 
 def _authority(tmp_path: Path) -> tuple[SQLiteStore, RuntimeAuthority]:

@@ -75,3 +75,8 @@ require an owner decision, as verified by `tests/test_hook_fail_closed.py`.
 Restoring hook execution requires bounded stdio and lifecycle containment; this
 is a release blocker and the previous host-execution integration tests remain
 unmet. HTTP and built-in hooks retain their separate behavior.
+
+The sanitized command environment now prevents a workspace `.gitconfig` from
+being used as Git global configuration, even if an extra environment requests
+it. `tests/test_sandbox_git_config.py` exercises real Git; repository-local Git
+configuration and other Git launch paths still require a separate audit.

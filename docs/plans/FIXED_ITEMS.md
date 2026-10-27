@@ -1,5 +1,14 @@
 # Fixed items
 
+## Workspace Git configuration used as global configuration
+
+The sanitized process environment now points Git's global configuration at the
+OS null device and disables system configuration, including after extra
+environment values are merged. `tests/test_sandbox_git_config.py` verifies with
+real Git that an agent-written workspace `.gitconfig` is not read as global
+configuration. Repository-local configuration and other launch paths remain
+subject to the open native sandbox migration.
+
 ## Agent Git diff external-driver execution
 
 The agent-facing `run_git` diff path now disables external diff and textconv

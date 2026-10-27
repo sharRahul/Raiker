@@ -38,9 +38,10 @@ unverified.
 
 ## Release blocker: sandboxed Git commit and artifact diff unavailable
 
-Commit previews, staging and the Build artifact diff may invoke repository
-clean filters on the host. These operations now refuse until they can use a
-verified native boundary. The Build changes API returns an explicit unavailable
+Commit previews, staging and working-tree Build artifact diffs may invoke
+repository clean filters on the host. These operations remain unavailable until
+they can use a verified native boundary. Staged-only artifact diffs are
+available with protected-path exclusion and truncation refusal. The Build changes API returns an explicit unavailable
 reason and preserves the changed-file list; the UI must not claim an empty or
 reviewed diff. Restore commit previews, approved commits and artifact diffs with
 positive-control filter tests, disposable workspaces and platform enforcement

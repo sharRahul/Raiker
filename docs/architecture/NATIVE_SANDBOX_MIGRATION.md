@@ -92,3 +92,9 @@ A positive-control test also found the commit preview and Build artifact diff
 helper could launch repository clean filters. Commit proposals and changed-tree
 artifact diffs are now unavailable pending native containment; the Build API
 returns `git_diff_native_sandbox_required` rather than an empty success.
+
+Build artifact diffs now support staged-only changes through the protected
+index-to-HEAD Git diff. A real Git control confirms a configured clean filter
+is not started in this case, and staged `.raiker` content is excluded. Mixed
+or unstaged changes remain unavailable; truncated output is refused rather than
+used as a complete review. Commit proposals remain blocked.

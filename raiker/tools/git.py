@@ -166,6 +166,11 @@ def run_git(
         # index-to-HEAD form until this operation can run inside the broker.
         if not staged:
             return {"status": "denied", "error": {"type": "git_diff_native_sandbox_required"}}
+        if "--" not in arguments:
+            arguments.append("--")
+        # Exclusions apply even when the caller requests the whole index or a
+        # parent path, so Raiker state cannot be exposed by a staged diff.
+        arguments.extend([":(top,icase,exclude).raiker", ":(top,icase,exclude).git"])
         arguments = ["--no-ext-diff", "--no-textconv", *arguments]
     command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *arguments]
     proc = subprocess.run(
@@ -274,7 +279,7 @@ def _is_protected(path: str) -> bool:
     working tree would otherwise write the owner's key material into git
     history, which is the opposite of what approving a commit was for.
     """
-    head = path.replace("\\", "/").split("/", 1)[0]
+    head = path.replace("\\", "/").split("/", 1)[0].lower()
     return head in PROTECTED_WORKSPACE_DIRS
 
 
@@ -336,10 +341,26 @@ class GitWorkingTreeDiffUnavailable(RuntimeError):
 
 
 def working_tree_diff(root: Path, entries: list[dict[str, str]]) -> str:
-    """Refuse changed trees until Git filters can run inside the native broker."""
-    if entries:
+    """Read staged-only changes; refuse any diff requiring the working tree."""
+    if not entries:
+        return ""
+    if any(entry.get("unstaged") or entry.get("state") == "untracked" for entry in entries):
         raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
-    return ""
+    paths: list[str] = []
+    for entry in entries:
+        for path in (entry.get("previous_path", ""), entry.get("path", "")):
+            if path:
+                if _is_protected(path):
+                    raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
+                paths.append(path)
+    if not paths:
+        raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
+    result = run_git(root, "diff", ["--cached", "--", *paths])
+    if result.get("status") != "success":
+        raise GitWorkingTreeDiffUnavailable("git_diff_unavailable")
+    if result.get("truncated"):
+        raise GitWorkingTreeDiffUnavailable("git_diff_output_too_large")
+    return str(result.get("output", ""))
 
 
 def _valid_branch_name(root: Path, name: str) -> bool:

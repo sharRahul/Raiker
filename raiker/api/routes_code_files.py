@@ -365,9 +365,9 @@ async def read_code_repo_changes(
     reason_code = None
     try:
         diff = working_tree_diff(root, entries) if entries else ""
-    except GitWorkingTreeDiffUnavailable:
+    except GitWorkingTreeDiffUnavailable as exc:
         diff = ""
-        reason_code = "git_diff_native_sandbox_required"
+        reason_code = str(exc)
     diff_truncated = len(diff) > MAX_CHANGES_DIFF_CHARS
     answer_2: CodeRepoChangesView = {
         "entries": [
@@ -508,8 +508,8 @@ def _current_patch(request: Request, repo: dict[str, Any]) -> tuple[str, str | N
     entries = working_tree_changes(root)
     try:
         return (working_tree_diff(root, entries) if entries else ""), None
-    except GitWorkingTreeDiffUnavailable:
-        return "", "git_diff_native_sandbox_required"
+    except GitWorkingTreeDiffUnavailable as exc:
+        return "", str(exc)
 
 
 def _review_answer(

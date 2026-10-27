@@ -137,6 +137,49 @@ def test_git_diff_does_not_run_workspace_filter(repo: Path) -> None:
     assert not marker.exists()
 
 
+def test_artifact_diff_shows_staged_files_without_running_filter(repo: Path) -> None:
+    marker = repo.parent / "artifact-filter-ran"
+    driver = repo.parent / "artifact-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    (repo / ".raiker").mkdir()
+    (repo / ".raiker" / "secret.txt").write_text("do-not-expose\n", encoding="utf-8")
+    _git(repo, "add", ".raiker/secret.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    entries = [{"path": "a.txt", "previous_path": "", "state": "modified", "unstaged": ""}]
+    diff = working_tree_diff(repo, entries)
+    assert "+staged change" in diff
+    assert "do-not-expose" not in diff
+    assert not marker.exists()
+    all_staged = run_git(repo, "diff", ["--cached"])
+    assert all_staged["status"] == "success"
+    assert "do-not-expose" not in all_staged["output"]
+    requested_secret = run_git(repo, "diff", ["--cached", "--", ".raiker"])
+    assert requested_secret["status"] == "success"
+    assert "do-not-expose" not in requested_secret["output"]
+
+
+def test_artifact_diff_does_not_present_truncated_output_as_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "raiker.tools.git.run_git",
+        lambda *args, **kwargs: {"status": "success", "output": "partial", "truncated": True},
+    )
+    entries = [{"path": "a.txt", "previous_path": "", "state": "modified", "unstaged": ""}]
+    with pytest.raises(GitWorkingTreeDiffUnavailable, match="git_diff_output_too_large"):
+        working_tree_diff(tmp_path, entries)
+
+
 def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
     marker = repo.parent / "status-filter-ran"
     driver = repo.parent / "status-filter.py"

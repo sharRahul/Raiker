@@ -250,8 +250,8 @@ class TestPermissionsSaysWhichMachineThisIs:
         from raiker.control.service import RuntimeControlService
 
         control = RuntimeControlService(tmp_path)
-        assert "no native sandbox" in control._network_boundary("shell_execution")
-        assert "no native sandbox" in control._network_boundary(HOST_NETWORK_CODE_CAPABILITY)
+        assert "commands are refused" in control._network_boundary("shell_execution")
+        assert "commands are refused" in control._network_boundary(HOST_NETWORK_CODE_CAPABILITY)
         assert control._network_boundary("web_fetch") == ""
 
     def test_with_a_sandbox_it_says_the_code_has_no_network(
@@ -260,7 +260,7 @@ class TestPermissionsSaysWhichMachineThisIs:
         from raiker.control.service import RuntimeControlService
 
         text = RuntimeControlService(tmp_path)._network_boundary("shell_execution")
-        assert "with no network" in text
+        assert "network disabled" in text
 
 
 class TestThePluginCardSaysWhereItsCodeRuns:

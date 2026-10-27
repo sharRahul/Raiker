@@ -466,15 +466,15 @@ it("names the host-network capability and says where code runs on this machine",
         allowed_transitions: ["disabled"],
         decision_mode: "ask",
         network_boundary:
-          "This machine has no native sandbox: python, node, npm and npx commands run with its network, and each one answers to Code with this machine's network.",
+          "The native sandbox is unavailable. Governed commands are refused until the required boundary can be established.",
       }),
     ],
   });
   render(CapabilitiesView);
   await openCategory(/Advanced/);
-  expect(await screen.findByRole("option", { name: /Code with this machine's network/ })).toBeInTheDocument();
+  expect(await screen.findByRole("option", { name: /Code with host-network risk/ })).toBeInTheDocument();
   expect(await screen.findByTestId("network-boundary")).toHaveTextContent(
-    /no native sandbox: python, node, npm and npx commands run with its network/,
+    /native sandbox is unavailable.*commands are refused/,
   );
 });
 

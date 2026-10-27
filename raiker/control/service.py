@@ -242,14 +242,13 @@ class RuntimeControlService:
             return ""
         if sandbox_available(self._workspace_root):
             return (
-                "This machine has the native sandbox: python, node, npm and npx "
-                "commands run inside it, with no network, unless you choose "
-                "another environment."
+                "The native sandbox probe is available. Governed commands require "
+                "the native sandbox with network disabled; unsupported profiles "
+                "and execution modes are refused."
             )
         return (
-            "This machine has no native sandbox: python, node, npm and npx "
-            "commands run with its network, and each one answers to "
-            "Code with this machine's network."
+            "The native sandbox is unavailable. Governed commands are refused "
+            "until the required boundary can be established."
         )
 
     def _enabled_by_connection(self, capability: str, principal_id: str | None) -> bool:

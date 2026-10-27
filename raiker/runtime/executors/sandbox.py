@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import subprocess
 import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
@@ -10,9 +9,6 @@ from typing import Any
 
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS as _ALLOWED_SHELL_COMMANDS,
-)
-from raiker.runtime.command_policy import (
-    portable_command,
 )
 
 ALLOWED_SHELL_COMMANDS = _ALLOWED_SHELL_COMMANDS
@@ -132,42 +128,8 @@ def run_command(
     env: dict[str, str] | None = None,
     stdin_text: str | None = None,
 ) -> dict[str, Any]:
-    if allowlist is not None:
-        check_command_allowlist(command, allowlist, workspace_root=cwd)
-    # A child gets a constructed environment, never the host's. Inheriting it
-    # would hand every command every credential the host holds — including the
-    # git token this runtime lends for exactly one command at a time.
-    from raiker.runtime.command_policy import sandbox_environment
-
-    child_env = sandbox_environment(workspace_root=cwd or Path.cwd(), extra=env)
-    launch_command = portable_command(command)
-    try:
-        proc = subprocess.run(
-            launch_command,
-            capture_output=True,
-            text=False,
-            timeout=timeout,
-            cwd=cwd,
-            env=child_env,
-            input=stdin_text.encode("utf-8") if stdin_text is not None else None,
-        )
-    except subprocess.TimeoutExpired:
-        raise SandboxError(f"command_timeout:{timeout}s") from None
-    except FileNotFoundError:
-        raise SandboxError(f"command_not_found:{command[0]}") from None
-    except OSError as exc:
-        raise SandboxError(f"command_failed:{exc}") from None
-
-    stdout_len = len(proc.stdout)
-    stderr_len = len(proc.stderr)
-    return {
-        "returncode": proc.returncode,
-        "stdout_bytes": stdout_len,
-        "stderr_bytes": stderr_len,
-        "stdout": proc.stdout[:max_output_bytes].decode("utf-8", errors="replace"),
-        "stderr": proc.stderr[:max_output_bytes].decode("utf-8", errors="replace"),
-        "truncated": stdout_len > max_output_bytes or stderr_len > max_output_bytes,
-    }
+    """Refuse legacy host execution until this path uses the native broker."""
+    raise SandboxError("native_sandbox_required")
 
 
 # `fetch_url()` and `default_egress_allowlist()` were removed in BUG-232. They

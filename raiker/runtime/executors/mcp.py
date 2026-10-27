@@ -32,7 +32,6 @@ import contextlib
 import json
 import os
 import re
-import subprocess
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -115,20 +114,6 @@ class _BoundedStdio:
     timed_out: bool = False
 
 
-def _terminate_tree(proc: subprocess.Popen[bytes]) -> None:
-    """Stop the server and anything it started.
-
-    The server runs in its own session on POSIX (``start_new_session``), so the
-    whole group goes; a helper it spawned must not outlive the refusal. Windows
-    has no process group to signal here and kills the server itself.
-    """
-    if os.name == "posix":
-        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-            os.killpg(proc.pid, 9)  # type: ignore[attr-defined]  # POSIX-only branch
-    with contextlib.suppress(OSError):
-        proc.kill()
-
-
 def run_bounded_stdio(
     command: list[str],
     payload: bytes,
@@ -139,106 +124,10 @@ def run_bounded_stdio(
     max_stdout: int = MCP_MAX_OUTPUT_BYTES,
     stderr_tail: int = MCP_STDERR_TAIL_BYTES,
 ) -> _BoundedStdio:
-    """Run one stdio session whose output is bounded *while* it is read.
+    """Refuse local MCP execution until stdio is supported by the native broker."""
+    raise SandboxError("native_sandbox_required")
 
-    DEC-25 of the release-readiness review. ``Popen.communicate()`` buffers the
-    whole of both pipes before anything can measure them, so a server that
-    wrote gigabytes was held in memory in full and only then refused as too
-    large. Here both pipes are drained concurrently in bounded chunks: stdout
-    stops being kept — and the process tree is stopped — the moment it passes
-    ``max_stdout``; stderr is drained to the end and only its last
-    ``stderr_tail`` bytes are kept. Draining both is what keeps a server that
-    fills one pipe while Raiker waits on the other from deadlocking.
 
-    Raises ``FileNotFoundError``/``OSError`` from spawning, as ``Popen`` does.
-    """
-    proc = subprocess.Popen(  # noqa: S603 - argv is allowlist-validated, no shell
-        command,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        cwd=cwd,
-        env=env,
-        # Unbuffered: a read returns what the pipe holds now, up to one chunk,
-        # rather than waiting to fill a buffer the bound is meant to cap.
-        bufsize=0,
-        start_new_session=os.name == "posix",
-    )
-    result = _BoundedStdio()
-    stdout_parts: list[bytes] = []
-    stdout_size = 0
-    stderr_buffer = bytearray()
-    lock = threading.Lock()
-
-    def feed() -> None:
-        assert proc.stdin is not None
-        with contextlib.suppress(OSError, ValueError):
-            proc.stdin.write(payload)
-        with contextlib.suppress(OSError, ValueError):
-            proc.stdin.close()
-
-    def read_stdout() -> None:
-        nonlocal stdout_size
-        assert proc.stdout is not None
-        while True:
-            try:
-                chunk = proc.stdout.read(_PIPE_CHUNK)
-            except (OSError, ValueError):
-                return
-            if not chunk:
-                return
-            with lock:
-                if stdout_size + len(chunk) > max_stdout:
-                    result.overflowed = True
-                    _terminate_tree(proc)
-                    return
-                stdout_parts.append(chunk)
-                stdout_size += len(chunk)
-
-    def read_stderr() -> None:
-        assert proc.stderr is not None
-        while True:
-            try:
-                chunk = proc.stderr.read(_PIPE_CHUNK)
-            except (OSError, ValueError):
-                return
-            if not chunk:
-                return
-            stderr_buffer.extend(chunk)
-            if len(stderr_buffer) > stderr_tail:
-                del stderr_buffer[: len(stderr_buffer) - stderr_tail]
-
-    workers = [
-        threading.Thread(target=feed, daemon=True),
-        threading.Thread(target=read_stdout, daemon=True),
-        threading.Thread(target=read_stderr, daemon=True),
-    ]
-    for worker in workers:
-        worker.start()
-    try:
-        proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        result.timed_out = True
-        _terminate_tree(proc)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=5)
-    for worker in workers:
-        # The readers end when the pipes close, which the exit (or the kill)
-        # guarantees; the bound only matters for a grandchild still holding a
-        # pipe open, and then the session is reported on what was read.
-        worker.join(timeout=5)
-    if result.overflowed:
-        _terminate_tree(proc)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=5)
-    for pipe in (proc.stdout, proc.stderr):
-        with contextlib.suppress(OSError, ValueError):
-            if pipe is not None:
-                pipe.close()
-    with lock:
-        result.stdout = b"".join(stdout_parts)
-    result.stderr_tail = bytes(stderr_buffer)
-    return result
 # ── Model Context Protocol revision (BUG-234) ────────────────────────────────
 #
 # Raiker negotiated `2024-11-05` for five revisions, which is not merely dated:

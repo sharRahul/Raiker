@@ -266,7 +266,7 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", raising=False)
         assert plugin_code_runtime("demo")["where"] == "not_enabled"
 
-    def test_with_no_container_it_says_host_network(
+    def test_with_no_container_it_reports_execution_blocked(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from raiker.runtime.executors.tier4_plugins import plugin_code_runtime
@@ -274,8 +274,8 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "demo")
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_IMAGE", raising=False)
         answer = plugin_code_runtime("demo")
-        assert answer["where"] == "host_network"
-        assert "network" in answer["summary"]
+        assert answer["where"] == "not_enabled"
+        assert "native sandbox" in answer["summary"]
 
     def test_with_a_container_ready_it_runs_there_instead(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -286,7 +286,7 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_IMAGE", "python:3.11-slim")
         monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.11-slim")
         monkeypatch.setattr(tier4_plugins.shutil, "which", lambda name: f"/usr/bin/{name}")
-        assert tier4_plugins.plugin_code_runtime("demo")["where"] == "isolated"
+        assert tier4_plugins.plugin_code_runtime("demo")["where"] == "not_enabled"
 
         seen: list[str] = []
 

@@ -13,8 +13,8 @@ Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 | --- | --- | --- |
 | `raiker/execution/commands/service.py`, `code_placement.py` | The service routes local-profile commands to the native backend and refuses other non-native profiles. The native backend refuses unavailable boundaries and unsupported background/interactive modes. The earlier router placement logic still describes host execution and needs consolidation. | Verify the native boundary itself, remove contradictory routing and profiles, and test stale approvals and all entry points. `tests/test_native_command_required.py` covers service placement and unavailable-probe refusal, not OS enforcement. |
 | `raiker/execution/commands/backends/container.py`, `profiles.py` | Persistent container backend and Docker/Podman profile detection are active. | Replace responsibilities before removal; retain old configuration as inert migration data. Verify upgrades and no reachable runtime invocation. |
-| `raiker/runtime/executors/containers.py`, `tier4_plugins.py` | Docker execution, image pulls and plugin execution paths exist; plugin code can also use a bounded host subprocess. | Migrate or refuse all plugin/container execution through the broker; verify actual boundary and failure behavior. |
-| `raiker/runtime/executors/mcp.py`, `sandbox.py`, `raiker/hooks/handlers/command.py` | Separate subprocess launch sites exist. Their trust classification and full callers remain to be audited. | Trace all callers, distinguish trusted infrastructure from agent-controlled execution, and enforce the broker where required. Test malicious child processes. |
+| `raiker/runtime/executors/containers.py`, `tier4_plugins.py` | Docker and plugin execution paths remain in source, but their default shared process launcher now refuses execution pending native broker integration. | Migrate or refuse all plugin/container execution through the broker; verify actual boundary and failure behavior. |
+| `raiker/runtime/executors/mcp.py`, `sandbox.py`, `raiker/hooks/handlers/command.py` | Local MCP stdio and the shared legacy `run_command` launcher now refuse execution. Other subprocess sites and their callers remain to be audited. | Trace all callers, distinguish trusted infrastructure from agent-controlled execution, and enforce the broker where required. Test malicious child processes. |
 | `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap and Seatbelt implementations exist; the Seatbelt profile explicitly allows broad file reads. No seccomp implementation was found in the native runner source search. | Narrow reads, add and verify seccomp and enforceable resource controls; test on actual supported Linux and macOS systems. |
 | `native/raiker-command-runner/src/boundary_windows.rs` | Existing Windows boundary requires detailed security and lifecycle review. | Verify AppContainer, ACL cleanup, job limits, process descendants and network denial on supported Windows versions with adversarial control-arm tests. |
 | `raiker/models/conversion.py` | Model conversion contains Docker-related process management. | Determine trusted infrastructure responsibilities and replace the dependency without exposing untrusted code. |
@@ -42,3 +42,9 @@ exhaustive inventory or security assessment.
 No platform-specific security test, installer test, Playwright test or CI run is
 claimed by this initial record. Missing cross-platform evidence is a release
 blocker, not evidence that a boundary works.
+
+The shared legacy subprocess launcher and local MCP stdio launcher are blocked with
+`native_sandbox_required`; affected plugin, container and network capabilities
+are unavailable until migrated. This is not a comprehensive bypass audit or OS
+enforcement evidence. The old CI suite contains host-execution expectations and
+is failing; it must be migrated without replacing enforcement tests with mocks.

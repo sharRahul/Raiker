@@ -130,28 +130,11 @@ def isolated_plugin_runtime_ready() -> bool:
 
 
 def plugin_code_runtime(plugin_id: str) -> dict[str, str]:
-    """Where an installed plugin's own code would run, for its card (BUG-308).
-
-    One of three answers, and never a claim of containment this machine cannot
-    keep: not at all, inside a container with no network, or with this
-    machine's network.
-    """
-    if plugin_id not in plugin_runtime_allowlist():
-        return {
-            "where": "not_enabled",
-            "summary": "Raiker does not run this plugin's own code: it is not on your plugin runtime allowlist.",
-        }
-    if isolated_plugin_runtime_ready():
-        return {
-            "where": "isolated",
-            "summary": "Its code runs in a container with no network, from the image you allowlisted.",
-        }
+    """Report that plugin code execution is blocked pending native isolation."""
+    del plugin_id
     return {
-        "where": "host_network",
-        "summary": (
-            "Its code runs as a bounded process with this machine's network: "
-            "no plugin container is set up here."
-        ),
+        "where": "not_enabled",
+        "summary": "Plugin code execution is unavailable until it uses the native sandbox.",
     }
 
 

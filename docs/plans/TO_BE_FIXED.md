@@ -3,7 +3,9 @@
 The requested Docker-free execution migration has not been implemented or
 verified. The command service now requires its native backend, but
 `raiker/execution/code_placement.py` still describes host placement; container,
-plugin and MCP execution paths remain separate. The macOS native
+plugin and MCP execution paths remain separate. Their legacy default launchers
+now refuse execution until migrated; other subprocess paths are not yet audited.
+The macOS native
 runner permits broad filesystem reads, and Linux seccomp enforcement has not
 been established. Reproduce by inspecting those paths and
 `native/raiker-command-runner/src/boundary_unix.rs`; a dependency probe alone

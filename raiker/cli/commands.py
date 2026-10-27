@@ -1347,7 +1347,7 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
     from raiker.review.lifecycle import ProposalLifecycleStore
     from raiker.review.models import SEVERITY_RANK
     from raiker.review.render import rebuild_review_result_with_findings, render_json, render_text
-    from raiker.review.workflow import CodeReviewWorkflow, ReviewPathError
+    from raiker.review.workflow import CodeReviewWorkflow, ReviewError, ReviewPathError
 
     parsed = _parse_review_command(command)
     if isinstance(parsed, str):
@@ -1368,6 +1368,10 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
         )
     except ReviewPathError:
         return "Review failed: path is outside the workspace."
+    except ReviewError as exc:
+        if str(exc) == "git_diff_native_sandbox_required":
+            return "Review unavailable: unstaged diffs require the native sandbox."
+        return "Review unavailable: the Git diff could not be collected."
     except (OSError, ValueError) as exc:
         return f"Review failed: {type(exc).__name__}"
 

@@ -80,3 +80,10 @@ The sanitized command environment now prevents a workspace `.gitconfig` from
 being used as Git global configuration, even if an extra environment requests
 it. `tests/test_sandbox_git_config.py` exercises real Git; repository-local Git
 configuration and other Git launch paths still require a separate audit.
+
+A positive-control test showed a repository clean filter can execute during a
+working-tree Git diff despite `--no-ext-diff` and `--no-textconv`. Until the
+broker can isolate that operation, `run_git` refuses working-tree diff while
+retaining staged diff. Code review propagates the refusal instead of reporting
+a clean result. Restore unstaged diff only with a verified native boundary;
+other Git operations and filter-triggering cases remain under review.

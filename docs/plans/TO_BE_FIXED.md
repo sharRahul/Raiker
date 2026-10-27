@@ -25,6 +25,15 @@ command-hook functionality unavailable. Integrate the native broker with
 bounded bidirectional stdio and process-tree cleanup, then verify legitimate
 hook decisions and adversarial escape attempts on each supported platform.
 
+## Release blocker: sandboxed working-tree diff unavailable
+
+Repository-configured clean filters can launch code during a working-tree diff.
+`run_git` refuses this form until it can be executed inside a verified native
+boundary; staged diff remains available. Code review reports the refusal rather
+than claiming a clean result. Restore working-tree diff with positive-control
+filter tests and cross-platform enforcement evidence. Other Git paths remain
+unverified.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

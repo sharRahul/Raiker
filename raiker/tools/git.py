@@ -157,11 +157,14 @@ def run_git(
     arguments = list(args or [])
     if subcommand == "diff":
         before_paths = True
+        staged = False
         for argument in arguments:
             if before_paths and argument == "--":
                 before_paths = False
             elif before_paths and argument not in _SAFE_DIFF_OPTIONS:
                 return {"status": "denied", "error": {"type": "git_diff_argument_denied"}}
+            elif before_paths and argument in {"--cached", "--staged"}:
+                staged = True
             elif not before_paths:
                 try:
                     if argument.startswith(":"):
@@ -169,6 +172,11 @@ def run_git(
                     resolve_workspace_path(root, argument)
                 except (ValueError, OSError):
                     return {"status": "denied", "error": {"type": "git_diff_path_denied"}}
+        # Comparing the working tree can invoke repository-configured clean
+        # filters even with external diff and textconv disabled. Keep only the
+        # index-to-HEAD form until this operation can run inside the broker.
+        if not staged:
+            return {"status": "denied", "error": {"type": "git_diff_native_sandbox_required"}}
         arguments = ["--no-ext-diff", "--no-textconv", *arguments]
     command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *arguments]
     proc = subprocess.run(

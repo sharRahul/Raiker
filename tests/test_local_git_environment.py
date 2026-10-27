@@ -84,7 +84,8 @@ def test_agent_git_diff_does_not_run_external_diff_driver(
         "GIT_EXTERNAL_DIFF", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
     )
     (repo / "a.txt").write_text("modified\n", encoding="utf-8")
-    result = run_git(repo, "diff")
+    _git(repo, "add", "a.txt")
+    result = run_git(repo, "diff", ["--cached"])
     assert result["status"] == "success"
     assert not marker.exists()
 
@@ -101,3 +102,49 @@ def test_git_diff_refuses_pathspec_escape(repo: Path, path: str) -> None:
     result = run_git(repo, "diff", ["--", path])
     assert result["status"] == "denied"
     assert result["error"]["type"] == "git_diff_path_denied"
+
+
+def test_git_diff_does_not_run_workspace_filter(repo: Path) -> None:
+    marker = repo.parent / "filter-ran"
+    driver = repo.parent / "filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = run_git(repo, "diff")
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "git_diff_native_sandbox_required"
+    assert not marker.exists()
+    staged = run_git(repo, "diff", ["--cached"])
+    assert staged["status"] == "success"
+    assert not marker.exists()
+
+
+def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
+    marker = repo.parent / "status-filter-ran"
+    driver = repo.parent / "status-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.clean", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    (repo / "a.txt").write_text("staged change\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the filter"
+    marker.unlink()
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = run_git(repo, "status", ["--short"])
+    assert result["status"] == "success"
+    assert not marker.exists()

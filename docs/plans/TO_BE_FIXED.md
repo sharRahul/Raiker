@@ -45,6 +45,15 @@ and are compatible with it:
 
 # To be fixed
 
+## Windows high-DPI window restoration
+
+On a Windows display at 150% scaling, the Electron shell geometry test observed
+a requested 900×640 window saved as 901×641 and restored as 904×643. The shell
+test fixture uses a fixed scale of 1 to make its exact-size CI assertions
+deterministic, but this does not verify high-DPI restoration. Investigate the
+Electron/Windows bounds conversion and add a separate high-DPI regression test
+before claiming exact window-size restoration at non-default scale factors.
+
 ## Local voice delivery — release blockers
 
 The local-only privacy changes do not complete the requested voice experience.

@@ -60,7 +60,9 @@ async function launch(args: string[], userData = mkdtempSync(join(tmpdir(), "rai
   const app = await electron.launch({
     // The Chromium sandbox needs a setuid helper that node_modules cannot
     // provide on a CI runner; the window's own `sandbox: true` is asserted below.
-    args: ["--no-sandbox", SHELL_DIR, ...args],
+    // Fixed scale makes the exact geometry assertions match CI independently
+    // of the developer's display scaling; high-DPI behavior needs separate coverage.
+    args: ["--no-sandbox", "--force-device-scale-factor=1", SHELL_DIR, ...args],
     env: { ...process.env, RAIKER_DESKTOP_USER_DATA: userData },
   });
   const page = await app.firstWindow();

@@ -19,6 +19,7 @@ refusal. Silently running the command on the host instead would be worse than
 not offering the sandbox at all, because the receipt would still say it ran in
 one.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -193,10 +194,17 @@ class NativeSandboxDriver:
             str(key): str(value) for key, value in dict(report.get("observations", {})).items()
         }
         available = bool(report.get("available"))
-        # The headline row is egress. A host whose firewall service is stopped
-        # measures `unenforced`; a host with no route measures `indeterminate`.
-        # Neither is a sandbox, so neither is offered as one.
-        if observations.get("egress") != ENFORCED:
+        # A headline success cannot substitute for any mandatory observation.
+        # An indeterminate control arm is not evidence of enforcement.
+        required = (
+            "relay",
+            "workspace_write",
+            "escape_write",
+            "masked_read",
+            "egress",
+            "descendant_reaped",
+        )
+        if any(observations.get(name) != ENFORCED for name in required):
             available = False
         return NativeSandboxProof(
             available=available,
@@ -245,9 +253,7 @@ class NativeSandboxDriver:
         return f"raiker.cmd.{digest}"
 
     def policy_path(self, request: CommandRequest) -> Path:
-        directory = internal_io_path(
-            request.workspace_root / ".raiker" / "command-policies"
-        )
+        directory = internal_io_path(request.workspace_root / ".raiker" / "command-policies")
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{request.run_id}.json"
 

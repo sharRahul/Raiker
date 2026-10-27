@@ -47,7 +47,8 @@ use std::path::{Path, PathBuf};
 use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_ALREADY_EXISTS, GENERIC_ALL, HANDLE, HLOCAL, LocalFree,
+    CloseHandle, ERROR_ALREADY_EXISTS, GENERIC_ALL, HANDLE, HLOCAL, LocalFree, WAIT_OBJECT_0,
+    WAIT_TIMEOUT,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, DENY_ACCESS,
@@ -79,7 +80,7 @@ use windows_sys::Win32::System::Threading::{
     CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
     GetCurrentProcess, GetExitCodeProcess, INFINITE, InitializeProcThreadAttributeList,
     OpenProcessToken, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW,
-    UpdateProcThreadAttribute, WaitForSingleObject,
+    TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
 
 const PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES: usize = 0x0002_0009;
@@ -153,10 +154,6 @@ pub fn probe(workspace: &Path) -> Value {
         allowed(&outside, "masked_read"),
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
-    let descendant = inside
-        .get("descendant_reaped")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
 
     json!({
         "platform": "windows",
@@ -164,7 +161,7 @@ pub fn probe(workspace: &Path) -> Value {
         "available": relay && inside_write && escape == "enforced",
         "reason": Value::Null,
         "network": network,
-        "process_tree_stop": descendant,
+        "process_tree_stop": false,
         "pty": false,
         "concurrent_runs": false,
         "observations": {
@@ -173,7 +170,7 @@ pub fn probe(workspace: &Path) -> Value {
             "escape_write": escape,
             "masked_read": masked,
             "egress": network,
-            "descendant_reaped": if descendant { "enforced" } else { "unenforced" },
+            "descendant_reaped": "indeterminate",
         },
         "connect_destination": test.connect_address,
     })
@@ -214,21 +211,21 @@ fn run_in_container(
     let stdout = Pipe::create(&descriptor, PipeEnd::Read)?;
     let stderr = Pipe::create(&descriptor, PipeEnd::Read)?;
 
-    let information = start_process(
+    let job = create_job(policy)?;
+    let information = match start_process(
         policy,
         argv,
         capability,
         container,
         [stdin.child, stdout.child, stderr.child],
-    )?;
-    let job = create_job(policy)?;
-    if unsafe { AssignProcessToJobObject(job, information.hProcess) } == 0 {
-        unsafe { CloseHandle(information.hProcess) };
-        unsafe { CloseHandle(job) };
-        return Err("native_sandbox_job_object_failed".into());
-    }
-    unsafe { ResumeThread(information.hThread) };
-    unsafe { CloseHandle(information.hThread) };
+    ) {
+        Ok(information) => information,
+        Err(reason) => {
+            unsafe { CloseHandle(job) };
+            return Err(reason);
+        }
+    };
+    assign_and_resume(job, &information)?;
 
     // The parent must let go of the child's ends or the reader threads never
     // see end-of-file and the command appears to hang after it has exited.
@@ -247,22 +244,31 @@ fn run_in_container(
         let _ = std::io::copy(&mut std::io::stdin(), &mut sink);
     });
 
-    // The boundary's own deadline. Raiker keeps an outer timer, but a wedged
-    // relay must not be able to leave a command running past its bound.
-    let deadline_job = job as usize;
-    let deadline = policy.deadline_seconds;
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(deadline));
-        unsafe { CloseHandle(deadline_job as HANDLE) };
-    });
-
-    unsafe { WaitForSingleObject(information.hProcess, INFINITE) };
+    // Closing the job kills descendants both on normal completion and timeout.
+    // Do this before joining the output pumps: descendants can hold pipes open.
+    let timeout_ms = (policy.deadline_seconds * 1000) as u32;
+    let wait = wait_and_close_job(job, information.hProcess, timeout_ms);
     let _ = out.join();
     let _ = err.join();
     let mut code: u32 = 0;
-    unsafe { GetExitCodeProcess(information.hProcess, &mut code) };
+    let got_exit = unsafe { GetExitCodeProcess(information.hProcess, &mut code) };
     unsafe { CloseHandle(information.hProcess) };
+    if wait == WAIT_TIMEOUT {
+        return Err("native_sandbox_deadline_exceeded".into());
+    }
+    if wait != WAIT_OBJECT_0 || got_exit == 0 {
+        return Err("native_sandbox_wait_failed".into());
+    }
     Ok(code as i32)
+}
+
+fn wait_and_close_job(job: HANDLE, process: HANDLE, timeout_ms: u32) -> u32 {
+    let wait = unsafe { WaitForSingleObject(process, timeout_ms) };
+    unsafe { CloseHandle(job) };
+    if wait != WAIT_OBJECT_0 {
+        unsafe { WaitForSingleObject(process, INFINITE) };
+    }
+    wait
 }
 
 fn start_process(
@@ -397,6 +403,27 @@ fn wide_environment(container: &AppContainer) -> Vec<u16> {
     }
     block.push(0);
     block
+}
+
+// The process is created suspended. Never resume it without job containment,
+// and terminate it on every failure so a suspended process cannot leak.
+fn assign_and_resume(job: HANDLE, information: &PROCESS_INFORMATION) -> Result<(), String> {
+    if unsafe { AssignProcessToJobObject(job, information.hProcess) } == 0 {
+        unsafe { TerminateProcess(information.hProcess, 1) };
+        unsafe { CloseHandle(information.hThread) };
+        unsafe { CloseHandle(information.hProcess) };
+        unsafe { CloseHandle(job) };
+        return Err("native_sandbox_job_object_failed".into());
+    }
+    if unsafe { ResumeThread(information.hThread) } == u32::MAX {
+        unsafe { TerminateProcess(information.hProcess, 1) };
+        unsafe { CloseHandle(information.hThread) };
+        unsafe { CloseHandle(information.hProcess) };
+        unsafe { CloseHandle(job) };
+        return Err("native_sandbox_resume_failed".into());
+    }
+    unsafe { CloseHandle(information.hThread) };
+    Ok(())
 }
 
 fn create_job(policy: &LaunchPolicy) -> Result<HANDLE, String> {
@@ -789,14 +816,12 @@ fn run_inside(workspace: &Path, test: &SelfTest) -> Result<Value, String> {
         test.to_value().to_string(),
     ];
     let captured = capture_in_container(&policy, &argv, &capability, &container);
-    // Observation 5: the grandchild detached itself, so only the Job Object can
-    // have taken it. `capture_in_container` closes the job before returning.
+    // Removing a marker does not prove the descendant started or terminated.
+    // Keep this observation indeterminate until the process itself is tracked.
     let marker = test.inside_path.with_extension("grandchild");
-    let reaped = !marker.exists() || std::fs::remove_file(&marker).is_ok();
+    let _ = std::fs::remove_file(&marker);
     container.delete();
-    let mut value = captured?;
-    value["descendant_reaped"] = Value::Bool(reaped);
-    Ok(value)
+    captured
 }
 
 fn capture_in_container(
@@ -810,17 +835,21 @@ fn capture_in_container(
     let stdin = Pipe::create(&descriptor, PipeEnd::Write)?;
     let stdout = Pipe::create(&descriptor, PipeEnd::Read)?;
     let stderr = Pipe::create(&descriptor, PipeEnd::Read)?;
-    let information = start_process(
+    let job = create_job(policy)?;
+    let information = match start_process(
         policy,
         argv,
         capability,
         container,
         [stdin.child, stdout.child, stderr.child],
-    )?;
-    let job = create_job(policy)?;
-    unsafe { AssignProcessToJobObject(job, information.hProcess) };
-    unsafe { ResumeThread(information.hThread) };
-    unsafe { CloseHandle(information.hThread) };
+    ) {
+        Ok(information) => information,
+        Err(reason) => {
+            unsafe { CloseHandle(job) };
+            return Err(reason);
+        }
+    };
+    assign_and_resume(job, &information)?;
     stdin.close_child();
     stdout.close_child();
     stderr.close_child();
@@ -1119,6 +1148,90 @@ fn quote(argument: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_job_assignment_never_resumes_the_child() {
+        let marker = std::env::temp_dir().join(format!("{}.txt", selftest::probe_nonce()));
+        let mut command = wide(&format!("cmd.exe /c echo ran > \"{}\"", marker.display()));
+        let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+        startup.StartupInfo.cb =
+            size_of::<windows_sys::Win32::System::Threading::STARTUPINFOW>() as u32;
+        let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+        let created = unsafe {
+            CreateProcessW(
+                null(),
+                command.as_mut_ptr(),
+                null(),
+                null(),
+                0,
+                CREATE_SUSPENDED,
+                null(),
+                null(),
+                &startup.StartupInfo,
+                &mut information,
+            )
+        };
+        assert_ne!(created, 0, "could not create suspended control process");
+        assert_eq!(
+            assign_and_resume(null_mut(), &information).unwrap_err(),
+            "native_sandbox_job_object_failed"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        assert!(!marker.exists(), "child ran after job assignment failed");
+    }
+
+    #[test]
+    fn deadline_closes_the_job_and_terminates_the_running_process() {
+        let mut command = wide("cmd.exe /c for /l %i in (1,1,1000000000) do @rem");
+        let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+        startup.StartupInfo.cb =
+            size_of::<windows_sys::Win32::System::Threading::STARTUPINFOW>() as u32;
+        let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+        assert_ne!(
+            unsafe {
+                CreateProcessW(
+                    null(),
+                    command.as_mut_ptr(),
+                    null(),
+                    null(),
+                    0,
+                    CREATE_SUSPENDED,
+                    null(),
+                    null(),
+                    &startup.StartupInfo,
+                    &mut information,
+                )
+            },
+            0
+        );
+        let policy = LaunchPolicy {
+            workspace_root: PathBuf::from("C:\\"),
+            cwd: PathBuf::from("C:\\"),
+            deny_paths: vec![],
+            readonly_paths: vec![],
+            network: NetworkPolicy::Denied,
+            pty: false,
+            max_processes: 32,
+            max_memory_bytes: 1024 * 1024 * 1024,
+            deadline_seconds: 1,
+            profile_name: "test".to_owned(),
+        };
+        let job = create_job(&policy).unwrap();
+        assign_and_resume(job, &information).unwrap();
+        assert_eq!(
+            unsafe { WaitForSingleObject(information.hProcess, 50) },
+            WAIT_TIMEOUT
+        );
+        assert_eq!(
+            wait_and_close_job(job, information.hProcess, 50),
+            WAIT_TIMEOUT
+        );
+        assert_eq!(
+            unsafe { WaitForSingleObject(information.hProcess, 0) },
+            WAIT_OBJECT_0
+        );
+        unsafe { CloseHandle(information.hProcess) };
+    }
 
     #[test]
     fn a_plain_argument_is_not_quoted() {

@@ -1,5 +1,13 @@
 ## Release blocker: native sandbox migration incomplete
 
+Native command execution is currently unavailable on every platform: the
+broker requires a positive descendant-termination observation, and the native
+probe now reports that observation as indeterminate. Its former marker-file
+check did not establish that a descendant had started or terminated. Implement
+real process identity and lifecycle tracking with positive controls on each OS,
+then restore execution only after all mandatory observations pass. Resource
+limit setup is checked on Unix but has not been validated as real enforcement.
+
 The requested Docker-free execution migration has not been implemented or
 verified. The command service now requires its native backend, but
 `raiker/execution/code_placement.py` now separates host-risk classification from

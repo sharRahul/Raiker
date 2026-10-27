@@ -119,11 +119,11 @@ pub fn probe(workspace: &Path) -> Value {
         return unavailable("native_sandbox_probe_no_output");
     };
 
-    // The namespace is torn down when bwrap exits, so a descendant that
-    // survived would have had to escape it. On macOS a `setsid()` grandchild
-    // does exactly that, which is what this observation is here to expose.
+    // A marker file does not prove that the descendant started or terminated.
+    // Cleanup is best effort; the verdict remains indeterminate until the
+    // probe observes the actual descendant process through its lifecycle.
     let marker = test.inside_path.with_extension("grandchild");
-    let descendant = !marker.exists() || std::fs::remove_file(&marker).is_ok();
+    let _ = std::fs::remove_file(&marker);
     let relay = inside.get("nonce").and_then(Value::as_str) == Some(test.nonce.as_str());
     let inside_write = allowed(&inside, "inside_write");
     let escape = folded_escape(&inside, &outside);
@@ -132,7 +132,6 @@ pub fn probe(workspace: &Path) -> Value {
         allowed(&outside, "masked_read"),
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
-    let descendant_enforced = descendant && !cfg!(target_os = "macos");
 
     json!({
         "platform": platform(),
@@ -140,7 +139,7 @@ pub fn probe(workspace: &Path) -> Value {
         "available": relay && inside_write && escape == "enforced",
         "reason": Value::Null,
         "network": network,
-        "process_tree_stop": descendant_enforced,
+        "process_tree_stop": false,
         "pty": false,
         "concurrent_runs": false,
         "observations": {
@@ -149,7 +148,7 @@ pub fn probe(workspace: &Path) -> Value {
             "escape_write": escape,
             "masked_read": masked_read,
             "egress": network,
-            "descendant_reaped": if descendant_enforced { "enforced" } else { "unenforced" },
+            "descendant_reaped": "indeterminate",
         },
         "connect_destination": test.connect_address,
     })
@@ -202,20 +201,32 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
     use std::os::unix::process::CommandExt;
     let processes = policy.max_processes as libc::rlim_t;
     let memory = policy.max_memory_bytes as libc::rlim_t;
+    #[cfg(target_os = "linux")]
+    let expected_parent = std::process::id() as libc::pid_t;
     unsafe {
         command.pre_exec(move || {
             let procs = libc::rlimit {
                 rlim_cur: processes,
                 rlim_max: processes,
             };
-            libc::setrlimit(libc::RLIMIT_NPROC, &procs);
+            if libc::setrlimit(libc::RLIMIT_NPROC, &procs) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
             let address_space = libc::rlimit {
                 rlim_cur: memory,
                 rlim_max: memory,
             };
-            libc::setrlimit(libc::RLIMIT_AS, &address_space);
+            if libc::setrlimit(libc::RLIMIT_AS, &address_space) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
             #[cfg(target_os = "linux")]
-            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            #[cfg(target_os = "linux")]
+            if libc::getppid() != expected_parent {
+                return Err(std::io::Error::other("runner_parent_exited"));
+            }
             Ok(())
         });
     }

@@ -112,6 +112,15 @@ the contract; they are not OS enforcement evidence. Symlink and junction races,
 real platform filesystem isolation, seccomp and resource enforcement remain
 release blockers.
 
+The broker requires every mandatory probe observation, including protected-data
+reads and descendant termination, to be enforced. The old descendant marker
+check did not observe process termination; it is now indeterminate. Therefore
+native commands are unavailable until a real lifecycle test can establish that
+property. Windows job assignment is checked before a suspended process resumes;
+the failure path terminates the process, including in the probe. Unix launch
+also fails if resource-limit or Linux parent-death setup fails. These changes do
+not replace real OS enforcement or process-cleanup tests.
+
 Native probe scratch directories and write targets now use per-run names. Probe
 writes use exclusive creation, cleanup checks the probe nonce before removing
 write targets, and scratch cleanup removes only an empty directory rather than

@@ -16,6 +16,15 @@ Complete the inventory, broker migration and adversarial OS-enforcement tests
 before treating this architecture as release-ready. Initial findings and the
 remaining checklist are in `docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
 
+## Release blocker: sandboxed command hooks unavailable
+
+Workspace command hooks cannot safely use the legacy host subprocess launcher.
+They now refuse with `native_sandbox_required`; an enforcing hook that cannot
+run requires an owner decision. This prevents unsandboxed hook code but leaves
+command-hook functionality unavailable. Integrate the native broker with
+bounded bidirectional stdio and process-tree cleanup, then verify legitimate
+hook decisions and adversarial escape attempts on each supported platform.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

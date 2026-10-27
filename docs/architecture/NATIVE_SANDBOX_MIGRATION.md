@@ -68,3 +68,10 @@ and rejects pathspec escapes. A real unsandboxed control showed the previous
 implementation could launch an external driver. Other Git subprocess paths and
 workspace command hooks still require a complete execution-boundary audit; this
 change does not classify them as safe.
+
+Workspace command hooks are blocked with `native_sandbox_required` until the
+broker supports sandboxed stdio. An enforcing hook that cannot run continues to
+require an owner decision, as verified by `tests/test_hook_fail_closed.py`.
+Restoring hook execution requires bounded stdio and lifecycle containment; this
+is a release blocker and the previous host-execution integration tests remain
+unmet. HTTP and built-in hooks retain their separate behavior.

@@ -80,6 +80,15 @@ def test_speech_language_is_owner_scoped_and_constrained(client: TestClient) -> 
     assert wrong_type.status_code == 422
 
 
+def test_chinese_speech_language_can_be_saved(client: TestClient) -> None:
+    token = _token(client, "alice")
+    response = client.put(
+        "/api/settings", json={"settings": {"general.speech_language": "zh"}}, headers=_h(token)
+    )
+    assert response.status_code == 200
+    assert client.get("/api/settings", headers=_h(token)).json()["settings"]["general.speech_language"] == "zh"
+
+
 def test_composer_approval_mode_defaults_to_manual(client: TestClient) -> None:
     token = _token(client, "alice")
 

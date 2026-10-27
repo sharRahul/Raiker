@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
-import { createAudioSessionCoordinator, type RecognitionHandlers, type VoiceRecognitionAdapter } from "../voice";
+import { createAudioSessionCoordinator, isLocalVoicePage, type RecognitionHandlers, type VoiceRecognitionAdapter } from "../voice";
 import VoiceDictationControl from "./VoiceDictationControl.svelte";
 
 function recognitionAdapterFake() {
@@ -21,6 +21,25 @@ function recognitionAdapterFake() {
   return adapter;
 }
 
+it("does not start browser recognition when the local runtime is unavailable", async () => {
+  const start = vi.fn();
+  vi.stubGlobal("SpeechRecognition", class { start = start; });
+  try {
+    render(VoiceDictationControl, { draft: "draft", runtime: "unavailable", onchange: vi.fn() });
+    expect(screen.getByRole("button", { name: "Dictate" })).toBeDisabled();
+    expect(screen.getByText(/Models → Local/)).toBeInTheDocument();
+    expect(start).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("does not record from a remotely served Raiker page", () => {
+  // The locality decision is tested independently of microphone permission.
+  expect(isLocalVoicePage("https://raiker.example.com")).toBe(false);
+  expect(isLocalVoicePage("http://127.0.0.1:8765")).toBe(true);
+});
+
 it("keeps recognized words editable and never sends", async () => {
   const adapter = recognitionAdapterFake();
   const onchange = vi.fn();
@@ -35,6 +54,7 @@ it("keeps recognized words editable and never sends", async () => {
     onfinalized,
   });
   await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  expect(adapter.start).toHaveBeenCalledWith("auto", expect.anything());
   adapter.final("the plan");
   expect(onchange).toHaveBeenLastCalledWith("Review the plan today", 15);
   expect(onfinalized).toHaveBeenCalledOnce();
@@ -59,12 +79,74 @@ it("cancel restores the complete draft and selection snapshot", async () => {
   expect(onchange).toHaveBeenLastCalledWith("keep this", 4);
 });
 
+it("inserts a completed transcript into the latest draft after typing", async () => {
+  const adapter = recognitionAdapterFake();
+  adapter.stop = vi.fn();
+  const onchange = vi.fn();
+  const view = render(VoiceDictationControl, {
+    draft: "hello", selectionStart: 5, selectionEnd: 5, runtime: "local", adapter, onchange,
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Done dictating" }));
+  await view.rerender({ draft: "hello new", selectionStart: 9, selectionEnd: 9 });
+  adapter.final("words");
+  expect(onchange).toHaveBeenLastCalledWith("hello new words", 15);
+});
+
+it("does not restore an old snapshot over edits made before cancellation", async () => {
+  const adapter = recognitionAdapterFake();
+  const onchange = vi.fn();
+  const view = render(VoiceDictationControl, { draft: "hello", adapter, onchange });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  await view.rerender({ draft: "hello edited", selectionStart: 12, selectionEnd: 12 });
+  await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
+  expect(onchange).not.toHaveBeenCalled();
+});
+
+it("uses a selection changed while transcription is pending", async () => {
+  const adapter = recognitionAdapterFake();
+  adapter.stop = vi.fn();
+  const onchange = vi.fn();
+  const view = render(VoiceDictationControl, {
+    draft: "one two", selectionStart: 7, selectionEnd: 7, runtime: "local", adapter, onchange,
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Done dictating" }));
+  await view.rerender({ selectionStart: 0, selectionEnd: 3 });
+  adapter.final("new");
+  expect(onchange).toHaveBeenLastCalledWith("new two", 3);
+});
+
+it("ignores a transcription callback received after cancellation", async () => {
+  const adapter = recognitionAdapterFake();
+  const onchange = vi.fn();
+  render(VoiceDictationControl, { draft: "hello", adapter, onchange });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
+  onchange.mockClear();
+  adapter.final("late result");
+  expect(onchange).not.toHaveBeenCalled();
+});
+
+it("ignores duplicate local transcription results", async () => {
+  const adapter = recognitionAdapterFake();
+  adapter.stop = vi.fn();
+  const onchange = vi.fn();
+  render(VoiceDictationControl, { draft: "", runtime: "local", adapter, onchange });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Done dictating" }));
+  adapter.final("words");
+  adapter.final("words");
+  expect(onchange).toHaveBeenCalledOnce();
+  expect(onchange).toHaveBeenLastCalledWith("words", 5);
+});
+
 describe("recognition recovery", () => {
   it.each([
     ["not-allowed", /Allow microphone and speech-recognition access/],
     ["audio-capture", /No usable microphone was found/],
     ["no-speech", /No speech was recognized/],
-    ["network", /browser speech service is unavailable/],
+    ["network", /speech runtime on this machine could not be reached/],
   ])("maps %s to exact recovery guidance", async (code, message) => {
     const adapter = recognitionAdapterFake();
     render(VoiceDictationControl, { draft: "", language: "auto", adapter, onchange: vi.fn() });
@@ -111,7 +193,7 @@ it("keeps finalized text but discards interim text on service failure or ownersh
   expect(await screen.findByRole("button", { name: "Dictate" })).toBeInTheDocument();
 });
 
-it("always exposes browser-processing disclosure and an honest unsupported state", () => {
+it("exposes local-processing disclosure and an honest unsupported state", () => {
   const adapter: VoiceRecognitionAdapter = {
     supported: () => false,
     start: vi.fn(),
@@ -119,7 +201,7 @@ it("always exposes browser-processing disclosure and an honest unsupported state
     abort: vi.fn(),
   };
   render(VoiceDictationControl, { draft: "", language: "auto", adapter, onchange: vi.fn() });
-  const disclosure = screen.getByText(/browser's speech service may process audio externally/);
+  const disclosure = screen.getByText(/transcribed by the speech runtime on this machine/);
   expect(disclosure).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Dictate" })).toBeDisabled();
   expect(screen.getByText(/You can keep typing/)).toBeInTheDocument();
@@ -144,17 +226,17 @@ describe("on-device dictation", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the browser's disclosure when the browser is the one in use", async () => {
+  it("never advertises browser processing when a test adapter is supplied", async () => {
     render(VoiceDictationControl, {
       draft: "",
-      runtime: "browser",
+      runtime: "unavailable",
       adapter: recognitionAdapterFake(),
       onchange: vi.fn(),
     });
     await fireEvent.click(screen.getByLabelText("About dictation privacy"));
     expect(
-      screen.getByText(/browser's speech service may process audio externally/),
-    ).toBeInTheDocument();
+      screen.queryByText(/browser's speech service may process audio externally/),
+    ).not.toBeInTheDocument();
   });
 
   it("says it is transcribing rather than still listening", async () => {

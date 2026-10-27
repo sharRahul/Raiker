@@ -89,6 +89,11 @@ afterEach(() => {
 });
 
 describe("arriving at Design from a project", () => {
+  it("offers local dictation beside the image composer action", async () => {
+    stubFetch(routes());
+    render(DesignView);
+    expect(await screen.findByRole("button", { name: "Dictate" })).toBeInTheDocument();
+  });
   it("shows only that project's images, and says so", async () => {
     arriveAt("#/design?project=proj_1");
     stubFetch(routes());

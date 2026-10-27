@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Iterator
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -87,7 +88,7 @@ def test_reading_the_choice_contacts_nothing(client: TestClient) -> None:
         "endpoint": "",
         "model": "",
         "configured": False,
-        "effective": "browser",
+        "effective": "unavailable",
     }
 
 
@@ -104,7 +105,7 @@ def test_setting_a_runtime_up_is_the_whole_decision(client: TestClient) -> None:
     ).json()
     assert saved["runtime"]["effective"] == "local"
     cleared = client.put("/api/speech/runtime", headers=headers, json={"endpoint": ""}).json()
-    assert cleared["runtime"]["effective"] == "browser"
+    assert cleared["runtime"]["effective"] == "unavailable"
     assert "mode" not in cleared["runtime"]
 
 
@@ -131,10 +132,10 @@ def test_the_address_can_be_set_without_restating_the_model(client: TestClient) 
     assert body["model"] == "base.en"
 
 
-def test_a_malformed_voice_section_leaves_dictation_on_the_browser() -> None:
+def test_a_malformed_voice_section_leaves_dictation_unavailable() -> None:
     sections: tuple[object, ...] = (None, [], "browser", {"transcription_endpoint": 7})
     for section in sections:
-        assert parse_settings(section).effective == "browser"
+        assert parse_settings(section).effective == "unavailable"
     assert parse_settings({"transcription_endpoint": "http://127.0.0.1:8910"}).effective == "local"
 
 
@@ -278,6 +279,28 @@ def test_a_transcript_reaches_the_composer_unredacted(
 def test_speech_routes_need_an_owner(client: TestClient) -> None:
     assert client.get("/api/speech/runtime").status_code == 401
     assert client.post("/api/speech/transcribe", content=b"x").status_code == 401
+
+
+def test_authenticated_nonlocal_speech_actions_are_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    headers = _owner(client)
+    monkeypatch.setattr("raiker.api.routes_speech.is_local_request", lambda _scope: False)
+    assert client.put("/api/speech/runtime", headers=headers, json={"endpoint": ""}).status_code == 403
+    assert client.post("/api/speech/runtime/probe", headers=headers).status_code == 403
+    assert client.post("/api/speech/transcribe", headers=headers, content=b"x").status_code == 403
+
+
+def test_remote_session_cannot_use_speech_on_local_listener(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from raiker.api.auth import AuthMiddleware
+
+    headers = _owner(client)
+    authenticate = AuthMiddleware.authenticate
+
+    def remote_session(self, request, required_scope="control"):  # type: ignore[no-untyped-def]
+        session, principal = authenticate(self, request, required_scope)
+        return replace(session, origin="remote"), principal
+
+    monkeypatch.setattr(AuthMiddleware, "authenticate", remote_session)
+    assert client.post("/api/speech/transcribe", headers=headers, content=b"x").status_code == 403
 
 
 def test_a_settings_save_cannot_revert_the_runtime_address(client: TestClient) -> None:

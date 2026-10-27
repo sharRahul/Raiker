@@ -174,4 +174,4 @@ class SpeechRuntimeView(TypedDict):
     endpoint: str
     model: str
     configured: bool
-    effective: Literal["local", "browser"]
+    effective: Literal["local", "unavailable"]

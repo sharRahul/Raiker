@@ -297,7 +297,7 @@
   // BUG-256 — which speech runtime dictation will use. Read once on mount and
   // defaulted to the browser, so a composer that cannot reach the host still
   // offers dictation rather than nothing.
-  let speechRuntime = $state<"browser" | "local">("browser");
+  let speechRuntime = $state<"unavailable" | "local">("unavailable");
   let voiceControl = $state<VoiceDictationHandle | undefined>();
   let voiceDictated = $state(false);
   let voiceTypedBefore = $state(false);
@@ -2670,7 +2670,6 @@
               draft={draft.text}
               selectionStart={promptSelectionStart}
               selectionEnd={promptSelectionEnd}
-              language={speechLanguage}
               runtime={speechRuntime}
               disabled={streaming}
               onchange={onVoiceDraft}

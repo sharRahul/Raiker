@@ -21,10 +21,10 @@
    */
   import { onMount, tick } from "svelte";
   import Composer from "../components/Composer.svelte";
-  import VoiceDictationControl from "../components/VoiceDictationControl.svelte";
   import DesignStarters, { type Starter } from "../components/DesignStarters.svelte";
   import ComposerActionMenu from "../components/ComposerActionMenu.svelte";
   import ComposerContext from "../components/ComposerContext.svelte";
+  import VoiceDictationControl from "../components/VoiceDictationControl.svelte";
   import Icon from "../components/Icon.svelte";
   import DesignCanvasRegion from "../components/DesignCanvasRegion.svelte";
   import DesignDocuments from "../components/DesignDocuments.svelte";
@@ -92,7 +92,25 @@
   let starterNotice = $state("");
   let starterNeedsImage = $state(false);
   let importing = $state(false);
-  let speechRuntime = $state<"browser" | "local">("browser");
+  let promptSelectionStart = $state(0);
+  let promptSelectionEnd = $state(0);
+  let speechRuntime = $state<"local" | "unavailable">("unavailable");
+  let voiceActive = $state(false);
+
+  function trackPromptSelection() {
+    promptSelectionStart = promptEl?.selectionStart ?? draft.text.length;
+    promptSelectionEnd = promptEl?.selectionEnd ?? promptSelectionStart;
+  }
+
+  function onVoiceDraft(next: string, cursor: number) {
+    draft.text = next;
+    promptSelectionStart = cursor;
+    promptSelectionEnd = cursor;
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(cursor, cursor);
+    });
+  }
 
   async function importImage(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
@@ -739,6 +757,7 @@
   function onKeydown(event: KeyboardEvent) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (voiceActive) return;
       void generate();
     }
   }
@@ -949,7 +968,7 @@
   {/if}
 
   <details class="design-options"><summary>Workspace options</summary>
-    <p>Dictation uses {speechRuntime === "local" ? "the configured local transcription runtime" : "your browser’s speech service, which may process audio externally"}. Raiker does not retain the audio.</p>
+    <p>Dictation requires a local speech engine. Raiker does not retain the audio.</p>
       <!-- COMPOSER-09 — the same two entry points Chat and Build carry, so a
            person moving between the three Work modes finds the composer in the
            same shape each time. -->
@@ -1028,8 +1047,11 @@
       title: "Enter to generate, Shift+Enter for a new line",
       disabled: busy,
       onkeydown: onKeydown,
+      onselect: trackPromptSelection,
+      onkeyup: trackPromptSelection,
+      onclick: trackPromptSelection,
     }}
-    onsubmit={() => void generate()}
+    onsubmit={() => { if (!voiceActive) void generate(); }}
   >
     {#snippet left()}
       <label class="upload-image" title="Import an image to edit">
@@ -1126,11 +1148,20 @@
     {/snippet}
 
     {#snippet right()}
-      <VoiceDictationControl showPrivacy={false} draft={draft.text} runtime={speechRuntime} disabled={busy} onchange={(next) => (draft.text = next)} />
+      <VoiceDictationControl
+        showPrivacy={false}
+        draft={draft.text}
+        selectionStart={promptSelectionStart}
+        selectionEnd={promptSelectionEnd}
+        runtime={speechRuntime}
+        disabled={busy}
+        onchange={onVoiceDraft}
+        onactivechange={(active) => (voiceActive = active)}
+      />
       <button
         type="submit"
         class="btn btn-primary send"
-        disabled={busy || importing || (starterNeedsImage && selectedId === null) || !draft.text.trim() || choice === null || block.kind !== "none"}
+        disabled={busy || voiceActive || importing || (starterNeedsImage && selectedId === null) || !draft.text.trim() || choice === null || block.kind !== "none"}
         aria-label={busy ? "Working" : primaryAction}
       >
         <Icon name={busy ? "clock" : "arrow-up"} size="sm" />

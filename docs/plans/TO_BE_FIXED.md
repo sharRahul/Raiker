@@ -45,6 +45,33 @@ and are compatible with it:
 
 # To be fixed
 
+## Local voice delivery — release blockers
+
+The local-only privacy changes do not complete the requested voice experience.
+Before beta, provide a verified managed speech engine and model installer with
+process lifecycle and recovery; validate Design dictation end to end and make
+the composer controls consistent; validate cancellation, permissions and recording limits
+end to end; and test real recognition plus packaged Windows, macOS and Linux
+releases. Existing local servers are configured manually. A successful mock
+transcription does not demonstrate model accuracy or packaging support.
+The speech routes now also use the existing local-request guard, but their
+full remote and proxy threat boundary still needs end-to-end validation.
+Record installation artifact provenance and checksums before running
+downloaded code. No cross-platform release validation has been performed here.
+
+On Windows, an optional real-engine test passed for the English JFK fixture
+using the CPU-only whisper.cpp b5454 binary and multilingual tiny model after
+checking their published SHA-256 hashes. The 11-second fixture took about 0.44
+seconds through Raiker's transcription function on the test machine. Hindi,
+microphone capture, managed installation and packaged applications remain
+unverified; this single measurement is not a performance guarantee.
+The optional `tests/test_speech_real_engine.py` takes a loopback endpoint in
+`RAIKER_SPEECH_TEST_ENDPOINT` and, per language, a WAV path and expected text in
+`RAIKER_SPEECH_TEST_EN_WAV` / `RAIKER_SPEECH_TEST_EN_TEXT` or the corresponding
+`HI` variables. It skips languages without those inputs. The tested sources
+were the upstream whisper.cpp b5454 Windows x64 archive, the pinned multilingual
+tiny model from ggerganov/whisper.cpp, and the upstream JFK WAV sample.
+
 ## Reading order
 
 1. **Open-defect index** — the table below is the current source of truth for status.

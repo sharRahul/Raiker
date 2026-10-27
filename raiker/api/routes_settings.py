@@ -48,7 +48,7 @@ ANSWER_STYLE_VALUES = frozenset({"auto", "text", "visual"})
 
 router = APIRouter()
 
-SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk"}
+SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk", "zh"}
 
 
 def _load(ws: str | Path, principal_id: str) -> dict[str, Any]:

@@ -130,6 +130,22 @@ it("coordinates browser playback and exposes failure callbacks", async () => {
 // saying so, and the page cannot tell afterwards which kind it got. It can tell
 // beforehand, so it does.
 describe("read aloud stays on this device", () => {
+  it("does not begin speaking after playback has been stopped while voices load", async () => {
+    let listener: (() => void) | undefined;
+    let voices: SpeechVoice[] = [];
+    const synth = {
+      speak: vi.fn(), cancel: vi.fn(), getVoices: () => voices,
+      addEventListener: (_type: string, next: () => void) => { listener = next; },
+      removeEventListener: vi.fn(),
+    };
+    const playback = createVoicePlayback(synth);
+    playback.speak("turn", "Answer", "en", { end: vi.fn(), error: vi.fn() });
+    playback.stop();
+    voices = [localVoice("en")];
+    listener?.();
+    await Promise.resolve();
+    expect(synth.speak).not.toHaveBeenCalled();
+  });
   it("prefers a local voice over a remote one for the same language", () => {
     expect(
       pickOnDeviceVoice([remoteVoice("en-GB"), localVoice("en-GB")], "en-GB")?.name,
@@ -271,6 +287,26 @@ it("leaves an ordinary code block as a code block", () => {
 // ── BUG-256 — dictation that runs on this machine ────────────────────────────
 
 describe("on-device transcription", () => {
+  it("ignores an older transcription after a new recording begins", async () => {
+    let resolveFirst!: (text: string) => void;
+    const transcribe = vi.fn(() => new Promise<string>((resolve) => { resolveFirst = resolve; }));
+    const recording = { stop: async () => new Blob(["audio"]), cancel: vi.fn() };
+    const adapter = createLocalTranscriptionAdapter({
+      supported: () => true, record: async () => recording,
+      toWav: async (clip) => clip, transcribe,
+    });
+    const oldFinal = vi.fn();
+    adapter.start("auto", { interim: vi.fn(), final: oldFinal, end: vi.fn(), error: vi.fn() });
+    await Promise.resolve();
+    adapter.stop();
+    await vi.waitFor(() => expect(transcribe).toHaveBeenCalledOnce());
+    adapter.abort();
+    adapter.start("auto", { interim: vi.fn(), final: vi.fn(), end: vi.fn(), error: vi.fn() });
+    resolveFirst("stale words");
+    await Promise.resolve();
+    expect(oldFinal).not.toHaveBeenCalled();
+    adapter.abort();
+  });
   function ports(overrides: Partial<LocalTranscriptionPorts> = {}) {
     let stopRecording: ((clip: Blob) => void) | null = null;
     const cancel = vi.fn();

@@ -13,24 +13,24 @@ posted to it and never written anywhere. ``whisper.cpp``'s ``whisper-server`` is
 the reference, and anything speaking either its native ``/inference`` route or
 the OpenAI-compatible ``/v1/audio/transcriptions`` route works unchanged.
 
-There is deliberately **no mode to choose**. Setting a runtime up is the whole
-decision: dictation uses it when one is there and the browser when none is. A
-switch would have made the owner answer a question they have already answered by
-installing the thing, and left a second place for the two surfaces to disagree.
+Dictation is unavailable until a local runtime is configured. Browser speech
+recognition is never used as a fallback.
 """
 
 from __future__ import annotations
 
 import io
+import ipaddress
 import struct
 import wave
-from collections.abc import Callable
+from collections.abc import AsyncIterable, Callable
 from dataclasses import dataclass
 from typing import Any, Final, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
-from raiker.models.endpoint_policy import EndpointPolicy, validate_endpoint_policy
+from raiker.models.endpoint_policy import canonical_origin
 from raiker.models.exceptions import ProviderPolicyError
 from raiker.models.wire import SpeechRuntimeView
 
@@ -44,8 +44,6 @@ MAX_AUDIO_BYTES: Final = 12 * 1024 * 1024
 #: either needs no configuration beyond its address.
 TRANSCRIBE_PATHS: Final = ("/v1/audio/transcriptions", "/inference")
 
-_LOCAL_ONLY: Final = EndpointPolicy(local_only=True, requires_network=False)
-
 
 class SpeechRuntimeError(RuntimeError):
     """A bounded reason code, for a surface that has to say what went wrong."""
@@ -53,6 +51,16 @@ class SpeechRuntimeError(RuntimeError):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+async def read_audio(chunks: AsyncIterable[bytes]) -> bytes:
+    """Read at most one bounded recording without buffering an unlimited body."""
+    audio = bytearray()
+    async for chunk in chunks:
+        if len(audio) + len(chunk) > MAX_AUDIO_BYTES:
+            raise SpeechRuntimeError("speech_audio_too_large")
+        audio.extend(chunk)
+    return bytes(audio)
 
 
 @dataclass(frozen=True)
@@ -67,13 +75,13 @@ class SpeechRuntimeSettings:
         return bool(self.endpoint)
 
     @property
-    def effective(self) -> Literal["local", "browser"]:
+    def effective(self) -> Literal["local", "unavailable"]:
         """Which runtime the microphone will use — a fact, not a preference.
 
         Resolved here rather than in the browser so the composer and anything
         that describes it cannot disagree about the answer.
         """
-        return "local" if self.configured else "browser"
+        return "local" if self.configured else "unavailable"
 
     def to_dict(self) -> SpeechRuntimeView:
         return {
@@ -89,7 +97,7 @@ def parse_settings(section: Any) -> SpeechRuntimeSettings:
 
     Settings are an owner-editable JSON blob, so every field here is treated as
     absent unless it is the shape it should be. A malformed section leaves
-    dictation on the browser rather than failing the page that reads it.
+    dictation unavailable rather than failing the page that reads it.
     """
     if not isinstance(section, dict):
         return SpeechRuntimeSettings()
@@ -113,10 +121,21 @@ def normalise_endpoint(endpoint: str) -> str:
     if not trimmed:
         return ""
     try:
-        validate_endpoint_policy(trimmed, _LOCAL_ONLY)
-    except ProviderPolicyError as exc:
+        canonical_origin(trimmed)
+        parsed = urlsplit(trimmed)
+        if parsed.query or parsed.fragment:
+            raise ValueError("query or fragment")
+        host = parsed.hostname or ""
+        if host.lower() == "localhost":
+            host = "127.0.0.1"
+        address = ipaddress.ip_address(host)
+        if not address.is_loopback:
+            raise ValueError("not loopback")
+        host = f"[{address.compressed}]" if address.version == 6 else address.compressed
+        port = f":{parsed.port}" if parsed.port is not None else ""
+        return urlunsplit((parsed.scheme, host + port, parsed.path.rstrip("/"), "", ""))
+    except (ProviderPolicyError, ValueError) as exc:
         raise SpeechRuntimeError("speech_endpoint_not_local") from exc
-    return trimmed
 
 
 def silent_probe_clip(milliseconds: int = 200) -> bytes:
@@ -199,11 +218,15 @@ def transcribe(
     last_refusal: str = "speech_runtime_unreachable"
     with make_client() as client:
         for path in TRANSCRIBE_PATHS:
+            path_data = dict(data)
+            if path == "/inference" and (not language or language == "auto"):
+                path_data["language"] = "auto"
             try:
                 response = client.post(
                     f"{origin}{path}",
                     files={"file": (filename, audio, content_type)},
-                    data=data,
+                    data=path_data,
+                    follow_redirects=False,
                 )
             except httpx.HTTPError as exc:
                 raise SpeechRuntimeError("speech_runtime_unreachable") from exc

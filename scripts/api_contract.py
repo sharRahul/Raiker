@@ -567,6 +567,7 @@ _SPECIAL_MARKERS = (
     "EventSourceResponse",
     "Response(",
     "await request.body()",
+    "request.stream()",
 )
 
 

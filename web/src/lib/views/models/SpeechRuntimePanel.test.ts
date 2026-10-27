@@ -5,7 +5,7 @@ import { api } from "../../api";
 import type { SpeechRuntimeView } from "../../apiTypes";
 
 function runtime(overrides: Partial<SpeechRuntimeView> = {}): SpeechRuntimeView {
-  return { endpoint: "", model: "", configured: false, effective: "browser", ...overrides };
+  return { endpoint: "", model: "", configured: false, effective: "unavailable", ...overrides };
 }
 
 beforeEach(() => vi.restoreAllMocks());

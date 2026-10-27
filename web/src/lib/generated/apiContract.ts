@@ -6112,7 +6112,7 @@ export type SpeechRuntimeView = {
   endpoint: string;
   model: string;
   configured: boolean;
-  effective: "local" | "browser";
+  effective: "local" | "unavailable";
 };
 
 /** DEC-24 step 2 — the owner's 24-hour spending limit in US dollars; null clears it. */

@@ -31588,7 +31588,7 @@
           "effective": {
             "enum": [
               "local",
-              "browser"
+              "unavailable"
             ],
             "title": "Effective",
             "type": "string"

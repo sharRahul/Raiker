@@ -366,9 +366,8 @@ creates a turn. Replies can be read aloud on request. Raiker stores prompt
 provenance, not microphone audio. Voice is turn-based, not continuous or
 full-duplex.
 
-Dictation can run entirely on this machine: set a speech runtime up under
-**Models → Local** and it is used in place of the browser's service, with no
-setting to change. The note under the microphone says which one is in use. Read
+Dictation requires a local speech runtime configured under **Models → Local**;
+it is unavailable when no runtime is configured or the page is remote. Read
 aloud stays on this machine too — it uses only a voice the browser reports as
 on-device, and names the language when there is none rather than speaking with a
 voice that may synthesise elsewhere. See

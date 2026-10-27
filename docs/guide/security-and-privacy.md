@@ -204,13 +204,15 @@ The same page is where you choose whether model reasoning is retained.
 Incognito conversations switch off ambient recall for that conversation.
 Voice dictation stores prompt provenance but not microphone audio.
 
-Dictation is transcribed on this machine when you have set a speech runtime up
-under **Models → Local**, and by your browser's own service — which on some
-browsers processes the audio externally — when you have not. There is no setting
-to change: adding the runtime is the whole decision, the note under the
-microphone says which one is in use, and nothing is contacted until you dictate.
-Raiker refuses a runtime address that is not on this machine, and never writes
-the recording to disk on either path.
+Dictation requires a speech runtime configured under **Models → Local** and a
+Raiker page opened at a loopback address on this device. Without both, dictation
+is unavailable; Raiker does not fall back to browser speech recognition. The
+host accepts only loopback runtime addresses, pins `localhost` to `127.0.0.1`,
+does not follow redirects or inherit proxy settings, and holds recordings in
+memory rather than writing them to disk. Installing a runtime is currently a
+manual step; managed installation is not yet available. Speech API operations
+require an authenticated session and the existing local-request check, which
+rejects forwarded and remote-listener requests.
 
 Read aloud goes the same way, without a runtime to install. Some browsers ship
 remote voices alongside the operating system's own and pick one without saying

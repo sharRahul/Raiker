@@ -12,10 +12,11 @@ export type SpeechLanguage =
   | "ru"
   | "es"
   | "tr"
-  | "uk";
+  | "uk"
+  | "zh";
 
 export const speechLanguages: readonly SpeechLanguage[] = [
-  "auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk",
+  "auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk", "zh",
 ];
 
 export function speechLanguagePreference(value: unknown): SpeechLanguage {
@@ -125,6 +126,17 @@ export function createAudioSessionCoordinator(): AudioSessionCoordinator {
 }
 
 export const audioSessionCoordinator = createAudioSessionCoordinator();
+
+/** The microphone must only send audio to a Raiker host on this device. */
+export function isLocalVoicePage(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (url.protocol === "http:" || url.protocol === "https:") &&
+      (url.hostname === "127.0.0.1" || url.hostname === "[::1]");
+  } catch {
+    return false;
+  }
+}
 
 export function resolveSpeechLanguage(preference: SpeechLanguage, deviceLanguage: string): string {
   if (preference !== "auto") return preference;
@@ -315,13 +327,16 @@ export function voicesWhenReady(
 }
 
 export function createVoicePlayback(synth: SpeechSynth | undefined): VoicePlayback {
+  let generation = 0;
   return {
     supported: () => synth !== undefined,
     speak(_ownerId, text, language, handlers) {
       if (!synth) throw new Error("speech_synthesis_unavailable");
+      const turn = ++generation;
       synth.cancel();
       const tag = resolveSpeechLanguage(language, globalThis.navigator?.language ?? "");
       void voicesWhenReady(synth).then((voices) => {
+        if (turn !== generation) return;
         const voice = pickOnDeviceVoice(voices, tag);
         if (!voice) {
           // Nothing is spoken. The alternative is a voice that may synthesise
@@ -338,6 +353,7 @@ export function createVoicePlayback(synth: SpeechSynth | undefined): VoicePlayba
       });
     },
     stop() {
+      generation += 1;
       synth?.cancel();
     },
   };
@@ -536,7 +552,7 @@ export function createLocalTranscriptionAdapter(
   let recording: LocalRecording | null = null;
   let handlers: RecognitionHandlers | null = null;
   let language: SpeechLanguage = "auto";
-  let cancelled = false;
+  let generation = 0;
 
   const finish = () => {
     recording = null;
@@ -546,19 +562,20 @@ export function createLocalTranscriptionAdapter(
   return {
     supported: () => ports.supported(),
     start(chosenLanguage, chosenHandlers) {
-      cancelled = false;
+      const turn = ++generation;
       language = chosenLanguage;
       handlers = chosenHandlers;
       chosenHandlers.phase?.("listening");
       void (async () => {
         try {
           const opened = await ports.record();
-          if (cancelled) {
+          if (turn !== generation) {
             opened.cancel();
             return;
           }
           recording = opened;
         } catch (error) {
+          if (turn !== generation) return;
           const report = handlers;
           finish();
           report?.error(localErrorCode(error));
@@ -568,12 +585,14 @@ export function createLocalTranscriptionAdapter(
     stop() {
       const active = recording;
       const report = handlers;
+      const turn = generation;
+      const chosenLanguage = language;
       recording = null;
       if (!active) {
         // Stopped before the microphone finished opening. There is nothing to
         // transcribe, and the control has to be told the turn is over or it
         // would sit on "Listening…" for ever.
-        cancelled = true;
+        generation += 1;
         finish();
         report?.end();
         return;
@@ -582,20 +601,21 @@ export function createLocalTranscriptionAdapter(
       void (async () => {
         try {
           const wav = await ports.toWav(await active.stop());
-          const text = await ports.transcribe(wav, language);
-          if (cancelled) return;
+          if (turn !== generation) return;
+          const text = await ports.transcribe(wav, chosenLanguage);
+          if (turn !== generation) return;
           if (text) report?.final(text);
           report?.end();
         } catch (error) {
-          if (cancelled) return;
+          if (turn !== generation) return;
           report?.error(localErrorCode(error));
         } finally {
-          finish();
+          if (turn === generation) finish();
         }
       })();
     },
     abort() {
-      cancelled = true;
+      generation += 1;
       recording?.cancel();
       finish();
     },

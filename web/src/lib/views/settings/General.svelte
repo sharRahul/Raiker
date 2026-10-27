@@ -91,7 +91,6 @@
       setupBusy = false;
     }
   }
-  const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
 
   // The time zone is not a formatting preference here. It is the one
   // owner-level value every model turn reasons from, so the control shows what
@@ -190,25 +189,6 @@
       </button>
     </p>
   {/if}
-  <label>
-    <span>Speech language</span>
-    <small>Dictation and read-aloud, in Chat and Build.</small>
-    <select aria-label="Speech language" value={speechLanguage} onchange={(e) => save({ "general.speech_language": e.currentTarget.value })}>
-      <option value="auto">Auto (device language)</option>
-      <option value="en">English</option>
-      <option value="fr">Français</option>
-      <option value="de">Deutsch</option>
-      <option value="hi">हिन्दी</option>
-      <option value="it">Italiano</option>
-      <option value="ja">日本語</option>
-      <option value="ko">한국어</option>
-      <option value="pt">Português</option>
-      <option value="ru">Русский</option>
-      <option value="es">Español</option>
-      <option value="tr">Türkçe</option>
-      <option value="uk">Українська</option>
-    </select>
-  </label>
   <label>
     <span>Answer in</span>
     <small>Every turn is told this; a message can still ask for another.</small>

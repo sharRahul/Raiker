@@ -39,9 +39,9 @@
   import { api } from "../api";
   import {
     audioSessionCoordinator,
-    browserRecognitionAdapter,
     browserTranscriptionPorts,
     createLocalTranscriptionAdapter,
+    isLocalVoicePage,
     type AudioSessionCoordinator,
     type RecognitionPhase,
     type SpeechLanguage,
@@ -65,9 +65,8 @@
     draft,
     selectionStart = draft.length,
     selectionEnd = selectionStart,
-    language = "auto",
     disabled = false,
-    runtime = "browser",
+    runtime = "unavailable",
     adapter = undefined,
     coordinator = audioSessionCoordinator,
     onchange,
@@ -86,11 +85,9 @@
      * Which speech runtime dictation will use (BUG-256).
      *
      * A fact about this install, not a preference: `local` when the owner has
-     * set a transcription runtime up on this machine, `browser` when they have
-     * not. There is no third state and no switch — the button behaves the same
-     * either way, and only the disclosure below it changes.
+     * set a transcription runtime up on this machine, `unavailable` otherwise.
      */
-    runtime?: "browser" | "local";
+    runtime?: "unavailable" | "local";
     /** Overridden in tests; otherwise chosen from `runtime`. */
     adapter?: VoiceRecognitionAdapter;
     coordinator?: AudioSessionCoordinator;
@@ -106,8 +103,12 @@
   let snapshotDraft = "";
   let snapshotStart = 0;
   let snapshotEnd = 0;
+  let lastRendered = "";
+  let hasRenderedTranscript = false;
   let finalized = "";
   let interim = "";
+  let generation = 0;
+  let localResultReceived = false;
   const ownerId = `voice-dictation-${Math.random().toString(36).slice(2)}`;
   const disclosureId = `${ownerId}-disclosure`;
   const unavailableId = `${ownerId}-unavailable`;
@@ -125,22 +126,21 @@
     ),
   );
 
-  const activeAdapter = $derived(
-    adapter ?? (runtime === "local" ? localAdapter : browserRecognitionAdapter),
-  );
+  const activeAdapter = $derived(adapter ?? localAdapter);
 
-  const supported = $derived(activeAdapter.supported());
+  const localPage = typeof window !== "undefined" && isLocalVoicePage(window.location.origin);
+  const supported = $derived((adapter !== undefined || (runtime === "local" && localPage)) && activeAdapter.supported());
 
   const disclosure = $derived(
-    runtime === "local"
-      ? "Audio is transcribed by the speech runtime on this machine. Raiker does not retain it."
-      : "Raiker does not retain audio. Your browser's speech service may process audio externally.",
+    "Audio is transcribed by the speech runtime on this machine. Raiker does not retain it.",
   );
 
   const unavailableReason = $derived(
-    runtime === "local"
+    runtime === "local" && localPage
       ? "Dictation is unavailable because this browser cannot record audio. You can keep typing."
-      : "Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.",
+      : runtime === "local"
+        ? "Dictation is available only when Raiker is opened on this device. You can keep typing."
+        : "Set up a local speech engine under Models → Local to use dictation. You can keep typing.",
   );
 
   function transcriptText(includeInterim: boolean) {
@@ -151,7 +151,7 @@
     const before = snapshotDraft.slice(0, snapshotStart);
     const after = snapshotDraft.slice(snapshotEnd);
     const transcript = transcriptText(includeInterim).trim();
-    if (!transcript) return { value: before + after, cursor: before.length };
+    if (!transcript) return { value: snapshotDraft, cursor: snapshotStart };
     const leftSpace = before.length > 0 && !/\s$/.test(before) ? " " : "";
     const rightSpace = after.length > 0 && !/^\s/.test(after) ? " " : "";
     const inserted = leftSpace + transcript;
@@ -162,8 +162,22 @@
   }
 
   function updateDraft(includeInterim: boolean) {
+    if (!hasRenderedTranscript || (draft !== snapshotDraft && draft !== lastRendered)) {
+      snapshotDraft = draft;
+      snapshotStart = Math.max(0, Math.min(selectionStart, draft.length));
+      snapshotEnd = Math.max(snapshotStart, Math.min(selectionEnd, draft.length));
+    }
     const next = composed(includeInterim);
+    if (transcriptText(includeInterim).trim()) hasRenderedTranscript = true;
+    lastRendered = next.value;
     onchange(next.value, next.cursor);
+  }
+
+  function restoreSnapshot() {
+    if (draft === snapshotDraft || draft === lastRendered) {
+      onchange(snapshotDraft, snapshotStart);
+      onrestored();
+    }
   }
 
   function setListening(next: boolean) {
@@ -180,8 +194,12 @@
 
   function start() {
     if (disabled || !supported || listening) return;
+    const turn = ++generation;
+    localResultReceived = false;
     errorMessage = "";
     snapshotDraft = draft;
+    lastRendered = draft;
+    hasRenderedTranscript = false;
     snapshotStart = Math.max(0, Math.min(selectionStart, draft.length));
     snapshotEnd = Math.max(snapshotStart, Math.min(selectionEnd, draft.length));
     finalized = "";
@@ -193,20 +211,26 @@
     try {
       coordinator.startRecognition(
         ownerId,
-        () => activeAdapter.start(language, {
+        () => activeAdapter.start("auto", {
           interim(text) {
+            if (turn !== generation) return;
             interim = text.trim();
             updateDraft(true);
           },
           final(text) {
+            if (turn !== generation) return;
+            if (runtime === "local" && localResultReceived) return;
             const segment = text.trim();
             if (!segment) return;
+            if (runtime === "local") localResultReceived = true;
             finalized = [finalized, segment].filter(Boolean).join(" ");
             interim = "";
             updateDraft(false);
             onfinalized();
           },
           end() {
+            if (turn !== generation) return;
+            generation += 1;
             if (listening) preserveFinalized();
             // The on-device turn finishes here rather than in `done`, because
             // the transcript arrives after the recording stops. Releasing is
@@ -215,15 +239,17 @@
             coordinator.release(ownerId);
           },
           phase(next) {
+            if (turn !== generation) return;
             phase = next;
           },
           error(code) {
+            if (turn !== generation) return;
+            generation += 1;
             const restore = code === "not-allowed" || code === "audio-capture" || code === "no-speech";
             errorMessage = errorFor(code);
             coordinator.release(ownerId);
             if (restore) {
-              onchange(snapshotDraft, snapshotStart);
-              onrestored();
+              restoreSnapshot();
             }
             else preserveFinalized();
             setListening(false);
@@ -249,16 +275,14 @@
     if (code === "speech_runtime_refused") return "The speech runtime refused the recording. Check that it serves transcription.";
     if (code === "speech_audio_too_large") return "That recording is too long to transcribe. Dictate in shorter passes.";
     if (code === "network") {
-      return runtime === "local"
-        ? "The speech runtime on this machine could not be reached. Finalized words were kept; you can keep typing."
-        : "The browser speech service is unavailable. Finalized words were kept; you can keep typing.";
+      return "The speech runtime on this machine could not be reached. Finalized words were kept; you can keep typing.";
     }
     return "Dictation stopped unexpectedly. Finalized words were kept; you can keep typing.";
   }
 
   export function done() {
     if (!listening) return false;
-    if (runtime === "local") {
+    if (runtime === "local" || adapter === undefined) {
       // The clip is only complete once recording stops, and the transcript
       // arrives afterwards through `final`. Releasing the coordinator here would
       // abort the recording that is about to be transcribed, so the turn is left
@@ -274,12 +298,12 @@
 
   export function cancel() {
     if (!listening) return false;
+    generation += 1;
     setListening(false);
     coordinator.release(ownerId);
     finalized = "";
     interim = "";
-    onchange(snapshotDraft, snapshotStart);
-    onrestored();
+    restoreSnapshot();
     return true;
   }
 
@@ -309,10 +333,14 @@
   }
 
   onMount(() => {
-    const unsubscribe = coordinator.subscribe(ownerId, () => preserveFinalized());
+    const unsubscribe = coordinator.subscribe(ownerId, () => {
+      generation += 1;
+      preserveFinalized();
+    });
     return () => {
       unsubscribe();
       if (listening) {
+        generation += 1;
         preserveFinalized();
         coordinator.release(ownerId);
       }

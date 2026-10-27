@@ -16,8 +16,10 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.dependencies import workspace_root as _ws
+from raiker.api.proxy_guard import is_local_request
 from raiker.api.refusals import refusal
 from raiker.api.schemas import SpeechRuntimeRequest, serialize_dto
+from raiker.api.sessions import ApiSession
 from raiker.api.wire.models import SpeechProbe, SpeechRuntime
 from raiker.contracts.ids import utc_now
 from raiker.models.speech_runtime import (
@@ -26,6 +28,7 @@ from raiker.models.speech_runtime import (
     SpeechRuntimeSettings,
     normalise_endpoint,
     parse_settings,
+    read_audio,
     silent_probe_clip,
     transcribe,
 )
@@ -53,6 +56,11 @@ def _refuse(reason: str, code: int = status.HTTP_422_UNPROCESSABLE_CONTENT) -> H
     return refusal(code, reason)
 
 
+def _require_local(request: Request, session: ApiSession) -> None:
+    if session.origin != "local" or not is_local_request(request.scope):
+        raise _refuse("speech_local_only", status.HTTP_403_FORBIDDEN)
+
+
 #: Some transcription servers decide how to decode from the filename alone, so
 #: the extension has to match what was actually recorded rather than always
 #: claiming WAV.
@@ -77,6 +85,7 @@ def _clip_name(content_type: str) -> str:
 async def read_speech_runtime(request: Request) -> dict[str, Any]:
     """What the owner chose. Nothing is contacted to answer this."""
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    _require_local(request, _session)
     settings = load_speech_runtime(_ws(request), principal.principal_id)
     answer: SpeechRuntime = {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
     return serialize_dto(answer)
@@ -88,6 +97,7 @@ async def write_speech_runtime(
 ) -> dict[str, Any]:
     """Record the runtime, and refuse an address that is not on this machine."""
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    _require_local(request, _session)
     ws = _ws(request)
     current = load_speech_runtime(ws, principal.principal_id)
 
@@ -121,6 +131,7 @@ async def probe_speech_runtime(
     is the same standard the model rows are tested to.
     """
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    _require_local(request, _session)
     stored = load_speech_runtime(_ws(request), principal.principal_id)
     endpoint_input = body.endpoint if body and body.endpoint is not None else stored.endpoint
     try:
@@ -154,10 +165,14 @@ async def transcribe_clip(request: Request) -> dict[str, Any]:
     what it expects; `httpx` builds that without help.
     """
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    _require_local(request, _session)
     settings = load_speech_runtime(_ws(request), principal.principal_id)
     if not settings.configured:
         raise _refuse("speech_runtime_not_configured")
-    clip = await request.body()
+    try:
+        clip = await read_audio(request.stream())
+    except SpeechRuntimeError as exc:
+        raise _refuse(exc.reason, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE) from exc
     if not clip:
         raise _refuse("speech_audio_missing")
     if len(clip) > MAX_AUDIO_BYTES:

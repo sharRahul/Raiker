@@ -5,16 +5,9 @@ import { stubFetch } from "../../test-helpers";
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("offers the exact persisted speech language set", async () => {
-  const save = vi.fn();
-  render(General, { settings: { "general.speech_language": "fr" }, save });
-  const select = screen.getByLabelText("Speech language");
-  expect(select).toHaveValue("fr");
-  expect(within(select).getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual([
-    "auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk",
-  ]);
-  await fireEvent.change(select, { target: { value: "ja" } });
-  expect(save).toHaveBeenCalledWith({ "general.speech_language": "ja" });
+it("does not require a speech-language choice for automatic dictation", () => {
+  render(General, { settings: { "general.speech_language": "fr" }, save: vi.fn() });
+  expect(screen.queryByLabelText("Speech language")).not.toBeInTheDocument();
 });
 
 it("does not ask the owner to choose a speech runtime", () => {

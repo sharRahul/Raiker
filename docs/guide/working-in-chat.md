@@ -135,22 +135,22 @@ The account's approval mode (*Manually approve*, *Automatically approve*,
 *Skip*, *Decline*) is not on the composer; it is in **Permissions → Advanced**.
 
 There is no planning chip in Chat. While dictation is listening, **Done** or the
-first `Enter` stops listening and keeps focus in the draft; **Cancel** restores
-the exact draft from before dictation began. A later `Enter` or **Send** is the
+first `Enter` stops listening and keeps focus in the draft; **Cancel** discards
+the recording without overwriting later edits. A later `Enter` or **Send** is the
 only way to submit. Outside dictation, `Enter` sends and `Shift+Enter` adds a
 line.
 
-Speech recognition and read-aloud use browser and operating-system services;
-the selected service may process speech online. Settings → General stores the
-owner's speech language. Raiker stores the normal prompt and its
+Dictation requires a configured local speech runtime and a local Raiker page.
+It requests automatic language detection; read-aloud uses only voices the
+browser reports as local. Raiker stores the normal prompt and its
 `typed`/`dictated`/`mixed` provenance, never microphone audio or a second copy of
 the transcript.
 
 **The language answers come in.** Settings → General → **Answer in** is the one
 language setting every turn is told: with French chosen, Raiker answers in
 French whatever language you type in, unless a message asks for another.
-**Dates and times** only changes how dates are written on screen, and **Speech
-language** only what dictation listens for; neither is told to a model. A
+**Dates and times** only changes how dates are written on screen and is not
+told to a model. A
 default weather place, if you set one, is not sent with your turns either — a
 turn is told only that one exists, and the place goes to the weather service
 when you ask about the weather without naming one.

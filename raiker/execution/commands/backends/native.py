@@ -182,6 +182,13 @@ class NativeSandboxDriver:
             report = json.loads(completed.stdout.strip() or "{}")
         except ValueError:
             return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
+        if (
+            completed.returncode != 0
+            or not isinstance(report, dict)
+            or not isinstance(report.get("available"), bool)
+            or not isinstance(report.get("observations"), dict)
+        ):
+            return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
         observations = {
             str(key): str(value) for key, value in dict(report.get("observations", {})).items()
         }

@@ -48,3 +48,10 @@ The shared legacy subprocess launcher and local MCP stdio launcher are blocked w
 are unavailable until migrated. This is not a comprehensive bypass audit or OS
 enforcement evidence. The old CI suite contains host-execution expectations and
 is failing; it must be migrated without replacing enforcement tests with mocks.
+
+The Python native-driver probe now rejects nonzero exits and malformed availability
+or observation fields. This validates the report format only; it does not prove
+the runner enforces filesystem, network or process isolation. Plugin execution
+remains blocked pending disposable workspaces and enforceable capability policy;
+local MCP stdio remains blocked pending sandboxed bidirectional stdio, lifecycle
+control and credential handling.

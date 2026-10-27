@@ -98,3 +98,9 @@ index-to-HEAD Git diff. A real Git control confirms a configured clean filter
 is not started in this case, and staged `.raiker` content is excluded. Mixed
 or unstaged changes remain unavailable; truncated output is refused rather than
 used as a complete review. Commit proposals remain blocked.
+
+Positive-control Git tests showed repository smudge filters run during task
+worktree checkout and branch creation from a different base. Both operations
+are now refused pending a sandboxed checkout; creating a branch at HEAD remains
+available and was tested in the same fixture. This does not establish safety
+of every Git operation or platform.

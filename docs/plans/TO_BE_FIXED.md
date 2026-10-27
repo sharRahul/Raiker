@@ -47,6 +47,15 @@ reviewed diff. Restore commit previews, approved commits and artifact diffs with
 positive-control filter tests, disposable workspaces and platform enforcement
 evidence. Existing commit and Build artifact functionality is affected.
 
+## Release blocker: sandboxed Git checkout unavailable
+
+Task worktree creation and branch creation from a specified base can execute
+repository smudge filters on the host. Both now refuse until checkout can run
+inside a verified native boundary. This prevents uncontained helper execution
+but leaves concurrent task worktrees and cross-base branch creation unavailable.
+Restore them with disposable workspaces and real cross-platform filter and
+cleanup tests; existing worktree functionality tests remain unmet.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

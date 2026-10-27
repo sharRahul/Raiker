@@ -1,5 +1,14 @@
 # Fixed items
 
+## Uncontained checkout filters in task worktree and cross-base branch creation
+
+Task worktree creation and branch creation from an explicit base now refuse
+until Git checkout can run inside a verified native boundary. Real Git tests in
+`tests/test_local_git_environment.py` demonstrate that both previous paths
+started a configured smudge filter; the refusal prevents that launch. Branch
+creation at HEAD remains available in the tested scenario. This is containment,
+not a completed sandbox or a restoration of task-worktree functionality.
+
 ## Workspace Git configuration used as global configuration
 
 The sanitized process environment now points Git's global configuration at the

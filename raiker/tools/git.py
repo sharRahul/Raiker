@@ -376,20 +376,18 @@ def _branch_exists(root: Path, name: str) -> bool:
     )
 
 
-def _ref_exists(root: Path, ref: str) -> bool:
-    return _git(root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], timeout=10).returncode == 0
-
-
 def proposed_branch_snapshot(
     repo_root: str | Path, name: str, base: str | None = None
 ) -> dict[str, Any]:
     """What creating branch *name* would do — computed without touching the repository.
 
-    Fail-closed on every case a later execution could not honour: no repository,
-    a name git itself would reject, a branch that already exists, an unknown
-    base, an operation already in progress, and — only when a *base* is named,
-    because that is the case that moves the working tree — uncommitted changes.
+    A requested base is refused until checkout filters can run inside the native
+    boundary. Other validation still applies to a branch created at HEAD.
     """
+    # Switching to a different base checks out worktree files and can run
+    # repository-configured smudge filters on the host.
+    if base and base.strip():
+        return _failed("git_branch_native_sandbox_required")
     root, refusal = _repository(repo_root)
     if refusal is not None:
         return refusal
@@ -401,16 +399,11 @@ def proposed_branch_snapshot(
     busy = _busy_reason(root)
     if busy is not None:
         return _failed("repository_busy", operation=busy)
-    base_ref = (base or "").strip()
-    if base_ref and not _ref_exists(root, base_ref):
-        return _failed("unknown_base_ref", base=base_ref)
     dirty = _porcelain(root, None)
-    if base_ref and dirty:
-        return _failed("working_tree_dirty", file_count=len(dirty), base=base_ref)
     return {
         "status": "success",
         "name": name,
-        "base": base_ref or None,
+        "base": None,
         "current_branch": current_branch(root),
         "head": _head_commit(root),
         "uncommitted_files": len(dirty),
@@ -426,8 +419,6 @@ def create_branch(
         return snapshot
     root = resolve_workspace_path(repo_root, ".")
     args = [*_NO_HOOKS, "switch", "--create", snapshot["name"]]
-    if snapshot["base"]:
-        args.append(str(snapshot["base"]))
     proc = _git(root, args)
     if proc.returncode != 0:
         return _failed("git_command_failed", command="switch", output=_git_output(proc))

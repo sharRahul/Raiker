@@ -9,8 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from raiker.control.build_worktrees import create_worktree
 from raiker.tools.git import (
     GitWorkingTreeDiffUnavailable,
+    create_branch,
     create_commit,
     local_git_environment,
     proposed_commit_snapshot,
@@ -226,4 +228,65 @@ def test_commit_proposal_refuses_uncontained_filter(repo: Path) -> None:
     entries = working_tree_changes(repo)
     with pytest.raises(GitWorkingTreeDiffUnavailable):
         working_tree_diff(repo, entries)
+    assert not marker.exists()
+
+
+def test_task_worktree_does_not_run_repository_smudge_filter(repo: Path) -> None:
+    marker = repo.parent / "smudge-filter-ran"
+    driver = repo.parent / "smudge-filter.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.smudge", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "add attributes")
+    (repo / "a.txt").unlink()
+    _git(repo, "checkout", "--force", "HEAD", "--", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the smudge filter"
+    marker.unlink()
+    result = create_worktree(repo.parent, repo.name, "sandbox-task")
+    assert result["status"] == "failed"
+    assert result["error"]["type"] == "git_worktree_native_sandbox_required"
+    assert not marker.exists()
+    assert not (repo.parent / f"{repo.name}.worktrees" / "sandbox-task").exists()
+
+
+def test_branch_checkout_does_not_run_repository_smudge_filter(repo: Path) -> None:
+    marker = repo.parent / "branch-smudge-ran"
+    driver = repo.parent / "branch-smudge.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+        encoding="utf-8",
+    )
+    _git(repo, "config", "filter.raiker-test.smudge", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"')
+    (repo / ".gitattributes").write_text("a.txt filter=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "attributes")
+    base = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "a.txt").write_text("new version\n", encoding="utf-8")
+    _git(repo, "add", "a.txt")
+    _git(repo, "commit", "-m", "new version")
+    (repo / "a.txt").unlink()
+    _git(repo, "checkout", "--force", "HEAD", "--", "a.txt")
+    assert marker.exists(), "control: Git must be able to start the smudge filter"
+    marker.unlink()
+    result = create_branch(repo, "sandbox-branch", base)
+    assert result["status"] == "failed"
+    assert result["error"]["type"] == "git_branch_native_sandbox_required"
+    assert not marker.exists()
+    check = subprocess.run(
+        ["git", "-C", str(repo), "show-ref", "--verify", "--quiet", "refs/heads/sandbox-branch"],
+        check=False, capture_output=True,
+    )
+    assert check.returncode != 0
+    at_head = create_branch(repo, "branch-at-head")
+    assert at_head["status"] == "success"
     assert not marker.exists()

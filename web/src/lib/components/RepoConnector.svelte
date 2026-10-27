@@ -214,6 +214,8 @@
         return "That branch is checked out in another worktree.";
       case "worktree_path_exists":
         return "A worktree folder with that name already exists.";
+      case "git_worktree_native_sandbox_required":
+        return "Worktree checkout requires the native sandbox. This operation is unavailable until it can be run safely.";
       case "worktree_needs_subfolder_repository":
         return "This repository is the whole workspace, so a worktree beside it would be outside the workspace.";
       case "invalid_worktree_name":

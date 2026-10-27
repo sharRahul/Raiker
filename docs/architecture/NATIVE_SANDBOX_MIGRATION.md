@@ -61,3 +61,10 @@ The existing host-network classification and gates are preserved; they do not
 select a host backend. Placement reports unavailable when the native sandbox or
 requested mode cannot be used. The command service still independently probes at
 launch. This does not account for all subprocess paths or prove OS enforcement.
+
+The agent-facing Git diff path (`raiker/tools/git.py:run_git`) now disables
+external diff and text-conversion drivers, restricts accepted diff arguments,
+and rejects pathspec escapes. A real unsandboxed control showed the previous
+implementation could launch an external driver. Other Git subprocess paths and
+workspace command hooks still require a complete execution-boundary audit; this
+change does not classify them as safe.

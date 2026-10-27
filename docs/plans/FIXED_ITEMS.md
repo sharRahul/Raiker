@@ -1,5 +1,13 @@
 # Fixed items
 
+## Agent Git diff external-driver execution
+
+The agent-facing `run_git` diff path now disables external diff and textconv
+drivers and refuses unsafe diff arguments and escaping pathspecs. A control run
+showed the former path could launch an external driver; regression coverage is
+in `tests/test_local_git_environment.py`. This fixes that specific path, not
+other Git subprocesses or the native sandbox migration as a whole.
+
 Every defect and gap that has been **closed**, with the evidence that closed
 it. Split out of [`TO_BE_FIXED.md`](TO_BE_FIXED.md) so that document reads as
 what it is named for — the open work — while the record of what was fixed, and

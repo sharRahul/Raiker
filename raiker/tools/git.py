@@ -16,6 +16,11 @@ from raiker.tools.filesystem import (
 )
 
 _ALLOWED = {"status", "diff", "log"}
+_SAFE_DIFF_OPTIONS = frozenset({
+    "--cached", "--staged", "--stat", "--name-only", "--name-status", "--numstat",
+    "--shortstat", "--summary", "--no-color", "--color=never", "--no-ext-diff",
+    "--no-textconv", "--", "HEAD", "HEAD^", "HEAD~1",
+})
 
 # B11 — a governed git write never runs the repository's own hooks. A commit or a
 # branch switch would otherwise execute whatever `.git/hooks` contains, which is
@@ -149,7 +154,23 @@ def run_git(
             "error": {"type": "git_subcommand_denied", "subcommand": subcommand},
         }
     root = resolve_workspace_path(repo_root, ".")
-    command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *(args or [])]
+    arguments = list(args or [])
+    if subcommand == "diff":
+        before_paths = True
+        for argument in arguments:
+            if before_paths and argument == "--":
+                before_paths = False
+            elif before_paths and argument not in _SAFE_DIFF_OPTIONS:
+                return {"status": "denied", "error": {"type": "git_diff_argument_denied"}}
+            elif not before_paths:
+                try:
+                    if argument.startswith(":"):
+                        raise ValueError("pathspec_magic_denied")
+                    resolve_workspace_path(root, argument)
+                except (ValueError, OSError):
+                    return {"status": "denied", "error": {"type": "git_diff_path_denied"}}
+        arguments = ["--no-ext-diff", "--no-textconv", *arguments]
+    command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *arguments]
     proc = subprocess.run(
         command, check=False, capture_output=True, text=True, timeout=10,
         env=local_git_environment(),

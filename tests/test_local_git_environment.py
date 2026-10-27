@@ -23,6 +23,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(tmp_path, "init", "--initial-branch=main", ".")
     _git(tmp_path, "config", "user.name", "T")
     _git(tmp_path, "config", "user.email", "t@example.com")
+    _git(tmp_path, "config", "commit.gpgsign", "false")
     (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
     _git(tmp_path, "add", "a.txt")
     _git(tmp_path, "commit", "-m", "a")
@@ -54,8 +55,8 @@ def test_a_repository_fsmonitor_does_not_run_on_status(repo: Path) -> None:
     assert not marker.exists()
 
 
-def test_status_does_not_see_the_hosts_token(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A git child (here an external diff driver) reads the environment it was given."""
+def test_git_diff_does_not_invoke_external_driver_with_host_token(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An external diff driver cannot observe credentials because it is not run."""
     seen = repo.parent / "seen-env"
     driver = repo.parent / "driver.py"
     driver.write_text(
@@ -70,4 +71,33 @@ def test_status_does_not_see_the_hosts_token(repo: Path, monkeypatch: pytest.Mon
     )
     (repo / "a.txt").write_text("b\n", encoding="utf-8")
     run_git(repo, "diff")
-    assert seen.read_text(encoding="utf-8") == "absent"
+    assert not seen.exists()
+
+
+def test_agent_git_diff_does_not_run_external_diff_driver(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = repo.parent / "external-driver-ran"
+    driver = repo.parent / "external-driver.py"
+    driver.write_text(f"from pathlib import Path\nPath({str(marker)!r}).touch()\n", encoding="utf-8")
+    monkeypatch.setenv(
+        "GIT_EXTERNAL_DIFF", f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
+    )
+    (repo / "a.txt").write_text("modified\n", encoding="utf-8")
+    result = run_git(repo, "diff")
+    assert result["status"] == "success"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("arg", ["--ext-diff", "--textconv", "--output=outside", "--ext-d"])
+def test_git_diff_refuses_arguments_that_can_launch_or_write(repo: Path, arg: str) -> None:
+    result = run_git(repo, "diff", [arg])
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "git_diff_argument_denied"
+
+
+@pytest.mark.parametrize("path", ["../outside", ":(top)outside"])
+def test_git_diff_refuses_pathspec_escape(repo: Path, path: str) -> None:
+    result = run_git(repo, "diff", ["--", path])
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "git_diff_path_denied"

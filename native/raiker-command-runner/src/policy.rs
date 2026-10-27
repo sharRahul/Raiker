@@ -121,6 +121,66 @@ fn policy_path_text_safe(path: &Path) -> bool {
         && (cfg!(windows) || !text.contains('\\'))
 }
 
+/// Check the current filesystem state immediately before boundary construction.
+/// This does not pin directory handles and therefore does not eliminate races.
+pub fn validate_filesystem_paths(policy: &LaunchPolicy) -> Result<(), &'static str> {
+    let root_metadata = std::fs::symlink_metadata(&policy.workspace_root)
+        .map_err(|_| "runner_policy_workspace_unreadable")?;
+    if is_link(&root_metadata) || !root_metadata.is_dir() {
+        return Err("runner_policy_workspace_invalid");
+    }
+    let root = std::fs::canonicalize(&policy.workspace_root)
+        .map_err(|_| "runner_policy_workspace_unreadable")?;
+    let cwd = std::fs::canonicalize(&policy.cwd).map_err(|_| "runner_policy_cwd_unreadable")?;
+    if !cwd.starts_with(&root) || !cwd.is_dir() {
+        return Err("runner_policy_cwd_outside_workspace");
+    }
+    let relative_cwd = policy
+        .cwd
+        .strip_prefix(&policy.workspace_root)
+        .map_err(|_| "runner_policy_cwd_outside_workspace")?;
+    check_no_links(
+        &policy.workspace_root,
+        relative_cwd,
+        "runner_policy_cwd_link",
+    )?;
+    for path in policy.deny_paths.iter().chain(policy.readonly_paths.iter()) {
+        check_no_links(
+            &policy.workspace_root,
+            Path::new(path),
+            "runner_policy_protected_path_link",
+        )?;
+    }
+    Ok(())
+}
+
+fn check_no_links(root: &Path, relative: &Path, reason: &'static str) -> Result<(), &'static str> {
+    let mut path = root.to_path_buf();
+    for part in relative.components() {
+        path.push(part.as_os_str());
+        match std::fs::symlink_metadata(&path) {
+            Ok(metadata) if is_link(&metadata) => return Err(reason),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(_) => return Err("runner_policy_path_unreadable"),
+        }
+    }
+    Ok(())
+}
+
+fn is_link(metadata: &std::fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.file_type().is_symlink()
+    }
+}
+
 fn string_list(value: Option<&Value>) -> Result<Vec<String>, &'static str> {
     let Some(value) = value else {
         return Ok(Vec::new());
@@ -273,5 +333,90 @@ mod tests {
             parse(&text).unwrap_err(),
             "runner_policy_workspace_root_invalid"
         );
+    }
+
+    #[test]
+    fn missing_workspace_is_not_a_valid_launch_boundary() {
+        let root = std::env::temp_dir().join(format!(
+            "raiker-missing-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let text = serde_json::json!({
+            "workspace_root": root,
+            "cwd": root,
+            "profile_name": "raiker.cmd.test"
+        })
+        .to_string();
+        let policy = parse(&text).unwrap();
+        assert_eq!(
+            validate_filesystem_paths(&policy).unwrap_err(),
+            "runner_policy_workspace_unreadable"
+        );
+    }
+
+    #[test]
+    fn existing_workspace_and_cwd_are_accepted() {
+        let root = std::env::temp_dir().join(format!(
+            "raiker-path-valid-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let cwd = root.join("project");
+        std::fs::create_dir_all(&cwd).unwrap();
+        let text = serde_json::json!({
+            "workspace_root": root,
+            "cwd": cwd,
+            "deny_paths": [".raiker"],
+            "readonly_paths": [".git"],
+            "profile_name": "raiker.cmd.test"
+        })
+        .to_string();
+        assert!(validate_filesystem_paths(&parse(&text).unwrap()).is_ok());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_cwd_and_protected_path_are_refused() {
+        use std::os::unix::fs::symlink;
+
+        let root = std::env::temp_dir().join(format!(
+            "raiker-path-check-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = root.join("workspace");
+        let outside = root.join("outside");
+        std::fs::create_dir_all(&workspace).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, workspace.join("escape")).unwrap();
+        let text = serde_json::json!({
+            "workspace_root": workspace,
+            "cwd": workspace.join("escape"),
+            "deny_paths": ["escape"],
+            "profile_name": "raiker.cmd.test"
+        })
+        .to_string();
+        let mut policy = parse(&text).unwrap();
+        assert_eq!(
+            validate_filesystem_paths(&policy).unwrap_err(),
+            "runner_policy_cwd_outside_workspace"
+        );
+        policy.cwd = workspace.clone();
+        assert_eq!(
+            validate_filesystem_paths(&policy).unwrap_err(),
+            "runner_policy_protected_path_link"
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

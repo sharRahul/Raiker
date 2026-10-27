@@ -111,3 +111,12 @@ out-of-range limits. Windows unit tests and Linux/macOS cross-target checks cove
 the contract; they are not OS enforcement evidence. Symlink and junction races,
 real platform filesystem isolation, seccomp and resource enforcement remain
 release blockers.
+
+Before launching, the runner also checks that the workspace exists and is not a
+link or Windows reparse point, that the working directory resolves inside it,
+and that existing components of the working directory and protected paths are
+not links or reparse points. Missing protected paths remain allowed. These are
+preflight checks, not a race-free filesystem boundary: directory handles are
+not pinned, ancestors and paths can change after validation, and hard links are
+not addressed. The Unix symlink test needs execution on a Unix runner; compiling
+it for Linux and macOS is not enforcement evidence.

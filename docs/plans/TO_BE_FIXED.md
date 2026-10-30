@@ -131,7 +131,7 @@ to the host. What still blocks release, by component:
 | Background, interactive and PTY execution | Unavailable rather than unsandboxed | Native backend refuses | `native_sandbox_pty_unsupported` | Sandboxed supervisor with ConPTY/PTY and process-tree ownership | Yes |
 | Plugin code, local MCP stdio, command hooks | Unavailable rather than unsandboxed | `tier4_plugins.py`, `mcp.py`, `hooks/handlers/command.py` | Refuse with `native_sandbox_required` | Bidirectional stdio through the broker | Yes |
 | Model conversion | Unavailable | `raiker/models/conversion.py` | `model_conversion_native_toolchain_required` | Package llama.cpp converter/quantizer and run them in the native sandbox | No (feature unavailable, safe) |
-| WSL2 backend and Windows MXC evaluation | Not implemented / not investigated | — | — | Implement as a separately verified backend; evaluate MXC availability and licensing | No for native-Windows path |
+| WSL2 backend | Not implemented | — | — | Implement as a separately verified Bubblewrap+seccomp backend inside WSL2 with interop, `/mnt` and host-network restrictions. (MXC was evaluated and rejected: its README disclaims being a security boundary.) | No for native-Windows path |
 | Runner publisher signing | Package-relative SHA-256 is integrity, not authenticity | `scripts/build_native_runner.py` | `runner_trust: package_relative_integrity` | Platform code signing with release credentials | Yes |
 
 The full inventory and checklist are in

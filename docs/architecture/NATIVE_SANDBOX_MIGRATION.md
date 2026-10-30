@@ -184,3 +184,15 @@ binaries an agent command may not invoke; that is a denial, not a dependency.
 | Windows (`windows-2025`) | Adversarial ACL test passes after the fail-closed change. The probe's descendant could not open `\\.\NUL` in the AppContainer; the probe now uses private pipes. Rerun pending. | CI job *Native runner (windows-2025)* |
 | macOS (`macos-15`, `macos-15-intel`) | Failing: `RLIMIT_AS` rejected (EINVAL), then `cat` denied `file-read-data /`. Both addressed; rerun pending | CI jobs *Native runner (macos-15*)* and the Seatbelt denial log step |
 
+## Windows MXC evaluation (2026-10-30)
+
+Microsoft MXC is public (`github.com/microsoft/mxc`). It is a cross-platform
+execution-container project whose default Windows backend is itself
+AppContainer-based, with an experimental Hyper-V Windows Sandbox backend. Its
+README states that no MXC profile should currently be treated as a security
+boundary, and no source found ties Codex's Windows sandbox to MXC: OpenAI
+describes its own sandbox as a custom design. Decision: do not adopt MXC; keep
+and harden Raiker's AppContainer + Job Object runner. Revisit when MXC claims a
+security boundary. Licence and supported Windows versions were not assessed,
+because the security disclaimer already rules it out.
+

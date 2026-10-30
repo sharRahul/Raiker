@@ -1,5 +1,15 @@
 # Fixed items
 
+## Native boundary helpers could be selected from an untrusted search path
+
+The Unix runner selects Bubblewrap and Seatbelt only from fixed system paths,
+requires root-owned, non-writable executable and directory components, and
+rejects a symlink in an untrusted directory. The Windows probe resolves its
+route utility from the system directory. Linux tests exercise fake helper
+rejection and real Bubblewrap execution; Windows tests exercise the system
+route lookup. This does not replace signed runner verification or the other
+open sandbox controls. Unix changes are in checkpoint `f9329835`.
+
 ## Native runner policy injection and unrestricted root workspace
 
 Seatbelt profile generation rejects unrepresentable path characters before

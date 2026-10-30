@@ -124,9 +124,9 @@ pub fn run(test: &SelfTest) -> Value {
     let (mut descendant, mut descendant_start) = if test.spawn_grandchild {
         match spawn_grandchild(test) {
             Ok(child) => (Some(child), json!({"state": "started"})),
-            Err(error) => (
+            Err((stage, error)) => (
                 None,
-                json!({"state": "spawn_failed", "error_code": error.raw_os_error()}),
+                json!({"state": stage, "error_code": error.raw_os_error(), "error_kind": error.kind().to_string()}),
             ),
         }
     } else {
@@ -168,9 +168,11 @@ pub fn run(test: &SelfTest) -> Value {
 /// process-group kill removes it on every platform, so the observation would
 /// pass on macOS, which is precisely the host whose weaker posture it exists to
 /// expose.
-fn spawn_grandchild(test: &SelfTest) -> std::io::Result<std::process::Child> {
+fn spawn_grandchild(
+    test: &SelfTest,
+) -> Result<std::process::Child, (&'static str, std::io::Error)> {
     let marker = test.inside_path.with_extension("grandchild");
-    let current = std::env::current_exe()?;
+    let current = std::env::current_exe().map_err(|error| ("executable_lookup_failed", error))?;
     let mut command = std::process::Command::new(current);
     command
         .arg("--linger")
@@ -184,7 +186,7 @@ fn spawn_grandchild(test: &SelfTest) -> std::io::Result<std::process::Child> {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     detach(&mut command);
-    command.spawn()
+    command.spawn().map_err(|error| ("spawn_failed", error))
 }
 
 #[cfg(windows)]

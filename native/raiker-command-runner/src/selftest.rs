@@ -40,6 +40,7 @@ pub struct SelfTest {
     pub masked_read_path: PathBuf,
     pub connect_address: String,
     pub spawn_grandchild: bool,
+    pub hold_for_probe: bool,
 }
 
 impl SelfTest {
@@ -60,6 +61,10 @@ impl SelfTest {
                 .get("spawn_grandchild")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            hold_for_probe: value
+                .get("hold_for_probe")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         })
     }
 
@@ -73,6 +78,7 @@ impl SelfTest {
             "masked_read_path": self.masked_read_path.to_string_lossy(),
             "connect_address": self.connect_address,
             "spawn_grandchild": self.spawn_grandchild,
+            "hold_for_probe": self.hold_for_probe,
         })
     }
 }
@@ -86,25 +92,57 @@ pub fn attempt(test: &SelfTest) -> Value {
         // through the relay the runner set up, so a boundary that silently
         // drops output cannot pass the probe.
         "nonce": test.nonce,
-        "inside_write": write_probe(&test.inside_path, &test.nonce),
+        "inside_write": write_probe(&test.inside_path, &test.nonce, true),
         "outside_writes": test.outside_paths.iter()
-            .map(|path| write_probe(path, &test.nonce))
+            .map(|path| write_probe(path, &test.nonce, !test.hold_for_probe))
             .collect::<Vec<_>>(),
         "masked_read": read_probe(&test.masked_read_path),
         "connect": connect_probe(&test.connect_address),
+        "seccomp_control": seccomp_control(),
     })
+}
+
+#[cfg(target_os = "linux")]
+fn seccomp_control() -> Value {
+    // Querying the current personality is harmless, but the sandbox policy
+    // deliberately denies it so the control arm can verify actual filtering.
+    let personality = unsafe { libc::syscall(libc::SYS_personality, u32::MAX as libc::c_ulong) };
+    let unshare = unsafe { libc::syscall(libc::SYS_unshare, 0) };
+    json!({"allowed": personality >= 0 && unshare >= 0,
+           "personality_allowed": personality >= 0,
+           "unshare_allowed": unshare >= 0})
+}
+
+#[cfg(not(target_os = "linux"))]
+fn seccomp_control() -> Value {
+    Value::Null
 }
 
 /// The probe child: detach a grandchild, take every measurement, print the
 /// result for the parent to read back.
 pub fn run(test: &SelfTest) -> Value {
-    if test.spawn_grandchild {
-        spawn_grandchild(test);
+    let mut descendant = if test.spawn_grandchild {
+        spawn_grandchild(test)
+    } else {
+        None
+    };
+    let mut result = attempt(test);
+    // A PID is only an invitation to measure the process, not proof of
+    // termination. The outer probe must retain and observe its OS handle.
+    if let Some(child) = descendant.as_mut()
+        && matches!(child.try_wait(), Ok(None))
+    {
+        result["descendant_pid"] = json!(child.id());
     }
-    let result = attempt(test);
     let mut stdout = std::io::stdout();
     let _ = writeln!(stdout, "{result}");
     let _ = stdout.flush();
+    if test.hold_for_probe {
+        // The parent closes this pipe on every exit path. This keeps the
+        // descendant in the process tree while its host identity is measured.
+        let mut release = [0u8; 1];
+        let _ = std::io::Read::read(&mut std::io::stdin(), &mut release);
+    }
     result
 }
 
@@ -116,10 +154,10 @@ pub fn run(test: &SelfTest) -> Value {
 /// process-group kill removes it on every platform, so the observation would
 /// pass on macOS, which is precisely the host whose weaker posture it exists to
 /// expose.
-fn spawn_grandchild(test: &SelfTest) {
+fn spawn_grandchild(test: &SelfTest) -> Option<std::process::Child> {
     let marker = test.inside_path.with_extension("grandchild");
     let Ok(current) = std::env::current_exe() else {
-        return;
+        return None;
     };
     let mut command = std::process::Command::new(current);
     command
@@ -134,7 +172,7 @@ fn spawn_grandchild(test: &SelfTest) {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     detach(&mut command);
-    let _ = command.spawn();
+    command.spawn().ok()
 }
 
 #[cfg(windows)]
@@ -188,14 +226,16 @@ pub fn remove_probe_writes(test: &SelfTest) {
     }
 }
 
-fn write_probe(path: &Path, nonce: &str) -> Value {
+fn write_probe(path: &Path, nonce: &str, cleanup: bool) -> Value {
     let opened = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path);
     match opened.and_then(|mut file| file.write_all(nonce.as_bytes())) {
         Ok(()) => {
-            let _ = std::fs::remove_file(path);
+            if cleanup {
+                let _ = std::fs::remove_file(path);
+            }
             json!({"allowed": true, "error": Value::Null})
         }
         Err(error) => json!({"allowed": false, "error": error.kind().to_string()}),
@@ -260,7 +300,7 @@ mod tests {
     fn probe_does_not_overwrite_or_remove_an_existing_file() {
         let path = std::env::temp_dir().join(probe_nonce());
         std::fs::write(&path, b"owner data").unwrap();
-        assert_eq!(write_probe(&path, "probe nonce")["allowed"], false);
+        assert_eq!(write_probe(&path, "probe nonce", true)["allowed"], false);
         let test = SelfTest {
             nonce: "probe nonce".to_owned(),
             inside_path: path.clone(),
@@ -268,6 +308,7 @@ mod tests {
             masked_read_path: path.clone(),
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
+            hold_for_probe: false,
         };
         remove_probe_writes(&test);
         assert_eq!(std::fs::read(&path).unwrap(), b"owner data");
@@ -285,6 +326,7 @@ mod tests {
             masked_read_path: dir.join("state"),
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
+            hold_for_probe: false,
         };
         std::fs::write(&test.inside_path, b"n").unwrap();
         std::fs::write(&test.outside_paths[0], b"n").unwrap();

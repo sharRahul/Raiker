@@ -15,7 +15,7 @@ Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 | `raiker/execution/commands/backends/container.py`, `profiles.py` | Persistent container backend and Docker/Podman profile detection are active. | Replace responsibilities before removal; retain old configuration as inert migration data. Verify upgrades and no reachable runtime invocation. |
 | `raiker/runtime/executors/containers.py`, `tier4_plugins.py` | Docker and plugin execution paths remain in source, but their default shared process launcher now refuses execution pending native broker integration. | Migrate or refuse all plugin/container execution through the broker; verify actual boundary and failure behavior. |
 | `raiker/runtime/executors/mcp.py`, `sandbox.py`, `raiker/hooks/handlers/command.py` | Local MCP stdio and the shared legacy `run_command` launcher now refuse execution. Other subprocess sites and their callers remain to be audited. | Trace all callers, distinguish trusted infrastructure from agent-controlled execution, and enforce the broker where required. Test malicious child processes. |
-| `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap and Seatbelt implementations exist; the Seatbelt profile explicitly allows broad file reads. No seccomp implementation was found in the native runner source search. | Narrow reads, add and verify seccomp and enforceable resource controls; test on actual supported Linux and macOS systems. |
+| `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap installs seccomp; two denied syscalls were measured with control arms in WSL2. Seatbelt uses a narrower runtime and workspace read allowlist, unverified on macOS. | Validate Seatbelt enforcement and toolchain access, additional seccomp restrictions, and resource controls on supported systems. |
 | `native/raiker-command-runner/src/boundary_windows.rs` | Existing Windows boundary requires detailed security and lifecycle review. | Verify AppContainer, ACL cleanup, job limits, process descendants and network denial on supported Windows versions with adversarial control-arm tests. |
 | `raiker/models/conversion.py` | Model conversion contains Docker-related process management. | Determine trusted infrastructure responsibilities and replace the dependency without exposing untrusted code. |
 | `raiker/tools/git.py`, `raiker/control/build_worktrees.py`, `raiker/github/local_methods.py` | Git and worktree operations spawn processes outside the command backend. | Trace configuration, hooks, external helpers and agent control; confine untrusted execution and protect original projects. |
@@ -109,14 +109,20 @@ The native runner policy parser rejects non-absolute workspace paths, lexical
 parent traversal, malformed protected-path lists, invalid network/PTY types and
 out-of-range limits. Windows unit tests and Linux/macOS cross-target checks cover
 the contract; they are not OS enforcement evidence. Symlink and junction races,
-real platform filesystem isolation, seccomp and resource enforcement remain
+real platform filesystem isolation, complete seccomp coverage and resource enforcement remain
 release blockers.
 
 The broker requires every mandatory probe observation, including protected-data
 reads and descendant termination, to be enforced. The old descendant marker
-check did not observe process termination; it is now indeterminate. Therefore
-native commands are unavailable until a real lifecycle test can establish that
-property. Windows job assignment is checked before a suspended process resumes;
+check did not observe process termination. Windows now retains a live descendant
+handle, verifies Job Object membership, and observes termination after job
+closure; a real disposable-workspace probe measured it as enforced. Linux now
+matches the namespace PID to a unique live descendant, pins it with a pidfd,
+and measures exit after Bubblewrap cancellation. The Linux test passed on WSL2;
+macOS remains indeterminate and hosted Linux CI evidence is pending. Native
+execution remains unavailable until disposable workspaces protect the original
+project. Windows job assignment
+is checked before a suspended process resumes;
 the failure path terminates the process, including in the probe. Unix launch
 also fails if resource-limit or Linux parent-death setup fails. These changes do
 not replace real OS enforcement or process-cleanup tests.

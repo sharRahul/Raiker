@@ -329,7 +329,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]
+        os: [windows-latest, macos-15]
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -355,7 +355,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -365,6 +365,9 @@ jobs:
         run: |
           rustc --version
           cargo --version
+      - name: Install Bubblewrap for native enforcement tests
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - name: Check formatting
         working-directory: native
         run: cargo fmt --check

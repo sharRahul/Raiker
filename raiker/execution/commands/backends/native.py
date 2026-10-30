@@ -28,6 +28,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -148,10 +149,13 @@ class NativeSandboxDriver:
         if not manifest.is_file():
             return None, "native_sandbox_runner_digest_missing"
         try:
-            recorded = json.loads(manifest.read_text(encoding="utf-8")).get("sha256")
+            document = json.loads(manifest.read_text(encoding="utf-8"))
+            if not isinstance(document, dict) or not isinstance(document.get("sha256"), str):
+                return None, "native_sandbox_runner_digest_missing"
+            recorded = document["sha256"]
+            actual = hashlib.sha256(binary.read_bytes()).hexdigest()
         except (OSError, ValueError):
             return None, "native_sandbox_runner_digest_missing"
-        actual = hashlib.sha256(binary.read_bytes()).hexdigest()
         if recorded != actual:
             return None, "native_sandbox_runner_digest_mismatch"
         return binary, None
@@ -174,10 +178,30 @@ class NativeSandboxDriver:
         if binary is None:
             return NativeSandboxProof(False, reason, "none", checked_at)
         try:
-            completed = self._run_probe(
-                [str(binary), "--probe", "--workspace", str(self.workspace_root)]
-            )
-        except (OSError, subprocess.SubprocessError):
+            # Windows probing grants ACLs and modifies protected DACLs. Probe a
+            # private temporary directory and its own runner copy, never the
+            # owner's project or the application's installation directory.
+            with tempfile.TemporaryDirectory(prefix="raiker-native-probe-") as temporary:
+                scratch = Path(temporary)
+                isolated_binary = scratch / binary.name
+                shutil.copy2(binary, isolated_binary)
+                recorded = json.loads(
+                    (self.helper_root / "digest.json").read_text(encoding="utf-8")
+                )["sha256"]
+                if hashlib.sha256(isolated_binary.read_bytes()).hexdigest() != recorded:
+                    raise OSError("native_sandbox_runner_digest_mismatch")
+                try:
+                    completed = self._run_probe(
+                        [str(isolated_binary), "--probe", "--workspace", str(scratch)]
+                    )
+                finally:
+                    if sys.platform == "win32":
+                        cleanup = self._run_probe(
+                            [str(isolated_binary), "--revoke-grant", "--workspace", str(scratch)]
+                        )
+                        if cleanup.returncode != 0:
+                            raise OSError("native_sandbox_probe_cleanup_failed")
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             return NativeSandboxProof(False, "native_sandbox_probe_failed", "none", checked_at)
         try:
             report = json.loads(completed.stdout.strip() or "{}")
@@ -196,7 +220,7 @@ class NativeSandboxDriver:
         available = bool(report.get("available"))
         # A headline success cannot substitute for any mandatory observation.
         # An indeterminate control arm is not evidence of enforcement.
-        required = (
+        required: tuple[str, ...] = (
             "relay",
             "workspace_write",
             "escape_write",
@@ -204,14 +228,24 @@ class NativeSandboxDriver:
             "egress",
             "descendant_reaped",
         )
+        if sys.platform.startswith("linux") or report.get("platform") == "linux":
+            required += ("seccomp",)
         if any(observations.get(name) != ENFORCED for name in required):
             available = False
+        # Measurements in a throwaway directory do not authorize writes to
+        # the owner's original project. Enable only after task workspaces are
+        # allocated and policy-bound through the broker.
+        gate_reason = "native_disposable_workspace_required" if available else None
+        available = False
         return NativeSandboxProof(
             available=available,
             reason_code=(
-                str(report.get("reason"))
-                if report.get("reason")
-                else (None if available else "native_sandbox_not_enforced")
+                gate_reason
+                or (
+                    str(report.get("reason"))
+                    if report.get("reason")
+                    else "native_sandbox_not_enforced"
+                )
             ),
             boundary=str(report.get("boundary") or "none"),
             checked_at=checked_at,
@@ -237,6 +271,7 @@ class NativeSandboxDriver:
             "network": "none",
             "pty": False,
             "deadline_seconds": max(1, int(request.timeout_seconds) + 5),
+            "max_cpu_seconds": max(1, int(request.timeout_seconds) + 5),
             "max_processes": 64,
             "max_memory_bytes": 2 * 1024 * 1024 * 1024,
         }

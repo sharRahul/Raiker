@@ -1,5 +1,22 @@
 # Fixed items
 
+## Native runner policy injection and unrestricted root workspace
+
+Seatbelt profile generation rejects unrepresentable path characters before
+launch, preventing paths from injecting profile expressions. Runner filesystem
+validation also rejects filesystem and Windows drive roots as workspaces.
+Rust unit tests exercise the rejection paths on Linux and Windows. These fixes
+do not establish a disposable workspace or prove macOS enforcement.
+
+## Unix runner deadline ownership and Linux host configuration exposure
+
+The Unix runner handles deadline termination in the child-owner wait loop,
+without a detached PID-targeting watchdog. Bubblewrap no longer exposes whole
+host `/etc`, `/opt` or `/nix` trees. Linux WSL integration tests exercise an
+early exit, deadline termination and denial of a host `/etc` read with an
+outside positive control. Linux helper identity, task-wide quotas and other
+filesystem protections remain open.
+
 ## Native runner policy parser silently accepted malformed restrictions
 
 The runner rejects lexical parent traversal, malformed protected-path lists,

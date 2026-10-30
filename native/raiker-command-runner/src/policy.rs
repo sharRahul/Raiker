@@ -35,6 +35,7 @@ pub struct LaunchPolicy {
     /// relay must not be able to leave a command running past its bound, and on
     /// a platform with no parent-death signal this is what bounds it at all.
     pub deadline_seconds: u64,
+    pub max_cpu_seconds: u64,
     /// The **per-run** AppContainer profile name (Windows) or namespace label
     /// (Linux/macOS). Per run, not stable: a predictable container name would
     /// let any local process enter a container the workspace already trusts.
@@ -94,6 +95,8 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
         Some(value) => value.as_bool().ok_or("runner_policy_pty_invalid")?,
     };
 
+    let deadline_seconds = bounded(object.get("deadline_seconds"), 300, 1, 86_400)?;
+    let max_cpu_seconds = bounded(object.get("max_cpu_seconds"), deadline_seconds, 1, 86_400)?;
     Ok(LaunchPolicy {
         workspace_root,
         cwd,
@@ -108,7 +111,8 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
             64 * 1024 * 1024,
             32u64 * 1024 * 1024 * 1024,
         )?,
-        deadline_seconds: bounded(object.get("deadline_seconds"), 300, 1, 86_400)?,
+        deadline_seconds,
+        max_cpu_seconds,
         profile_name,
     })
 }
@@ -131,6 +135,9 @@ pub fn validate_filesystem_paths(policy: &LaunchPolicy) -> Result<(), &'static s
     }
     let root = std::fs::canonicalize(&policy.workspace_root)
         .map_err(|_| "runner_policy_workspace_unreadable")?;
+    if root.parent().is_none() {
+        return Err("runner_policy_workspace_root_forbidden");
+    }
     let cwd = std::fs::canonicalize(&policy.cwd).map_err(|_| "runner_policy_cwd_unreadable")?;
     if !cwd.starts_with(&root) || !cwd.is_dir() {
         return Err("runner_policy_cwd_outside_workspace");
@@ -221,6 +228,31 @@ fn bounded(value: Option<&Value>, default: u64, low: u64, high: u64) -> Result<u
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
+    #[test]
+    fn the_host_filesystem_root_cannot_be_the_workspace() {
+        let policy = parse(r#"{"workspace_root":"/","cwd":"/","profile_name":"root"}"#).unwrap();
+        assert_eq!(
+            validate_filesystem_paths(&policy),
+            Err("runner_policy_workspace_root_forbidden")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_drive_root_cannot_be_the_workspace() {
+        let current = std::env::current_dir().unwrap();
+        let root = current.ancestors().last().unwrap();
+        let json = serde_json::json!({
+            "workspace_root": root, "cwd": root, "profile_name": "root"
+        });
+        let policy = parse(&json.to_string()).unwrap();
+        assert_eq!(
+            validate_filesystem_paths(&policy),
+            Err("runner_policy_workspace_root_forbidden")
+        );
+    }
+
     fn minimal() -> String {
         let root = if cfg!(windows) { "C:\\ws" } else { "/ws" };
         format!(
@@ -298,6 +330,8 @@ mod tests {
     fn invalid_limits_are_rejected_instead_of_widened() {
         let text = minimal().replace("\"profile_name\"", "\"max_processes\":0,\"profile_name\"");
         assert_eq!(parse(&text).unwrap_err(), "runner_policy_limit_invalid");
+        let cpu = minimal().replace("\"profile_name\"", "\"max_cpu_seconds\":0,\"profile_name\"");
+        assert_eq!(parse(&cpu).unwrap_err(), "runner_policy_limit_invalid");
     }
 
     #[test]

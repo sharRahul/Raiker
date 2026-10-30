@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -267,6 +268,7 @@ def _probe_reply(**overrides: str) -> Any:
         "masked_read": "enforced",
         "egress": "enforced",
         "descendant_reaped": "enforced",
+        "seccomp": "enforced",
     }
     measured.update(overrides)
     payload = {
@@ -295,7 +297,8 @@ def test_native_sandbox_capabilities_come_from_measurements_not_configuration(
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
     proof = driver.probe()
-    assert proof.available is True
+    assert proof.available is False
+    assert proof.reason_code == "native_disposable_workspace_required"
     assert proof.boundary == "appcontainer"
     assert proof.features.process_tree_stop is True
     # Everything unmeasured stays off, however the profile is configured.
@@ -339,6 +342,7 @@ def test_the_launch_policy_masks_raiker_state_and_denies_the_network(tmp_path: P
     assert ".git" in document["readonly_paths"]
     assert document["pty"] is False
     assert document["deadline_seconds"] > 0
+    assert document["max_cpu_seconds"] == document["deadline_seconds"]
 
 
 def test_the_container_profile_name_is_per_run_not_per_workspace(tmp_path: Path) -> None:
@@ -368,7 +372,10 @@ def test_the_native_backend_refuses_unbuilt_capabilities_by_name(
 ) -> None:
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
-    backend = NativeSandboxBackend(driver=driver, proof=driver.probe())
+    # Exercise the capability-specific guards independently of the current
+    # disposable-workspace gate, using an explicitly simulated future proof.
+    proof = replace(driver.probe(), available=True, reason_code=None)
+    backend = NativeSandboxBackend(driver=driver, proof=proof)
     asked = request(tmp_path, **{field: True})
     with pytest.raises(CommandBackendError) as raised:
         backend.start(asked)

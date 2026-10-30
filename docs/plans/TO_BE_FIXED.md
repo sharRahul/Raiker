@@ -1,22 +1,105 @@
 ## Release blocker: native sandbox migration incomplete
 
-Native command execution is currently unavailable on every platform: the
-broker requires a positive descendant-termination observation, and the native
-probe now reports that observation as indeterminate. Its former marker-file
-check did not establish that a descendant had started or terminated. Implement
-real process identity and lifecycle tracking with positive controls on each OS,
-then restore execution only after all mandatory observations pass. Resource
-limit setup is checked on Unix but has not been validated as real enforcement.
+Real Windows adversarial ACL testing found that an AppContainer can write into
+`.git` when that directory grants `ALL APPLICATION PACKAGES` modify access,
+despite an explicit deny for the workspace capability SID. An experimental
+package-SID deny also failed this test and was removed. The broker remains
+unavailable: disposable workspaces and an ACL strategy that passes this real
+test are required before Windows execution can be enabled. The failing test is
+`appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_control`.
+An experimental less-privileged AppContainer (LPAC) passed that filesystem
+test but could not initialize Winsock or start the probe descendant on this
+machine. The experiment was removed to preserve the existing lifecycle probe.
+LPAC needs narrowly justified capabilities and real tests for useful process
+creation and network denial before it can replace the current boundary.
+
+The desktop packaging run for PR head `07f345f0` on 2026-10-30 could not
+start its macOS job because GitHub's `macos-14` runner was in a scheduled
+brownout. The local workflow and release target definitions now select
+`macos-15` for Apple Silicon; their configuration tests pass, but the updated
+job has not yet run on GitHub. The prior PR CI also has failing Python shards,
+Windows lifecycle and Build fault jobs; these are not resolved by the runner
+label change.
+
+Native command execution remains unavailable. A Windows probe now retains a
+live descendant process handle, checks its Job Object membership and observes
+termination after job closure; a real disposable-workspace probe produced an
+enforced verdict. This does not protect the original project, so Windows still
+refuses availability until disposable workspaces exist. A Linux Bubblewrap
+probe in Ubuntu WSL2 now matches a live namespace descendant to its host
+process, pins it with a pidfd and observes its exit after supervisor cancellation.
+The WSL2 integration test passes; hosted Linux CI and macOS process lifecycle
+evidence remain open. Restore execution only after all mandatory observations
+and disposable-workspace protections pass. Linux WSL2 tests now verify memory,
+CPU, process count and wall deadlines against outside controls; Windows verifies
+Job Object CPU-time termination. Linux process-count limits remain per-user and
+can be affected by unrelated processes; memory and CPU limits are per process,
+not task-wide aggregate quotas. macOS limits, hosted CI and aggregate quotas
+remain unverified.
+
+The Unix runner now makes deadline decisions in its child-owner wait loop
+instead of leaving a detached PID-targeting watchdog. Linux WSL integration
+tests exercise both deadline termination and prompt early completion; real
+macOS lifecycle and cancellation evidence is still required.
+
+The Linux boundary no longer mounts the host `/etc`, `/opt` or `/nix` trees.
+A WSL Bubblewrap test verifies that `/etc/hostname` is hidden while an outside
+control can read it. Toolchains outside `/usr` need a future governed mount;
+the remaining broad `/usr` read access and other platform filesystem policies
+still require threat-specific review. Runner policies reject a filesystem or
+drive root as the workspace, but non-root original projects still require a
+disposable workspace before execution may be enabled.
+
+On macOS the Seatbelt executable is resolved only at the system path. Linux
+Bubblewrap resolution still searches `PATH`, so an attacker able to influence
+that environment or replace its executable could supply a fake boundary.
+Require a trusted, non-agent-writable Bubblewrap artifact and verify its
+identity before enabling Linux execution; do not treat a `PATH` lookup as proof.
+
+Seatbelt profile construction now refuses non-UTF-8 paths and paths containing
+quotes, backslashes or control characters, preventing those path values from
+injecting policy expressions. The rejection has Rust unit coverage on Linux;
+the revised profile still requires genuine macOS enforcement tests.
+
+The existing credential snapshot now rejects overlapping staging/source roots,
+case-insensitively excludes protected directories, rejects Windows reparse
+points and compares a file's opened identity against its inspected identity.
+Windows hard-link, junction and file-replacement tests pass. This snapshot is
+now checked for file modification during copying, and cleanup refuses an
+unowned or replaced staging root. Source copying and artifact manifests enforce
+entry and byte limits; manifests reject roots that are symlinks or Windows
+reparse points. These checks are covered by `tests/test_credential_overlay.py`.
+Cleanup permission retries reject known links, reparse points and parent
+traversal and do not change permissions on the staging root's parent. These
+checks are still subject to concurrent path replacement.
+The preliminary conflict check compares affected paths and deleted-directory
+descendants against the original snapshot, including case-folded collisions.
+It is advisory only: it does not lock paths, authorize writes, promote files,
+or provide rollback.
+They are not yet a general task workspace:
+directory components are not held by pinned
+handles, promotion and rollback are missing, and adversarial directory races
+remain. Do not remove the native execution gate on this basis.
+
+The Python driver now probes a copied runner in a temporary directory, revokes
+its Windows grant and refuses project execution until disposable task workspaces
+exist. A real Windows check confirmed the original project, protected directory
+and runner-installation ACLs were unchanged by the probe. This does not yet
+prove crash recovery or safely revoke every historic grant already made. A real
+Windows test also verifies that a workspace capability ACE can be removed by
+the existing revocation function; protected child ACL restoration is still open.
 
 The requested Docker-free execution migration has not been implemented or
-verified. The command service now requires its native backend, but
-`raiker/execution/code_placement.py` now separates host-risk classification from
-sandbox placement, but the execution inventory remains incomplete; container,
+verified. The command service requires its native backend, and
+`raiker/execution/code_placement.py` separates host-risk classification from
+sandbox placement. The execution inventory remains incomplete; container,
 plugin and MCP execution paths remain separate. Their legacy default launchers
 now refuse execution until migrated; other subprocess paths are not yet audited.
-The macOS native
-runner permits broad filesystem reads, and Linux seccomp enforcement has not
-been established. Reproduce by inspecting those paths and
+The macOS native runner now uses a system-runtime and workspace read allowlist,
+but its real enforcement and toolchain compatibility remain unverified.
+Linux now installs a seccomp BPF filter;
+a WSL2 control-arm test observed personality and unshare blocked inside the
+boundary, but the rest of the filter and ARM runtime remain unverified. Inspect
 `native/raiker-command-runner/src/boundary_unix.rs`; a dependency probe alone
 does not demonstrate OS enforcement. The security impact is potential access
 to host files or network by code that the target design intends to isolate.

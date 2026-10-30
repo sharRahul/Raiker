@@ -62,28 +62,30 @@ use windows_sys::Win32::Security::Isolation::{
 };
 use windows_sys::Win32::Security::{
     ACCESS_ALLOWED_ACE, ACL, CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, EqualSid, GetAce,
-    GetTokenInformation, INHERITED_ACE, OBJECT_INHERIT_ACE, PSECURITY_DESCRIPTOR, PSID,
-    SECURITY_ATTRIBUTES, SECURITY_CAPABILITIES, SID_AND_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
-    TokenUser,
+    GetSecurityDescriptorControl, GetTokenInformation, INHERITED_ACE, OBJECT_INHERIT_ACE,
+    PSECURITY_DESCRIPTOR, PSID, SECURITY_ATTRIBUTES, SECURITY_CAPABILITIES, SID_AND_ATTRIBUTES,
+    TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_GENERIC_EXECUTE, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
 };
 use windows_sys::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
+    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_ACTIVE_PROCESS,
     JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION, JOB_OBJECT_LIMIT_JOB_MEMORY,
-    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JobObjectExtendedLimitInformation, SetInformationJobObject,
+    JOB_OBJECT_LIMIT_JOB_TIME, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+    SetInformationJobObject,
 };
 use windows_sys::Win32::System::Pipes::CreatePipe;
 use windows_sys::Win32::System::Threading::{
     CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
     GetCurrentProcess, GetExitCodeProcess, INFINITE, InitializeProcThreadAttributeList,
-    OpenProcessToken, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW,
-    TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+    OpenProcess, OpenProcessToken, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,
+    STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
 
 const PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES: usize = 0x0002_0009;
+const PROC_THREAD_ATTRIBUTE_HANDLE_LIST: usize = 0x0002_0002;
 const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
 /// `SE_GROUP_ENABLED`, which windows-sys exposes only under `SystemServices`.
 const SID_ATTRIBUTE_ENABLED: u32 = 4;
@@ -92,6 +94,8 @@ const SID_ATTRIBUTE_ENABLED: u32 = 4;
 const PROTECTED_DACL: u32 = 0x8000_0000;
 const ACE_TYPE_ALLOWED: u8 = 0;
 const ACE_TYPE_DENIED: u8 = 1;
+// File write/append/EA/attribute, delete-child, delete, WRITE_DAC, WRITE_OWNER.
+const READONLY_DENY_MASK: u32 = 0x000d_0156;
 
 unsafe extern "system" {
     fn SetHandleInformation(handle: HANDLE, mask: u32, flags: u32) -> i32;
@@ -128,6 +132,7 @@ pub fn probe(workspace: &Path) -> Value {
         masked_read_path: scratch.join("state"),
         connect_address: probe_destination(),
         spawn_grandchild: true,
+        hold_for_probe: false,
     };
     if std::fs::write(&test.masked_read_path, b"raiker-probe-state").is_err() {
         let _ = std::fs::remove_dir(&scratch);
@@ -154,14 +159,27 @@ pub fn probe(workspace: &Path) -> Value {
         allowed(&outside, "masked_read"),
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
+    let descendant = match inside.get("descendant_reaped").and_then(Value::as_str) {
+        Some("enforced") if relay => "enforced",
+        Some("unenforced") if relay => "unenforced",
+        _ => "indeterminate",
+    };
 
     json!({
         "platform": "windows",
         "boundary": "appcontainer",
-        "available": relay && inside_write && escape == "enforced",
-        "reason": Value::Null,
+        // The current broker passes the original workspace to the runner.
+        // Do not expose an executable boundary until disposable workspaces
+        // prevent autonomous code from writing directly to the owner's files.
+        "available": false,
+        "reason": if relay && inside_write && escape == "enforced"
+            && masked == "enforced" && network == "enforced" && descendant == "enforced" {
+            "native_disposable_workspace_required"
+        } else {
+            "native_sandbox_not_enforced"
+        },
         "network": network,
-        "process_tree_stop": false,
+        "process_tree_stop": descendant == "enforced",
         "pty": false,
         "concurrent_runs": false,
         "observations": {
@@ -170,7 +188,7 @@ pub fn probe(workspace: &Path) -> Value {
             "escape_write": escape,
             "masked_read": masked,
             "egress": network,
-            "descendant_reaped": "indeterminate",
+            "descendant_reaped": descendant,
         },
         "connect_destination": test.connect_address,
     })
@@ -294,10 +312,10 @@ fn start_process(
     };
 
     let mut attribute_size: usize = 0;
-    unsafe { InitializeProcThreadAttributeList(null_mut(), 1, 0, &mut attribute_size) };
+    unsafe { InitializeProcThreadAttributeList(null_mut(), 2, 0, &mut attribute_size) };
     let mut storage = vec![0u8; attribute_size];
     let list = storage.as_mut_ptr() as *mut c_void;
-    if unsafe { InitializeProcThreadAttributeList(list, 1, 0, &mut attribute_size) } == 0 {
+    if unsafe { InitializeProcThreadAttributeList(list, 2, 0, &mut attribute_size) } == 0 {
         return Err("native_sandbox_attribute_list_failed".into());
     }
     let updated = unsafe {
@@ -314,6 +332,21 @@ fn start_process(
     if updated == 0 {
         unsafe { DeleteProcThreadAttributeList(list) };
         return Err("native_sandbox_appcontainer_unavailable".into());
+    }
+    let handles_updated = unsafe {
+        UpdateProcThreadAttribute(
+            list,
+            0,
+            PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+            handles.as_ptr() as *const c_void,
+            size_of::<[HANDLE; 3]>(),
+            null_mut(),
+            null(),
+        )
+    };
+    if handles_updated == 0 {
+        unsafe { DeleteProcThreadAttributeList(list) };
+        return Err("native_sandbox_handle_list_failed".into());
     }
 
     let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
@@ -435,7 +468,9 @@ fn create_job(policy: &LaunchPolicy) -> Result<HANDLE, String> {
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
         | JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION
         | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
-        | JOB_OBJECT_LIMIT_JOB_MEMORY;
+        | JOB_OBJECT_LIMIT_JOB_MEMORY
+        | JOB_OBJECT_LIMIT_JOB_TIME;
+    limits.BasicLimitInformation.PerJobUserTimeLimit = (policy.max_cpu_seconds * 10_000_000) as i64;
     limits.BasicLimitInformation.ActiveProcessLimit = policy.max_processes;
     limits.JobMemoryLimit = policy.max_memory_bytes as usize;
     let set = unsafe {
@@ -540,13 +575,18 @@ fn ensure_workspace_grant(policy: &LaunchPolicy, capability: &Capability) -> Res
     // and `.git` inherit nothing, so what they say is the whole answer.
     for relative in &policy.deny_paths {
         let path = policy.workspace_root.join(relative);
-        if path.exists() && !has_explicit_ace(&path, capability.dacl_sid, ACE_TYPE_DENIED)? {
+        if path.exists() && !deny_ace_is_safe(&path, capability.dacl_sid)? {
+            set_entry(&path, capability.dacl_sid, 0, REVOKE_ACCESS, true)?;
             set_entry(&path, capability.dacl_sid, GENERIC_ALL, DENY_ACCESS, true)?;
+            if !deny_ace_is_safe(&path, capability.dacl_sid)? {
+                return Err("native_sandbox_deny_acl_unverified".into());
+            }
         }
     }
     for relative in &policy.readonly_paths {
         let path = policy.workspace_root.join(relative);
-        if path.exists() && !has_explicit_ace(&path, capability.dacl_sid, ACE_TYPE_ALLOWED)? {
+        if path.exists() && !readonly_ace_is_safe(&path, capability.dacl_sid)? {
+            set_entry(&path, capability.dacl_sid, 0, REVOKE_ACCESS, true)?;
             set_entry(
                 &path,
                 capability.dacl_sid,
@@ -554,6 +594,16 @@ fn ensure_workspace_grant(policy: &LaunchPolicy, capability: &Capability) -> Res
                 SET_ACCESS,
                 true,
             )?;
+            set_entry(
+                &path,
+                capability.dacl_sid,
+                READONLY_DENY_MASK,
+                DENY_ACCESS,
+                true,
+            )?;
+            if !readonly_ace_is_safe(&path, capability.dacl_sid)? {
+                return Err("native_sandbox_readonly_acl_unverified".into());
+            }
         }
     }
     if !has_explicit_ace(
@@ -592,6 +642,149 @@ fn ensure_workspace_grant(policy: &LaunchPolicy, capability: &Capability) -> Res
 pub fn revoke_workspace_grant(workspace: &Path) -> Result<(), String> {
     let capability = Capability::derive(&capability_name(workspace))?;
     set_entry(workspace, capability.dacl_sid, 0, REVOKE_ACCESS, false)
+}
+
+/// A deny ACE is only useful if it is protected, inheritable, covers full
+/// access, and appears before any allow that might satisfy the access check.
+fn deny_ace_is_safe(path: &Path, sid: PSID) -> Result<bool, String> {
+    const DACL_PROTECTED: u16 = 0x1000;
+    const FILE_ALL_ACCESS: u32 = 0x001f_01ff;
+    let wide_path = wide(&path.to_string_lossy());
+    let mut acl: *mut ACL = null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+    let read = unsafe {
+        GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut acl,
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if read != 0 {
+        return Err("native_sandbox_acl_grant_failed".into());
+    }
+    let mut control = 0u16;
+    let mut revision = 0u32;
+    let control_ok =
+        unsafe { GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) } != 0;
+    let mut denies_self = false;
+    let mut denies_children = false;
+    if control_ok && control & DACL_PROTECTED != 0 && !acl.is_null() {
+        for index in 0..unsafe { (*acl).AceCount } {
+            let mut ace: *mut c_void = null_mut();
+            if unsafe { GetAce(acl, index as u32, &mut ace) } == 0 {
+                break;
+            }
+            let entry = ace as *const ACCESS_ALLOWED_ACE;
+            let kind = unsafe { (*entry).Header.AceType };
+            // Only deny entries are permitted ahead of the target deny. This
+            // conservatively rejects noncanonical or unsupported ACL entries.
+            if kind != ACE_TYPE_DENIED {
+                break;
+            }
+            let entry_sid = unsafe { std::ptr::addr_of!((*entry).SidStart) } as PSID;
+            if unsafe { EqualSid(entry_sid, sid) } == 0 {
+                continue;
+            }
+            let mask = unsafe { (*entry).Mask };
+            let flags = unsafe { (*entry).Header.AceFlags };
+            let inherit = (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE) as u8;
+            let full = mask & GENERIC_ALL != 0 || mask & FILE_ALL_ACCESS == FILE_ALL_ACCESS;
+            if flags & (INHERITED_ACE as u8) == 0 && full {
+                // Windows may split one inheritable generic ACE into a
+                // direct mapped ACE and an inherit-only generic ACE.
+                denies_self |= flags & 0x08 == 0; // INHERIT_ONLY_ACE
+                denies_children |= flags & inherit == inherit;
+            }
+        }
+    }
+    unsafe { LocalFree(descriptor as HLOCAL) };
+    Ok(control_ok && control & DACL_PROTECTED != 0 && denies_self && denies_children)
+}
+
+/// A read-only allow is insufficient when another SID grants writes. Require
+/// an inheritable capability deny ahead of every allow as well as the read grant.
+fn readonly_ace_is_safe(path: &Path, sid: PSID) -> Result<bool, String> {
+    const DACL_PROTECTED: u16 = 0x1000;
+    const WRITE_LIKE: u32 = 0x500d_0156;
+    let wide_path = wide(&path.to_string_lossy());
+    let mut acl: *mut ACL = null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+    let read = unsafe {
+        GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut acl,
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if read != 0 {
+        return Err("native_sandbox_acl_grant_failed".into());
+    }
+    let mut control = 0u16;
+    let mut revision = 0u32;
+    let control_ok =
+        unsafe { GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) } != 0;
+    let mut found = false;
+    let mut unsafe_allow = false;
+    let mut leading_denies = true;
+    let mut deny_self = 0u32;
+    let mut deny_children = 0u32;
+    if control_ok && control & DACL_PROTECTED != 0 && !acl.is_null() {
+        for index in 0..unsafe { (*acl).AceCount } {
+            let mut ace: *mut c_void = null_mut();
+            if unsafe { GetAce(acl, index as u32, &mut ace) } == 0 {
+                unsafe_allow = true;
+                break;
+            }
+            let entry = ace as *const ACCESS_ALLOWED_ACE;
+            let kind = unsafe { (*entry).Header.AceType };
+            if kind != ACE_TYPE_DENIED {
+                leading_denies = false;
+            }
+            if kind != ACE_TYPE_ALLOWED && kind != ACE_TYPE_DENIED {
+                continue;
+            }
+            let entry_sid = unsafe { std::ptr::addr_of!((*entry).SidStart) } as PSID;
+            if unsafe { EqualSid(entry_sid, sid) } == 0 {
+                continue;
+            }
+            let mask = unsafe { (*entry).Mask };
+            let flags = unsafe { (*entry).Header.AceFlags };
+            let inherit = (CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE) as u8;
+            if kind == ACE_TYPE_DENIED {
+                if leading_denies && flags & (INHERITED_ACE as u8) == 0 {
+                    if flags & 0x08 == 0 {
+                        deny_self |= mask;
+                    }
+                    if flags & inherit == inherit {
+                        deny_children |= mask;
+                    }
+                }
+                continue;
+            }
+            unsafe_allow |= mask & WRITE_LIKE != 0;
+            let required = FILE_GENERIC_READ | FILE_GENERIC_EXECUTE;
+            found |= flags & (INHERITED_ACE as u8) == 0
+                && flags & inherit == inherit
+                && mask & required == required;
+        }
+    }
+    unsafe { LocalFree(descriptor as HLOCAL) };
+    Ok(control_ok
+        && control & DACL_PROTECTED != 0
+        && found
+        && !unsafe_allow
+        && deny_self & READONLY_DENY_MASK == READONLY_DENY_MASK
+        && deny_children & READONLY_DENY_MASK == READONLY_DENY_MASK)
 }
 
 /// True when this exact path carries an **explicit** (non-inherited) ACE of the
@@ -804,6 +997,7 @@ fn run_inside(workspace: &Path, test: &SelfTest) -> Result<Value, String> {
         max_processes: 32,
         max_memory_bytes: 1024 * 1024 * 1024,
         deadline_seconds: 60,
+        max_cpu_seconds: 60,
         profile_name: format!("raiker.probe.{}", std::process::id()),
     };
     let capability = Capability::derive(&capability_name(workspace))?;
@@ -857,22 +1051,69 @@ fn capture_in_container(
     stderr.close_parent();
 
     let handle = stdout.parent as usize;
-    let reader = std::thread::spawn(move || {
-        let mut source = unsafe { File::from_raw_handle(handle as RawHandle) };
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        let source = unsafe { File::from_raw_handle(handle as RawHandle) };
+        let mut source = std::io::BufReader::new(source);
         let mut text = String::new();
-        let _ = std::io::Read::read_to_string(&mut source, &mut text);
-        text
+        let _ = source.read_line(&mut text);
+        let _ = send.send(text);
     });
-    unsafe { WaitForSingleObject(information.hProcess, 30_000) };
+    let parent_wait = unsafe { WaitForSingleObject(information.hProcess, 30_000) };
+    let mut parent_exit = 0u32;
+    let exit_known = parent_wait == WAIT_OBJECT_0
+        && unsafe { GetExitCodeProcess(information.hProcess, &mut parent_exit) } != 0;
     unsafe { CloseHandle(information.hProcess) };
-    // Close the job *before* draining: closing it is what kills the detached
-    // grandchild, and until that happens anything the grandchild still holds
-    // keeps the read alive.
+    let text = if parent_wait == WAIT_OBJECT_0 {
+        receive.recv_timeout(std::time::Duration::from_secs(2)).ok()
+    } else {
+        None
+    };
+    let mut result = text.and_then(|text| serde_json::from_str::<Value>(text.trim()).ok());
+    let descendant = result
+        .as_ref()
+        .and_then(|value| live_job_descendant(job, value));
     unsafe { CloseHandle(job) };
-    std::thread::sleep(std::time::Duration::from_millis(400));
-    let text = reader.join().unwrap_or_default();
-    serde_json::from_str::<Value>(text.trim())
-        .map_err(|_| "native_sandbox_probe_no_output".to_owned())
+    let verdict = match descendant {
+        Some(process) => {
+            let stopped = unsafe { WaitForSingleObject(process, 2_000) } == WAIT_OBJECT_0;
+            unsafe { CloseHandle(process) };
+            if stopped { "enforced" } else { "unenforced" }
+        }
+        None => "indeterminate",
+    };
+    if !exit_known {
+        return Err("native_sandbox_probe_wait_failed".to_owned());
+    }
+    if parent_exit != 0 {
+        return Err(format!("native_sandbox_probe_exit_{parent_exit:08x}"));
+    }
+    let Some(ref mut value) = result else {
+        return Err("native_sandbox_probe_no_output".to_owned());
+    };
+    value["descendant_reaped"] = json!(verdict);
+    Ok(result.expect("checked above"))
+}
+
+// Establish a positive control on the exact process before closing the job.
+// Membership prevents an unrelated process with a reused PID from counting.
+fn live_job_descendant(job: HANDLE, value: &Value) -> Option<HANDLE> {
+    let pid = u32::try_from(value.get("descendant_pid")?.as_u64()?).ok()?;
+    const SYNCHRONIZE_AND_QUERY_LIMITED: u32 = 0x0010_1000;
+    let process = unsafe { OpenProcess(SYNCHRONIZE_AND_QUERY_LIMITED, 0, pid) };
+    if process.is_null() {
+        return None;
+    }
+    let mut member = 0;
+    let valid = unsafe { IsProcessInJob(process, job, &mut member) } != 0
+        && member != 0
+        && unsafe { WaitForSingleObject(process, 0) } == WAIT_TIMEOUT;
+    if !valid {
+        unsafe { CloseHandle(process) };
+        return None;
+    }
+    Some(process)
 }
 
 fn outside_targets(workspace: &Path, nonce: &str) -> Vec<PathBuf> {
@@ -900,7 +1141,7 @@ fn probe_destination() -> String {
 }
 
 fn default_gateway() -> Option<String> {
-    let output = std::process::Command::new("route")
+    let output = std::process::Command::new(system_route_program()?)
         .args(["print", "-4", "0.0.0.0"])
         .output()
         .ok()?;
@@ -909,6 +1150,19 @@ fn default_gateway() -> Option<String> {
         .filter(|line| line.trim_start().starts_with("0.0.0.0"))
         .filter_map(|line| line.split_whitespace().nth(2).map(str::to_owned))
         .find(|candidate| candidate.parse::<std::net::Ipv4Addr>().is_ok())
+}
+
+fn system_route_program() -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::SystemInformation::GetSystemDirectoryW;
+    let mut buffer = vec![0u16; 32_768];
+    let length = unsafe { GetSystemDirectoryW(buffer.as_mut_ptr(), buffer.len() as u32) } as usize;
+    if length == 0 || length >= buffer.len() {
+        return None;
+    }
+    let mut directory = PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length]));
+    directory.push("route.exe");
+    directory.is_file().then_some(directory)
 }
 
 /// Whether the connect attempt's packet reached the destination — a refusal
@@ -1150,6 +1404,105 @@ mod tests {
     use super::*;
 
     #[test]
+    fn route_program_is_resolved_from_the_windows_system_directory() {
+        let path = system_route_program().expect("system route.exe unavailable");
+        assert!(path.is_absolute());
+        assert_eq!(path.file_name().unwrap(), "route.exe");
+        assert_eq!(
+            path.parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_lowercase(),
+            "system32"
+        );
+    }
+
+    #[test]
+    fn workspace_capability_grant_is_removed_by_revocation() {
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        let capability = Capability::derive(&capability_name(&directory)).unwrap();
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            FILE_GENERIC_READ,
+            SET_ACCESS,
+            false,
+        )
+        .unwrap();
+        assert!(has_explicit_ace(&directory, capability.dacl_sid, ACE_TYPE_ALLOWED).unwrap());
+        revoke_workspace_grant(&directory).unwrap();
+        assert!(!has_explicit_ace(&directory, capability.dacl_sid, ACE_TYPE_ALLOWED).unwrap());
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn readonly_acl_does_not_accept_a_write_capable_allow() {
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        let capability = Capability::derive(&capability_name(&directory)).unwrap();
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+            SET_ACCESS,
+            true,
+        )
+        .unwrap();
+        assert!(has_explicit_ace(&directory, capability.dacl_sid, ACE_TYPE_ALLOWED).unwrap());
+        assert!(!readonly_ace_is_safe(&directory, capability.dacl_sid).unwrap());
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            FILE_GENERIC_READ | FILE_GENERIC_EXECUTE,
+            SET_ACCESS,
+            true,
+        )
+        .unwrap();
+        assert!(!readonly_ace_is_safe(&directory, capability.dacl_sid).unwrap());
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            READONLY_DENY_MASK,
+            DENY_ACCESS,
+            true,
+        )
+        .unwrap();
+        assert!(readonly_ace_is_safe(&directory, capability.dacl_sid).unwrap());
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn protected_acl_does_not_accept_a_partial_deny() {
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        let capability = Capability::derive(&capability_name(&directory)).unwrap();
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            FILE_GENERIC_READ,
+            DENY_ACCESS,
+            true,
+        )
+        .unwrap();
+        assert!(has_explicit_ace(&directory, capability.dacl_sid, ACE_TYPE_DENIED).unwrap());
+        assert!(!deny_ace_is_safe(&directory, capability.dacl_sid).unwrap());
+        set_entry(&directory, capability.dacl_sid, 0, REVOKE_ACCESS, true).unwrap();
+        set_entry(
+            &directory,
+            capability.dacl_sid,
+            GENERIC_ALL,
+            DENY_ACCESS,
+            true,
+        )
+        .unwrap();
+        assert!(deny_ace_is_safe(&directory, capability.dacl_sid).unwrap());
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
     fn failed_job_assignment_never_resumes_the_child() {
         let marker = std::env::temp_dir().join(format!("{}.txt", selftest::probe_nonce()));
         let mut command = wide(&format!("cmd.exe /c echo ran > \"{}\"", marker.display()));
@@ -1214,6 +1567,7 @@ mod tests {
             max_processes: 32,
             max_memory_bytes: 1024 * 1024 * 1024,
             deadline_seconds: 1,
+            max_cpu_seconds: 1,
             profile_name: "test".to_owned(),
         };
         let job = create_job(&policy).unwrap();
@@ -1222,15 +1576,157 @@ mod tests {
             unsafe { WaitForSingleObject(information.hProcess, 50) },
             WAIT_TIMEOUT
         );
+        let other_job = create_job(&policy).unwrap();
+        let report = json!({"descendant_pid": information.dwProcessId});
+        assert!(live_job_descendant(other_job, &report).is_none());
+        unsafe { CloseHandle(other_job) };
+        let descendant =
+            live_job_descendant(job, &report).expect("live child must be observed in its own job");
         assert_eq!(
             wait_and_close_job(job, information.hProcess, 50),
             WAIT_TIMEOUT
         );
         assert_eq!(
+            unsafe { WaitForSingleObject(descendant, 2_000) },
+            WAIT_OBJECT_0
+        );
+        unsafe { CloseHandle(descendant) };
+        assert_eq!(
             unsafe { WaitForSingleObject(information.hProcess, 0) },
             WAIT_OBJECT_0
         );
         unsafe { CloseHandle(information.hProcess) };
+    }
+
+    #[test]
+    fn job_cpu_time_limit_terminates_a_busy_process() {
+        let mut command = wide("cmd.exe /c for /l %i in (1,1,1000000000) do @rem");
+        let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+        startup.StartupInfo.cb =
+            size_of::<windows_sys::Win32::System::Threading::STARTUPINFOW>() as u32;
+        let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+        assert_ne!(
+            unsafe {
+                CreateProcessW(
+                    null(),
+                    command.as_mut_ptr(),
+                    null(),
+                    null(),
+                    0,
+                    CREATE_SUSPENDED,
+                    null(),
+                    null(),
+                    &startup.StartupInfo,
+                    &mut information,
+                )
+            },
+            0
+        );
+        let policy = LaunchPolicy {
+            workspace_root: PathBuf::from("C:\\"),
+            cwd: PathBuf::from("C:\\"),
+            deny_paths: vec![],
+            readonly_paths: vec![],
+            network: NetworkPolicy::Denied,
+            pty: false,
+            max_processes: 32,
+            max_memory_bytes: 1024 * 1024 * 1024,
+            deadline_seconds: 15,
+            max_cpu_seconds: 1,
+            profile_name: "test".to_owned(),
+        };
+        let job = create_job(&policy).unwrap();
+        assign_and_resume(job, &information).unwrap();
+        let live = unsafe { WaitForSingleObject(information.hProcess, 50) };
+        let terminated = unsafe { WaitForSingleObject(information.hProcess, 10_000) };
+        unsafe { CloseHandle(job) };
+        unsafe { CloseHandle(information.hProcess) };
+        assert_eq!(live, WAIT_TIMEOUT, "positive control must start alive");
+        assert_eq!(
+            terminated, WAIT_OBJECT_0,
+            "job CPU limit did not stop the process"
+        );
+    }
+
+    #[test]
+    fn job_process_limit_refuses_a_second_process() {
+        fn suspended_loop() -> PROCESS_INFORMATION {
+            let mut command = wide("cmd.exe /c for /l %i in (1,1,1000000000) do @rem");
+            let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+            startup.StartupInfo.cb =
+                size_of::<windows_sys::Win32::System::Threading::STARTUPINFOW>() as u32;
+            let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+            assert_ne!(
+                unsafe {
+                    CreateProcessW(
+                        null(),
+                        command.as_mut_ptr(),
+                        null(),
+                        null(),
+                        0,
+                        CREATE_SUSPENDED,
+                        null(),
+                        null(),
+                        &startup.StartupInfo,
+                        &mut information,
+                    )
+                },
+                0
+            );
+            information
+        }
+        let policy = LaunchPolicy {
+            workspace_root: PathBuf::from("C:\\"),
+            cwd: PathBuf::from("C:\\"),
+            deny_paths: vec![],
+            readonly_paths: vec![],
+            network: NetworkPolicy::Denied,
+            pty: false,
+            max_processes: 1,
+            max_memory_bytes: 1024 * 1024 * 1024,
+            deadline_seconds: 15,
+            max_cpu_seconds: 15,
+            profile_name: "test".to_owned(),
+        };
+        let job = create_job(&policy).unwrap();
+        let first = suspended_loop();
+        assign_and_resume(job, &first).unwrap();
+        let live = unsafe { WaitForSingleObject(first.hProcess, 50) };
+        let second = suspended_loop();
+        // Use a duplicate job handle: failure closes the handle passed to the
+        // helper, while the original remains valid to terminate the first job.
+        let mut duplicate: HANDLE = null_mut();
+        assert_ne!(
+            unsafe {
+                windows_sys::Win32::Foundation::DuplicateHandle(
+                    GetCurrentProcess(),
+                    job,
+                    GetCurrentProcess(),
+                    &mut duplicate,
+                    0,
+                    0,
+                    windows_sys::Win32::Foundation::DUPLICATE_SAME_ACCESS,
+                )
+            },
+            0
+        );
+        let result = assign_and_resume(duplicate, &second);
+        if result.is_ok() {
+            unsafe { CloseHandle(duplicate) };
+        }
+        unsafe { CloseHandle(job) };
+        let first_exited = unsafe { WaitForSingleObject(first.hProcess, 5_000) };
+        unsafe { CloseHandle(first.hProcess) };
+        if result.is_ok() {
+            unsafe { WaitForSingleObject(second.hProcess, 5_000) };
+            unsafe { CloseHandle(second.hProcess) };
+        }
+        assert_eq!(live, WAIT_TIMEOUT, "positive control must be running");
+        assert_eq!(result.unwrap_err(), "native_sandbox_job_object_failed");
+        assert_eq!(
+            first_exited, WAIT_OBJECT_0,
+            "closing the job must reap the first process"
+        );
     }
 
     #[test]

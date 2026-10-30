@@ -24,7 +24,11 @@
 //! * `--linger <marker>` — the probe's detached grandchild, which exists to
 //!   prove containment reaches descendants and not merely the first executable.
 
+#[cfg(target_os = "linux")]
+mod lifecycle_linux;
 mod policy;
+#[cfg(target_os = "linux")]
+mod seccomp_linux;
 mod selftest;
 
 #[cfg(unix)]

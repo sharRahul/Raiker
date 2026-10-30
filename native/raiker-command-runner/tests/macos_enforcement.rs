@@ -26,6 +26,44 @@ fn run(runner: &Path, policy: &Path, argv: &[&str]) -> Output {
 }
 
 #[test]
+fn seatbelt_probe_measures_real_filesystem_controls_without_claiming_availability() {
+    let name = format!(
+        "raiker-seatbelt-probe-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let temp = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let root = temp.join(&name);
+    std::fs::create_dir(&root).unwrap();
+    let fixture = Fixture {
+        root,
+        outside: temp.join(format!("{name}-outside")),
+    };
+    let runner = fixture.root.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let output = Command::new(&runner)
+        .arg("--probe")
+        .arg("--workspace")
+        .arg(&fixture.root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["boundary"], "seatbelt", "{report}");
+    for property in ["relay", "workspace_write", "escape_write", "masked_read"] {
+        assert_eq!(report["observations"][property], "enforced", "{report}");
+    }
+    assert_eq!(report["available"], false, "{report}");
+}
+
+#[test]
 fn seatbelt_allows_workspace_reads_but_denies_outside_reads_and_writes() {
     let name = format!(
         "raiker-seatbelt-{}-{}",

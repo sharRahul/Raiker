@@ -514,6 +514,10 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
             arguments.push(path.to_owned());
         }
     }
+    if Path::new("/usr/local").is_dir() {
+        arguments.push("--tmpfs".to_owned());
+        arguments.push("/usr/local".to_owned());
+    }
     for (target, link) in SYSTEM_LINKS {
         if Path::new(link).is_symlink() || !Path::new(link).exists() {
             arguments.push("--symlink".to_owned());

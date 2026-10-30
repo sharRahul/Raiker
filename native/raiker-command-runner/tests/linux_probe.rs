@@ -104,6 +104,59 @@ fn bubblewrap_memory_limit_blocks_an_allocation_that_the_host_control_allows() {
 }
 
 #[test]
+fn bubblewrap_never_executes_a_fake_helper_from_path() {
+    use std::os::unix::fs::PermissionsExt;
+    let path = std::env::temp_dir().join(format!(
+        "raiker-linux-fake-bwrap-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&path).unwrap();
+    let workspace = Workspace(path);
+    let fake_dir = workspace.0.join("fake-bin");
+    std::fs::create_dir(&fake_dir).unwrap();
+    let fake = fake_dir.join("bwrap");
+    std::fs::write(
+        &fake,
+        "#!/bin/sh\nprintf launched > \"$RAIKER_FAKE_MARKER\"\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let marker = workspace.0.join("fake-launched");
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0, "cwd": workspace.0,
+        "profile_name": "raiker.fake.test", "deadline_seconds": 15,
+        "max_processes": 4096
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let output = output_after_transient_exec_busy(
+        Command::new(&runner)
+            .arg("--policy")
+            .arg(policy_path)
+            .arg("--")
+            .args(["/usr/bin/python3", "-c", "print('sandbox started')"])
+            .env("PATH", &fake_dir)
+            .env("RAIKER_FAKE_MARKER", &marker),
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "sandbox started"
+    );
+    assert!(!marker.exists(), "fake Bubblewrap ran on the host");
+}
+
+#[test]
 fn bubblewrap_respects_a_stricter_inherited_memory_limit() {
     use std::os::unix::process::CommandExt;
 
@@ -154,11 +207,15 @@ fn bubblewrap_respects_a_stricter_inherited_memory_limit() {
 }
 
 #[test]
-fn bubblewrap_hides_host_etc_files_with_a_readable_host_control() {
+fn bubblewrap_hides_host_configuration_and_local_software_with_host_controls() {
     let sensitive = "/etc/hostname";
     assert!(
         std::fs::read_to_string(sensitive).is_ok(),
         "host control cannot read {sensitive}"
+    );
+    assert!(
+        std::path::Path::new("/usr/local/bin").is_dir(),
+        "host local software control missing"
     );
     let path = std::env::temp_dir().join(format!(
         "raiker-linux-host-read-{}-{}",
@@ -179,7 +236,7 @@ fn bubblewrap_hides_host_etc_files_with_a_readable_host_control() {
     });
     let policy_path = workspace.0.join("policy.json");
     std::fs::write(&policy_path, policy.to_string()).unwrap();
-    let program = "from pathlib import Path\np = Path('/etc/hostname')\nprint('exposed' if p.exists() else 'hidden')";
+    let program = "from pathlib import Path\nprint(' '.join('exposed' if Path(p).exists() else 'hidden' for p in ['/etc/hostname', '/usr/local/bin']))";
     let output = output_after_transient_exec_busy(
         Command::new(&runner)
             .arg("--policy")
@@ -192,7 +249,10 @@ fn bubblewrap_hides_host_etc_files_with_a_readable_host_control() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "hidden");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "hidden hidden"
+    );
 }
 
 #[test]

@@ -42,16 +42,17 @@ instead of leaving a detached PID-targeting watchdog. Linux WSL integration
 tests exercise both deadline termination and prompt early completion; real
 macOS lifecycle and cancellation evidence is still required.
 
-The macOS hosted control returned `EINVAL` during process startup. The runner
-now reports which resource-limit operation failed while preserving the native
-error number; the updated code still needs hosted macOS evidence. Ubuntu CI
-now loads the distribution's targeted `bwrap-userns-restrict` AppArmor profile
-without disabling AppArmor or its global namespace restrictions; this setup
-must pass the actual namespace enforcement tests before being considered fixed.
+The macOS hosted control returned `EINVAL` when setting `RLIMIT_AS`; no
+equivalent memory control has yet been verified, so full execution stays
+unavailable. Ubuntu CI loads the distribution's targeted
+`bwrap-userns-restrict` AppArmor profile without disabling AppArmor or its
+global namespace restrictions. On checkpoint `1645da24`, the hosted Ubuntu
+native job passed its real Bubblewrap tests and built the runner.
 
-The Linux boundary no longer mounts the host `/etc`, `/opt` or `/nix` trees.
-A WSL Bubblewrap test verifies that `/etc/hostname` is hidden while an outside
-control can read it. Toolchains outside `/usr` need a future governed mount;
+The Linux boundary no longer mounts the host `/etc`, `/opt` or `/nix` trees,
+and masks `/usr/local`. A WSL Bubblewrap test verifies host configuration and
+local software paths are hidden while outside controls can access them.
+Toolchains outside the remaining system paths need a future governed mount;
 the remaining broad `/usr` read access and other platform filesystem policies
 still require threat-specific review. Runner policies reject a filesystem or
 drive root as the workspace, but non-root original projects still require a
@@ -68,8 +69,8 @@ Seatbelt control could start, and on hosted Ubuntu because Bubblewrap could not
 configure its network namespace (`RTM_NEWADDR: Operation not permitted`).
 Windows reproduced the protected-directory ACL bypass and did not prove its
 descendant observation on the hosted runner. These are release blockers, not
-skipped security checks; Linux requires a suitable dedicated runner if the
-hosted environment cannot support the namespace without weakening isolation.
+skipped security checks. The later Ubuntu job passed after loading its targeted
+AppArmor profile, without disabling global protections.
 The same CI run's legacy image scan also reported a critical Python base-image
 vulnerability (CVE-2026-115557); the obsolete image path must remain blocked
 and be removed only when its native replacement is ready.

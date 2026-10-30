@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -164,8 +165,17 @@ class NativeSandboxDriver:
 
     @staticmethod
     def _default_probe_runner(argv: list[str]) -> subprocess.CompletedProcess[str]:
+        # The probe is trusted infrastructure, but it launches a sandboxed
+        # child. Do not pass host credentials or loader injection variables to
+        # either process. Home/profile paths are needed for outside controls.
+        allowed = (
+            "PATH", "HOME", "USERPROFILE", "LOCALAPPDATA", "SYSTEMROOT", "WINDIR",
+            "TMP", "TEMP", "TMPDIR", "LANG", "LC_ALL",
+        )
+        environment = {name: os.environ[name] for name in allowed if name in os.environ}
         return subprocess.run(  # noqa: S603 - argv is built from a verified binary path
             argv,
+            env=environment,
             capture_output=True,
             text=True,
             timeout=180,

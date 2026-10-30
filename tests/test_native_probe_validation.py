@@ -11,6 +11,25 @@ import pytest
 from raiker.execution.commands.backends.native import NativeSandboxDriver
 
 
+def test_probe_runner_uses_a_restricted_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LD_PRELOAD", "attacker-library")
+    monkeypatch.setenv("DYLD_INSERT_LIBRARIES", "attacker-library")
+    monkeypatch.setenv("RAIKER_TEST_PRIVATE_TOKEN", "private-value")
+    captured: dict[str, object] = {}
+
+    def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(argv, 0, "{}", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    NativeSandboxDriver._default_probe_runner(["runner", "--probe"])
+    environment = captured["env"]
+    assert isinstance(environment, dict)
+    assert "LD_PRELOAD" not in environment
+    assert "DYLD_INSERT_LIBRARIES" not in environment
+    assert "RAIKER_TEST_PRIVATE_TOKEN" not in environment
+
+
 def test_non_object_digest_manifest_is_refused(tmp_path: Path) -> None:
     helper = tmp_path / "helper"
     helper.mkdir()

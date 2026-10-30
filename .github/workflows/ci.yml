@@ -144,7 +144,7 @@ jobs:
   # about a third of the time, well inside the limit the single job reached.
   python-tests:
     name: Python tests (shard ${{ matrix.shard }} of 3)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -159,6 +159,13 @@ jobs:
         with:
           install: dev
           cache: pip
+      - name: Install native sandbox prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap apparmor-profiles
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+      - name: Build native runner
+        run: python scripts/build_native_runner.py
       - name: Run tests
         run: |
           python -m pytest -vv --durations=25 $(python scripts/test_shard.py ${{ matrix.shard }} 3)
@@ -510,7 +517,7 @@ jobs:
     # host dies (the check is taken back over and the outcome follows its real
     # exit), and the host and the check both die (never verified). No credential.
     name: Build faults (host killed mid-check)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -520,6 +527,13 @@ jobs:
         with:
           install: dev
           cache: pip
+      - name: Install native sandbox prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap apparmor-profiles
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+      - name: Build native runner
+        run: python scripts/build_native_runner.py
       - name: Kill the host mid-check and read the outcome
         run: python scripts/build_restart_fault.py --report build-restart-fault.json
       - name: Keep the report

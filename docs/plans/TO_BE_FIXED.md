@@ -74,6 +74,10 @@ AppArmor profile, without disabling global protections.
 The same CI run's legacy image scan also reported a critical Python base-image
 vulnerability (CVE-2026-115557); the obsolete image path must remain blocked
 and be removed only when its native replacement is ready.
+The Python shards and Build fault job now provision Bubblewrap, its targeted
+AppArmor profile, and the native runner before testing. Their remaining
+failures must still be resolved; provisioning is not proof that currently
+blocked background, Git, plugin or MCP execution works.
 
 Seatbelt profile construction now refuses non-UTF-8 paths and paths containing
 quotes, backslashes or control characters, preventing those path values from

@@ -181,8 +181,8 @@ binaries an agent command may not invoke; that is a denial, not a dependency.
 | Platform | Result | Evidence |
 | --- | --- | --- |
 | Linux (`ubuntu-24.04`) | Native runner tests pass, including real Bubblewrap and seccomp control-arm tests | CI job *Native runner (ubuntu-24.04)* |
-| Windows (`windows-2025`) | Adversarial ACL test passes after the fail-closed change. The probe's descendant could not open `\\.\NUL` in the AppContainer; the probe now uses private pipes. Rerun pending. | CI job *Native runner (windows-2025)* |
-| macOS (`macos-15`, `macos-15-intel`) | Failing: `RLIMIT_AS` rejected (EINVAL), then `cat` denied `file-read-data /`. Both addressed; rerun pending | CI jobs *Native runner (macos-15*)* and the Seatbelt denial log step |
+| Windows (`windows-2025`) | Adversarial ACL test passes after the fail-closed change. The probe measured relay, workspace write, escape write, masked read and descendant reaping as **enforced**. Egress is **indeterminate** because the hosted runner's gateway drops the unsandboxed control packet; the probe correctly withholds "fully enforced" there (egress was enforced on the owner's Windows 11 host). | CI job *Native runner (windows-2025)* |
+| macOS (`macos-15`, `macos-15-intel`) | Seatbelt runs `cat` and `sh`; workspace reads are allowed and outside reads and writes are **denied** (measured). The probe measured `.raiker` **readable** (`masked_read: unenforced`) because a later deny did not override the workspace allow. The allow rules now exclude protected paths with `require-not`, and a direct `sandbox-exec` test covers `.raiker` reads and `.git` writes. Rerun pending. Descendant containment is indeterminate. | CI jobs *Native runner (macos-15*)* and the Seatbelt denial log step |
 
 ## Windows MXC evaluation (2026-10-30)
 

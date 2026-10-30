@@ -63,10 +63,23 @@ fn real_appcontainer_probe_observes_descendant_exit_and_requires_disposable_work
     );
     assert_eq!(report["process_tree_stop"], true, "{report}");
     assert_eq!(report["available"], false, "{report}");
-    assert_eq!(
-        report["reason"], "native_disposable_workspace_required",
-        "{report}"
-    );
+    for property in ["relay", "workspace_write", "escape_write", "masked_read"] {
+        assert_eq!(report["observations"][property], "enforced", "{report}");
+    }
+    // Egress is proven only when the unsandboxed control reaches the gateway.
+    // Hosted runners drop that packet, so there it stays indeterminate and the
+    // probe must not report the boundary as fully enforced. It may never be
+    // measured as unenforced.
+    match report["observations"]["egress"].as_str() {
+        Some("enforced") => assert_eq!(
+            report["reason"], "native_disposable_workspace_required",
+            "{report}"
+        ),
+        Some("indeterminate") => {
+            assert_eq!(report["reason"], "native_sandbox_not_enforced", "{report}")
+        }
+        _ => panic!("egress not contained: {report}"),
+    }
     let revoke = Command::new(&workspace.runner)
         .args(["--revoke-grant", "--workspace"])
         .arg(&workspace.path)

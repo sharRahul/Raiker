@@ -633,8 +633,31 @@ pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
             seatbelt_path(ancestor)?
         ));
     }
-    profile.push_str(&format!("(allow file-read* (subpath \"{root}\"))\n"));
-    profile.push_str(&format!("(allow file-write* (subpath \"{root}\"))\n"));
+    // The workspace grants exclude the protected paths themselves rather than
+    // relying on a later deny to override them: measured on macOS 15, a deny
+    // placed after the workspace allow did not keep `.raiker` unreadable.
+    let mut masked = String::new();
+    for relative in &policy.deny_paths {
+        let path = policy.workspace_root.join(relative);
+        masked.push_str(&format!(
+            " (require-not (subpath \"{}\"))",
+            seatbelt_path(&path)?
+        ));
+    }
+    let mut unwritable = masked.clone();
+    for relative in &policy.readonly_paths {
+        let path = policy.workspace_root.join(relative);
+        unwritable.push_str(&format!(
+            " (require-not (subpath \"{}\"))",
+            seatbelt_path(&path)?
+        ));
+    }
+    profile.push_str(&format!(
+        "(allow file-read* (require-all (subpath \"{root}\"){masked}))\n"
+    ));
+    profile.push_str(&format!(
+        "(allow file-write* (require-all (subpath \"{root}\"){unwritable}))\n"
+    ));
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
     for relative in &policy.deny_paths {
         let path = policy.workspace_root.join(relative);
@@ -924,7 +947,10 @@ mod tests {
         assert!(!profile.contains("(allow file-read* file-read-metadata)"));
         assert!(!profile.contains("(allow file-write* (subpath \"/private/tmp\")"));
         assert!(profile.contains("(subpath \"/System/Library\")"));
-        assert!(profile.contains("(allow file-read* (subpath \"/ws\"))"));
+        assert!(profile.contains(
+            "(allow file-read* (require-all (subpath \"/ws\") (require-not (subpath \"/ws/.raiker\"))))"
+        ));
+        assert!(profile.contains("(require-not (subpath \"/ws/.git\"))))"));
         assert!(profile.contains("(allow file-read-metadata (literal \"/\"))"));
         assert!(!profile.contains("(allow file-read* (literal \"/\"))"));
     }
@@ -956,6 +982,9 @@ mod tests {
         let outside = temp.join(format!("{}-outside", selftest::probe_nonce()));
         std::fs::write(&inside, b"inside control").unwrap();
         std::fs::write(&outside, b"outside private").unwrap();
+        std::fs::create_dir(root.join(".raiker")).unwrap();
+        std::fs::write(root.join(".raiker").join("state"), b"raiker private").unwrap();
+        std::fs::create_dir(root.join(".git")).unwrap();
         let mut policy = sample();
         policy.workspace_root = root.clone();
         policy.cwd = root.clone();
@@ -969,6 +998,14 @@ mod tests {
         };
         let allowed = run(&inside);
         let denied = run(&outside);
+        let masked = run(&root.join(".raiker").join("state"));
+        let git_target = root.join(".git").join("hook");
+        let git_write = Command::new("/usr/bin/sandbox-exec")
+            .args(["-p", &profile, "/bin/sh", "-c", "printf x > \"$1\"", "sh"])
+            .arg(&git_target)
+            .output()
+            .unwrap();
+        let git_written = git_target.exists();
         let _ = std::fs::remove_file(&outside);
         let _ = std::fs::remove_dir_all(&root);
         assert!(
@@ -979,6 +1016,12 @@ mod tests {
         assert_eq!(allowed.stdout, b"inside control");
         assert!(!denied.status.success(), "outside read was allowed");
         assert!(!String::from_utf8_lossy(&denied.stdout).contains("outside private"));
+        assert!(!masked.status.success(), "masked .raiker read was allowed");
+        assert!(!String::from_utf8_lossy(&masked.stdout).contains("raiker private"));
+        assert!(
+            !git_write.status.success() && !git_written,
+            ".git write was allowed"
+        );
     }
 
     #[test]

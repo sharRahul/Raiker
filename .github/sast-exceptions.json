@@ -42,22 +42,6 @@
       "expires": "2027-04-10"
     },
     {
-      "path": "raiker/execution/commands/backends/container.py",
-      "rule": "S604",
-      "fingerprint": "f25712f53e9f6c91",
-      "owner": "Raiker maintainers",
-      "reason": "A capability flag named shell on a dataclass, not a subprocess call",
-      "expires": "2027-04-10"
-    },
-    {
-      "path": "raiker/execution/commands/backends/container.py",
-      "rule": "S108",
-      "fingerprint": "a0beaffb57190a0f",
-      "owner": "Raiker maintainers",
-      "reason": "A path inside the sandbox or container (tmpfs mount, or the sandboxed process's TMPDIR), not a host temporary file Raiker creates",
-      "expires": "2027-04-10"
-    },
-    {
       "path": "raiker/execution/commands/egress_proxy.py",
       "rule": "S104",
       "fingerprint": "0cd6d8e7f2d98f11",
@@ -127,14 +111,6 @@
       "fingerprint": "1ee44d6f40312b17",
       "owner": "Raiker maintainers",
       "reason": "A constant naming an environment variable, a redaction marker or a status label, not a credential",
-      "expires": "2027-04-10"
-    },
-    {
-      "path": "raiker/models/conversion.py",
-      "rule": "S108",
-      "fingerprint": "057be5cbc26fd7d1",
-      "owner": "Raiker maintainers",
-      "reason": "A path inside the sandbox or container (tmpfs mount, or the sandboxed process's TMPDIR), not a host temporary file Raiker creates",
       "expires": "2027-04-10"
     },
     {

@@ -98,6 +98,6 @@ def test_disabled_runtime_surfaces_remain_disabled(tmp_path: Path) -> None:
     assert gates["subagents"]["runtime_enabled"] is True
     assert gates["multi_agent_teams"]["runtime_enabled"] is True
     assert gates["remote_execution"]["runtime_enabled"] is False
-    assert gates["container_execution"]["runtime_enabled"] is False
+    assert "container_execution" not in gates  # removed with Docker and Podman
     assert graph_governance_status()["runtime_indexing_enabled"] is False
     assert memory_governance_summary(tmp_path)["semantic_writes_enabled"] is False

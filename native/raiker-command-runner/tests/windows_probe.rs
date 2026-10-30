@@ -56,6 +56,7 @@ fn real_appcontainer_probe_observes_descendant_exit_and_requires_disposable_work
     assert!(output.status.success(), "probe did not exit successfully");
     let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["boundary"], "appcontainer", "{report}");
+    assert_eq!(report["descendant_start"]["state"], "started", "{report}");
     assert_eq!(
         report["observations"]["descendant_reaped"], "enforced",
         "{report}"

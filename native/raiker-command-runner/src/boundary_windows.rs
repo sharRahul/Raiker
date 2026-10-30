@@ -180,6 +180,7 @@ pub fn probe(workspace: &Path) -> Value {
         },
         "network": network,
         "process_tree_stop": descendant == "enforced",
+        "descendant_start": inside.get("descendant_start"),
         "pty": false,
         "concurrent_runs": false,
         "observations": {

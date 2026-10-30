@@ -104,6 +104,56 @@ fn bubblewrap_memory_limit_blocks_an_allocation_that_the_host_control_allows() {
 }
 
 #[test]
+fn bubblewrap_respects_a_stricter_inherited_memory_limit() {
+    use std::os::unix::process::CommandExt;
+
+    let path = std::env::temp_dir().join(format!(
+        "raiker-linux-inherited-limit-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&path).unwrap();
+    let workspace = Workspace(path);
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let policy = serde_json::json!({
+        "workspace_root": workspace.0, "cwd": workspace.0,
+        "profile_name": "raiker.inherited.test", "deadline_seconds": 15,
+        "max_memory_bytes": 1024 * 1024 * 1024, "max_processes": 4096
+    });
+    let policy_path = workspace.0.join("policy.json");
+    std::fs::write(&policy_path, policy.to_string()).unwrap();
+    let mut command = Command::new(&runner);
+    command.arg("--policy").arg(policy_path).arg("--").args([
+        "/usr/bin/python3",
+        "-c",
+        "print('started')",
+    ]);
+    unsafe {
+        command.pre_exec(|| {
+            let limit = libc::rlimit {
+                rlim_cur: 256 * 1024 * 1024,
+                rlim_max: 256 * 1024 * 1024,
+            };
+            if libc::setrlimit(libc::RLIMIT_AS, &limit) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let output = output_after_transient_exec_busy(&mut command);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "started");
+}
+
+#[test]
 fn bubblewrap_hides_host_etc_files_with_a_readable_host_control() {
     let sensitive = "/etc/hostname";
     assert!(

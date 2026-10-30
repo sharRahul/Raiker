@@ -121,19 +121,33 @@ fn seccomp_control() -> Value {
 /// The probe child: detach a grandchild, take every measurement, print the
 /// result for the parent to read back.
 pub fn run(test: &SelfTest) -> Value {
-    let mut descendant = if test.spawn_grandchild {
-        spawn_grandchild(test)
+    let (mut descendant, mut descendant_start) = if test.spawn_grandchild {
+        match spawn_grandchild(test) {
+            Ok(child) => (Some(child), json!({"state": "started"})),
+            Err(error) => (
+                None,
+                json!({"state": "spawn_failed", "error_code": error.raw_os_error()}),
+            ),
+        }
     } else {
-        None
+        (None, json!({"state": "not_requested"}))
     };
     let mut result = attempt(test);
     // A PID is only an invitation to measure the process, not proof of
     // termination. The outer probe must retain and observe its OS handle.
-    if let Some(child) = descendant.as_mut()
-        && matches!(child.try_wait(), Ok(None))
-    {
-        result["descendant_pid"] = json!(child.id());
+    if let Some(child) = descendant.as_mut() {
+        match child.try_wait() {
+            Ok(None) => result["descendant_pid"] = json!(child.id()),
+            Ok(Some(status)) => {
+                descendant_start = json!({"state": "exited", "exit_code": status.code()})
+            }
+            Err(error) => {
+                descendant_start =
+                    json!({"state": "wait_failed", "error_code": error.raw_os_error()})
+            }
+        }
     }
+    result["descendant_start"] = descendant_start;
     let mut stdout = std::io::stdout();
     let _ = writeln!(stdout, "{result}");
     let _ = stdout.flush();
@@ -154,11 +168,9 @@ pub fn run(test: &SelfTest) -> Value {
 /// process-group kill removes it on every platform, so the observation would
 /// pass on macOS, which is precisely the host whose weaker posture it exists to
 /// expose.
-fn spawn_grandchild(test: &SelfTest) -> Option<std::process::Child> {
+fn spawn_grandchild(test: &SelfTest) -> std::io::Result<std::process::Child> {
     let marker = test.inside_path.with_extension("grandchild");
-    let Ok(current) = std::env::current_exe() else {
-        return None;
-    };
+    let current = std::env::current_exe()?;
     let mut command = std::process::Command::new(current);
     command
         .arg("--linger")
@@ -172,7 +184,7 @@ fn spawn_grandchild(test: &SelfTest) -> Option<std::process::Child> {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     detach(&mut command);
-    command.spawn().ok()
+    command.spawn()
 }
 
 #[cfg(windows)]

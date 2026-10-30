@@ -70,6 +70,9 @@ Windows reproduced the protected-directory ACL bypass and did not prove its
 descendant observation on the hosted runner. These are release blockers, not
 skipped security checks; Linux requires a suitable dedicated runner if the
 hosted environment cannot support the namespace without weakening isolation.
+The same CI run's legacy image scan also reported a critical Python base-image
+vulnerability (CVE-2026-115557); the obsolete image path must remain blocked
+and be removed only when its native replacement is ready.
 
 Seatbelt profile construction now refuses non-UTF-8 paths and paths containing
 quotes, backslashes or control characters, preventing those path values from

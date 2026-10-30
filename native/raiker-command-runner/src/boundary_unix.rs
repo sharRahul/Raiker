@@ -287,9 +287,12 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     #[cfg(target_os = "linux")]
     inherit_linux_filter(&mut command, &filter);
     bound_child(&mut command, policy);
-    let mut child = command
-        .spawn()
-        .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
+    let mut child = command.spawn().map_err(|error| {
+        format!(
+            "native_sandbox_launch_failed:{}",
+            error.raw_os_error().unwrap_or(0)
+        )
+    })?;
     #[cfg(target_os = "linux")]
     drop(filter);
 
@@ -369,27 +372,20 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
     let expected_parent = std::process::id() as libc::pid_t;
     unsafe {
         command.pre_exec(move || {
-            let procs = libc::rlimit {
-                rlim_cur: processes,
-                rlim_max: processes,
+            let apply_limit = |resource, requested| -> std::io::Result<()> {
+                let mut existing: libc::rlimit = std::mem::zeroed();
+                if libc::getrlimit(resource, &mut existing) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                let limit = narrower_limit(&existing, requested);
+                if libc::setrlimit(resource, &limit) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
             };
-            if libc::setrlimit(libc::RLIMIT_NPROC, &procs) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            let address_space = libc::rlimit {
-                rlim_cur: memory,
-                rlim_max: memory,
-            };
-            if libc::setrlimit(libc::RLIMIT_AS, &address_space) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            let cpu_limit = libc::rlimit {
-                rlim_cur: cpu,
-                rlim_max: cpu,
-            };
-            if libc::setrlimit(libc::RLIMIT_CPU, &cpu_limit) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
+            apply_limit(libc::RLIMIT_NPROC, processes)?;
+            apply_limit(libc::RLIMIT_AS, memory)?;
+            apply_limit(libc::RLIMIT_CPU, cpu)?;
             #[cfg(target_os = "linux")]
             if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
                 return Err(std::io::Error::last_os_error());
@@ -400,6 +396,13 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
             }
             Ok(())
         });
+    }
+}
+
+fn narrower_limit(existing: &libc::rlimit, requested: libc::rlim_t) -> libc::rlimit {
+    libc::rlimit {
+        rlim_cur: existing.rlim_cur.min(requested),
+        rlim_max: existing.rlim_max.min(requested),
     }
 }
 
@@ -428,20 +431,37 @@ fn mechanism() -> (&'static str, &'static str) {
 }
 
 fn which(tool: &str) -> Option<String> {
-    if tool == "sandbox-exec" {
-        let system_tool = Path::new("/usr/bin/sandbox-exec");
-        return system_tool
-            .is_file()
-            .then(|| system_tool.to_string_lossy().into_owned());
+    let candidates: &[&str] = match tool {
+        "sandbox-exec" => &["/usr/bin/sandbox-exec"],
+        "bwrap" => &["/usr/bin/bwrap", "/bin/bwrap"],
+        _ => return None,
+    };
+    candidates
+        .iter()
+        .find_map(|candidate| trusted_system_tool(Path::new(candidate)))
+}
+
+fn trusted_system_tool(path: &Path) -> Option<String> {
+    use std::os::unix::fs::MetadataExt;
+
+    for parent in path.parent()?.ancestors() {
+        let metadata = std::fs::metadata(parent).ok()?;
+        if metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+            return None;
+        }
     }
-    std::env::var("PATH").ok().and_then(|paths| {
-        paths.split(':').find_map(|directory| {
-            let candidate = Path::new(directory).join(tool);
-            candidate
-                .is_file()
-                .then(|| candidate.to_string_lossy().into_owned())
-        })
-    })
+    let resolved = path.canonicalize().ok()?;
+    let file = std::fs::metadata(&resolved).ok()?;
+    if !file.is_file() || file.mode() & 0o111 == 0 {
+        return None;
+    }
+    for component in resolved.ancestors() {
+        let metadata = std::fs::metadata(component).ok()?;
+        if metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+            return None;
+        }
+    }
+    resolved.to_str().map(str::to_owned)
 }
 
 /// The system paths a dynamic loader needs. bwrap starts from an empty root, so
@@ -866,6 +886,20 @@ mod tests {
     }
 
     #[test]
+    fn resource_bounds_never_raise_existing_soft_or_hard_limits() {
+        let existing = libc::rlimit {
+            rlim_cur: 128,
+            rlim_max: 256,
+        };
+        let bounded = narrower_limit(&existing, 4096);
+        assert_eq!(bounded.rlim_cur, 128);
+        assert_eq!(bounded.rlim_max, 256);
+        let bounded = narrower_limit(&existing, 64);
+        assert_eq!(bounded.rlim_cur, 64);
+        assert_eq!(bounded.rlim_max, 64);
+    }
+
+    #[test]
     fn the_macos_profile_refuses_policy_injection_in_paths() {
         use std::os::unix::ffi::OsStringExt;
 
@@ -909,6 +943,47 @@ mod tests {
             .args([
                 "--exact",
                 "boundary::tests::seatbelt_launcher_is_not_selected_from_an_untrusted_path",
+            ])
+            .env(CHILD, "1")
+            .env("PATH", &directory)
+            .output()
+            .unwrap();
+        std::fs::remove_dir_all(&directory).unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn trusted_helper_refuses_a_symlink_in_a_writable_directory() {
+        use std::os::unix::fs::symlink;
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        let link = directory.join("tool");
+        symlink("/usr/bin/true", &link).unwrap();
+        assert!(trusted_system_tool(&link).is_none());
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn bubblewrap_launcher_is_not_selected_from_an_untrusted_path() {
+        const CHILD: &str = "RAIKER_BWRAP_RESOLUTION_TEST";
+        if std::env::var_os(CHILD).is_some() {
+            assert!(
+                which("bwrap").is_none_or(|path| path == "/usr/bin/bwrap" || path == "/bin/bwrap")
+            );
+            return;
+        }
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("bwrap"), b"untrusted").unwrap();
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "boundary::tests::bubblewrap_launcher_is_not_selected_from_an_untrusted_path",
             ])
             .env(CHILD, "1")
             .env("PATH", &directory)

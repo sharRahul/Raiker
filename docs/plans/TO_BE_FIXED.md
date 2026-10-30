@@ -50,11 +50,19 @@ still require threat-specific review. Runner policies reject a filesystem or
 drive root as the workspace, but non-root original projects still require a
 disposable workspace before execution may be enabled.
 
-On macOS the Seatbelt executable is resolved only at the system path. Linux
-Bubblewrap resolution still searches `PATH`, so an attacker able to influence
-that environment or replace its executable could supply a fake boundary.
-Require a trusted, non-agent-writable Bubblewrap artifact and verify its
-identity before enabling Linux execution; do not treat a `PATH` lookup as proof.
+Seatbelt and Bubblewrap are now resolved at fixed system paths. The runner
+requires root ownership and rejects group- or world-writable path components
+and executables; tests reject a fake helper supplied through `PATH` and a
+symlink in an untrusted directory. Signed artifact verification and the
+remaining platform enforcement checks are still open.
+
+Checkpoint `466ed3c7` failed native CI on both macOS architectures before the
+Seatbelt control could start, and on hosted Ubuntu because Bubblewrap could not
+configure its network namespace (`RTM_NEWADDR: Operation not permitted`).
+Windows reproduced the protected-directory ACL bypass and did not prove its
+descendant observation on the hosted runner. These are release blockers, not
+skipped security checks; Linux requires a suitable dedicated runner if the
+hosted environment cannot support the namespace without weakening isolation.
 
 Seatbelt profile construction now refuses non-UTF-8 paths and paths containing
 quotes, backslashes or control characters, preventing those path values from

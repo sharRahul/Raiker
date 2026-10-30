@@ -384,7 +384,13 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
                 Ok(())
             };
             apply_limit(libc::RLIMIT_NPROC, processes, 1)?;
+            // XNU rejects a finite RLIMIT_AS with EINVAL and does not enforce
+            // address-space limits, so macOS reports memory as unenforced
+            // instead of failing every launch or claiming a quota it lacks.
+            #[cfg(not(target_os = "macos"))]
             apply_limit(libc::RLIMIT_AS, memory, 2)?;
+            #[cfg(target_os = "macos")]
+            let _ = memory;
             apply_limit(libc::RLIMIT_CPU, cpu, 3)?;
             #[cfg(target_os = "linux")]
             if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
@@ -600,8 +606,30 @@ fn macos_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
 pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
     let root = seatbelt_path(&policy.workspace_root)?;
     let mut profile = String::from("(version 1)\n(deny default)\n(deny network*)\n");
-    profile.push_str("(allow process-exec* process-fork signal sysctl-read mach-lookup)\n");
-    profile.push_str("(allow file-read* (subpath \"/System/Library\") (subpath \"/usr/lib\") (subpath \"/usr/bin\") (subpath \"/usr/sbin\") (subpath \"/usr/share\") (subpath \"/bin\") (subpath \"/sbin\") (subpath \"/private/var/db/dyld\") (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\") (literal \"/dev/zero\"))\n");
+    profile.push_str("(allow process-exec* process-fork sysctl-read)\n");
+    // Signals and process inspection stay inside this sandbox: an unrestricted
+    // `signal` would let a command kill any of the owner's processes.
+    profile.push_str("(allow signal (target same-sandbox))\n");
+    profile.push_str("(allow process-info* (target same-sandbox))\n");
+    // An unrestricted `mach-lookup` reaches launchd and LaunchServices, which
+    // can start processes outside this sandbox. Only libc's directory lookup,
+    // notifications and logging are reachable.
+    profile.push_str(
+        "(allow mach-lookup (global-name \"com.apple.system.opendirectoryd.libinfo\") \
+         (global-name \"com.apple.system.notification_center\") \
+         (global-name \"com.apple.system.logger\") (global-name \"com.apple.logd\"))\n",
+    );
+    // macOS 13 and later load the dyld shared cache from the OS cryptex, and
+    // /bin/sh resolves its implementation through /private/var/select.
+    profile.push_str("(allow file-read* (subpath \"/System/Library\") (subpath \"/System/Volumes/Preboot/Cryptexes/OS\") (subpath \"/private/preboot/Cryptexes/OS\") (subpath \"/usr/lib\") (subpath \"/usr/libexec\") (subpath \"/usr/bin\") (subpath \"/usr/sbin\") (subpath \"/usr/share\") (subpath \"/bin\") (subpath \"/sbin\") (subpath \"/private/var/db/dyld\") (subpath \"/private/var/select\") (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\") (literal \"/dev/zero\") (literal \"/dev/dtracehelper\"))\n");
+    // Path resolution stats each ancestor of the workspace. Metadata of those
+    // directories only — not their contents — is readable.
+    for ancestor in policy.workspace_root.ancestors().skip(1) {
+        profile.push_str(&format!(
+            "(allow file-read-metadata (literal \"{}\"))\n",
+            seatbelt_path(ancestor)?
+        ));
+    }
     profile.push_str(&format!("(allow file-read* (subpath \"{root}\"))\n"));
     profile.push_str(&format!("(allow file-write* (subpath \"{root}\"))\n"));
     profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
@@ -894,6 +922,60 @@ mod tests {
         assert!(!profile.contains("(allow file-write* (subpath \"/private/tmp\")"));
         assert!(profile.contains("(subpath \"/System/Library\")"));
         assert!(profile.contains("(allow file-read* (subpath \"/ws\"))"));
+        assert!(profile.contains("(allow file-read-metadata (literal \"/\"))"));
+        assert!(!profile.contains("(allow file-read* (literal \"/\"))"));
+    }
+
+    #[test]
+    fn the_macos_profile_keeps_signals_and_services_inside_the_sandbox() {
+        let profile = macos_profile(&sample()).unwrap();
+        assert!(profile.contains("(allow signal (target same-sandbox))"));
+        for line in profile.lines() {
+            assert!(
+                !line.contains("signal") || line.contains("same-sandbox"),
+                "unrestricted signal: {line}"
+            );
+            assert!(
+                !line.contains("mach-lookup") || line.contains("(global-name "),
+                "unrestricted mach-lookup: {line}"
+            );
+        }
+        assert!(!profile.contains("launchservicesd"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn seatbelt_profile_enforces_filesystem_policy_on_real_processes() {
+        let temp = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let root = temp.join(selftest::probe_nonce());
+        std::fs::create_dir(&root).unwrap();
+        let inside = root.join("inside");
+        let outside = temp.join(format!("{}-outside", selftest::probe_nonce()));
+        std::fs::write(&inside, b"inside control").unwrap();
+        std::fs::write(&outside, b"outside private").unwrap();
+        let mut policy = sample();
+        policy.workspace_root = root.clone();
+        policy.cwd = root.clone();
+        let profile = macos_profile(&policy).unwrap();
+        let run = |path: &Path| {
+            Command::new("/usr/bin/sandbox-exec")
+                .args(["-p", &profile, "/bin/cat"])
+                .arg(path)
+                .output()
+                .unwrap()
+        };
+        let allowed = run(&inside);
+        let denied = run(&outside);
+        let _ = std::fs::remove_file(&outside);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            allowed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&allowed.stderr)
+        );
+        assert_eq!(allowed.stdout, b"inside control");
+        assert!(!denied.status.success(), "outside read was allowed");
+        assert!(!String::from_utf8_lossy(&denied.stdout).contains("outside private"));
     }
 
     #[test]

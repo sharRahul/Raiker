@@ -126,7 +126,8 @@ pub fn run(test: &SelfTest) -> Value {
             Ok(child) => (Some(child), json!({"state": "started"})),
             Err((stage, error)) => (
                 None,
-                json!({"state": stage, "error_code": error.raw_os_error(), "error_kind": error.kind().to_string()}),
+                json!({"state": stage, "error_code": error.raw_os_error(),
+                       "error_kind": error.kind().to_string(), "error": error.to_string()}),
             ),
         }
     } else {

@@ -386,7 +386,11 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Test
         working-directory: native
-        run: cargo test --all
+        run: cargo test --all --no-fail-fast
+      - name: Show Seatbelt denials
+        # Diagnostic only: the failing test step above still fails the job.
+        if: failure() && runner.os == 'macOS'
+        run: log show --last 15m --style compact --predicate 'sender == "Sandbox"' | tail -n 200
       - name: Build and install into the package
         run: python scripts/build_native_runner.py
 

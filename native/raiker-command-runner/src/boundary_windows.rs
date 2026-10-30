@@ -51,10 +51,10 @@ use windows_sys::Win32::Foundation::{
     WAIT_TIMEOUT,
 };
 use windows_sys::Win32::Security::Authorization::{
-    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, DENY_ACCESS,
-    EXPLICIT_ACCESS_W, GetNamedSecurityInfoW, NO_MULTIPLE_TRUSTEE, REVOKE_ACCESS, SDDL_REVISION_1,
-    SE_FILE_OBJECT, SET_ACCESS, SetEntriesInAclW, SetNamedSecurityInfoW, TRUSTEE_IS_SID,
-    TRUSTEE_IS_UNKNOWN, TRUSTEE_W,
+    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
+    ConvertStringSidToSidW, DENY_ACCESS, EXPLICIT_ACCESS_W, GetNamedSecurityInfoW,
+    NO_MULTIPLE_TRUSTEE, REVOKE_ACCESS, SDDL_REVISION_1, SE_FILE_OBJECT, SET_ACCESS,
+    SetEntriesInAclW, SetNamedSecurityInfoW, TRUSTEE_IS_SID, TRUSTEE_IS_UNKNOWN, TRUSTEE_W,
 };
 use windows_sys::Win32::Security::DeriveCapabilitySidsFromName;
 use windows_sys::Win32::Security::Isolation::{
@@ -96,6 +96,9 @@ const ACE_TYPE_ALLOWED: u8 = 0;
 const ACE_TYPE_DENIED: u8 = 1;
 // File write/append/EA/attribute, delete-child, delete, WRITE_DAC, WRITE_OWNER.
 const READONLY_DENY_MASK: u32 = 0x000d_0156;
+// READONLY_DENY_MASK plus GENERIC_WRITE and GENERIC_ALL.
+const WRITE_LIKE: u32 = 0x500d_0156;
+const SYNCHRONIZE_RIGHT: u32 = 0x0010_0000;
 
 unsafe extern "system" {
     fn SetHandleInformation(handle: HANDLE, mask: u32, flags: u32) -> i32;
@@ -607,6 +610,21 @@ fn ensure_workspace_grant(policy: &LaunchPolicy, capability: &Capability) -> Res
             }
         }
     }
+    // The capability deny above does not bind a grant made to every package:
+    // Windows ignores capability SIDs in deny entries during the AppContainer
+    // check, so `ALL APPLICATION PACKAGES:(M)` on `.git` was measured to let the
+    // sandbox write there. Such a path cannot be protected; refuse the launch.
+    for (relative, rights) in policy
+        .deny_paths
+        .iter()
+        .map(|path| (path, !SYNCHRONIZE_RIGHT))
+        .chain(policy.readonly_paths.iter().map(|path| (path, WRITE_LIKE)))
+    {
+        let path = policy.workspace_root.join(relative);
+        if path.exists() && granted_to_all_packages(&path, rights)? {
+            return Err("native_sandbox_protected_path_shared_with_app_packages".into());
+        }
+    }
     if !has_explicit_ace(
         &policy.workspace_root,
         capability.dacl_sid,
@@ -707,11 +725,77 @@ fn deny_ace_is_safe(path: &Path, sid: PSID) -> Result<bool, String> {
     Ok(control_ok && control & DACL_PROTECTED != 0 && denies_self && denies_children)
 }
 
+/// True when an allow entry for `ALL APPLICATION PACKAGES` or `ALL RESTRICTED
+/// APPLICATION PACKAGES` on this path grants any of `rights`, explicitly or by
+/// inheritance. Every AppContainer satisfies those SIDs, so no capability deny
+/// can withhold what they grant.
+fn granted_to_all_packages(path: &Path, rights: u32) -> Result<bool, String> {
+    let packages = [well_known_sid("S-1-15-2-1")?, well_known_sid("S-1-15-2-2")?];
+    let wide_path = wide(&path.to_string_lossy());
+    let mut acl: *mut ACL = null_mut();
+    let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();
+    let read = unsafe {
+        GetNamedSecurityInfoW(
+            wide_path.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut acl,
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if read != 0 {
+        for sid in packages {
+            unsafe { LocalFree(sid as HLOCAL) };
+        }
+        return Err("native_sandbox_acl_grant_failed".into());
+    }
+    // A null DACL grants everyone everything.
+    let mut granted = acl.is_null();
+    if !acl.is_null() {
+        for index in 0..unsafe { (*acl).AceCount } {
+            let mut ace: *mut c_void = null_mut();
+            if unsafe { GetAce(acl, index as u32, &mut ace) } == 0 {
+                granted = true;
+                break;
+            }
+            let entry = ace as *const ACCESS_ALLOWED_ACE;
+            let flags = unsafe { (*entry).Header.AceFlags };
+            if unsafe { (*entry).Header.AceType } != ACE_TYPE_ALLOWED || flags & 0x08 != 0 {
+                continue;
+            }
+            let entry_sid = unsafe { std::ptr::addr_of!((*entry).SidStart) } as PSID;
+            if packages
+                .iter()
+                .any(|sid| unsafe { EqualSid(entry_sid, *sid) } != 0)
+                && unsafe { (*entry).Mask } & rights != 0
+            {
+                granted = true;
+                break;
+            }
+        }
+    }
+    unsafe { LocalFree(descriptor as HLOCAL) };
+    for sid in packages {
+        unsafe { LocalFree(sid as HLOCAL) };
+    }
+    Ok(granted)
+}
+
+fn well_known_sid(text: &str) -> Result<PSID, String> {
+    let mut sid: PSID = null_mut();
+    if unsafe { ConvertStringSidToSidW(wide(text).as_ptr(), &mut sid) } == 0 {
+        return Err("native_sandbox_acl_grant_failed".into());
+    }
+    Ok(sid)
+}
+
 /// A read-only allow is insufficient when another SID grants writes. Require
 /// an inheritable capability deny ahead of every allow as well as the read grant.
 fn readonly_ace_is_safe(path: &Path, sid: PSID) -> Result<bool, String> {
     const DACL_PROTECTED: u16 = 0x1000;
-    const WRITE_LIKE: u32 = 0x500d_0156;
     let wide_path = wide(&path.to_string_lossy());
     let mut acl: *mut ACL = null_mut();
     let mut descriptor: PSECURITY_DESCRIPTOR = null_mut();

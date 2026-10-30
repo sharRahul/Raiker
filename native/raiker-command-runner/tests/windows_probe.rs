@@ -150,15 +150,6 @@ fn appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_con
     let git = workspace.path.join(".git");
     std::fs::create_dir(&protected).unwrap();
     std::fs::create_dir(&git).unwrap();
-    let grant = Command::new("icacls")
-        .arg(&git)
-        .args(["/grant", "*S-1-15-2-1:(OI)(CI)(M)"])
-        .output()
-        .unwrap();
-    assert!(
-        grant.status.success(),
-        "failed to construct the adversarial ACL control"
-    );
     std::fs::write(&inside, "allowed control").unwrap();
     std::fs::write(&outside, "outside private").unwrap();
     std::fs::write(protected.join("secret"), "internal private").unwrap();
@@ -184,16 +175,8 @@ fn appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_con
     let write_target = parent.join("outside-write.txt");
     std::fs::write(&write_target, "control").unwrap();
     std::fs::remove_file(&write_target).unwrap();
-    let run = |read_path: &std::path::Path, writes: Vec<PathBuf>| {
-        let payload = serde_json::json!({
-            "nonce": "windows-files-control",
-            "inside_path": workspace.path.join("probe-write"),
-            "outside_paths": writes,
-            "masked_read_path": read_path,
-            "connect_address": "invalid",
-            "spawn_grandchild": false
-        });
-        let output = Command::new(&workspace.runner)
+    let launch = |payload: &serde_json::Value| {
+        Command::new(&workspace.runner)
             .arg("--policy")
             .arg(&policy)
             .arg("--")
@@ -201,7 +184,18 @@ fn appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_con
             .arg("--selftest")
             .arg(payload.to_string())
             .output()
-            .unwrap();
+            .unwrap()
+    };
+    let run = |read_path: &std::path::Path, writes: Vec<PathBuf>| {
+        let payload = serde_json::json!({
+            "nonce": "windows-files-control",
+            "inside_path": workspace.path.join(format!("probe-write-{}", writes.len())),
+            "outside_paths": writes,
+            "masked_read_path": read_path,
+            "connect_address": "invalid",
+            "spawn_grandchild": false
+        });
+        let output = launch(&payload);
         assert!(
             output.status.success(),
             "sandboxed control failed: {}",
@@ -225,12 +219,6 @@ fn appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_con
     std::fs::write(&git_target, "owner control").unwrap();
     std::fs::remove_file(&git_target).unwrap();
     let git_write = run(&inside, vec![git_target.clone()]);
-    if git_write["outside_writes"][0]["allowed"] == true {
-        eprintln!(
-            "Git ACL: {}",
-            String::from_utf8_lossy(&Command::new("icacls").arg(&git).output().unwrap().stdout)
-        );
-    }
     assert_eq!(
         git_write["outside_writes"][0]["allowed"], false,
         "{git_write}"
@@ -239,6 +227,33 @@ fn appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_con
         !git_target.exists(),
         "sandbox wrote to protected Git metadata"
     );
+    // Adversarial control: a grant to every AppContainer cannot be withheld by
+    // a capability deny, so the runner must refuse rather than launch.
+    let grant = Command::new("icacls")
+        .arg(&git)
+        .args(["/grant", "*S-1-15-2-1:(OI)(CI)(M)"])
+        .output()
+        .unwrap();
+    assert!(
+        grant.status.success(),
+        "failed to construct the adversarial ACL control"
+    );
+    let refused = launch(&serde_json::json!({
+        "nonce": "windows-files-shared",
+        "inside_path": workspace.path.join("probe-write-shared"),
+        "outside_paths": [git_target.clone()],
+        "masked_read_path": inside,
+        "connect_address": "invalid",
+        "spawn_grandchild": false
+    }));
+    assert!(!refused.status.success(), "shared .git was not refused");
+    assert!(
+        String::from_utf8_lossy(&refused.stderr)
+            .contains("native_sandbox_protected_path_shared_with_app_packages"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    assert!(!git_target.exists(), "sandbox wrote to shared Git metadata");
     std::fs::write(&git_target, "owner still writes").unwrap();
     std::fs::remove_file(git_target).unwrap();
     assert_eq!(

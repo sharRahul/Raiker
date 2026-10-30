@@ -42,6 +42,13 @@ instead of leaving a detached PID-targeting watchdog. Linux WSL integration
 tests exercise both deadline termination and prompt early completion; real
 macOS lifecycle and cancellation evidence is still required.
 
+The macOS hosted control returned `EINVAL` during process startup. The runner
+now reports which resource-limit operation failed while preserving the native
+error number; the updated code still needs hosted macOS evidence. Ubuntu CI
+now loads the distribution's targeted `bwrap-userns-restrict` AppArmor profile
+without disabling AppArmor or its global namespace restrictions; this setup
+must pass the actual namespace enforcement tests before being considered fixed.
+
 The Linux boundary no longer mounts the host `/etc`, `/opt` or `/nix` trees.
 A WSL Bubblewrap test verifies that `/etc/hostname` is hidden while an outside
 control can read it. Toolchains outside `/usr` need a future governed mount;

@@ -367,7 +367,10 @@ jobs:
           cargo --version
       - name: Install Bubblewrap for native enforcement tests
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap apparmor-profiles
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
       - name: Check formatting
         working-directory: native
         run: cargo fmt --check

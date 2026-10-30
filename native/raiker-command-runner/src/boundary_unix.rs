@@ -372,20 +372,20 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
     let expected_parent = std::process::id() as libc::pid_t;
     unsafe {
         command.pre_exec(move || {
-            let apply_limit = |resource, requested| -> std::io::Result<()> {
+            let apply_limit = |resource, requested, stage| -> std::io::Result<()> {
                 let mut existing: libc::rlimit = std::mem::zeroed();
                 if libc::getrlimit(resource, &mut existing) != 0 {
-                    return Err(std::io::Error::last_os_error());
+                    return Err(resource_limit_error(20_000 + stage * 1_000));
                 }
                 let limit = narrower_limit(&existing, requested);
                 if libc::setrlimit(resource, &limit) != 0 {
-                    return Err(std::io::Error::last_os_error());
+                    return Err(resource_limit_error(10_000 + stage * 1_000));
                 }
                 Ok(())
             };
-            apply_limit(libc::RLIMIT_NPROC, processes)?;
-            apply_limit(libc::RLIMIT_AS, memory)?;
-            apply_limit(libc::RLIMIT_CPU, cpu)?;
+            apply_limit(libc::RLIMIT_NPROC, processes, 1)?;
+            apply_limit(libc::RLIMIT_AS, memory, 2)?;
+            apply_limit(libc::RLIMIT_CPU, cpu, 3)?;
             #[cfg(target_os = "linux")]
             if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
                 return Err(std::io::Error::last_os_error());
@@ -397,6 +397,13 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
             Ok(())
         });
     }
+}
+
+// Preserve which limit operation failed through Rust's pre-exec error pipe.
+// The final three digits contain the native errno; no sandbox policy is widened.
+fn resource_limit_error(stage: i32) -> std::io::Error {
+    let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+    std::io::Error::from_raw_os_error(stage + errno.clamp(0, 999))
 }
 
 fn narrower_limit(existing: &libc::rlimit, requested: libc::rlim_t) -> libc::rlimit {

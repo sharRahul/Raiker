@@ -1580,12 +1580,6 @@ export type ContainedSubject = {
   updated_at: string;
 };
 
-export type ContainerOptions = {
-  runtimes: ("docker" | "podman")[];
-  images: string[];
-  supported_tools: string[];
-};
-
 export type ContainmentCapability = {
   id: string;
   label: string;
@@ -2490,7 +2484,7 @@ export type ExecutionEnvironmentSelected = {
 /** One boundary a command could run in, as measured on this host. */
 export type ExecutionEnvironmentView = {
   profile_id: string;
-  kind: "local" | "native" | "container" | "ssh" | "daytona";
+  kind: "native" | "retired" | "ssh" | "daytona";
   name: string;
   enabled: boolean;
   configured: boolean;
@@ -2508,18 +2502,12 @@ export type ExecutionEnvironmentView = {
   boundary?: string;
   probe_observations?: Record<string, "enforced" | "unenforced" | "indeterminate">;
   runner_trust?: "publisher_verified" | "package_relative_integrity" | "development_unverified" | null;
-  runtime?: "docker" | "podman" | null;
-  image?: string | null;
-  repository_access?: "none" | "read_only";
-  writable_output?: boolean;
-  assigned_tool_count?: number;
   config?: Record<string, unknown>;
 };
 
 export type ExecutionEnvironmentsView = {
   selected_profile_id: string;
   environments: ExecutionEnvironmentView[];
-  container_options: ContainerOptions;
 };
 
 export type ExecutionProfileBinding = {

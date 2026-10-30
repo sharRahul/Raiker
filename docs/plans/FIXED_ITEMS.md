@@ -1,5 +1,42 @@
 # Fixed items
 
+## Docker and Podman removed as Raiker execution dependencies
+
+Raiker no longer invokes Docker or Podman. Removed: the persistent container
+command backend, the container tool bridge, `container_execution_cap`, the
+Docker plugin runtime (`plugin_sandboxed_runtime_cap`) and image pull
+(`plugin_sandbox_image_pull_cap`), the Docker model-conversion runner,
+`containers/**`, the container definition and image-scan CI checks, and the
+container options in Settings. Upgrades are safe: a stored container profile is
+listed as *retired*, refuses with `container_environment_retired`, is never
+converted to host execution, and can be removed with its command history kept;
+a tool an owner assigned to it is refused rather than moved. Covered by
+`tests/test_command_backends.py`, `tests/test_execution_environments.py`,
+`tests/test_execution_profiles.py` and `tests/test_tool_broker.py`. This does
+not make native execution available; see the release blockers in
+`TO_BE_FIXED.md`.
+
+## Windows read-only protection bypassed by an all-packages grant
+
+Measured locally and on `windows-2025`: with `ALL APPLICATION PACKAGES:(M)` on
+`.git`, a sandboxed process wrote into `.git` despite the capability deny entry,
+because Windows ignores capability SIDs in deny entries during the AppContainer
+access check. The runner now refuses to launch when a protected path grants
+`ALL APPLICATION PACKAGES` or `ALL RESTRICTED APPLICATION PACKAGES` any write
+right (read-only paths) or any right (masked paths). The adversarial test in
+`native/raiker-command-runner/tests/windows_probe.rs` passes locally and in CI.
+Explicit grants on files below the protected directory are not scanned.
+
+## Seatbelt profile allowed signals to and services outside the sandbox
+
+The macOS profile allowed unrestricted `signal` and `mach-lookup`, so a command
+could signal any of the owner's processes or ask launchd services to act
+outside the sandbox. Signals and process inspection are now limited to the same
+sandbox and Mach lookups to a named allowlist; unit tests assert both. macOS
+also no longer requests `RLIMIT_AS`, which XNU rejects with EINVAL (measured on
+`macos-15`); memory is reported unenforced there rather than every launch
+failing. Real Seatbelt enforcement evidence is still pending.
+
 ## Native boundary helpers could be selected from an untrusted search path
 
 The Unix runner selects Bubblewrap and Seatbelt only from fixed system paths,

@@ -112,23 +112,30 @@ prove crash recovery or safely revoke every historic grant already made. A real
 Windows test also verifies that a workspace capability ACE can be removed by
 the existing revocation function; protected child ACL restoration is still open.
 
-The requested Docker-free execution migration has not been implemented or
-verified. The command service requires its native backend, and
-`raiker/execution/code_placement.py` separates host-risk classification from
-sandbox placement. The execution inventory remains incomplete; container,
-plugin and MCP execution paths remain separate. Their legacy default launchers
-now refuse execution until migrated; other subprocess paths are not yet audited.
-The macOS native runner now uses a system-runtime and workspace read allowlist,
-but its real enforcement and toolchain compatibility remain unverified.
-Linux now installs a seccomp BPF filter;
-a WSL2 control-arm test observed personality and unshare blocked inside the
-boundary, but the rest of the filter and ARM runtime remain unverified. Inspect
-`native/raiker-command-runner/src/boundary_unix.rs`; a dependency probe alone
-does not demonstrate OS enforcement. The security impact is potential access
-to host files or network by code that the target design intends to isolate.
-Complete the inventory, broker migration and adversarial OS-enforcement tests
-before treating this architecture as release-ready. Initial findings and the
-remaining checklist are in `docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
+The Docker-free execution migration is **incomplete and not release-ready**
+(PR #239). Docker and Podman are no longer invoked by Raiker: the container
+command backend, container tool bridge, container execution capability, Docker
+plugin runtime and image pull, Docker model conversion, container CI image scan
+and `containers/**` were removed. Stored container profiles are kept as inert
+history and refuse with `container_environment_retired`; they never fall back
+to the host. What still blocks release, by component:
+
+| Blocker | Security impact | Component | Reproduction / evidence | Required remediation | Release-blocking |
+| --- | --- | --- | --- | --- | --- |
+| Native execution is unavailable until disposable task workspaces exist | Without them the runner would write into the owner's original project | `raiker/execution/commands/backends/native.py`, runner probe (`available: false`) | Probe reports `native_disposable_workspace_required` even when every observation is enforced | `raiker/execution/workspaces.py` implements snapshot, diff, conflict-checked promotion and rollback (tested); wire it into the command service and Build review, map each run's cwd into the copy, then enable availability | Yes |
+| Windows protected paths shared with every AppContainer | A grant to `ALL [RESTRICTED] APPLICATION PACKAGES` on `.git` or `.raiker` let the sandbox write there; capability-SID deny entries do not bind it | `boundary_windows.rs` `granted_to_all_packages` | `appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_control` now expects refusal | Launch now fails closed for the directory itself; explicit grants on files **inside** `.git` are not scanned. Disposable workspaces with a Raiker-built DACL remove the case | Yes, until disposable workspaces |
+| Windows Server 2025 AppContainer denied `\\.\NUL` | Toolchains that open the null device fail inside the sandbox | Hosted `windows-2025` runner | Probe descendant `failed to open NUL device for child stdin: Access is denied` | Probe now uses private pipes; real toolchain compatibility (Python `DEVNULL`, npm) still needs measurement | Yes |
+| macOS Seatbelt not yet verified on hosted runners | Unknown read/launch compatibility; no measured enforcement yet | `boundary_unix.rs` `macos_profile` | `macos_enforcement.rs` failed: `RLIMIT_AS` EINVAL, then `cat` denied `file-read-data /` | Fixed both; rerun `macos-15` and `macos-15-intel` and record evidence | Yes |
+| macOS memory and process-tree limits | XNU does not enforce `RLIMIT_AS`; `RLIMIT_NPROC` is per user; detached descendants are not contained | `bound_child`, probe `descendant_reaped` | Probe reports descendant `indeterminate` on macOS | Measured process-tree ownership (e.g. per-run uid or kqueue tracking) or keep macOS unavailable | Yes |
+| Network mediation | Native boundary is deny-all only; package installs and approved Git remotes cannot run | `linux_arguments`, `macos_arguments`, Windows `launch` refuse non-denied policy | `filtered_egress_*_unsupported` | OS-enforced egress through an outside-the-sandbox proxy (`egress_proxy.py` exists, unwired) with connect-time IP validation | Yes |
+| Background, interactive and PTY execution | Unavailable rather than unsandboxed | Native backend refuses | `native_sandbox_pty_unsupported` | Sandboxed supervisor with ConPTY/PTY and process-tree ownership | Yes |
+| Plugin code, local MCP stdio, command hooks | Unavailable rather than unsandboxed | `tier4_plugins.py`, `mcp.py`, `hooks/handlers/command.py` | Refuse with `native_sandbox_required` | Bidirectional stdio through the broker | Yes |
+| Model conversion | Unavailable | `raiker/models/conversion.py` | `model_conversion_native_toolchain_required` | Package llama.cpp converter/quantizer and run them in the native sandbox | No (feature unavailable, safe) |
+| WSL2 backend and Windows MXC evaluation | Not implemented / not investigated | — | — | Implement as a separately verified backend; evaluate MXC availability and licensing | No for native-Windows path |
+| Runner publisher signing | Package-relative SHA-256 is integrity, not authenticity | `scripts/build_native_runner.py` | `runner_trust: package_relative_integrity` | Platform code signing with release credentials | Yes |
+
+The full inventory and checklist are in
+`docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
 
 ## Release blocker: sandboxed command hooks unavailable
 

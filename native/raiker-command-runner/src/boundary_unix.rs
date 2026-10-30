@@ -623,7 +623,10 @@ pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
     // /bin/sh resolves its implementation through /private/var/select.
     profile.push_str("(allow file-read* (subpath \"/System/Library\") (subpath \"/System/Volumes/Preboot/Cryptexes/OS\") (subpath \"/private/preboot/Cryptexes/OS\") (subpath \"/usr/lib\") (subpath \"/usr/libexec\") (subpath \"/usr/bin\") (subpath \"/usr/sbin\") (subpath \"/usr/share\") (subpath \"/bin\") (subpath \"/sbin\") (subpath \"/private/var/db/dyld\") (subpath \"/private/var/select\") (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\") (literal \"/dev/zero\") (literal \"/dev/dtracehelper\"))\n");
     // Path resolution stats each ancestor of the workspace. Metadata of those
-    // directories only — not their contents — is readable.
+    // directories only — not their contents — is readable. Process startup
+    // also lists `/` (measured on macOS 15: `cat` was denied without it); that
+    // exposes the names of top-level directories, not anything inside them.
+    profile.push_str("(allow file-read-data (literal \"/\"))\n");
     for ancestor in policy.workspace_root.ancestors().skip(1) {
         profile.push_str(&format!(
             "(allow file-read-metadata (literal \"{}\"))\n",

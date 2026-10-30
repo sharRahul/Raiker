@@ -92,36 +92,30 @@ def _container(store: SQLiteStore, profile_id: str = "container_a") -> None:
     )
 
 
-def test_selected_command_environment_is_authoritative(tmp_path: Path) -> None:
+def test_a_retired_container_selection_is_refused_without_fallback(tmp_path: Path) -> None:
+    """A stored Docker/Podman selection never runs and never moves to the host."""
     store = SQLiteStore(tmp_path)
     _container(store)
     store.select_execution_environment("owner_a", "container_a")
+    probe = Mock()
 
-    resolution = resolve_command_environment(
-        store,
-        "owner_a",
-        "shell",
-        probe=lambda profile: ProfileProbe(profile, True, None, utc_now()),
-    )
+    resolution = resolve_command_environment(store, "owner_a", "shell", probe=probe)
 
-    assert resolution.profile is not None
-    assert resolution.profile.profile_id == "container_a"
-    assert resolution.selected_for_commands is True
-    assert resolution.available is True
+    assert resolution.profile is None
+    assert resolution.available is False
+    assert resolution.reason_code == "container_environment_retired"
+    probe.assert_not_called()
+    store.select_execution_environment("owner_a", "container_default")
+    default = resolve_command_environment(store, "owner_a", "shell", probe=probe)
+    assert default.reason_code == "container_environment_retired"
 
 
-def test_unknown_or_unassigned_selected_environment_fails_without_fallback(tmp_path: Path) -> None:
+def test_unknown_selected_environment_fails_without_fallback(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     store.select_execution_environment("owner_a", "missing")
     missing = resolve_command_environment(store, "owner_a", "shell")
     assert missing.profile is None
     assert missing.reason_code == "selected_environment_unavailable"
-
-    _container(store)
-    store.select_execution_environment("owner_a", "container_a")
-    unsupported = resolve_command_environment(store, "owner_a", "read_file")
-    assert unsupported.profile is None
-    assert unsupported.reason_code == "selected_environment_tool_unsupported"
 
 
 def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -> None:
@@ -129,16 +123,16 @@ def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -
     registry = BackendRegistry(
         {
             "local_native": local,
-            "container_a": UnavailableBackend("container_daemon_unreachable"),
+            "native_sandbox": UnavailableBackend("native_sandbox_not_enforced"),
         }
     )
 
-    with pytest.raises(CommandBackendError, match="container_daemon_unreachable"):
-        registry.start(request(tmp_path, environment_profile_id="container_a"))
+    with pytest.raises(CommandBackendError, match="native_sandbox_not_enforced"):
+        registry.start(request(tmp_path, environment_profile_id="native_sandbox"))
     local.start.assert_not_called()
 
 
-def test_command_service_refuses_selected_container_without_local_fallback(tmp_path: Path) -> None:
+def test_command_service_refuses_a_retired_container_without_local_fallback(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     _container(store)
     store.select_execution_environment("owner_a", "container_a")
@@ -152,7 +146,7 @@ def test_command_service_refuses_selected_container_without_local_fallback(tmp_p
         backend_factory=lambda profile: selected,
     )
 
-    with pytest.raises(CommandServiceError, match="native_sandbox_required"):
+    with pytest.raises(CommandServiceError, match="container_environment_retired"):
         service.start(
             owner_principal_id="owner_a",
             acting_principal_id="agent_a",
@@ -421,7 +415,7 @@ def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path
         ExecutionProfile("daytona_a", "daytona", tools=("shell",)),
     ),
 )
-def test_non_container_profiles_never_advertise_credential_delivery(
+def test_profiles_never_advertise_credential_delivery(
     profile: ExecutionProfile,
 ) -> None:
     assert profile.features.credential_delivery is False
@@ -432,34 +426,8 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
     with pytest.raises(ValueError, match="credential_delivery_requires_quarantine"):
         ExecutionProfile(
             "bad",
-            "container",
-            runtime="docker",
-            image="raiker-tools:test",
+            "ssh",
             tools=("shell",),
             credential_delivery=True,
             credential_delta_quarantine=False,
         )
-
-
-def test_container_profile_advertises_only_the_proven_foreground_shell() -> None:
-    features = ExecutionProfile(
-        "container_a",
-        "container",
-        runtime="docker",
-        image="raiker-command-sandbox@sha256:" + ("a" * 64),
-        tools=("shell",),
-        credential_delivery=True,
-        credential_delta_quarantine=True,
-    ).features
-
-    assert features.shell is True
-    assert features.process_tree_stop is True
-    assert features.pty is False
-    assert features.background is False
-    assert features.input is False
-    assert features.filtered_network is False
-    assert features.persistent is False
-    assert features.restart_recovery is False
-    assert features.concurrent_runs is False
-    assert features.credential_delivery is False
-    assert features.credential_delta_quarantine is False

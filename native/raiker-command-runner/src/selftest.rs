@@ -181,13 +181,20 @@ fn spawn_grandchild(
     // The grandchild must not inherit the relay pipes. If it did, it would hold
     // the write end open for its whole lifetime and the parent's read would
     // block long after the child had exited — a hang that looks like a wedged
-    // boundary and is really a leaked handle.
+    // boundary and is really a leaked handle. Private pipes, not the null
+    // device: an AppContainer on Windows Server 2025 was measured to be denied
+    // `\\.\NUL`, which made the descendant observation fail to start at all.
     command
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
     detach(&mut command);
-    command.spawn().map_err(|error| ("spawn_failed", error))
+    let mut child = command.spawn().map_err(|error| ("spawn_failed", error))?;
+    // Close this side so the grandchild sees end-of-file rather than a reader.
+    drop(child.stdin.take());
+    drop(child.stdout.take());
+    drop(child.stderr.take());
+    Ok(child)
 }
 
 #[cfg(windows)]

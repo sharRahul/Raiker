@@ -1,50 +1,26 @@
 """Converting a model the owner already has into one this machine can serve.
 
-**Cancel means cancel, while it is running (GCR-24).** The two steps are Docker
-containers and the isolation budget allows six hours, and the worker used to
-check the cancellation flag immediately before starting the first one and
-immediately after the last finished. In between there was nothing to check it:
-``subprocess.run`` blocks until the child exits. So pressing **Cancel** on a
-conversion that had just started left the operation at ``cancel_requested``, with
-the CPU still committed, potentially for the rest of the day.
-
-Three things make it answer now:
-
-* **A handle instead of a wait.** Each step runs under ``Popen`` and is polled,
-  so the flag is read on a cadence rather than at two instants.
-* **A name for the container.** Killing the ``docker run`` client does not stop
-  the container it started — the work goes on without anything watching it. Each
-  step is given a deterministic name, derived from the preview, and cancelling
-  stops *that container* by name. Deterministic rather than random on purpose:
-  the preview is what is persisted with the operation, so the names can be
-  recomputed by anything that has to clean up after a host restart, without
-  storing a second identity that could drift from the first.
-* **A cancellation is not a failure.** It raises
-  :class:`ConversionCancelled` rather than the generic refusal, so the owner is
-  told their conversion stopped because they stopped it, and not that it broke.
+The conversion toolchain (llama.cpp's converter and quantizer) previously ran
+in a Docker container. Docker was removed by the native sandbox migration and a
+native, sandboxed toolchain is not yet packaged, so :class:`UnavailableConversionRunner`
+refuses every conversion with ``model_conversion_native_toolchain_required``.
+Previews, provenance and cleanup remain, so stored operations still read
+correctly and an owner is told exactly why the conversion cannot start.
 """
-
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
-import os
 import shutil
-import subprocess
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
 from raiker.contracts.views import View
-from raiker.models.gguf import read_gguf_metadata
 
-TOOLCHAIN_IMAGE = (
-    "ghcr.io/ggml-org/llama.cpp@"
-    "sha256:bd00b69f6efef29e3fda689ea584e8fdd0a33a87860f700b16fecab147ac72f1"
-)
+#: Recorded on previews in place of the retired container image digest.
+TOOLCHAIN_IMAGE = "native_toolchain_required"
 SUPPORTED_ARCHITECTURES = frozenset(
     {
         "LlamaForCausalLM",
@@ -71,17 +47,6 @@ class ConversionCancelled(ConversionRefused):
     a caller that cares can tell the two apart. They are different sentences to
     an owner: one says the work broke, the other says they stopped it.
     """
-
-
-#: How often a running step is asked whether it should stop. Short enough that
-#: Cancel feels immediate, long enough that a six-hour conversion spends no
-#: measurable time being asked. The container stop below is what actually takes
-#: a moment.
-CANCEL_POLL_SECONDS = 1.0
-
-#: How long a stopped container is given to exit before it is killed outright.
-#: Docker's own default is ten seconds and the toolchain has nothing to flush.
-CONTAINER_STOP_SECONDS = 10
 
 
 @dataclass(frozen=True)
@@ -122,123 +87,21 @@ class ConversionProvenance(View):
     output_path: str
 
 
-class DockerConversionRunner:
+class UnavailableConversionRunner:
+    """Refuses: no verified native conversion toolchain is installed."""
+
     def run(
         self,
         preview: ConversionPreview,
         should_cancel: Callable[[], bool] | None = None,
     ) -> ConversionProvenance:
-        """Convert, answering ``should_cancel`` throughout rather than at the ends.
-
-        ``should_cancel`` is optional so every existing caller and test keeps
-        working unchanged; without one the steps run to completion exactly as
-        they did, and with one a conversion stops when the owner says so.
-        """
-        docker = shutil.which("docker")
-        if not docker:
-            raise ConversionRefused("isolated_conversion_worker_unavailable")
-        source = Path(preview.source)
-        output = Path(preview.output)
-        intermediate, result = _output_paths(preview)
-        convert, quantize = docker_command_plan(preview, docker)
-        clean_env = {"PATH": str(Path(docker).parent)}
-        if os.name == "nt" and os.environ.get("SYSTEMROOT"):
-            clean_env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
-        names = conversion_container_names(preview)
-        for argv, name in zip((convert, quantize), names, strict=True):
-            returncode = self._step(argv, name, docker, clean_env, preview, should_cancel)
-            if returncode != 0:
-                raise ConversionRefused("isolated_conversion_failed")
-        metadata = read_gguf_metadata(result)
-        if metadata.architecture.strip() == "":
-            raise ConversionRefused("converted_gguf_invalid")
-        provenance = ConversionProvenance(
-            source_revision=preview.revision,
-            source_fingerprint=_source_fingerprint(source, preview.revision),
-            output_fingerprint=_sha256_file(result),
-            toolchain_image=preview.toolchain_image,
-            architecture=preview.architecture,
-            quantization=preview.quantization,
-            output_path=str(result.resolve()),
-        )
-        _provenance_path(output, result).write_text(
-            json.dumps(provenance.to_dict(), sort_keys=True, indent=2), encoding="utf-8"
-        )
-        intermediate.unlink(missing_ok=True)
-        return provenance
-
-    def _step(
-        self,
-        argv: list[str],
-        container: str,
-        docker: str,
-        env: dict[str, str],
-        preview: ConversionPreview,
-        should_cancel: Callable[[], bool] | None,
-    ) -> int:
-        """Run one container to completion, cancellation or the isolation deadline.
-
-        Output goes to ``DEVNULL`` rather than to pipes. It was captured and
-        never read, and a step that is *waited on* rather than drained can fill
-        a pipe buffer and block — which for a converter that prints a line per
-        tensor is not hypothetical. Nothing that was used is lost.
-        """
-        process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell, cleaned env
-            argv,
-            shell=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            env=env,
-        )
-        deadline = time.monotonic() + preview.isolation.timeout_seconds
-        while True:
-            try:
-                return process.wait(timeout=CANCEL_POLL_SECONDS)
-            except subprocess.TimeoutExpired:
-                pass
-            if should_cancel is not None and should_cancel():
-                self._stop(process, container, docker, env)
-                raise ConversionCancelled("conversion_cancelled_by_owner")
-            if time.monotonic() >= deadline:
-                self._stop(process, container, docker, env)
-                raise ConversionRefused("isolated_conversion_timed_out")
-
-    def _stop(
-        self, process: subprocess.Popen[bytes], container: str, docker: str, env: dict[str, str]
-    ) -> None:
-        """Stop the container, then the client that is waiting on it.
-
-        In that order, and both: terminating the ``docker run`` client alone
-        leaves the container running with nothing watching it, which is the
-        worst of the three outcomes — the owner is told it stopped and the CPU
-        is still committed.
-        """
-        # Docker itself may be unreachable. The client below is still killed in
-        # that case, so the worker settles rather than waiting for ever on
-        # something it has no way to stop.
-        with contextlib.suppress(OSError, subprocess.SubprocessError):
-            subprocess.run(  # noqa: S603 - fixed argv, no shell, cleaned env
-                [docker, "stop", "--time", str(CONTAINER_STOP_SECONDS), container],
-                shell=False,
-                check=False,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=CONTAINER_STOP_SECONDS + 20,
-                env=env,
-            )
-        process.terminate()
-        try:
-            process.wait(timeout=CONTAINER_STOP_SECONDS)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=CONTAINER_STOP_SECONDS)
+        del preview, should_cancel
+        raise ConversionRefused("model_conversion_native_toolchain_required")
 
 
 class ModelConversionService:
-    def __init__(self, runner: DockerConversionRunner | None = None) -> None:
-        self.runner = runner or DockerConversionRunner()
+    def __init__(self, runner: UnavailableConversionRunner | None = None) -> None:
+        self.runner = runner or UnavailableConversionRunner()
 
     def preview(
         self, source: Path, output: Path, revision: str, quantization: str
@@ -300,78 +163,6 @@ class ModelConversionService:
         should_cancel: Callable[[], bool] | None = None,
     ) -> ConversionProvenance:
         return self.runner.run(preview, should_cancel)
-
-
-def conversion_container_names(preview: ConversionPreview) -> tuple[str, str]:
-    """The two containers this conversion runs, named ``(convert, quantize)``.
-
-    Derived from the preview rather than generated, which is what makes the
-    identity *recoverable* (GCR-24): the preview is persisted with the
-    operation, so anything cleaning up after a host restart can recompute these
-    names and remove the containers, without a second stored identity that could
-    disagree with the first.
-
-    The digest covers everything that decides what the container does, so two
-    conversions the owner could reasonably run at once — the same source at two
-    quantizations, or the same model into two libraries — never collide on a
-    name and stop each other.
-    """
-    digest = hashlib.sha256(
-        "\x00".join(
-            (preview.source, preview.output, preview.revision, preview.quantization)
-        ).encode("utf-8")
-    ).hexdigest()[:16]
-    return (f"raiker-convert-{digest}", f"raiker-quantize-{digest}")
-
-
-def docker_command_plan(preview: ConversionPreview, docker: str) -> tuple[list[str], list[str]]:
-    source = Path(preview.source)
-    output = Path(preview.output)
-    intermediate, result = _output_paths(preview)
-    convert_name, quantize_name = conversion_container_names(preview)
-    base = [
-        docker,
-        "run",
-        "--rm",
-        "--network",
-        "none",
-        "--read-only",
-        "--cpus",
-        str(preview.isolation.max_cpu_count),
-        "--memory",
-        str(preview.isolation.max_memory_bytes),
-        "--pids-limit",
-        str(preview.isolation.max_processes),
-        "--tmpfs",
-        "/tmp:rw,noexec,nosuid,size=2g",
-        "--mount",
-        f"type=bind,src={source},dst=/models/source,readonly",
-        "--mount",
-        f"type=bind,src={output},dst=/models/output",
-    ]
-    # GCR-24 — a named container is one Cancel can reach. Without it the only
-    # handle is the `docker run` client, and killing that leaves the work going.
-    convert = base + [
-        "--name",
-        convert_name,
-        "--entrypoint",
-        "python",
-        preview.toolchain_image,
-        *preview.convert_argv[1:-3],
-        "/models/output/" + intermediate.name,
-        *preview.convert_argv[-2:],
-    ]
-    quantize = base + [
-        "--name",
-        quantize_name,
-        "--entrypoint",
-        "/app/llama-quantize",
-        preview.toolchain_image,
-        "/models/output/" + intermediate.name,
-        "/models/output/" + result.name,
-        preview.quantization,
-    ]
-    return convert, quantize
 
 
 def _output_paths(preview: ConversionPreview) -> tuple[Path, Path]:

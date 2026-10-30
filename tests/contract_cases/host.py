@@ -156,8 +156,8 @@ def _remove_environment(_ws: Path, client: TestClient, h: dict[str, str]) -> Cal
 
 
 def _reset(_ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
-    """The default container is the boundary that persists across a session's commands."""
-    return "/api/execution-environments/container_default/reset", {
+    """Reset is refused for the native sandbox, which keeps no boundary between runs."""
+    return "/api/execution-environments/native_sandbox/reset", {
         "session_id": "sess_build", "recreate": False,
     }
 

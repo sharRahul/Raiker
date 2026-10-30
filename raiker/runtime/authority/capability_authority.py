@@ -254,16 +254,6 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "Revocation is the safe direction and is the owner's own act.",
     ),
     _row(
-        "container_execution_cap",
-        SIDE_EFFECT_REVERSIBLE,
-        "Work would move into a container the owner did not choose, and a "
-        "different execution destination is a different set of things that can "
-        "go wrong with it.",
-        "Choosing a container execution profile is the owner's act of "
-        "authorisation, and every tool call inside it is still brokered under "
-        "that tool's own gate. No network, no host mounts.",
-    ),
-    _row(
         "reminder_runtime",
         SIDE_EFFECT_REVERSIBLE,
         "Local reminder records would be created and read by later turns, so a "
@@ -466,15 +456,6 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "An owner-enabled gate, an owner-configured cloud target, and an "
         "approval. As with the remote target, there is no silent host fallback.",
     ),
-    _row(
-        "plugin_sandbox_image_pull_cap",
-        SIDE_EFFECT_EXTERNAL,
-        "A container image would be pulled from a registry, which is both an "
-        "egress and the moment third-party code arrives on the machine.",
-        "Nothing pulls a sandbox image, because nothing runs a sandboxed plugin "
-        "yet. A pull would need an owner-enabled gate and a pinned, allowlisted "
-        "image reference, and pulling one still does not run it.",
-    ),
     # ── Destructive: the owner cannot get it back from inside Raiker ───────
     _row(
         "shell_execution",
@@ -594,15 +575,6 @@ _AUTHORITY: tuple[CapabilityAuthority, ...] = (
         "No owner surface runs an installed plugin's entrypoint, so the executor "
         "exists and nothing invokes it. Reaching it would need an owner-enabled "
         "gate, an allowlisted install and a bounded subprocess.",
-    ),
-    _row(
-        "plugin_sandboxed_runtime_cap",
-        SIDE_EFFECT_CRITICAL,
-        "Third-party code would execute in a container, and a sandbox the owner "
-        "did not choose is a boundary they cannot have reasoned about.",
-        "No owner surface runs a sandboxed plugin, so nothing invokes this. "
-        "Reaching it would need an owner-enabled gate and the network-isolated "
-        "container with no host mounts that the executor builds.",
     ),
 )
 

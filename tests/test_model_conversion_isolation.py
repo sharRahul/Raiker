@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raiker.models.conversion import ModelConversionService, docker_command_plan
+import pytest
+
+from raiker.models.conversion import ConversionRefused, ModelConversionService
 
 
 def test_conversion_worker_has_no_network_credentials_or_workspace_mount(tmp_path: Path) -> None:
@@ -27,7 +29,7 @@ def test_conversion_worker_has_no_network_credentials_or_workspace_mount(tmp_pat
     assert worker.timeout_seconds > 0
 
 
-def test_docker_argv_enforces_isolation_without_a_shell(tmp_path: Path) -> None:
+def test_conversion_refuses_until_a_native_toolchain_exists(tmp_path: Path) -> None:
     source = tmp_path / "snapshot"
     source.mkdir()
     (source / "config.json").write_text(
@@ -36,16 +38,9 @@ def test_docker_argv_enforces_isolation_without_a_shell(tmp_path: Path) -> None:
     (source / "model.safetensors").write_bytes(b"safe")
     output = tmp_path / "output"
     output.mkdir()
-    preview = ModelConversionService().preview(source, output, "e" * 40, "Q4_K_M")
+    service = ModelConversionService()
+    preview = service.preview(source, output, "e" * 40, "Q4_K_M")
 
-    convert, quantize = docker_command_plan(preview, "docker")
-
-    for argv in (convert, quantize):
-        assert argv[0:2] == ["docker", "run"]
-        assert argv[argv.index("--network") + 1] == "none"
-        assert "--read-only" in argv
-        mounts = [argv[index + 1] for index, value in enumerate(argv) if value == "--mount"]
-        assert len(mounts) == 2
-        assert mounts[0].endswith("dst=/models/source,readonly")
-        assert mounts[1].endswith("dst=/models/output")
-        assert preview.toolchain_image in argv
+    with pytest.raises(ConversionRefused, match="model_conversion_native_toolchain_required"):
+        service.convert(preview)
+    assert list(output.iterdir()) == []

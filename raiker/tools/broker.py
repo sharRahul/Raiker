@@ -21,13 +21,13 @@ from raiker.contracts.streaming import TOOL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.execution.commands.service import CommandService, CommandServiceError
-from raiker.execution.container_tools import ContainerToolExecutor
 from raiker.execution.profiles import (
+    CONTAINER_ENVIRONMENT_RETIRED,
     ExecutionProfile,
     ProfileResolution,
-    execution_profiles_from_rows,
     list_execution_profiles,
     resolve_tool_profile,
+    retired_container_tools,
 )
 from raiker.goals.store import session_memory_withheld
 from raiker.hooks.contracts import HookInput, HookOutcome
@@ -906,17 +906,16 @@ class ToolBroker:
         }
 
     def _execution_profiles(self) -> list[ExecutionProfile]:
-        profiles = list_execution_profiles()
-        if self.store is None:
-            return profiles
-        rows = self.store.list_remote_execution_profiles(
-            enabled_only=True,
-            owner_principal_id=self.owner_scope or self.principal_id,
-        )
-        profiles.extend(execution_profiles_from_rows(rows))
-        return profiles
+        return list_execution_profiles()
 
     def _execution_profile(self, tool_name: str) -> ProfileResolution:
+        if self.store is not None and tool_name in retired_container_tools(
+            self.store.list_remote_execution_profiles(
+                enabled_only=True,
+                owner_principal_id=self.owner_scope or self.principal_id,
+            )
+        ):
+            return ProfileResolution(None, CONTAINER_ENVIRONMENT_RETIRED)
         return resolve_tool_profile(tool_name, self._execution_profiles())
 
     def _assign_session_project(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
@@ -2409,13 +2408,6 @@ class ToolBroker:
                 "status": "failed",
                 "error": {"type": profile_resolution.reason_code},
             }
-        elif (
-            profile_resolution.profile is not None
-            and profile_resolution.profile.kind == "container"
-        ):
-            raw = ContainerToolExecutor(
-                self.workspace_root, profile_resolution.profile
-            ).execute(action.tool_name, action.arguments, action.action_id)
         elif executor is None and context_executor is None and is_mcp_tool(action.tool_name):
             raw = self._mcp_call(action)
         elif executor is None and context_executor is None:

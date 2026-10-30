@@ -283,41 +283,6 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         assert answer["where"] == "not_enabled"
         assert "native sandbox" in answer["summary"]
 
-    def test_with_a_container_ready_it_runs_there_instead(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from raiker.runtime.executors import tier4_plugins
-
-        monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "demo")
-        monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_IMAGE", "python:3.11-slim")
-        monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.11-slim")
-        monkeypatch.setattr(tier4_plugins.shutil, "which", lambda name: f"/usr/bin/{name}")
-        assert tier4_plugins.plugin_code_runtime("demo")["where"] == "not_enabled"
-
-        seen: list[str] = []
-
-        class _Sandboxed:
-            def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-                pass
-
-            def execute(self, action: GovernedAction, principal: Principal) -> Any:
-                seen.append(action.action_id)
-                return "ran-in-container"
-
-        monkeypatch.setattr(tier4_plugins, "PluginSandboxedRuntimeExecutor", _Sandboxed)
-        action = GovernedAction(
-            action_id=new_id("act_"),
-            principal_id=OWNER,
-            action_type="plugin_runtime_cap",
-            tool_or_service_name="plugin_runtime_cap",
-            arguments={"plugin_id": "demo", "entrypoint": "main.py"},
-        )
-        outcome = tier4_plugins.PluginRuntimeExecutor(tmp_path, SQLiteStore(tmp_path)).execute(
-            action, _human()
-        )
-        assert outcome == "ran-in-container"
-        assert seen == [action.action_id]
-
 
 class TestNothingThatWorkedStartsRefusing:
     """The owner's decision: a script that ran before still runs — now asking.

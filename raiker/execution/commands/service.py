@@ -10,10 +10,6 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
-from raiker.execution.commands.backends.container import (
-    PersistentContainerBackend,
-    SubprocessContainerRuntime,
-)
 from raiker.execution.commands.backends.local import LocalStrictBackend
 from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
 from raiker.execution.commands.backends.remote import DaytonaCommandBackend, SshCommandBackend
@@ -151,10 +147,6 @@ class CommandService:
         self._profile_probe = profile_probe
         self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
-        #: Backends that hold state between runs, kept for the life of the
-        #: service. See `_backend_for` for why this is exactly the container
-        #: backends and nothing else.
-        self._backends: dict[str, Any] = {}
         self._lock = threading.Lock()
         #: Set on shutdown so lease holders stop renewing immediately rather
         #: than sleeping out their interval while the runtime is going away.
@@ -496,29 +488,15 @@ class CommandService:
         """The backend for a profile, kept where keeping it is what makes the
         capability real.
 
-        BUG-194 — a container backend holds the session's standing boundary in
-        its own map, so building a fresh one per run would mean every run
-        created a new container no matter what the naming said. Only container
-        backends are held: a local backend has no cross-run state to keep, and a
-        native one must *not* be kept, because its capability set comes from a
-        probe whose answer can change between commands (see `_default_backend`).
+        No backend is held across runs: a native one must *not* be kept,
+        because its capability set comes from a probe whose answer can change
+        between commands (see `_default_backend`).
         """
-        if profile.kind != "container":
-            return (
-                self._backend_factory(profile)
-                if self._backend_factory is not None
-                else self._default_backend(profile)
-            )
-        with self._lock:
-            backend = self._backends.get(profile.profile_id)
-            if backend is None:
-                backend = (
-                    self._backend_factory(profile)
-                    if self._backend_factory is not None
-                    else self._default_backend(profile)
-                )
-                self._backends[profile.profile_id] = backend
-            return backend
+        return (
+            self._backend_factory(profile)
+            if self._backend_factory is not None
+            else self._default_backend(profile)
+        )
 
     def _default_backend(self, profile: ExecutionProfile) -> Any:
         if profile.kind == "local":
@@ -529,12 +507,6 @@ class CommandService:
             # measurement taken before the firewall service was stopped.
             driver = NativeSandboxDriver(self.workspace_root)
             return NativeSandboxBackend(driver=driver, proof=driver.probe())
-        if profile.kind == "container":
-            return PersistentContainerBackend(
-                runtime=SubprocessContainerRuntime(self.workspace_root),
-                workspace_root=self.workspace_root,
-                profile=profile,
-            )
         if profile.kind == "ssh":
             return SshCommandBackend(profile, self.workspace_root)
         if profile.kind == "daytona":

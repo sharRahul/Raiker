@@ -7845,42 +7845,6 @@
         "title": "ContainedSubject",
         "type": "object"
       },
-      "ContainerOptions": {
-        "properties": {
-          "images": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Images",
-            "type": "array"
-          },
-          "runtimes": {
-            "items": {
-              "enum": [
-                "docker",
-                "podman"
-              ],
-              "type": "string"
-            },
-            "title": "Runtimes",
-            "type": "array"
-          },
-          "supported_tools": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Supported Tools",
-            "type": "array"
-          }
-        },
-        "required": [
-          "runtimes",
-          "images",
-          "supported_tools"
-        ],
-        "title": "ContainerOptions",
-        "type": "object"
-      },
       "ContainmentCapability": {
         "properties": {
           "id": {
@@ -12521,12 +12485,8 @@
         "type": "object"
       },
       "ExecutionEnvironmentView": {
-        "description": "One boundary a command could run in, as measured on this host.\n\nThe container keys are present for a container profile; ``boundary`` and\n``probe_observations`` for the boundaries a probe measures; ``config`` for\nan owner-configured profile, never with its secrets.",
+        "description": "One boundary a command could run in, as measured on this host.\n\n``boundary`` and ``probe_observations`` are present for the boundaries a\nprobe measures; ``config`` for an owner-configured profile, never with its\nsecrets. A ``retired`` entry is a removed Docker/Podman environment kept so\nthe owner can see and remove it; it is never available.",
         "properties": {
-          "assigned_tool_count": {
-            "title": "Assigned Tool Count",
-            "type": "integer"
-          },
           "assigned_tools": {
             "items": {
               "type": "string"
@@ -12598,22 +12558,10 @@
             "title": "Features",
             "type": "object"
           },
-          "image": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image"
-          },
           "kind": {
             "enum": [
-              "local",
               "native",
-              "container",
+              "retired",
               "ssh",
               "daytona"
             ],
@@ -12644,14 +12592,6 @@
             "title": "Profile Id",
             "type": "string"
           },
-          "repository_access": {
-            "enum": [
-              "none",
-              "read_only"
-            ],
-            "title": "Repository Access",
-            "type": "string"
-          },
           "runner_trust": {
             "anyOf": [
               {
@@ -12668,21 +12608,6 @@
             ],
             "title": "Runner Trust"
           },
-          "runtime": {
-            "anyOf": [
-              {
-                "enum": [
-                  "docker",
-                  "podman"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runtime"
-          },
           "selected": {
             "title": "Selected",
             "type": "boolean"
@@ -12694,10 +12619,6 @@
           "status": {
             "title": "Status",
             "type": "string"
-          },
-          "writable_output": {
-            "title": "Writable Output",
-            "type": "boolean"
           }
         },
         "required": [
@@ -12723,9 +12644,6 @@
       },
       "ExecutionEnvironmentsView": {
         "properties": {
-          "container_options": {
-            "$ref": "#/components/schemas/ContainerOptions"
-          },
           "environments": {
             "items": {
               "$ref": "#/components/schemas/ExecutionEnvironmentView"
@@ -12740,8 +12658,7 @@
         },
         "required": [
           "selected_profile_id",
-          "environments",
-          "container_options"
+          "environments"
         ],
         "title": "ExecutionEnvironmentsView",
         "type": "object"

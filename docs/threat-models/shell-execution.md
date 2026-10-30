@@ -118,6 +118,6 @@ the sandbox cannot host — it answers to its own capability,
   `raiker/execution/commands/service.py`, `raiker/execution/profiles.py`,
   `native/`
 - [`../EXECUTION_ENVIRONMENTS_SPEC.md`](../architecture/EXECUTION_ENVIRONMENTS_SPEC.md)
-- [`container.md`](container.md), [`remote-cloud.md`](remote-cloud.md) — the other backends
+- [`remote-cloud.md`](remote-cloud.md) — the remote backends; Docker and Podman were removed (see `docs/architecture/NATIVE_SANDBOX_MIGRATION.md`)
 - [`process-execution.md`](process-execution.md) — the sibling capability
 - [`approval-execution-relay.md`](approval-execution-relay.md)

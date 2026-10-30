@@ -1,8 +1,0 @@
-# Re-pinned 2026-10-11 (the earlier digest was no longer served); scanned by
-# scripts/scan_images.py on every change.
-FROM python:3.13.16-alpine@sha256:2d9aefe2fef018a7eb2c13064c89c71929800fd2e5dccdbf52ea5da5bb8d929a
-RUN addgroup -S raiker && adduser -S -G raiker -h /app raiker
-WORKDIR /app
-COPY raiker /app/raiker
-USER raiker
-ENTRYPOINT ["python", "-m", "raiker.execution.commands.egress_proxy", "--config", "/run/raiker/egress.json"]

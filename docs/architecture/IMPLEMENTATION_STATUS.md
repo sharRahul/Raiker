@@ -131,12 +131,10 @@ gate, decision mode and registered executor above:
 `process_execution_enabled`, `shell_execution_enabled`,
 `network_execution_enabled`, and `runtime_execution_enabled`.
 
-`container_execution_enabled` is no longer a fixed false compatibility flag.
-It is derived from the owner account's container gate plus a valid persisted
-profile whose Docker/Podman runtime and operator-allowlisted image are available.
-Profiled safe filesystem/search tools execute through the container bridge with
-a read-only repository and one action-scoped writable output directory; an
-unavailable profile never falls back to native host execution.
+`container_execution_enabled` is a fixed false historical flag: Docker and
+Podman execution was removed by the native sandbox migration, and a stored
+container profile refuses with `container_environment_retired` without any host
+fallback.
 
 The dashboard's Build workspace is a client of these controls and adds no
 authority of its own. Its Plan/Edit/Auto composer modes set the existing

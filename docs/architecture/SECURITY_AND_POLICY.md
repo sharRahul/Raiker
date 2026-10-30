@@ -141,23 +141,17 @@ refresh tokens, App private keys and client secrets never reach a model, a
 transcript, a log or an agent sandbox, and a method whose controls cannot be
 enforced is unavailable rather than ungoverned.
 
-## Container tool boundary
+## Native sandbox boundary (Docker and Podman removed)
 
-Container profiles do not grant tools or bypass the broker. Policy, decision
-mode, and any approval are resolved first; only then may a statically registered
-safe tool be routed to the selected profile. The operator separately allowlists
-images through `RAIKER_CONTAINER_IMAGE_ALLOWLIST`; the account separately enables
-`container_execution_cap`; and the profile separately assigns tools. All three
-must agree.
-
-Docker and Podman runs use no network, a read-only root filesystem, dropped Linux
-capabilities, `no-new-privileges`, bounded CPU/memory/PIDs/time/output, a
-read-only `/repository` bind, and one action-scoped writable
-`/workspace-output`. Requests and responses are bounded JSON over attached stdin
-and stdout. The bridge contains no dynamic import, shell, connector, credential,
-or arbitrary-command dispatch. Missing runtimes, disallowed images, unsupported
-tools, malformed responses, and cleanup failures are explicit and never cause a
-host fallback.
+Raiker does not use Docker or Podman. Agent-controlled commands run only through
+the native runner (`native/raiker-command-runner`): AppContainer with a Job
+Object on Windows, Bubblewrap with seccomp on Linux and Seatbelt on macOS. A
+stored container profile from an earlier version is listed as retired, refuses
+with `container_environment_retired`, and never falls back to the host. Until
+disposable task workspaces exist the runner reports itself unavailable, so
+governed commands are refused rather than run against the owner's project. See
+`docs/architecture/NATIVE_SANDBOX_MIGRATION.md` and the release blockers in
+`docs/plans/TO_BE_FIXED.md`.
 
 ## Governed command boundary
 

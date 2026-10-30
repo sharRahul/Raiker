@@ -176,13 +176,20 @@ sandbox, which is stricter. Nothing is converted into host execution.
 `raiker/runtime/command_policy.py` still names `docker` and `podman`, as
 binaries an agent command may not invoke; that is a denial, not a dependency.
 
-## Cross-platform evidence (hosted CI, PR #239)
+## Cross-platform evidence (hosted CI, PR #239, commit `09cbfd37`)
 
-| Platform | Result | Evidence |
-| --- | --- | --- |
-| Linux (`ubuntu-24.04`) | Native runner tests pass, including real Bubblewrap and seccomp control-arm tests | CI job *Native runner (ubuntu-24.04)* |
-| Windows (`windows-2025`) | Adversarial ACL test passes after the fail-closed change. The probe measured relay, workspace write, escape write, masked read and descendant reaping as **enforced**. Egress is **indeterminate** because the hosted runner's gateway drops the unsandboxed control packet; the probe correctly withholds "fully enforced" there (egress was enforced on the owner's Windows 11 host). | CI job *Native runner (windows-2025)* |
-| macOS (`macos-15`, `macos-15-intel`) | Seatbelt runs `cat` and `sh`; workspace reads are allowed and outside reads and writes are **denied** (measured). The probe measured `.raiker` **readable** (`masked_read: unenforced`) because a later deny did not override the workspace allow. The allow rules now exclude protected paths with `require-not`, and a direct `sandbox-exec` test covers `.raiker` reads and `.git` writes. Rerun pending. Descendant containment is indeterminate. | CI jobs *Native runner (macos-15*)* and the Seatbelt denial log step |
+All four native runner jobs pass: `ubuntu-24.04`, `windows-2025`, `macos-15` and `macos-15-intel`.
+
+| Platform | Measured |
+| --- | --- |
+| Linux | Bubblewrap + seccomp control-arm tests: filesystem, masked state, egress, descendant reaping and two denied syscalls enforced. |
+| Windows | Relay, workspace write, escape write, masked read and descendant reaping enforced; the shared-`.git` adversarial ACL is refused. Egress is indeterminate on hosted runners (gateway drops the control packet) and enforced on the owner's Windows 11 host. |
+| macOS (arm64 and Intel) | Seatbelt: workspace read allowed; outside read and write, `.raiker` read and `.git` write denied (direct `sandbox-exec` test); the probe measures relay, writes and masked read enforced. Egress is indeterminate because there is no gateway control on macOS, and descendant containment is indeterminate (not implemented). |
+
+These are boundary measurements, not release evidence: native execution remains
+unavailable until disposable workspaces are wired in (see `TO_BE_FIXED.md`).
+The Python suite still has the same 189 pre-migration host-execution failures
+it had before Docker was removed; none are new.
 
 ## Windows MXC evaluation (2026-10-30)
 

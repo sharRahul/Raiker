@@ -8,7 +8,20 @@ from pathlib import Path
 
 import pytest
 
-from raiker.execution.commands.backends.native import NativeSandboxDriver
+from raiker.execution.commands.backends.base import CommandBackendError
+from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
+from raiker.execution.commands.models import CommandRequest
+
+
+def _request(workspace_root: Path) -> CommandRequest:
+    return CommandRequest(
+        run_id="cmd_probe", owner_principal_id="owner", acting_principal_id="agent",
+        session_id="sess", turn_id="turn", action_id="act", repository_id=None,
+        workspace_root=workspace_root, cwd=".", executable_template="",
+        argv_template=("python", "-V"), safe_display="python -V", credential_bindings=(),
+        shell=False, interactive=False, background=False, timeout_seconds=5,
+        max_output_bytes=1000, environment_profile_id="native_sandbox", network_policy_id=None,
+    )
 
 
 def test_probe_runner_uses_a_restricted_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -151,7 +164,7 @@ def test_probe_never_grants_access_to_the_original_workspace(tmp_path: Path) -> 
     assert sentinel.read_text(encoding="utf-8") == "owner data"
 
 
-def test_measured_probe_does_not_authorize_original_workspace_execution(tmp_path: Path) -> None:
+def test_a_measured_probe_still_never_runs_in_the_original_workspace(tmp_path: Path) -> None:
     helper = tmp_path / "helper"
     helper.mkdir()
     driver = NativeSandboxDriver(tmp_path, helper_root=helper)
@@ -175,8 +188,11 @@ def test_measured_probe_does_not_authorize_original_workspace_execution(tmp_path
     report = json.dumps({"available": True, "observations": observations})
     driver._run_probe = lambda argv: subprocess.CompletedProcess(argv, 0, report, "")
     proof = driver.probe()
-    assert not proof.available
-    assert proof.reason_code == "native_disposable_workspace_required"
+    assert proof.available
+    # Availability is the boundary; the copy is the backend's job. Without a
+    # task workspace registry it refuses rather than run in the project.
+    with pytest.raises(CommandBackendError, match="native_disposable_workspace_required"):
+        NativeSandboxBackend(driver=driver, proof=proof).start(_request(tmp_path))
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows ACL revocation")

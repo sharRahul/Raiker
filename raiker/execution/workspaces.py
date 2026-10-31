@@ -33,11 +33,13 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import shutil
 import stat
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
@@ -243,7 +245,9 @@ def _unsafe_relative(relative: str) -> str | None:
     path = PurePosixPath(relative)
     if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
         return "path_traversal"
-    if path.parts[0] in EXCLUDED_NAMES:
+    # At any depth: a nested `.git` the task planted would be a repository
+    # whose hooks or config the owner's own Git could later run.
+    if any(part.casefold() in EXCLUDED_NAMES for part in path.parts):
         return "protected_path"
     if any(":" in part or "\\" in part for part in path.parts):
         return "path_unrepresentable"
@@ -381,3 +385,140 @@ def sweep_stale(base: str | Path, *, older_than_seconds: float) -> list[Path]:
             discard(TaskWorkspace("stale", base_path, child, {}))
             removed.append(child)
     return removed
+
+
+class TaskWorkspaceRegistry:
+    """One disposable copy per (owner, session, source), kept across commands.
+
+    Successive commands in a session see each other's work, and the owner
+    reviews the accumulated change set once. Records live beside the copies in
+    a Raiker-owned directory that no sandbox is granted, never in the project.
+    """
+
+    def __init__(self, base: str | Path) -> None:
+        self.base = Path(base)
+        self._lock = threading.Lock()
+
+    @classmethod
+    def for_workspace(cls, workspace_root: str | Path) -> TaskWorkspaceRegistry:
+        """Copies live outside the Raiker workspace, so none is ever its own source."""
+        root = Path(workspace_root).resolve()
+        return cls(root.parent / f"{root.name}-sandboxes")
+
+    @staticmethod
+    def key(owner_principal_id: str, session_id: str, source: Path) -> str:
+        text = "\x00".join((owner_principal_id, session_id, str(source.resolve())))
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+    def _record(self, key: str) -> Path:
+        if len(key) != 32 or any(c not in "0123456789abcdef" for c in key):
+            raise WorkspaceError("workspace_not_found")
+        return self.base / f"{key}.json"
+
+    def acquire(
+        self, owner_principal_id: str, session_id: str, source: str | Path
+    ) -> tuple[str, TaskWorkspace]:
+        source_path = Path(source).resolve()
+        key = self.key(owner_principal_id, session_id, source_path)
+        with self._lock:
+            existing = self._load(key)
+            if existing is not None and existing[0] == owner_principal_id:
+                return key, existing[1]
+            workspace = create_task_workspace(source_path, self.base, session_id)
+            self._save(key, owner_principal_id, session_id, workspace)
+            return key, workspace
+
+    def load(self, owner_principal_id: str, key: str) -> TaskWorkspace:
+        loaded = self._load(key)
+        # Another owner's copy reads exactly like a missing one.
+        if loaded is None or loaded[0] != owner_principal_id:
+            raise WorkspaceError("workspace_not_found")
+        return loaded[1]
+
+    def entries(self, owner_principal_id: str) -> list[tuple[str, str, TaskWorkspace]]:
+        """``(key, session_id, workspace)`` for the owner's live copies."""
+        found: list[tuple[str, str, TaskWorkspace]] = []
+        if not self.base.is_dir():
+            return found
+        for record in sorted(self.base.glob("*.json")):
+            loaded = self._load(record.stem)
+            if loaded is not None and loaded[0] == owner_principal_id:
+                found.append((record.stem, loaded[2], loaded[1]))
+        return found
+
+    def release(self, owner_principal_id: str, key: str) -> None:
+        """Discard the copy and forget it. The project is not touched."""
+        with self._lock:
+            workspace = self.load(owner_principal_id, key)
+            discard(workspace)
+            with contextlib.suppress(FileNotFoundError):
+                self._record(key).unlink()
+
+    def _save(
+        self, key: str, owner_principal_id: str, session_id: str, workspace: TaskWorkspace
+    ) -> None:
+        document = {
+            "owner_principal_id": owner_principal_id,
+            "session_id": session_id,
+            "task_id": workspace.task_id,
+            "source": str(workspace.source),
+            "root": str(workspace.root),
+            "created_at": workspace.created_at,
+            "skipped": workspace.skipped,
+            "manifest": {
+                relative: [entry.sha256, entry.size, entry.executable]
+                for relative, entry in workspace.manifest.items()
+            },
+        }
+        record = self._record(key)
+        staged = record.with_suffix(".tmp")
+        staged.write_text(json.dumps(document), encoding="utf-8")
+        os.replace(staged, record)
+
+    def _load(self, key: str) -> tuple[str, TaskWorkspace, str] | None:
+        record = self._record(key)
+        try:
+            document = json.loads(record.read_text(encoding="utf-8"))
+            root = Path(document["root"])
+            # A record must name a copy directly under this registry's base.
+            if root.parent.resolve() != self.base.resolve() or not root.is_dir():
+                return None
+            workspace = TaskWorkspace(
+                str(document["task_id"]),
+                Path(document["source"]),
+                root,
+                {
+                    str(relative): ManifestEntry(str(entry[0]), int(entry[1]), bool(entry[2]))
+                    for relative, entry in dict(document["manifest"]).items()
+                },
+                [str(item) for item in document.get("skipped", [])],
+                float(document.get("created_at", 0.0)),
+            )
+            return str(document["owner_principal_id"]), workspace, str(document["session_id"])
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            return None
+
+    def sweep_orphans(self, *, older_than_seconds: float = 24 * 3600) -> list[Path]:
+        """Remove copies no record names, left by a crash before it was saved.
+
+        A recorded copy holds work the owner has not reviewed yet, so it is
+        never swept: only the owner's discard or promotion removes it.
+        """
+        if not self.base.is_dir() or _path_is_link_like(self.base):
+            return []
+        with self._lock:
+            recorded = set()
+            for record in self.base.glob("*.json"):
+                loaded = self._load(record.stem)
+                if loaded is not None:
+                    recorded.add(loaded[1].root.resolve())
+            cutoff = time.time() - older_than_seconds
+            removed: list[Path] = []
+            for child in self.base.iterdir():
+                if _path_is_link_like(child) or not child.is_dir():
+                    continue
+                if child.resolve() in recorded or child.stat().st_mtime >= cutoff:
+                    continue
+                discard(TaskWorkspace("orphan", self.base, child, {}))
+                removed.append(child)
+            return removed

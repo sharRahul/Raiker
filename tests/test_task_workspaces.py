@@ -11,6 +11,7 @@ import pytest
 
 from raiker.execution import workspaces
 from raiker.execution.workspaces import (
+    TaskWorkspaceRegistry,
     WorkspaceError,
     create_task_workspace,
     diff_workspace,
@@ -117,6 +118,13 @@ def test_links_and_protected_names_the_task_creates_are_never_promotable(tmp_pat
 
     diff = diff_workspace(workspace)
 
+    (workspace.root / "src" / "inner" / ".git").mkdir(parents=True)
+    (workspace.root / "src" / "inner" / ".git" / "config").write_text("[core]\n", encoding="utf-8")
+    (workspace.root / "src" / ".RAIKER").mkdir()
+    (workspace.root / "src" / ".RAIKER" / "x").write_text("x", encoding="utf-8")
+    diff = diff_workspace(workspace)
+    assert ("src/inner/.git/config", "protected_path") in diff.rejected
+    assert ("src/.RAIKER/x", "protected_path") in diff.rejected
     assert ("escape", "link") in diff.rejected
     assert (".git", "protected_path") in diff.rejected
     assert diff.created == ()
@@ -237,3 +245,28 @@ def test_discard_and_crash_sweep_remove_only_task_copies(tmp_path: Path) -> None
     discard(kept)
     assert not kept.root.exists()
     assert (project / "src" / "app.py").exists()
+
+
+def test_the_registry_keeps_recorded_copies_and_sweeps_only_orphans(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    registry = TaskWorkspaceRegistry(tmp_path / "copies")
+    key, kept = registry.acquire("owner", "sess", project / "src")
+    again_key, again = registry.acquire("owner", "sess", project / "src")
+    orphan = create_task_workspace(project / "src", tmp_path / "copies", "crashed")
+    old = 1_000_000_000
+    os.utime(kept.root, (old, old))
+    os.utime(orphan.root, (old, old))
+
+    removed = registry.sweep_orphans(older_than_seconds=3600)
+
+    assert (again_key, again.root) == (key, kept.root)
+    assert removed == [orphan.root]
+    assert kept.root.exists()
+    with pytest.raises(WorkspaceError, match="workspace_not_found"):
+        registry.load("someone_else", key)
+    with pytest.raises(WorkspaceError, match="workspace_not_found"):
+        registry.load("owner", "../../etc")
+    registry.release("owner", key)
+    assert not kept.root.exists()
+    assert registry.entries("owner") == []
+

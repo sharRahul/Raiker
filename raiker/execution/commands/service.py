@@ -36,6 +36,7 @@ from raiker.execution.profiles import (
     ExecutionProfile,
     resolve_command_environment,
 )
+from raiker.execution.workspaces import TaskWorkspaceRegistry
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -148,6 +149,10 @@ class CommandService:
         self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
         self._lock = threading.Lock()
+        # A crash between creating a task copy and recording it leaves a copy
+        # nobody can review; remove those. Recorded copies are never swept.
+        with contextlib.suppress(OSError):
+            TaskWorkspaceRegistry.for_workspace(self.workspace_root).sweep_orphans()
         #: Set on shutdown so lease holders stop renewing immediately rather
         #: than sleeping out their interval while the runtime is going away.
         self._lease_stop = threading.Event()
@@ -506,7 +511,11 @@ class CommandService:
             # list: a receipt must not assert "network denied" from a
             # measurement taken before the firewall service was stopped.
             driver = NativeSandboxDriver(self.workspace_root)
-            return NativeSandboxBackend(driver=driver, proof=driver.probe())
+            return NativeSandboxBackend(
+                driver=driver,
+                proof=driver.probe(),
+                workspaces=TaskWorkspaceRegistry.for_workspace(self.workspace_root),
+            )
         if profile.kind == "ssh":
             return SshCommandBackend(profile, self.workspace_root)
         if profile.kind == "daytona":

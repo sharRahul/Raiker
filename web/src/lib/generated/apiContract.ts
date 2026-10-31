@@ -5081,6 +5081,13 @@ export type ProjectsListView = {
   active_project_id: string | null;
 };
 
+/** The exact change set the owner reviewed. */
+export type PromoteTaskWorkspaceRequest = {
+  created: string[];
+  modified: string[];
+  deleted: string[];
+};
+
 export type PromptRequest = {
   text: string;
   input_mode?: "typed" | "dictated" | "mixed";
@@ -6380,6 +6387,40 @@ export type TaskView = {
   phase: string;
 };
 
+export type TaskWorkspaceDiscarded = {
+  ok: boolean;
+  workspace_id: string;
+};
+
+export type TaskWorkspaceList = {
+  workspaces: TaskWorkspaceView[];
+};
+
+export type TaskWorkspacePromoted = {
+  ok: boolean;
+  workspace_id: string;
+  created: string[];
+  modified: string[];
+  deleted: string[];
+};
+
+export type TaskWorkspaceRejection = {
+  path: string;
+  reason: string;
+};
+
+/** A session's disposable copy and what its commands changed in it. */
+export type TaskWorkspaceView = {
+  workspace_id: string;
+  session_id: string;
+  source: string;
+  created_at: number;
+  created: string[];
+  modified: string[];
+  deleted: string[];
+  rejected: TaskWorkspaceRejection[];
+};
+
 export type TelemetryCadenceRequest = {
   cadence: string;
 };
@@ -7067,6 +7108,12 @@ export const contract = {
     request<CommandReceiptAnswer>(`/api/command-runs/${encodeURIComponent(runId)}/receipt`),
   stopCommand: (runId: string) =>
     call<CommandStopped>("POST", `/api/command-runs/${encodeURIComponent(runId)}/stop`),
+  listTaskWorkspaces: () =>
+    request<TaskWorkspaceList>("/api/command-workspaces"),
+  discardTaskWorkspace: (workspaceId: string) =>
+    call<TaskWorkspaceDiscarded>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/discard`),
+  promoteTaskWorkspace: (workspaceId: string, body: PromoteTaskWorkspaceRequest) =>
+    call<TaskWorkspacePromoted>("POST", `/api/command-workspaces/${encodeURIComponent(workspaceId)}/promote`, { body }),
   getConnections: () =>
     request<ConnectionsView>("/api/connections"),
   connectorStore: () =>

@@ -40,8 +40,22 @@ exhaustive inventory or security assessment.
   that refuses on owner changes made after the snapshot, writes nothing a
   path check refuses, never writes through a link, and restores every original
   on failure; quotas; and crash cleanup. `tests/test_task_workspaces.py`
-  exercises real junctions/symlinks and hard links. It is **not yet wired** into
-  the command service, so native execution remains unavailable.
+  exercises real junctions/symlinks and hard links.
+  **Wired (2026-10-31).** `NativeSandboxBackend` runs every command in a
+  per-(owner, session, working-folder) copy from `TaskWorkspaceRegistry`, kept
+  outside the Raiker workspace in `<workspace>-sandboxes/`; the copy holds only
+  the command's working folder. The probe's measurements alone decide
+  availability, and the backend refuses (`native_disposable_workspace_required`)
+  without a registry. The owner reviews and applies or discards a copy through
+  `GET /api/command-workspaces` and `POST .../{id}/promote|discard`; promotion
+  must name the exact change set the owner saw (`workspace_review_stale`
+  otherwise) and is refused while a run in that session is active. Both outcomes
+  are audited (`task_workspace_promoted`, `task_workspace_discarded`). Build shows
+  the copy's changes with **Apply to project** and **Discard**. `.git` and
+  `.raiker` are rejected at any depth, so a task cannot plant a repository.
+  Real Windows end-to-end: `git --version` ran in the AppContainer rooted in the
+  copy and the project was unchanged; a virtualenv interpreter outside the
+  boundary was refused.
 - [ ] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement.
 - [ ] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities.
 - [ ] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback.

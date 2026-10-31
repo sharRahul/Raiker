@@ -22,6 +22,7 @@ one.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -40,6 +41,7 @@ from raiker.execution.commands.backends.base import CommandBackendError
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.process_lifetime import bind_to_runtime_lifetime
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.workspaces import TaskWorkspaceRegistry, WorkspaceError
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
     CommandRejected,
@@ -240,23 +242,15 @@ class NativeSandboxDriver:
         )
         if sys.platform.startswith("linux") or report.get("platform") == "linux":
             required += ("seccomp",)
-        if any(observations.get(name) != ENFORCED for name in required):
-            available = False
-        # Measurements in a throwaway directory do not authorize writes to
-        # the owner's original project. Enable only after task workspaces are
-        # allocated and policy-bound through the broker.
-        gate_reason = "native_disposable_workspace_required" if available else None
-        available = False
+        # Availability is decided here, from the measurements alone. The
+        # runner's own headline is always false: it cannot know that the
+        # backend runs every command in a disposable task copy, which is what
+        # keeps the owner's project out of reach. Every mandatory observation
+        # must be enforced; an indeterminate control arm is not evidence.
+        available = all(observations.get(name) == ENFORCED for name in required)
         return NativeSandboxProof(
             available=available,
-            reason_code=(
-                gate_reason
-                or (
-                    str(report.get("reason"))
-                    if report.get("reason")
-                    else "native_sandbox_not_enforced"
-                )
-            ),
+            reason_code=None if available else "native_sandbox_not_enforced",
             boundary=str(report.get("boundary") or "none"),
             checked_at=checked_at,
             observations=observations,
@@ -333,10 +327,14 @@ class NativeSandboxBackend:
         *,
         driver: NativeSandboxDriver,
         proof: NativeSandboxProof,
+        workspaces: TaskWorkspaceRegistry | None = None,
         runner: Callable[..., Any] | None = None,
     ) -> None:
         self.driver = driver
         self.proof = proof
+        # Without a registry there is no disposable copy, and the command would
+        # write to the owner's project: refuse rather than run there.
+        self.workspaces = workspaces
         self.features = proof.features
         self._runner = runner or StreamingCommandRunner().start
 
@@ -353,6 +351,10 @@ class NativeSandboxBackend:
             raise CommandBackendError("filtered_egress_windows_unsupported")
         if request.credential_bindings:
             raise CommandBackendError("selected_environment_credential_unsupported")
+        if self.workspaces is None:
+            raise CommandBackendError("native_disposable_workspace_required")
+        original = request
+        request = self._in_task_copy(request)
 
         # The argv policy is applied here *and* the boundary is applied by the
         # runner. Two independent checks of the same rule is deliberate: neither
@@ -370,7 +372,9 @@ class NativeSandboxBackend:
         if binary is None:
             raise CommandBackendError(reason or "native_sandbox_artifact_missing")
 
-        policy_path = self.driver.policy_path(request)
+        # The policy is Raiker state: it is written beside the original
+        # workspace's own state, never into the copy the command can touch.
+        policy_path = self.driver.policy_path(original)
         policy_path.write_text(
             json.dumps(self.driver.policy_document(request), indent=2), encoding="utf-8"
         )
@@ -407,6 +411,26 @@ class NativeSandboxBackend:
         bind_to_runtime_lifetime(getattr(getattr(process, "process", None), "pid", None))
         return process
 
+    def _in_task_copy(self, request: CommandRequest) -> CommandRequest:
+        """The same request, rooted in this session's disposable copy.
+
+        The copy holds only the command's working directory, the least of the
+        project it needs; its parent folders, siblings, `.git` and `.raiker`
+        are not in it at all.
+        """
+        assert self.workspaces is not None
+        root = request.workspace_root.resolve()
+        scope = (root / request.cwd).resolve()
+        if scope != root and root not in scope.parents:
+            raise CommandBackendError("command_cwd_outside_workspace")
+        try:
+            _, workspace = self.workspaces.acquire(
+                request.owner_principal_id, request.session_id, scope
+            )
+        except WorkspaceError as exc:
+            raise CommandBackendError(exc.reason_code) from None
+        return dataclasses.replace(request, workspace_root=workspace.root, cwd=".")
+
     def isolation_evidence(self, request: CommandRequest) -> dict[str, Any]:
         """What this run's boundary actually was, separate from host readiness.
 
@@ -422,6 +446,7 @@ class NativeSandboxBackend:
             "deny_paths": list(PROTECTED_DENY_PATHS),
             "readonly_paths": list(PROTECTED_READONLY_PATHS),
             "runner_digest": _runner_digest(self.driver),
+            "workspace": "disposable_task_copy",
         }
         return evidence
 

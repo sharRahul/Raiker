@@ -53,6 +53,7 @@ import type {
   ConversationCompaction,
   ConversionPreview,
   CredentialDeltaView,
+  TaskWorkspaceView,
   CredentialLifecycleView,
   CriticalApprovalResolved,
   Diagnostic,
@@ -779,6 +780,8 @@ export type { CommandChunkView };
 export type { CommandReceiptView };
 
 export type { CredentialDeltaView };
+
+export type { TaskWorkspaceView };
 
 export type { ModelCapacityEntry };
 

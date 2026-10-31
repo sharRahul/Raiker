@@ -99,6 +99,8 @@ const READONLY_DENY_MASK: u32 = 0x000d_0156;
 // READONLY_DENY_MASK plus GENERIC_WRITE and GENERIC_ALL.
 const WRITE_LIKE: u32 = 0x500d_0156;
 const SYNCHRONIZE_RIGHT: u32 = 0x0010_0000;
+const DELETE_RIGHT: u32 = 0x0001_0000;
+const FILE_DELETE_CHILD_RIGHT: u32 = 0x0000_0040;
 
 unsafe extern "system" {
     fn SetHandleInformation(handle: HANDLE, mask: u32, flags: u32) -> i32;
@@ -630,10 +632,17 @@ fn ensure_workspace_grant(policy: &LaunchPolicy, capability: &Capability) -> Res
         capability.dacl_sid,
         ACE_TYPE_ALLOWED,
     )? {
+        // DELETE and FILE_DELETE_CHILD: toolchains write atomically by
+        // rename, which needs delete on the source. The broker only ever
+        // passes a disposable task copy here, never the owner's project.
         set_entry(
             &policy.workspace_root,
             capability.dacl_sid,
-            FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE,
+            FILE_GENERIC_READ
+                | FILE_GENERIC_WRITE
+                | FILE_GENERIC_EXECUTE
+                | DELETE_RIGHT
+                | FILE_DELETE_CHILD_RIGHT,
             SET_ACCESS,
             false,
         )?;

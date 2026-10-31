@@ -28,6 +28,7 @@ from raiker.execution.profiles import (
     ProfileProbe,
     resolve_command_environment,
 )
+from raiker.execution.workspaces import TaskWorkspaceRegistry
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -291,8 +292,10 @@ def test_native_sandbox_capabilities_come_from_measurements_not_configuration(
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
     proof = driver.probe()
-    assert proof.available is False
-    assert proof.reason_code == "native_disposable_workspace_required"
+    # Every mandatory observation enforced: available, because each command
+    # runs in a disposable task copy rather than the owner's project.
+    assert proof.available is True
+    assert proof.reason_code is None
     assert proof.boundary == "appcontainer"
     assert proof.features.process_tree_stop is True
     # Everything unmeasured stays off, however the profile is configured.
@@ -366,10 +369,11 @@ def test_the_native_backend_refuses_unbuilt_capabilities_by_name(
 ) -> None:
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
-    # Exercise the capability-specific guards independently of the current
-    # disposable-workspace gate, using an explicitly simulated future proof.
-    proof = replace(driver.probe(), available=True, reason_code=None)
-    backend = NativeSandboxBackend(driver=driver, proof=proof)
+    backend = NativeSandboxBackend(
+        driver=driver,
+        proof=driver.probe(),
+        workspaces=TaskWorkspaceRegistry(tmp_path / "copies"),
+    )
     asked = request(tmp_path, **{field: True})
     with pytest.raises(CommandBackendError) as raised:
         backend.start(asked)
@@ -389,6 +393,50 @@ def test_an_unavailable_boundary_refuses_rather_than_running_on_the_host(
     assert raised.value.reason_code == "native_sandbox_not_enforced"
 
 
+def test_without_a_task_workspace_registry_the_backend_refuses(tmp_path: Path) -> None:
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
+    backend = NativeSandboxBackend(driver=driver, proof=driver.probe())
+    with pytest.raises(CommandBackendError) as raised:
+        backend.start(request(tmp_path))
+    assert raised.value.reason_code == "native_disposable_workspace_required"
+
+
+def test_a_command_runs_in_the_session_copy_never_in_the_project(tmp_path: Path) -> None:
+    project = tmp_path / "ws"
+    (project / "app").mkdir(parents=True)
+    (project / "app" / "main.py").write_text("print(1)\n", encoding="utf-8")
+    (project / ".raiker").mkdir()
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(project, helper_root=directory, run_probe=_probe_reply())
+    registry = TaskWorkspaceRegistry(tmp_path / "copies")
+    launched: list[tuple[list[str], Path]] = []
+
+    def fake_runner(req: Any, argv: list[str], cwd: Path, *_args: Any, **_kwargs: Any) -> Any:
+        launched.append((argv, Path(cwd)))
+        return object()  # no process, so nothing to bind to the runtime lifetime
+
+    backend = NativeSandboxBackend(
+        driver=driver, proof=driver.probe(), workspaces=registry, runner=fake_runner
+    )
+    asked = request(project, cwd="app")
+    backend.start(asked)
+    backend.start(replace(asked, run_id="cmd_second"))
+
+    [(key, session_id, copy)] = registry.entries(asked.owner_principal_id)
+    assert session_id == asked.session_id
+    assert copy.source == (project / "app").resolve()
+    assert (copy.root / "main.py").exists()
+    # Both runs used the same copy; neither ran in the project.
+    assert {cwd for _, cwd in launched} == {copy.root}
+    policy = json.loads(Path(launched[0][0][2]).read_text(encoding="utf-8"))
+    assert Path(policy["workspace_root"]) == copy.root
+    assert Path(policy["cwd"]) == copy.root.resolve()
+    # The policy document is Raiker state, kept out of the copy.
+    assert copy.root not in Path(launched[0][0][2]).parents
+    assert key
+
+
 def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path) -> None:
     """Two claims, kept apart.
 
@@ -403,6 +451,7 @@ def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path
     evidence = backend.isolation_evidence(request(tmp_path))
     assert evidence["boundary_constructed"]["network_capability"] is False
     assert evidence["boundary_constructed"]["profile_name"].startswith("raiker.cmd.")
+    assert evidence["boundary_constructed"]["workspace"] == "disposable_task_copy"
     assert evidence["probe_observations"]["egress"] == "enforced"
     assert evidence["probe_checked_at"]
 

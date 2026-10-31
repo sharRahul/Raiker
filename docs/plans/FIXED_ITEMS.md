@@ -1,5 +1,18 @@
 # Fixed items
 
+## Native commands ran against the owner's project instead of a disposable copy
+
+Governed commands now run in a per-session copy of their working folder, kept
+outside the Raiker workspace. Nothing reaches the project until the owner
+applies the exact change set they reviewed in Build; a stale review, an owner
+edit made after the snapshot, an active run, a link or a nested `.git`/`.raiker`
+is refused, and a failed promotion restores every original. Discard leaves the
+project unchanged. Covered by `tests/test_task_workspaces.py`,
+`tests/test_task_workspace_api.py`, `tests/test_command_backends.py` and
+`web/src/lib/components/TaskWorkspaceReview.test.ts`, plus a real Windows
+AppContainer run. Network mediation, background/PTY execution and toolchain
+provisioning remain open in `TO_BE_FIXED.md`.
+
 ## Docker and Podman removed as Raiker execution dependencies
 
 Raiker no longer invokes Docker or Podman. Removed: the persistent container

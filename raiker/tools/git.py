@@ -132,22 +132,28 @@ def no_filter_drivers(root: Path) -> list[str]:
     them. Listing configuration only reads it.
     """
     listed = subprocess.run(
-        ["git", "-C", str(root), "config", "--null", "--name-only", "--get-regexp", r"^filter\."],
+        ["git", "-C", str(root), "config", "--null", "--name-only", "--get-regexp", r"^(filter|diff)\."],
         check=False,
         capture_output=True,
         text=True,
         timeout=10,
         env=local_git_environment(),
     )
-    drivers: set[str] = set()
+    filters: set[str] = set()
+    diffs: set[str] = set()
     for name in listed.stdout.split("\0"):
-        if name.startswith("filter.") and name.count(".") >= 2:
-            drivers.add(name[len("filter."):name.rindex(".")])
+        for prefix, found in (("filter.", filters), ("diff.", diffs)):
+            if name.startswith(prefix) and name.count(".") >= 2:
+                found.add(name[len(prefix):name.rindex(".")])
     overrides: list[str] = []
-    for driver in sorted(drivers):
+    for driver in sorted(filters):
         for key in ("clean", "smudge", "process"):
             overrides += ["-c", f"filter.{driver}.{key}="]
         overrides += ["-c", f"filter.{driver}.required=false"]
+    # Diff drivers name programs too (`command`, `textconv`). The diff calls
+    # also pass --no-ext-diff/--no-textconv; this covers any that do not.
+    for driver in sorted(diffs):
+        overrides += ["-c", f"diff.{driver}.command=", "-c", f"diff.{driver}.textconv="]
     return overrides
 
 
@@ -392,11 +398,23 @@ def _entry_paths(entries: list[dict[str, str]]) -> list[str]:
 
 def _untracked_diff(root: Path, path: str) -> str:
     """A unified diff for a file git does not track yet, or `""` if it cannot be read."""
+    if _is_protected(path):
+        return ""
     try:
         target = root / path
-        if not target.is_file() or target.stat().st_size > _MAX_DIFF_BYTES:
+        # A link is rendered as nothing rather than followed: its target can be
+        # anywhere, and reading it would put that file's content in the diff.
+        if target.is_symlink() or not target.is_file():
             return ""
-        text = target.read_text(encoding="utf-8")
+        real = target.resolve()
+        if real != root.resolve() and root.resolve() not in real.parents:
+            return ""
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        descriptor = os.open(real, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            if os.fstat(handle.fileno()).st_size > _MAX_DIFF_BYTES:
+                return ""
+            text = handle.read().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return ""
     return "".join(
@@ -415,7 +433,11 @@ def _commit_diff(root: Path, entries: list[dict[str, str]]) -> str:
     tracked_paths = _entry_paths([e for e in entries if e["state"] != "untracked"])
     parts: list[str] = []
     if tracked_paths:
-        tracked = _git(root, ["diff", "HEAD", "--", *tracked_paths])
+        tracked = _git(
+            root,
+            ["diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", *tracked_paths,
+             ":(top,icase,exclude).raiker", ":(top,icase,exclude).git"],
+        )
         if tracked.returncode == 0:
             parts.append(tracked.stdout)
     for entry in entries:
@@ -797,7 +819,7 @@ def outgoing_secret_findings(root: Path, selection: list[str]) -> list[dict[str,
 
     proc = _git(
         root,
-        ["log", "-p", "--no-color", "--no-ext-diff", "--format=", "--unified=0",
+        ["log", "-p", "--no-color", "--no-ext-diff", "--no-textconv", "--format=", "--unified=0",
          f"-n{_MAX_SCANNED_COMMITS}", *selection],
         timeout=30,
     )

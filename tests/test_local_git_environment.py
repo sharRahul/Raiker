@@ -268,3 +268,43 @@ def test_branch_checkout_does_not_run_repository_smudge_filter(repo: Path) -> No
     at_head = create_branch(repo, "branch-at-head")
     assert at_head["status"] == "success"
     assert not marker.exists()
+
+
+def test_commit_diff_never_runs_a_textconv_or_external_diff_driver(repo: Path) -> None:
+    marker = repo.parent / "textconv-ran"
+    driver = repo.parent / "textconv.py"
+    driver.write_text(
+        "import pathlib,sys\n"
+        f"pathlib.Path({str(marker)!r}).touch()\n"
+        "sys.stdout.write(open(sys.argv[1]).read())\n",
+        encoding="utf-8",
+    )
+    program = f'"{Path(sys.executable).as_posix()}" "{driver.as_posix()}"'
+    _git(repo, "config", "diff.raiker-test.textconv", program)
+    _git(repo, "config", "diff.raiker-test.command", program)
+    (repo / ".gitattributes").write_text("a.txt diff=raiker-test\n", encoding="utf-8")
+    _git(repo, "add", ".gitattributes")
+    _git(repo, "commit", "-m", "attributes")
+    (repo / "a.txt").write_text("changed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "diff", "HEAD"], check=True, capture_output=True)
+    assert marker.exists(), "control: Git must be able to start the textconv driver"
+    marker.unlink()
+
+    diff = working_tree_diff(repo, working_tree_changes(repo))
+
+    assert "+changed" in diff
+    assert not marker.exists()
+
+
+def test_an_untracked_link_is_never_followed_into_the_diff(repo: Path, tmp_path: Path) -> None:
+    secret = tmp_path.parent / f"{tmp_path.name}-secret.txt"
+    secret.write_text("PRIVATE KEY MATERIAL\n", encoding="utf-8")
+    try:
+        (repo / "leak.txt").symlink_to(secret)
+    except OSError:
+        pytest.skip("symlink creation is not permitted on this host")
+    try:
+        diff = working_tree_diff(repo, working_tree_changes(repo))
+        assert "PRIVATE KEY MATERIAL" not in diff
+    finally:
+        secret.unlink()

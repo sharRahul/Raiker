@@ -147,3 +147,33 @@ fn the_account_cannot_write_the_owners_profile_or_a_copy_outside_its_base() {
             .contains("raikersandbox")
     );
 }
+
+#[test]
+fn a_run_cannot_touch_another_sessions_copy() {
+    let Some(base) = configured() else { return };
+    let mine = copy_under(&base, "mine");
+    let theirs = copy_under(&base, "theirs");
+    std::fs::write(theirs.0.join("secret.txt"), "other session").unwrap();
+    let cmd = std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
+    let target = theirs.0.join("planted.txt").to_string_lossy().into_owned();
+    let read = theirs.0.join("secret.txt").to_string_lossy().into_owned();
+    let attempt = run(
+        &mine,
+        &[
+            &cmd,
+            "/c",
+            &format!("type \"{read}\" & echo x> \"{target}\""),
+        ],
+    );
+    assert!(
+        !theirs.0.join("planted.txt").exists(),
+        "a run wrote into another copy"
+    );
+    assert!(
+        !String::from_utf8_lossy(&attempt.stdout).contains("other session"),
+        "a run read another copy"
+    );
+    // Its own copy stays writable, and the grant is gone once the run ends.
+    let own = run(&mine, &[&cmd, "/c", "echo ok> own.txt"]);
+    assert!(own.status.success() && mine.0.join("own.txt").exists());
+}

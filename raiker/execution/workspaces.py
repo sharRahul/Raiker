@@ -539,6 +539,11 @@ class TaskWorkspaceRegistry:
         """
         if not self.base.is_dir() or _path_is_link_like(self.base):
             return []
+        # A base shared with records kept elsewhere (the Windows account base)
+        # holds other workspaces' copies too; this registry cannot tell them
+        # from orphans, so it removes nothing there.
+        if self.records.resolve() != self.base.resolve():
+            return []
         with self._lock:
             recorded = set()
             for record in self.records.glob("*.json"):

@@ -136,9 +136,8 @@ pub fn setup() -> Result<Value, String> {
     }
     add_member()?;
     let group = account_sid(GROUP)?;
-    let group_text = sid_text(group.as_ptr() as PSID)?;
     let account_text = sid_text(account_sid(ACCOUNT)?.as_ptr() as PSID)?;
-    create_base(&owner, &group_text)?;
+    create_base(&owner, &account_text)?;
     firewall_block(&account_text)?;
     let denied = deny_other_drives(group.as_ptr() as PSID)?;
     Ok(json!({
@@ -439,16 +438,48 @@ fn restrict(path: &Path, sddl: &str) -> Result<(), String> {
     }
 }
 
-fn create_base(owner: &str, group: &str) -> Result<(), String> {
+fn create_base(owner: &str, account: &str) -> Result<(), String> {
     let path = base()?;
     fs::create_dir_all(&path).map_err(|_| "native_sandbox_account_base_failed")?;
-    // Modify (0x1301bf) for the sandbox group, inherited by every task copy.
+    // The account gets no standing access to the base or any copy in it: only
+    // read-attributes on the base itself (toolchains stat every ancestor), not
+    // inherited. Each launch grants it the one copy it runs in (`CopyGrant`),
+    // so a command cannot reach another session's copy.
     restrict(
         &path,
         &format!(
-            "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{owner})(A;OICI;0x1301bf;;;{group})"
+            "D:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{owner})(A;;0x100080;;;{account})"
         ),
     )
+}
+
+/// Modify on exactly one copy, for exactly one run; revoked on every exit.
+struct CopyGrant {
+    root: PathBuf,
+    sid: Vec<u8>,
+}
+
+impl CopyGrant {
+    fn apply(root: &Path) -> Result<CopyGrant, String> {
+        let sid = account_sid(ACCOUNT)?;
+        set_entry(root, sid.as_ptr() as PSID, 0x0013_01bf, SET_ACCESS, false)?;
+        Ok(CopyGrant {
+            root: root.to_path_buf(),
+            sid,
+        })
+    }
+}
+
+impl Drop for CopyGrant {
+    fn drop(&mut self) {
+        let _ = set_entry(
+            &self.root,
+            self.sid.as_ptr() as PSID,
+            0,
+            REVOKE_ACCESS,
+            false,
+        );
+    }
 }
 
 fn powershell(script: &str) -> Result<(), String> {
@@ -526,10 +557,13 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
             .canonicalize()
             .map_err(|_| "runner_policy_workspace_unreadable")?,
     );
-    if !root.starts_with(&base) || root == base {
+    // A copy is a direct child of the base, so its grant covers it and nothing
+    // beside it.
+    if root.parent() != Some(base.as_path()) {
         return Err("native_sandbox_account_workspace_outside_base".into());
     }
     let password = credential()?;
+    let _grant = CopyGrant::apply(&root)?;
     let job = create_job(policy)?;
     restrict_ui(job)?;
     let descriptor = PipeDescriptor::build(

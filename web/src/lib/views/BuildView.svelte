@@ -55,6 +55,7 @@
   import { retryConfirmation, retryConsequence } from "../conversationCommands";
   import TurnEvidence from "../components/TurnEvidence.svelte";
   import RewindPanel from "../components/RewindPanel.svelte";
+  import TaskWorkspaceReview from "../components/TaskWorkspaceReview.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import DiffView from "../components/DiffView.svelte";
   import SourceChips from "../components/SourceChips.svelte";
@@ -2515,6 +2516,8 @@
     {#if compactRail}
       <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
     {/if}
+
+    <TaskWorkspaceReview {sessionId} />
 
     <div class="composer-status">
         <!-- COMPOSER-12 — governance appears when it changes what the next

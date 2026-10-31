@@ -34,14 +34,13 @@ const run: CommandRunView = {
 
 it("shows the authoritative environment, redacted output, and immutable receipt", async () => {
   vi.spyOn(api, "executionEnvironments").mockResolvedValue({
-    selected_profile_id: "local_native",
+    selected_profile_id: "native_sandbox",
     environments: [{
-      profile_id: "local_native", kind: "local", name: "Local strict", enabled: true,
+      profile_id: "native_sandbox", kind: "native", name: "Local sandbox", enabled: true,
       configured: true, available: true, status: "ready", selected: true,
       credential_configured: false, budget: null, cost: null,
-      selected_for_commands: true, assigned_tools: [], features: {}, probe_checked_at: "2026-08-14T10:00:00Z", availability_reason: null,
+      selected_for_commands: true, assigned_tools: [], features: {}, probe_checked_at: "2026-08-14T10:00:00Z", availability_reason: null, boundary: "appcontainer",
     }],
-    container_options: { runtimes: [], images: [], supported_tools: [] },
   });
   vi.spyOn(api, "commandRuns").mockResolvedValue({ runs: [run] });
   vi.spyOn(api, "commandOutput").mockResolvedValue({
@@ -64,7 +63,7 @@ it("shows the authoritative environment, redacted output, and immutable receipt"
 
   // The posture line names the boundary that was measured, not a reassurance
   // about the selection being authoritative.
-  expect(await screen.findByText("Host access — reduced isolation")).toBeInTheDocument();
+  expect(await screen.findByText("Local sandbox · network not proven")).toBeInTheDocument();
   expect(await screen.findByText("clean")).toBeInTheDocument();
   expect(await screen.findByText(/Immutable receipt/)).toBeInTheDocument();
   expect(screen.getByText("local_strict")).toBeInTheDocument();
@@ -74,9 +73,8 @@ it("shows the authoritative environment, redacted output, and immutable receipt"
 
 it("refreshes when reopened after an approval ran while Build was hidden", async () => {
   vi.spyOn(api, "executionEnvironments").mockResolvedValue({
-    selected_profile_id: "local_native",
+    selected_profile_id: "native_sandbox",
     environments: [],
-    container_options: { runtimes: [], images: [], supported_tools: [] },
   });
   const runs = vi
     .spyOn(api, "commandRuns")
@@ -101,9 +99,8 @@ it("refreshes when reopened after an approval ran while Build was hidden", async
 
 it("refreshes an already-open terminal when Build becomes visible again", async () => {
   vi.spyOn(api, "executionEnvironments").mockResolvedValue({
-    selected_profile_id: "local_native",
+    selected_profile_id: "native_sandbox",
     environments: [],
-    container_options: { runtimes: [], images: [], supported_tools: [] },
   });
   const runs = vi
     .spyOn(api, "commandRuns")
@@ -136,9 +133,8 @@ it("selects the new session's run instead of retaining a stale run id", async ()
     safe_display: "git --version",
   };
   vi.spyOn(api, "executionEnvironments").mockResolvedValue({
-    selected_profile_id: "local_native",
+    selected_profile_id: "native_sandbox",
     environments: [],
-    container_options: { runtimes: [], images: [], supported_tools: [] },
   });
   vi.spyOn(api, "commandRuns").mockImplementation(async (sessionId) => ({
     runs: sessionId === "sess_2" ? [secondRun] : [run],

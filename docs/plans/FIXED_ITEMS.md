@@ -1,5 +1,141 @@
 # Fixed items
 
+## Windows builds could not run in the AppContainer sandbox
+
+AppContainer blocked Node (`EPERM: lstat 'C:\\'`), Git, MSYS tools and
+virtualenv Python. Windows build commands now run as a dedicated restricted
+local account (`RaikerSandbox`) set up once with the owner's approval, inside a
+copy under `C:\\RaikerSandbox`, in a Job Object with UI restrictions and an
+outbound firewall block. Measured on the owner's PC: every probe observation
+enforced, the toolchains run, and profile, data-drive and network escapes are
+refused. Gaps remain listed in `TO_BE_FIXED.md`.
+
+## Local Git could run repository filter programs; diff, commit and worktrees were blocked
+
+A `.gitattributes` line names a filter driver; the program it runs comes from
+Git configuration, and `status`, `diff`, `add`, `switch` and `worktree add` ran
+it on the host. Every local Git invocation (`run_git` and the governed `_git`)
+now passes `-c filter.<driver>.clean= / smudge= / process=` and
+`required=false` for each configured driver, so no filter program can run;
+`core.fsmonitor` and hooks were already off. A positive control showed the
+configured driver ran without these overrides and never with them. This
+replaces the interim refusals: working-tree diff, untracked-file diffs, commit
+previews and commits, branch creation from a base and task worktrees work
+again, and `tests/test_local_git_environment.py` asserts each succeeds without
+the filter starting. A diff Git refuses is still never reported as a clean
+review. Agent code no longer touches a project's `.git` at all; it runs in a
+disposable copy without one.
+
+## Native commands ran against the owner's project instead of a disposable copy
+
+Governed commands now run in a per-session copy of their working folder, kept
+outside the Raiker workspace. Nothing reaches the project until the owner
+applies the exact change set they reviewed in Build; a stale review, an owner
+edit made after the snapshot, an active run, a link or a nested `.git`/`.raiker`
+is refused, and a failed promotion restores every original. Discard leaves the
+project unchanged. Covered by `tests/test_task_workspaces.py`,
+`tests/test_task_workspace_api.py`, `tests/test_command_backends.py` and
+`web/src/lib/components/TaskWorkspaceReview.test.ts`, plus a real Windows
+AppContainer run. Network mediation, background/PTY execution and toolchain
+provisioning remain open in `TO_BE_FIXED.md`.
+
+## Docker and Podman removed as Raiker execution dependencies
+
+Raiker no longer invokes Docker or Podman. Removed: the persistent container
+command backend, the container tool bridge, `container_execution_cap`, the
+Docker plugin runtime (`plugin_sandboxed_runtime_cap`) and image pull
+(`plugin_sandbox_image_pull_cap`), the Docker model-conversion runner,
+`containers/**`, the container definition and image-scan CI checks, and the
+container options in Settings. Upgrades are safe: a stored container profile is
+listed as *retired*, refuses with `container_environment_retired`, is never
+converted to host execution, and can be removed with its command history kept;
+a tool an owner assigned to it is refused rather than moved. Covered by
+`tests/test_command_backends.py`, `tests/test_execution_environments.py`,
+`tests/test_execution_profiles.py` and `tests/test_tool_broker.py`. This does
+not make native execution available; see the release blockers in
+`TO_BE_FIXED.md`.
+
+## Windows read-only protection bypassed by an all-packages grant
+
+Measured locally and on `windows-2025`: with `ALL APPLICATION PACKAGES:(M)` on
+`.git`, a sandboxed process wrote into `.git` despite the capability deny entry,
+because Windows ignores capability SIDs in deny entries during the AppContainer
+access check. The runner now refuses to launch when a protected path grants
+`ALL APPLICATION PACKAGES` or `ALL RESTRICTED APPLICATION PACKAGES` any write
+right (read-only paths) or any right (masked paths). The adversarial test in
+`native/raiker-command-runner/tests/windows_probe.rs` passes locally and in CI.
+Explicit grants on files below the protected directory are not scanned.
+
+## Seatbelt profile allowed signals to and services outside the sandbox
+
+The macOS profile allowed unrestricted `signal` and `mach-lookup`, so a command
+could signal any of the owner's processes or ask launchd services to act
+outside the sandbox. Signals and process inspection are now limited to the same
+sandbox and Mach lookups to a named allowlist; unit tests assert both. macOS
+also no longer requests `RLIMIT_AS`, which XNU rejects with EINVAL (measured on
+`macos-15`); memory is reported unenforced there rather than every launch
+failing. Real Seatbelt enforcement evidence is still pending.
+
+## Native boundary helpers could be selected from an untrusted search path
+
+The Unix runner selects Bubblewrap and Seatbelt only from fixed system paths,
+requires root-owned, non-writable executable and directory components, and
+rejects a symlink in an untrusted directory. The Windows probe resolves its
+route utility from the system directory. Linux tests exercise fake helper
+rejection and real Bubblewrap execution; Windows tests exercise the system
+route lookup. This does not replace signed runner verification or the other
+open sandbox controls. Unix changes are in checkpoint `f9329835`.
+
+## Native runner policy injection and unrestricted root workspace
+
+Seatbelt profile generation rejects unrepresentable path characters before
+launch, preventing paths from injecting profile expressions. Runner filesystem
+validation also rejects filesystem and Windows drive roots as workspaces.
+Rust unit tests exercise the rejection paths on Linux and Windows. These fixes
+do not establish a disposable workspace or prove macOS enforcement.
+
+## Unix runner deadline ownership and Linux host configuration exposure
+
+The Unix runner handles deadline termination in the child-owner wait loop,
+without a detached PID-targeting watchdog. Bubblewrap no longer exposes whole
+host `/etc`, `/opt` or `/nix` trees. Linux WSL integration tests exercise an
+early exit, deadline termination and denial of a host `/etc` read with an
+outside positive control. Linux helper identity, task-wide quotas and other
+filesystem protections remain open.
+
+## Native runner policy parser silently accepted malformed restrictions
+
+The runner rejects lexical parent traversal, malformed protected-path lists,
+invalid policy field types and out-of-range resource limits instead of silently
+dropping or widening them. Rust policy tests cover these inputs. This is parser
+validation only; symlink containment and OS enforcement remain open.
+
+## Uncontained checkout filters in task worktree and cross-base branch creation
+
+Task worktree creation and branch creation from an explicit base now refuse
+until Git checkout can run inside a verified native boundary. Real Git tests in
+`tests/test_local_git_environment.py` demonstrate that both previous paths
+started a configured smudge filter; the refusal prevents that launch. Branch
+creation at HEAD remains available in the tested scenario. This is containment,
+not a completed sandbox or a restoration of task-worktree functionality.
+
+## Workspace Git configuration used as global configuration
+
+The sanitized process environment now points Git's global configuration at the
+OS null device and disables system configuration, including after extra
+environment values are merged. `tests/test_sandbox_git_config.py` verifies with
+real Git that an agent-written workspace `.gitconfig` is not read as global
+configuration. Repository-local configuration and other launch paths remain
+subject to the open native sandbox migration.
+
+## Agent Git diff external-driver execution
+
+The agent-facing `run_git` diff path now disables external diff and textconv
+drivers and refuses unsafe diff arguments and escaping pathspecs. A control run
+showed the former path could launch an external driver; regression coverage is
+in `tests/test_local_git_environment.py`. This fixes that specific path, not
+other Git subprocesses or the native sandbox migration as a whole.
+
 Every defect and gap that has been **closed**, with the evidence that closed
 it. Split out of [`TO_BE_FIXED.md`](TO_BE_FIXED.md) so that document reads as
 what it is named for — the open work — while the record of what was fixed, and

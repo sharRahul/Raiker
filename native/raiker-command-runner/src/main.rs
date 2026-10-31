@@ -24,7 +24,11 @@
 //! * `--linger <marker>` — the probe's detached grandchild, which exists to
 //!   prove containment reaches descendants and not merely the first executable.
 
+#[cfg(target_os = "linux")]
+mod lifecycle_linux;
 mod policy;
+#[cfg(target_os = "linux")]
+mod seccomp_linux;
 mod selftest;
 
 #[cfg(unix)]
@@ -65,6 +69,11 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
         Some("--probe") => {
             let workspace =
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
+            #[cfg(windows)]
+            if named(arguments, "--boundary").as_deref() == Some("appcontainer") {
+                println!("{}", boundary::probe_appcontainer(Path::new(&workspace)));
+                return Ok(0);
+            }
             println!("{}", boundary::probe(Path::new(&workspace)));
             return Ok(0);
         }
@@ -72,6 +81,21 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             let workspace =
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
             boundary::revoke_workspace_grant(Path::new(&workspace))?;
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--setup-account") => {
+            println!("{}", boundary::account::setup()?);
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--reset-account") => {
+            boundary::account::reset()?;
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--account-status") => {
+            println!("{}", boundary::account::status());
             return Ok(0);
         }
         Some("--selftest") => {
@@ -103,6 +127,7 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
     let text =
         std::fs::read_to_string(PathBuf::from(path)).map_err(|_| "runner_policy_unreadable")?;
     let launch = policy::parse(&text)?;
+    policy::validate_filesystem_paths(&launch)?;
     boundary::launch(&launch, argv)
 }
 
@@ -112,4 +137,41 @@ fn named(arguments: &[String], flag: &str) -> Option<String> {
         .position(|argument| argument == flag)
         .and_then(|index| arguments.get(index + 1))
         .cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dispatch;
+
+    #[test]
+    fn dispatch_refuses_a_missing_workspace_before_launch() {
+        let directory = std::env::temp_dir().join(format!(
+            "raiker-dispatch-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let workspace = directory.join("missing");
+        let policy = serde_json::json!({
+            "workspace_root": workspace,
+            "cwd": workspace,
+            "profile_name": "raiker.cmd.test"
+        });
+        let policy_path = directory.join("policy.json");
+        std::fs::write(&policy_path, policy.to_string()).unwrap();
+        let arguments = vec![
+            "--policy".into(),
+            policy_path.to_string_lossy().into_owned(),
+            "--".into(),
+            "nonexistent-executable".into(),
+        ];
+        assert_eq!(
+            dispatch(&arguments).unwrap_err(),
+            "runner_policy_workspace_unreadable"
+        );
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 }

@@ -89,46 +89,19 @@ test("Ollama gemma4:31b-cloud answers a real turn", async () => {
   await capture(page, join(SHOTS, "add01-ollama-turn-live.png"));
 });
 
-test("container profile is enabled, configured, selected, and visibly bounded", async () => {
-  test.setTimeout(180_000);
-  /*
-   * The container gate is not switched on first, and that is the point rather
-   * than an omission.
-   *
-   * GEP-04 classified `container_execution_cap` as **governed elsewhere**: every
-   * tool call inside a container is still brokered under that tool's own gate,
-   * and configuring the profile below is the owner's act of authorisation. The
-   * gate is never consulted, so the step this spec used to perform — open the
-   * row, press Turn on, step up — changed nothing and proved nothing. Permissions
-   * lists it read-only now, under **Not decided here**, and this spec reads it
-   * there instead of ceremonially flipping it.
-   */
-  await page.goto(`${BASE}/#/capabilities`);
-  const reference = page.locator("details.not-decided");
-  await expect(reference).toBeVisible({ timeout: 60_000 });
-  await reference.getByText("Not decided here").click();
-  await expect(reference.getByText("Container execution")).toBeVisible();
-
+test("commands run in the local sandbox and no container environment is offered", async () => {
+  test.setTimeout(120_000);
+  // Docker and Podman were removed: the only local target is the native OS
+  // sandbox, and adding an environment offers remote targets only.
   await page.goto(`${BASE}/#/settings?tab=runtime`);
-  const profileName = `Docker repository review ${Date.now()}`;
+  const card = page.locator("article").filter({ hasText: "Local sandbox" });
+  await expect(card).toBeVisible({ timeout: 60_000 });
   await page.getByText("Add execution profile").click();
-  await page.getByLabel("Environment type").selectOption("container");
-  await page.getByLabel("Display name").fill(profileName);
-  await page.getByLabel("Container runtime").selectOption("docker");
-  await page.getByLabel("Approved image").selectOption("python:3.12-alpine");
-  await page.getByLabel("read_file").check();
-  await page.getByLabel("grep").check();
-  await page.getByRole("button", { name: "Save environment" }).click();
-
-  const card = page.locator("article").filter({ hasText: profileName });
-  await expect(card.getByText("Docker · python:3.12-alpine")).toBeVisible({ timeout: 30_000 });
-  await expect(card.getByText("Read-only repository → writable output")).toBeVisible();
-  await expect(card.getByText("2 tools")).toBeVisible();
-  await card.getByRole("button", { name: "Select" }).click();
-  await expect(card.getByRole("button", { name: "Selected" })).toBeVisible({ timeout: 30_000 });
-  await capture(page, join(SHOTS, "add01-container-profile-live.png"));
-  // Build, not Chat: the environment badge is about where a *command* runs, so
-  // it lives on the coding surface. Chat's composer no longer carries it.
+  const kinds = await page.getByLabel("Environment type").locator("option").evaluateAll(
+    (options) => options.map((option) => (option as HTMLOptionElement).value),
+  );
+  expect(kinds).toEqual(["ssh", "daytona"]);
+  await capture(page, join(SHOTS, "add01-local-sandbox-live.png"));
   await page.goto(`${BASE}/#/build`);
-  await expect(page.getByLabel("Execution environment")).toContainText(`${profileName} · Docker · Ready`);
+  await expect(page.getByLabel("Execution environment")).toContainText("Local sandbox");
 });

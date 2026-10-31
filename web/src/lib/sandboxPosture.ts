@@ -65,21 +65,19 @@ export function observationRows(
 /** The chip a work surface shows for the environment a command actually ran in. */
 export function boundaryLabel(environment: ExecutionEnvironment | null): string {
   if (environment === null) return "Environment unavailable";
-  if (environment.kind === "local") return "Host access — reduced isolation";
+  if (environment.kind === "retired") return `${environment.name} — removed`;
   if (!environment.available) return `${environment.name} — unavailable`;
   const network =
     environment.probe_observations?.egress === "enforced"
-      ? "network denied"
+      ? "network restricted"
       : "network not proven";
+  // The owner does not need to know which OS mechanism enforces the boundary;
+  // the details panel names it for anyone who does.
   switch (environment.boundary) {
     case "appcontainer":
-      return `AppContainer · ${network}`;
     case "bubblewrap":
-      return `bubblewrap · ${network}`;
     case "seatbelt":
-      return `Seatbelt · ${network}`;
-    case "container":
-      return `Container · ${network}`;
+      return `Local sandbox · ${network}`;
     default:
       return environment.name;
   }
@@ -91,8 +89,8 @@ export function boundaryLabel(environment: ExecutionEnvironment | null): string 
  */
 export function posturaLine(environment: ExecutionEnvironment | null): string {
   if (environment === null) return "No environment selected";
-  if (environment.kind === "local") {
-    return "Argv only · no credential inheritance · no PTY · foreground";
+  if (environment.kind === "retired") {
+    return "Docker and Podman are no longer used · nothing runs here";
   }
   if (environment.kind === "native") {
     return "OS boundary · foreground only · no PTY, background or network grant";

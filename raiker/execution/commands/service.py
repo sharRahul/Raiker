@@ -9,14 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
-from raiker.execution.code_placement import place_code
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
-from raiker.execution.commands.backends.container import (
-    PersistentContainerBackend,
-    SubprocessContainerRuntime,
-)
 from raiker.execution.commands.backends.local import LocalStrictBackend
-from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
+from raiker.execution.commands.backends.native import (
+    NativeSandboxBackend,
+    NativeSandboxDriver,
+    task_workspace_registry,
+)
 from raiker.execution.commands.backends.remote import DaytonaCommandBackend, SshCommandBackend
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
@@ -41,6 +40,7 @@ from raiker.execution.profiles import (
     ExecutionProfile,
     resolve_command_environment,
 )
+from raiker.execution.workspaces import TaskWorkspaceRegistry
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -152,11 +152,11 @@ class CommandService:
         self._profile_probe = profile_probe
         self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
-        #: Backends that hold state between runs, kept for the life of the
-        #: service. See `_backend_for` for why this is exactly the container
-        #: backends and nothing else.
-        self._backends: dict[str, Any] = {}
         self._lock = threading.Lock()
+        # A crash between creating a task copy and recording it leaves a copy
+        # nobody can review; remove those. Recorded copies are never swept.
+        with contextlib.suppress(OSError):
+            TaskWorkspaceRegistry.for_workspace(self.workspace_root).sweep_orphans()
         #: Set on shutdown so lease holders stop renewing immediately rather
         #: than sleeping out their interval while the runtime is going away.
         self._lease_stop = threading.Event()
@@ -293,41 +293,21 @@ class CommandService:
         interactive: bool,
         host_network_code: bool,
     ) -> ExecutionProfile:
-        """Run code in the sandbox where there is one; never on the host unasked.
+        """Require the native backend for every governed command.
 
-        BUG-308 — ``python``, ``node``, ``npm`` and ``npx`` passed every argv
-        check and then ran with the host's network, which no check here can see.
-        Where this machine has the native sandbox and the owner has not chosen
-        an environment, such a command runs inside it. Where it would run on the
-        host, the caller must say it was authorised under
-        ``host_network_code_execution`` — the router does, after that
-        capability's own switch and decision mode; a command authorised only as
-        an ordinary shell command is refused rather than run.
-
-        There is no fallback in either direction. A sandbox that fails at launch
-        refuses the command (the native backend's rule), and a command the owner
-        approved for the host that now finds a sandbox runs inside it, which is
-        only ever stricter than what they approved.
+        Executable names and prior host approvals are not isolation boundaries.
+        The native backend probes again and refuses unsupported execution modes.
+        Other selected environments are refused rather than silently changed.
         """
-        if profile.kind != "local":
+        del owner_principal_id, argv, background, interactive, host_network_code
+        if profile.kind == "native":
             return profile
-        placement = place_code(
-            self.sqlite,
-            owner_principal_id,
-            argv,
-            self.workspace_root,
-            background=background,
-            interactive=interactive,
+        if profile.kind != "local":
+            raise CommandServiceError("native_sandbox_required")
+        return next(
+            candidate for candidate in DEFAULT_EXECUTION_PROFILES
+            if candidate.profile_id == "native_sandbox"
         )
-        if placement.kind == "sandbox":
-            return next(
-                candidate
-                for candidate in DEFAULT_EXECUTION_PROFILES
-                if candidate.profile_id == "native_sandbox"
-            )
-        if placement.kind == "host_network" and not host_network_code:
-            raise CommandServiceError("host_network_code_not_authorized")
-        return profile
 
     # ── Background lifecycle (BUG-194) ───────────────────────────────────────
 
@@ -517,29 +497,15 @@ class CommandService:
         """The backend for a profile, kept where keeping it is what makes the
         capability real.
 
-        BUG-194 — a container backend holds the session's standing boundary in
-        its own map, so building a fresh one per run would mean every run
-        created a new container no matter what the naming said. Only container
-        backends are held: a local backend has no cross-run state to keep, and a
-        native one must *not* be kept, because its capability set comes from a
-        probe whose answer can change between commands (see `_default_backend`).
+        No backend is held across runs: a native one must *not* be kept,
+        because its capability set comes from a probe whose answer can change
+        between commands (see `_default_backend`).
         """
-        if profile.kind != "container":
-            return (
-                self._backend_factory(profile)
-                if self._backend_factory is not None
-                else self._default_backend(profile)
-            )
-        with self._lock:
-            backend = self._backends.get(profile.profile_id)
-            if backend is None:
-                backend = (
-                    self._backend_factory(profile)
-                    if self._backend_factory is not None
-                    else self._default_backend(profile)
-                )
-                self._backends[profile.profile_id] = backend
-            return backend
+        return (
+            self._backend_factory(profile)
+            if self._backend_factory is not None
+            else self._default_backend(profile)
+        )
 
     def _default_backend(self, profile: ExecutionProfile) -> Any:
         if profile.kind == "local":
@@ -549,12 +515,10 @@ class CommandService:
             # list: a receipt must not assert "network denied" from a
             # measurement taken before the firewall service was stopped.
             driver = NativeSandboxDriver(self.workspace_root)
-            return NativeSandboxBackend(driver=driver, proof=driver.probe())
-        if profile.kind == "container":
-            return PersistentContainerBackend(
-                runtime=SubprocessContainerRuntime(self.workspace_root),
-                workspace_root=self.workspace_root,
-                profile=profile,
+            return NativeSandboxBackend(
+                driver=driver,
+                proof=driver.probe(),
+                workspaces=task_workspace_registry(self.workspace_root, driver),
             )
         if profile.kind == "ssh":
             return SshCommandBackend(profile, self.workspace_root)

@@ -78,9 +78,9 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("subagents", "multi_agent_teams"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Spawning/team runtime; isolation + budgets.")
-    for cap in ("remote_execution", "container_execution"):
+    for cap in ("remote_execution",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
-                      notes="Alias for remote_execution_cap / container_execution_cap.")
+                      notes="Alias for remote_execution_cap.")
 
     # B9 — the repository code map. A real executor exists, so this is a switch
     # the owner can throw rather than a name on the matrix: Tier 1 because the
@@ -174,12 +174,6 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["plugin_runtime_cap"] = _req(
         "plugin_runtime_cap", "4", threat_ack=True, human_confirm=True,
         notes="Bounded subprocess plugin code runtime; owner plugin allowlist, interpreter allowlist.")
-    r["plugin_sandboxed_runtime_cap"] = _req(
-        "plugin_sandboxed_runtime_cap", "4", threat_ack=True, human_confirm=True,
-        notes="Network-isolated container plugin runtime; owner plugin + image allowlist.")
-    r["plugin_sandbox_image_pull_cap"] = _req(
-        "plugin_sandbox_image_pull_cap", "4", threat_ack=True, human_confirm=True,
-        notes="Owner-allowlisted Docker image pull for the sandboxed plugin runtime.")
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):
@@ -187,12 +181,8 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         # connector's own auth plus the owner egress allowlist, not a mode.
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Single-user reference channel: connector auth + owner egress allowlist.")
-    # Local sandboxed container execution: local Docker, no network, no host
-    # mounts. Remote/cloud execution is a separate capability with its own gate
-    # and threat model — see BUG-31 for the containment work still owed there.
-    r["container_execution_cap"] = _req(
-        "container_execution_cap", "5", threat_ack=True, human_confirm=True,
-        notes="Local sandboxed container: no network, no mounts, owner image allowlist.")
+    # Remote/cloud execution has its own gate and threat model — see BUG-31 for
+    # the containment work still owed there.
     for cap in ("remote_execution_cap", "cloud_execution_cap"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Isolation, secrets, egress, budget required.")

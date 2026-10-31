@@ -26,7 +26,6 @@ from raiker.execution.code_placement import (
     code_runner,
     place_code,
 )
-from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
@@ -128,7 +127,8 @@ class TestWhereItRuns:
         self, tmp_path: Path, no_sandbox: None
     ) -> None:
         placement = place_code(SQLiteStore(tmp_path), OWNER, ["node", "a.js"], tmp_path)
-        assert placement.kind == "host_network"
+        assert placement.classification == "host_network"
+        assert placement.kind == "unavailable"
         assert placement.reason == "no_sandbox_on_this_host"
 
     def test_an_owner_who_chose_the_host_chose_its_network(
@@ -143,7 +143,9 @@ class TestWhereItRuns:
     ) -> None:
         store = SQLiteStore(tmp_path)
         store.select_execution_environment(OWNER, "container_default")
-        assert place_code(store, OWNER, ["python3", "x.py"], tmp_path).kind == "owner_environment"
+        placement = place_code(store, OWNER, ["python3", "x.py"], tmp_path)
+        assert placement.classification == "owner_environment"
+        assert placement.kind == "unavailable"
 
     def test_a_run_the_sandbox_cannot_host_goes_to_the_host_under_the_named_capability(
         self, tmp_path: Path, with_sandbox: None
@@ -151,67 +153,15 @@ class TestWhereItRuns:
         placement = place_code(
             SQLiteStore(tmp_path), OWNER, ["npm", "run", "dev"], tmp_path, background=True
         )
-        assert placement.kind == "host_network"
+        assert placement.classification == "host_network"
+        assert placement.kind == "unavailable"
 
     def test_a_command_that_runs_no_code_is_untouched(
         self, tmp_path: Path, no_sandbox: None
     ) -> None:
-        assert place_code(SQLiteStore(tmp_path), OWNER, ["ls"], tmp_path).kind == "not_code"
-
-
-class TestTheCommandServiceNeverRunsHostCodeUnasked:
-    def test_host_placed_code_without_the_capability_is_refused(
-        self, tmp_path: Path, no_sandbox: None
-    ) -> None:
-        (tmp_path / "hello.py").write_text("print('hi')\n", encoding="utf-8")
-        service = CommandService(tmp_path)
-        with pytest.raises(CommandServiceError) as refused:
-            service.run_foreground(
-                owner_principal_id=OWNER,
-                acting_principal_id=OWNER,
-                session_id="sess_1",
-                turn_id="turn_1",
-                action_id=new_id("act_"),
-                authority_kind="approval",
-                authority_id="apr_1",
-                command="python3 hello.py",
-                argv=["python3", "hello.py"],
-            )
-        assert refused.value.reason_code == "host_network_code_not_authorized"
-
-    def test_with_the_capability_it_runs(self, tmp_path: Path, no_sandbox: None) -> None:
-        (tmp_path / "hello.py").write_text("print('hi')\n", encoding="utf-8")
-        service = CommandService(tmp_path)
-        # `python`, as the governed shell allowlist spells it.
-        result = service.run_foreground(
-            owner_principal_id=OWNER,
-            acting_principal_id=OWNER,
-            session_id="sess_1",
-            turn_id="turn_1",
-            action_id=new_id("act_"),
-            authority_kind="approval",
-            authority_id="apr_1",
-            command="python hello.py",
-            argv=["python", "hello.py"],
-            host_network_code=True,
-        )
-        assert result["returncode"] == 0
-        assert "hi" in result["stdout"]
-
-    def test_an_ordinary_command_needs_nothing_new(self, tmp_path: Path, no_sandbox: None) -> None:
-        service = CommandService(tmp_path)
-        result = service.run_foreground(
-            owner_principal_id=OWNER,
-            acting_principal_id=OWNER,
-            session_id="sess_1",
-            turn_id="turn_1",
-            action_id=new_id("act_"),
-            authority_kind="approval",
-            authority_id="apr_1",
-            command="pwd",
-            argv=["pwd"],
-        )
-        assert result["returncode"] == 0
+        placement = place_code(SQLiteStore(tmp_path), OWNER, ["ls"], tmp_path)
+        assert placement.classification == "not_code"
+        assert placement.kind == "unavailable"
 
 
 def _authority(tmp_path: Path) -> tuple[SQLiteStore, RuntimeAuthority]:
@@ -300,8 +250,8 @@ class TestPermissionsSaysWhichMachineThisIs:
         from raiker.control.service import RuntimeControlService
 
         control = RuntimeControlService(tmp_path)
-        assert "no native sandbox" in control._network_boundary("shell_execution")
-        assert "no native sandbox" in control._network_boundary(HOST_NETWORK_CODE_CAPABILITY)
+        assert "commands are refused" in control._network_boundary("shell_execution")
+        assert "commands are refused" in control._network_boundary(HOST_NETWORK_CODE_CAPABILITY)
         assert control._network_boundary("web_fetch") == ""
 
     def test_with_a_sandbox_it_says_the_code_has_no_network(
@@ -310,7 +260,7 @@ class TestPermissionsSaysWhichMachineThisIs:
         from raiker.control.service import RuntimeControlService
 
         text = RuntimeControlService(tmp_path)._network_boundary("shell_execution")
-        assert "with no network" in text
+        assert "network disabled" in text
 
 
 class TestThePluginCardSaysWhereItsCodeRuns:
@@ -322,7 +272,7 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", raising=False)
         assert plugin_code_runtime("demo")["where"] == "not_enabled"
 
-    def test_with_no_container_it_says_host_network(
+    def test_with_no_container_it_reports_execution_blocked(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from raiker.runtime.executors.tier4_plugins import plugin_code_runtime
@@ -330,43 +280,8 @@ class TestThePluginCardSaysWhereItsCodeRuns:
         monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "demo")
         monkeypatch.delenv("RAIKER_PLUGIN_RUNTIME_IMAGE", raising=False)
         answer = plugin_code_runtime("demo")
-        assert answer["where"] == "host_network"
-        assert "network" in answer["summary"]
-
-    def test_with_a_container_ready_it_runs_there_instead(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        from raiker.runtime.executors import tier4_plugins
-
-        monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_ALLOWLIST", "demo")
-        monkeypatch.setenv("RAIKER_PLUGIN_RUNTIME_IMAGE", "python:3.11-slim")
-        monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.11-slim")
-        monkeypatch.setattr(tier4_plugins.shutil, "which", lambda name: f"/usr/bin/{name}")
-        assert tier4_plugins.plugin_code_runtime("demo")["where"] == "isolated"
-
-        seen: list[str] = []
-
-        class _Sandboxed:
-            def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-                pass
-
-            def execute(self, action: GovernedAction, principal: Principal) -> Any:
-                seen.append(action.action_id)
-                return "ran-in-container"
-
-        monkeypatch.setattr(tier4_plugins, "PluginSandboxedRuntimeExecutor", _Sandboxed)
-        action = GovernedAction(
-            action_id=new_id("act_"),
-            principal_id=OWNER,
-            action_type="plugin_runtime_cap",
-            tool_or_service_name="plugin_runtime_cap",
-            arguments={"plugin_id": "demo", "entrypoint": "main.py"},
-        )
-        outcome = tier4_plugins.PluginRuntimeExecutor(tmp_path, SQLiteStore(tmp_path)).execute(
-            action, _human()
-        )
-        assert outcome == "ran-in-container"
-        assert seen == [action.action_id]
+        assert answer["where"] == "not_enabled"
+        assert "native sandbox" in answer["summary"]
 
 
 class TestNothingThatWorkedStartsRefusing:

@@ -4,6 +4,7 @@ import hashlib
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -21,12 +22,13 @@ from raiker.execution.commands.backends import (
     NativeSandboxDriver,
     UnavailableBackend,
 )
-from raiker.execution.commands.service import CommandService
+from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.profiles import (
     ExecutionProfile,
     ProfileProbe,
     resolve_command_environment,
 )
+from raiker.execution.workspaces import TaskWorkspaceRegistry
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -91,36 +93,30 @@ def _container(store: SQLiteStore, profile_id: str = "container_a") -> None:
     )
 
 
-def test_selected_command_environment_is_authoritative(tmp_path: Path) -> None:
+def test_a_retired_container_selection_is_refused_without_fallback(tmp_path: Path) -> None:
+    """A stored Docker/Podman selection never runs and never moves to the host."""
     store = SQLiteStore(tmp_path)
     _container(store)
     store.select_execution_environment("owner_a", "container_a")
+    probe = Mock()
 
-    resolution = resolve_command_environment(
-        store,
-        "owner_a",
-        "shell",
-        probe=lambda profile: ProfileProbe(profile, True, None, utc_now()),
-    )
+    resolution = resolve_command_environment(store, "owner_a", "shell", probe=probe)
 
-    assert resolution.profile is not None
-    assert resolution.profile.profile_id == "container_a"
-    assert resolution.selected_for_commands is True
-    assert resolution.available is True
+    assert resolution.profile is None
+    assert resolution.available is False
+    assert resolution.reason_code == "container_environment_retired"
+    probe.assert_not_called()
+    store.select_execution_environment("owner_a", "container_default")
+    default = resolve_command_environment(store, "owner_a", "shell", probe=probe)
+    assert default.reason_code == "container_environment_retired"
 
 
-def test_unknown_or_unassigned_selected_environment_fails_without_fallback(tmp_path: Path) -> None:
+def test_unknown_selected_environment_fails_without_fallback(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     store.select_execution_environment("owner_a", "missing")
     missing = resolve_command_environment(store, "owner_a", "shell")
     assert missing.profile is None
     assert missing.reason_code == "selected_environment_unavailable"
-
-    _container(store)
-    store.select_execution_environment("owner_a", "container_a")
-    unsupported = resolve_command_environment(store, "owner_a", "read_file")
-    assert unsupported.profile is None
-    assert unsupported.reason_code == "selected_environment_tool_unsupported"
 
 
 def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -> None:
@@ -128,16 +124,16 @@ def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -
     registry = BackendRegistry(
         {
             "local_native": local,
-            "container_a": UnavailableBackend("container_daemon_unreachable"),
+            "native_sandbox": UnavailableBackend("native_sandbox_not_enforced"),
         }
     )
 
-    with pytest.raises(CommandBackendError, match="container_daemon_unreachable"):
-        registry.start(request(tmp_path, environment_profile_id="container_a"))
+    with pytest.raises(CommandBackendError, match="native_sandbox_not_enforced"):
+        registry.start(request(tmp_path, environment_profile_id="native_sandbox"))
     local.start.assert_not_called()
 
 
-def test_command_service_routes_selected_container_without_local_fallback(tmp_path: Path) -> None:
+def test_command_service_refuses_a_retired_container_without_local_fallback(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     _container(store)
     store.select_execution_environment("owner_a", "container_a")
@@ -151,28 +147,19 @@ def test_command_service_routes_selected_container_without_local_fallback(tmp_pa
         backend_factory=lambda profile: selected,
     )
 
-    run = service.start(
-        owner_principal_id="owner_a",
-        acting_principal_id="agent_a",
-        session_id="sess_a",
-        turn_id="turn_a",
-        action_id="act_a",
-        authority_kind="approval",
-        authority_id="appr_a",
-        command="misleading display",
-        argv=["printf", "hello"],
-    )
-
-    routed = selected.start.call_args.args[0]
-    assert run.profile_id == "container_a"
-    assert routed.shell is False
-    assert routed.executable_template == ""
-    assert routed.argv_template == ("printf", "hello")
-    assert routed.safe_display == "printf hello"
-    # BUG-197 — the run names its backend while it is still in flight, not only
-    # once a receipt exists. `run` is read straight back out of the store, so
-    # this is the column the run list reads.
-    assert run.backend == "container"
+    with pytest.raises(CommandServiceError, match="container_environment_retired"):
+        service.start(
+            owner_principal_id="owner_a",
+            acting_principal_id="agent_a",
+            session_id="sess_a",
+            turn_id="turn_a",
+            action_id="act_a",
+            authority_kind="approval",
+            authority_id="appr_a",
+            command="misleading display",
+            argv=["printf", "hello"],
+        )
+    selected.start.assert_not_called()
     service.shutdown()
 
 
@@ -185,9 +172,6 @@ def test_a_run_in_flight_already_names_the_backend_its_receipt_will_name(
     on the receipt was correct, so the record that proves what ran a command and
     the list the owner reads said different things about the same run.
     """
-    store = SQLiteStore(tmp_path)
-    _container(store)
-    store.select_execution_environment("owner_a", "container_a")
     backend = Mock()
     handle = Mock()
     handle.poll.return_value = None
@@ -211,8 +195,12 @@ def test_a_run_in_flight_already_names_the_backend_its_receipt_will_name(
     )
 
     listed = service.store.list_runs("owner_a", session_id="sess_a")
-    assert [item.backend for item in listed] == ["container"]
+    assert [item.backend for item in listed] == ["native"]
     assert run.backend == listed[0].backend
+    routed = backend.start.call_args.args[0]
+    assert routed.shell is False
+    assert routed.argv_template == ("printf", "hello")
+    assert routed.safe_display == "printf hello"
     service.shutdown()
 
 
@@ -275,6 +263,7 @@ def _probe_reply(**overrides: str) -> Any:
         "masked_read": "enforced",
         "egress": "enforced",
         "descendant_reaped": "enforced",
+        "seccomp": "enforced",
     }
     measured.update(overrides)
     payload = {
@@ -303,7 +292,10 @@ def test_native_sandbox_capabilities_come_from_measurements_not_configuration(
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
     proof = driver.probe()
+    # Every mandatory observation enforced: available, because each command
+    # runs in a disposable task copy rather than the owner's project.
     assert proof.available is True
+    assert proof.reason_code is None
     assert proof.boundary == "appcontainer"
     assert proof.features.process_tree_stop is True
     # Everything unmeasured stays off, however the profile is configured.
@@ -347,6 +339,7 @@ def test_the_launch_policy_masks_raiker_state_and_denies_the_network(tmp_path: P
     assert ".git" in document["readonly_paths"]
     assert document["pty"] is False
     assert document["deadline_seconds"] > 0
+    assert document["max_cpu_seconds"] == document["deadline_seconds"]
 
 
 def test_the_container_profile_name_is_per_run_not_per_workspace(tmp_path: Path) -> None:
@@ -376,7 +369,11 @@ def test_the_native_backend_refuses_unbuilt_capabilities_by_name(
 ) -> None:
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
-    backend = NativeSandboxBackend(driver=driver, proof=driver.probe())
+    backend = NativeSandboxBackend(
+        driver=driver,
+        proof=driver.probe(),
+        workspaces=TaskWorkspaceRegistry(tmp_path / "copies"),
+    )
     asked = request(tmp_path, **{field: True})
     with pytest.raises(CommandBackendError) as raised:
         backend.start(asked)
@@ -396,6 +393,50 @@ def test_an_unavailable_boundary_refuses_rather_than_running_on_the_host(
     assert raised.value.reason_code == "native_sandbox_not_enforced"
 
 
+def test_without_a_task_workspace_registry_the_backend_refuses(tmp_path: Path) -> None:
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
+    backend = NativeSandboxBackend(driver=driver, proof=driver.probe())
+    with pytest.raises(CommandBackendError) as raised:
+        backend.start(request(tmp_path))
+    assert raised.value.reason_code == "native_disposable_workspace_required"
+
+
+def test_a_command_runs_in_the_session_copy_never_in_the_project(tmp_path: Path) -> None:
+    project = tmp_path / "ws"
+    (project / "app").mkdir(parents=True)
+    (project / "app" / "main.py").write_text("print(1)\n", encoding="utf-8")
+    (project / ".raiker").mkdir()
+    directory = _installed_runner(tmp_path)
+    driver = NativeSandboxDriver(project, helper_root=directory, run_probe=_probe_reply())
+    registry = TaskWorkspaceRegistry(tmp_path / "copies")
+    launched: list[tuple[list[str], Path]] = []
+
+    def fake_runner(req: Any, argv: list[str], cwd: Path, *_args: Any, **_kwargs: Any) -> Any:
+        launched.append((argv, Path(cwd)))
+        return object()  # no process, so nothing to bind to the runtime lifetime
+
+    backend = NativeSandboxBackend(
+        driver=driver, proof=driver.probe(), workspaces=registry, runner=fake_runner
+    )
+    asked = request(project, cwd="app")
+    backend.start(asked)
+    backend.start(replace(asked, run_id="cmd_second"))
+
+    [(key, session_id, copy)] = registry.entries(asked.owner_principal_id)
+    assert session_id == asked.session_id
+    assert copy.source == (project / "app").resolve()
+    assert (copy.root / "main.py").exists()
+    # Both runs used the same copy; neither ran in the project.
+    assert {cwd for _, cwd in launched} == {copy.root}
+    policy = json.loads(Path(launched[0][0][2]).read_text(encoding="utf-8"))
+    assert Path(policy["workspace_root"]) == copy.root
+    assert Path(policy["cwd"]) == copy.root.resolve()
+    # The policy document is Raiker state, kept out of the copy.
+    assert copy.root not in Path(launched[0][0][2]).parents
+    assert key
+
+
 def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path) -> None:
     """Two claims, kept apart.
 
@@ -410,6 +451,7 @@ def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path
     evidence = backend.isolation_evidence(request(tmp_path))
     assert evidence["boundary_constructed"]["network_capability"] is False
     assert evidence["boundary_constructed"]["profile_name"].startswith("raiker.cmd.")
+    assert evidence["boundary_constructed"]["workspace"] == "disposable_task_copy"
     assert evidence["probe_observations"]["egress"] == "enforced"
     assert evidence["probe_checked_at"]
 
@@ -422,7 +464,7 @@ def test_the_receipt_separates_this_run_from_the_host_measurement(tmp_path: Path
         ExecutionProfile("daytona_a", "daytona", tools=("shell",)),
     ),
 )
-def test_non_container_profiles_never_advertise_credential_delivery(
+def test_profiles_never_advertise_credential_delivery(
     profile: ExecutionProfile,
 ) -> None:
     assert profile.features.credential_delivery is False
@@ -433,34 +475,8 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
     with pytest.raises(ValueError, match="credential_delivery_requires_quarantine"):
         ExecutionProfile(
             "bad",
-            "container",
-            runtime="docker",
-            image="raiker-tools:test",
+            "ssh",
             tools=("shell",),
             credential_delivery=True,
             credential_delta_quarantine=False,
         )
-
-
-def test_container_profile_advertises_only_the_proven_foreground_shell() -> None:
-    features = ExecutionProfile(
-        "container_a",
-        "container",
-        runtime="docker",
-        image="raiker-command-sandbox@sha256:" + ("a" * 64),
-        tools=("shell",),
-        credential_delivery=True,
-        credential_delta_quarantine=True,
-    ).features
-
-    assert features.shell is True
-    assert features.process_tree_stop is True
-    assert features.pty is False
-    assert features.background is False
-    assert features.input is False
-    assert features.filtered_network is False
-    assert features.persistent is False
-    assert features.restart_recovery is False
-    assert features.concurrent_runs is False
-    assert features.credential_delivery is False
-    assert features.credential_delta_quarantine is False

@@ -240,10 +240,9 @@ def test_explicit_extras_are_the_only_way_in(workspace: Path) -> None:
 # ── End to end, through the executor's own entry point ───────────────────────
 
 
-def test_the_sandbox_runs_an_allowed_command(workspace: Path) -> None:
-    result = run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
-    assert result["returncode"] == 0
-    assert result["stdout"].strip() == "hello"
+def test_direct_command_execution_requires_native_sandbox(workspace: Path) -> None:
+    with pytest.raises(SandboxError, match="native_sandbox_required"):
+        run_command(["cat", "README.md"], allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
 
 
 @pytest.mark.parametrize(
@@ -260,14 +259,3 @@ def test_the_sandbox_blocks_before_anything_runs(argv: list[str], workspace: Pat
         run_command(argv, allowlist=ALLOWED_SHELL_COMMANDS, cwd=workspace)
 
 
-def test_a_real_child_does_not_receive_the_host_token(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("RAIKER_GITHUB_TOKEN", "ghp_must_not_reach_a_child")
-    result = run_command(
-        ["python", "-"],
-        allowlist=ALLOWED_SHELL_COMMANDS,
-        cwd=workspace,
-        stdin_text="import os; print('RAIKER_GITHUB_TOKEN' in os.environ)",
-    )
-    assert result["stdout"].strip() == "False"

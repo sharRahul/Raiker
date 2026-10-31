@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.approvals.execution import executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.ids import utc_now
+from raiker.contracts.models import RemoteExecutionProfile
 from raiker.control.dashboard import DashboardService
 from raiker.execution.commands.known_hosts import host_key_fingerprint
 from raiker.execution.profiles import ProfileProbe
@@ -22,6 +24,7 @@ from raiker.runtime.executors.tier5_network import (
     ProviderSpendSnapshot,
     RemoteExecutionExecutor,
 )
+from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_owner"
 
@@ -111,86 +114,59 @@ def test_execution_environment_api_surfaces_native_runner_trust(
     assert native["runner_trust"] == "package_relative_integrity"
 
 
-def test_execution_environment_api_configures_container_profile(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_container_environment_can_no_longer_be_configured(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
-    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
-    monkeypatch.setattr("shutil.which", lambda name: f"/bin/{name}")
     client = TestClient(create_app(workspace))
     token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    saved = client.put(
+    response = client.put(
         "/api/execution-environments/configure",
         headers=headers,
         json={
             "kind": "container",
             "name": "Repository review",
             "enabled": True,
-            "config": {
-                "runtime": "podman",
-                "image": "raiker-tools:approved",
-                "tools": ["grep", "read_file"],
-                "repository_access": "read_only",
-                "writable_output": True,
-                "egress_domains": ["BÜCHER.example.", "*.packages.example"],
-                "egress_ports": [443],
-            },
-        },
-    )
-
-    assert saved.status_code == 200, saved.text
-    view = client.get("/api/execution-environments", headers=headers).json()
-    profile = next(
-        item for item in view["environments"] if item["profile_id"] == saved.json()["profile_id"]
-    )
-    assert profile["runtime"] == "podman"
-    assert profile["image"] == "raiker-tools:approved"
-    assert profile["assigned_tool_count"] == 2
-    assert profile["repository_access"] == "read_only"
-    assert profile["writable_output"] is True
-    assert profile["config"]["egress_domains"] == [
-        "*.packages.example",
-        "xn--bcher-kva.example",
-    ]
-    assert profile["config"]["egress_ports"] == [443]
-    assert profile["config"]["egress_enforcement"] == "not_proven"
-    assert profile["features"]["filtered_network"] is False
-    assert view["container_options"] == {
-        "runtimes": ["docker", "podman"],
-        "images": ["raiker-tools:approved"],
-        "supported_tools": ["glob", "grep", "list_directory", "read_file", "shell", "stat_path"],
-    }
-
-
-def test_execution_environment_api_rejects_non_allowlisted_container_image(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    workspace = _workspace(tmp_path)
-    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
-    client = TestClient(create_app(workspace))
-    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
-
-    response = client.put(
-        "/api/execution-environments/configure",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "kind": "container",
-            "name": "Unapproved",
-            "enabled": True,
-            "config": {
-                "runtime": "docker",
-                "image": "attacker/latest",
-                "tools": ["grep"],
-                "repository_access": "read_only",
-                "writable_output": True,
-            },
+            "config": {"runtime": "docker", "image": "raiker-tools:approved", "tools": ["grep"]},
         },
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"]["reason_code"] == "container_image_not_allowed"
+    assert response.json()["detail"]["reason_code"] == "container_environment_retired"
+    view = client.get("/api/execution-environments", headers=headers).json()
+    assert "container_options" not in view
+    assert all(item["kind"] != "container" for item in view["environments"])
+
+
+def test_an_upgraded_container_profile_is_listed_as_retired_and_removable(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    service = DashboardService(workspace)
+    store = SQLiteStore(workspace)
+    owner = OWNER
+    now = utc_now()
+    store.insert_remote_execution_profile(
+        RemoteExecutionProfile(
+            "rex_old", "container", "Old container",
+            '{"runtime":"docker","image":"x","tools":["shell"]}', True, owner, now, now,
+        )
+    )
+    store.select_execution_environment(owner, "rex_old")
+
+    view = service.execution_environments(owner)
+    retired = next(item for item in view["environments"] if item["profile_id"] == "rex_old")
+    assert retired["kind"] == "retired"
+    assert retired["available"] is False
+    assert retired["selected"] is True
+    assert retired["availability_reason"] == "container_environment_retired"
+    assert service.select_execution_environment("rex_old", owner).reason_code == (
+        "execution_environment_unavailable"
+    )
+    removed = service.remove_execution_environment("rex_old", owner, move_to="native_sandbox")
+    assert removed.ok is True, removed.reason_code
+    assert removed.data["selected_profile_id"] == "native_sandbox"
+    assert store.selected_execution_environment(owner) == "native_sandbox"
 
 
 def test_remote_and_daytona_executors_are_real_bounded_adapters(

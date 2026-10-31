@@ -21,6 +21,24 @@ from raiker.models.session_state import ModelSessionState
 from raiker.storage.sqlite import SQLiteStore
 
 
+@pytest.fixture(autouse=True)
+def measured_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests are about the other links; the sandbox is measured available.
+
+    `test_an_unenforced_sandbox_stops_the_turn_at_the_environment` undoes this.
+    """
+    from raiker.control.dashboard_parts import execution
+    from raiker.execution.profiles import ProfileProbe
+
+    monkeypatch.setattr(
+        execution,
+        "probe_execution_profile",
+        lambda profile, **_: ProfileProbe(
+            profile, True, None, "2026-10-30T00:00:00Z", boundary="appcontainer"
+        ),
+    )
+
+
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
@@ -120,3 +138,23 @@ def test_a_ready_boundary_names_every_link_in_order(
     assert body["provider"] == "ollama"
     assert body["model_off_machine"] is False
     assert body["model_ready"] is True
+
+
+def test_an_unenforced_sandbox_stops_the_turn_at_the_environment(
+    client: TestClient, headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.control.dashboard_parts import execution
+    from raiker.execution.profiles import ProfileProbe
+
+    monkeypatch.setattr(
+        execution,
+        "probe_execution_profile",
+        lambda profile, **_: ProfileProbe(
+            profile, False, "native_sandbox_not_enforced", "2026-10-30T00:00:00Z", boundary="none"
+        ),
+    )
+    body = _boundary(client, headers, _project(client, headers))
+    assert body["ready"] is False
+    assert body["refusal"]["step"] == "environment"
+    assert body["refusal"]["reason_code"] == "native_sandbox_not_enforced"
+    assert body["environment_available"] is False

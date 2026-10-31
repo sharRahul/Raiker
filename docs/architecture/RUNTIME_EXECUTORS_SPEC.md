@@ -96,7 +96,6 @@ not in this table is a documentation defect, not a hidden feature.
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
 | `external_channel_runtime` | 5 | Bounded outbound webhook delivery over the owner connector egress allowlist, signed with `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) when a secret is configured and reported as unsigned on the Channels tab when not. Inbound delivery is recorded, rate-limited to 60 messages per sender per minute, and quarantined: a channel message is untrusted content with a named sender who is not the owner, and never raises a turn's authority. Events stay metadata-only. |
 | `channel_approval_relay` | 5 | Metadata-only **pending** approval relay for a paired channel (never resolves). |
-| `container_execution_cap` | 5 | Local Docker run: owner image allowlist, no network, no host mounts, dropped caps, read-only, resource bounds. |
 | `scheduled_routines` | 5 | Local on-demand routine runner (no daemon); runs bounded read-only subagent payloads when due. |
 | `hosted_model_runtime` | 5 | The owner's saved hosted connection, origin-bound: gate-derived provider policy on the chat path (saved connection required, explicit revocation wins) + a metadata-only connectivity check of a connection named by `profile_id` (no endpoint or path arguments). Every new connection is checked at dial time: each resolved answer must be public, the passing address is pinned, and a proxied request goes through the owner's proxy (`raiker/models/transport_guard.py`). |
 | `private_network_model_runtime` | 5 | The owner's saved home-lab connection (private network, HTTP permitted), origin-bound; same gate-derived policy and the same profile-named connectivity check. Resolved answers must be on the owner's network (link-local only with the connection's opt-in, metadata services never), and the request never uses a proxy. |
@@ -123,8 +122,7 @@ not in this table is a documentation defect, not a hidden feature.
 | `email_runtime` | 6 | Local governed email store. No outbound send. |
 | `calendar_runtime` | 6 | Local governed calendar store. |
 | `reminder_runtime` | 6 | Local governed reminder store. |
-| `plugin_sandbox_image_pull_cap` | 4 | Pull-only acquisition for a sandbox image. Requires an exact image in `RAIKER_CONTAINER_IMAGE_ALLOWLIST` and its registry in `RAIKER_PLUGIN_IMAGE_REGISTRY_ALLOWLIST`; invokes only `docker pull <image>`, bounds/redacts output, and never builds or executes an image. Docker daemon egress remains an operator-controlled boundary. |
-| `run_command` standing grant | 4 | Executes only an exact active session/principal grant inside `RAIKER_COMMAND_SANDBOX_IMAGE`, which must also be owner-allowlisted. Docker uses `--network none`, dropped capabilities, `no-new-privileges`, bounded resources, and a workspace-only bind mount. Missing image/runtime configuration fails closed. |
+| `run_command` standing grant | 4 | Executes only through the native sandbox backend; refused with `native_sandbox_required` until disposable task workspaces make native execution available. Docker and Podman are not used. |
 
 Tier 2 capabilities additionally require a threat-model ack and a human confirmation
 token to enable (`--confirm <token>` / API `confirmation_token`).
@@ -149,8 +147,7 @@ that has no installed supervisor still fails closed.*
   far: `remote_execution_cap` + `cloud_execution_cap` —
   `docs/threat-models/remote-cloud.md`; `subagents` + `multi_agent_teams` — `docs/threat-models/subagents.md`;
   `external_channel_runtime` + `channel_approval_relay` —
-  `docs/threat-models/channels.md`; `container_execution_cap` —
-  `docs/threat-models/container.md`; `scheduled_routines` —
+  `docs/threat-models/channels.md`; `scheduled_routines` —
   `docs/threat-models/scheduled-routines.md`; `hosted_model_runtime` +
   `private_network_model_runtime` — `docs/threat-models/hosted-models.md`;
   `advisor_model_runtime` — `docs/threat-models/advisor-model.md`;
@@ -161,8 +158,9 @@ that has no installed supervisor still fails closed.*
   `plugin_install` — `docs/threat-models/plugins.md`;
   `plugin_execution_cap` — `docs/threat-models/plugin-execution.md`;
   `plugin_revocation_cap` — `docs/threat-models/plugin-revocation.md`;
-  `plugin_runtime_cap` — `docs/threat-models/plugin-runtime.md`;
-  `plugin_sandboxed_runtime_cap` — `docs/threat-models/plugin-sandboxed-runtime.md`.
+  `plugin_runtime_cap` — `docs/threat-models/plugin-runtime.md`.
+  (`container_execution_cap`, `plugin_sandboxed_runtime_cap` and
+  `plugin_sandbox_image_pull_cap` were removed with Docker and Podman.)
   Every remote or cloud command still runs only through an owner-configured,
   owner-selected profile — see `docs/threat-models/remote-cloud.md`.)
 - **Tier 6 (sensitive domains):** `finance_runtime`, `investment_runtime`,

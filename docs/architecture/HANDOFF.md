@@ -580,12 +580,9 @@ comment.
   surface are implemented. GitHub issue-comment creation is the one shipped,
   governed connector write reference; other connector write operations remain
   unimplemented and fail closed.
-- Plugin code has two real, governed runtimes: bounded subprocess and a
-  no-network/read-only container. Host in-process import of plugin code is an
-  explicit security non-goal, not a deferred implementation task.
-- The sandbox image has a governed, pull-only acquisition capability. It accepts
-  only an exact owner-allowlisted image/registry, invokes only `docker pull`,
-  and never builds or runs an image.
+- Plugin code execution is blocked pending the native sandbox broker; the
+  Docker runtime and image pull capability were removed. Host in-process import
+  of plugin code remains an explicit security non-goal.
 - Project-only export has landed as an authenticated, human-initiated download
   of the existing redacted JSONL audit timeline. It includes exactly the
   project's direct sessions, never descendant-project sessions, and applies

@@ -31,9 +31,7 @@ def test_supported_safetensors_snapshot_produces_pinned_commands(tmp_path: Path)
     assert preview.architecture == "LlamaForCausalLM"
     assert preview.revision == REVISION
     assert preview.quantization == "Q4_K_M"
-    assert preview.toolchain_image.endswith(
-        "@sha256:bd00b69f6efef29e3fda689ea584e8fdd0a33a87860f700b16fecab147ac72f1"
-    )
+    assert preview.toolchain_image == "native_toolchain_required"
     assert preview.convert_argv[0:2] == ("python", "/app/convert_hf_to_gguf.py")
     assert preview.quantize_argv[0] == "/app/llama-quantize"
     assert "--outtype" in preview.convert_argv

@@ -1228,3 +1228,16 @@ class ExecutionProfileBindingRequest(StrictRequest):
     """Which profile to bind; ``None`` unbinds."""
 
     profile_id: str | None = Field(default=None, max_length=80)
+
+
+class PromoteTaskWorkspaceRequest(StrictRequest):
+    """The exact change set the owner reviewed.
+
+    Promotion is refused unless it still matches the copy, so a command that
+    ran after the owner looked cannot slip an unreviewed change through.
+    """
+
+    created: list[str]
+    modified: list[str]
+    deleted: list[str]
+

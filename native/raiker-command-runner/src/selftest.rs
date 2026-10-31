@@ -18,6 +18,18 @@ use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Unique run name prevents ordinary probe collisions across repeated runs.
+pub fn probe_nonce() -> String {
+    format!(
+        "raiker-probe-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    )
+}
+
 /// What the probe child is asked to attempt. Every path and address is named
 /// by the caller: a probe that chooses its own targets can pick one that fails
 /// for an unrelated reason and call the boundary proven.
@@ -28,6 +40,7 @@ pub struct SelfTest {
     pub masked_read_path: PathBuf,
     pub connect_address: String,
     pub spawn_grandchild: bool,
+    pub hold_for_probe: bool,
 }
 
 impl SelfTest {
@@ -48,6 +61,10 @@ impl SelfTest {
                 .get("spawn_grandchild")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
+            hold_for_probe: value
+                .get("hold_for_probe")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         })
     }
 
@@ -61,6 +78,7 @@ impl SelfTest {
             "masked_read_path": self.masked_read_path.to_string_lossy(),
             "connect_address": self.connect_address,
             "spawn_grandchild": self.spawn_grandchild,
+            "hold_for_probe": self.hold_for_probe,
         })
     }
 }
@@ -74,25 +92,72 @@ pub fn attempt(test: &SelfTest) -> Value {
         // through the relay the runner set up, so a boundary that silently
         // drops output cannot pass the probe.
         "nonce": test.nonce,
-        "inside_write": write_probe(&test.inside_path),
+        "inside_write": write_probe(&test.inside_path, &test.nonce, true),
         "outside_writes": test.outside_paths.iter()
-            .map(|path| write_probe(path))
+            .map(|path| write_probe(path, &test.nonce, !test.hold_for_probe))
             .collect::<Vec<_>>(),
         "masked_read": read_probe(&test.masked_read_path),
         "connect": connect_probe(&test.connect_address),
+        "seccomp_control": seccomp_control(),
     })
+}
+
+#[cfg(target_os = "linux")]
+fn seccomp_control() -> Value {
+    // Querying the current personality is harmless, but the sandbox policy
+    // deliberately denies it so the control arm can verify actual filtering.
+    let personality = unsafe { libc::syscall(libc::SYS_personality, u32::MAX as libc::c_ulong) };
+    let unshare = unsafe { libc::syscall(libc::SYS_unshare, 0) };
+    json!({"allowed": personality >= 0 && unshare >= 0,
+           "personality_allowed": personality >= 0,
+           "unshare_allowed": unshare >= 0})
+}
+
+#[cfg(not(target_os = "linux"))]
+fn seccomp_control() -> Value {
+    Value::Null
 }
 
 /// The probe child: detach a grandchild, take every measurement, print the
 /// result for the parent to read back.
 pub fn run(test: &SelfTest) -> Value {
-    if test.spawn_grandchild {
-        spawn_grandchild(test);
+    let (mut descendant, mut descendant_start) = if test.spawn_grandchild {
+        match spawn_grandchild(test) {
+            Ok(child) => (Some(child), json!({"state": "started"})),
+            Err((stage, error)) => (
+                None,
+                json!({"state": stage, "error_code": error.raw_os_error(),
+                       "error_kind": error.kind().to_string(), "error": error.to_string()}),
+            ),
+        }
+    } else {
+        (None, json!({"state": "not_requested"}))
+    };
+    let mut result = attempt(test);
+    // A PID is only an invitation to measure the process, not proof of
+    // termination. The outer probe must retain and observe its OS handle.
+    if let Some(child) = descendant.as_mut() {
+        match child.try_wait() {
+            Ok(None) => result["descendant_pid"] = json!(child.id()),
+            Ok(Some(status)) => {
+                descendant_start = json!({"state": "exited", "exit_code": status.code()})
+            }
+            Err(error) => {
+                descendant_start =
+                    json!({"state": "wait_failed", "error_code": error.raw_os_error()})
+            }
+        }
     }
-    let result = attempt(test);
+    result["descendant_start"] = descendant_start;
     let mut stdout = std::io::stdout();
     let _ = writeln!(stdout, "{result}");
     let _ = stdout.flush();
+    if test.hold_for_probe {
+        // The parent closes this pipe on every exit path. This keeps the
+        // descendant in the process tree while its host identity is measured.
+        let mut release = [0u8; 1];
+        let _ = std::io::Read::read(&mut std::io::stdin(), &mut release);
+    }
     result
 }
 
@@ -104,11 +169,11 @@ pub fn run(test: &SelfTest) -> Value {
 /// process-group kill removes it on every platform, so the observation would
 /// pass on macOS, which is precisely the host whose weaker posture it exists to
 /// expose.
-fn spawn_grandchild(test: &SelfTest) {
+fn spawn_grandchild(
+    test: &SelfTest,
+) -> Result<std::process::Child, (&'static str, std::io::Error)> {
     let marker = test.inside_path.with_extension("grandchild");
-    let Ok(current) = std::env::current_exe() else {
-        return;
-    };
+    let current = std::env::current_exe().map_err(|error| ("executable_lookup_failed", error))?;
     let mut command = std::process::Command::new(current);
     command
         .arg("--linger")
@@ -116,13 +181,20 @@ fn spawn_grandchild(test: &SelfTest) {
     // The grandchild must not inherit the relay pipes. If it did, it would hold
     // the write end open for its whole lifetime and the parent's read would
     // block long after the child had exited — a hang that looks like a wedged
-    // boundary and is really a leaked handle.
+    // boundary and is really a leaked handle. Private pipes, not the null
+    // device: an AppContainer on Windows Server 2025 was measured to be denied
+    // `\\.\NUL`, which made the descendant observation fail to start at all.
     command
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
     detach(&mut command);
-    let _ = command.spawn();
+    let mut child = command.spawn().map_err(|error| ("spawn_failed", error))?;
+    // Close this side so the grandchild sees end-of-file rather than a reader.
+    drop(child.stdin.take());
+    drop(child.stdout.take());
+    drop(child.stderr.take());
+    Ok(child)
 }
 
 #[cfg(windows)]
@@ -149,7 +221,13 @@ fn detach(command: &mut std::process::Command) {
 /// outlive its parent. If it is still alive after the runner stops, containment
 /// did not cover descendants.
 pub fn linger(marker: &Path) {
-    let _ = std::fs::write(marker, b"alive");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(marker)
+    {
+        let _ = file.write_all(b"alive");
+    }
     std::thread::sleep(Duration::from_secs(600));
 }
 
@@ -161,16 +239,25 @@ pub fn linger(marker: &Path) {
 /// owner's workspace. The parent runs with the owner's own rights and removes
 /// it, and any file an escaping write left outside.
 pub fn remove_probe_writes(test: &SelfTest) {
-    let _ = std::fs::remove_file(&test.inside_path);
-    for path in &test.outside_paths {
-        let _ = std::fs::remove_file(path);
+    for path in std::iter::once(&test.inside_path).chain(test.outside_paths.iter()) {
+        // A pre-existing file is not probe-owned. The nonce also prevents a
+        // stale run from deleting another run's output; paths are not pinned.
+        if std::fs::read(path).is_ok_and(|content| content == test.nonce.as_bytes()) {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 
-fn write_probe(path: &Path) -> Value {
-    match std::fs::write(path, b"raiker-probe") {
+fn write_probe(path: &Path, nonce: &str, cleanup: bool) -> Value {
+    let opened = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path);
+    match opened.and_then(|mut file| file.write_all(nonce.as_bytes())) {
         Ok(()) => {
-            let _ = std::fs::remove_file(path);
+            if cleanup {
+                let _ = std::fs::remove_file(path);
+            }
             json!({"allowed": true, "error": Value::Null})
         }
         Err(error) => json!({"allowed": false, "error": error.kind().to_string()}),
@@ -232,6 +319,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn probe_does_not_overwrite_or_remove_an_existing_file() {
+        let path = std::env::temp_dir().join(probe_nonce());
+        std::fs::write(&path, b"owner data").unwrap();
+        assert_eq!(write_probe(&path, "probe nonce", true)["allowed"], false);
+        let test = SelfTest {
+            nonce: "probe nonce".to_owned(),
+            inside_path: path.clone(),
+            outside_paths: Vec::new(),
+            masked_read_path: path.clone(),
+            connect_address: "127.0.0.1:9".to_owned(),
+            spawn_grandchild: false,
+            hold_for_probe: false,
+        };
+        remove_probe_writes(&test);
+        assert_eq!(std::fs::read(&path).unwrap(), b"owner data");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn the_parent_removes_what_the_probe_wrote_in_the_workspace() {
         let dir = std::env::temp_dir().join(format!("raiker-probe-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -242,9 +348,10 @@ mod tests {
             masked_read_path: dir.join("state"),
             connect_address: "127.0.0.1:9".to_owned(),
             spawn_grandchild: false,
+            hold_for_probe: false,
         };
-        std::fs::write(&test.inside_path, b"raiker-probe").unwrap();
-        std::fs::write(&test.outside_paths[0], b"raiker-probe").unwrap();
+        std::fs::write(&test.inside_path, b"n").unwrap();
+        std::fs::write(&test.outside_paths[0], b"n").unwrap();
         remove_probe_writes(&test);
         assert!(!test.inside_path.exists());
         assert!(!test.outside_paths[0].exists());

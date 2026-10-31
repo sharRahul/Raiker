@@ -456,6 +456,12 @@ def sandbox_environment(
         {name: source[name] for name in _PASSTHROUGH if source.get(name)}
     )
     environment.update(extra or {})
+    # HOME is the workspace, which may contain an agent-written .gitconfig.
+    # Do not let that file become the global configuration for host-side Git
+    # transfers or native commands. These controls cannot be overridden by an
+    # extra environment grant.
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    environment["GIT_CONFIG_GLOBAL"] = os.devnull
     return environment
 
 

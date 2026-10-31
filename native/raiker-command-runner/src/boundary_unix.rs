@@ -54,20 +54,37 @@ pub fn probe(workspace: &Path) -> Value {
     let Ok(current) = std::env::current_exe() else {
         return unavailable("native_sandbox_runner_unreadable");
     };
-    let scratch = workspace.join(".raiker").join("command-probe");
-    let _ = std::fs::create_dir_all(&scratch);
+    let nonce = selftest::probe_nonce();
+    let parent = workspace.join(".raiker");
+    if std::fs::create_dir_all(&parent).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
+    let scratch = parent.join(&nonce);
+    if std::fs::create_dir(&scratch).is_err() {
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
     let masked = scratch.join("state");
-    let _ = std::fs::write(&masked, b"raiker-probe-state");
+    if std::fs::write(&masked, b"raiker-probe-state").is_err() {
+        let _ = std::fs::remove_dir(&scratch);
+        return unavailable("native_sandbox_probe_storage_unavailable");
+    }
 
     let test = SelfTest {
-        nonce: format!("raiker-probe-{}", std::process::id()),
-        inside_path: workspace.join(".raiker-probe-inside.tmp"),
-        outside_paths: outside_targets(&workspace),
+        nonce: nonce.clone(),
+        inside_path: workspace.join(format!(".{nonce}-inside.tmp")),
+        outside_paths: outside_targets(&workspace, &nonce),
         masked_read_path: masked.clone(),
         connect_address: probe_destination(),
-        spawn_grandchild: true,
+        // macOS has no verified descendant reaper yet; starting a detached
+        // probe child there would leave it running after every status check.
+        spawn_grandchild: cfg!(target_os = "linux"),
+        hold_for_probe: cfg!(target_os = "linux"),
     };
     let outside = selftest::attempt(&test);
+    if test.hold_for_probe {
+        // The host control must not be mistaken for a sandbox escape.
+        selftest::remove_probe_writes(&test);
+    }
 
     let policy = LaunchPolicy {
         workspace_root: workspace.clone(),
@@ -79,6 +96,7 @@ pub fn probe(workspace: &Path) -> Value {
         max_processes: 32,
         max_memory_bytes: 1024 * 1024 * 1024,
         deadline_seconds: 60,
+        max_cpu_seconds: 60,
         profile_name: format!("raiker.probe.{}", std::process::id()),
     };
     let argv = vec![
@@ -88,44 +106,64 @@ pub fn probe(workspace: &Path) -> Value {
     ];
     let arguments = match boundary_arguments(&policy, &argv) {
         Ok(value) => value,
-        Err(reason) => return unavailable(&reason),
+        Err(reason) => {
+            let _ = std::fs::remove_file(&masked);
+            let _ = std::fs::remove_dir(&scratch);
+            selftest::remove_probe_writes(&test);
+            return unavailable(&reason);
+        }
     };
-    let output = Command::new(which(tool).expect("probed above"))
+    #[cfg(target_os = "linux")]
+    let measured = capture_linux(
+        &which(tool).expect("probed above"),
+        &arguments,
+        &test,
+        &outside,
+    );
+    #[cfg(not(target_os = "linux"))]
+    let measured = Command::new(which(tool).expect("probed above"))
         .args(arguments)
-        .output();
+        .output()
+        .ok()
+        .and_then(|output| serde_json::from_slice::<Value>(&output.stdout).ok())
+        .map(|inside| (inside, "indeterminate", None));
     let _ = std::fs::remove_file(&masked);
-    let _ = std::fs::remove_dir_all(&scratch);
+    let _ = std::fs::remove_dir(&scratch);
     selftest::remove_probe_writes(&test);
-    let Ok(output) = output else {
-        return unavailable("native_sandbox_launch_failed");
-    };
-    let text = String::from_utf8_lossy(&output.stdout);
-    let Ok(inside) = serde_json::from_str::<Value>(text.trim()) else {
+    let Some((inside, descendant, host_escape)) = measured else {
         return unavailable("native_sandbox_probe_no_output");
     };
 
-    // The namespace is torn down when bwrap exits, so a descendant that
-    // survived would have had to escape it. On macOS a `setsid()` grandchild
-    // does exactly that, which is what this observation is here to expose.
+    // A marker file does not prove that the descendant started or terminated.
+    // Cleanup is best effort; the verdict remains indeterminate until the
+    // probe observes the actual descendant process through its lifecycle.
     let marker = test.inside_path.with_extension("grandchild");
-    let descendant = !marker.exists() || std::fs::remove_file(&marker).is_ok();
+    let _ = std::fs::remove_file(&marker);
     let relay = inside.get("nonce").and_then(Value::as_str) == Some(test.nonce.as_str());
     let inside_write = allowed(&inside, "inside_write");
-    let escape = folded_escape(&inside, &outside);
+    let escape = host_escape.unwrap_or_else(|| folded_escape(&inside, &outside));
     let masked_read = selftest::verdict(
         allowed(&inside, "masked_read"),
         allowed(&outside, "masked_read"),
     );
     let network = selftest::verdict(reached(&inside), reached(&outside));
-    let descendant_enforced = descendant && !cfg!(target_os = "macos");
+    let seccomp = seccomp_verdict(&inside, &outside);
 
     json!({
         "platform": platform(),
         "boundary": mechanism,
-        "available": relay && inside_write && escape == "enforced",
-        "reason": Value::Null,
+        // The broker still passes the original project as the workspace.
+        // A verified OS boundary is not a disposable project snapshot.
+        "available": false,
+        "reason": if relay && inside_write && escape == "enforced"
+            && masked_read == "enforced" && network == "enforced" && descendant == "enforced"
+            && (!cfg!(target_os = "linux") || seccomp == "enforced") {
+            "native_disposable_workspace_required"
+        } else {
+            "native_sandbox_not_enforced"
+        },
         "network": network,
-        "process_tree_stop": descendant_enforced,
+        "process_tree_stop": descendant == "enforced" && relay,
         "pty": false,
         "concurrent_runs": false,
         "observations": {
@@ -134,10 +172,100 @@ pub fn probe(workspace: &Path) -> Value {
             "escape_write": escape,
             "masked_read": masked_read,
             "egress": network,
-            "descendant_reaped": if descendant_enforced { "enforced" } else { "unenforced" },
+            "seccomp": seccomp,
+            "descendant_reaped": if relay { descendant } else { "indeterminate" },
         },
         "connect_destination": test.connect_address,
     })
+}
+
+#[cfg(target_os = "linux")]
+fn capture_linux(
+    tool: &str,
+    arguments: &[String],
+    test: &SelfTest,
+    outside: &Value,
+) -> Option<(Value, &'static str, Option<&'static str>)> {
+    use std::io::{BufRead, BufReader};
+    use std::os::fd::AsRawFd;
+    use std::process::Stdio;
+
+    let mut arguments = arguments.to_vec();
+    let filter = linux_filter(&mut arguments).ok()?;
+    let mut command = Command::new(tool);
+    command
+        .args(arguments)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    inherit_linux_filter(&mut command, &filter);
+    let mut child = command.spawn().ok()?;
+    drop(filter);
+    let stdout = child.stdout.take()?;
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let _ = BufReader::new(stdout).read_line(&mut line);
+        let _ = send.send(line);
+    });
+    let inside = receive
+        .recv_timeout(std::time::Duration::from_secs(30))
+        .ok()
+        .and_then(|line| serde_json::from_str::<Value>(&line).ok());
+    let handle = inside
+        .as_ref()
+        .and_then(|value| u32::try_from(value.get("descendant_pid")?.as_u64()?).ok())
+        .and_then(|pid| crate::lifecycle_linux::find_live_descendant(child.id(), pid));
+    let escape = host_escape_verdict(test, outside);
+    // Test actual cancellation of the supervisor; keep the self-test parent
+    // blocked until that point so the observed descendant is still its child.
+    let _ = child.kill();
+    drop(child.stdin.take());
+    let _ = child.wait();
+    let verdict = match handle {
+        Some(handle) if crate::lifecycle_linux::exited(&handle, 5_000) => "enforced",
+        Some(handle) => {
+            // Clean up the trusted test child even when containment failed.
+            unsafe {
+                libc::syscall(
+                    libc::SYS_pidfd_send_signal,
+                    handle.as_raw_fd(),
+                    libc::SIGKILL,
+                    0,
+                    0,
+                )
+            };
+            "unenforced"
+        }
+        None => "indeterminate",
+    };
+    inside.map(|value| (value, verdict, Some(escape)))
+}
+
+#[cfg(target_os = "linux")]
+fn host_escape_verdict(test: &SelfTest, outside: &Value) -> &'static str {
+    let control = outside
+        .get("outside_writes")
+        .and_then(Value::as_array)
+        .is_some_and(|entries| {
+            entries
+                .iter()
+                .any(|entry| entry.get("allowed").and_then(Value::as_bool) == Some(true))
+        });
+    let mut uncertain = false;
+    for path in &test.outside_paths {
+        match std::fs::read(path) {
+            Ok(bytes) if bytes == test.nonce.as_bytes() => return "unenforced",
+            Ok(_) => uncertain = true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => uncertain = true,
+        }
+    }
+    if control && !uncertain {
+        "enforced"
+    } else {
+        "indeterminate"
+    }
 }
 
 pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
@@ -145,31 +273,83 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_pty_unsupported".into());
     }
     let (_, tool) = mechanism();
+    let deadline = std::time::Instant::now()
+        .checked_add(std::time::Duration::from_secs(policy.deadline_seconds))
+        .ok_or("native_sandbox_deadline_invalid")?;
     let executable = which(tool).ok_or("native_sandbox_artifact_missing")?;
     let arguments = boundary_arguments(policy, argv)?;
+    #[cfg(target_os = "linux")]
+    let mut arguments = arguments;
+    #[cfg(target_os = "linux")]
+    let filter = linux_filter(&mut arguments)?;
     let mut command = Command::new(executable);
     command.args(arguments);
+    #[cfg(target_os = "linux")]
+    inherit_linux_filter(&mut command, &filter);
     bound_child(&mut command, policy);
-    let mut child = command
-        .spawn()
-        .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
+    let mut child = command.spawn().map_err(|error| {
+        format!(
+            "native_sandbox_launch_failed:{}",
+            error.raw_os_error().unwrap_or(0)
+        )
+    })?;
+    #[cfg(target_os = "linux")]
+    drop(filter);
 
-    // The boundary's own deadline. Raiker keeps an outer timer, but a wedged
-    // relay must not be able to leave a command running past its bound — and on
-    // macOS, where there is no parent-death signal, this is the only bound.
+    // Keep the child unreaped until the deadline decision. A detached watchdog
+    // using only its numeric PID could otherwise target a reused PID after an
+    // early exit. Polling and termination live in the same owner thread.
     let pid = child.id() as i32;
-    let deadline = policy.deadline_seconds;
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(deadline));
-        // Negative pid: the whole process group, not just the launcher.
-        unsafe { libc::kill(-pid, libc::SIGKILL) };
-        unsafe { libc::kill(pid, libc::SIGKILL) };
-    });
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status.code().unwrap_or(1)),
+            Ok(None) => {}
+            // A wait error can mean the child was already reaped elsewhere.
+            // Its numeric PID is no longer a reliable target in that case.
+            Err(_) => return Err("native_sandbox_wait_failed".into()),
+        }
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            unsafe { libc::kill(-pid, libc::SIGKILL) };
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+            let status = child
+                .wait()
+                .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
+            return Ok(status.code().unwrap_or(1));
+        }
+        std::thread::sleep(remaining.min(std::time::Duration::from_millis(20)));
+    }
+}
 
-    let status = child
-        .wait()
-        .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
-    Ok(status.code().unwrap_or(1))
+#[cfg(target_os = "linux")]
+fn linux_filter(arguments: &mut Vec<String>) -> Result<std::fs::File, String> {
+    use std::os::fd::AsRawFd;
+    let filter = crate::seccomp_linux::filter()
+        .map_err(|_| "native_sandbox_seccomp_unavailable".to_owned())?;
+    let position = arguments
+        .iter()
+        .position(|arg| arg == "--")
+        .ok_or("native_sandbox_arguments_invalid")?;
+    arguments.splice(
+        position..position,
+        ["--seccomp".to_owned(), filter.as_raw_fd().to_string()],
+    );
+    Ok(filter)
+}
+
+#[cfg(target_os = "linux")]
+fn inherit_linux_filter(command: &mut Command, filter: &std::fs::File) {
+    use std::os::fd::AsRawFd;
+    use std::os::unix::process::CommandExt;
+    let fd = filter.as_raw_fd();
+    unsafe {
+        command.pre_exec(move || {
+            if libc::fcntl(fd, libc::F_SETFD, 0) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
 }
 
 /// Everything the kernel can be asked for before `exec`.
@@ -187,22 +367,55 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
     use std::os::unix::process::CommandExt;
     let processes = policy.max_processes as libc::rlim_t;
     let memory = policy.max_memory_bytes as libc::rlim_t;
+    let cpu = policy.max_cpu_seconds as libc::rlim_t;
+    #[cfg(target_os = "linux")]
+    let expected_parent = std::process::id() as libc::pid_t;
     unsafe {
         command.pre_exec(move || {
-            let procs = libc::rlimit {
-                rlim_cur: processes,
-                rlim_max: processes,
+            let apply_limit = |resource, requested, stage| -> std::io::Result<()> {
+                let mut existing: libc::rlimit = std::mem::zeroed();
+                if libc::getrlimit(resource, &mut existing) != 0 {
+                    return Err(resource_limit_error(20_000 + stage * 1_000));
+                }
+                let limit = narrower_limit(&existing, requested);
+                if libc::setrlimit(resource, &limit) != 0 {
+                    return Err(resource_limit_error(10_000 + stage * 1_000));
+                }
+                Ok(())
             };
-            libc::setrlimit(libc::RLIMIT_NPROC, &procs);
-            let address_space = libc::rlimit {
-                rlim_cur: memory,
-                rlim_max: memory,
-            };
-            libc::setrlimit(libc::RLIMIT_AS, &address_space);
+            apply_limit(libc::RLIMIT_NPROC, processes, 1)?;
+            // XNU rejects a finite RLIMIT_AS with EINVAL and does not enforce
+            // address-space limits, so macOS reports memory as unenforced
+            // instead of failing every launch or claiming a quota it lacks.
+            #[cfg(not(target_os = "macos"))]
+            apply_limit(libc::RLIMIT_AS, memory, 2)?;
+            #[cfg(target_os = "macos")]
+            let _ = memory;
+            apply_limit(libc::RLIMIT_CPU, cpu, 3)?;
             #[cfg(target_os = "linux")]
-            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            #[cfg(target_os = "linux")]
+            if libc::getppid() != expected_parent {
+                return Err(std::io::Error::other("runner_parent_exited"));
+            }
             Ok(())
         });
+    }
+}
+
+// Preserve which limit operation failed through Rust's pre-exec error pipe.
+// The final three digits contain the native errno; no sandbox policy is widened.
+fn resource_limit_error(stage: i32) -> std::io::Error {
+    let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
+    std::io::Error::from_raw_os_error(stage + errno.clamp(0, 999))
+}
+
+fn narrower_limit(existing: &libc::rlimit, requested: libc::rlim_t) -> libc::rlimit {
+    libc::rlimit {
+        rlim_cur: existing.rlim_cur.min(requested),
+        rlim_max: existing.rlim_max.min(requested),
     }
 }
 
@@ -231,20 +444,46 @@ fn mechanism() -> (&'static str, &'static str) {
 }
 
 fn which(tool: &str) -> Option<String> {
-    std::env::var("PATH").ok().and_then(|paths| {
-        paths.split(':').find_map(|directory| {
-            let candidate = Path::new(directory).join(tool);
-            candidate
-                .is_file()
-                .then(|| candidate.to_string_lossy().into_owned())
-        })
-    })
+    let candidates: &[&str] = match tool {
+        "sandbox-exec" => &["/usr/bin/sandbox-exec"],
+        "bwrap" => &["/usr/bin/bwrap", "/bin/bwrap"],
+        _ => return None,
+    };
+    candidates
+        .iter()
+        .find_map(|candidate| trusted_system_tool(Path::new(candidate)))
+}
+
+fn trusted_system_tool(path: &Path) -> Option<String> {
+    use std::os::unix::fs::MetadataExt;
+
+    for parent in path.parent()?.ancestors() {
+        let metadata = std::fs::metadata(parent).ok()?;
+        if metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+            return None;
+        }
+    }
+    let resolved = path.canonicalize().ok()?;
+    let file = std::fs::metadata(&resolved).ok()?;
+    if !file.is_file() || file.mode() & 0o111 == 0 {
+        return None;
+    }
+    for component in resolved.ancestors() {
+        let metadata = std::fs::metadata(component).ok()?;
+        if metadata.uid() != 0 || metadata.mode() & 0o022 != 0 {
+            return None;
+        }
+    }
+    resolved.to_str().map(str::to_owned)
 }
 
 /// The system paths a dynamic loader needs. bwrap starts from an empty root, so
 /// omitting these does not produce a stricter sandbox — it produces one where
 /// nothing can exec at all.
-const SYSTEM_READ_ONLY: [&str; 4] = ["/usr", "/etc", "/opt", "/nix"];
+// These other trees can contain administrator or application data and are
+// not necessary to start the supported system runtime. Toolchains outside
+// /usr require an explicitly governed mount rather than broad host access.
+const SYSTEM_READ_ONLY: [&str; 1] = ["/usr"];
 const SYSTEM_LINKS: [(&str, &str); 4] = [
     ("usr/bin", "/bin"),
     ("usr/sbin", "/sbin"),
@@ -280,6 +519,10 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
             arguments.push(path.to_owned());
             arguments.push(path.to_owned());
         }
+    }
+    if Path::new("/usr/local").is_dir() {
+        arguments.push("--tmpfs".to_owned());
+        arguments.push("/usr/local".to_owned());
     }
     for (target, link) in SYSTEM_LINKS {
         if Path::new(link).is_symlink() || !Path::new(link).exists() {
@@ -350,48 +593,107 @@ fn macos_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
     if policy.network != NetworkPolicy::Denied {
         return Err("filtered_egress_seatbelt_unsupported".into());
     }
-    let mut arguments = vec!["-p".to_owned(), macos_profile(policy)];
+    let mut arguments = vec!["-p".to_owned(), macos_profile(policy)?];
     arguments.extend(argv.iter().cloned());
     Ok(arguments)
 }
 
 /// Deny by default, then allow exactly what a program needs to start.
 ///
-/// `(allow file-read*)` is broad on purpose: the write boundary is what this
-/// sandbox enforces, and a read allow-list narrow enough to be interesting is
-/// also narrow enough to stop `dyld` resolving a framework. `.raiker` is denied
-/// for reads as well, because that is the invariant.
-pub fn macos_profile(policy: &LaunchPolicy) -> String {
-    let root = policy.workspace_root.to_string_lossy();
+/// Read access is limited to the workspace and common system runtime paths.
+/// This initial allowlist is not yet verified on macOS and may prevent some
+/// toolchains from starting; macOS remains unavailable until real tests pass.
+pub fn macos_profile(policy: &LaunchPolicy) -> Result<String, String> {
+    let root = seatbelt_path(&policy.workspace_root)?;
     let mut profile = String::from("(version 1)\n(deny default)\n(deny network*)\n");
-    profile.push_str("(allow process-exec* process-fork signal sysctl-read mach-lookup)\n");
-    profile.push_str("(allow file-read* file-read-metadata)\n");
-    profile.push_str(&format!("(allow file-write* (subpath \"{root}\"))\n"));
-    profile.push_str("(allow file-write* (subpath \"/private/tmp\") (subpath \"/dev\"))\n");
+    profile.push_str("(allow process-exec* process-fork sysctl-read)\n");
+    // Signals and process inspection stay inside this sandbox: an unrestricted
+    // `signal` would let a command kill any of the owner's processes.
+    profile.push_str("(allow signal (target same-sandbox))\n");
+    profile.push_str("(allow process-info* (target same-sandbox))\n");
+    // An unrestricted `mach-lookup` reaches launchd and LaunchServices, which
+    // can start processes outside this sandbox. Only libc's directory lookup,
+    // notifications and logging are reachable.
+    profile.push_str(
+        "(allow mach-lookup (global-name \"com.apple.system.opendirectoryd.libinfo\") \
+         (global-name \"com.apple.system.notification_center\") \
+         (global-name \"com.apple.system.logger\") (global-name \"com.apple.logd\"))\n",
+    );
+    // macOS 13 and later load the dyld shared cache from the OS cryptex, and
+    // /bin/sh resolves its implementation through /private/var/select.
+    profile.push_str("(allow file-read* (subpath \"/System/Library\") (subpath \"/System/Volumes/Preboot/Cryptexes/OS\") (subpath \"/private/preboot/Cryptexes/OS\") (subpath \"/usr/lib\") (subpath \"/usr/libexec\") (subpath \"/usr/bin\") (subpath \"/usr/sbin\") (subpath \"/usr/share\") (subpath \"/bin\") (subpath \"/sbin\") (subpath \"/private/var/db/dyld\") (subpath \"/private/var/select\") (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\") (literal \"/dev/zero\") (literal \"/dev/dtracehelper\"))\n");
+    // Path resolution stats each ancestor of the workspace. Metadata of those
+    // directories only — not their contents — is readable. Process startup
+    // also lists `/` (measured on macOS 15: `cat` was denied without it); that
+    // exposes the names of top-level directories, not anything inside them.
+    profile.push_str("(allow file-read-data (literal \"/\"))\n");
+    for ancestor in policy.workspace_root.ancestors().skip(1) {
+        profile.push_str(&format!(
+            "(allow file-read-metadata (literal \"{}\"))\n",
+            seatbelt_path(ancestor)?
+        ));
+    }
+    // The workspace grants exclude the protected paths themselves rather than
+    // relying on a later deny to override them: measured on macOS 15, a deny
+    // placed after the workspace allow did not keep `.raiker` unreadable.
+    let mut masked = String::new();
+    for relative in &policy.deny_paths {
+        let path = policy.workspace_root.join(relative);
+        masked.push_str(&format!(
+            " (require-not (subpath \"{}\"))",
+            seatbelt_path(&path)?
+        ));
+    }
+    let mut unwritable = masked.clone();
+    for relative in &policy.readonly_paths {
+        let path = policy.workspace_root.join(relative);
+        unwritable.push_str(&format!(
+            " (require-not (subpath \"{}\"))",
+            seatbelt_path(&path)?
+        ));
+    }
+    profile.push_str(&format!(
+        "(allow file-read* (require-all (subpath \"{root}\"){masked}))\n"
+    ));
+    profile.push_str(&format!(
+        "(allow file-write* (require-all (subpath \"{root}\"){unwritable}))\n"
+    ));
+    profile.push_str("(allow file-write* (literal \"/dev/null\"))\n");
     for relative in &policy.deny_paths {
         let path = policy.workspace_root.join(relative);
         profile.push_str(&format!(
             "(deny file* (subpath \"{}\"))\n",
-            path.to_string_lossy()
+            seatbelt_path(&path)?
         ));
     }
     for relative in &policy.readonly_paths {
         let path = policy.workspace_root.join(relative);
         profile.push_str(&format!(
             "(deny file-write* (subpath \"{}\"))\n",
-            path.to_string_lossy()
+            seatbelt_path(&path)?
         ));
     }
-    profile
+    Ok(profile)
 }
 
-fn outside_targets(workspace: &Path) -> Vec<PathBuf> {
+fn seatbelt_path(path: &Path) -> Result<&str, String> {
+    let value = path.to_str().ok_or("native_sandbox_seatbelt_unsafe_path")?;
+    if value
+        .chars()
+        .any(|character| character.is_control() || matches!(character, '"' | '\\'))
+    {
+        return Err("native_sandbox_seatbelt_unsafe_path".into());
+    }
+    Ok(value)
+}
+
+fn outside_targets(workspace: &Path, nonce: &str) -> Vec<PathBuf> {
     let mut targets = Vec::new();
     if let Some(parent) = workspace.parent() {
-        targets.push(parent.join(".raiker-probe-escape.tmp"));
+        targets.push(parent.join(format!(".{nonce}-escape.tmp")));
     }
     if let Ok(home) = std::env::var("HOME") {
-        targets.push(PathBuf::from(home).join(".raiker-probe-escape.tmp"));
+        targets.push(PathBuf::from(home).join(format!(".{nonce}-escape.tmp")));
     }
     targets
 }
@@ -409,15 +711,16 @@ fn probe_destination() -> String {
 
 fn default_gateway() -> Option<String> {
     let text = std::fs::read_to_string("/proc/net/route").ok()?;
+    parse_default_gateway(&text)
+}
+
+fn parse_default_gateway(text: &str) -> Option<String> {
     for line in text.lines().skip(1) {
         let fields: Vec<&str> = line.split_whitespace().collect();
         if fields.len() > 2 && fields[1] == "00000000" {
             let raw = u32::from_str_radix(fields[2], 16).ok()?;
             let octets = raw.to_le_bytes();
-            return Some(format!(
-                "{}.{}.{}.{}",
-                octets[3], octets[2], octets[1], octets[0]
-            ));
+            return Some(std::net::Ipv4Addr::from(octets).to_string());
         }
     }
     None
@@ -429,6 +732,29 @@ fn allowed(value: &Value, key: &str) -> bool {
         .and_then(|entry| entry.get("allowed"))
         .and_then(Value::as_bool)
         .unwrap_or(false)
+}
+
+fn seccomp_verdict(inside: &Value, outside: &Value) -> &'static str {
+    let observation = |value: &Value, name: &str| {
+        value
+            .get("seccomp_control")
+            .and_then(|entry| entry.get(name))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    };
+    let personality = selftest::verdict(
+        observation(inside, "personality_allowed"),
+        observation(outside, "personality_allowed"),
+    );
+    let unshare = selftest::verdict(
+        observation(inside, "unshare_allowed"),
+        observation(outside, "unshare_allowed"),
+    );
+    match (personality, unshare) {
+        ("unenforced", _) | (_, "unenforced") => "unenforced",
+        ("enforced", "enforced") => "enforced",
+        _ => "indeterminate",
+    }
 }
 
 fn reached(value: &Value) -> bool {
@@ -483,6 +809,52 @@ mod tests {
     use super::*;
     use crate::policy;
 
+    #[test]
+    fn linux_default_gateway_uses_little_endian_route_bytes() {
+        let route = "Iface Destination Gateway Flags\neth0 00000000 0102A8C0 0003\n";
+        assert_eq!(parse_default_gateway(route).as_deref(), Some("192.168.2.1"));
+    }
+
+    #[test]
+    fn seccomp_requires_both_controlled_syscalls_to_be_blocked() {
+        let outside =
+            json!({"seccomp_control": {"personality_allowed": true, "unshare_allowed": true}});
+        let partial =
+            json!({"seccomp_control": {"personality_allowed": false, "unshare_allowed": true}});
+        let denied =
+            json!({"seccomp_control": {"personality_allowed": false, "unshare_allowed": false}});
+        assert_eq!(seccomp_verdict(&partial, &outside), "unenforced");
+        assert_eq!(seccomp_verdict(&denied, &outside), "enforced");
+        assert_eq!(seccomp_verdict(&denied, &denied), "indeterminate");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn host_escape_requires_a_control_and_observes_real_host_writes() {
+        let root = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&root).unwrap();
+        let target = root.join("outside");
+        let test = SelfTest {
+            nonce: "probe-identity".into(),
+            inside_path: root.join("inside"),
+            outside_paths: vec![target.clone()],
+            masked_read_path: root.join("masked"),
+            connect_address: "127.0.0.1:9".into(),
+            spawn_grandchild: false,
+            hold_for_probe: true,
+        };
+        let failed_control = json!({"outside_writes": [{"allowed": false}]});
+        let passed_control = json!({"outside_writes": [{"allowed": true}]});
+        assert_eq!(host_escape_verdict(&test, &failed_control), "indeterminate");
+        assert_eq!(host_escape_verdict(&test, &passed_control), "enforced");
+        std::fs::write(&target, test.nonce.as_bytes()).unwrap();
+        assert_eq!(host_escape_verdict(&test, &passed_control), "unenforced");
+        std::fs::write(&target, b"unrelated content").unwrap();
+        assert_eq!(host_escape_verdict(&test, &passed_control), "indeterminate");
+        std::fs::remove_file(target).unwrap();
+        std::fs::remove_dir(root).unwrap();
+    }
+
     fn sample() -> policy::LaunchPolicy {
         policy::parse(
             r#"{"workspace_root":"/ws","cwd":"/ws","profile_name":"raiker.cmd.test",
@@ -512,6 +884,14 @@ mod tests {
                 .any(|pair| pair[0] == "--tmpfs" && pair[1] == "/tmp")
         );
         assert!(arguments.contains(&"--unshare-net".to_owned()));
+        for forbidden in ["/etc", "/opt", "/nix"] {
+            assert!(
+                !arguments.windows(3).any(|triple| {
+                    triple[0] == "--ro-bind" && triple[1] == forbidden && triple[2] == forbidden
+                }),
+                "host tree must not be exposed: {forbidden}"
+            );
+        }
         assert_eq!(arguments.last().unwrap(), "hi");
     }
 
@@ -560,12 +940,200 @@ mod tests {
 
     #[test]
     fn the_macos_profile_denies_by_default_and_protects_raiker_state() {
-        let profile = macos_profile(&sample());
+        let profile = macos_profile(&sample()).unwrap();
         assert!(profile.contains("(deny default)"));
         assert!(profile.contains("(deny network*)"));
         assert!(profile.contains("(deny file* (subpath \"/ws/.raiker\"))"));
-        // The loader has to be able to read, or nothing starts.
-        assert!(profile.contains("(allow file-read*"));
+        assert!(!profile.contains("(allow file-read* file-read-metadata)"));
+        assert!(!profile.contains("(allow file-write* (subpath \"/private/tmp\")"));
+        assert!(profile.contains("(subpath \"/System/Library\")"));
+        assert!(profile.contains(
+            "(allow file-read* (require-all (subpath \"/ws\") (require-not (subpath \"/ws/.raiker\"))))"
+        ));
+        assert!(profile.contains("(require-not (subpath \"/ws/.git\"))))"));
+        assert!(profile.contains("(allow file-read-metadata (literal \"/\"))"));
+        assert!(!profile.contains("(allow file-read* (literal \"/\"))"));
+    }
+
+    #[test]
+    fn the_macos_profile_keeps_signals_and_services_inside_the_sandbox() {
+        let profile = macos_profile(&sample()).unwrap();
+        assert!(profile.contains("(allow signal (target same-sandbox))"));
+        for line in profile.lines() {
+            assert!(
+                !line.contains("signal") || line.contains("same-sandbox"),
+                "unrestricted signal: {line}"
+            );
+            assert!(
+                !line.contains("mach-lookup") || line.contains("(global-name "),
+                "unrestricted mach-lookup: {line}"
+            );
+        }
+        assert!(!profile.contains("launchservicesd"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn seatbelt_profile_enforces_filesystem_policy_on_real_processes() {
+        let temp = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let root = temp.join(selftest::probe_nonce());
+        std::fs::create_dir(&root).unwrap();
+        let inside = root.join("inside");
+        let outside = temp.join(format!("{}-outside", selftest::probe_nonce()));
+        std::fs::write(&inside, b"inside control").unwrap();
+        std::fs::write(&outside, b"outside private").unwrap();
+        std::fs::create_dir(root.join(".raiker")).unwrap();
+        std::fs::write(root.join(".raiker").join("state"), b"raiker private").unwrap();
+        std::fs::create_dir(root.join(".git")).unwrap();
+        let mut policy = sample();
+        policy.workspace_root = root.clone();
+        policy.cwd = root.clone();
+        let profile = macos_profile(&policy).unwrap();
+        let run = |path: &Path| {
+            Command::new("/usr/bin/sandbox-exec")
+                .args(["-p", &profile, "/bin/cat"])
+                .arg(path)
+                .output()
+                .unwrap()
+        };
+        let allowed = run(&inside);
+        let denied = run(&outside);
+        let masked = run(&root.join(".raiker").join("state"));
+        let git_target = root.join(".git").join("hook");
+        let git_write = Command::new("/usr/bin/sandbox-exec")
+            .args(["-p", &profile, "/bin/sh", "-c", "printf x > \"$1\"", "sh"])
+            .arg(&git_target)
+            .output()
+            .unwrap();
+        let git_written = git_target.exists();
+        let _ = std::fs::remove_file(&outside);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            allowed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&allowed.stderr)
+        );
+        assert_eq!(allowed.stdout, b"inside control");
+        assert!(!denied.status.success(), "outside read was allowed");
+        assert!(!String::from_utf8_lossy(&denied.stdout).contains("outside private"));
+        assert!(!masked.status.success(), "masked .raiker read was allowed");
+        assert!(!String::from_utf8_lossy(&masked.stdout).contains("raiker private"));
+        assert!(
+            !git_write.status.success() && !git_written,
+            ".git write was allowed"
+        );
+    }
+
+    #[test]
+    fn resource_bounds_never_raise_existing_soft_or_hard_limits() {
+        let existing = libc::rlimit {
+            rlim_cur: 128,
+            rlim_max: 256,
+        };
+        let bounded = narrower_limit(&existing, 4096);
+        assert_eq!(bounded.rlim_cur, 128);
+        assert_eq!(bounded.rlim_max, 256);
+        let bounded = narrower_limit(&existing, 64);
+        assert_eq!(bounded.rlim_cur, 64);
+        assert_eq!(bounded.rlim_max, 64);
+    }
+
+    #[test]
+    fn the_macos_profile_refuses_policy_injection_in_paths() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let mut policy = sample();
+        policy.workspace_root = PathBuf::from("/tmp/work\") (allow file-read*) ;");
+        assert_eq!(
+            macos_arguments(&policy, &["echo".into()]).unwrap_err(),
+            "native_sandbox_seatbelt_unsafe_path"
+        );
+        let mut policy = sample();
+        policy.workspace_root = PathBuf::from(std::ffi::OsString::from_vec(vec![b'/', 0xff]));
+        assert_eq!(
+            macos_arguments(&policy, &["echo".into()]).unwrap_err(),
+            "native_sandbox_seatbelt_unsafe_path"
+        );
+        let mut policy = sample();
+        policy.readonly_paths = vec!["folder\nname".into()];
+        assert_eq!(
+            macos_arguments(&policy, &["echo".into()]).unwrap_err(),
+            "native_sandbox_seatbelt_unsafe_path"
+        );
+        let mut policy = sample();
+        policy.deny_paths = vec!["folder\\name".into()];
+        assert_eq!(
+            macos_arguments(&policy, &["echo".into()]).unwrap_err(),
+            "native_sandbox_seatbelt_unsafe_path"
+        );
+    }
+
+    #[test]
+    fn seatbelt_launcher_is_not_selected_from_an_untrusted_path() {
+        const CHILD: &str = "RAIKER_SEATBELT_RESOLUTION_TEST";
+        if std::env::var_os(CHILD).is_some() {
+            assert!(which("sandbox-exec").is_none_or(|path| path == "/usr/bin/sandbox-exec"));
+            return;
+        }
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("sandbox-exec"), b"untrusted").unwrap();
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "boundary::tests::seatbelt_launcher_is_not_selected_from_an_untrusted_path",
+            ])
+            .env(CHILD, "1")
+            .env("PATH", &directory)
+            .output()
+            .unwrap();
+        std::fs::remove_dir_all(&directory).unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn trusted_helper_refuses_a_symlink_in_a_writable_directory() {
+        use std::os::unix::fs::symlink;
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        let link = directory.join("tool");
+        symlink("/usr/bin/true", &link).unwrap();
+        assert!(trusted_system_tool(&link).is_none());
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn bubblewrap_launcher_is_not_selected_from_an_untrusted_path() {
+        const CHILD: &str = "RAIKER_BWRAP_RESOLUTION_TEST";
+        if std::env::var_os(CHILD).is_some() {
+            assert!(
+                which("bwrap").is_none_or(|path| path == "/usr/bin/bwrap" || path == "/bin/bwrap")
+            );
+            return;
+        }
+        let directory = std::env::temp_dir().join(selftest::probe_nonce());
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("bwrap"), b"untrusted").unwrap();
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "boundary::tests::bubblewrap_launcher_is_not_selected_from_an_untrusted_path",
+            ])
+            .env(CHILD, "1")
+            .env("PATH", &directory)
+            .output()
+            .unwrap();
+        std::fs::remove_dir_all(&directory).unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     #[test]

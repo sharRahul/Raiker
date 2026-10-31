@@ -7845,42 +7845,6 @@
         "title": "ContainedSubject",
         "type": "object"
       },
-      "ContainerOptions": {
-        "properties": {
-          "images": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Images",
-            "type": "array"
-          },
-          "runtimes": {
-            "items": {
-              "enum": [
-                "docker",
-                "podman"
-              ],
-              "type": "string"
-            },
-            "title": "Runtimes",
-            "type": "array"
-          },
-          "supported_tools": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Supported Tools",
-            "type": "array"
-          }
-        },
-        "required": [
-          "runtimes",
-          "images",
-          "supported_tools"
-        ],
-        "title": "ContainerOptions",
-        "type": "object"
-      },
       "ContainmentCapability": {
         "properties": {
           "id": {
@@ -12521,12 +12485,8 @@
         "type": "object"
       },
       "ExecutionEnvironmentView": {
-        "description": "One boundary a command could run in, as measured on this host.\n\nThe container keys are present for a container profile; ``boundary`` and\n``probe_observations`` for the boundaries a probe measures; ``config`` for\nan owner-configured profile, never with its secrets.",
+        "description": "One boundary a command could run in, as measured on this host.\n\n``boundary`` and ``probe_observations`` are present for the boundaries a\nprobe measures; ``config`` for an owner-configured profile, never with its\nsecrets. A ``retired`` entry is a removed Docker/Podman environment kept so\nthe owner can see and remove it; it is never available.",
         "properties": {
-          "assigned_tool_count": {
-            "title": "Assigned Tool Count",
-            "type": "integer"
-          },
           "assigned_tools": {
             "items": {
               "type": "string"
@@ -12598,22 +12558,10 @@
             "title": "Features",
             "type": "object"
           },
-          "image": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image"
-          },
           "kind": {
             "enum": [
-              "local",
               "native",
-              "container",
+              "retired",
               "ssh",
               "daytona"
             ],
@@ -12644,14 +12592,6 @@
             "title": "Profile Id",
             "type": "string"
           },
-          "repository_access": {
-            "enum": [
-              "none",
-              "read_only"
-            ],
-            "title": "Repository Access",
-            "type": "string"
-          },
           "runner_trust": {
             "anyOf": [
               {
@@ -12668,21 +12608,6 @@
             ],
             "title": "Runner Trust"
           },
-          "runtime": {
-            "anyOf": [
-              {
-                "enum": [
-                  "docker",
-                  "podman"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runtime"
-          },
           "selected": {
             "title": "Selected",
             "type": "boolean"
@@ -12694,10 +12619,6 @@
           "status": {
             "title": "Status",
             "type": "string"
-          },
-          "writable_output": {
-            "title": "Writable Output",
-            "type": "boolean"
           }
         },
         "required": [
@@ -12723,9 +12644,6 @@
       },
       "ExecutionEnvironmentsView": {
         "properties": {
-          "container_options": {
-            "$ref": "#/components/schemas/ContainerOptions"
-          },
           "environments": {
             "items": {
               "$ref": "#/components/schemas/ExecutionEnvironmentView"
@@ -12740,8 +12658,7 @@
         },
         "required": [
           "selected_profile_id",
-          "environments",
-          "container_options"
+          "environments"
         ],
         "title": "ExecutionEnvironmentsView",
         "type": "object"
@@ -26491,6 +26408,40 @@
         "title": "ProjectsListView",
         "type": "object"
       },
+      "PromoteTaskWorkspaceRequest": {
+        "additionalProperties": false,
+        "description": "The exact change set the owner reviewed.\n\nPromotion is refused unless it still matches the copy, so a command that\nran after the owner looked cannot slip an unreviewed change through.",
+        "properties": {
+          "created": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Created",
+            "type": "array"
+          },
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
+          "modified": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modified",
+            "type": "array"
+          }
+        },
+        "required": [
+          "created",
+          "modified",
+          "deleted"
+        ],
+        "title": "PromoteTaskWorkspaceRequest",
+        "type": "object"
+      },
       "PromptRequest": {
         "properties": {
           "answer_style": {
@@ -33216,6 +33167,161 @@
           "summary"
         ],
         "title": "TaskView",
+        "type": "object"
+      },
+      "TaskWorkspaceDiscarded": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "workspace_id"
+        ],
+        "title": "TaskWorkspaceDiscarded",
+        "type": "object"
+      },
+      "TaskWorkspaceList": {
+        "properties": {
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/TaskWorkspaceView"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workspaces"
+        ],
+        "title": "TaskWorkspaceList",
+        "type": "object"
+      },
+      "TaskWorkspacePromoted": {
+        "properties": {
+          "created": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Created",
+            "type": "array"
+          },
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
+          "modified": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modified",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "workspace_id",
+          "created",
+          "modified",
+          "deleted"
+        ],
+        "title": "TaskWorkspacePromoted",
+        "type": "object"
+      },
+      "TaskWorkspaceRejection": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "reason"
+        ],
+        "title": "TaskWorkspaceRejection",
+        "type": "object"
+      },
+      "TaskWorkspaceView": {
+        "description": "A session's disposable copy and what its commands changed in it.\n\nPaths are relative to the copied folder (``source``, itself relative to the\nRaiker workspace). Nothing here has reached the project until promoted.",
+        "properties": {
+          "created": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Created",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Deleted",
+            "type": "array"
+          },
+          "modified": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modified",
+            "type": "array"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/TaskWorkspaceRejection"
+            },
+            "title": "Rejected",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id",
+          "source",
+          "created_at",
+          "created",
+          "modified",
+          "deleted",
+          "rejected"
+        ],
+        "title": "TaskWorkspaceView",
         "type": "object"
       },
       "TelemetryCadenceRequest": {
@@ -40061,6 +40167,114 @@
           }
         },
         "summary": "Stop Command"
+      }
+    },
+    "/api/command-workspaces": {
+      "get": {
+        "operationId": "list_task_workspaces_api_command_workspaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkspaceList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Task Workspaces"
+      }
+    },
+    "/api/command-workspaces/{workspace_id}/discard": {
+      "post": {
+        "description": "Throw the copy away. The project is unchanged.",
+        "operationId": "discard_task_workspace_api_command_workspaces__workspace_id__discard_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkspaceDiscarded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard Task Workspace"
+      }
+    },
+    "/api/command-workspaces/{workspace_id}/promote": {
+      "post": {
+        "description": "Apply the reviewed change set to the project, all or nothing.",
+        "operationId": "promote_task_workspace_api_command_workspaces__workspace_id__promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteTaskWorkspaceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskWorkspacePromoted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Task Workspace"
       }
     },
     "/api/connections": {

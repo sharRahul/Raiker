@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import json
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, NoReturn, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
-from raiker.api.schemas import serialize_dto
+from raiker.api.schemas import PromoteTaskWorkspaceRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.commands import (
     CommandOutput,
@@ -22,10 +24,25 @@ from raiker.api.wire.commands import (
     CredentialDeltaDiscarded,
     CredentialDeltaList,
     CredentialDeltaView,
+    TaskWorkspaceDiscarded,
+    TaskWorkspaceList,
+    TaskWorkspacePromoted,
+    TaskWorkspaceView,
 )
-from raiker.execution.commands.models import CommandReceipt, StoredCommandRun
+from raiker.execution.commands.models import (
+    TERMINAL_COMMAND_STATES,
+    CommandReceipt,
+    StoredCommandRun,
+)
 from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.commands.store import ReceiptImmutable
+from raiker.execution.workspaces import (
+    TaskWorkspace,
+    TaskWorkspaceRegistry,
+    WorkspaceError,
+    diff_workspace,
+    promote,
+)
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
@@ -199,4 +216,156 @@ def discard_credential_delta(
         "ok": True,
         "receipt": _service(request).store.get_delta_receipt(auth_data[0].principal_id, run_id),
     }
+    return serialize_dto(discarded)
+
+
+# ── Disposable task workspaces: review, promote, discard ─────────────────────
+
+
+def _workspaces(request: Request) -> TaskWorkspaceRegistry:
+    from raiker.execution.commands.backends.native import task_workspace_registry  # noqa: PLC0415
+
+    return task_workspace_registry(request.app.state.workspace_root)
+
+
+def _workspace_view(
+    request: Request, key: str, session_id: str, workspace: TaskWorkspace
+) -> TaskWorkspaceView:
+    diff = diff_workspace(workspace)
+    root = Path(request.app.state.workspace_root).resolve()
+    try:
+        source = workspace.source.relative_to(root).as_posix() or "."
+    except ValueError:
+        source = workspace.source.name
+    return {
+        "workspace_id": key,
+        "session_id": session_id,
+        "source": source,
+        "created_at": workspace.created_at,
+        "created": list(diff.created),
+        "modified": list(diff.modified),
+        "deleted": list(diff.deleted),
+        "rejected": [{"path": path, "reason": reason} for path, reason in diff.rejected],
+    }
+
+
+def _refuse_while_running(request: Request, owner: str, session_id: str) -> None:
+    """A copy a command is still writing cannot be reviewed as finished."""
+    for run in _service(request).store.list_runs(owner, limit=500):
+        if run.session_id == session_id and run.state not in TERMINAL_COMMAND_STATES:
+            raise refusal(status.HTTP_409_CONFLICT, "workspace_in_use")
+
+
+def _audit_workspace(
+    request: Request, owner: str, session_id: str, event_type: str, payload: dict[str, Any]
+) -> None:
+    """Paths and counts only — never file content."""
+    from raiker.events.types import make_event  # noqa: PLC0415
+    from raiker.events.writer import EventLogWriter  # noqa: PLC0415
+    from raiker.storage.sqlite import SQLiteStore  # noqa: PLC0415
+
+    store = SQLiteStore(request.app.state.workspace_root)
+    audit_session = f"sess_inbox_{owner}"
+    with contextlib.suppress(Exception):
+        store.create_session(audit_session, str(request.app.state.workspace_root), title="Inbox")
+    EventLogWriter(store).append(
+        make_event(
+            session_id=audit_session,
+            turn_id=None,
+            event_type=event_type,
+            actor="owner",
+            payload={"principal_id": owner, "task_session_id": session_id, **payload},
+        )
+    )
+
+
+@router.get("/api/command-workspaces")
+def list_task_workspaces(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    owner = auth_data[0].principal_id
+    listed: TaskWorkspaceList = {
+        "workspaces": [
+            _workspace_view(request, key, session_id, workspace)
+            for key, session_id, workspace in _workspaces(request).entries(owner)
+        ]
+    }
+    return serialize_dto(listed)
+
+
+@router.post("/api/command-workspaces/{workspace_id}/promote")
+def promote_task_workspace(
+    workspace_id: str,
+    body: PromoteTaskWorkspaceRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Apply the reviewed change set to the project, all or nothing."""
+    owner = auth_data[0].principal_id
+    registry = _workspaces(request)
+    try:
+        workspace = registry.load(owner, workspace_id)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_404_NOT_FOUND, exc.reason_code) from exc
+    session_id = next(
+        (session for key, session, _ in registry.entries(owner) if key == workspace_id), ""
+    )
+    _refuse_while_running(request, owner, session_id)
+    diff = diff_workspace(workspace)
+    reviewed = (sorted(body.created), sorted(body.modified), sorted(body.deleted))
+    if reviewed != (list(diff.created), list(diff.modified), list(diff.deleted)):
+        raise refusal(status.HTTP_409_CONFLICT, "workspace_review_stale")
+    try:
+        result = promote(workspace, diff)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_409_CONFLICT, exc.reason_code) from exc
+    registry.release(owner, workspace_id)
+    _audit_workspace(
+        request, owner, session_id, "task_workspace_promoted",
+        {
+            "workspace_id": workspace_id,
+            "created": list(result.created),
+            "modified": list(result.modified),
+            "deleted": list(result.deleted),
+            "rejected_count": len(diff.rejected),
+        },
+    )
+    promoted: TaskWorkspacePromoted = {
+        "ok": True,
+        "workspace_id": workspace_id,
+        "created": list(result.created),
+        "modified": list(result.modified),
+        "deleted": list(result.deleted),
+    }
+    return serialize_dto(promoted)
+
+
+@router.post("/api/command-workspaces/{workspace_id}/discard")
+def discard_task_workspace(
+    workspace_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Throw the copy away. The project is unchanged."""
+    owner = auth_data[0].principal_id
+    registry = _workspaces(request)
+    try:
+        workspace = registry.load(owner, workspace_id)
+    except WorkspaceError as exc:
+        raise refusal(status.HTTP_404_NOT_FOUND, exc.reason_code) from exc
+    session_id = next(
+        (session for key, session, _ in registry.entries(owner) if key == workspace_id), ""
+    )
+    _refuse_while_running(request, owner, session_id)
+    diff = diff_workspace(workspace)
+    registry.release(owner, workspace_id)
+    _audit_workspace(
+        request, owner, session_id, "task_workspace_discarded",
+        {
+            "workspace_id": workspace_id,
+            "changed_count": len(diff.created) + len(diff.modified) + len(diff.deleted),
+        },
+    )
+    discarded: TaskWorkspaceDiscarded = {"ok": True, "workspace_id": workspace_id}
     return serialize_dto(discarded)

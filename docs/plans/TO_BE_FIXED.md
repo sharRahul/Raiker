@@ -1,3 +1,152 @@
+## Release blocker: native sandbox migration incomplete
+
+Real Windows adversarial ACL testing found that an AppContainer can write into
+`.git` when that directory grants `ALL APPLICATION PACKAGES` modify access,
+despite an explicit deny for the workspace capability SID. An experimental
+package-SID deny also failed this test and was removed. The broker remains
+unavailable: disposable workspaces and an ACL strategy that passes this real
+test are required before Windows execution can be enabled. The failing test is
+`appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_control`.
+An experimental less-privileged AppContainer (LPAC) passed that filesystem
+test but could not initialize Winsock or start the probe descendant on this
+machine. The experiment was removed to preserve the existing lifecycle probe.
+LPAC needs narrowly justified capabilities and real tests for useful process
+creation and network denial before it can replace the current boundary.
+
+The desktop packaging run for PR head `07f345f0` on 2026-10-30 could not
+start its macOS job because GitHub's `macos-14` runner was in a scheduled
+brownout. The local workflow and release target definitions now select
+`macos-15` for Apple Silicon; their configuration tests pass, but the updated
+job has not yet run on GitHub. The prior PR CI also has failing Python shards,
+Windows lifecycle and Build fault jobs; these are not resolved by the runner
+label change.
+
+Native command execution remains unavailable. A Windows probe now retains a
+live descendant process handle, checks its Job Object membership and observes
+termination after job closure; a real disposable-workspace probe produced an
+enforced verdict. This does not protect the original project, so Windows still
+refuses availability until disposable workspaces exist. A Linux Bubblewrap
+probe in Ubuntu WSL2 now matches a live namespace descendant to its host
+process, pins it with a pidfd and observes its exit after supervisor cancellation.
+The WSL2 integration test passes; hosted Linux CI and macOS process lifecycle
+evidence remain open. Restore execution only after all mandatory observations
+and disposable-workspace protections pass. Linux WSL2 tests now verify memory,
+CPU, process count and wall deadlines against outside controls; Windows verifies
+Job Object CPU-time termination. Linux process-count limits remain per-user and
+can be affected by unrelated processes; memory and CPU limits are per process,
+not task-wide aggregate quotas. macOS limits, hosted CI and aggregate quotas
+remain unverified.
+
+The Unix runner now makes deadline decisions in its child-owner wait loop
+instead of leaving a detached PID-targeting watchdog. Linux WSL integration
+tests exercise both deadline termination and prompt early completion; real
+macOS lifecycle and cancellation evidence is still required.
+
+The macOS hosted control returned `EINVAL` when setting `RLIMIT_AS`; no
+equivalent memory control has yet been verified, so full execution stays
+unavailable. Ubuntu CI loads the distribution's targeted
+`bwrap-userns-restrict` AppArmor profile without disabling AppArmor or its
+global namespace restrictions. On checkpoint `1645da24`, the hosted Ubuntu
+native job passed its real Bubblewrap tests and built the runner.
+
+The Linux boundary no longer mounts the host `/etc`, `/opt` or `/nix` trees,
+and masks `/usr/local`. A WSL Bubblewrap test verifies host configuration and
+local software paths are hidden while outside controls can access them.
+Toolchains outside the remaining system paths need a future governed mount;
+the remaining broad `/usr` read access and other platform filesystem policies
+still require threat-specific review. Runner policies reject a filesystem or
+drive root as the workspace, but non-root original projects still require a
+disposable workspace before execution may be enabled.
+
+Seatbelt and Bubblewrap are now resolved at fixed system paths. The runner
+requires root ownership and rejects group- or world-writable path components
+and executables; tests reject a fake helper supplied through `PATH` and a
+symlink in an untrusted directory. Signed artifact verification and the
+remaining platform enforcement checks are still open.
+
+Checkpoint `466ed3c7` failed native CI on both macOS architectures before the
+Seatbelt control could start, and on hosted Ubuntu because Bubblewrap could not
+configure its network namespace (`RTM_NEWADDR: Operation not permitted`).
+Windows reproduced the protected-directory ACL bypass and did not prove its
+descendant observation on the hosted runner. These are release blockers, not
+skipped security checks. The later Ubuntu job passed after loading its targeted
+AppArmor profile, without disabling global protections.
+The same CI run's legacy image scan also reported a critical Python base-image
+vulnerability (CVE-2026-115557); the obsolete image path must remain blocked
+and be removed only when its native replacement is ready.
+The Python shards and Build fault job now provision Bubblewrap, its targeted
+AppArmor profile, and the native runner before testing. Their remaining
+failures must still be resolved; provisioning is not proof that currently
+blocked background, Git, plugin or MCP execution works.
+
+Seatbelt profile construction now refuses non-UTF-8 paths and paths containing
+quotes, backslashes or control characters, preventing those path values from
+injecting policy expressions. The rejection has Rust unit coverage on Linux;
+the revised profile still requires genuine macOS enforcement tests.
+
+The existing credential snapshot now rejects overlapping staging/source roots,
+case-insensitively excludes protected directories, rejects Windows reparse
+points and compares a file's opened identity against its inspected identity.
+Windows hard-link, junction and file-replacement tests pass. This snapshot is
+now checked for file modification during copying, and cleanup refuses an
+unowned or replaced staging root. Source copying and artifact manifests enforce
+entry and byte limits; manifests reject roots that are symlinks or Windows
+reparse points. These checks are covered by `tests/test_credential_overlay.py`.
+Cleanup permission retries reject known links, reparse points and parent
+traversal and do not change permissions on the staging root's parent. These
+checks are still subject to concurrent path replacement.
+The preliminary conflict check compares affected paths and deleted-directory
+descendants against the original snapshot, including case-folded collisions.
+It is advisory only: it does not lock paths, authorize writes, promote files,
+or provide rollback.
+They are not yet a general task workspace:
+directory components are not held by pinned
+handles, promotion and rollback are missing, and adversarial directory races
+remain. Do not remove the native execution gate on this basis.
+
+The Python driver now probes a copied runner in a temporary directory, revokes
+its Windows grant and refuses project execution until disposable task workspaces
+exist. A real Windows check confirmed the original project, protected directory
+and runner-installation ACLs were unchanged by the probe. This does not yet
+prove crash recovery or safely revoke every historic grant already made. A real
+Windows test also verifies that a workspace capability ACE can be removed by
+the existing revocation function; protected child ACL restoration is still open.
+
+The Docker-free execution migration is **incomplete and not release-ready**
+(PR #239). Docker and Podman are no longer invoked by Raiker: the container
+command backend, container tool bridge, container execution capability, Docker
+plugin runtime and image pull, Docker model conversion, container CI image scan
+and `containers/**` were removed. Stored container profiles are kept as inert
+history and refuse with `container_environment_retired`; they never fall back
+to the host. What still blocks release, by component:
+
+| Blocker | Security impact | Component | Reproduction / evidence | Required remediation | Release-blocking |
+| --- | --- | --- | --- | --- | --- |
+| Native execution depends on measured enforcement per host | Where any mandatory observation is not enforced the sandbox stays unavailable (fail-closed) | `NativeSandboxDriver.probe` | Hosted Windows runners report egress indeterminate, so commands refuse there | Disposable task copies are wired in: commands run in a per-session copy and the owner applies reviewed changes. Remaining: measure on each supported host; macOS descendant containment | Yes, per platform |
+| Windows restricted-account sandbox gaps | Loopback is not filtered; explicit allows below a denied drive root stay reachable; the account profile persists between tasks; network/remote logon rights are not yet denied | `account_windows.rs` | See `WINDOWS_RESTRICTED_ACCOUNT_SANDBOX.md` (the account boundary replaced AppContainer for builds after AppContainer blocked Node, Git, MSYS and virtualenv Python) | WFP loopback filter, per-task profile reset, LSA logon-right denials, explicit-ACE scan under denied roots | Yes |
+| Windows protected paths shared with every AppContainer | A grant to `ALL [RESTRICTED] APPLICATION PACKAGES` on `.git` or `.raiker` let the sandbox write there; capability-SID deny entries do not bind it | `boundary_windows.rs` `granted_to_all_packages` | `appcontainer_denies_protected_and_outside_files_with_a_readable_workspace_control` now expects refusal | Launch now fails closed for the directory itself; explicit grants on files **inside** `.git` are not scanned. Disposable workspaces with a Raiker-built DACL remove the case | Yes, until disposable workspaces |
+| Windows Server 2025 AppContainer denied `\\.\NUL` | Toolchains that open the null device fail inside the sandbox | Hosted `windows-2025` runner | Probe descendant `failed to open NUL device for child stdin: Access is denied` | Probe now uses private pipes; real toolchain compatibility (Python `DEVNULL`, npm) still needs measurement | Yes |
+| macOS Seatbelt not yet verified on hosted runners | Unknown read/launch compatibility; no measured enforcement yet | `boundary_unix.rs` `macos_profile` | `macos_enforcement.rs` failed: `RLIMIT_AS` EINVAL, then `cat` denied `file-read-data /` | Fixed both; rerun `macos-15` and `macos-15-intel` and record evidence | Yes |
+| macOS memory and process-tree limits | XNU does not enforce `RLIMIT_AS`; `RLIMIT_NPROC` is per user; detached descendants are not contained | `bound_child`, probe `descendant_reaped` | Probe reports descendant `indeterminate` on macOS | Measured process-tree ownership (e.g. per-run uid or kqueue tracking) or keep macOS unavailable | Yes |
+| Network mediation | Native boundary is deny-all only; package installs and approved Git remotes cannot run | `linux_arguments`, `macos_arguments`, Windows `launch` refuse non-denied policy | `filtered_egress_*_unsupported` | OS-enforced egress through an outside-the-sandbox proxy (`egress_proxy.py` exists, unwired) with connect-time IP validation | Yes |
+| Background, interactive and PTY execution | Unavailable rather than unsandboxed | Native backend refuses | `native_sandbox_pty_unsupported` | Sandboxed supervisor with ConPTY/PTY and process-tree ownership | Yes |
+| Plugin code, local MCP stdio, command hooks | Unavailable rather than unsandboxed | `tier4_plugins.py`, `mcp.py`, `hooks/handlers/command.py` | Refuse with `native_sandbox_required` | Bidirectional stdio through the broker | Yes |
+| Model conversion | Unavailable | `raiker/models/conversion.py` | `model_conversion_native_toolchain_required` | Package llama.cpp converter/quantizer and run them in the native sandbox | No (feature unavailable, safe) |
+| WSL2 backend | Not implemented | — | — | Implement as a separately verified Bubblewrap+seccomp backend inside WSL2 with interop, `/mnt` and host-network restrictions. (MXC was evaluated and rejected: its README disclaims being a security boundary.) | No for native-Windows path |
+| Runner publisher signing | Package-relative SHA-256 is integrity, not authenticity | `scripts/build_native_runner.py` | `runner_trust: package_relative_integrity` | Platform code signing with release credentials | Yes |
+
+The full inventory and checklist are in
+`docs/architecture/NATIVE_SANDBOX_MIGRATION.md`.
+
+## Release blocker: sandboxed command hooks unavailable
+
+Workspace command hooks cannot safely use the legacy host subprocess launcher.
+They now refuse with `native_sandbox_required`; an enforcing hook that cannot
+run requires an owner decision. This prevents unsandboxed hook code but leaves
+command-hook functionality unavailable. Integrate the native broker with
+bounded bidirectional stdio and process-tree cleanup, then verify legitimate
+hook decisions and adversarial escape attempts on each supported platform.
+
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

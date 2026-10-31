@@ -233,7 +233,11 @@ class CodeReviewWorkflow:
         if path_filter is not None and path_filter != ".":
             args.extend(["--", path_filter])
         result = run_git(root, "diff", args)
-        return str(result.get("output", "")) if result.get("status") == "success" else ""
+        if result.get("status") != "success":
+            error = result.get("error")
+            reason = error.get("type") if isinstance(error, dict) else None
+            raise ReviewError(str(reason or "git_diff_failed"))
+        return str(result.get("output", ""))
 
     def _collect_untracked_files(
         self, root: Path, *, path_filter: str | None

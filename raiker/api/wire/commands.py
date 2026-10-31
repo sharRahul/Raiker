@@ -118,3 +118,43 @@ class CredentialDeltaList(TypedDict):
 class CredentialDeltaDiscarded(TypedDict):
     ok: bool
     receipt: dict[str, Any] | None
+
+
+class TaskWorkspaceRejection(TypedDict):
+    path: str
+    reason: str
+
+
+class TaskWorkspaceView(TypedDict):
+    """A session's disposable copy and what its commands changed in it.
+
+    Paths are relative to the copied folder (``source``, itself relative to the
+    Raiker workspace). Nothing here has reached the project until promoted.
+    """
+
+    workspace_id: str
+    session_id: str
+    source: str
+    created_at: float
+    created: list[str]
+    modified: list[str]
+    deleted: list[str]
+    #: Produced by the task but never promotable: links, special files, `.git`.
+    rejected: list[TaskWorkspaceRejection]
+
+
+class TaskWorkspaceList(TypedDict):
+    workspaces: list[TaskWorkspaceView]
+
+
+class TaskWorkspacePromoted(TypedDict):
+    ok: bool
+    workspace_id: str
+    created: list[str]
+    modified: list[str]
+    deleted: list[str]
+
+
+class TaskWorkspaceDiscarded(TypedDict):
+    ok: bool
+    workspace_id: str

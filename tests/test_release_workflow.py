@@ -56,7 +56,7 @@ def test_release_workflow_covers_supported_cross_platform_runners() -> None:
     assert {
         target_id: target.runner for target_id, target in TARGETS_BY_ID.items()
     } == {
-        "macos-arm64": "macos-14",
+        "macos-arm64": "macos-15",
         "windows-x86_64": "windows-2022",
         "linux-x86_64": "ubuntu-22.04",
         "linux-arm64": "ubuntu-22.04-arm",

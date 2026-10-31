@@ -34,16 +34,17 @@ function environment(overrides: Partial<ExecutionEnvironment> = {}): ExecutionEn
 }
 
 describe("boundaryLabel", () => {
-  it("names the measured boundary, not the configured one", () => {
-    expect(boundaryLabel(environment())).toBe("AppContainer · network denied");
+  it("names a measured OS boundary in plain words", () => {
+    expect(boundaryLabel(environment())).toBe("Local sandbox · network restricted");
     expect(boundaryLabel(environment({ boundary: "bubblewrap" }))).toBe(
-      "bubblewrap · network denied",
+      "Local sandbox · network restricted",
     );
+    expect(boundaryLabel(environment({ boundary: "none" }))).toBe(environment().name);
   });
 
-  it("never calls host access a sandbox", () => {
-    const local = environment({ kind: "local", name: "Local strict", boundary: undefined });
-    expect(boundaryLabel(local)).toBe("Host access — reduced isolation");
+  it("never calls a removed container environment a sandbox", () => {
+    const retired = environment({ kind: "retired", name: "Local container", available: false, boundary: "none" });
+    expect(boundaryLabel(retired)).toBe("Local container — removed");
   });
 
   it("does not claim network denial from an unproven observation", () => {
@@ -57,7 +58,7 @@ describe("boundaryLabel", () => {
         descendant_reaped: "enforced",
       },
     });
-    expect(boundaryLabel(unproven)).toBe("AppContainer · network not proven");
+    expect(boundaryLabel(unproven)).toBe("Local sandbox · network not proven");
   });
 });
 
@@ -106,6 +107,6 @@ describe("fullyProven", () => {
 describe("posturaLine", () => {
   it("states what the boundary does not do, not only what it does", () => {
     expect(posturaLine(environment())).toContain("no PTY, background or network grant");
-    expect(posturaLine(environment({ kind: "local" }))).toContain("no PTY");
+    expect(posturaLine(environment({ kind: "retired" }))).toContain("nothing runs here");
   });
 });

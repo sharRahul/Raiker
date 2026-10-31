@@ -79,15 +79,11 @@ from whenever the owner last looked at it. Two things changed.
   `plugin_entrypoint_digest_not_pinned`, and a file that no longer matches with
   `plugin_entrypoint_digest_mismatch`. The install record's checksum covers the
   manifest, not the code, which is why the pin is the owner's and not the
-  install's. The same check runs in `plugin_sandboxed_runtime_cap`.
-- **Where a container can run it, it runs there.** When
-  `RAIKER_PLUGIN_RUNTIME_IMAGE` is set, allowlisted, and `docker` is present,
-  this capability hands the run to the no-network container runtime
-  ([plugin-sandboxed-runtime.md](plugin-sandboxed-runtime.md)). The bare
-  subprocess below — with the host's network — is only the path where no
-  container exists, and the plugin's card in Extensions says which of the three
-  answers (*not enabled*, *in a container with no network*, *with this
-  machine's network*) is true on this machine.
+  install's.
+- **Plugin code does not run until the native sandbox can host it.** The
+  Docker runtime was removed. The shared launcher refuses with
+  `native_sandbox_required`, and the plugin's card in Extensions says
+  *not enabled*.
 
 ## Explicit non-goals
 

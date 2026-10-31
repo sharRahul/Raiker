@@ -108,7 +108,7 @@ def _target(
 DESKTOP_TARGETS: tuple[DesktopTarget, ...] = (
     _target("windows-x86_64", "windows", "x86_64", "windows-2022",
             ("-setup.exe", ".msi"), ("--win", "--x64"), "-setup.exe"),
-    _target("macos-arm64", "macos", "arm64", "macos-14",
+    _target("macos-arm64", "macos", "arm64", "macos-15",
             (".dmg", ".zip"), ("--mac", "--arm64"), ".zip"),
     _target("linux-x86_64", "linux", "x86_64", "ubuntu-22.04",
             (".AppImage", ".deb", ".rpm"), ("--linux", "--x64"), ".AppImage"),

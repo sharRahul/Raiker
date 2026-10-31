@@ -71,7 +71,9 @@ copy. CI: hosted `windows-2025` runners allow elevated setup in the job.
 `native/raiker-command-runner/src/account_windows.rs`:
 `--setup-account` / `--reset-account` (elevated, idempotent) and
 `--account-status`. Launches use `CreateProcessWithLogonW` with the account's
-own profile environment (no owner variables), a Job Object with UI
+own profile environment (no owner variables), a per-run Modify grant on that
+run's copy only (the base grants the account nothing but read-attributes;
+revoked when the run ends), a Job Object with UI
 restrictions (handles, clipboard, desktop, system parameters, exit Windows)
 and pipes for stdio. A policy whose workspace is under `C:\RaikerSandbox` runs
 as the account; any other workspace keeps the AppContainer boundary.
@@ -108,9 +110,6 @@ and the profile-escape refusal; CI's Windows job now runs setup and requires it.
 * **Persistent account profile:** `C:\Users\RaikerSandbox` persists between
   tasks (caches, user environment), so one task can leave state for the next.
   It stays inside the boundary; resetting it per task is open.
-* **Shared base:** the group can write every copy under the base, so one task
-  could alter another session's copy. Promotion still shows the owner the exact
-  diff; per-copy ACLs are open.
 * **Logon rights:** the account is not yet denied network or remote-desktop
   logon by policy; its random password is known only to Raiker.
 

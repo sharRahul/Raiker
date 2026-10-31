@@ -454,19 +454,67 @@ fn create_base(owner: &str, account: &str) -> Result<(), String> {
 }
 
 /// Modify on exactly one copy, for exactly one run; revoked on every exit.
+///
+/// The grant names the shared account, so it is exclusive only while no other
+/// account run exists. `apply` therefore holds a machine-wide lock for the
+/// whole run, and before granting it revokes any account entry a crashed run
+/// left on another copy, failing closed if one cannot be removed. At most one
+/// copy under the base carries the account's entry at any moment. `_lock` is
+/// the last field, so the grant is revoked before the lock is released.
 struct CopyGrant {
     root: PathBuf,
     sid: Vec<u8>,
+    _lock: File,
 }
 
 impl CopyGrant {
-    fn apply(root: &Path) -> Result<CopyGrant, String> {
+    fn apply(root: &Path, wait_seconds: u64) -> Result<CopyGrant, String> {
+        let base = base()?;
+        let lock = exclusive_lock(&base.join(".account-run.lock"), wait_seconds)?;
         let sid = account_sid(ACCOUNT)?;
-        set_entry(root, sid.as_ptr() as PSID, 0x0013_01bf, SET_ACCESS, false)?;
+        let account = sid.as_ptr() as PSID;
+        let entries = fs::read_dir(&base).map_err(|_| "native_sandbox_account_base_failed")?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path == root || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                continue;
+            }
+            if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
+                set_entry(&path, account, 0, REVOKE_ACCESS, false)?;
+                if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
+                    return Err("native_sandbox_account_stale_grant".into());
+                }
+            }
+        }
+        set_entry(root, account, 0x0013_01bf, SET_ACCESS, false)?;
         Ok(CopyGrant {
             root: root.to_path_buf(),
             sid,
+            _lock: lock,
         })
+    }
+}
+
+/// An exclusively opened lock file. No other process can open it until this
+/// one closes it, which Windows also does when the process dies.
+fn exclusive_lock(path: &Path, wait_seconds: u64) -> Result<File, String> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(wait_seconds.max(1));
+    loop {
+        let opened = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .share_mode(0)
+            .open(path);
+        match opened {
+            Ok(file) => return Ok(file),
+            Err(_) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(_) => return Err("native_sandbox_account_busy".into()),
+        }
     }
 }
 
@@ -563,7 +611,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_account_workspace_outside_base".into());
     }
     let password = credential()?;
-    let _grant = CopyGrant::apply(&root)?;
+    let _grant = CopyGrant::apply(&root, policy.deadline_seconds)?;
     let job = create_job(policy)?;
     restrict_ui(job)?;
     let descriptor = PipeDescriptor::build(

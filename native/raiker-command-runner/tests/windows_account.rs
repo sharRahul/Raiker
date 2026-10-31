@@ -177,3 +177,34 @@ fn a_run_cannot_touch_another_sessions_copy() {
     let own = run(&mine, &[&cmd, "/c", "echo ok> own.txt"]);
     assert!(own.status.success() && mine.0.join("own.txt").exists());
 }
+
+#[test]
+fn a_grant_left_on_another_copy_is_revoked_before_a_run_starts() {
+    let Some(base) = configured() else { return };
+    let mine = copy_under(&base, "fresh");
+    let stale = copy_under(&base, "stale");
+    // What a crashed run would leave behind: the account's entry on its copy.
+    let planted = Command::new("icacls")
+        .arg(&stale.0)
+        .args(["/grant", "RaikerSandbox:(OI)(CI)(M)"])
+        .output()
+        .unwrap();
+    assert!(
+        planted.status.success(),
+        "failed to construct the stale grant"
+    );
+    let cmd = std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
+    let target = stale.0.join("planted.txt").to_string_lossy().into_owned();
+    let run = run(&mine, &[&cmd, "/c", &format!("echo x> \"{target}\"")]);
+    assert!(
+        !stale.0.join("planted.txt").exists(),
+        "a stale grant let a run write another copy"
+    );
+    let acl = Command::new("icacls").arg(&stale.0).output().unwrap();
+    assert!(
+        !String::from_utf8_lossy(&acl.stdout).contains("RaikerSandbox:"),
+        "the stale grant survived: {}",
+        String::from_utf8_lossy(&acl.stdout)
+    );
+    let _ = run;
+}

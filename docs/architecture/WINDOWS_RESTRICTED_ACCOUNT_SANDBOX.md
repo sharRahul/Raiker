@@ -73,7 +73,10 @@ copy. CI: hosted `windows-2025` runners allow elevated setup in the job.
 `--account-status`. Launches use `CreateProcessWithLogonW` with the account's
 own profile environment (no owner variables), a per-run Modify grant on that
 run's copy only (the base grants the account nothing but read-attributes;
-revoked when the run ends), a Job Object with UI
+revoked when the run ends; account runs are serialised by a machine-wide
+exclusive lock and any grant a crashed run left on another copy is revoked
+first, failing closed if it cannot be, so at most one copy carries the
+account's entry at a time), a Job Object with UI
 restrictions (handles, clipboard, desktop, system parameters, exit Windows)
 and pipes for stdio. A policy whose workspace is under `C:\RaikerSandbox` runs
 as the account; any other workspace keeps the AppContainer boundary.

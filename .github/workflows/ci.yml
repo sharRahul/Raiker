@@ -161,6 +161,11 @@ jobs:
           sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
       - name: Build native runner
         run: python scripts/build_native_runner.py
+      - name: Show the native sandbox measurement
+        # Diagnostic only: prints what this host enforces, so a refused
+        # command in the tests below names the observation that failed.
+        run: |
+          python -c "import tempfile; from raiker.execution.commands.backends.native import NativeSandboxDriver as D; p = D(tempfile.mkdtemp()).probe(); print(p.available, p.reason_code, p.boundary, dict(p.observations))"
       - name: Run tests
         run: |
           python -m pytest -vv --durations=25 $(python scripts/test_shard.py ${{ matrix.shard }} 3)

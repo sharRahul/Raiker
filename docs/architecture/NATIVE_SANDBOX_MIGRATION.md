@@ -228,3 +228,24 @@ contain no `.git`, nothing agent-controlled can define one, and the overrides
 stop even owner-configured drivers from running during Raiker's own Git calls.
 Verified with positive-control tests for clean and smudge drivers.
 
+## Windows toolchain compatibility (measured 2026-10-31)
+
+Real runs through `CommandService` on Windows 11, each in a disposable copy:
+
+| Command | Result |
+| --- | --- |
+| `git --version` | Succeeded inside the AppContainer; project unchanged |
+| `git init` | Wrote files in the copy (renames work after granting DELETE), then failed creating leading directories |
+| Git-for-Windows `echo` / `sort` / `cat` (MSYS) | `0xC0000142` — MSYS runtime cannot initialise in an AppContainer |
+| `node script.js` | `EPERM: lstat 'C:\'` while resolving the script's real path |
+| virtualenv `python` | `failed to locate pyvenv.cfg: Access is denied` |
+| Escape write to the user profile, home-directory read | Refused |
+
+The boundary holds; the toolchains do not run. The cause is structural: tools
+stat every ancestor from the drive root, and a drive root grants AppContainers
+nothing. Granting it needs administrator rights and a permanent host ACL
+change, which this design rules out. Windows build execution therefore needs
+either a restricted-token boundary under a dedicated low-privilege local
+account (granted only the task copy) or the WSL2 Bubblewrap backend. This is a
+release blocker in `TO_BE_FIXED.md`.
+

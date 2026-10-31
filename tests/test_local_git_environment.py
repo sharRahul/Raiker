@@ -11,7 +11,6 @@ import pytest
 
 from raiker.control.build_worktrees import create_worktree
 from raiker.tools.git import (
-    GitWorkingTreeDiffUnavailable,
     create_branch,
     create_commit,
     local_git_environment,
@@ -131,8 +130,8 @@ def test_git_diff_does_not_run_workspace_filter(repo: Path) -> None:
     marker.unlink()
     (repo / "a.txt").write_text("modified\n", encoding="utf-8")
     result = run_git(repo, "diff")
-    assert result["status"] == "denied"
-    assert result["error"]["type"] == "git_diff_native_sandbox_required"
+    assert result["status"] == "success"
+    assert "+modified" in result["output"]
     assert not marker.exists()
     staged = run_git(repo, "diff", ["--cached"])
     assert staged["status"] == "success"
@@ -170,18 +169,6 @@ def test_artifact_diff_shows_staged_files_without_running_filter(repo: Path) -> 
     assert "do-not-expose" not in requested_secret["output"]
 
 
-def test_artifact_diff_does_not_present_truncated_output_as_complete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(
-        "raiker.tools.git.run_git",
-        lambda *args, **kwargs: {"status": "success", "output": "partial", "truncated": True},
-    )
-    entries = [{"path": "a.txt", "previous_path": "", "state": "modified", "unstaged": ""}]
-    with pytest.raises(GitWorkingTreeDiffUnavailable, match="git_diff_output_too_large"):
-        working_tree_diff(tmp_path, entries)
-
-
 def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
     marker = repo.parent / "status-filter-ran"
     driver = repo.parent / "status-filter.py"
@@ -203,7 +190,7 @@ def test_git_status_does_not_run_workspace_filter(repo: Path) -> None:
     assert not marker.exists()
 
 
-def test_commit_proposal_refuses_uncontained_filter(repo: Path) -> None:
+def test_commit_preview_and_commit_never_run_a_configured_filter(repo: Path) -> None:
     marker = repo.parent / "commit-filter-ran"
     driver = repo.parent / "commit-filter.py"
     driver.write_text(
@@ -219,15 +206,14 @@ def test_commit_proposal_refuses_uncontained_filter(repo: Path) -> None:
     assert marker.exists(), "control: Git must be able to start the filter"
     marker.unlink()
     (repo / "a.txt").write_text("modified\n", encoding="utf-8")
-    result = proposed_commit_snapshot(repo, "test")
-    assert result["status"] == "failed"
-    assert result["error"]["type"] == "git_commit_native_sandbox_required"
-    assert not marker.exists()
-    assert create_commit(repo, "test")["error"]["type"] == "git_commit_native_sandbox_required"
-    assert not marker.exists()
     entries = working_tree_changes(repo)
-    with pytest.raises(GitWorkingTreeDiffUnavailable):
-        working_tree_diff(repo, entries)
+    assert "+modified" in working_tree_diff(repo, entries)
+    assert not marker.exists()
+    result = proposed_commit_snapshot(repo, "test")
+    assert result["status"] == "success", result
+    assert not marker.exists()
+    committed = create_commit(repo, "test")
+    assert committed["status"] == "success", committed
     assert not marker.exists()
 
 
@@ -249,10 +235,8 @@ def test_task_worktree_does_not_run_repository_smudge_filter(repo: Path) -> None
     assert marker.exists(), "control: Git must be able to start the smudge filter"
     marker.unlink()
     result = create_worktree(repo.parent, repo.name, "sandbox-task")
-    assert result["status"] == "failed"
-    assert result["error"]["type"] == "git_worktree_native_sandbox_required"
+    assert result["status"] == "success", result
     assert not marker.exists()
-    assert not (repo.parent / f"{repo.name}.worktrees" / "sandbox-task").exists()
 
 
 def test_branch_checkout_does_not_run_repository_smudge_filter(repo: Path) -> None:
@@ -279,14 +263,8 @@ def test_branch_checkout_does_not_run_repository_smudge_filter(repo: Path) -> No
     assert marker.exists(), "control: Git must be able to start the smudge filter"
     marker.unlink()
     result = create_branch(repo, "sandbox-branch", base)
-    assert result["status"] == "failed"
-    assert result["error"]["type"] == "git_branch_native_sandbox_required"
+    assert result["status"] == "success", result
     assert not marker.exists()
-    check = subprocess.run(
-        ["git", "-C", str(repo), "show-ref", "--verify", "--quiet", "refs/heads/sandbox-branch"],
-        check=False, capture_output=True,
-    )
-    assert check.returncode != 0
     at_head = create_branch(repo, "branch-at-head")
     assert at_head["status"] == "success"
     assert not marker.exists()

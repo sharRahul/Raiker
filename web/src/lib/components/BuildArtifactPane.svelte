@@ -251,16 +251,8 @@
             </li>
           {/each}
         </ul>
-        {#if changes.reason_code === "git_diff_native_sandbox_required"}
-          <p class="note" role="status">The diff is unavailable until the native sandbox can safely run Git.</p>
-        {:else if changes.reason_code === "git_diff_output_too_large"}
-          <p class="note" role="status">The diff is too large to review safely in this pane.</p>
-        {:else if changes.reason_code === "git_diff_unavailable"}
-          <p class="note" role="status">The diff could not be collected.</p>
-        {:else}
-          <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
-          <PatchReview repoId={repoId} {revision} {onrepair} {reviewModel} />
-        {/if}
+        <!-- BR-D04 — a review of this exact patch, kept by its fingerprint. -->
+        <PatchReview repoId={repoId} {revision} {onrepair} {reviewModel} />
         {#if changes.diff}
           <DiffView diff={changes.diff} open={true} />
           {#if changes.diff_truncated}

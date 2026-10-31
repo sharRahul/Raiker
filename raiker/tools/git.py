@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import os
 import re
 import subprocess
@@ -27,6 +28,16 @@ _SAFE_DIFF_OPTIONS = frozenset({
 # reached through a governed one. Pointing `core.hooksPath` at a directory that
 # does not exist is the portable way to disable them for a single invocation.
 _NO_HOOKS = ("-c", "core.hooksPath=raiker-no-such-hooks")
+# Signing is the same argument: a configured `commit.gpgsign` would block the
+# commit on an interactive passphrase prompt this process can never answer.
+_NO_SIGN = ("-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false")
+# Used only when the repository has no identity of its own. An owner who has
+# configured `user.name`/`user.email` keeps theirs.
+_FALLBACK_NAME = "Raiker agent"
+_FALLBACK_EMAIL = "agent@raiker.local"
+
+_MAX_DIFF_BYTES = 200_000
+_MAX_PREVIEW_FILES = 200
 _WRITE_TIMEOUT = 30
 
 # Everything a branch name may not be. `git check-ref-format` is the authority
@@ -109,6 +120,37 @@ _DROPPED_NAMES = frozenset({"SSH_AUTH_SOCK", "GIT_ASKPASS", "SSH_ASKPASS", "GH_E
 _NO_FSMONITOR = ("-c", "core.fsmonitor=false")
 
 
+def no_filter_drivers(root: Path) -> list[str]:
+    """``-c`` overrides that empty every filter driver Git has configured.
+
+    A `.gitattributes` line only *names* a driver; the program it runs comes
+    from configuration. Reading or comparing the working tree (`status`,
+    `diff`, `add`, `switch`) would otherwise run that program on the host. An
+    empty `clean`/`smudge`/`process` is no filter at all, so the comparison
+    sees the raw bytes and nothing is executed. Measured with a positive
+    control: the configured driver ran without these overrides, never with
+    them. Listing configuration only reads it.
+    """
+    listed = subprocess.run(
+        ["git", "-C", str(root), "config", "--null", "--name-only", "--get-regexp", r"^filter\."],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env=local_git_environment(),
+    )
+    drivers: set[str] = set()
+    for name in listed.stdout.split("\0"):
+        if name.startswith("filter.") and name.count(".") >= 2:
+            drivers.add(name[len("filter."):name.rindex(".")])
+    overrides: list[str] = []
+    for driver in sorted(drivers):
+        for key in ("clean", "smudge", "process"):
+            overrides += ["-c", f"filter.{driver}.{key}="]
+        overrides += ["-c", f"filter.{driver}.required=false"]
+    return overrides
+
+
 def local_git_environment(source: dict[str, str] | None = None) -> dict[str, str]:
     """The host environment without anything that looks like a credential.
 
@@ -146,14 +188,11 @@ def run_git(
     arguments = list(args or [])
     if subcommand == "diff":
         before_paths = True
-        staged = False
         for argument in arguments:
             if before_paths and argument == "--":
                 before_paths = False
             elif before_paths and argument not in _SAFE_DIFF_OPTIONS:
                 return {"status": "denied", "error": {"type": "git_diff_argument_denied"}}
-            elif before_paths and argument in {"--cached", "--staged"}:
-                staged = True
             elif not before_paths:
                 try:
                     if argument.startswith(":"):
@@ -161,18 +200,15 @@ def run_git(
                     resolve_workspace_path(root, argument)
                 except (ValueError, OSError):
                     return {"status": "denied", "error": {"type": "git_diff_path_denied"}}
-        # Comparing the working tree can invoke repository-configured clean
-        # filters even with external diff and textconv disabled. Keep only the
-        # index-to-HEAD form until this operation can run inside the broker.
-        if not staged:
-            return {"status": "denied", "error": {"type": "git_diff_native_sandbox_required"}}
         if "--" not in arguments:
             arguments.append("--")
-        # Exclusions apply even when the caller requests the whole index or a
-        # parent path, so Raiker state cannot be exposed by a staged diff.
+        # Exclusions apply even when the caller requests the whole tree or a
+        # parent path, so Raiker state is never part of a diff.
         arguments.extend([":(top,icase,exclude).raiker", ":(top,icase,exclude).git"])
         arguments = ["--no-ext-diff", "--no-textconv", *arguments]
-    command = ["git", "-C", str(root), *_NO_FSMONITOR, subcommand, *arguments]
+    command = [
+        "git", "-C", str(root), *_NO_FSMONITOR, *no_filter_drivers(root), subcommand, *arguments,
+    ]
     proc = subprocess.run(
         command, check=False, capture_output=True, text=True, timeout=10,
         env=local_git_environment(),
@@ -200,7 +236,7 @@ def _git(
     root: Path, args: list[str], *, timeout: int = _WRITE_TIMEOUT
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["git", "-C", str(root), *_NO_FSMONITOR, *args],
+        ["git", "-C", str(root), *_NO_FSMONITOR, *no_filter_drivers(root), *args],
         check=False,
         capture_output=True,
         text=True,
@@ -336,31 +372,66 @@ def working_tree_changes(root: Path) -> list[dict[str, str]]:
     return _porcelain(root, None)
 
 
-class GitWorkingTreeDiffUnavailable(RuntimeError):
-    """Working-tree Git diff needs an enforceable process boundary."""
-
-
 def working_tree_diff(root: Path, entries: list[dict[str, str]]) -> str:
-    """Read staged-only changes; refuse any diff requiring the working tree."""
-    if not entries:
-        return ""
-    if any(entry.get("unstaged") or entry.get("state") == "untracked" for entry in entries):
-        raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
+    """The complete diff those *entries* represent, tracked and untracked alike.
+
+    The public half of :func:`_commit_diff`, for the same reason as above.
+    """
+    return _commit_diff(root, entries)
+
+
+def _entry_paths(entries: list[dict[str, str]]) -> list[str]:
+    """Every path a commit of *entries* records, renames counted at both ends."""
     paths: list[str] = []
     for entry in entries:
-        for path in (entry.get("previous_path", ""), entry.get("path", "")):
-            if path:
-                if _is_protected(path):
-                    raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
-                paths.append(path)
-    if not paths:
-        raise GitWorkingTreeDiffUnavailable("git_diff_native_sandbox_required")
-    result = run_git(root, "diff", ["--cached", "--", *paths])
-    if result.get("status") != "success":
-        raise GitWorkingTreeDiffUnavailable("git_diff_unavailable")
-    if result.get("truncated"):
-        raise GitWorkingTreeDiffUnavailable("git_diff_output_too_large")
-    return str(result.get("output", ""))
+        if entry.get("previous_path"):
+            paths.append(entry["previous_path"])
+        paths.append(entry["path"])
+    return paths
+
+
+def _untracked_diff(root: Path, path: str) -> str:
+    """A unified diff for a file git does not track yet, or `""` if it cannot be read."""
+    try:
+        target = root / path
+        if not target.is_file() or target.stat().st_size > _MAX_DIFF_BYTES:
+            return ""
+        text = target.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return "".join(
+        difflib.unified_diff(
+            [], text.splitlines(keepends=True), fromfile="/dev/null", tofile=f"b/{path}"
+        )
+    )
+
+
+def _commit_diff(root: Path, entries: list[dict[str, str]]) -> str:
+    """The complete diff of what a commit would record, tracked and untracked alike.
+
+    Scoped to the proposal's own paths rather than to the whole tree, so the
+    preview and the execution describe one and the same change set.
+    """
+    tracked_paths = _entry_paths([e for e in entries if e["state"] != "untracked"])
+    parts: list[str] = []
+    if tracked_paths:
+        tracked = _git(root, ["diff", "HEAD", "--", *tracked_paths])
+        if tracked.returncode == 0:
+            parts.append(tracked.stdout)
+    for entry in entries:
+        if entry["state"] == "untracked":
+            parts.append(_untracked_diff(root, entry["path"]))
+    return "".join(parts)
+
+
+def _identity_args(root: Path) -> list[str]:
+    """A committer identity only when the repository does not already have one."""
+    args: list[str] = []
+    if not _git(root, ["config", "--get", "user.name"], timeout=10).stdout.strip():
+        args += ["-c", f"user.name={_FALLBACK_NAME}"]
+    if not _git(root, ["config", "--get", "user.email"], timeout=10).stdout.strip():
+        args += ["-c", f"user.email={_FALLBACK_EMAIL}"]
+    return args
 
 
 def _valid_branch_name(root: Path, name: str) -> bool:
@@ -376,18 +447,20 @@ def _branch_exists(root: Path, name: str) -> bool:
     )
 
 
+def _ref_exists(root: Path, ref: str) -> bool:
+    return _git(root, ["rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"], timeout=10).returncode == 0
+
+
 def proposed_branch_snapshot(
     repo_root: str | Path, name: str, base: str | None = None
 ) -> dict[str, Any]:
     """What creating branch *name* would do — computed without touching the repository.
 
-    A requested base is refused until checkout filters can run inside the native
-    boundary. Other validation still applies to a branch created at HEAD.
+    Fail-closed on every case a later execution could not honour: no repository,
+    a name git itself would reject, a branch that already exists, an unknown
+    base, an operation already in progress, and — only when a *base* is named,
+    because that is the case that moves the working tree — uncommitted changes.
     """
-    # Switching to a different base checks out worktree files and can run
-    # repository-configured smudge filters on the host.
-    if base and base.strip():
-        return _failed("git_branch_native_sandbox_required")
     root, refusal = _repository(repo_root)
     if refusal is not None:
         return refusal
@@ -399,11 +472,16 @@ def proposed_branch_snapshot(
     busy = _busy_reason(root)
     if busy is not None:
         return _failed("repository_busy", operation=busy)
+    base_ref = (base or "").strip()
+    if base_ref and not _ref_exists(root, base_ref):
+        return _failed("unknown_base_ref", base=base_ref)
     dirty = _porcelain(root, None)
+    if base_ref and dirty:
+        return _failed("working_tree_dirty", file_count=len(dirty), base=base_ref)
     return {
         "status": "success",
         "name": name,
-        "base": None,
+        "base": base_ref or None,
         "current_branch": current_branch(root),
         "head": _head_commit(root),
         "uncommitted_files": len(dirty),
@@ -419,6 +497,8 @@ def create_branch(
         return snapshot
     root = resolve_workspace_path(repo_root, ".")
     args = [*_NO_HOOKS, "switch", "--create", snapshot["name"]]
+    if snapshot["base"]:
+        args.append(str(snapshot["base"]))
     proc = _git(root, args)
     if proc.returncode != 0:
         return _failed("git_command_failed", command="switch", output=_git_output(proc))
@@ -461,9 +541,48 @@ def _normalise_paths(root: Path, paths: Any) -> tuple[list[str] | None, dict[str
 def proposed_commit_snapshot(
     repo_root: str | Path, message: str, paths: Any = None
 ) -> dict[str, Any]:
-    """Refuse commit previews until working-tree Git is sandboxed."""
-    # Previewing working-tree content can invoke repository clean filters.
-    return _failed("git_commit_native_sandbox_required")
+    """Exactly what committing would record — the file list and the complete diff.
+
+    Nothing is staged and nothing is written: the index is left as the owner had
+    it, so a rejected proposal costs the repository nothing.
+    """
+    root, refusal = _repository(repo_root)
+    if refusal is not None:
+        return refusal
+    text = (message or "").strip()
+    if not text:
+        return _failed("empty_commit_message")
+    selected, path_error = _normalise_paths(root, paths)
+    if path_error is not None:
+        return path_error
+    busy = _busy_reason(root)
+    if busy is not None:
+        return _failed("repository_busy", operation=busy)
+    entries = _porcelain(root, selected)
+    if not entries:
+        return _failed("nothing_to_commit", paths=selected or [])
+    diff = _commit_diff(root, entries)
+    truncated = len(diff) > _MAX_DIFF_BYTES
+    return {
+        "status": "success",
+        "message": text,
+        "subject": text.splitlines()[0],
+        "branch": current_branch(root) or "(detached HEAD)",
+        "head": _head_commit(root),
+        "paths": selected or [],
+        # The complete change set, which the execution stages verbatim. `files`
+        # below is the same list bounded for display; committing from the bound
+        # would silently drop everything past it.
+        "commit_paths": _entry_paths(entries),
+        # The complete entry list the execution stages from. `files` below is the
+        # same list bounded for display; staging from the bound would silently
+        # drop everything past it.
+        "entries": entries,
+        "files": entries[:_MAX_PREVIEW_FILES],
+        "file_count": len(entries),
+        "diff": diff[:_MAX_DIFF_BYTES],
+        "truncated": truncated,
+    }
 
 
 def create_commit(
@@ -473,10 +592,51 @@ def create_commit(
     *,
     trailers: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Refuse commits until preview and staging can be sandboxed."""
-    # The preview and path-limited commit both touch working-tree content;
-    # neither may start until the native broker can contain Git filters.
-    return proposed_commit_snapshot(repo_root, message, paths)
+    """Stage the proposed change set and record one commit. Re-validates first.
+
+    ``trailers`` (BR-D05) are appended as the message's final paragraph. They
+    are provenance only — built by the caller from runtime identifiers — and
+    change nothing about which paths are staged.
+    """
+    snapshot = proposed_commit_snapshot(repo_root, message, paths)
+    if snapshot["status"] != "success":
+        return snapshot
+    from raiker.control.build_provenance import with_trailers
+
+    root = resolve_workspace_path(repo_root, ".")
+    # Exactly the paths the owner was shown — not `--all`, which would sweep
+    # `.raiker/` (the vault key, the audit log, the encrypted store) into the
+    # commit, and not the index, which the owner may have staged for themselves.
+    staging: list[str] = list(snapshot["commit_paths"])
+    to_add = [entry["path"] for entry in snapshot["entries"] if entry.get("unstaged")]
+    if to_add:
+        staged = _git(root, [*_NO_HOOKS, "add", "--", *to_add])
+        if staged.returncode != 0:
+            return _failed("git_command_failed", command="add", output=_git_output(staged))
+    # A path-limited commit records only these paths, whatever else happens to
+    # be staged. It is the all-or-nothing property the approval promised.
+    commit_args = [
+        *_NO_HOOKS,
+        *_NO_SIGN,
+        *_identity_args(root),
+        "commit",
+        "--message",
+        with_trailers(str(snapshot["message"]), list(trailers or [])),
+        "--",
+        *staging,
+    ]
+    proc = _git(root, commit_args)
+    if proc.returncode != 0:
+        return _failed("git_command_failed", command="commit", output=_git_output(proc))
+    return {
+        "status": "success",
+        "commit": _head_commit(root),
+        "branch": current_branch(root) or "(detached HEAD)",
+        "subject": str(snapshot["subject"]),
+        "files": list(snapshot["files"]),
+        "file_count": int(snapshot["file_count"]),
+        "trailers": [f"{key}: {value}" for key, value in (trailers or [])],
+    }
 
 
 # ── BUG-67: the governed push ────────────────────────────────────────────────

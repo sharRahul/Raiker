@@ -217,3 +217,14 @@ and harden Raiker's AppContainer + Job Object runner. Revisit when MXC claims a
 security boundary. Licence and supported Windows versions were not assessed,
 because the security disclaimer already rules it out.
 
+## Git filter programs (2026-10-31)
+
+The interim Git refusals (working-tree diff, commit preview/commit, branch from
+a base, task worktree) are replaced by neutralising every configured filter
+driver on each local Git invocation (`raiker/tools/git.py:no_filter_drivers`).
+Rationale: a repository's content can only *name* a filter; the program comes
+from Git configuration. With agent code confined to disposable copies that
+contain no `.git`, nothing agent-controlled can define one, and the overrides
+stop even owner-configured drivers from running during Raiker's own Git calls.
+Verified with positive-control tests for clean and smudge drivers.
+

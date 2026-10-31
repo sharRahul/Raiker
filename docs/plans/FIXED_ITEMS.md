@@ -1,5 +1,21 @@
 # Fixed items
 
+## Local Git could run repository filter programs; diff, commit and worktrees were blocked
+
+A `.gitattributes` line names a filter driver; the program it runs comes from
+Git configuration, and `status`, `diff`, `add`, `switch` and `worktree add` ran
+it on the host. Every local Git invocation (`run_git` and the governed `_git`)
+now passes `-c filter.<driver>.clean= / smudge= / process=` and
+`required=false` for each configured driver, so no filter program can run;
+`core.fsmonitor` and hooks were already off. A positive control showed the
+configured driver ran without these overrides and never with them. This
+replaces the interim refusals: working-tree diff, untracked-file diffs, commit
+previews and commits, branch creation from a base and task worktrees work
+again, and `tests/test_local_git_environment.py` asserts each succeeds without
+the filter starting. A diff Git refuses is still never reported as a clean
+review. Agent code no longer touches a project's `.git` at all; it runs in a
+disposable copy without one.
+
 ## Native commands ran against the owner's project instead of a disposable copy
 
 Governed commands now run in a per-session copy of their working folder, kept

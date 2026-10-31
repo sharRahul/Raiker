@@ -1368,9 +1368,8 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
         )
     except ReviewPathError:
         return "Review failed: path is outside the workspace."
-    except ReviewError as exc:
-        if str(exc) == "git_diff_native_sandbox_required":
-            return "Review unavailable: unstaged diffs require the native sandbox."
+    except ReviewError:
+        # A diff Git refused or could not produce is never a clean review.
         return "Review unavailable: the Git diff could not be collected."
     except (OSError, ValueError) as exc:
         return f"Review failed: {type(exc).__name__}"

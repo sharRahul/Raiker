@@ -147,37 +147,6 @@ command-hook functionality unavailable. Integrate the native broker with
 bounded bidirectional stdio and process-tree cleanup, then verify legitimate
 hook decisions and adversarial escape attempts on each supported platform.
 
-## Release blocker: sandboxed working-tree diff unavailable
-
-Repository-configured clean filters can launch code during a working-tree diff.
-`run_git` refuses this form until it can be executed inside a verified native
-boundary; staged diff remains available. Code review reports the refusal rather
-than claiming a clean result. Restore working-tree diff with positive-control
-filter tests and cross-platform enforcement evidence. The existing
-`tests/test_phase_2_5_code_review_workflow.py` currently has 11 failures and 2
-passes because unstaged review is unavailable. Other Git paths remain
-unverified.
-
-## Release blocker: sandboxed Git commit and artifact diff unavailable
-
-Commit previews, staging and working-tree Build artifact diffs may invoke
-repository clean filters on the host. These operations remain unavailable until
-they can use a verified native boundary. Staged-only artifact diffs are
-available with protected-path exclusion and truncation refusal. The Build changes API returns an explicit unavailable
-reason and preserves the changed-file list; the UI must not claim an empty or
-reviewed diff. Restore commit previews, approved commits and artifact diffs with
-positive-control filter tests, disposable workspaces and platform enforcement
-evidence. Existing commit and Build artifact functionality is affected.
-
-## Release blocker: sandboxed Git checkout unavailable
-
-Task worktree creation and branch creation from a specified base can execute
-repository smudge filters on the host. Both now refuse until checkout can run
-inside a verified native boundary. This prevents uncontained helper execution
-but leaves concurrent task worktrees and cross-base branch creation unavailable.
-Restore them with disposable workspaces and real cross-platform filter and
-cleanup tests; existing worktree functionality tests remain unmet.
-
 ## Goal
 
 Make Raiker a secure AI product that combines **four** things: a polished AI

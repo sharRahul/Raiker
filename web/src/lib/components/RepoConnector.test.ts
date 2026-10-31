@@ -270,19 +270,6 @@ describe("RepoConnector", () => {
     expect(await screen.findByText(/Created raiker\/fix-login in projects\/my-app.worktrees\/fix-login/)).toBeInTheDocument();
   });
 
-  it("explains when worktree checkout requires the native sandbox", async () => {
-    stubFetch({
-      "POST /api/code/repos/repo_1/worktrees": {
-        __status: 422, detail: { reason_code: "git_worktree_native_sandbox_required" },
-      },
-    });
-    mount({ repos: [localRepo()], selected_repo_id: "repo_1" });
-    await fireEvent.click(screen.getByRole("button", { name: "New worktree from my-app" }));
-    await fireEvent.input(screen.getByLabelText("Worktree name"), { target: { value: "fix-login" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create worktree" }));
-    expect(await screen.findByText(/worktree checkout requires the native sandbox/i)).toBeInTheDocument();
-  });
-
   it("explains a refused removal instead of hiding the owner's uncommitted work", async () => {
     stubFetch({
       "DELETE /api/code/repos/repo_2/worktree": {

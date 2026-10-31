@@ -337,7 +337,7 @@ class TestWorkingTreeChanges:
             },
         )
 
-    def test_changed_tree_reports_diff_unavailable(
+    def test_an_untracked_file_is_in_the_diff(
         self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
     ) -> None:
         root = workspace / "project"
@@ -347,8 +347,8 @@ class TestWorkingTreeChanges:
         assert response.status_code == 200
         body = response.json()
         assert body["entries"]
-        assert body["diff"] == ""
-        assert body["reason_code"] == "git_diff_native_sandbox_required"
+        assert "+change" in body["diff"]
+        assert body["reason_code"] is None
 
     def test_staged_only_tree_displays_diff(
         self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path

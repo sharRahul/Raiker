@@ -106,6 +106,9 @@ unsafe extern "system" {
     fn SetHandleInformation(handle: HANDLE, mask: u32, flags: u32) -> i32;
 }
 
+#[path = "account_windows.rs"]
+pub mod account;
+
 // ---------------------------------------------------------------------------
 // Public entry points
 // ---------------------------------------------------------------------------
@@ -117,6 +120,16 @@ unsafe extern "system" {
 /// to connect; a read-only target refuses to be written. Only *outside
 /// succeeded and inside failed* means the boundary did something.
 pub fn probe(workspace: &Path) -> Value {
+    // Once the owner has set up the restricted account, that is the boundary
+    // Windows builds run in, so it is the one measured.
+    if account::status()["configured"] == true {
+        return account::probe();
+    }
+    probe_appcontainer(workspace)
+}
+
+/// The AppContainer measurement, regardless of account setup.
+pub fn probe_appcontainer(workspace: &Path) -> Value {
     let workspace = match workspace.canonicalize() {
         Ok(path) => strip_verbatim(&path),
         Err(_) => return unavailable("native_sandbox_workspace_unreadable"),
@@ -210,6 +223,13 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         // exemption, which needs elevation. Claiming filtered egress without
         // that is exactly the kind of green row this boundary exists to avoid.
         return Err("filtered_egress_windows_unsupported".into());
+    }
+    // Task copies under the restricted account's base run as that account,
+    // where ordinary toolchains work; anything else keeps the AppContainer.
+    if let Ok(base) = account::base()
+        && strip_verbatim(&policy.workspace_root).starts_with(&base)
+    {
+        return account::launch(policy, argv);
     }
     let capability = Capability::derive(&capability_name(&policy.workspace_root))?;
     ensure_workspace_grant(policy, &capability)?;

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.execution.workspaces import TaskWorkspaceRegistry
+from raiker.execution.commands.backends.native import task_workspace_registry
 
 OWNER = "principal_owner"
 
@@ -38,7 +38,7 @@ def headers(client: TestClient) -> dict[str, str]:
 
 def _task_copy(workspace: Path, owner: str = OWNER) -> tuple[str, Path]:
     """What a sandboxed command leaves behind in its session's copy."""
-    key, copy = TaskWorkspaceRegistry.for_workspace(workspace).acquire(
+    key, copy = task_workspace_registry(workspace).acquire(
         owner, "sess_build", workspace / "app"
     )
     (copy.root / "main.py").write_text("print('v2')\n", encoding="utf-8")

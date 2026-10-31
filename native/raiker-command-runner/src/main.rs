@@ -69,6 +69,11 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
         Some("--probe") => {
             let workspace =
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
+            #[cfg(windows)]
+            if named(arguments, "--boundary").as_deref() == Some("appcontainer") {
+                println!("{}", boundary::probe_appcontainer(Path::new(&workspace)));
+                return Ok(0);
+            }
             println!("{}", boundary::probe(Path::new(&workspace)));
             return Ok(0);
         }
@@ -76,6 +81,21 @@ fn dispatch(arguments: &[String]) -> Result<i32, String> {
             let workspace =
                 named(arguments, "--workspace").ok_or("runner_probe_workspace_required")?;
             boundary::revoke_workspace_grant(Path::new(&workspace))?;
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--setup-account") => {
+            println!("{}", boundary::account::setup()?);
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--reset-account") => {
+            boundary::account::reset()?;
+            return Ok(0);
+        }
+        #[cfg(windows)]
+        Some("--account-status") => {
+            println!("{}", boundary::account::status());
             return Ok(0);
         }
         Some("--selftest") => {

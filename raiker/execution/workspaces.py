@@ -35,6 +35,7 @@ import contextlib
 import hashlib
 import json
 import os
+import secrets
 import shutil
 import stat
 import sys
@@ -161,6 +162,27 @@ def _copy_file(source: Path, target: Path) -> str:
     return digest.hexdigest()
 
 
+def _new_private_directory(base: Path, prefix: str) -> Path:
+    """An unpredictable, exclusively created directory under ``base``.
+
+    Not `tempfile.mkdtemp`: since Python 3.13 its 0o700 mode becomes an
+    owner-only, non-inheriting ACL on Windows, which cuts off the sandbox
+    account's grant on the base and leaves the copy unreadable to the command.
+    POSIX keeps 0o700; Windows inherits the base's ACL.
+    """
+    for _ in range(16):
+        candidate = base / f"{prefix}-{secrets.token_hex(8)}"
+        try:
+            if sys.platform == "win32":
+                os.mkdir(candidate)
+            else:
+                os.mkdir(candidate, 0o700)
+        except FileExistsError:
+            continue
+        return candidate
+    raise WorkspaceError("workspace_create_failed")
+
+
 def create_task_workspace(
     source: str | Path,
     base: str | Path,
@@ -182,7 +204,7 @@ def create_task_workspace(
     if base_path == source_path or source_path in base_path.parents:
         raise WorkspaceError("workspace_base_inside_source")
     safe_task = "".join(c if c.isalnum() or c in "-_" else "-" for c in task_id)[:48]
-    root = Path(tempfile.mkdtemp(prefix=f"{safe_task or 'task'}-", dir=base_path))
+    root = _new_private_directory(base_path, safe_task or "task")
     workspace = TaskWorkspace(task_id, source_path, root, {})
     total = 0
     try:
@@ -395,15 +417,25 @@ class TaskWorkspaceRegistry:
     a Raiker-owned directory that no sandbox is granted, never in the project.
     """
 
-    def __init__(self, base: str | Path) -> None:
+    def __init__(self, base: str | Path, *, records: str | Path | None = None) -> None:
         self.base = Path(base)
+        # Records name each copy's source, which is where promotion writes.
+        # Where sandboxed code can write the copy base (the Windows account
+        # boundary grants it the whole base), records must live elsewhere, or
+        # a task could rewrite a record and redirect a promotion.
+        self.records = Path(records) if records is not None else self.base
         self._lock = threading.Lock()
 
     @classmethod
-    def for_workspace(cls, workspace_root: str | Path) -> TaskWorkspaceRegistry:
-        """Copies live outside the Raiker workspace, so none is ever its own source."""
+    def for_workspace(
+        cls, workspace_root: str | Path, *, base: str | Path | None = None
+    ) -> TaskWorkspaceRegistry:
+        """Copies live outside the Raiker workspace; records in its own state."""
         root = Path(workspace_root).resolve()
-        return cls(root.parent / f"{root.name}-sandboxes")
+        return cls(
+            base if base is not None else root.parent / f"{root.name}-sandboxes",
+            records=root / ".raiker" / "task-workspaces",
+        )
 
     @staticmethod
     def key(owner_principal_id: str, session_id: str, source: Path) -> str:
@@ -413,7 +445,7 @@ class TaskWorkspaceRegistry:
     def _record(self, key: str) -> Path:
         if len(key) != 32 or any(c not in "0123456789abcdef" for c in key):
             raise WorkspaceError("workspace_not_found")
-        return self.base / f"{key}.json"
+        return self.records / f"{key}.json"
 
     def acquire(
         self, owner_principal_id: str, session_id: str, source: str | Path
@@ -438,9 +470,9 @@ class TaskWorkspaceRegistry:
     def entries(self, owner_principal_id: str) -> list[tuple[str, str, TaskWorkspace]]:
         """``(key, session_id, workspace)`` for the owner's live copies."""
         found: list[tuple[str, str, TaskWorkspace]] = []
-        if not self.base.is_dir():
+        if not self.records.is_dir():
             return found
-        for record in sorted(self.base.glob("*.json")):
+        for record in sorted(self.records.glob("*.json")):
             loaded = self._load(record.stem)
             if loaded is not None and loaded[0] == owner_principal_id:
                 found.append((record.stem, loaded[2], loaded[1]))
@@ -471,6 +503,7 @@ class TaskWorkspaceRegistry:
             },
         }
         record = self._record(key)
+        record.parent.mkdir(parents=True, exist_ok=True)
         staged = record.with_suffix(".tmp")
         staged.write_text(json.dumps(document), encoding="utf-8")
         os.replace(staged, record)
@@ -508,7 +541,7 @@ class TaskWorkspaceRegistry:
             return []
         with self._lock:
             recorded = set()
-            for record in self.base.glob("*.json"):
+            for record in self.records.glob("*.json"):
                 loaded = self._load(record.stem)
                 if loaded is not None:
                     recorded.add(loaded[1].root.resolve())

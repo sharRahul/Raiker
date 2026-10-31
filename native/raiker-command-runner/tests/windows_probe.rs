@@ -49,7 +49,7 @@ fn real_appcontainer_probe_observes_descendant_exit_and_requires_disposable_work
     )
     .unwrap();
     let output = Command::new(&workspace.runner)
-        .args(["--probe", "--workspace"])
+        .args(["--probe", "--boundary", "appcontainer", "--workspace"])
         .arg(&workspace.path)
         .output()
         .unwrap();

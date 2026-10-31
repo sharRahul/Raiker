@@ -11,7 +11,11 @@ from typing import Any
 from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
 from raiker.execution.commands.backends.local import LocalStrictBackend
-from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
+from raiker.execution.commands.backends.native import (
+    NativeSandboxBackend,
+    NativeSandboxDriver,
+    task_workspace_registry,
+)
 from raiker.execution.commands.backends.remote import DaytonaCommandBackend, SshCommandBackend
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
@@ -514,7 +518,7 @@ class CommandService:
             return NativeSandboxBackend(
                 driver=driver,
                 proof=driver.probe(),
-                workspaces=TaskWorkspaceRegistry.for_workspace(self.workspace_root),
+                workspaces=task_workspace_registry(self.workspace_root, driver),
             )
         if profile.kind == "ssh":
             return SshCommandBackend(profile, self.workspace_root)

@@ -343,6 +343,16 @@ jobs:
       - name: Lint
         working-directory: native
         run: cargo clippy --all-targets -- -D warnings
+      - name: Set up the restricted sandbox account
+        # Hosted Windows runners are elevated, so the one-time setup an owner
+        # approves through UAC runs here directly. The account tests below
+        # then require it rather than skipping.
+        if: runner.os == 'Windows'
+        working-directory: native
+        run: |
+          cargo build -p raiker-command-runner
+          ./target/debug/raiker-command-runner.exe --setup-account
+          echo "RAIKER_REQUIRE_ACCOUNT_SANDBOX=1" >> $env:GITHUB_ENV
       - name: Test
         working-directory: native
         run: cargo test --all --no-fail-fast

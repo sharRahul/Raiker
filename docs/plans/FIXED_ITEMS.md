@@ -1,5 +1,15 @@
 # Fixed items
 
+## Windows builds could not run in the AppContainer sandbox
+
+AppContainer blocked Node (`EPERM: lstat 'C:\\'`), Git, MSYS tools and
+virtualenv Python. Windows build commands now run as a dedicated restricted
+local account (`RaikerSandbox`) set up once with the owner's approval, inside a
+copy under `C:\\RaikerSandbox`, in a Job Object with UI restrictions and an
+outbound firewall block. Measured on the owner's PC: every probe observation
+enforced, the toolchains run, and profile, data-drive and network escapes are
+refused. Gaps remain listed in `TO_BE_FIXED.md`.
+
 ## Local Git could run repository filter programs; diff, commit and worktrees were blocked
 
 A `.gitattributes` line names a filter driver; the program it runs comes from

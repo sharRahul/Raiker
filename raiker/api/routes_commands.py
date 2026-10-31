@@ -223,7 +223,9 @@ def discard_credential_delta(
 
 
 def _workspaces(request: Request) -> TaskWorkspaceRegistry:
-    return TaskWorkspaceRegistry.for_workspace(request.app.state.workspace_root)
+    from raiker.execution.commands.backends.native import task_workspace_registry  # noqa: PLC0415
+
+    return task_workspace_registry(request.app.state.workspace_root)
 
 
 def _workspace_view(

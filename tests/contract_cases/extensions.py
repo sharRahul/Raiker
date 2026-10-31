@@ -312,11 +312,11 @@ def _runs(ws: Path, _client: TestClient, _h: dict[str, str]) -> Call:
 
 
 def _task_copy(ws: Path) -> str:
-    from raiker.execution.workspaces import TaskWorkspaceRegistry
+    from raiker.execution.commands.backends.native import task_workspace_registry
 
     (ws / "contract-app").mkdir(exist_ok=True)
     (ws / "contract-app" / "main.py").write_text("v1\n", encoding="utf-8")
-    key, copy = TaskWorkspaceRegistry.for_workspace(ws).acquire(
+    key, copy = task_workspace_registry(ws).acquire(
         OWNER, "sess_contract", ws / "contract-app"
     )
     (copy.root / "main.py").write_text("v2\n", encoding="utf-8")

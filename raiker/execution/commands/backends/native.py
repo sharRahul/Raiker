@@ -296,6 +296,23 @@ class NativeSandboxDriver:
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{request.run_id}.json"
 
+    def account_base(self) -> Path | None:
+        """The restricted-account copy base, when the owner has set it up (Windows)."""
+        if sys.platform != "win32":
+            return None
+        binary, _ = self.locate()
+        if binary is None:
+            return None
+        try:
+            completed = self._run_probe([str(binary), "--account-status"])
+            status = json.loads(completed.stdout.strip() or "{}")
+        except (OSError, ValueError, subprocess.SubprocessError):
+            return None
+        if completed.returncode != 0 or status.get("configured") is not True:
+            return None
+        base = status.get("base")
+        return Path(base) if isinstance(base, str) and base else None
+
     def revoke_workspace_grant(self) -> None:
         """Remove the workspace grant.
 
@@ -463,3 +480,16 @@ def native_sandbox_supported() -> bool:
     if sys.platform in {"win32", "darwin"}:
         return True
     return shutil.which("bwrap") is not None
+
+
+def task_workspace_registry(
+    workspace_root: str | Path, driver: NativeSandboxDriver | None = None
+) -> TaskWorkspaceRegistry:
+    """The registry commands and the review API share.
+
+    On Windows with the restricted account set up, copies live under its base
+    (the only place that account may write); records stay in Raiker's state.
+    """
+    base = (driver or NativeSandboxDriver(workspace_root)).account_base()
+    return TaskWorkspaceRegistry.for_workspace(workspace_root, base=base)
+

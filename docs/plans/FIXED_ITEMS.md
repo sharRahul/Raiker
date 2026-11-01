@@ -1579,6 +1579,11 @@ file you can open. The two capture sets that remain — `screenshots/pages/` and
 | [FIXED-1272](#fixed-1272--host-quit-and-restart-and-the-trays-session-exchange-answered-other-devices-found-building-bug-358) | Medium | Host / remote access | Fixed 2026-10-26 |
 | [FIXED-1273](#fixed-1273--security-settings-showed-their-defaults-as-the-accounts-state-while-loading-found-live) | Low | Settings | Fixed 2026-10-26 |
 | [FIXED-1274](#fixed-1274--a-signed-in-owner-on-another-device-was-rate-limited-within-a-minute-found-live) | Medium | Host / remote access | Fixed 2026-10-26 |
+| [FIXED-1275](#fixed-1275--local-mcp-servers-and-plugin-code-could-not-run-at-all-after-host-launchers-were-blocked-native-sandbox) | High | Execution / MCP / plugins | Fixed 2026-11-01 |
+| [FIXED-1276](#fixed-1276--commands-on-windows-restricted-account-never-received-the-environment-raiker-built-for-them) | High | Native sandbox (Windows) | Fixed 2026-11-01 |
+| [FIXED-1277](#fixed-1277--hosted-linux-ci-measured-egress-as-indeterminate-so-every-sandboxed-command-there-refused) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
+| [FIXED-1278](#fixed-1278--linux-sandboxed-commands-failed-to-start-on-a-busy-session-rlimit_nproc) | High | Native sandbox (Linux) | Fixed 2026-11-01 |
+| [FIXED-1279](#fixed-1279--native-background-runs-were-lost-on-every-restart-of-raiker-bug-194-regression) | Medium | Commands | Fixed 2026-11-01 |
 
 ---
 

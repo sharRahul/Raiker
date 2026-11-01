@@ -1345,20 +1345,49 @@ class RuntimeOrchestrator:
         store = getattr(self.tool_broker, "store", None)
         project_id = str(envelope.prompt.metadata.get("project_id") or "").strip()
         authority = None
+        task_root = None
+        owner = self._source_owner(envelope)
         if store is not None and project_id:
             with contextlib.suppress(Exception):
-                from raiker.control.project_roots import authority_for_project
-
-                owner = self._source_owner(envelope)
-                authority = authority_for_project(
-                    store.load_project(project_id),
-                    store.list_brain_source_grants(owner),
-                    self.workspace_root,
+                from raiker.control.project_roots import (
+                    authority_for_project,
+                    resolve_project_root,
                 )
+
+                project = store.load_project(project_id)
+                grants = store.list_brain_source_grants(owner)
+                authority = authority_for_project(project, grants, self.workspace_root)
+                root = resolve_project_root(project, grants, self.workspace_root)
+                if root.path is not None and not root.missing:
+                    task_root = root.path
+        authority = self._task_tree_authority(envelope, owner, authority, task_root)
         self.tool_broker.path_authority = authority
         engine = getattr(self.tool_broker, "policy_engine", None)
         if engine is not None:
             engine.authority = authority
+
+    def _task_tree_authority(
+        self, envelope: PromptEnvelope, owner: str, authority: Any, task_root: Path | None
+    ) -> Any:
+        """*authority* routed through this session's task copy.
+
+        A project turn binds the session to its project root, so the agent's
+        first write or command takes one copy of the project and the project
+        itself changes only when the owner applies the reviewed result. A turn
+        with no project still reads and writes any copy its commands made, so
+        an edit and the next test run never see two different trees.
+        """
+        try:
+            from raiker.execution.commands.backends.native import task_workspace_registry
+            from raiker.execution.task_tree import TaskTree, wrap_authority
+
+            registry = task_workspace_registry(self.workspace_root)
+            if task_root is not None:
+                registry.bind(owner, envelope.session_id, task_root)
+            tree = TaskTree(registry, owner, envelope.session_id)
+        except Exception:  # noqa: BLE001 — no registry means no copy to route to
+            return authority
+        return wrap_authority(authority, tree, self.workspace_root)
 
     def _open_sink(self, stream: bool) -> None:
         """Start collecting this turn's out-of-band events, if anyone is watching.

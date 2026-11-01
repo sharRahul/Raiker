@@ -2,8 +2,9 @@
   /**
    * The session's sandbox copy, reviewed before it reaches the project.
    *
-   * Commands run in a disposable copy of their folder. Nothing they wrote is in
-   * the project until the owner applies it here, and Apply sends back exactly
+   * The agent's file edits and commands work in one disposable copy of the
+   * project. Nothing they wrote is in the project until the owner applies it
+   * here, and Apply sends back exactly
    * the change set shown: if a command changed the copy after this was read,
    * the server refuses the stale review instead of applying what was not seen.
    */
@@ -11,7 +12,9 @@
   import type { TaskWorkspaceView } from "../apiTypes";
   import { askConfirm } from "../confirm.svelte";
 
-  let { sessionId }: { sessionId: string | null } = $props();
+  // `refresh` changes when a turn ends: the copy moves with every edit, so the
+  // list is reread rather than kept from when the session was opened.
+  let { sessionId, refresh = 0 }: { sessionId: string | null; refresh?: number } = $props();
 
   let workspaces = $state<TaskWorkspaceView[]>([]);
   let busy = $state(false);
@@ -39,6 +42,7 @@
 
   $effect(() => {
     void sessionId;
+    void refresh;
     void load();
   });
 

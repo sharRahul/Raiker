@@ -60,3 +60,15 @@ it("shows nothing when the session has no sandbox changes", async () => {
   await waitFor(() => expect(api.taskWorkspaces).toHaveBeenCalled());
   expect(screen.queryByRole("region", { name: "Sandbox changes" })).not.toBeInTheDocument();
 });
+
+it("rereads the copy when a turn ends", async () => {
+  const list = vi.spyOn(api, "taskWorkspaces").mockResolvedValue({ workspaces: [] });
+  const view = render(TaskWorkspaceReview, { sessionId: "sess_build", refresh: 0 });
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+
+  list.mockResolvedValue({ workspaces: [copy] });
+  await view.rerender({ sessionId: "sess_build", refresh: 1 });
+
+  expect(await screen.findByText("Sandbox changes · app")).toBeInTheDocument();
+  expect(list).toHaveBeenCalledTimes(2);
+});

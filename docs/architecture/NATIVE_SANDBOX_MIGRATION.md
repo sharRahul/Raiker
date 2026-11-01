@@ -56,6 +56,19 @@ exhaustive inventory or security assessment.
   Real Windows end-to-end: `git --version` ran in the AppContainer rooted in the
   copy and the project was unchanged; a virtualenv interpreter outside the
   boundary was refused.
+  **Task tree (2026-11-01).** File tools and commands now share the copy
+  (`raiker/execution/task_tree.py`). A project turn binds its session to the
+  project root (`TaskWorkspaceRegistry.bind`); the turn's `PathAuthority` is
+  wrapped in a `TaskTreeAuthority` that confines and names every path against
+  the real project and then opens it in the copy, creating the copy on the
+  first write. Commands take the same copy and run at their cwd inside it.
+  Approved writes executed after the turn resolve through the conversation's
+  session binding. Components of a copy path are checked for links before use,
+  because sandboxed code can create them; this is a path check, not a pinned
+  handle, so a command racing a file tool remains a residual risk. Git tools
+  (`git_status`, `git_diff`) still describe the real repository, since the copy
+  has no `.git`; the copy's changes are reviewed through the task-copy review.
+  Checkpoint pre-images are still captured from the real path.
 - [ ] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement.
 - [ ] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities.
 - [ ] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback.

@@ -223,6 +223,7 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("pattern", "*")),
                 max_results=int(args.get("max_results", 100)),
+                authority=self.path_authority,
             ),
             "grep": lambda args: grep(
                 self.workspace_root,
@@ -233,6 +234,7 @@ class ToolBroker:
                 regex=args.get("regex") is True,
                 ignore_case=args.get("ignore_case") is True,
                 context=_bounded_int(args.get("context"), 0, 0, 5),
+                authority=self.path_authority,
             ),
             "stat_path": lambda args: stat_path(
                 self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
@@ -265,6 +267,7 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("before_path", ".")),
                 str(args.get("after_path", ".")),
+                authority=self.path_authority,
             ),
             "git_status": lambda args: run_git(self.git_root(), "status", ["--short"]),
             "git_diff": lambda args: run_git(
@@ -711,7 +714,13 @@ class ToolBroker:
             resolved = resolve_workspace_path(root, text)
         except Exception:  # noqa: BLE001 — every refusal reads the same to the model
             return ".", "command_cwd_outside_workspace"
-        if not resolved.is_dir():
+        tree = getattr(self.path_authority, "tree", None)
+        try:
+            # A folder the task created exists only in its copy.
+            present = tree.to_copy(resolved, create=False) if tree is not None else resolved
+        except FilesystemSafetyError:
+            return ".", "command_cwd_not_a_directory"
+        if not present.is_dir():
             return ".", "command_cwd_not_a_directory"
         try:
             relative = resolved.relative_to(root).as_posix()

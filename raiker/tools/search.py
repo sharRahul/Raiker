@@ -6,8 +6,10 @@ from typing import Any
 from raiker.tools.filesystem import glob_paths, grep_files
 
 
-def glob(workspace_root: str | Path, pattern: str, *, max_results: int = 100) -> dict[str, Any]:
-    return glob_paths(workspace_root, pattern, max_results=max_results)
+def glob(
+    workspace_root: str | Path, pattern: str, *, max_results: int = 100, authority: Any = None
+) -> dict[str, Any]:
+    return glob_paths(workspace_root, pattern, max_results=max_results, authority=authority)
 
 
 def grep(
@@ -20,6 +22,7 @@ def grep(
     regex: bool = False,
     ignore_case: bool = False,
     context: int = 0,
+    authority: Any = None,
 ) -> dict[str, Any]:
     return grep_files(
         workspace_root,
@@ -30,4 +33,5 @@ def grep(
         regex=regex,
         ignore_case=ignore_case,
         context=context,
+        authority=authority,
     )

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.execution.task_tree import authority_for_action
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.filesystem import (
@@ -37,6 +38,9 @@ class FileWriteExecutor:
                 reason_code="missing_argument:path",
                 summary="File write denied: no path provided.",
             )
+        authority = authority_for_action(
+            self._authority, self._workspace_root, action.origin_session_id or action.session_id
+        )
         try:
             if action.action_type == "edit_file":
                 result = replace_text_content(
@@ -45,7 +49,7 @@ class FileWriteExecutor:
                     str(action.arguments.get("old_text", "")),
                     str(action.arguments.get("new_text", "")),
                     **edit_options(action.arguments),
-                    authority=self._authority,
+                    authority=authority,
                 )
                 if result["status"] != "success":
                     error = result["error"]
@@ -62,7 +66,7 @@ class FileWriteExecutor:
                 )
             text = str(action.arguments.get("text", ""))
             resolved = resolve_writable_workspace_path(
-                self._workspace_root, path, authority=self._authority
+                self._workspace_root, path, authority=authority
             )
             io_resolved = internal_io_path(resolved)
             io_resolved.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +76,7 @@ class FileWriteExecutor:
             # while it reported itself. Ask the authority what the file is
             # called instead; for a workspace file that is the same string.
             rel = (
-                self._authority or PathAuthority(self._workspace_root)
+                authority or PathAuthority(self._workspace_root)
             ).resolve_read(resolved).display
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
@@ -97,10 +101,13 @@ class PatchApplyExecutor:
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         path_value = action.arguments.get("path")
         path = str(path_value) if path_value else None
+        authority = authority_for_action(
+            self._authority, self._workspace_root, action.origin_session_id or action.session_id
+        )
         try:
             result = apply_patch_content(
                 self._workspace_root, path, str(action.arguments.get("patch", "")),
-                authority=self._authority,
+                authority=authority,
             )
             if result["status"] != "success":
                 error = result["error"]

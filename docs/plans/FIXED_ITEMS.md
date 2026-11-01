@@ -1,5 +1,22 @@
 # Fixed items
 
+## File edits and commands worked on two different trees
+
+File tools wrote the real project while commands ran in a copy taken at the
+first command, so a test run missed the edit just made and a formatter's output
+was invisible to the next read. A session now has one task tree. A project
+turn binds its session to the project root, and the first write or command
+takes one copy of the whole project; every read, write, edit, patch, grep,
+glob and command cwd inside the project then resolves into that copy, under
+the same names, policy and confinement as before. The project changes only
+when the owner applies the reviewed copy. An approved write executed after its
+turn follows the conversation's session (`origin_session_id`), so approval
+cannot write around the copy. A link a sandboxed command plants in the copy is
+never followed (`task_copy_link`), and a copy wider than one the session
+already holds is refused (`task_copy_scope_conflict`) instead of splitting the
+work. Turns without a project keep the old behaviour until a command makes a
+copy, then follow it. Covered by `tests/test_task_tree.py`.
+
 ## Windows builds could not run in the AppContainer sandbox
 
 AppContainer blocked Node (`EPERM: lstat 'C:\\'`), Git, MSYS tools and

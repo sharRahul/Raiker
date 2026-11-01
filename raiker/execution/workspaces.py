@@ -409,12 +409,38 @@ def sweep_stale(base: str | Path, *, older_than_seconds: float) -> list[Path]:
     return removed
 
 
-class TaskWorkspaceRegistry:
-    """One disposable copy per (owner, session, source), kept across commands.
+#: One lock per records directory, shared by every registry instance on it: the
+#: broker, the executors and the review API each build their own registry, and
+#: two of them creating overlapping copies at once would split one task's work.
+_REGISTRY_LOCKS: dict[str, threading.RLock] = {}
+_REGISTRY_LOCKS_GUARD = threading.Lock()
 
-    Successive commands in a session see each other's work, and the owner
-    reviews the accumulated change set once. Records live beside the copies in
-    a Raiker-owned directory that no sandbox is granted, never in the project.
+
+def _registry_lock(records: Path) -> threading.RLock:
+    key = os.path.normcase(str(records.resolve()))
+    with _REGISTRY_LOCKS_GUARD:
+        return _REGISTRY_LOCKS.setdefault(key, threading.RLock())
+
+
+def _contains(outer: Path, inner: Path) -> bool:
+    return inner == outer or outer in inner.parents
+
+
+class TaskWorkspaceRegistry:
+    """One disposable copy per (owner, session, task root), kept across a task.
+
+    Successive commands *and file edits* in a session work in the same copy and
+    see each other's work, and the owner reviews the accumulated change set
+    once. A session never holds two copies where one contains the other: that
+    would split one task's work across two trees, so :meth:`acquire` returns the
+    copy that already covers a path and refuses a wider one
+    (``task_copy_scope_conflict``) until the narrower copy is applied or
+    discarded.
+
+    A project turn *binds* its session to the project root (:meth:`bind`), so
+    the first copy is of the whole project whichever tool asks first. Records
+    and bindings live in a Raiker-owned directory that no sandbox is granted,
+    never in the project.
     """
 
     def __init__(self, base: str | Path, *, records: str | Path | None = None) -> None:
@@ -424,7 +450,7 @@ class TaskWorkspaceRegistry:
         # boundary grants it the whole base), records must live elsewhere, or
         # a task could rewrite a record and redirect a promotion.
         self.records = Path(records) if records is not None else self.base
-        self._lock = threading.Lock()
+        self._lock = _registry_lock(self.records)
 
     @classmethod
     def for_workspace(
@@ -450,15 +476,102 @@ class TaskWorkspaceRegistry:
     def acquire(
         self, owner_principal_id: str, session_id: str, source: str | Path
     ) -> tuple[str, TaskWorkspace]:
+        """The session's copy covering *source*, created if there is none.
+
+        The returned copy's ``source`` may be an ancestor of *source*; callers
+        address *source* inside it by its path relative to ``workspace.source``.
+        """
         source_path = Path(source).resolve()
-        key = self.key(owner_principal_id, session_id, source_path)
         with self._lock:
-            existing = self._load(key)
-            if existing is not None and existing[0] == owner_principal_id:
-                return key, existing[1]
+            for key, workspace in self.session_copies(owner_principal_id, session_id):
+                if _contains(workspace.source.resolve(), source_path):
+                    return key, workspace
+                if _contains(source_path, workspace.source.resolve()):
+                    raise WorkspaceError("task_copy_scope_conflict", str(workspace.source))
+            key = self.key(owner_principal_id, session_id, source_path)
             workspace = create_task_workspace(source_path, self.base, session_id)
             self._save(key, owner_principal_id, session_id, workspace)
             return key, workspace
+
+    def covering(
+        self, owner_principal_id: str, session_id: str, path: str | Path
+    ) -> TaskWorkspace | None:
+        """The session's existing copy that contains *path*, without creating one."""
+        target = Path(path).resolve()
+        for _, workspace in self.session_copies(owner_principal_id, session_id):
+            if _contains(workspace.source.resolve(), target):
+                return workspace
+        return None
+
+    def session_copies(
+        self, owner_principal_id: str, session_id: str
+    ) -> list[tuple[str, TaskWorkspace]]:
+        return [
+            (key, workspace)
+            for key, session, workspace in self.entries(owner_principal_id)
+            if session == session_id
+        ]
+
+    def session_owner(self, session_id: str) -> str | None:
+        """Whose task this session is, from its binding or any live copy."""
+        binding = self._load_binding(session_id)
+        if binding is not None:
+            return binding[0]
+        if not self.records.is_dir():
+            return None
+        for record in sorted(self.records.glob("*.json")):
+            loaded = self._load(record.stem)
+            if loaded is not None and loaded[2] == session_id:
+                return loaded[0]
+        return None
+
+    # Session binding: the task root a session's copy is taken from.
+
+    def bind(self, owner_principal_id: str, session_id: str, root: str | Path) -> None:
+        """Record that this session's task is the project at *root*.
+
+        Rebinding is a no-op while the session holds a copy, so a turn that
+        names a different project cannot move work already in progress.
+        """
+        resolved = Path(root).resolve()
+        with self._lock:
+            if self.session_copies(owner_principal_id, session_id):
+                return
+            path = self._binding_path(session_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            staged = path.with_suffix(".tmp")
+            staged.write_text(
+                json.dumps({"owner_principal_id": owner_principal_id, "root": str(resolved)}),
+                encoding="utf-8",
+            )
+            os.replace(staged, path)
+
+    def scope_for(self, owner_principal_id: str, session_id: str, path: str | Path) -> Path:
+        """The folder a copy for *path* should be taken from.
+
+        The session's bound task root when it contains *path*, so every tool
+        lands in one copy of the project; otherwise *path* itself.
+        """
+        target = Path(path).resolve()
+        root = self.bound_root(owner_principal_id, session_id)
+        return root if root is not None and _contains(root, target) else target
+
+    def bound_root(self, owner_principal_id: str, session_id: str) -> Path | None:
+        binding = self._load_binding(session_id)
+        if binding is None or binding[0] != owner_principal_id:
+            return None
+        return binding[1]
+
+    def _binding_path(self, session_id: str) -> Path:
+        digest = hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:32]
+        return self.records / "sessions" / f"{digest}.json"
+
+    def _load_binding(self, session_id: str) -> tuple[str, Path] | None:
+        try:
+            document = json.loads(self._binding_path(session_id).read_text(encoding="utf-8"))
+            return str(document["owner_principal_id"]), Path(str(document["root"]))
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
 
     def load(self, owner_principal_id: str, key: str) -> TaskWorkspace:
         loaded = self._load(key)

@@ -31,6 +31,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -54,6 +55,8 @@ from raiker.storage.internal_paths import internal_io_path
 #: the runtime's own encrypted state; a command that could read it could read
 #: every approval, receipt and credential reference Raiker has.
 PROTECTED_DENY_PATHS = (".raiker",)
+_ACCOUNT_BASE_TTL_SECONDS = 30.0
+_ACCOUNT_BASE_CACHE: dict[str, tuple[float, Path | None]] = {}
 
 #: Workspace-relative paths a command may read but never write. `.git` changes
 #: only through the separately governed git executors. The known consequence:
@@ -303,6 +306,16 @@ class NativeSandboxDriver:
         binary, _ = self.locate()
         if binary is None:
             return None
+        # Every turn and every file action asks; the answer changes only when
+        # the owner runs the elevated setup, so a short-lived answer is enough.
+        cached = _ACCOUNT_BASE_CACHE.get(str(binary))
+        if cached is not None and time.monotonic() - cached[0] < _ACCOUNT_BASE_TTL_SECONDS:
+            return cached[1]
+        base = self._account_base_uncached(binary)
+        _ACCOUNT_BASE_CACHE[str(binary)] = (time.monotonic(), base)
+        return base
+
+    def _account_base_uncached(self, binary: Path) -> Path | None:
         try:
             completed = self._run_probe([str(binary), "--account-status"])
             status = json.loads(completed.stdout.strip() or "{}")
@@ -431,22 +444,28 @@ class NativeSandboxBackend:
     def _in_task_copy(self, request: CommandRequest) -> CommandRequest:
         """The same request, rooted in this session's disposable copy.
 
-        The copy holds only the command's working directory, the least of the
-        project it needs; its parent folders, siblings, `.git` and `.raiker`
+        The copy is the session's task tree: the project root a project turn
+        bound, which the agent's file edits use too, so a command sees every
+        edit made before it. Without a binding it holds only the command's
+        working directory. Its parent folders, siblings, `.git` and `.raiker`
         are not in it at all.
         """
         assert self.workspaces is not None
         root = request.workspace_root.resolve()
-        scope = (root / request.cwd).resolve()
-        if scope != root and root not in scope.parents:
+        cwd = (root / request.cwd).resolve()
+        if cwd != root and root not in cwd.parents:
             raise CommandBackendError("command_cwd_outside_workspace")
+        owner, session = request.owner_principal_id, request.session_id
         try:
             _, workspace = self.workspaces.acquire(
-                request.owner_principal_id, request.session_id, scope
+                owner, session, self.workspaces.scope_for(owner, session, cwd)
             )
         except WorkspaceError as exc:
             raise CommandBackendError(exc.reason_code) from None
-        return dataclasses.replace(request, workspace_root=workspace.root, cwd=".")
+        inside = cwd.relative_to(workspace.source.resolve()).as_posix() or "."
+        if not (workspace.root / inside).is_dir():
+            raise CommandBackendError("command_cwd_not_a_directory")
+        return dataclasses.replace(request, workspace_root=workspace.root, cwd=inside)
 
     def isolation_evidence(self, request: CommandRequest) -> dict[str, Any]:
         """What this run's boundary actually was, separate from host readiness.

@@ -18,6 +18,7 @@ from raiker.checkpoints.service import (
     RESTORE_OP_DELETE,
     CheckpointService,
 )
+from raiker.execution.task_tree import authority_for_action
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.tools.path_authority import PathAuthority, decode_root_path
 
@@ -75,7 +76,12 @@ class CheckpointRestoreExecutor:
             # written and revoked since -- decodes to nothing and is skipped
             # rather than guessed at.
             resolved = decode_root_path(
-                self._authority or PathAuthority(self._workspace_root), path
+                authority_for_action(
+                    self._authority or PathAuthority(self._workspace_root),
+                    self._workspace_root,
+                    action.origin_session_id or action.session_id,
+                ),
+                path,
             )
             if resolved is None:
                 skipped += 1

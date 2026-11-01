@@ -760,3 +760,54 @@ fn the_process_allowance_still_stops_a_run_that_forks_past_it() {
         .unwrap_or_else(|_| panic!("{}", String::from_utf8_lossy(&output.stderr)));
     assert!(started < 20, "the run started all {started} children");
 }
+
+#[test]
+fn a_cgroup_scope_bounds_the_memory_of_the_whole_run_not_each_process() {
+    let runtime = format!("/run/user/{}/bus", unsafe { libc::getuid() });
+    if !std::path::Path::new(&runtime).exists()
+        || !std::path::Path::new("/usr/bin/systemd-run").exists()
+    {
+        eprintln!("no user manager: the rlimits are the bounds on this host");
+        return;
+    }
+    let stamp = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let workspace = Workspace(std::env::temp_dir().join(format!("raiker-linux-cgroup-{stamp}")));
+    std::fs::create_dir(&workspace.0).unwrap();
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    // Three children, each holding 160 MB at once: under any one process's
+    // limit, over a 320 MB limit for the run.
+    let script = "import subprocess, sys\nchild = \"import time; b = b'x' * (160 << 20); time.sleep(3)\"\nprocs = [subprocess.Popen([sys.executable, '-c', child]) for _ in range(3)]\nprint(sum(p.wait() == 0 for p in procs))\n";
+    let run = |memory: u64| {
+        let policy = serde_json::json!({
+            "workspace_root": workspace.0, "cwd": workspace.0,
+            "profile_name": "raiker.cgroup.test", "deadline_seconds": 30,
+            "max_processes": 16, "max_memory_bytes": memory,
+        });
+        let policy_path = workspace.0.join("policy.json");
+        std::fs::write(&policy_path, policy.to_string()).unwrap();
+        let output = output_after_transient_exec_busy(
+            Command::new(&runner)
+                .arg("--policy")
+                .arg(&policy_path)
+                .arg("--")
+                .args(["/usr/bin/python3", "-c", script]),
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse::<u32>()
+            .unwrap_or(0)
+    };
+    assert_eq!(run(2 << 30), 3, "control arm: three children fit in 2 GB");
+    assert!(
+        run(320 << 20) < 3,
+        "the run held more memory than its limit"
+    );
+}

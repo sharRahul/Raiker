@@ -175,6 +175,7 @@ pub fn probe(workspace: &Path) -> Value {
         },
         "network": network,
         "process_tree_stop": descendant == "enforced" && relay,
+        "resource_limits": resource_limits(),
         "pty": false,
         "concurrent_runs": false,
         "observations": {
@@ -297,8 +298,21 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     let mut arguments = arguments;
     #[cfg(target_os = "linux")]
     let filter = linux_filter(&mut arguments)?;
-    let mut command = Command::new(executable);
-    command.args(arguments);
+    #[cfg(target_os = "linux")]
+    let mut command = match cgroup_scope() {
+        Some(scope) => scope.command(policy, &executable, arguments),
+        None => {
+            let mut command = Command::new(executable);
+            command.args(arguments);
+            command
+        }
+    };
+    #[cfg(not(target_os = "linux"))]
+    let mut command = {
+        let mut command = Command::new(executable);
+        command.args(arguments);
+        command
+    };
     #[cfg(target_os = "linux")]
     inherit_linux_filter(&mut command, &filter);
     bound_child(&mut command, policy);
@@ -421,6 +435,73 @@ fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
             }
             Ok(())
         });
+    }
+}
+
+/// Which mechanism bounds a run's memory and process count on this host.
+fn resource_limits() -> &'static str {
+    #[cfg(target_os = "linux")]
+    if cgroup_scope().is_some() {
+        return "cgroup_scope";
+    }
+    "rlimit"
+}
+
+/// A transient systemd scope that holds the whole run: one cgroup with the
+/// run's memory (swap included) and task limits across every process in it,
+/// which per-process rlimits cannot give. Used where the owner's user manager
+/// is running; elsewhere the rlimits are the bounds, and the probe says which.
+#[cfg(target_os = "linux")]
+pub(crate) struct CgroupScope {
+    systemd_run: String,
+    runtime: String,
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn cgroup_scope() -> Option<CgroupScope> {
+    let systemd_run = trusted_system_tool(Path::new("/usr/bin/systemd-run"))?;
+    let runtime = format!("/run/user/{}", unsafe { libc::getuid() });
+    std::fs::metadata(format!("{runtime}/bus")).ok()?;
+    Some(CgroupScope {
+        systemd_run,
+        runtime,
+    })
+}
+
+#[cfg(target_os = "linux")]
+impl CgroupScope {
+    /// `systemd-run --scope` registers itself as the scope and then execs
+    /// bwrap, so the pid, its process group and the inherited seccomp fd are
+    /// the ones the runner already manages. The bus variables it needs are
+    /// unset again before the command starts.
+    fn command(&self, policy: &LaunchPolicy, bwrap: &str, arguments: Vec<String>) -> Command {
+        let mut command = Command::new(&self.systemd_run);
+        command
+            .env("XDG_RUNTIME_DIR", &self.runtime)
+            .env(
+                "DBUS_SESSION_BUS_ADDRESS",
+                format!("unix:path={}/bus", self.runtime),
+            )
+            .args([
+                "--user".to_owned(),
+                "--scope".to_owned(),
+                "--quiet".to_owned(),
+                "--collect".to_owned(),
+                "-p".to_owned(),
+                format!("MemoryMax={}", policy.max_memory_bytes),
+                "-p".to_owned(),
+                "MemorySwapMax=0".to_owned(),
+                "-p".to_owned(),
+                format!("TasksMax={}", policy.max_processes.saturating_add(8)),
+                "--".to_owned(),
+                bwrap.to_owned(),
+                "--unsetenv".to_owned(),
+                "XDG_RUNTIME_DIR".to_owned(),
+                "--unsetenv".to_owned(),
+                "DBUS_SESSION_BUS_ADDRESS".to_owned(),
+            ])
+            .args(arguments);
+        command
     }
 }
 

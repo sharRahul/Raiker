@@ -251,6 +251,25 @@ the default gateway, and hosted CI networks drop that packet, so egress read
 `indeterminate` and every sandboxed command there was refused. It now connects
 to a listener on the host's own outward address for the length of the probe.
 
+## Resource limits, measured (2026-11-01)
+
+**Linux.** Where the owner's systemd user manager runs (its bus is at
+`/run/user/<uid>/bus`), the runner starts `bwrap` through
+`systemd-run --user --scope` with `MemoryMax` (the run's memory limit),
+`MemorySwapMax=0` and `TasksMax`, so one cgroup bounds the whole run rather
+than each process. `systemd-run --scope` execs `bwrap` in place, so the pid,
+process group and seccomp descriptor are unchanged; the bus variables are
+unset before the command starts. Elsewhere the per-process rlimits and the
+in-namespace process limit are the bounds, and the probe's
+`resource_limits` says which (`cgroup_scope` or `rlimit`). Measured in WSL2:
+three children holding 160 MB each all finish under a 2 GB limit and do not
+all finish under 320 MB (`linux_probe.rs`).
+
+**Windows.** The restricted account's Job Object limits are now measured
+with control arms (`windows_account.rs`): a 768 MB allocation succeeds under a
+2 GB limit and fails with `OutOfMemoryException` under 384 MB; a child process
+starts under a limit of 8 and not under 1.
+
 ## Process limit and restart recovery on Linux (2026-11-01)
 
 `max_processes` was applied as `RLIMIT_NPROC` before `bwrap` started. Linux

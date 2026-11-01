@@ -513,7 +513,13 @@ def test_background_and_terminals_need_a_measured_tree_stop(
     assert proof.features.input is terminal
 
 
-def test_an_interactive_run_gets_a_terminal_and_says_so_in_its_policy(tmp_path: Path) -> None:
+def test_an_interactive_run_gets_a_terminal_and_says_so_in_its_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.execution.commands.backends.native as native_backend
+
+    # In-process, so the fake runner sees the launch rather than the supervisor.
+    monkeypatch.setattr(native_backend, "supervisor_supported", lambda: False)
     project = tmp_path / "ws"
     (project / ".raiker").mkdir(parents=True)
     directory = _installed_runner(tmp_path)

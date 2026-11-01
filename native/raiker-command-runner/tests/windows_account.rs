@@ -281,3 +281,80 @@ fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
         String::from_utf8_lossy(&after.stderr)
     );
 }
+
+fn run_limited(copy: &Copy, limits: serde_json::Value, argv: &[&str]) -> std::process::Output {
+    let policy = copy.0.join("policy.json");
+    let mut document = serde_json::json!({
+        "workspace_root": copy.0, "cwd": copy.0,
+        "profile_name": "raiker.account.limits", "deadline_seconds": 60
+    });
+    for (key, value) in limits.as_object().unwrap() {
+        document[key] = value.clone();
+    }
+    std::fs::write(&policy, document.to_string()).unwrap();
+    Command::new(runner())
+        .arg("--policy")
+        .arg(&policy)
+        .arg("--")
+        .args(argv)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn the_job_memory_limit_stops_an_allocation_past_it_and_not_one_inside_it() {
+    let Some(base) = configured() else { return };
+    let copy = copy_under(&base, "memory");
+    let powershell = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe";
+    let allocate = [
+        powershell,
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "$ErrorActionPreference = 'Stop'; $a = New-Object byte[] (768MB); [Array]::Clear($a, 0, $a.Length); 'allocated'",
+    ];
+    // Control arm: the same allocation inside a larger limit succeeds.
+    let roomy = run_limited(
+        &copy,
+        serde_json::json!({"max_memory_bytes": 2u64 << 30}),
+        &allocate,
+    );
+    assert!(
+        String::from_utf8_lossy(&roomy.stdout).contains("allocated"),
+        "control arm failed: {}",
+        String::from_utf8_lossy(&roomy.stderr)
+    );
+    let tight = run_limited(
+        &copy,
+        serde_json::json!({"max_memory_bytes": 384u64 << 20}),
+        &allocate,
+    );
+    assert!(
+        !String::from_utf8_lossy(&tight.stdout).contains("allocated"),
+        "an allocation past the job's memory limit succeeded"
+    );
+}
+
+#[test]
+fn the_job_process_limit_stops_a_child_past_it_and_not_one_inside_it() {
+    let Some(base) = configured() else { return };
+    let copy = copy_under(&base, "processes");
+    let cmd = r"C:\Windows\System32\cmd.exe";
+    let child = [
+        cmd,
+        "/c",
+        r"C:\Windows\System32\whoami.exe && echo child-ran",
+    ];
+    let roomy = run_limited(&copy, serde_json::json!({"max_processes": 8}), &child);
+    assert!(
+        String::from_utf8_lossy(&roomy.stdout).contains("child-ran"),
+        "control arm failed: {}",
+        String::from_utf8_lossy(&roomy.stderr)
+    );
+    // One process: `cmd` itself. Its child cannot start.
+    let tight = run_limited(&copy, serde_json::json!({"max_processes": 1}), &child);
+    assert!(
+        !String::from_utf8_lossy(&tight.stdout).contains("child-ran"),
+        "a child past the job's process limit started"
+    );
+}

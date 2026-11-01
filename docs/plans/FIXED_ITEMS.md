@@ -38597,3 +38597,34 @@ Found live in this round and fixed before it closed: re-applying a listener the 
 **Fixed.** `RateLimitMiddleware` (`raiker/api/security.py`) counts a request that presents a session (a bearer token or the session cookie) in a window of its own, five times wider, per peer. Sign-in, MFA, elevation, recovery and the session mint (`SIGN_IN_PATHS`) stay in the strict window whatever the request carries, so a credential cannot buy more password or code guesses; a forged credential buys only the wider, still bounded, read window and is refused by the auth check. The lock screen says *Too many attempts in the last minute* for a `429` instead of blaming the password.
 
 **Evidence.** `tests/test_api_rest_hardening.py::test_a_signed_in_client_has_a_wider_window_of_its_own` (and the existing limits, adjusted to the two windows); `LoginView.test.ts` (too many attempts); live RT-SEC-07 to RT-SEC-11 in one run with no `429` in the host log.
+
+## FIXED-1275 — Local MCP servers and plugin code could not run at all after host launchers were blocked (native sandbox)
+
+**Severity: High. Area: Execution / MCP / plugins. Status: Fixed 2026-11-01.**
+
+**Observed.** Once host process launchers were blocked, every local stdio MCP session and every plugin entrypoint refused with `native_sandbox_required`, even on hosts whose boundary was enforced.
+
+**Fixed.** Both run in the native sandbox through `raiker/execution/commands/sandboxed_program.py`: the script's folder is copied into a throwaway folder and runs there with no network; output stays bounded while read. Hosts without an enforced boundary still refuse.
+
+**Evidence.** `tests/test_mcp_sandbox.py`, `tests/test_plugin_sandbox.py` (real boundary on Windows 11), the MCP suite (`test_mcp_runtime.py`, `test_mcp_server_secrets.py`, `test_mcp_process_environment.py`, …).
+
+## FIXED-1276 — Commands on Windows' restricted account never received the environment Raiker built for them
+
+**Severity: High. Area: Native sandbox (Windows). Status: Fixed 2026-11-01.**
+
+**Observed.** The account boundary started every command with the account's profile environment only, so `GIT_CONFIG_GLOBAL` (which keeps a planted `.gitconfig` from becoming Git's global configuration), interpreter settings and an MCP server's own secret were dropped.
+
+**Fixed.** The runner overlays its environment on the account's identity and folders, read from the account's `ProfileList` entry; building the block from a logon token failed with `ACCESS_DENIED` while another run held the hive.
+
+**Evidence.** `account_windows.rs` unit test `the_runner_environment_overlays_the_profile_but_not_the_account_identity`; `tests/windows_account.rs` 6/6, three parallel runs; `tests/test_mcp_server_secrets.py` on the real boundary.
+
+## FIXED-1277 — Hosted Linux CI measured egress as indeterminate, so every sandboxed command there refused
+
+**Severity: High. Area: Native sandbox (Linux). Status: Fixed 2026-11-01.**
+
+**Observed.** The probe's egress control arm connected to a closed port on the default gateway; hosted networks drop that packet silently, so the outside arm never answered and `NativeSandboxProof.available` was false on CI.
+
+**Fixed.** The probe listens on the host's own outward (never loopback) address for the length of the measurement; no packet leaves the machine. The gateway remains the fallback without a default route.
+
+**Evidence.** CI "Show the native sandbox measurement" now prints `True … 'egress': 'enforced'`; WSL2 probe `connect_destination` is the host's own address.
+

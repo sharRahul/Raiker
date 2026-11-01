@@ -734,7 +734,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
         return Err("native_sandbox_account_workspace_outside_base".into());
     }
     let password = credential()?;
-    let environment = account_environment(policy, &password)?;
+    let environment = account_environment(&password)?;
     let _grant = CopyGrant::apply(&root, policy.deadline_seconds)?;
     let job = create_job(policy)?;
     restrict_ui(job)?;
@@ -758,10 +758,9 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     let mut command_line = wide(&command_line_for(argv));
     let directory = wide(&policy.cwd.to_string_lossy());
     let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
-    // A null environment is built from the sandbox account's own profile, so
-    // no variable of the owner's — token, path or home — reaches the command.
-    // With filtered egress it is that same profile environment plus the proxy
-    // variables Raiker set for this run (`account_environment`).
+    // The account's own profile environment overlaid with the one Raiker
+    // constructed for this run; the account's identity and folders stay its
+    // own, so the owner's home and temporary folder never reach the command.
     let created = unsafe {
         CreateProcessWithLogonW(
             user.as_ptr(),
@@ -771,9 +770,7 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
             null(),
             command_line.as_mut_ptr(),
             CREATE_SUSPENDED | 0x0000_0400,
-            environment
-                .as_ref()
-                .map_or(null(), |block| block.as_ptr().cast()),
+            environment.as_ptr().cast(),
             directory.as_ptr(),
             &startup,
             &mut information,
@@ -812,23 +809,109 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     Ok(code as i32)
 }
 
-/// The proxy variables a run with filtered egress receives. Only these cross
-/// from Raiker's environment into the account's; nothing else of the owner's.
-const PROXY_VARIABLES: [&str; 6] = [
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "ALL_PROXY",
-    "http_proxy",
-    "https_proxy",
-    "all_proxy",
+/// Variables that name the account itself. The account's own profile values
+/// win, so a run never points at the owner's profile or temporary folder.
+const ACCOUNT_VARIABLES: [&str; 11] = [
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "TEMP",
+    "TMP",
+    "USERNAME",
+    "USERDOMAIN",
+    "USERDOMAIN_ROAMINGPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "LOGONSERVER",
 ];
 
-/// The account's own profile environment plus this run's proxy variables, as a
-/// Unicode environment block; `None` (the profile alone) without egress.
-fn account_environment(policy: &LaunchPolicy, password: &str) -> Result<Option<Vec<u16>>, String> {
-    if policy.network == NetworkPolicy::Denied {
-        return Ok(None);
+/// The account's own profile environment, overlaid with the runner's.
+///
+/// The runner's environment is the one Raiker constructed for this run (the
+/// same one the Linux and macOS boundaries hand the command): Git's config
+/// guards, the interpreter's encoding, a server's own secret, and this run's
+/// proxy variables. It replaces the profile's values except for the account's
+/// identity and folders, which stay the account's.
+fn account_environment(password: &str) -> Result<Vec<u16>, String> {
+    // The account's folders come from its profile entry, which needs no logon:
+    // building a block from a logon token reads the account's registry hive,
+    // and Windows refuses that (ACCESS_DENIED) while another run's process
+    // holds the hive loaded. Without a profile entry yet (before the
+    // account's first run), the logon path builds the block once.
+    match account_profile_dir() {
+        Some(profile) => Ok(encode_environment(merge_environment(
+            account_variables(&profile),
+            std::env::vars(),
+        ))),
+        None => account_environment_once(password),
     }
+}
+
+/// `ProfileImagePath` of the account's entry under `ProfileList`.
+fn account_profile_dir() -> Option<PathBuf> {
+    use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
+    use windows_sys::Win32::System::Registry::{HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ, RegGetValueW};
+    let sid = account_sid(ACCOUNT).ok()?;
+    let mut text: *mut u16 = null_mut();
+    if unsafe { ConvertSidToStringSidW(sid.as_ptr() as PSID, &mut text) } == 0 {
+        return None;
+    }
+    let mut length = 0usize;
+    while unsafe { *text.add(length) } != 0 {
+        length += 1;
+    }
+    let sid_text = String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(text, length) });
+    unsafe { LocalFree(text as HLOCAL) };
+    let key = wide(&format!(
+        r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid_text}"
+    ));
+    let value = wide("ProfileImagePath");
+    let mut buffer = vec![0u16; 1024];
+    let mut size = (buffer.len() * 2) as u32;
+    // REG_EXPAND_SZ is expanded and reported as REG_SZ.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            key.as_ptr(),
+            value.as_ptr(),
+            RRF_RT_REG_SZ,
+            null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    if status != 0 {
+        return None;
+    }
+    let end = buffer
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(buffer.len());
+    let path = PathBuf::from(String::from_utf16_lossy(&buffer[..end]));
+    path.is_absolute().then_some(path)
+}
+
+/// The account's identity and folders, as a logon would set them.
+fn account_variables(profile: &Path) -> Vec<String> {
+    let local = profile.join("AppData").join("Local");
+    let text = |path: &Path| path.to_string_lossy().into_owned();
+    let drive = text(profile).chars().take(2).collect::<String>();
+    let home = text(profile).chars().skip(2).collect::<String>();
+    let domain = std::env::var("COMPUTERNAME").unwrap_or_else(|_| ".".into());
+    vec![
+        format!("USERPROFILE={}", text(profile)),
+        format!("APPDATA={}", text(&profile.join("AppData").join("Roaming"))),
+        format!("LOCALAPPDATA={}", text(&local)),
+        format!("TEMP={}", text(&local.join("Temp"))),
+        format!("TMP={}", text(&local.join("Temp"))),
+        format!("USERNAME={ACCOUNT}"),
+        format!("USERDOMAIN={domain}"),
+        format!("HOMEDRIVE={drive}"),
+        format!("HOMEPATH={home}"),
+    ]
+}
+
+fn account_environment_once(password: &str) -> Result<Vec<u16>, String> {
     let user = wide(ACCOUNT);
     let domain = wide(".");
     let mut secret = wide(password);
@@ -855,7 +938,7 @@ fn account_environment(policy: &LaunchPolicy, password: &str) -> Result<Option<V
         let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
         return Err(format!("native_sandbox_account_environment_failed:{code}"));
     }
-    let mut entries: Vec<String> = Vec::new();
+    let mut profile: Vec<String> = Vec::new();
     let mut cursor = block as *const u16;
     loop {
         let mut length = 0usize;
@@ -865,30 +948,60 @@ fn account_environment(policy: &LaunchPolicy, password: &str) -> Result<Option<V
         if length == 0 {
             break;
         }
-        let entry = String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(cursor, length) });
+        profile.push(String::from_utf16_lossy(unsafe {
+            std::slice::from_raw_parts(cursor, length)
+        }));
         cursor = unsafe { cursor.add(length + 1) };
-        let name = entry.split('=').next().unwrap_or("");
-        if !PROXY_VARIABLES
-            .iter()
-            .any(|known| known.eq_ignore_ascii_case(name))
-        {
-            entries.push(entry);
-        }
     }
     unsafe { DestroyEnvironmentBlock(block) };
-    for name in PROXY_VARIABLES {
-        if let Ok(value) = std::env::var(name) {
-            entries.push(format!("{name}={value}"));
+    Ok(encode_environment(merge_environment(
+        profile,
+        std::env::vars(),
+    )))
+}
+
+fn is_account_variable(name: &str) -> bool {
+    ACCOUNT_VARIABLES
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(name))
+}
+
+/// *profile* entries (`NAME=value`), each replaced by the runner's own value
+/// for that name unless it names the account, plus the runner's other names.
+fn merge_environment(
+    profile: Vec<String>,
+    runner: impl Iterator<Item = (String, String)>,
+) -> Vec<String> {
+    let mut merged: Vec<(String, String)> = profile
+        .into_iter()
+        .filter_map(|entry| {
+            // `=C:=C:\` entries begin with `=`, so the name ends at a later one.
+            let split = entry.char_indices().skip(1).find(|(_, c)| *c == '=')?.0;
+            Some((entry[..split].to_owned(), entry[split + 1..].to_owned()))
+        })
+        .collect();
+    for (name, value) in runner {
+        if name.is_empty() || name.starts_with('=') || is_account_variable(&name) {
+            continue;
         }
+        merged.retain(|(existing, _)| !existing.eq_ignore_ascii_case(&name));
+        merged.push((name, value));
     }
-    entries.sort_by_key(|entry| entry.to_ascii_uppercase());
+    merged.sort_by_key(|(name, _)| name.to_ascii_uppercase());
+    merged
+        .into_iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect()
+}
+
+fn encode_environment(entries: Vec<String>) -> Vec<u16> {
     let mut encoded: Vec<u16> = Vec::new();
     for entry in entries {
         encoded.extend(entry.encode_utf16());
         encoded.push(0);
     }
     encoded.push(0);
-    Ok(Some(encoded))
+    encoded
 }
 
 /// No reaching the owner's windows, clipboard, desktop or session settings.
@@ -1057,4 +1170,27 @@ fn descendant_verdict(pid: u32) -> &'static str {
     }
     unsafe { CloseHandle(handle) };
     if running { "unenforced" } else { "enforced" }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_runner_environment_overlays_the_profile_but_not_the_account_identity() {
+        let profile = vec![
+            r"=C:=C:\".to_owned(),
+            r"PATH=C:\Windows".to_owned(),
+            r"USERPROFILE=C:\Users\RaikerSandbox".to_owned(),
+        ];
+        let runner = vec![
+            ("Path".to_owned(), r"C:\Python313".to_owned()),
+            ("USERPROFILE".to_owned(), r"C:\Users\owner".to_owned()),
+            ("WEATHER_TOKEN".to_owned(), "t".to_owned()),
+        ];
+        let merged = super::merge_environment(profile, runner.into_iter());
+        assert!(merged.contains(&r"=C:=C:\".to_owned()));
+        assert!(merged.contains(&r"Path=C:\Python313".to_owned()));
+        assert!(!merged.iter().any(|entry| entry == r"PATH=C:\Windows"));
+        assert!(merged.contains(&r"USERPROFILE=C:\Users\RaikerSandbox".to_owned()));
+        assert!(merged.contains(&"WEATHER_TOKEN=t".to_owned()));
+    }
 }

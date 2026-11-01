@@ -15,8 +15,8 @@ Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 | --- | --- | --- |
 | `raiker/execution/commands/service.py`, `code_placement.py` | The service routes local-profile commands to the native backend and refuses other non-native profiles. The native backend refuses unavailable boundaries and unsupported background/interactive modes. The earlier router placement logic still describes host execution and needs consolidation. | Verify the native boundary itself, remove contradictory routing and profiles, and test stale approvals and all entry points. `tests/test_native_command_required.py` covers service placement and unavailable-probe refusal, not OS enforcement. |
 | `raiker/execution/commands/backends/container.py`, `raiker/execution/container_tools.py`, `profiles.py` | **Removed.** The `container` profile kind no longer exists. Stored container rows are inert history: the selection resolves to `container_environment_retired`, tools assigned to an enabled retired row are refused (`retired_container_tools`), and Settings lists the row as *retired* so the owner can remove it. | Covered by `tests/test_command_backends.py`, `tests/test_execution_environments.py`, `tests/test_execution_profiles.py`, `tests/test_tool_broker.py`. |
-| `raiker/runtime/executors/containers.py`, `tier4_plugins.py` | **Removed:** `container_execution_cap`, `plugin_sandboxed_runtime_cap`, `plugin_sandbox_image_pull_cap` and their executors. The remaining plugin runtime uses the shared launcher, which refuses with `native_sandbox_required`. | Run plugin code through the broker with bidirectional stdio once disposable workspaces exist. |
-| `raiker/runtime/executors/mcp.py`, `sandbox.py`, `raiker/hooks/handlers/command.py` | Local MCP stdio and the shared legacy `run_command` launcher now refuse execution. Other subprocess sites and their callers remain to be audited. | Trace all callers, distinguish trusted infrastructure from agent-controlled execution, and enforce the broker where required. Test malicious child processes. |
+| `raiker/runtime/executors/containers.py`, `tier4_plugins.py` | **Removed:** `container_execution_cap`, `plugin_sandboxed_runtime_cap`, `plugin_sandbox_image_pull_cap` and their executors. The remaining plugin runtime runs the entrypoint in the native sandbox (`sandbox.run_command` → `sandboxed_program.run_bounded`). | Covered by `tests/test_plugin_sandbox.py` (real boundary) and `tests/test_phase_4_plugin_runtime.py`. |
+| `raiker/runtime/executors/mcp.py`, `sandbox.py`, `raiker/hooks/handlers/command.py` | Local MCP stdio, the plugin launcher and command hooks run in the native sandbox, each holding only its own folder with no network, or refuse with `native_sandbox_required`. Other subprocess sites and their callers remain to be audited. | Trace all callers, distinguish trusted infrastructure from agent-controlled execution, and enforce the broker where required. |
 | `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap installs seccomp; two denied syscalls were measured with control arms in WSL2. Seatbelt uses a narrower runtime and workspace read allowlist, unverified on macOS. | Validate Seatbelt enforcement and toolchain access, additional seccomp restrictions, and resource controls on supported systems. |
 | `native/raiker-command-runner/src/boundary_windows.rs` | Existing Windows boundary requires detailed security and lifecycle review. | Verify AppContainer, ACL cleanup, job limits, process descendants and network denial on supported Windows versions with adversarial control-arm tests. |
 | `raiker/models/conversion.py` | **Docker runner removed.** Conversion refuses with `model_conversion_native_toolchain_required`; preview, provenance and cleanup remain. | Package llama.cpp's converter and quantizer and run them in the native sandbox. |
@@ -217,6 +217,39 @@ These are boundary measurements, not release evidence: native execution remains
 unavailable until disposable workspaces are wired in (see `TO_BE_FIXED.md`).
 The Python suite still has the same 189 pre-migration host-execution failures
 it had before Docker was removed; none are new.
+
+## MCP servers and plugin code (2026-11-01)
+
+A local stdio MCP server and an installed plugin's entrypoint are both an
+interpreter on a workspace script. `raiker/execution/commands/sandboxed_program.py`
+runs either one: the folder holding the script (minus `.git` and `.raiker`,
+at most 20,000 files and 256 MB) is copied into a throwaway folder under the
+copy base, arguments naming a path are rewritten against it (one outside it is
+refused), and the program runs through the runner with no network. Output is
+bounded while it is read, as before. The interpreter is the first on the path
+the sandbox can reach: never one in the project or the owner's home, and on
+Windows only one on the system drive.
+
+Two runner changes came with it. On Windows' restricted account the command
+received the account's profile environment only, so the environment Raiker
+built for the run — Git's `GIT_CONFIG_GLOBAL` guard, an interpreter's encoding,
+an MCP server's own secret — never arrived. It now gets the account's identity
+and folders (from its `ProfileList` entry, no logon needed) overlaid with the
+runner's environment. Building that block from a logon token instead failed
+with `ACCESS_DENIED` whenever another run held the account's hive loaded. On
+Linux, `toolchain_paths` mounts an interpreter's install prefix read-only when
+it lives outside `/usr`, which is where a hosted runner's Python lives.
+
+Measured on Windows 11 (restricted account): an MCP server answered from
+`C:\RaikerSandbox\mcp_…\server` and could not open a project file; a plugin
+entrypoint printed `refused` for the same read; the account tests pass 6/6
+three times in a row in parallel. On WSL2 Ubuntu 24.04 a copied interpreter
+under a prefix outside `/usr` failed unmounted and ran mounted.
+
+The Linux probe also changed: its egress control arm targeted a closed port on
+the default gateway, and hosted CI networks drop that packet, so egress read
+`indeterminate` and every sandboxed command there was refused. It now connects
+to a listener on the host's own outward address for the length of the probe.
 
 ## Allow-listed downloads (2026-11-01)
 

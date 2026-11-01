@@ -121,17 +121,13 @@ def test_an_empty_allowlist_grants_nothing(monkeypatch: pytest.MonkeyPatch) -> N
 
 #: A dependency-free stdio MCP server that reports what it was started with.
 #:
-#: It writes to a file rather than answering with the environment, because the
-#: answer is redacted before it reaches the artifacts — which is correct, and
-#: would make this test assert nothing. The file is the server's own record of
-#: what it saw.
+#: Its tool answers with the names it was started with. The artifacts hold
+#: only redacted metadata, so the answer is read from the content sink; the
+#: server runs in the sandbox and cannot leave a record in the project.
 _ENV_PROBE_SERVER = '''\
 import json
 import os
 import sys
-
-with open(os.path.join(os.path.dirname(__file__), "seen_env.json"), "w") as handle:
-    json.dump(sorted(os.environ), handle)
 
 for line in sys.stdin:
     line = line.strip()
@@ -155,7 +151,7 @@ for line in sys.stdin:
             ]
         }
     else:
-        result = {"content": [{"type": "text", "text": "ok"}]}
+        result = {"content": [{"type": "text", "text": json.dumps(sorted(os.environ))}]}
     sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": message.get("id"), "result": result}) + "\\n")
     sys.stdout.flush()
 '''
@@ -176,13 +172,15 @@ def test_a_real_local_server_never_sees_the_workspace_secret(
     # and not merely "everything that does not look like a key".
     monkeypatch.setenv("RAIKER_MCP_TEST_UNGRANTED", "ungranted")
 
-    connector = McpConnectorExecutor(ws, store)
+    texts: list[str] = []
+    connector = McpConnectorExecutor(ws, store, content_sink=lambda text: texts.append(str(text)))
     result = connector.execute(
-        _action("mcp_list_tools", {"command": ["python", "servers/probe.py"]}), _principal()
+        _action("mcp_call_tool", {"command": ["python", "servers/probe.py"], "tool_name": "probe"}),
+        _principal(),
     )
     assert result.ok is True, result.reason_code
 
-    seen = json.loads((ws / "servers" / "seen_env.json").read_text(encoding="utf-8"))
+    seen = json.loads("".join(texts))
     assert "ANTHROPIC_API_KEY" not in seen
     assert "RAIKER_MCP_TEST_UNGRANTED" not in seen
     # What the owner granted arrived, and so did what any program needs to run.

@@ -29,6 +29,11 @@ pub struct LaunchPolicy {
     pub deny_paths: Vec<String>,
     /// Workspace-relative paths the child may read but never write.
     pub readonly_paths: Vec<String>,
+    /// Absolute folders outside the workspace holding a toolchain the
+    /// command runs (an interpreter's install prefix), mounted read-only.
+    /// Linux only; the other boundaries already read system installs.
+    #[cfg_attr(windows, allow(dead_code))]
+    pub toolchain_paths: Vec<PathBuf>,
     pub network: NetworkPolicy,
     pub pty: bool,
     pub max_processes: u32,
@@ -119,11 +124,13 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
 
     let deadline_seconds = bounded(object.get("deadline_seconds"), 300, 1, 86_400)?;
     let max_cpu_seconds = bounded(object.get("max_cpu_seconds"), deadline_seconds, 1, 86_400)?;
+    let toolchain_paths = toolchain_paths(object.get("toolchain_paths"), &workspace_root)?;
     Ok(LaunchPolicy {
         workspace_root,
         cwd,
         deny_paths: string_list(object.get("deny_paths"))?,
         readonly_paths: string_list(object.get("readonly_paths"))?,
+        toolchain_paths,
         network,
         pty,
         max_processes: bounded(object.get("max_processes"), 64, 1, 4096)? as u32,
@@ -137,6 +144,34 @@ pub fn parse(text: &str) -> Result<LaunchPolicy, &'static str> {
         max_cpu_seconds,
         profile_name,
     })
+}
+
+/// Absolute, plain, never the root, and never the workspace or anything
+/// holding it: a toolchain mount adds a read-only system tree, it does not
+/// re-expose the project the copy exists to keep out of reach.
+fn toolchain_paths(value: Option<&Value>, workspace: &Path) -> Result<Vec<PathBuf>, &'static str> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let entries = value.as_array().ok_or("runner_policy_toolchain_invalid")?;
+    if entries.len() > 16 {
+        return Err("runner_policy_toolchain_invalid");
+    }
+    let mut paths = Vec::new();
+    for entry in entries {
+        let path = PathBuf::from(entry.as_str().ok_or("runner_policy_toolchain_invalid")?);
+        if !path.is_absolute()
+            || path.components().count() < 3
+            || path.components().any(|part| part == Component::ParentDir)
+            || !policy_path_text_safe(&path)
+            || workspace.starts_with(&path)
+            || path.starts_with(workspace)
+        {
+            return Err("runner_policy_toolchain_invalid");
+        }
+        paths.push(path);
+    }
+    Ok(paths)
 }
 
 fn policy_path_text_safe(path: &Path) -> bool {
@@ -248,6 +283,36 @@ fn bounded(value: Option<&Value>, default: u64, low: u64, high: u64) -> Result<u
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_toolchain_mount_is_a_plain_system_tree_never_the_workspace() {
+        let parse = |toolchains: serde_json::Value| {
+            let workspace = if cfg!(windows) {
+                r"C:\work\copy"
+            } else {
+                "/work/copy"
+            };
+            parse(
+                &serde_json::json!({
+                    "workspace_root": workspace, "cwd": workspace,
+                    "profile_name": "raiker.cmd.t", "toolchain_paths": toolchains,
+                })
+                .to_string(),
+            )
+        };
+        let (good, root, holding, inside) = if cfg!(windows) {
+            (r"C:\opt\py", r"C:\", r"C:\work", r"C:\work\copy\venv")
+        } else {
+            ("/opt/py/x64", "/", "/work", "/work/copy/venv")
+        };
+        assert_eq!(
+            parse(serde_json::json!([good])).unwrap().toolchain_paths,
+            vec![PathBuf::from(good)]
+        );
+        for bad in [root, holding, inside, "relative/path"] {
+            assert!(parse(serde_json::json!([bad])).is_err(), "{bad}");
+        }
+    }
+
     use super::*;
 
     #[cfg(unix)]

@@ -101,6 +101,7 @@ pub fn probe(workspace: &Path) -> Value {
         cwd: workspace.clone(),
         deny_paths: vec![".raiker".to_owned()],
         readonly_paths: vec![".git".to_owned()],
+        toolchain_paths: vec![],
         network: NetworkPolicy::Denied,
         pty: false,
         max_processes: 32,
@@ -565,6 +566,14 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
     arguments.push("/dev".to_owned());
     arguments.push("--tmpfs".to_owned());
     arguments.push("/tmp".to_owned());
+    // After the `/usr/local` and `/tmp` masks, so a toolchain installed there is visible
+    // while the rest of `/usr/local` stays hidden.
+    for path in &policy.toolchain_paths {
+        if path.is_dir() {
+            let text = path.to_string_lossy().into_owned();
+            arguments.extend(["--ro-bind".to_owned(), text.clone(), text]);
+        }
+    }
 
     arguments.push("--bind".to_owned());
     arguments.push(root.clone());

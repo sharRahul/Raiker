@@ -124,8 +124,40 @@ def run_bounded_stdio(
     max_stdout: int = MCP_MAX_OUTPUT_BYTES,
     stderr_tail: int = MCP_STDERR_TAIL_BYTES,
 ) -> _BoundedStdio:
-    """Refuse local MCP execution until stdio is supported by the native broker."""
-    raise SandboxError("native_sandbox_required")
+    """Run one stdio session in the native boundary, bounded while it is read.
+
+    The server's folder is copied into a throwaway folder and runs there with
+    no network (:mod:`raiker.execution.commands.sandboxed_program`). A host
+    whose boundary is not enforced refuses with ``native_sandbox_required``;
+    nothing runs on the host instead.
+
+    Raises ``FileNotFoundError`` when the interpreter is not found, and
+    ``OSError`` from spawning, as ``Popen`` does.
+    """
+    from raiker.execution.commands.backends.base import CommandBackendError
+    from raiker.execution.commands.sandboxed_program import ProgramRefused, run_bounded
+
+    try:
+        run = run_bounded(
+            command,
+            payload,
+            workspace=cwd,
+            env=env,
+            timeout=timeout,
+            max_stdout=max_stdout,
+            stderr_tail=stderr_tail,
+            label="mcp",
+        )
+    except CommandBackendError:
+        raise SandboxError("native_sandbox_required") from None
+    except ProgramRefused as refused:
+        raise SandboxError(refused.reason_code) from None
+    return _BoundedStdio(
+        stdout=run.stdout,
+        stderr_tail=run.stderr_tail,
+        overflowed=run.overflowed,
+        timed_out=run.timed_out,
+    )
 
 
 # ── Model Context Protocol revision (BUG-234) ────────────────────────────────

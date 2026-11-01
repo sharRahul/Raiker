@@ -634,3 +634,50 @@ fn an_interactive_run_sees_a_terminal_inside_bubblewrap() {
     assert!(status.success(), "{text}");
     assert!(text.contains("tty True True"), "{text}");
 }
+
+#[test]
+fn a_toolchain_outside_usr_runs_only_when_its_prefix_is_mounted() {
+    let stamp = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    let workspace = Workspace(std::env::temp_dir().join(format!("raiker-linux-toolchain-{stamp}")));
+    std::fs::create_dir(&workspace.0).unwrap();
+    // A prefix outside `/usr`, as a hosted runner's Python is.
+    let prefix = Workspace(std::env::temp_dir().join(format!("raiker-linux-prefix-{stamp}")));
+    std::fs::create_dir_all(prefix.0.join("bin")).unwrap();
+    let interpreter = prefix.0.join("bin").join("python");
+    std::fs::copy("/usr/bin/python3", &interpreter).unwrap();
+    let runner = workspace.0.join("runner");
+    std::fs::copy(env!("CARGO_BIN_EXE_raiker-command-runner"), &runner).unwrap();
+    let run = |toolchains: serde_json::Value| {
+        let policy = serde_json::json!({
+            "workspace_root": workspace.0, "cwd": workspace.0,
+            "profile_name": "raiker.toolchain.test", "deadline_seconds": 15,
+            "max_processes": 4096, "toolchain_paths": toolchains,
+        });
+        let policy_path = workspace.0.join("policy.json");
+        std::fs::write(&policy_path, policy.to_string()).unwrap();
+        output_after_transient_exec_busy(
+            Command::new(&runner)
+                .arg("--policy")
+                .arg(&policy_path)
+                .arg("--")
+                .arg(&interpreter)
+                .args(["-c", "print('ran')"]),
+        )
+    };
+    let without = run(serde_json::json!([]));
+    assert!(!without.status.success(), "an unmounted toolchain ran");
+    let with = run(serde_json::json!([prefix.0]));
+    assert!(
+        with.status.success(),
+        "{}",
+        String::from_utf8_lossy(&with.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&with.stdout).trim(), "ran");
+}

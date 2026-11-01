@@ -31,15 +31,13 @@ from tests.factories import governed_action
 OWNER = "principal_owner"
 TOKEN = "ghp_live-token-for-weather-only"
 
-#: Writes the two variables it was given to a file, then answers its one tool
-#: with the token itself — the server that leaks, which is what redaction is for.
+#: Answers its one tool with the token itself and the names it was started
+#: with — the server that leaks, which is what redaction is for. It runs in the
+#: sandbox, so its answer is the only record of what it saw.
 _PROBE = '''\
 import json
 import os
 import sys
-
-with open(os.path.join(os.path.dirname(__file__), os.environ.get("PROBE_OUT", "seen.json")), "w") as handle:
-    json.dump({"token": os.environ.get("WEATHER_TOKEN"), "names": sorted(os.environ)}, handle)
 
 for line in sys.stdin:
     line = line.strip()
@@ -54,7 +52,8 @@ for line in sys.stdin:
         result = {"tools": [{"name": "leak", "description": "Says its token.",
                              "inputSchema": {"type": "object", "properties": {}}}]}
     elif method == "tools/call":
-        result = {"content": [{"type": "text", "text": "token=" + str(os.environ.get("WEATHER_TOKEN"))}]}
+        seen = {"token": os.environ.get("WEATHER_TOKEN"), "names": sorted(os.environ)}
+        result = {"content": [{"type": "text", "text": "token=" + json.dumps(seen)}]}
     else:
         continue
     sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": message.get("id"), "result": result}) + "\\n")
@@ -92,19 +91,33 @@ def _run(ws: Path, store: SQLiteStore, name: str, action_type: str = "mcp_list_t
     )
 
 
-def test_a_secret_reaches_its_own_server_and_no_other(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _seen(ws: Path, store: SQLiteStore, name: str) -> dict[str, Any]:
+    """What the named server reported it was started with, redacted."""
+    texts: list[str] = []
+    executor = McpConnectorExecutor(ws, store, content_sink=lambda text: texts.append(str(text)))
+    result = executor.execute(
+        governed_action(
+            "mcp_call_tool", principal_id=OWNER, risk_level=RiskLevelValue.MEDIUM,
+            arguments={"command": ["python", f"servers/{name}.py"], "tool_name": "leak"},
+        ),
+        SimpleNamespace(principal_id=OWNER),  # type: ignore[arg-type]
+    )
+    assert result.ok, result.reason_code
+    seen: dict[str, Any] = json.loads("".join(texts).split("token=", 1)[1])
+    return seen
+
+
+def test_a_secret_reaches_its_own_server_and_no_other(ws: Path) -> None:
     service = DashboardService(ws)
     weather = _server(service.store, "weather")
     _server(service.store, "other")
     assert service.set_mcp_server_secret(OWNER, weather, "WEATHER_TOKEN", TOKEN).ok
 
-    monkeypatch.setenv("PROBE_OUT", "seen.json")
-    assert _run(ws, service.store, "weather").ok
-    seen = json.loads((ws / "servers" / "seen.json").read_text(encoding="utf-8"))
-    assert seen["token"] == TOKEN
+    # The value arrived, and was redacted on the way back.
+    seen = _seen(ws, service.store, "weather")
+    assert seen["token"] == REDACTED and "WEATHER_TOKEN" in seen["names"]
 
-    assert _run(ws, service.store, "other").ok
-    seen = json.loads((ws / "servers" / "seen.json").read_text(encoding="utf-8"))
+    seen = _seen(ws, service.store, "other")
     assert seen["token"] is None and "WEATHER_TOKEN" not in seen["names"]
 
 

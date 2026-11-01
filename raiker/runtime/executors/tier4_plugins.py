@@ -87,11 +87,23 @@ def entrypoint_digest_refusal(plugin_id: str, script_path: Path) -> str | None:
 
 
 def plugin_code_runtime(plugin_id: str) -> dict[str, str]:
-    """Report that plugin code execution is blocked pending native isolation."""
-    del plugin_id
+    """Where an installed plugin's own code would run, for its card (BUG-308).
+
+    Never a claim of containment this machine cannot keep: not at all, or in
+    the native sandbox, which refuses to run it when this machine does not
+    enforce the boundary.
+    """
+    if plugin_id not in plugin_runtime_allowlist():
+        return {
+            "where": "not_enabled",
+            "summary": "Raiker does not run this plugin's own code: it is not on your plugin runtime allowlist.",
+        }
     return {
-        "where": "not_enabled",
-        "summary": "Plugin code execution is unavailable until it uses the native sandbox.",
+        "where": "native_sandbox",
+        "summary": (
+            "Its code runs in the native sandbox with only its own folder and no network; "
+            "where this machine does not enforce the sandbox, it does not run."
+        ),
     }
 
 
@@ -615,11 +627,10 @@ class PluginRuntimeExecutor:
       authorizes code execution.
     - Only interpreters on ``_PLUGIN_RUNTIME_INTERPRETERS`` may be launched, and
       only on an entrypoint that resolves inside the workspace root.
-    - Execution is a bounded subprocess (timeout, output caps, workspace cwd) via
-      the shared sandbox — the same isolation posture as ``shell_execution`` /
-      ``process_execution``. It does **not** import plugin modules in-process,
-      grant a network-namespace jail, or return stdout/stderr content: runtime
-      artifacts are metadata only.
+    - Execution is a bounded run in the native sandbox (timeout, output caps),
+      holding only the entrypoint's folder and no network. It does **not**
+      import plugin modules in-process or return stdout/stderr content:
+      runtime artifacts are metadata only.
 
     Every attempt records a ``plugin_execution_records`` row.
     """
@@ -639,8 +650,6 @@ class PluginRuntimeExecutor:
         self._runner: CommandRunner = runner or run_command
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        # The shared launcher below refuses with `native_sandbox_required`
-        # until plugin code runs through the native sandbox broker.
         plugin_id = action.arguments.get("plugin_id")
         entrypoint = action.arguments.get("entrypoint")
         interpreter = action.arguments.get("interpreter", "python" if os.name == "nt" else "python3")
@@ -723,7 +732,7 @@ class PluginRuntimeExecutor:
             capability=self.capability,
             action_id=action.action_id,
             reason_code=None if returncode == 0 else f"plugin_runtime_exit:{returncode}",
-            summary="Installed plugin entrypoint executed in a bounded subprocess; output is not included in runtime artifacts.",
+            summary="Installed plugin entrypoint executed in the native sandbox; output is not included in runtime artifacts.",
             artifacts={
                 "execution_id": record.execution_id,
                 "plugin_id": plugin_id,

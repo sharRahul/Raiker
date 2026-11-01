@@ -34,7 +34,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -430,6 +430,7 @@ class NativeSandboxBackend:
             # answer.
             raise CommandBackendError("native_sandbox_executable_unreachable")
         document = self.driver.policy_document(request)
+        document["toolchain_paths"] = toolchain_mounts(executable, request.workspace_root)
         egress = self._egress_for(original)
         sink = sink or MemoryCommandSink()
         if egress is not None:
@@ -563,6 +564,46 @@ def task_workspace_registry(
 #: than most hooks take, so a hook reuses a measurement this recent; commands
 #: keep probing per run, because their receipts state what was measured.
 _HOOK_PROOF_TTL_SECONDS = 30.0
+#: Interpreters whose install prefix is mounted read-only when it lives
+#: outside `/usr`: a hosted runner's Python, a pyenv or nvm install. Nothing
+#: else is: a tool's prefix in the owner's home can hold its credentials
+#: (`~/.cargo/credentials.toml`), so it needs a governed mount of its own.
+TOOLCHAIN_INTERPRETERS = frozenset({"python", "python3", "pip", "pip3", "node", "npm", "npx"})
+
+
+def toolchain_mounts(executable: str | Path, workspace_root: Path) -> list[str]:
+    """Install prefixes the Linux boundary must mount for *executable* to run.
+
+    `/usr` is always mounted, so an interpreter there needs nothing. One in
+    `/usr/local`, `/opt` or a version manager's folder needs its prefix (the
+    folder above its `bin`), read-only, both as found on the path and after
+    resolving links. Never the home folder itself, nor anything holding the
+    project or inside it; other platforms already read system installs.
+    """
+    if not sys.platform.startswith("linux"):
+        return []
+    path = Path(executable)
+    if path.name not in TOOLCHAIN_INTERPRETERS:
+        return []
+    home = Path.home().resolve()
+    root = workspace_root.resolve()
+    mounts: list[str] = []
+    for candidate in (path.absolute(), path.resolve()):
+        if candidate.parent.name != "bin":
+            continue
+        prefix = candidate.parent.parent
+        usr = Path("/usr")
+        if prefix == usr or (usr in prefix.parents and Path("/usr/local") not in (prefix, *prefix.parents)):
+            continue
+        if len(prefix.parts) < 3 or prefix == home or prefix in home.parents:
+            continue
+        if root == prefix or prefix in root.parents or root in prefix.parents:
+            continue
+        if str(prefix) not in mounts:
+            mounts.append(str(prefix))
+    return mounts
+
+
 _HOOK_PROOFS: dict[str, tuple[float, NativeSandboxProof]] = {}
 
 
@@ -574,6 +615,93 @@ def _recent_proof(driver: NativeSandboxDriver, workspace_root: Path) -> NativeSa
     proof = driver.probe()
     _HOOK_PROOFS[key] = (time.monotonic(), proof)
     return proof
+
+
+class ScratchRun:
+    """A throwaway folder under the copy base, and the runner argv for it.
+
+    The caller fills :attr:`folder` with what the program may see, then asks
+    for :meth:`command`. Nothing else of the project is in reach, and there is
+    no network. The folder and its policy are removed when the context ends.
+    """
+
+    def __init__(self, root: Path, binary: Path, folder: Path, label: str, memory_bytes: int,
+                 timeout_seconds: float) -> None:
+        self.folder = folder
+        self._root = root
+        self._binary = binary
+        self._label = label
+        self._memory_bytes = memory_bytes
+        self._deadline = max(1, int(timeout_seconds) + 5)
+        self._policies: list[Path] = []
+
+    def command(self, argv: list[str], *, cwd: Path | None = None) -> list[str]:
+        """Write this run's policy and return the runner argv for *argv*."""
+        directory = (cwd or self.folder).resolve()
+        if directory != self.folder.resolve() and self.folder.resolve() not in directory.parents:
+            raise CommandBackendError("sandbox_cwd_outside_folder")
+        document = {
+            "workspace_root": str(self.folder),
+            "cwd": str(directory),
+            "profile_name": f"raiker.{self._label}.{hashlib.sha256(self.folder.name.encode()).hexdigest()[:16]}",
+            "deny_paths": list(PROTECTED_DENY_PATHS),
+            "readonly_paths": list(PROTECTED_READONLY_PATHS),
+            "network": "none",
+            "pty": False,
+            "deadline_seconds": self._deadline,
+            "max_cpu_seconds": self._deadline,
+            "max_processes": 64,
+            "max_memory_bytes": self._memory_bytes,
+            "toolchain_paths": toolchain_mounts(argv[0], self.folder) if argv else [],
+        }
+        policies = internal_io_path(self._root / ".raiker" / "command-policies")
+        policies.mkdir(parents=True, exist_ok=True)
+        policy_path = policies / f"{self.folder.name}-{len(self._policies)}.json"
+        policy_path.write_text(json.dumps(document), encoding="utf-8")
+        self._policies.append(policy_path)
+        return [str(self._binary), "--policy", str(policy_path), "--", *argv]
+
+    def environment(self, extra: Mapping[str, str] | None = None) -> dict[str, str]:
+        """The constructed environment, with HOME and the work folder in here."""
+        return sandbox_environment(workspace_root=self.folder, extra=dict(extra or {}))
+
+    def close(self) -> None:
+        for policy in self._policies:
+            with contextlib.suppress(OSError):
+                policy.unlink()
+        shutil.rmtree(self.folder, ignore_errors=True)
+
+
+@contextlib.contextmanager
+def scratch_run(
+    workspace_root: str | Path,
+    label: str,
+    *,
+    timeout_seconds: float,
+    memory_bytes: int = 512 * 1024 * 1024,
+) -> Iterator[ScratchRun]:
+    """A :class:`ScratchRun` for one sandboxed program, removed afterwards.
+
+    Raises :class:`CommandBackendError` when the host's boundary is not
+    enforced, so the caller refuses rather than run the program on the host.
+    """
+    root = Path(workspace_root).resolve()
+    driver = NativeSandboxDriver(root)
+    proof = _recent_proof(driver, root)
+    if not proof.available:
+        raise CommandBackendError(proof.reason_code or "native_sandbox_unavailable")
+    binary, reason = driver.locate()
+    if binary is None:
+        raise CommandBackendError(reason or "native_sandbox_artifact_missing")
+    base = driver.account_base() or task_workspace_registry(root, driver).base
+    base.mkdir(parents=True, exist_ok=True)
+    folder = base / f"{label}_{secrets.token_hex(8)}"
+    folder.mkdir()
+    run = ScratchRun(root, binary, folder, label, memory_bytes, timeout_seconds)
+    try:
+        yield run
+    finally:
+        run.close()
 
 
 def run_sandboxed_program(
@@ -592,53 +720,16 @@ def run_sandboxed_program(
     Raises :class:`CommandBackendError` when the host's boundary is not
     enforced, so a hook is refused rather than run on the host.
     """
-    root = Path(workspace_root).resolve()
-    driver = NativeSandboxDriver(root)
-    proof = _recent_proof(driver, root)
-    if not proof.available:
-        raise CommandBackendError(proof.reason_code or "native_sandbox_unavailable")
-    binary, reason = driver.locate()
-    if binary is None:
-        raise CommandBackendError(reason or "native_sandbox_artifact_missing")
-    base = driver.account_base() or task_workspace_registry(root, driver).base
-    base.mkdir(parents=True, exist_ok=True)
-    run_id = f"hook_{secrets.token_hex(8)}"
-    folder = base / run_id
-    folder.mkdir()
-    try:
-        copied = folder / program.name
+    with scratch_run(workspace_root, "hook", timeout_seconds=timeout_seconds) as run:
+        copied = run.folder / program.name
         shutil.copyfile(program, copied)
         copied.chmod(0o755)
-        deadline = max(1, int(timeout_seconds) + 5)
-        document = {
-            "workspace_root": str(folder),
-            "cwd": str(folder),
-            "profile_name": f"raiker.hook.{hashlib.sha256(run_id.encode()).hexdigest()[:16]}",
-            "deny_paths": list(PROTECTED_DENY_PATHS),
-            "readonly_paths": list(PROTECTED_READONLY_PATHS),
-            "network": "none",
-            "pty": False,
-            "deadline_seconds": deadline,
-            "max_cpu_seconds": deadline,
-            "max_processes": 64,
-            "max_memory_bytes": 512 * 1024 * 1024,
-        }
-        policies = internal_io_path(root / ".raiker" / "command-policies")
-        policies.mkdir(parents=True, exist_ok=True)
-        policy_path = policies / f"{run_id}.json"
-        policy_path.write_text(json.dumps(document), encoding="utf-8")
-        try:
-            return subprocess.run(
-                [str(binary), "--policy", str(policy_path), "--", str(copied), *args],
-                input=stdin,
-                capture_output=True,
-                text=True,
-                env=sandbox_environment(workspace_root=folder),
-                timeout=timeout_seconds,
-                check=False,
-            )
-        finally:
-            with contextlib.suppress(OSError):
-                policy_path.unlink()
-    finally:
-        shutil.rmtree(folder, ignore_errors=True)
+        return subprocess.run(
+            run.command([str(copied), *args]),
+            input=stdin,
+            capture_output=True,
+            text=True,
+            env=run.environment(),
+            timeout=timeout_seconds,
+            check=False,
+        )

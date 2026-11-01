@@ -128,8 +128,50 @@ def run_command(
     env: dict[str, str] | None = None,
     stdin_text: str | None = None,
 ) -> dict[str, Any]:
-    """Refuse legacy host execution until this path uses the native broker."""
-    raise SandboxError("native_sandbox_required")
+    """Run an interpreter on a workspace script inside the native boundary.
+
+    The script's folder is copied into a throwaway folder and runs there with
+    no network (:mod:`raiker.execution.commands.sandboxed_program`); a host
+    whose boundary is not enforced refuses with ``native_sandbox_required``
+    and nothing runs on the host. *env* names the variables granted beyond the
+    sandbox's constructed environment.
+    """
+    from raiker.execution.commands.backends.base import CommandBackendError
+    from raiker.execution.commands.sandboxed_program import ProgramRefused, run_bounded
+
+    root = Path(cwd).resolve() if cwd else Path.cwd().resolve()
+    if allowlist is not None:
+        check_command_allowlist(command, allowlist, workspace_root=root)
+    grant = {"PATH": os.environ.get("PATH", ""), **(env or {})}
+    try:
+        run = run_bounded(
+            list(command),
+            (stdin_text or "").encode("utf-8"),
+            workspace=root,
+            env=grant,
+            timeout=timeout,
+            max_stdout=max_output_bytes,
+            stderr_tail=max_output_bytes,
+            label="plugin",
+        )
+    except CommandBackendError:
+        raise SandboxError("native_sandbox_required") from None
+    except ProgramRefused as refused:
+        raise SandboxError(refused.reason_code) from None
+    except FileNotFoundError:
+        raise SandboxError(f"command_not_found:{command[0]}") from None
+    except OSError as exc:
+        raise SandboxError(f"command_failed:{type(exc).__name__}") from None
+    if run.timed_out:
+        raise SandboxError(f"command_timeout:{timeout}s")
+    return {
+        "returncode": run.returncode if run.returncode is not None else 1,
+        "stdout_bytes": len(run.stdout),
+        "stderr_bytes": run.stderr_bytes,
+        "stdout": run.stdout.decode("utf-8", errors="replace"),
+        "stderr": run.stderr_tail.decode("utf-8", errors="replace"),
+        "truncated": run.overflowed or run.stderr_bytes > max_output_bytes,
+    }
 
 
 # `fetch_url()` and `default_egress_allowlist()` were removed in BUG-232. They

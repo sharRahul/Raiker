@@ -290,3 +290,61 @@ def pending_copy_changes(
         answers.append(entry)
     return answers
 
+
+
+def owner_tree(
+    workspace_root: str | Path, owner_principal_id: str, session_id: str | None
+) -> TaskTree | None:
+    """*owner*'s tree for *session_id*, when that session holds a copy.
+
+    For readers outside a turn (Build's file viewer and Changes pane): only
+    the asking owner's copies are found, so a session id cannot open someone
+    else's work.
+    """
+    if not session_id:
+        return None
+    from raiker.execution.commands.backends.native import task_workspace_registry
+
+    registry = task_workspace_registry(workspace_root)
+    if not registry.session_copies(owner_principal_id, session_id):
+        return None
+    return TaskTree(registry, owner_principal_id, session_id)
+
+
+def copy_changes_under(
+    tree: TaskTree, root: Path, *, max_chars: int = 200_000
+) -> tuple[list[dict[str, str]], str, bool]:
+    """``(entries, diff, diff_truncated)`` of the copy's pending edits under *root*.
+
+    *root* is a real folder (a repository); each entry is ``{"path", "state"}``
+    with the path relative to it and the state ``created``, ``modified`` or
+    ``deleted``. Only what the owner has not applied yet: the project itself
+    is Git's to describe.
+    """
+    from raiker.execution.workspaces import diff_workspace, file_diff
+
+    real_root = root.resolve()
+    entries: list[dict[str, str]] = []
+    texts: list[str] = []
+    for workspace in tree._copies():
+        source = workspace.source.resolve()
+        if not (_within(real_root, source) or _within(source, real_root)):
+            continue
+        diff = diff_workspace(workspace)
+        for state, paths in (
+            ("created", diff.created), ("modified", diff.modified), ("deleted", diff.deleted)
+        ):
+            for relative in paths:
+                real = source / relative
+                if not _within(real_root, real):
+                    continue
+                entries.append({"path": real.relative_to(real_root).as_posix(), "state": state})
+                try:
+                    changed = file_diff(workspace, diff, relative)
+                except WorkspaceError:
+                    continue  # the project side is a link: listed, never read
+                if changed is not None:
+                    texts.append("(binary file differs)\n" if changed.binary else changed.text)
+    entries.sort(key=lambda entry: entry["path"])
+    text = "".join(texts)
+    return entries, text[:max_chars], len(text) > max_chars

@@ -340,14 +340,20 @@ class RuntimeAuthority:
         return outcome
 
     def _snapshot_pre_image(
-        self, capability: str, arguments: dict[str, Any]
+        self, capability: str, arguments: dict[str, Any], session_id: str | None = None
     ) -> tuple[Any, dict[str, Any] | None]:
-        """Return a snapshot plus an honest structured eligibility/outcome."""
+        """Return a snapshot plus an honest structured eligibility/outcome.
+
+        *session_id* is the session whose task copy the write lands in, so the
+        pre-image is read from the copy, not the untouched project file.
+        """
         if not self.capture_service.eligible(capability):
             return None, None
         path = arguments.get("path")
         try:
-            pre_image = self.capture_service.snapshot_pre_image(capability, arguments)
+            pre_image = self.capture_service.snapshot_pre_image(
+                capability, arguments, session_id=session_id
+            )
         except Exception as exc:  # capture cannot block an approved mutation
             reason = self._checkpoint_reason("snapshot", exc)
             return None, self._capture_outcome(
@@ -1798,7 +1804,7 @@ class RuntimeAuthority:
             # and fully isolated — a capture failure must never fail or block the
             # real mutation.
             pre_image, checkpoint_capture = self._snapshot_pre_image(
-                capability, action.arguments
+                capability, action.arguments, action.origin_session_id or action.session_id
             )
             # CR-03 — the one place a service may be told governance already
             # happened. The token lives only for this call.

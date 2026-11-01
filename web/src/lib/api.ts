@@ -980,13 +980,21 @@ export const api = {
   // B13 — the connected repository, one directory at a time and one bounded
   // file at a time. Both are reads through the same path authority a turn
   // writes through, so the explorer can never reach further than the agent can.
-  browseCodeRepo: (repoId: string, path = "") =>
-    contract.browseCodeRepo(repoId, path === "" ? {} : { path }),
-  readCodeRepoFile: (repoId: string, path: string) => contract.readCodeRepoFile(repoId, { path }),
+  // With a session, both read that session's sandbox copy where it holds the
+  // path, so the owner sees the edit they have not applied yet.
+  browseCodeRepo: (repoId: string, path = "", sessionId: string | null = null) =>
+    contract.browseCodeRepo(repoId, {
+      ...(path === "" ? {} : { path }),
+      ...(sessionId ? { session_id: sessionId } : {}),
+    }),
+  readCodeRepoFile: (repoId: string, path: string, sessionId: string | null = null) =>
+    contract.readCodeRepoFile(repoId, { path, ...(sessionId ? { session_id: sessionId } : {}) }),
   // What has changed in the working tree and not yet been committed.
   // The `Changes` tab of Build's artifact pane reads this; it is the same change
   // set a commit would record, because it comes from the same two helpers.
-  readCodeRepoChanges: (repoId: string) => contract.readCodeRepoChanges(repoId),
+  // With a session, `task_copy` lists its sandbox edits not yet applied.
+  readCodeRepoChanges: (repoId: string, sessionId: string | null = null) =>
+    contract.readCodeRepoChanges(repoId, sessionId ? { session_id: sessionId } : {}),
   // BR-D02 — where a Build turn on this repository would run: folder, branch,
   // environment and the fingerprint a turn is bound to. Read-only.
   readCodeRepoTarget: (repoId: string) => contract.readCodeRepoTarget(repoId),

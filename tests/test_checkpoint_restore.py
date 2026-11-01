@@ -614,3 +614,54 @@ def test_restore_of_another_principals_change_is_critical(tmp_path: Path) -> Non
     result = authority.route_action(action, other)
 
     assert result.decision == "needs_human_confirmation"
+
+
+def test_checkpoints_follow_the_session_task_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A task-tree session edits its copy, so pre-images, the restore plan and
+    the restore itself all read and write the copy; the project is untouched."""
+    from raiker.execution.commands.backends import native as native_backend
+    from raiker.execution.workspaces import TaskWorkspaceRegistry
+
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    store.create_session("sess_a", "ws")
+    project = ws / "proj"
+    project.mkdir()
+    (project / "a.txt").write_text("v1", encoding="utf-8")
+    registry = TaskWorkspaceRegistry(tmp_path / "copies", records=tmp_path / "records")
+    registry.bind("principal_owner", "sess_a", project)
+    monkeypatch.setattr(native_backend, "task_workspace_registry", lambda *_a, **_k: registry)
+    checkpoint_id = _checkpoint_at(store, created_at="2000-01-01T00:00:00Z")
+    authority = _authority(ws, store)
+
+    authority.route_action(_write_action(path="proj/a.txt", text="v2"), _human(store))
+    authority.route_action(_write_action(path="proj/a.txt", text="v3"), _human(store))
+    authority.route_action(_write_action(path="proj/b.txt", text="new"), _human(store))
+    [(_, copy)] = registry.session_copies("principal_owner", "sess_a")
+    assert (copy.root / "a.txt").read_text(encoding="utf-8") == "v3"
+
+    # The second write's pre-image is the copy's v2, not the project's v1.
+    entries = store.list_checkpoint_capture_entries(session_id="sess_a")
+    blobs = sorted(
+        authority.capture_service.blob_path(e["pre_image_sha256"]).read_bytes()
+        for e in entries
+        if e["workspace_path"] == "proj/a.txt"
+    )
+    assert blobs == [b"v1", b"v2"]
+
+    # The plan compares against the copy, so both files count as changed.
+    plan = CheckpointService(store).compute_restore_plan(checkpoint_id)
+    files: list[dict[str, object]] = plan["files"]  # type: ignore[assignment]
+    changed = {f["workspace_path"]: f["changed"] for f in files}
+    assert changed == {"proj/a.txt": True, "proj/b.txt": True}
+
+    result = CheckpointRestoreExecutor(ws, store).execute(
+        _restore_action(checkpoint_id), _human(store)
+    )
+    assert result.ok, result.reason_code
+    assert (copy.root / "a.txt").read_text(encoding="utf-8") == "v1"
+    assert not (copy.root / "b.txt").exists()
+    assert (project / "a.txt").read_text(encoding="utf-8") == "v1"
+    assert not (project / "b.txt").exists()

@@ -116,6 +116,9 @@ class RecordStore:
             params.append(created_after)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
+        # Timestamps have whole-second precision and manifest ids are random,
+        # so two writes in one second are told apart by insertion order; a
+        # restore plan relies on finding the earliest.
         rows = self._rows(
             f"""
             SELECT manifest_id, session_id, turn_id, action_id, capability, principal_id,
@@ -123,7 +126,7 @@ class RecordStore:
                    capture_status, created_at
             FROM checkpoint_capture_manifest
             {where}
-            ORDER BY created_at DESC, manifest_id DESC
+            ORDER BY created_at DESC, rowid DESC
             LIMIT ?
             """,
             tuple(params),

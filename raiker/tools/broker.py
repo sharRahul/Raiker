@@ -1233,7 +1233,12 @@ class ToolBroker:
         return failed, decision
 
     def _with_copy_changes(
-        self, result: dict[str, Any], args: list[str] | None, *, with_diffs: bool
+        self,
+        result: dict[str, Any],
+        args: list[str] | None,
+        *,
+        with_diffs: bool,
+        note: str = "Edits in this session's sandbox copy, not yet applied to the project.",
     ) -> dict[str, Any]:
         """Git's answer plus the session's copy, whose edits Git cannot see.
 
@@ -1254,7 +1259,7 @@ class ToolBroker:
             return {
                 **result,
                 "task_copy": {
-                    "note": "Edits in this session's sandbox copy, not yet applied to the project.",
+                    "note": note,
                     "changes": pending,
                 },
             }
@@ -1295,11 +1300,14 @@ class ToolBroker:
                 action.arguments.get("path", "")
             ).lower().endswith((".md", ".markdown")):
                 return {"status": "failed", "error": {"type": "document_path_must_be_markdown"}}
+            # The authority is the turn's: in a task tree the "before" the
+            # owner approves against is the copy's file, where the write lands.
             try:
                 return proposed_write_snapshot(
                     self.workspace_root,
                     str(action.arguments.get("path", ".")),
                     str(action.arguments.get("text", "")),
+                    authority=self.path_authority,
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
@@ -1311,6 +1319,7 @@ class ToolBroker:
                     str(action.arguments.get("old_text", "")),
                     str(action.arguments.get("new_text", "")),
                     **edit_options(action.arguments),
+                    authority=self.path_authority,
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
@@ -1323,12 +1332,23 @@ class ToolBroker:
                 )
             )
         if action.tool_name == "git_commit":
-            return self._with_repository(
-                proposed_commit_snapshot(
-                    self.git_root(),
-                    str(action.arguments.get("message", "")),
-                    action.arguments.get("paths"),
-                )
+            # A commit records the project; edits still in the session's copy
+            # are not in it until the owner applies them, and the owner
+            # approving the commit is told so.
+            return self._with_copy_changes(
+                self._with_repository(
+                    proposed_commit_snapshot(
+                        self.git_root(),
+                        str(action.arguments.get("message", "")),
+                        action.arguments.get("paths"),
+                    )
+                ),
+                None,
+                with_diffs=False,
+                note=(
+                    "Edits in this session's sandbox copy, not yet applied to the project: "
+                    "this commit does not include them until the owner applies the copy."
+                ),
             )
         if action.tool_name == "git_push":
             return self._with_repository(

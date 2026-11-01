@@ -20,7 +20,7 @@ Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 | `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap installs seccomp; two denied syscalls were measured with control arms in WSL2. Seatbelt uses a narrower runtime and workspace read allowlist, unverified on macOS. | Validate Seatbelt enforcement and toolchain access, additional seccomp restrictions, and resource controls on supported systems. |
 | `native/raiker-command-runner/src/boundary_windows.rs` | Existing Windows boundary requires detailed security and lifecycle review. | Verify AppContainer, ACL cleanup, job limits, process descendants and network denial on supported Windows versions with adversarial control-arm tests. |
 | `raiker/models/conversion.py` | **Docker runner removed.** `NativeConversionRunner` runs an owner-installed llama.cpp (`RAIKER_LLAMA_CPP_DIR`) in the native sandbox on Linux: model and toolchain mounted read-only, writes only to a scratch folder, results moved to the output afterwards, provenance names the converter and quantizer by content. Without a toolchain, or off Linux, it refuses by name. | Package llama.cpp with Raiker; Windows and macOS read-only staging. `tests/test_model_conversion_isolation.py` runs a stand-in toolchain through the real boundary. |
-| `raiker/tools/git.py`, `raiker/control/build_worktrees.py`, `raiker/github/local_methods.py` | Git and worktree operations run on the host as trusted infrastructure: Raiker builds every argv, and hooks, fsmonitor and filter drivers are neutralised (see the audit below). | Git tools read the real repository; `git_status` and `git_diff` add the session copy's not-yet-applied edits (`task_copy`), so the agent sees its own work. Commits and branches still act on the project, after the owner applies the copy. |
+| `raiker/tools/git.py`, `raiker/control/build_worktrees.py`, `raiker/github/local_methods.py` | Git and worktree operations run on the host as trusted infrastructure: Raiker builds every argv, and hooks, fsmonitor and filter drivers are neutralised (see the audit below). | Git tools read the real repository; `git_status`, `git_diff` and a commit proposal add the session copy's not-yet-applied edits (`task_copy`), so the agent and the approving owner see them. Commits and branches still act on the project, after the owner applies the copy. |
 | `raiker/app/`, `desktop/src/`, `scripts/` | Launch, update, packaging, setup and test infrastructure; each site is classified in the audit below. | Done: a release refuses a commit unless every platform's native-runner enforcement tests passed on it, and every download is signed keylessly with the repository's GitHub identity and verified before the draft (FIXED-1282). Apple, Authenticode and Linux package identities remain owner secrets, applied when configured. |
 | `.github/workflows/ci.yml`, `scripts/scan_containers.py`, `scripts/scan_images.py`, `containers/**` | **Removed** with the product dependency: the container definition check, the grype image scan, its exception file and both Containerfiles. The native runner job runs on `ubuntu-24.04`, `windows-2025`, `macos-15` and `macos-15-intel`. | Add release-evidence gates that fail packaging when a platform's enforcement tests have not passed. |
 
@@ -98,7 +98,19 @@ host as owner infrastructure.
   handle, so a command racing a file tool remains a residual risk. Git tools
   (`git_status`, `git_diff`) still describe the real repository, since the copy
   has no `.git`; the copy's changes are reviewed through the task-copy review.
-  Checkpoint pre-images are still captured from the real path.
+  **Everything a session reads now sees its copy (2026-11-01).** Checkpoint
+  pre-images, the restore plan's "has it changed since" check and the restore
+  itself go through the session's tree, so a restore rewinds the copy and never
+  writes the project; a write approval previews its *before* from the copy.
+  Build's explorer, file viewer and Changes pane take the session
+  (`?session_id=` on `/api/code/repos/{id}/browse|file|changes`): the viewer
+  reads the copy's file (`source: task_copy`), the explorer lists the copy, and
+  Changes lists the copy's unapplied edits apart from the working tree
+  (`task_copy`), since no commit holds them yet. A commit proposal carries the
+  same list and says the commit leaves them out until the owner applies the
+  copy. Only the asking owner's copies are found. `git_log` stays the project's
+  history: the copy has none of its own. Still open: commits and branches act on
+  the project only, and the link check is not a pinned handle.
 - [ ] Verify Windows AppContainer, macOS Seatbelt and Linux Bubblewrap plus real seccomp enforcement.
 - [ ] Implement and measure resource, network, lifecycle and cleanup controls; report only measured capabilities.
 - [ ] Migrate command, plugin, MCP, scheduled and delegated execution without host fallback.

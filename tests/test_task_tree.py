@@ -258,3 +258,43 @@ def test_git_status_and_diff_show_the_copys_edits_git_cannot_see(tmp_path: Path)
     assert pending_copy_changes(authority, paths=["notes.md"]) == []
     # A plain authority has no copy, and Git's answer stands alone.
     assert pending_copy_changes(PathAuthority(workspace)) == []
+
+
+def test_an_edit_approval_previews_against_the_copy(tmp_path: Path) -> None:
+    """The owner approves an edit against the file it lands in: the copy's."""
+    from raiker.cli.principal_resolver import bootstrap_owner
+    from raiker.contracts.ids import new_id
+    from raiker.contracts.models import ToolAction
+    from raiker.policy.config import StaticPolicyConfig
+    from raiker.policy.engine import PolicyEngine
+    from raiker.storage.sqlite import SQLiteStore
+    from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+
+    workspace = tmp_path / "ws"
+    (workspace / "proj" / "src").mkdir(parents=True)
+    (workspace / "proj" / "src" / "app.py").write_text("print('v1')\n", encoding="utf-8")
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
+    authority = _tree(tmp_path, workspace)
+    write_file_content(workspace, "proj/src/app.py", "print('v2')\n", authority=authority)
+    broker = ToolBroker(
+        workspace_root=workspace,
+        policy_engine=PolicyEngine(StaticPolicyConfig(workspace)),
+        store=SQLiteStore(workspace),
+        principal_id="principal_owner",
+    )
+    broker.path_authority = authority
+
+    preview = broker._approval_preview(
+        ToolAction(
+            new_id("act_"),
+            "edit_file",
+            {"path": "proj/src/app.py", "old_text": "v2", "new_text": "v3"},
+            "medium",
+            True,
+        )
+    )
+
+    assert preview is not None
+    assert preview["before_snapshot"] == "print('v2')\n"
+    assert preview["proposed_text"] == "print('v3')\n"
+    assert (workspace / "proj" / "src" / "app.py").read_text(encoding="utf-8") == "print('v1')\n"

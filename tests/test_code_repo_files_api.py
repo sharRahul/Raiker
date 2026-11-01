@@ -448,3 +448,67 @@ class TestWorkingTreeChanges:
             client.get("/api/code/repos/repo_nope/changes", headers=headers).status_code
             == 404
         )
+
+
+class TestSessionTaskCopy:
+    """A Build session's edits are in its sandbox copy until the owner applies
+    them, so naming the session makes the explorer, the viewer and Changes
+    show the copy; without it (or for a session with no copy) nothing moves."""
+
+    @pytest.fixture
+    def copy_root(
+        self, tmp_path: Path, workspace: Path, repo_id: str, monkeypatch: pytest.MonkeyPatch
+    ) -> Path:
+        from raiker.execution.commands.backends import native as native_backend
+        from raiker.execution.workspaces import TaskWorkspaceRegistry
+
+        registry = TaskWorkspaceRegistry(tmp_path / "copies", records=tmp_path / "records")
+        monkeypatch.setattr(native_backend, "task_workspace_registry", lambda *_a, **_k: registry)
+        _, copy = registry.acquire(OWNER, "ses_build", workspace / "project")
+        (copy.root / "src" / "main.py").write_text("print('edited')\n", encoding="utf-8", newline="")
+        (copy.root / "new.txt").write_text("fresh\n", encoding="utf-8", newline="")
+        (copy.root / "README.md").unlink()
+        return copy.root
+
+    def test_the_viewer_reads_the_sessions_copy(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, copy_root: Path
+    ) -> None:
+        url = f"/api/code/repos/{repo_id}/file"
+        body = client.get(
+            url, params={"path": "src/main.py", "session_id": "ses_build"}, headers=headers
+        ).json()
+        assert (body["text"], body["source"]) == ("print('edited')\n", "task_copy")
+        plain = client.get(url, params={"path": "src/main.py"}, headers=headers).json()
+        assert (plain["text"], plain["source"]) == ("print('hello')\n", "project")
+        gone = client.get(
+            url, params={"path": "README.md", "session_id": "ses_build"}, headers=headers
+        )
+        assert gone.status_code == 404
+        other = client.get(
+            url, params={"path": "src/main.py", "session_id": "ses_other"}, headers=headers
+        ).json()
+        assert other["source"] == "project"
+
+    def test_the_explorer_lists_the_copy(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, copy_root: Path
+    ) -> None:
+        body = client.get(
+            f"/api/code/repos/{repo_id}/browse", params={"session_id": "ses_build"}, headers=headers
+        ).json()
+        names = {entry["name"]: entry for entry in body["entries"]}
+        assert "new.txt" in names and "README.md" not in names
+        assert names["new.txt"]["relative_path"] == "new.txt"
+        assert names["new.txt"]["size_bytes"] == len("fresh\n")
+
+    def test_changes_lists_the_copys_unapplied_edits_apart(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, copy_root: Path
+    ) -> None:
+        url = f"/api/code/repos/{repo_id}/changes"
+        body = client.get(url, params={"session_id": "ses_build"}, headers=headers).json()
+        assert body["task_copy"]["entries"] == [
+            {"path": "README.md", "state": "deleted"},
+            {"path": "new.txt", "state": "created"},
+            {"path": "src/main.py", "state": "modified"},
+        ]
+        assert "+print('edited')" in body["task_copy"]["diff"]
+        assert client.get(url, headers=headers).json()["task_copy"] is None

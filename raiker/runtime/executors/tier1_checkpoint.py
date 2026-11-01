@@ -20,6 +20,7 @@ from raiker.checkpoints.service import (
 )
 from raiker.execution.task_tree import authority_for_action
 from raiker.runtime.executors.base import ExecutionResult
+from raiker.tools.filesystem import FilesystemSafetyError
 from raiker.tools.path_authority import PathAuthority, decode_root_path
 
 if TYPE_CHECKING:
@@ -58,6 +59,7 @@ class CheckpointRestoreExecutor:
             )
 
         capture = service.capture_service()
+        session_id = action.origin_session_id or action.session_id
         files: list[dict[str, object]] = plan.get("files", [])  # type: ignore[assignment]
         restored = 0
         deleted = 0
@@ -75,21 +77,28 @@ class CheckpointRestoreExecutor:
             # a root that is gone -- a folder attached when the checkpoint was
             # written and revoked since -- decodes to nothing and is skipped
             # rather than guessed at.
-            resolved = decode_root_path(
-                authority_for_action(
-                    self._authority or PathAuthority(self._workspace_root),
-                    self._workspace_root,
-                    action.origin_session_id or action.session_id,
-                ),
-                path,
+            authority = authority_for_action(
+                self._authority or PathAuthority(self._workspace_root),
+                self._workspace_root,
+                session_id,
             )
+            resolved = decode_root_path(authority, path)
             if resolved is None:
                 skipped += 1
                 continue
+            tree = getattr(authority, "tree", None)
+            if tree is not None:
+                # A restore is a write: in a session with a task tree it lands
+                # in the copy (made now if need be), never the project itself.
+                try:
+                    resolved = tree.to_copy(tree.to_real(resolved), create=True)
+                except FilesystemSafetyError:
+                    skipped += 1
+                    continue
 
             # Write our own pre-image FIRST so the restore is reversible, tagging
             # it with this restore's action id (capability = checkpoint restore).
-            pre = capture.snapshot_path(path, self.capability)
+            pre = capture.snapshot_path(path, self.capability, session_id=session_id)
             if pre is not None:
                 # BUG-235 — file this restore's own pre-image under the
                 # *conversation* whose checkpoints a later restore plan selects
@@ -98,7 +107,7 @@ class CheckpointRestoreExecutor:
                 # blob and false of every plan that could reach it.
                 capture.commit(
                     pre,
-                    session_id=action.origin_session_id or action.session_id,
+                    session_id=session_id,
                     turn_id=action.turn_id,
                     action_id=action.action_id,
                     principal_id=principal.principal_id,

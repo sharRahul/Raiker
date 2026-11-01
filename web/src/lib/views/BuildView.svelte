@@ -1981,6 +1981,7 @@
       <CodeExplorer
         repoId={activeRepo?.repo_id ?? ""}
         repoLabel={activeRepo?.label ?? ""}
+        {sessionId}
         onclose={() => closeFiles(true)}
         onmention={mentionPath}
         onopen={previewFile}

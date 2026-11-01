@@ -20,15 +20,45 @@ Baseline: `4d7c14dc9161160e10c417a2f3b5b824c1a646fd` on `origin/main`.
 | `native/raiker-command-runner/src/boundary_unix.rs` | Bubblewrap installs seccomp; two denied syscalls were measured with control arms in WSL2. Seatbelt uses a narrower runtime and workspace read allowlist, unverified on macOS. | Validate Seatbelt enforcement and toolchain access, additional seccomp restrictions, and resource controls on supported systems. |
 | `native/raiker-command-runner/src/boundary_windows.rs` | Existing Windows boundary requires detailed security and lifecycle review. | Verify AppContainer, ACL cleanup, job limits, process descendants and network denial on supported Windows versions with adversarial control-arm tests. |
 | `raiker/models/conversion.py` | **Docker runner removed.** `NativeConversionRunner` runs an owner-installed llama.cpp (`RAIKER_LLAMA_CPP_DIR`) in the native sandbox on Linux: model and toolchain mounted read-only, writes only to a scratch folder, results moved to the output afterwards, provenance names the converter and quantizer by content. Without a toolchain, or off Linux, it refuses by name. | Package llama.cpp with Raiker; Windows and macOS read-only staging. `tests/test_model_conversion_isolation.py` runs a stand-in toolchain through the real boundary. |
-| `raiker/tools/git.py`, `raiker/control/build_worktrees.py`, `raiker/github/local_methods.py` | Git and worktree operations spawn processes outside the command backend. | Trace configuration, hooks, external helpers and agent control; confine untrusted execution and protect original projects. |
-| `raiker/app/`, `desktop/src/`, `scripts/` | Launch, update, packaging, setup and test infrastructure spawn processes. | Classify each operation and preserve separately authorized trusted infrastructure. Audit installers and package the verified runner. |
+| `raiker/tools/git.py`, `raiker/control/build_worktrees.py`, `raiker/github/local_methods.py` | Git and worktree operations run on the host as trusted infrastructure: Raiker builds every argv, and hooks, fsmonitor and filter drivers are neutralised (see the audit below). | Git tools read the real repository rather than the session's copy, which has no `.git`; a copy-aware status/diff is open. |
+| `raiker/app/`, `desktop/src/`, `scripts/` | Launch, update, packaging, setup and test infrastructure; each site is classified in the audit below. | Release gates that fail packaging when a platform's enforcement tests have not passed (item 11, needs release credentials). |
 | `.github/workflows/ci.yml`, `scripts/scan_containers.py`, `scripts/scan_images.py`, `containers/**` | **Removed** with the product dependency: the container definition check, the grype image scan, its exception file and both Containerfiles. The native runner job runs on `ubuntu-24.04`, `windows-2025`, `macos-15` and `macos-15-intel`. | Add release-evidence gates that fail packaging when a platform's enforcement tests have not passed. |
 
-Searches also identified process creation in model runtimes, storage probes,
-notifications and desktop tests. Their individual trust boundaries, indirect
-library calls, UI/API entry points, scheduling, delegation and filesystem/network
-operations have not yet been fully traced. This list must not be treated as an
-exhaustive inventory or security assessment.
+## Every place Raiker starts a process (audit, 2026-11-01)
+
+Found by searching the Python package for `subprocess.run`, `Popen`,
+`check_output`, `call`, `os.system`, `os.exec*`, `os.spawn*` and
+`asyncio.create_subprocess_*`, the desktop shell for `child_process`, and the
+runner for `Command::new`. Each site is classified by **who chooses what
+runs**. Agent-reachable code (the model, a task's files, a server or plugin
+the owner allowed) must cross the native boundary; trusted infrastructure runs
+programs Raiker or the owner chose, with arguments Raiker builds.
+
+| Site | What it starts | Who chooses it | Boundary |
+| --- | --- | --- | --- |
+| `execution/commands/backends/native.py`, `runner.py` (`StreamingCommandRunner`) | `raiker-command-runner`, which starts the agent's command | Agent argv, validated by `command_policy` | **Native sandbox** (task copy, no network unless downloads are on) |
+| `execution/commands/supervisor_client.py` | Raiker's own detached supervisor (`python -m raiker.execution.commands.supervisor`), which starts the runner | Raiker | Supervisor is trusted; the command inside it is **native sandbox** |
+| `execution/commands/sandboxed_program.py` | The runner, for a local MCP server or a plugin entrypoint | Owner-allowed server or plugin | **Native sandbox** (its own folder only, no network) |
+| `execution/commands/backends/native.py` `run_sandboxed_program` | The runner, for a command hook | Hook script in the project | **Native sandbox** (the script alone, no network) |
+| `models/conversion.py` `NativeConversionRunner` | The runner, for llama.cpp's converter and quantizer | Owner-installed toolchain | **Native sandbox** (model read-only, Linux only) |
+| `execution/commands/runner.py` (tree stop) | `taskkill` / process-group signals | Raiker, fixed argv | Trusted (stops a sandboxed run) |
+| `execution/commands/backends/remote.py`, `remote_supervisor.py` | `ssh` to an owner-added host; the remote supervisor there | Owner-configured host; agent argv validated | **Remote host's boundary**, not this machine's; the owner chose the host |
+| `tools/git.py` | `git` | Raiker builds every argv | Trusted, hardened: hooks path, fsmonitor and every filter driver neutralised; task copies hold no `.git`, so agent code cannot configure one |
+| `github/local_methods.py` | `gh auth token`, `git credential fill` | Raiker, fixed argv, owner-selected | Trusted (reads the owner's own credential, only when selected) |
+| `models/slot_runtime.py` | `llama-server` / MLX servers on loopback | Owner-installed runtime and model | Trusted owner infrastructure; never handed agent input as code |
+| `models/codex_app_server.py` | The owner's Codex CLI app server | Owner-installed | Trusted owner infrastructure (stdio JSON-RPC) |
+| `notify/approval_notifier.py` | The owner's notification command | Owner configuration; arguments are redacted metadata | Trusted owner configuration; agents edit task copies, never Raiker's settings |
+| `storage/sqlcipher_probe.py` | Raiker's own interpreter, probing SQLCipher | Raiker, fixed argv | Trusted |
+| `execution/windows_authenticode.py` | PowerShell `Get-AuthenticodeSignature` | Raiker, fixed argv | Trusted (verifies a downloaded file) |
+| `app/launcher.py`, `service.py`, `desktop_shell.py`, `desktop_update.py`, `update_handoff.py`, `system_check.py` | The Raiker host, the OS service manager, the desktop window, a verified installer, system queries | Raiker, fixed argv | Trusted infrastructure (installation and lifecycle) |
+| `app/desktop_build.py`, `desktop_smoke.py`, `scripts/` | Build and test tooling | Developer | Not shipped behaviour |
+| `desktop/src/host.ts`, `setup.ts` | The Raiker host and its system check | The desktop shell, fixed argv | Trusted infrastructure |
+| `native/raiker-command-runner` (`Command::new`) | `bwrap`, `sandbox-exec`, `systemd-run --scope`, `CreateProcessWithLogonW`, the probe's own self-test child, `icacls`/PowerShell during account setup | The runner | The boundary itself |
+
+No site runs model-chosen or project-supplied code on the host. The remaining
+work is not a missing boundary but a narrower one: Git operations read the
+real repository (trusted, hardened), and the local model servers run on the
+host as owner infrastructure.
 
 ## Ordered checklist
 

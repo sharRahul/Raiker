@@ -1369,6 +1369,20 @@ export type CommandRunView = {
   cwd: string;
 };
 
+/** Which boundary sandboxed commands use on Windows. */
+export type CommandSandboxRequest = {
+  windows_backend: "account" | "wsl";
+};
+
+/** Which boundary sandboxed commands use, and whether WSL2 is ready. */
+export type CommandSandboxView = {
+  windows_backend: string;
+  applies: boolean;
+  wsl_configured: boolean;
+  wsl_missing: string[];
+  wsl_setup_command: string | null;
+};
+
 export type CommandStopRequested = {
   run_id: string;
   state: string;
@@ -7135,6 +7149,10 @@ export const contract = {
     request<CommandReceiptAnswer>(`/api/command-runs/${encodeURIComponent(runId)}/receipt`),
   stopCommand: (runId: string) =>
     call<CommandStopped>("POST", `/api/command-runs/${encodeURIComponent(runId)}/stop`),
+  getCommandSandbox: () =>
+    request<CommandSandboxView>("/api/command-sandbox"),
+  putCommandSandbox: (body: CommandSandboxRequest) =>
+    call<CommandSandboxView>("PUT", "/api/command-sandbox", { body }),
   listTaskWorkspaces: () =>
     request<TaskWorkspaceList>("/api/command-workspaces"),
   taskWorkspaceFileDiff: (workspaceId: string, query: { path: string }) =>

@@ -6875,6 +6875,69 @@
         "title": "CommandRunView",
         "type": "object"
       },
+      "CommandSandboxRequest": {
+        "additionalProperties": false,
+        "description": "Which boundary sandboxed commands use on Windows.",
+        "properties": {
+          "windows_backend": {
+            "enum": [
+              "account",
+              "wsl"
+            ],
+            "title": "Windows Backend",
+            "type": "string"
+          }
+        },
+        "required": [
+          "windows_backend"
+        ],
+        "title": "CommandSandboxRequest",
+        "type": "object"
+      },
+      "CommandSandboxView": {
+        "description": "Which boundary sandboxed commands use, and whether WSL2 is ready.",
+        "properties": {
+          "applies": {
+            "title": "Applies",
+            "type": "boolean"
+          },
+          "windows_backend": {
+            "title": "Windows Backend",
+            "type": "string"
+          },
+          "wsl_configured": {
+            "title": "Wsl Configured",
+            "type": "boolean"
+          },
+          "wsl_missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Wsl Missing",
+            "type": "array"
+          },
+          "wsl_setup_command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wsl Setup Command"
+          }
+        },
+        "required": [
+          "windows_backend",
+          "applies",
+          "wsl_configured",
+          "wsl_missing",
+          "wsl_setup_command"
+        ],
+        "title": "CommandSandboxView",
+        "type": "object"
+      },
       "CommandStopRequested": {
         "properties": {
           "run_id": {
@@ -40319,6 +40382,61 @@
           }
         },
         "summary": "Stop Command"
+      }
+    },
+    "/api/command-sandbox": {
+      "get": {
+        "operationId": "get_command_sandbox_api_command_sandbox_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandSandboxView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Command Sandbox"
+      },
+      "put": {
+        "description": "The owner's choice; every later command probes and launches with it.\n\nChoosing WSL2 before it is set up is allowed and fails closed: commands\nrefuse (`native_sandbox_wsl_unconfigured`) rather than fall back.",
+        "operationId": "put_command_sandbox_api_command_sandbox_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandSandboxRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandSandboxView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Command Sandbox"
       }
     },
     "/api/command-workspaces": {

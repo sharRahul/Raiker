@@ -374,10 +374,26 @@ is mounted under `/mnt` and no interop socket is named.
 Refused rather than half-supported: downloads (Raiker's proxy socket is on
 Windows, unreachable from the namespace), Windows toolchain mounts, terminals.
 
-Not done: Python does not offer WSL as a choice yet (the copy base, Linux
-argv and environment for a run); the release build does not yet ship the
-Linux runner inside the Windows package; and nothing here has run on a
-Windows machine — it type-checks and lints for `x86_64-pc-windows-gnu`, and
+**Choosing it (2026-11-01).** Settings › Runtime › *Command sandbox* (Windows
+only; `GET/PUT /api/command-sandbox`, audited as
+`command_sandbox_backend_changed`) picks the account (default) or WSL2 for
+*commands*. With WSL2 chosen, the driver probes `--boundary wsl` (requiring
+`seccomp` and `windows_interop` enforced too), task copies live in the
+distribution (`copy_base`), and a command's argv is passed through unchanged
+for the Linux runner to resolve, with no toolchain mounts and no downloads.
+Hooks, MCP servers and plugin code keep the account: they run Windows
+interpreters. Choosing WSL2 before it is set up fails closed. The card shows
+what is missing and the exact `--setup-wsl` command for this install.
+
+**Shipping it.** `scripts/build_native_runner.py --wsl` builds the runner for
+`x86_64-unknown-linux-musl`, statically linked so it runs in any
+distribution, into `raiker/native/wsl-x86_64/` with its digest. The desktop
+package workflow builds it on Linux and the Windows job installs it with
+`--wsl --from`, so it ships in the Windows installer beside the Windows
+runner; the driver digest-checks it (`wsl_runner`).
+
+Not done: a run's environment is not carried into WSL; and nothing here has
+run on a Windows machine — it type-checks and lints for `x86_64-pc-windows-gnu`, and
 the path, policy, `wsl.conf` and interop logic is unit-tested on Linux. To
 measure on a machine with WSL2: is a file Python creates through
 `\\wsl.localhost` owned by `raiker` (writable by the run), does the Linux

@@ -56,6 +56,7 @@ import type {
   TaskWorkspaceView,
   TaskWorkspaceFileDiff,
   CommandEgressView,
+  CommandSandboxView,
   CredentialLifecycleView,
   CriticalApprovalResolved,
   Diagnostic,
@@ -786,6 +787,8 @@ export type { CredentialDeltaView };
 export type { TaskWorkspaceView, TaskWorkspaceFileDiff };
 
 export type { CommandEgressView };
+
+export type { CommandSandboxView };
 
 export type { ModelCapacityEntry };
 

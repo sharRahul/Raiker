@@ -708,6 +708,8 @@ CASES: Cases = {
     ("POST", "/api/command-runs/{run_id}/stop"): _run("/stop"),
     ("GET", "/api/command-egress"): plain("/api/command-egress"),
     ("PUT", "/api/command-egress"): plain("/api/command-egress", {"enabled": True, "domains": ["pypi.org"]}),
+    ("GET", "/api/command-sandbox"): plain("/api/command-sandbox"),
+    ("PUT", "/api/command-sandbox"): plain("/api/command-sandbox", {"windows_backend": "account"}),
     ("GET", "/api/command-workspaces"): _task_copies,
     ("GET", "/api/command-workspaces/{workspace_id}/diff"): _task_copy_diff,
     ("POST", "/api/command-workspaces/{workspace_id}/promote"): _task_copy_promoted,

@@ -116,9 +116,37 @@ jobs:
           path: web/dist
           retention-days: 3
 
+  # The static Linux runner Windows installs into Raiker's WSL2 distribution
+  # (`--setup-wsl --linux-runner`). Windows cannot build it, so it is built
+  # here, statically linked against musl so it runs in any distribution, and
+  # the Windows package job installs this file beside its own runner.
+  wsl-runner:
+    name: WSL2 Linux runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.0.0 (Node 24)
+      - name: Set up Python (build tooling only)
+        # actions/setup-python v6.2.0 (Node 24 runtime)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Build the static Linux runner
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          python scripts/build_native_runner.py --wsl
+          file raiker/native/wsl-x86_64/raiker-command-runner | tee /dev/stderr | grep -q "static"
+      - name: Upload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0 (Node 24)
+        with:
+          name: wsl-linux-runner
+          path: raiker/native/wsl-x86_64/raiker-command-runner
+          retention-days: 3
+
   package:
     name: ${{ matrix.target }}
-    needs: web
+    needs: [web, wsl-runner]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
     strategy:
@@ -159,6 +187,17 @@ jobs:
         run: |
           cargo --version
           python scripts/build_native_runner.py
+      - name: Download the WSL2 Linux runner
+        if: matrix.os == 'windows'
+        # actions/download-artifact v7.0.0, the first release on Node 24 (v5 and v6 run on Node 20)
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0 (Node 24)
+        with:
+          name: wsl-linux-runner
+          path: ${{ runner.temp }}/wsl-runner
+      - name: Bundle the WSL2 Linux runner into the Windows package
+        if: matrix.os == 'windows'
+        run: |
+          python scripts/build_native_runner.py --wsl --from "$RUNNER_TEMP/wsl-runner/raiker-command-runner"
       - name: Install Linux packaging tools
         if: matrix.os == 'linux'
         run: |

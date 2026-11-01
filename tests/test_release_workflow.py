@@ -119,7 +119,7 @@ def test_release_artifact_actions_are_immutable() -> None:
         )
     ]
 
-    assert len(artifact_uses) == 10
+    assert len(artifact_uses) == 12
     assert all(
         re.fullmatch(r"actions/(?:upload|download)-artifact@[0-9a-f]{40}", use)
         for use in artifact_uses
@@ -211,3 +211,17 @@ def test_every_published_download_is_signed_with_the_repository_identity() -> No
         draft = next(step for step in steps if step.startswith("Create the"))
         assert steps.index(sign["name"]) < steps.index(draft)
         assert steps.index("Verify the signatures the way an owner will") < steps.index(draft)
+
+
+def test_the_windows_package_carries_the_static_wsl_linux_runner() -> None:
+    """Item 8 — Windows ships the Linux runner `--setup-wsl` installs into WSL2."""
+    jobs = _workflow(PACKAGE_PATH)["jobs"]
+    build = jobs["wsl-runner"]
+    script = " ".join(step.get("run", "") for step in build["steps"])
+    assert "x86_64-unknown-linux-musl" in script and "--wsl" in script
+    assert "static" in script
+    assert "wsl-runner" in jobs["package"]["needs"]
+    steps = {step.get("name", ""): step for step in jobs["package"]["steps"]}
+    bundle = steps["Bundle the WSL2 Linux runner into the Windows package"]
+    assert bundle["if"] == "matrix.os == 'windows'"
+    assert "--wsl --from" in bundle["run"]

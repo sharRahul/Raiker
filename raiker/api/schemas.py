@@ -1237,6 +1237,12 @@ class CommandEgressRequest(StrictRequest):
     domains: list[str] = Field(default_factory=list, max_length=200)
 
 
+class CommandSandboxRequest(StrictRequest):
+    """Which boundary sandboxed commands use on Windows."""
+
+    windows_backend: Literal["account", "wsl"]
+
+
 class PromoteTaskWorkspaceRequest(StrictRequest):
     """The exact change set the owner reviewed.
 

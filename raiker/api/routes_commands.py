@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends, Query, Request, status
 
 from raiker.api.dependencies import authenticate as _auth
 from raiker.api.dependencies import refusal
-from raiker.api.schemas import CommandEgressRequest, PromoteTaskWorkspaceRequest, serialize_dto
+from raiker.api.schemas import (
+    CommandEgressRequest,
+    CommandSandboxRequest,
+    PromoteTaskWorkspaceRequest,
+    serialize_dto,
+)
 from raiker.api.sessions import ApiSession
 from raiker.api.wire.commands import (
     CommandEgressView,
@@ -21,6 +26,7 @@ from raiker.api.wire.commands import (
     CommandRunList,
     CommandRunState,
     CommandRunView,
+    CommandSandboxView,
     CommandStopped,
     CredentialDeltaDiscarded,
     CredentialDeltaList,
@@ -264,6 +270,82 @@ def put_command_egress(
         {"enabled": settings.enabled, "domain_count": len(settings.domains)},
     )
     view: CommandEgressView = _egress_view(settings)
+    return serialize_dto(view)
+
+
+# ── Which boundary sandboxed commands use (Windows) ─────────────────────────
+
+#: `--wsl-status` fields that must be true, named for the owner when not.
+_WSL_REQUIREMENTS = (
+    "distribution_present",
+    "wsl_conf_current",
+    "runner_installed",
+    "bubblewrap_present",
+)
+
+
+def _sandbox_view(request: Request, choice: str) -> CommandSandboxView:
+    import sys  # noqa: PLC0415
+
+    from raiker.execution.commands.backends.native import NativeSandboxDriver  # noqa: PLC0415
+
+    applies = sys.platform == "win32"
+    driver = NativeSandboxDriver(request.app.state.workspace_root)
+    status = driver.wsl_status() if applies else None
+    runner, _ = driver.locate()
+    linux_runner = driver.wsl_runner() if applies else None
+    setup = (
+        f'"{runner}" --setup-wsl --linux-runner "{linux_runner}" --rootfs <rootfs.tar>'
+        if runner is not None and linux_runner is not None
+        else None
+    )
+    configured = bool(status and status.get("configured") is True)
+    missing = (
+        []
+        if configured or not applies
+        else [name for name in _WSL_REQUIREMENTS if not (status or {}).get(name)]
+    )
+    return {
+        "windows_backend": choice,
+        "applies": applies,
+        "wsl_configured": configured,
+        "wsl_missing": missing,
+        "wsl_setup_command": setup,
+    }
+
+
+@router.get("/api/command-sandbox")
+def get_command_sandbox(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    from raiker.execution.commands.sandbox_backend import load_windows_backend  # noqa: PLC0415
+
+    view: CommandSandboxView = _sandbox_view(
+        request, load_windows_backend(request.app.state.workspace_root)
+    )
+    return serialize_dto(view)
+
+
+@router.put("/api/command-sandbox")
+def put_command_sandbox(
+    body: CommandSandboxRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The owner's choice; every later command probes and launches with it.
+
+    Choosing WSL2 before it is set up is allowed and fails closed: commands
+    refuse (`native_sandbox_wsl_unconfigured`) rather than fall back.
+    """
+    from raiker.execution.commands.sandbox_backend import save_windows_backend  # noqa: PLC0415
+
+    choice = save_windows_backend(request.app.state.workspace_root, body.windows_backend)
+    _audit_workspace(
+        request, auth_data[0].principal_id, "", "command_sandbox_backend_changed",
+        {"windows_backend": choice},
+    )
+    view: CommandSandboxView = _sandbox_view(request, choice)
     return serialize_dto(view)
 
 

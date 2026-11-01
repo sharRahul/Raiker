@@ -13,6 +13,7 @@
   import { onMount } from "svelte";
   import Icon from "../../components/Icon.svelte";
   import CommandDownloads from "./CommandDownloads.svelte";
+  import CommandSandbox from "./CommandSandbox.svelte";
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
   import { api, ApiError } from "../../api";
@@ -418,6 +419,8 @@
     </form>
   </details>
 </section>
+
+<CommandSandbox />
 
 <CommandDownloads />
 

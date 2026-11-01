@@ -362,6 +362,8 @@ EVENT_TYPES = {
     "task_workspace_promoted",
     "task_workspace_discarded",
     "command_egress_changed",
+    # Windows: which boundary sandboxed commands use (account or WSL2).
+    "command_sandbox_backend_changed",
     # BR-D04 — a connected model read an exact patch, or its stored reading of
     # the same patch was returned. Provider, model, fingerprint and counts only.
     "patch_model_review_completed",

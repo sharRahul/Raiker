@@ -90,20 +90,21 @@ class NativeSandboxProof:
         """Capabilities derived from measurements, never from configuration.
 
         Background and interactive runs need the whole process tree to stop
-        when the run is stopped or Raiker exits. Only Bubblewrap measures that
-        today (`descendant_reaped`, and its PID namespace dies with the runner).
-        Windows runs as one restricted account whose grant covers a single
-        copy at a time, so a long run would hold every other command, and
-        `CreateProcessWithLogonW` cannot attach a pseudo-console; macOS cannot
-        yet contain a detached descendant.
+        when the run is stopped or Raiker exits. Bubblewrap measures that
+        (`descendant_reaped`; its PID namespace dies with the runner), and so
+        does the Windows restricted account (a kill-on-close Job Object owns
+        the tree; runs in one copy may overlap, other copies wait). Only
+        Bubblewrap offers a terminal: `CreateProcessWithLogonW` cannot attach
+        a pseudo-console. macOS cannot yet contain a detached descendant.
         """
         tree_stop = self.observations.get("descendant_reaped") == ENFORCED
-        supervised = tree_stop and self.boundary == "bubblewrap"
+        terminal = tree_stop and self.boundary == "bubblewrap"
+        background = tree_stop and self.boundary in {"bubblewrap", "restricted_account"}
         return CommandFeatures(
             shell=False,
-            pty=supervised,
-            background=supervised,
-            input=supervised,
+            pty=terminal,
+            background=background,
+            input=terminal,
             process_tree_stop=tree_stop,
             network_escalation=False,
             filtered_network=False,

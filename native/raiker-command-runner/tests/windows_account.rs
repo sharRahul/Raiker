@@ -208,3 +208,74 @@ fn a_grant_left_on_another_copy_is_revoked_before_a_run_starts() {
     );
     let _ = run;
 }
+
+fn spawn(copy: &Copy, label: &str, deadline: u64, argv: &[&str]) -> std::process::Child {
+    let policy = std::env::temp_dir().join(format!(
+        "raiker-account-{label}-{}.json",
+        std::process::id()
+    ));
+    std::fs::write(
+        &policy,
+        serde_json::json!({
+            "workspace_root": copy.0, "cwd": copy.0,
+            "profile_name": format!("raiker.account.{label}"), "deadline_seconds": deadline
+        })
+        .to_string(),
+    )
+    .unwrap();
+    Command::new(runner())
+        .arg("--policy")
+        .arg(&policy)
+        .arg("--")
+        .args(argv)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap()
+}
+
+#[test]
+fn runs_in_one_copy_overlap_while_another_copy_waits_for_the_grant() {
+    let Some(base) = configured() else { return };
+    let ping = r"C:\Windows\System32\PING.EXE";
+    let cmd = r"C:\Windows\System32\cmd.exe";
+    let first = copy_under(&base, "overlap-a");
+    let second = copy_under(&base, "overlap-b");
+    let long = spawn(&first, "long", 60, &[ping, "-n", "8", "127.0.0.1"]);
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    // Same copy: starts at once beside the long run.
+    let started = std::time::Instant::now();
+    let same = spawn(&first, "same", 30, &[cmd, "/c", "echo same"])
+        .wait_with_output()
+        .unwrap();
+    assert!(
+        same.status.success(),
+        "{}",
+        String::from_utf8_lossy(&same.stderr)
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(4));
+
+    // Another copy: the account may hold only one copy's grant, so a run
+    // whose wait ends before the long run does is refused, never granted.
+    let other = spawn(&second, "other", 2, &[cmd, "/c", "echo other"])
+        .wait_with_output()
+        .unwrap();
+    assert!(!other.status.success());
+    assert!(
+        String::from_utf8_lossy(&other.stderr).contains("native_sandbox_account_busy"),
+        "{}",
+        String::from_utf8_lossy(&other.stderr)
+    );
+    let long = long.wait_with_output().unwrap();
+    assert!(long.status.success());
+    // With the copy's last run gone, the other copy can run.
+    let after = spawn(&second, "after", 30, &[cmd, "/c", "echo after"])
+        .wait_with_output()
+        .unwrap();
+    assert!(
+        after.status.success(),
+        "{}",
+        String::from_utf8_lossy(&after.stderr)
+    );
+}

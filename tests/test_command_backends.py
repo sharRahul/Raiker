@@ -484,20 +484,22 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
 
 
 @pytest.mark.parametrize(
-    ("boundary", "descendant", "supervised"),
+    ("boundary", "descendant", "background", "terminal"),
     (
-        ("bubblewrap", "enforced", True),
+        ("bubblewrap", "enforced", True, True),
         # Without a measured tree stop, a run that outlives its turn could
-        # leave children behind; and the Windows account holds one copy at a
-        # time, while macOS cannot contain a detached descendant yet.
-        ("bubblewrap", "indeterminate", False),
-        ("restricted_account", "enforced", False),
-        ("appcontainer", "enforced", False),
-        ("seatbelt", "enforced", False),
+        # leave children behind. The Windows account's job owns its tree but
+        # cannot attach a pseudo-console; macOS cannot contain a detached
+        # descendant yet.
+        ("bubblewrap", "indeterminate", False, False),
+        ("restricted_account", "enforced", True, False),
+        ("restricted_account", "indeterminate", False, False),
+        ("appcontainer", "enforced", False, False),
+        ("seatbelt", "enforced", False, False),
     ),
 )
-def test_background_and_terminals_need_a_measured_tree_stop_on_bubblewrap(
-    boundary: str, descendant: str, supervised: bool
+def test_background_and_terminals_need_a_measured_tree_stop(
+    boundary: str, descendant: str, background: bool, terminal: bool
 ) -> None:
     proof = NativeSandboxProof(
         available=True,
@@ -506,9 +508,9 @@ def test_background_and_terminals_need_a_measured_tree_stop_on_bubblewrap(
         checked_at="2026-11-01T00:00:00Z",
         observations={"descendant_reaped": descendant},
     )
-    assert proof.features.background is supervised
-    assert proof.features.pty is supervised
-    assert proof.features.input is supervised
+    assert proof.features.background is background
+    assert proof.features.pty is terminal
+    assert proof.features.input is terminal
 
 
 def test_an_interactive_run_gets_a_terminal_and_says_so_in_its_policy(tmp_path: Path) -> None:

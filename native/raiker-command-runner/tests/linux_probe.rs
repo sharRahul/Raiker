@@ -583,7 +583,13 @@ fn an_interactive_run_sees_a_terminal_inside_bubblewrap() {
     std::fs::write(&policy_path, policy.to_string()).unwrap();
     let (mut master, mut slave) = (0, 0);
     let opened = unsafe {
-        libc::openpty(&mut master, &mut slave, std::ptr::null_mut(), std::ptr::null(), std::ptr::null())
+        libc::openpty(
+            &mut master,
+            &mut slave,
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            std::ptr::null(),
+        )
     };
     assert_eq!(opened, 0);
     let stdio = |fd: i32| unsafe { Stdio::from_raw_fd(libc::dup(fd)) };
@@ -591,7 +597,11 @@ fn an_interactive_run_sees_a_terminal_inside_bubblewrap() {
         .arg("--policy")
         .arg(&policy_path)
         .arg("--")
-        .args(["/usr/bin/python3", "-c", "import os; print('tty', os.isatty(0), os.isatty(1))"])
+        .args([
+            "/usr/bin/python3",
+            "-c",
+            "import os; print('tty', os.isatty(0), os.isatty(1))",
+        ])
         .stdin(stdio(slave))
         .stdout(stdio(slave))
         .stderr(stdio(slave))

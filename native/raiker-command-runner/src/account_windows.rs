@@ -455,46 +455,158 @@ fn create_base(owner: &str, account: &str) -> Result<(), String> {
     )
 }
 
-/// Modify on exactly one copy, for exactly one run; revoked on every exit.
+/// Modify on exactly one copy; revoked when its last run ends.
 ///
-/// The grant names the shared account, so it is exclusive only while no other
-/// account run exists. `apply` therefore holds a machine-wide lock for the
-/// whole run, and before granting it revokes any account entry a crashed run
-/// left on another copy, failing closed if one cannot be removed. At most one
-/// copy under the base carries the account's entry at any moment. `_lock` is
-/// the last field, so the grant is revoked before the lock is released.
+/// The grant names the shared account, so it is exclusive only while no run in
+/// another copy exists. Runs in the *same* copy may overlap (a background
+/// server and a test run in one task), and each holds a holder file open with
+/// no sharing for its lifetime; a run in a different copy waits until the last
+/// holder is gone. A crashed run's handle is closed by Windows, so its holder
+/// file becomes deletable and is pruned. Holders and the short lock that
+/// guards them live in the owner's own profile, which the account cannot
+/// write, so sandboxed code cannot forge or remove one. Before granting a new
+/// copy, any account entry a crashed run left on another copy is revoked,
+/// failing closed if one cannot be removed. At most one copy under the base
+/// carries the account's entry at any moment.
 struct CopyGrant {
     root: PathBuf,
     sid: Vec<u8>,
-    _lock: File,
+    state: PathBuf,
+    holder: PathBuf,
+    handle: Option<File>,
+}
+
+/// A stable name for a copy, used to group its holders.
+fn copy_key(root: &Path) -> String {
+    let text = root.to_string_lossy().to_lowercase();
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in text.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// `<owner profile>\AppData\Local\Raiker\account-grant`: the owner's own,
+/// never readable or writable by the sandbox account.
+fn grant_state_dir() -> Result<PathBuf, String> {
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    use windows_sys::Win32::UI::Shell::GetUserProfileDirectoryW;
+    let mut token: HANDLE = null_mut();
+    if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+        return Err("native_sandbox_account_state_failed".into());
+    }
+    let mut buffer = vec![0u16; 1024];
+    let mut size = buffer.len() as u32;
+    let found = unsafe { GetUserProfileDirectoryW(token, buffer.as_mut_ptr(), &mut size) };
+    unsafe { CloseHandle(token) };
+    if found == 0 {
+        return Err("native_sandbox_account_state_failed".into());
+    }
+    let length = buffer
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(buffer.len());
+    let profile = PathBuf::from(String::from_utf16_lossy(&buffer[..length]));
+    let directory = profile
+        .join("AppData")
+        .join("Local")
+        .join("Raiker")
+        .join("account-grant");
+    fs::create_dir_all(directory.join("holders"))
+        .map_err(|_| "native_sandbox_account_state_failed")?;
+    Ok(directory)
+}
+
+/// Remove holder files nobody holds open, then list the live ones' copy keys.
+fn live_holders(holders: &Path) -> Vec<String> {
+    let mut live = Vec::new();
+    if let Ok(entries) = fs::read_dir(holders) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if fs::remove_file(&path).is_ok() {
+                continue; // nobody had it open: a crashed or finished run
+            }
+            if let Some(name) = path.file_name().and_then(|name| name.to_str())
+                && let Some((key, _)) = name.split_once('-')
+            {
+                live.push(key.to_owned());
+            }
+        }
+    }
+    live
 }
 
 impl CopyGrant {
     fn apply(root: &Path, wait_seconds: u64) -> Result<CopyGrant, String> {
+        use std::os::windows::fs::OpenOptionsExt;
         let base = base()?;
-        let lock = exclusive_lock(&base.join(".account-run.lock"), wait_seconds)?;
+        let state = grant_state_dir()?;
         let sid = account_sid(ACCOUNT)?;
         let account = sid.as_ptr() as PSID;
-        let entries = fs::read_dir(&base).map_err(|_| "native_sandbox_account_base_failed")?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path == root || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-                continue;
-            }
-            if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
-                set_entry(&path, account, 0, REVOKE_ACCESS, false)?;
-                if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
-                    return Err("native_sandbox_account_stale_grant".into());
+        let key = copy_key(root);
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(wait_seconds.max(1));
+        loop {
+            {
+                let _guard = exclusive_lock(&state.join(".lock"), 10)?;
+                let live = live_holders(&state.join("holders"));
+                if live.iter().all(|holder| *holder == key) {
+                    if live.is_empty() {
+                        revoke_other_copies(&base, root, account)?;
+                        set_entry(root, account, 0x0013_01bf, SET_ACCESS, false)?;
+                    }
+                    let mut nonce = [0u8; 8];
+                    unsafe {
+                        BCryptGenRandom(
+                            null_mut(),
+                            nonce.as_mut_ptr(),
+                            8,
+                            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+                        )
+                    };
+                    let holder = state
+                        .join("holders")
+                        .join(format!("{key}-{}", u64::from_le_bytes(nonce)));
+                    let handle = fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .share_mode(0)
+                        .open(&holder)
+                        .map_err(|_| "native_sandbox_account_state_failed")?;
+                    return Ok(CopyGrant {
+                        root: root.to_path_buf(),
+                        sid,
+                        state,
+                        holder,
+                        handle: Some(handle),
+                    });
                 }
             }
+            if std::time::Instant::now() >= deadline {
+                return Err("native_sandbox_account_busy".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
         }
-        set_entry(root, account, 0x0013_01bf, SET_ACCESS, false)?;
-        Ok(CopyGrant {
-            root: root.to_path_buf(),
-            sid,
-            _lock: lock,
-        })
     }
+}
+
+/// Revoke any account entry a crashed run left on a copy other than *root*.
+fn revoke_other_copies(base: &Path, root: &Path, account: PSID) -> Result<(), String> {
+    let entries = fs::read_dir(base).map_err(|_| "native_sandbox_account_base_failed")?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path == root || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+            continue;
+        }
+        if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
+            set_entry(&path, account, 0, REVOKE_ACCESS, false)?;
+            if has_explicit_ace(&path, account, ACE_TYPE_ALLOWED)? {
+                return Err("native_sandbox_account_stale_grant".into());
+            }
+        }
+    }
+    Ok(())
 }
 
 /// An exclusively opened lock file. No other process can open it until this
@@ -513,7 +625,7 @@ fn exclusive_lock(path: &Path, wait_seconds: u64) -> Result<File, String> {
         match opened {
             Ok(file) => return Ok(file),
             Err(_) if std::time::Instant::now() < deadline => {
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
             Err(_) => return Err("native_sandbox_account_busy".into()),
         }
@@ -522,13 +634,22 @@ fn exclusive_lock(path: &Path, wait_seconds: u64) -> Result<File, String> {
 
 impl Drop for CopyGrant {
     fn drop(&mut self) {
-        let _ = set_entry(
-            &self.root,
-            self.sid.as_ptr() as PSID,
-            0,
-            REVOKE_ACCESS,
-            false,
-        );
+        // Revoke only when this was the copy's last run; a failure to take
+        // the lock still revokes, because a left-over grant is the worse error.
+        let guard = exclusive_lock(&self.state.join(".lock"), 10);
+        drop(self.handle.take());
+        let _ = fs::remove_file(&self.holder);
+        let key = copy_key(&self.root);
+        if guard.is_err() || !live_holders(&self.state.join("holders")).contains(&key) {
+            let _ = set_entry(
+                &self.root,
+                self.sid.as_ptr() as PSID,
+                0,
+                REVOKE_ACCESS,
+                false,
+            );
+        }
+        drop(guard);
     }
 }
 

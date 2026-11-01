@@ -1,5 +1,19 @@
 # Fixed items
 
+## Windows sandboxed runs were one at a time, so background runs were impossible
+
+The restricted account's grant covered one copy for one run behind a
+machine-wide lock, so a background run would have held every other command.
+Runs in the same copy now overlap (a dev server beside a test run); a run in a
+different copy waits for the copy's last run, so the account still holds at
+most one copy at a time. Each run keeps a holder file open without sharing in
+the owner's profile, which the account cannot write, and a crashed run's holder
+is pruned. Background runs are now offered on Windows. Measured on Windows 11:
+same-copy run started in 1.7 s beside a running one, another copy waited for
+it, no grant was left behind, and killing the runner killed the account's
+process tree. Covered by `native/raiker-command-runner/tests/windows_account.rs`
+and `tests/test_command_backends.py`.
+
 ## Command hooks were refused everywhere
 
 Workspace command hooks refused with `native_sandbox_required` because the only
